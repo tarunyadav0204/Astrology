@@ -342,6 +342,7 @@
   "chat": {
     "chartEssence": "Esencia de la Carta de {{name}}",
     "welcomeMessage": "🌟 ¡Bienvenido {{name}}! Estoy aquí para ayudarte a entender tu carta natal.\n\nToca una pregunta abajo, o pregúntame lo que quieras.",
+    "nativeGateTapInstruction": "Por favor, elige una de las opciones de abajo en lugar de escribir una respuesta.",
     "welcomeSuggestionsTitle": "Prueba a preguntar",
     "insufficientCreditsTitle": "Créditos insuficientes",
     "insufficientCreditsMessage": "Esta pregunta necesita {{cost}} créditos — tienes {{balance}}. Añade créditos para continuar.",

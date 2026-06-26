@@ -342,6 +342,7 @@
   "chat": {
     "chartEssence": "{{name}} 的星盘核心",
     "welcomeMessage": "🌟 欢迎 {{name}}！我在这里帮助您解读出生星盘并提供占星见解。\n\n点击下方问题，或用您自己的话提问。",
+    "nativeGateTapInstruction": "请不要直接输入回复，而是在下方选项中选择一个。",
     "welcomeSuggestionsTitle": "试着问",
     "insufficientCreditsTitle": "积分不足",
     "insufficientCreditsMessage": "此问题需要 {{cost}} 积分 — 您目前有 {{balance}}。请充值以继续解读。",

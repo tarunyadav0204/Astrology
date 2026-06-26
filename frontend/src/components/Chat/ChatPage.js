@@ -1261,10 +1261,12 @@ const ChatPage = ({ onLogin }) => {
                 }
 
                 const status = await res.json();
+                const polledChartInsights = Array.isArray(status?.chart_insights) ? status.chart_insights : [];
                 console.log('[ChatPage] chat-v2 poll', {
                     assistantMessageId,
                     pollCount,
                     status: status?.status,
+                    chartInsightsCount: polledChartInsights.length,
                 });
 
                 if (status.status === 'completed') {
@@ -1296,6 +1298,7 @@ const ChatPage = ({ onLogin }) => {
                                     content,
                                     isProcessing: false,
                                     isTyping: false,
+                                    chartInsights: polledChartInsights,
                                     message_type: status.message_type || 'answer',
                                     intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
                                     gate_metadata: status.gate_metadata || null,
@@ -1341,9 +1344,20 @@ const ChatPage = ({ onLogin }) => {
                             }
                             if (Array.isArray(loadingList) && loadingList.length > 0) {
                                 const next = loadingList[Math.floor(Math.random() * loadingList.length)];
-                                return { ...m, loadingMessage: next, isProcessing: true, isTyping: true };
+                                return {
+                                    ...m,
+                                    loadingMessage: next,
+                                    isProcessing: true,
+                                    isTyping: true,
+                                    chartInsights: polledChartInsights.length > 0 ? polledChartInsights : m.chartInsights,
+                                };
                             }
-                            return { ...m, isProcessing: true, isTyping: true };
+                            return {
+                                ...m,
+                                isProcessing: true,
+                                isTyping: true,
+                                chartInsights: polledChartInsights.length > 0 ? polledChartInsights : m.chartInsights,
+                            };
                         })
                     );
 

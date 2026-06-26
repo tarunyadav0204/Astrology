@@ -342,6 +342,7 @@
   "chat": {
     "chartEssence": "{{name}}s Horoskop-Kern",
     "welcomeMessage": "🌟 Willkommen {{name}}! Ich helfe dir, dein Geburtshoroskop zu verstehen.\n\nTippe auf eine Frage unten oder stelle mir deine eigene Frage.",
+    "nativeGateTapInstruction": "Bitte wähle eine der untenstehenden Optionen, anstatt eine Antwort zu tippen.",
     "welcomeSuggestionsTitle": "Frag zum Beispiel",
     "insufficientCreditsTitle": "Nicht genug Credits",
     "insufficientCreditsMessage": "Diese Frage benötigt {{cost}} Credits — du hast {{balance}}. Füge Credits hinzu, um fortzufahren.",

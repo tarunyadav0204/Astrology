@@ -342,6 +342,7 @@
   "chat": {
     "chartEssence": "Essence du thème de {{name}}",
     "welcomeMessage": "🌟 Bienvenue {{name}} ! Je suis là pour vous aider à comprendre votre thème natal.\n\nTouchez une question ci-dessous, ou posez-moi votre propre question.",
+    "nativeGateTapInstruction": "Veuillez choisir l'une des options ci-dessous au lieu de taper une réponse.",
     "welcomeSuggestionsTitle": "Essayez de demander",
     "insufficientCreditsTitle": "Crédits insuffisants",
     "insufficientCreditsMessage": "Cette question nécessite {{cost}} crédits — vous en avez {{balance}}. Ajoutez des crédits pour continuer.",

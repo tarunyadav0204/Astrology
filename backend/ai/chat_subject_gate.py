@@ -164,8 +164,10 @@ STRICT RULES:
 - If uncertain, return gate_required=false so the normal chat can continue.
 - Return a gate only when answering with the currently selected profile would likely be wrong or materially incomplete.
 - Write ALL user-facing text in the same language/script as the user's question when you can infer it naturally. This includes user_message and option labels.
-- If previous user choices show the user already chose selected-chart-only for the same referenced person or same exact relation in this chat, return gate_required=false for follow-up questions about that same person/relation. Do not apply that memory to a different person or different relation.
+- When gate_required=true, user_message must explicitly tell the user to choose/tap one of the options shown below instead of typing a reply. Say this naturally in the same language/script as the user's question.
+- If previous user choices show the user already chose selected-chart-only for the same referenced person or same exact relation in this chat, you may return gate_required=false only for a clear follow-up continuation of that same unresolved gate topic. Do not suppress a new gate for a fresh standalone question just because the relation is the same.
 - In previous user choices, `relation_to_user` is the exact remembered relation/context; `relation_family` is broad metadata only. Never use `relation_family` alone to suppress a new gate. For example, a prior choice about "elder sister" or "sister" must not suppress a new gate for "brother"; a prior choice about "sibling" must not suppress sister/brother unless the new question explicitly references the same exact sibling context.
+- For spouse / wife / husband / partner relationship questions, default to partnership_offer unless this is clearly just a direct continuation of the immediately prior selected-chart-only path for the same exact topic.
 
 Currently selected birth profile:
 {json.dumps(_compact_birth_details(birth_details), ensure_ascii=False)}
@@ -182,7 +184,7 @@ When to gate:
    If the user is mainly asking about another specific person's own life area, gate to create_subject_chart or complete_subject_birth_details.
    This applies even when the user has NOT provided that person's birth details yet. The UX must suggest creating/selecting that person's chart instead of answering from the selected native's chart.
    Life areas include health, career, marriage, relationship, mental state, education, money, timing, future, problems, remedies, and similar personal matters.
-   user_message should explain: for blood relations, the selected chart can still be useful; for friends, colleagues, partners, or other independent people, their own chart is strongly recommended if accurate birth date, birth time, and birth place are available; then ask the user to choose how to continue.
+   user_message should explain: for blood relations, the selected chart can still be useful; for friends, colleagues, partners, or other independent people, their own chart is strongly recommended if accurate birth date, birth time, and birth place are available; then ask the user to choose how to continue by tapping one of the options below.
    Example: "my friend was born on 12 Jan 1994 at 4pm in Delhi, tell me about his career" -> create_subject_chart.
    Example: "How will my friend's health be?" -> create_subject_chart.
    Example: "Mere dost ki tabiyat kab thik hogi?" -> create_subject_chart.
@@ -191,7 +193,7 @@ When to gate:
    This is mandatory for relationship/dynamics wording such as "my relationship with...", "bond with...", "compatibility with...", "equation with...", "will we get along...", or equivalent phrasing in any language, including blood relations such as sister, brother, father, mother, child, spouse, and in-laws.
    Do NOT return gate_required=false merely because blood relations can be partially judged from the selected native's chart. For relationship/dynamics questions, the UX should still offer Partnership Analysis as the more complete option while allowing the user to continue from the selected chart.
    This applies even when the other person's birth details are not yet provided: the UX should offer combined-chart Partnership Analysis if the user knows those details, or let them continue with a general single-chart answer if they do not.
-   user_message should explain that combined-chart Partnership Analysis is best when accurate birth details are available, while the user may continue with the selected chart if they do not have those details.
+   user_message should explain that combined-chart Partnership Analysis is best when accurate birth details are available, while the user may continue with the selected chart if they do not have those details; and ask them to tap one of the options below.
    If the other person is a repeatable blood relation where house selection also needs ordinal/role context (for example sister/brother/child/spouse), still use partnership_offer for relationship/dynamics questions, but also fill relationship_setup.required=true with options like elder sister / younger sister or 1st child / 2nd child. This lets the UX offer both: quick single-chart context and optional combined-chart Partnership Analysis.
    For parent relationship/dynamics questions such as father or mother, use partnership_offer even though ordinal setup is usually not needed.
    Example: "will I marry this person, born..." -> partnership_offer.
@@ -204,7 +206,7 @@ When to gate:
    Use relationship_setup alone for questions about the other person's life area through the selected chart, not for relationship/compatibility/dynamics between the selected native and that person.
    Examples: daughter/son/child health or future may need first/second/third child; sibling questions may need elder/younger; spouse questions may need first/second marriage where relevant.
    Relationship setup must NEVER be used to ask the broad relation category. Do not offer options like "friend, sibling, partner, colleague". Only ask for ordinal/role context within a relation the user already stated, such as "1st daughter / 2nd daughter" or "elder brother / younger brother".
-   user_message should ask for that exact ordinal/role context in the user's language.
+   user_message should ask for that exact ordinal/role context in the user's language and tell the user to tap one of the options below instead of typing.
 
 When NOT to gate:
 - The user asks about the selected native's own life, feelings, career, marriage, health, timing, or general distress.
@@ -253,3 +255,113 @@ Return ONLY valid JSON:
         except Exception as exc:
             logger.warning("chat subject gate failed; continuing normal chat: %s", exc)
             return {"gate_required": False, "intent_gate": "none", "reason": "gate_failed"}
+
+    async def resolve_pending_gate_reply(
+        self,
+        *,
+        pending_gate: Dict[str, Any],
+        user_message: str,
+        birth_details: Dict[str, Any] | None,
+        partner_birth_details: Dict[str, Any] | None = None,
+        language: str = "english",
+    ) -> Dict[str, Any]:
+        gate_intent = str((pending_gate or {}).get("intent_gate") or "none").strip()
+        if gate_intent not in GATE_INTENTS:
+            return {"action": "treat_as_new_question", "reason": "no_valid_pending_gate"}
+
+        if isinstance(partner_birth_details, dict):
+            partner_name = str(partner_birth_details.get("name") or "").strip()
+            partner_date = str(partner_birth_details.get("date") or "").strip()
+            partner_time = str(partner_birth_details.get("time") or "").strip()
+            partner_place = str(partner_birth_details.get("place") or "").strip()
+            if partner_name and partner_date and partner_time and partner_place:
+                return {"action": "start_partnership", "reason": "partner_birth_details_already_present"}
+
+        prompt = f"""
+You are resolving a pending astrology chat gate reply.
+
+Goal:
+- The previous assistant turn was a gate, not a final answer.
+- Decide what the user's latest free-text reply means in relation to that pending gate.
+- This is session-state resolution, not astrology analysis.
+
+STRICT RULES:
+- Work semantically across languages.
+- Do not depend on yes/no keywords.
+- Do not ask a fresh astrology clarification here.
+- Prefer treating the message as a gate reply when it is plausibly continuing that exact gate.
+- Use `treat_as_new_question` only when the user clearly moved to a fresh unrelated question.
+- Return only JSON.
+
+Selected chart:
+{json.dumps(_compact_birth_details(birth_details), ensure_ascii=False)}
+
+Pending gate metadata:
+{json.dumps(pending_gate, ensure_ascii=False)}
+
+Partner birth details already supplied in request:
+{json.dumps(partner_birth_details or {}, ensure_ascii=False)}
+
+User language preference:
+{language}
+
+Latest user message:
+{user_message}
+
+Allowed actions:
+- continue_selected_chart
+- start_partnership
+- need_relationship_context
+- need_other_person_chart
+- need_partner_birth_details
+- repeat_gate
+- treat_as_new_question
+
+Use these meanings:
+- continue_selected_chart:
+  The user is continuing with the selected chart only, or is asking the same gate-bound question in a way that should proceed with the selected chart.
+- start_partnership:
+  The user wants the combined-chart / partnership path.
+- need_relationship_context:
+  The user is still in the gate path, but exact relation-order context is still missing.
+- need_other_person_chart:
+  The user still needs the other person's own chart/profile path.
+- need_partner_birth_details:
+  The user wants partnership analysis, but birth details are still missing.
+- repeat_gate:
+  The user is still replying to the gate, but the safest move is to restate the gate choices more clearly.
+- treat_as_new_question:
+  The latest message is clearly a fresh unrelated question and should bypass the old gate.
+
+Return only JSON:
+{{
+  "action": "one_of_the_allowed_actions",
+  "confidence": "high" or "medium" or "low",
+  "reason": "short internal reason"
+}}
+"""
+        try:
+            response = await asyncio.wait_for(
+                self.model.generate_content_async(prompt, request_options={"timeout": 10}),
+                timeout=12,
+            )
+            raw = _extract_json(getattr(response, "text", "") or "")
+            action = str(raw.get("action") or "").strip()
+            if action not in {
+                "continue_selected_chart",
+                "start_partnership",
+                "need_relationship_context",
+                "need_other_person_chart",
+                "need_partner_birth_details",
+                "repeat_gate",
+                "treat_as_new_question",
+            }:
+                action = "repeat_gate"
+            return {
+                "action": action,
+                "confidence": str(raw.get("confidence") or "low").strip().lower(),
+                "reason": str(raw.get("reason") or "").strip(),
+            }
+        except Exception as exc:
+            logger.warning("pending native gate resolver failed; treating as new question: %s", exc)
+            return {"action": "treat_as_new_question", "confidence": "low", "reason": "resolver_failed"}

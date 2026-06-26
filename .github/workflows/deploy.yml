@@ -1,13 +1,3 @@
-# Push to main deploys the app on the current Managed Instance Group VMs one at
-# a time. VM names are discovered dynamically from the MIG, so autoscaling or
-# self-healing replacements do not require changing this workflow.
-#
-# ChunkLoadError / "Unexpected token '<'" during deploy: the HTTP(S) load balancer
-# can send HTML (from one VM) and a later /static/js/*.chunk.js request to another
-# VM that is still on the previous build (or missing that hashed file). Frontend
-# index.js includes a one-time reload recovery for that case. Mitigations: serve
-# hashed static assets from a single source (e.g. Cloud CDN + bucket), or session
-# affinity, or parallel same-artifact sync to all backends before traffic sees the new HTML.
 name: Deploy to GCP
 
 on:
@@ -52,417 +42,195 @@ permissions:
   contents: read
   id-token: write
 
+env:
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  CLOUDSDK_CORE_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+  CLOUDSDK_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+  GCP_API_MIG_NAME: astroroshni-mig-s2b
+  GCP_API_MIG_ZONE: asia-south2-b
+  GCP_CHAT_WORKER_MIG_NAME: astroroshni-chat-worker-mig
+  GCP_CHAT_WORKER_MIG_ZONE: asia-south2-b
+  GCP_PLAY_PAYMENT_SERVICE_NAME: astroroshni-play-payment-service
+  GCP_PLAY_PAYMENT_SERVICE_REGION: asia-south2
+  GCP_NUDGE_DISPATCH_SERVICE_NAME: astroroshni-nudge-dispatch
+  GCP_NUDGE_WORKER_SERVICE_NAME: astroroshni-nudge-worker
+  GCP_NUDGE_SERVICE_REGION: asia-south1
+  GCP_BACKEND_MACHINE_TYPE: c3-highmem-4
+  GCP_IMAGE_BUILDER_MACHINE_TYPE: ${{ vars.GCP_IMAGE_BUILDER_MACHINE_TYPE || 'e2-standard-4' }}
+
 jobs:
-  deploy:
+  detect_changes:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
     runs-on: ubuntu-latest
-    env:
-      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-      CLOUDSDK_CORE_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-      CLOUDSDK_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-      GCP_API_MIG_NAME: astroroshni-mig-s2b
-      GCP_API_MIG_ZONE: asia-south2-b
-      GCP_CHAT_WORKER_MIG_NAME: astroroshni-chat-worker-mig
-      GCP_CHAT_WORKER_MIG_ZONE: asia-south2-b
-      GCP_PLAY_PAYMENT_SERVICE_NAME: astroroshni-play-payment-service
-      GCP_PLAY_PAYMENT_SERVICE_REGION: asia-south2
-      GCP_NUDGE_DISPATCH_SERVICE_NAME: astroroshni-nudge-dispatch
-      GCP_NUDGE_WORKER_SERVICE_NAME: astroroshni-nudge-worker
-      GCP_NUDGE_SERVICE_REGION: asia-south1
-      GCP_BACKEND_MACHINE_TYPE: c3-highmem-4
-      GCP_IMAGE_BUILDER_MACHINE_TYPE: ${{ vars.GCP_IMAGE_BUILDER_MACHINE_TYPE || 'e2-standard-4' }}
-    
+    outputs:
+      payment_required: ${{ steps.detect.outputs.payment_required }}
+      nudge_required: ${{ steps.detect.outputs.nudge_required }}
+      frontend_required: ${{ steps.detect.outputs.frontend_required }}
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
 
-    - name: Authenticate to Google Cloud
-      uses: google-github-actions/auth@v2
-      with:
-        workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-        service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - name: Detect deploy target changes
+        id: detect
+        shell: bash
+        env:
+          FORCE_FRONTEND_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_frontend_deploy || false }}
+          FORCE_FULL_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_full_deploy || false }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
 
-    - name: Set up gcloud
-      uses: google-github-actions/setup-gcloud@v2
-      with:
-        project_id: ${{ vars.GCP_PROJECT_ID }}
-
-    - name: Build play payment service image
-      id: play_payment_image
-      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
-      shell: bash
-      env:
-        GCP_ARTIFACT_REGISTRY_REGION: ${{ vars.GCP_ARTIFACT_REGISTRY_REGION || 'asia-south2' }}
-      run: |
-        set -euo pipefail
-        IMAGE_URI="${GCP_ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/cloud-run/play-payment-service:${GITHUB_SHA}"
-        echo "image_uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
-        PAYMENT_BUILD_DIR="${RUNNER_TEMP}/play-payment-build-context"
-        bash "${GITHUB_WORKSPACE}/scripts/prepare-play-payment-build-context.sh" "${PAYMENT_BUILD_DIR}"
-        du -sh "${PAYMENT_BUILD_DIR}" || true
-        gcloud builds submit "${PAYMENT_BUILD_DIR}" \
-          --project "${GCP_PROJECT_ID}" \
-          --config play_payment_service/cloudbuild.yaml \
-          --substitutions "_IMAGE_URI=${IMAGE_URI}"
-
-    - name: Deploy play payment service to Cloud Run
-      id: deploy_play_payment_service
-      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
-      shell: bash
-      run: |
-        set -euo pipefail
-        gcloud run deploy "${GCP_PLAY_PAYMENT_SERVICE_NAME}" \
-          --project "${GCP_PROJECT_ID}" \
-          --region "${GCP_PLAY_PAYMENT_SERVICE_REGION}" \
-          --image "${{ steps.play_payment_image.outputs.image_uri }}" \
-          --platform managed \
-          --allow-unauthenticated \
-          --ingress all \
-          --service-account "800681558445-compute@developer.gserviceaccount.com" \
-          --execution-environment gen2 \
-          --network default \
-          --subnet default \
-          --vpc-egress private-ranges-only \
-          --cpu 1 \
-          --memory 1Gi \
-          --concurrency 8 \
-          --timeout 60 \
-          --min-instances 1 \
-          --max-instances 10 \
-          --port 8080 \
-          --set-env-vars "PLAY_PAYMENT_SERVICE_ENV=production,PLAY_PAYMENT_SERVICE_ENV_FILE=/secrets/app_env/.env,GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID},GCP_PROJECT_ID=${GCP_PROJECT_ID}" \
-          --update-secrets "/secrets/app_env/.env=APP_ENV_FILE:latest,PLAY_PAYMENT_SERVICE_SHARED_SECRET=PLAY_PAYMENT_SERVICE_SHARED_SECRET:latest"
-
-        SERVICE_URL="$(gcloud run services describe "${GCP_PLAY_PAYMENT_SERVICE_NAME}" \
-          --project "${GCP_PROJECT_ID}" \
-          --region "${GCP_PLAY_PAYMENT_SERVICE_REGION}" \
-          --format='value(status.url)')"
-        echo "service_url=${SERVICE_URL}" >> "${GITHUB_OUTPUT}"
-        echo "Deployed play payment service at ${SERVICE_URL}"
-
-    - name: Build nudge worker service image
-      id: nudge_worker_image
-      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
-      shell: bash
-      env:
-        GCP_ARTIFACT_REGISTRY_REGION: ${{ vars.GCP_ARTIFACT_REGISTRY_REGION || 'asia-south2' }}
-      run: |
-        set -euo pipefail
-        IMAGE_URI="${GCP_ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/cloud-run/nudge-worker:${GITHUB_SHA}"
-        echo "image_uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
-        BUILD_DIR="${RUNNER_TEMP}/nudge-worker-build-context"
-        bash "${GITHUB_WORKSPACE}/scripts/prepare-nudge-service-build-context.sh" "nudge_worker_service" "${BUILD_DIR}"
-        gcloud builds submit "${BUILD_DIR}" \
-          --project "${GCP_PROJECT_ID}" \
-          --config nudge_worker_service/cloudbuild.yaml \
-          --substitutions "_IMAGE_URI=${IMAGE_URI}"
-
-    - name: Deploy nudge worker service to Cloud Run
-      id: deploy_nudge_worker_service
-      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
-      shell: bash
-      run: |
-        set -euo pipefail
-        gcloud run deploy "${GCP_NUDGE_WORKER_SERVICE_NAME}" \
-          --project "${GCP_PROJECT_ID}" \
-          --region "${GCP_NUDGE_SERVICE_REGION}" \
-          --image "${{ steps.nudge_worker_image.outputs.image_uri }}" \
-          --platform managed \
-          --allow-unauthenticated \
-          --ingress all \
-          --service-account "800681558445-compute@developer.gserviceaccount.com" \
-          --execution-environment gen2 \
-          --network default \
-          --subnet default \
-          --vpc-egress private-ranges-only \
-          --cpu 2 \
-          --memory 2Gi \
-          --concurrency 8 \
-          --timeout 900 \
-          --min-instances 0 \
-          --max-instances 20 \
-          --port 8080 \
-          --set-env-vars "NUDGE_SERVICE_ROLE=worker,NUDGE_SERVICE_ENV_FILE=/secrets/app_env/.env,GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID},GCP_PROJECT_ID=${GCP_PROJECT_ID},PUBLIC_API_BASE_URL=https://astroroshni.com" \
-          --update-secrets "/secrets/app_env/.env=APP_ENV_FILE:latest,NUDGE_CRON_SECRET=NUDGE_CRON_SECRET:latest,NUDGE_TASKS_SECRET=NUDGE_TASKS_SECRET:latest"
-
-        SERVICE_URL="$(gcloud run services describe "${GCP_NUDGE_WORKER_SERVICE_NAME}" \
-          --project "${GCP_PROJECT_ID}" \
-          --region "${GCP_NUDGE_SERVICE_REGION}" \
-          --format='value(status.url)')"
-        echo "service_url=${SERVICE_URL}" >> "${GITHUB_OUTPUT}"
-        echo "Deployed nudge worker service at ${SERVICE_URL}"
-
-    - name: Build nudge dispatch service image
-      id: nudge_dispatch_image
-      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
-      shell: bash
-      env:
-        GCP_ARTIFACT_REGISTRY_REGION: ${{ vars.GCP_ARTIFACT_REGISTRY_REGION || 'asia-south2' }}
-      run: |
-        set -euo pipefail
-        IMAGE_URI="${GCP_ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/cloud-run/nudge-dispatch:${GITHUB_SHA}"
-        echo "image_uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
-        BUILD_DIR="${RUNNER_TEMP}/nudge-dispatch-build-context"
-        bash "${GITHUB_WORKSPACE}/scripts/prepare-nudge-service-build-context.sh" "nudge_dispatch_service" "${BUILD_DIR}"
-        gcloud builds submit "${BUILD_DIR}" \
-          --project "${GCP_PROJECT_ID}" \
-          --config nudge_dispatch_service/cloudbuild.yaml \
-          --substitutions "_IMAGE_URI=${IMAGE_URI}"
-
-    - name: Deploy nudge dispatch service to Cloud Run
-      id: deploy_nudge_dispatch_service
-      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
-      shell: bash
-      run: |
-        set -euo pipefail
-        gcloud run deploy "${GCP_NUDGE_DISPATCH_SERVICE_NAME}" \
-          --project "${GCP_PROJECT_ID}" \
-          --region "${GCP_NUDGE_SERVICE_REGION}" \
-          --image "${{ steps.nudge_dispatch_image.outputs.image_uri }}" \
-          --platform managed \
-          --allow-unauthenticated \
-          --ingress all \
-          --service-account "800681558445-compute@developer.gserviceaccount.com" \
-          --execution-environment gen2 \
-          --network default \
-          --subnet default \
-          --vpc-egress private-ranges-only \
-          --cpu 1 \
-          --memory 1Gi \
-          --concurrency 4 \
-          --timeout 300 \
-          --min-instances 0 \
-          --max-instances 5 \
-          --port 8080 \
-          --set-env-vars "NUDGE_SERVICE_ROLE=dispatch,NUDGE_SERVICE_ENV_FILE=/secrets/app_env/.env,GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID},GCP_PROJECT_ID=${GCP_PROJECT_ID},PUBLIC_API_BASE_URL=https://astroroshni.com,NUDGE_TASKS_TARGET_BASE_URL=${{ steps.deploy_nudge_worker_service.outputs.service_url }}" \
-          --update-secrets "/secrets/app_env/.env=APP_ENV_FILE:latest,NUDGE_CRON_SECRET=NUDGE_CRON_SECRET:latest,NUDGE_TASKS_SECRET=NUDGE_TASKS_SECRET:latest"
-
-        SERVICE_URL="$(gcloud run services describe "${GCP_NUDGE_DISPATCH_SERVICE_NAME}" \
-          --project "${GCP_PROJECT_ID}" \
-          --region "${GCP_NUDGE_SERVICE_REGION}" \
-          --format='value(status.url)')"
-        echo "service_url=${SERVICE_URL}" >> "${GITHUB_OUTPUT}"
-        echo "Deployed nudge dispatch service at ${SERVICE_URL}"
-
-    - name: Repoint nudge scheduler jobs to nudge dispatch service
-      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
-      shell: bash
-      run: |
-        set -euo pipefail
-        DISPATCH_URL="${{ steps.deploy_nudge_dispatch_service.outputs.service_url }}"
-        CRON_SECRET="$(gcloud secrets versions access latest --secret=NUDGE_CRON_SECRET --project "${GCP_PROJECT_ID}" | tr -d '\r\n')"
-        gcloud scheduler jobs update http nudge-campaign-dispatch \
-          --project "${GCP_PROJECT_ID}" \
-          --location asia-south1 \
-          --uri "${DISPATCH_URL}/api/nudge/cron/campaign/dispatch-due?limit=20" \
-          --http-method POST \
-          --update-headers "X-Cron-Secret=${CRON_SECRET}"
-        gcloud scheduler jobs update http astroroshni-broadcast-dispatch-due \
-          --project "${GCP_PROJECT_ID}" \
-          --location asia-south1 \
-          --uri "${DISPATCH_URL}/api/nudge/cron/broadcast/dispatch-due?limit=100" \
-          --http-method POST \
-          --update-headers "X-Cron-Secret=${CRON_SECRET}"
-        gcloud scheduler jobs update http astroroshni-chat-followup-hourly \
-          --project "${GCP_PROJECT_ID}" \
-          --location asia-south1 \
-          --uri "${DISPATCH_URL}/api/nudge/cron/chat-followup/dispatch-recent?limit_users=200&lookback_minutes=60" \
-          --http-method POST \
-          --update-headers "X-Cron-Secret=${CRON_SECRET}"
-        gcloud scheduler jobs update http astroroshni-nudge-scan-daily \
-          --project "${GCP_PROJECT_ID}" \
-          --location asia-south1 \
-          --uri "${DISPATCH_URL}/api/nudge/scan" \
-          --http-method POST \
-          --update-headers "X-Cron-Secret=${CRON_SECRET}"
-
-    - name: Detect frontend artifact need
-      id: frontend_artifact
-      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
-      shell: bash
-      env:
-        FORCE_FRONTEND_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_frontend_deploy || false }}
-        FORCE_FULL_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_full_deploy || false }}
-        BEFORE_SHA: ${{ github.event.before }}
-      run: |
-        set -euo pipefail
-        required=false
-        if [[ "${FORCE_FULL_DEPLOY}" == "true" || "${FORCE_FRONTEND_DEPLOY}" == "true" ]]; then
-          required=true
-        else
+          changed_files=""
           if [[ -n "${BEFORE_SHA}" && "${BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]]; then
-            if git diff --name-only "${BEFORE_SHA}" "${GITHUB_SHA}" | grep -E -q '^frontend/|^frontend-next/'; then
-              required=true
-            fi
+            changed_files="$(git diff --name-only "${BEFORE_SHA}" "${GITHUB_SHA}" || true)"
           elif git rev-parse HEAD^ >/dev/null 2>&1; then
-            if git diff --name-only HEAD^ HEAD | grep -E -q '^frontend/|^frontend-next/'; then
-              required=true
-            fi
-          fi
-        fi
-        echo "required=${required}" >> "${GITHUB_OUTPUT}"
-
-    - name: Set up Node.js
-      if: ${{ steps.frontend_artifact.outputs.required == 'true' }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: npm
-        cache-dependency-path: |
-          frontend/package-lock.json
-          frontend-next/package-lock.json
-
-    - name: Build frontend artifact once
-      if: ${{ steps.frontend_artifact.outputs.required == 'true' }}
-      shell: bash
-      env:
-        CI: 'true'
-        GENERATE_SOURCEMAP: 'false'
-        INLINE_RUNTIME_CHUNK: 'true'
-        PRERENDER: 'true'
-      run: |
-        set -euo pipefail
-        npm --prefix frontend ci
-        npm --prefix frontend-next ci
-        unset PRERENDER_ROUTES
-        SITEMAP_URL="https://astroroshni.com/sitemap.xml" \
-        BLOG_API_URL="https://astroroshni.com" \
-        npm --prefix frontend run build:ci
-        tar -czf "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" -C frontend build
-
-    - name: Publish frontend artifact to GCS
-      if: ${{ steps.frontend_artifact.outputs.required == 'true' }}
-      shell: bash
-      env:
-        GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-        GCP_FRONTEND_ARTIFACT_BUCKET: ${{ vars.GCP_FRONTEND_ARTIFACT_BUCKET }}
-      run: |
-        set -euo pipefail
-        if [[ -z "${GCP_FRONTEND_ARTIFACT_BUCKET}" ]]; then
-          echo "❌ GCP_FRONTEND_ARTIFACT_BUCKET GitHub variable is required to publish frontend artifacts"
-          exit 1
-        fi
-        gcloud config set project "${GCP_PROJECT_ID}"
-        VERSIONED_URI="gs://${GCP_FRONTEND_ARTIFACT_BUCKET}/prod/frontend-build-${GITHUB_SHA}.tgz"
-        LATEST_URI="gs://${GCP_FRONTEND_ARTIFACT_BUCKET}/prod/frontend-build-latest.tgz"
-        gcloud storage cp "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" "${VERSIONED_URI}"
-        gcloud storage cp "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" "${LATEST_URI}"
-        echo "Published frontend artifact:"
-        echo "  ${VERSIONED_URI}"
-        echo "  ${LATEST_URI}"
-
-    - name: Publish frontend site build to GCS
-      if: ${{ steps.frontend_artifact.outputs.required == 'true' && vars.GCP_FRONTEND_SITE_BUCKET != '' }}
-      shell: bash
-      env:
-        GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-        GCP_FRONTEND_SITE_BUCKET: ${{ vars.GCP_FRONTEND_SITE_BUCKET }}
-      run: |
-        set -euo pipefail
-        gcloud config set project "${GCP_PROJECT_ID}"
-        gsutil -m rsync -r -d frontend/build "gs://${GCP_FRONTEND_SITE_BUCKET}"
-        gsutil -m setmeta -h "Cache-Control:no-cache" "gs://${GCP_FRONTEND_SITE_BUCKET}/**/*.html" || true
-        gsutil -m setmeta -h "Cache-Control:public, max-age=31536000, immutable" "gs://${GCP_FRONTEND_SITE_BUCKET}/static/**" || true
-        gsutil -m setmeta -h "Cache-Control:public, max-age=31536000, immutable" "gs://${GCP_FRONTEND_SITE_BUCKET}/_next/static/**" || true
-        gsutil -m setmeta -h "Cache-Control:public, max-age=3600" "gs://${GCP_FRONTEND_SITE_BUCKET}/manifest.json" || true
-        gsutil -m setmeta -h "Cache-Control:public, max-age=3600" "gs://${GCP_FRONTEND_SITE_BUCKET}/robots.txt" || true
-        gsutil -m setmeta -h "Cache-Control:public, max-age=3600" "gs://${GCP_FRONTEND_SITE_BUCKET}/sitemap.xml" || true
-
-    - name: Rolling app deploy on current MIG VMs
-      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
-      env:
-        FORCE_BACKEND_PIP: ${{ github.event_name == 'workflow_dispatch' && inputs.force_backend_pip || false }}
-        FORCE_FRONTEND_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_frontend_deploy || false }}
-        FORCE_FULL_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_full_deploy || false }}
-        FRONTEND_ARTIFACT_REQUIRED: ${{ steps.frontend_artifact.outputs.required }}
-        GCP_FRONTEND_SITE_BUCKET: ${{ vars.GCP_FRONTEND_SITE_BUCKET }}
-        SERVE_FRONTEND_LOCALLY: ${{ vars.SERVE_FRONTEND_LOCALLY || 'true' }}
-      run: |
-        set -euo pipefail
-        echo "========== GitHub Actions: rolling app deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
-        gcloud config set project "${GCP_PROJECT_ID}"
-
-        retry_gcloud_remote() {
-          local attempts="$1"
-          local sleep_seconds="$2"
-          shift 2
-          local try
-          for try in $(seq 1 "${attempts}"); do
-            if "$@"; then
-              return 0
-            fi
-            if [ "${try}" -lt "${attempts}" ]; then
-              echo "⚠️ Remote command failed (attempt ${try}/${attempts}); retrying in ${sleep_seconds}s..."
-              sleep "${sleep_seconds}"
-            fi
-          done
-          echo "❌ Remote command failed after ${attempts} attempts"
-          return 1
-        }
-
-        deploy_mig_instances() {
-          local mig_name="$1"
-          local mig_zone="$2"
-          local serve_frontend_locally="$3"
-          local mig_label="$4"
-          local frontend_required="${FRONTEND_ARTIFACT_REQUIRED:-false}"
-
-          mapfile -t INSTANCES < <(
-            gcloud compute instance-groups managed list-instances "${mig_name}" \
-              --project "${GCP_PROJECT_ID}" \
-              --zone "${mig_zone}" \
-              --filter="instanceStatus=RUNNING" \
-              --format="value(instance.basename())" \
-            | sort
-          )
-
-          if [ "${#INSTANCES[@]}" -eq 0 ]; then
-            echo "❌ No RUNNING instances found in ${mig_label} MIG ${mig_name}"
-            exit 1
+            changed_files="$(git diff --name-only HEAD^ HEAD || true)"
+          else
+            changed_files="$(git ls-files || true)"
           fi
 
-          echo "📋 Deploying to ${#INSTANCES[@]} ${mig_label} instance(s): ${INSTANCES[*]}"
-          for INSTANCE in "${INSTANCES[@]}"; do
-            echo "========== Deploying ${mig_label} instance ${INSTANCE} $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
-            retry_gcloud_remote 3 10 \
-              gcloud compute ssh "tarun_yadav@${INSTANCE}" \
-                --project "${GCP_PROJECT_ID}" \
-                --zone "${mig_zone}" \
-                --tunnel-through-iap \
-                --quiet \
-                --command "for i in \$(seq 1 60); do if [ -f /home/tarun_yadav/AstrologyApp/deploy.sh ] && [ -d /home/tarun_yadav/AstrologyApp/backend ] && [ -f /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key ]; then exit 0; fi; sleep 5; done; echo 'AstrologyApp repo or deploy key not ready on ${INSTANCE}'; exit 1"
+          echo "Changed files:"
+          printf '%s\n' "${changed_files}"
 
-            FRONTEND_REMOTE_ARCHIVE=""
-            if [ "${serve_frontend_locally}" = "true" ] && [ "${frontend_required}" = "true" ]; then
-              FRONTEND_REMOTE_ARCHIVE="/tmp/frontend-build-${GITHUB_SHA}.tgz"
-              retry_gcloud_remote 3 10 \
-                gcloud compute scp "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" "tarun_yadav@${INSTANCE}:${FRONTEND_REMOTE_ARCHIVE}" \
-                  --project "${GCP_PROJECT_ID}" \
-                  --zone "${mig_zone}" \
-                  --tunnel-through-iap \
-                  --quiet
+          payment_required=false
+          nudge_required=false
+          frontend_required=false
+
+          if [[ "${FORCE_FULL_DEPLOY}" == "true" ]]; then
+            payment_required=true
+            nudge_required=true
+            frontend_required=true
+          else
+            if [[ "${FORCE_FRONTEND_DEPLOY}" == "true" ]]; then
+              frontend_required=true
             fi
 
-            retry_gcloud_remote 3 15 \
-              gcloud compute ssh "tarun_yadav@${INSTANCE}" \
+            if printf '%s\n' "${changed_files}" | grep -E -q \
+              '^(play_payment_service/|backend/(credits/|activity/|utils/admin_settings\.py|utils/birth_hash\.py|utils/env_json\.py|auth\.py|db\.py)|scripts/prepare-play-payment-build-context\.sh)$'; then
+              payment_required=true
+            fi
+
+            if printf '%s\n' "${changed_files}" | grep -E -q \
+              '^(nudge_worker_service/|nudge_dispatch_service/|backend/|scripts/prepare-nudge-service-build-context\.sh)$'; then
+              nudge_required=true
+            fi
+
+            if printf '%s\n' "${changed_files}" | grep -E -q '^frontend/|^frontend-next/'; then
+              frontend_required=true
+            fi
+          fi
+
+          echo "payment_required=${payment_required}" >> "${GITHUB_OUTPUT}"
+          echo "nudge_required=${nudge_required}" >> "${GITHUB_OUTPUT}"
+          echo "frontend_required=${frontend_required}" >> "${GITHUB_OUTPUT}"
+
+  backend_and_chat:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Rolling API and chat-worker deploy on current MIG VMs
+        env:
+          FORCE_BACKEND_PIP: ${{ github.event_name == 'workflow_dispatch' && inputs.force_backend_pip || false }}
+          FORCE_FRONTEND_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_frontend_deploy || false }}
+          FORCE_FULL_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_full_deploy || false }}
+          FRONTEND_ARTIFACT_REQUIRED: 'false'
+          SERVE_FRONTEND_LOCALLY: 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "========== GitHub Actions: rolling app deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
+          gcloud config set project "${GCP_PROJECT_ID}"
+
+          retry_gcloud_remote() {
+            local attempts="$1"
+            local sleep_seconds="$2"
+            shift 2
+            local try
+            for try in $(seq 1 "${attempts}"); do
+              if "$@"; then
+                return 0
+              fi
+              if [ "${try}" -lt "${attempts}" ]; then
+                echo "⚠️ Remote command failed (attempt ${try}/${attempts}); retrying in ${sleep_seconds}s..."
+                sleep "${sleep_seconds}"
+              fi
+            done
+            echo "❌ Remote command failed after ${attempts} attempts"
+            return 1
+          }
+
+          deploy_mig_instances() {
+            local mig_name="$1"
+            local mig_zone="$2"
+            local serve_frontend_locally="$3"
+            local mig_label="$4"
+            local frontend_required="${FRONTEND_ARTIFACT_REQUIRED:-false}"
+
+            mapfile -t INSTANCES < <(
+              gcloud compute instance-groups managed list-instances "${mig_name}" \
                 --project "${GCP_PROJECT_ID}" \
                 --zone "${mig_zone}" \
-                --tunnel-through-iap \
-                --quiet \
-                --command "cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' DEPLOY_BRANCH='main' FORCE_BACKEND_PIP='${FORCE_BACKEND_PIP}' FORCE_FRONTEND_DEPLOY='${FORCE_FRONTEND_DEPLOY}' FORCE_FULL_DEPLOY='${FORCE_FULL_DEPLOY}' FRONTEND_PREBUILT_ARCHIVE='${FRONTEND_REMOTE_ARCHIVE}' SERVE_FRONTEND_LOCALLY='${serve_frontend_locally}' SYNC_GCP_SECRETS='true' && bash deploy.sh && if [ -n '${FRONTEND_REMOTE_ARCHIVE}' ]; then rm -f '${FRONTEND_REMOTE_ARCHIVE}'; fi"
+                --filter="instanceStatus=RUNNING" \
+                --format="value(instance.basename())" \
+              | sort
+            )
 
-            echo "🔎 Waiting for ${mig_label} instance ${INSTANCE} local app health"
-            if [ "${serve_frontend_locally}" = "true" ]; then
+            if [ "${#INSTANCES[@]}" -eq 0 ]; then
+              echo "❌ No RUNNING instances found in ${mig_label} MIG ${mig_name}"
+              exit 1
+            fi
+
+            echo "📋 Deploying to ${#INSTANCES[@]} ${mig_label} instance(s): ${INSTANCES[*]}"
+            for INSTANCE in "${INSTANCES[@]}"; do
+              echo "========== Deploying ${mig_label} instance ${INSTANCE} $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
               retry_gcloud_remote 3 10 \
                 gcloud compute ssh "tarun_yadav@${INSTANCE}" \
                   --project "${GCP_PROJECT_ID}" \
                   --zone "${mig_zone}" \
                   --tunnel-through-iap \
                   --quiet \
-                  --command "for i in \$(seq 1 30); do curl -fsS --max-time 5 http://127.0.0.1:8001/api/health >/dev/null && curl -fsS --max-time 5 http://127.0.0.1:3001/ >/dev/null && exit 0; sleep 5; done; echo 'health check failed on ${INSTANCE}'; exit 1"
-            else
+                  --command "for i in \$(seq 1 60); do if [ -f /home/tarun_yadav/AstrologyApp/deploy.sh ] && [ -d /home/tarun_yadav/AstrologyApp/backend ] && [ -f /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key ]; then exit 0; fi; sleep 5; done; echo 'AstrologyApp repo or deploy key not ready on ${INSTANCE}'; exit 1"
+
+              FRONTEND_REMOTE_ARCHIVE=""
+              if [ "${serve_frontend_locally}" = "true" ] && [ "${frontend_required}" = "true" ]; then
+                FRONTEND_REMOTE_ARCHIVE="/tmp/frontend-build-${GITHUB_SHA}.tgz"
+                retry_gcloud_remote 3 10 \
+                  gcloud compute scp "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" "tarun_yadav@${INSTANCE}:${FRONTEND_REMOTE_ARCHIVE}" \
+                    --project "${GCP_PROJECT_ID}" \
+                    --zone "${mig_zone}" \
+                    --tunnel-through-iap \
+                    --quiet
+              fi
+
+              retry_gcloud_remote 3 15 \
+                gcloud compute ssh "tarun_yadav@${INSTANCE}" \
+                  --project "${GCP_PROJECT_ID}" \
+                  --zone "${mig_zone}" \
+                  --tunnel-through-iap \
+                  --quiet \
+                  --command "cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' DEPLOY_BRANCH='main' FORCE_BACKEND_PIP='${FORCE_BACKEND_PIP}' FORCE_FRONTEND_DEPLOY='${FORCE_FRONTEND_DEPLOY}' FORCE_FULL_DEPLOY='${FORCE_FULL_DEPLOY}' FRONTEND_PREBUILT_ARCHIVE='${FRONTEND_REMOTE_ARCHIVE}' SERVE_FRONTEND_LOCALLY='${serve_frontend_locally}' SYNC_GCP_SECRETS='true' && bash deploy.sh && if [ -n '${FRONTEND_REMOTE_ARCHIVE}' ]; then rm -f '${FRONTEND_REMOTE_ARCHIVE}'; fi"
+
+              echo "🔎 Waiting for ${mig_label} instance ${INSTANCE} local app health"
               retry_gcloud_remote 3 10 \
                 gcloud compute ssh "tarun_yadav@${INSTANCE}" \
                   --project "${GCP_PROJECT_ID}" \
@@ -470,147 +238,460 @@ jobs:
                   --tunnel-through-iap \
                   --quiet \
                   --command "for i in \$(seq 1 30); do curl -fsS --max-time 5 http://127.0.0.1:8001/api/health >/dev/null && exit 0; sleep 5; done; echo 'backend health check failed on ${INSTANCE}'; exit 1"
-            fi
 
-            echo "✅ ${mig_label} instance ${INSTANCE} deployed and healthy"
-          done
-        }
+              echo "✅ ${mig_label} instance ${INSTANCE} deployed and healthy"
+            done
+          }
 
-        deploy_mig_instances "${GCP_API_MIG_NAME}" "${GCP_API_MIG_ZONE}" "${SERVE_FRONTEND_LOCALLY}" "api"
-        deploy_mig_instances "${GCP_CHAT_WORKER_MIG_NAME}" "${GCP_CHAT_WORKER_MIG_ZONE}" "false" "chat-worker"
+          deploy_mig_instances "${GCP_API_MIG_NAME}" "${GCP_API_MIG_ZONE}" "false" "api"
+          deploy_mig_instances "${GCP_CHAT_WORKER_MIG_NAME}" "${GCP_CHAT_WORKER_MIG_ZONE}" "false" "chat-worker"
 
-        echo "🔎 Final public health check"
-        curl -fsS --max-time 20 "https://astroroshni.com/api/health" >/dev/null
-        if [ -n "${GCP_FRONTEND_SITE_BUCKET}" ] || [ "${SERVE_FRONTEND_LOCALLY}" = "true" ]; then
+          echo "🔎 Final public API health check"
+          curl -fsS --max-time 20 "https://astroroshni.com/api/health" >/dev/null
+          echo "========== GitHub Actions: rolling app deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
+
+      - name: Build baked backend release image
+        id: baked_image
+        shell: bash
+        env:
+          GCP_RELEASE_BASE_IMAGE: ${{ vars.GCP_RELEASE_BASE_IMAGE || 'astroroshni-release-backend-cad234c4eae9-855' }}
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${GITHUB_SHA::12}"
+          IMAGE_NAME="astroroshni-release-backend-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
+          echo "image_name=${IMAGE_NAME}" >> "${GITHUB_OUTPUT}"
+          APP_ROOT="${GITHUB_WORKSPACE}" \
+          GCLOUD_BIN="gcloud" \
+          GCLOUD_CONFIG="${CLOUDSDK_CONFIG:-}" \
+          PROJECT_ID="${GCP_PROJECT_ID}" \
+          ZONE="${GCP_API_MIG_ZONE}" \
+          MACHINE_TYPE="${GCP_IMAGE_BUILDER_MACHINE_TYPE}" \
+          BASE_IMAGE="${GCP_RELEASE_BASE_IMAGE}" \
+          BASE_IMAGE_PROJECT="${GCP_PROJECT_ID}" \
+          IMAGE_NAME="${IMAGE_NAME}" \
+          IMAGE_FAMILY="astroroshni-release-backend" \
+          STORAGE_LOCATION="asia-south2" \
+          KEEP_BUILDER_VM="false" \
+          SERVE_FRONTEND_LOCALLY="false" \
+          INSTALL_GCP_OPS_AGENT="false" \
+          bash "${GITHUB_WORKSPACE}/scripts/build-gce-release-image.sh"
+
+      - name: Refresh API MIG baked-image template for future replacements
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${GITHUB_SHA::12}"
+          TEMPLATE_NAME="astro-baked-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
+          SUBNET_REGION="${GCP_API_MIG_ZONE%-*}"
+          SUBNET_SELF_LINK="projects/${GCP_PROJECT_ID}/regions/${SUBNET_REGION}/subnetworks/default"
+
+          gcloud compute instance-templates create "${TEMPLATE_NAME}" \
+            --project="${GCP_PROJECT_ID}" \
+            --machine-type="${GCP_BACKEND_MACHINE_TYPE}" \
+            --network=default \
+            --subnet="${SUBNET_SELF_LINK}" \
+            --no-address \
+            --maintenance-policy=MIGRATE \
+            --provisioning-model=STANDARD \
+            --service-account="800681558445-compute@developer.gserviceaccount.com" \
+            --scopes="https://www.googleapis.com/auth/cloud-platform" \
+            --tags="web-server" \
+            --image="${{ steps.baked_image.outputs.image_name }}" \
+            --image-project="${GCP_PROJECT_ID}" \
+            --metadata-from-file="startup-script=${GITHUB_WORKSPACE}/scripts/gce-startup-bootstrap.sh"
+
+          gcloud compute instance-groups managed set-instance-template "${GCP_API_MIG_NAME}" \
+            --project="${GCP_PROJECT_ID}" \
+            --zone="${GCP_API_MIG_ZONE}" \
+            --template="${TEMPLATE_NAME}"
+
+      - name: Refresh chat worker MIG baked-image template for future replacements
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${GITHUB_SHA::12}"
+          TEMPLATE_NAME="astro-chat-worker-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
+          SUBNET_REGION="${GCP_CHAT_WORKER_MIG_ZONE%-*}"
+          SUBNET_SELF_LINK="projects/${GCP_PROJECT_ID}/regions/${SUBNET_REGION}/subnetworks/default"
+
+          gcloud compute instance-templates create "${TEMPLATE_NAME}" \
+            --project="${GCP_PROJECT_ID}" \
+            --machine-type="${GCP_BACKEND_MACHINE_TYPE}" \
+            --network=default \
+            --subnet="${SUBNET_SELF_LINK}" \
+            --no-address \
+            --maintenance-policy=MIGRATE \
+            --provisioning-model=STANDARD \
+            --service-account="800681558445-compute@developer.gserviceaccount.com" \
+            --scopes="https://www.googleapis.com/auth/cloud-platform" \
+            --tags="web-server" \
+            --image="${{ steps.baked_image.outputs.image_name }}" \
+            --image-project="${GCP_PROJECT_ID}" \
+            --metadata-from-file="startup-script=${GITHUB_WORKSPACE}/scripts/gce-startup-bootstrap.sh"
+
+          gcloud compute instance-groups managed set-instance-template "${GCP_CHAT_WORKER_MIG_NAME}" \
+            --project="${GCP_PROJECT_ID}" \
+            --zone="${GCP_CHAT_WORKER_MIG_ZONE}" \
+            --template="${TEMPLATE_NAME}"
+
+  payment_service:
+    if: ${{ (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') && needs.detect_changes.outputs.payment_required == 'true' }}
+    needs: [detect_changes, backend_and_chat]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Build play payment service image
+        id: play_payment_image
+        shell: bash
+        env:
+          GCP_ARTIFACT_REGISTRY_REGION: ${{ vars.GCP_ARTIFACT_REGISTRY_REGION || 'asia-south2' }}
+        run: |
+          set -euo pipefail
+          IMAGE_URI="${GCP_ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/cloud-run/play-payment-service:${GITHUB_SHA}"
+          echo "image_uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
+          PAYMENT_BUILD_DIR="${RUNNER_TEMP}/play-payment-build-context"
+          bash "${GITHUB_WORKSPACE}/scripts/prepare-play-payment-build-context.sh" "${PAYMENT_BUILD_DIR}"
+          du -sh "${PAYMENT_BUILD_DIR}" || true
+          gcloud builds submit "${PAYMENT_BUILD_DIR}" \
+            --project "${GCP_PROJECT_ID}" \
+            --config play_payment_service/cloudbuild.yaml \
+            --substitutions "_IMAGE_URI=${IMAGE_URI}"
+
+      - name: Deploy play payment service to Cloud Run
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud run deploy "${GCP_PLAY_PAYMENT_SERVICE_NAME}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_PLAY_PAYMENT_SERVICE_REGION}" \
+            --image "${{ steps.play_payment_image.outputs.image_uri }}" \
+            --platform managed \
+            --allow-unauthenticated \
+            --ingress all \
+            --service-account "800681558445-compute@developer.gserviceaccount.com" \
+            --execution-environment gen2 \
+            --network default \
+            --subnet default \
+            --vpc-egress private-ranges-only \
+            --cpu 1 \
+            --memory 1Gi \
+            --concurrency 8 \
+            --timeout 60 \
+            --min-instances 1 \
+            --max-instances 10 \
+            --port 8080 \
+            --set-env-vars "PLAY_PAYMENT_SERVICE_ENV=production,PLAY_PAYMENT_SERVICE_ENV_FILE=/secrets/app_env/.env,GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID},GCP_PROJECT_ID=${GCP_PROJECT_ID}" \
+            --update-secrets "/secrets/app_env/.env=APP_ENV_FILE:latest,PLAY_PAYMENT_SERVICE_SHARED_SECRET=PLAY_PAYMENT_SERVICE_SHARED_SECRET:latest"
+
+  nudge_services:
+    if: ${{ (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') && needs.detect_changes.outputs.nudge_required == 'true' }}
+    needs: [detect_changes, backend_and_chat]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Build nudge worker service image
+        id: nudge_worker_image
+        shell: bash
+        env:
+          GCP_ARTIFACT_REGISTRY_REGION: ${{ vars.GCP_ARTIFACT_REGISTRY_REGION || 'asia-south2' }}
+        run: |
+          set -euo pipefail
+          IMAGE_URI="${GCP_ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/cloud-run/nudge-worker:${GITHUB_SHA}"
+          echo "image_uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
+          BUILD_DIR="${RUNNER_TEMP}/nudge-worker-build-context"
+          bash "${GITHUB_WORKSPACE}/scripts/prepare-nudge-service-build-context.sh" "nudge_worker_service" "${BUILD_DIR}"
+          gcloud builds submit "${BUILD_DIR}" \
+            --project "${GCP_PROJECT_ID}" \
+            --config nudge_worker_service/cloudbuild.yaml \
+            --substitutions "_IMAGE_URI=${IMAGE_URI}"
+
+      - name: Deploy nudge worker service to Cloud Run
+        id: deploy_nudge_worker_service
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud run deploy "${GCP_NUDGE_WORKER_SERVICE_NAME}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_NUDGE_SERVICE_REGION}" \
+            --image "${{ steps.nudge_worker_image.outputs.image_uri }}" \
+            --platform managed \
+            --allow-unauthenticated \
+            --ingress all \
+            --service-account "800681558445-compute@developer.gserviceaccount.com" \
+            --execution-environment gen2 \
+            --network default \
+            --subnet default \
+            --vpc-egress private-ranges-only \
+            --cpu 2 \
+            --memory 2Gi \
+            --concurrency 8 \
+            --timeout 900 \
+            --min-instances 0 \
+            --max-instances 20 \
+            --port 8080 \
+            --set-env-vars "NUDGE_SERVICE_ROLE=worker,NUDGE_SERVICE_ENV_FILE=/secrets/app_env/.env,GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID},GCP_PROJECT_ID=${GCP_PROJECT_ID},PUBLIC_API_BASE_URL=https://astroroshni.com" \
+            --update-secrets "/secrets/app_env/.env=APP_ENV_FILE:latest,NUDGE_CRON_SECRET=NUDGE_CRON_SECRET:latest,NUDGE_TASKS_SECRET=NUDGE_TASKS_SECRET:latest"
+
+          SERVICE_URL="$(gcloud run services describe "${GCP_NUDGE_WORKER_SERVICE_NAME}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_NUDGE_SERVICE_REGION}" \
+            --format='value(status.url)')"
+          echo "service_url=${SERVICE_URL}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build nudge dispatch service image
+        id: nudge_dispatch_image
+        shell: bash
+        env:
+          GCP_ARTIFACT_REGISTRY_REGION: ${{ vars.GCP_ARTIFACT_REGISTRY_REGION || 'asia-south2' }}
+        run: |
+          set -euo pipefail
+          IMAGE_URI="${GCP_ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/cloud-run/nudge-dispatch:${GITHUB_SHA}"
+          echo "image_uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
+          BUILD_DIR="${RUNNER_TEMP}/nudge-dispatch-build-context"
+          bash "${GITHUB_WORKSPACE}/scripts/prepare-nudge-service-build-context.sh" "nudge_dispatch_service" "${BUILD_DIR}"
+          gcloud builds submit "${BUILD_DIR}" \
+            --project "${GCP_PROJECT_ID}" \
+            --config nudge_dispatch_service/cloudbuild.yaml \
+            --substitutions "_IMAGE_URI=${IMAGE_URI}"
+
+      - name: Deploy nudge dispatch service to Cloud Run
+        id: deploy_nudge_dispatch_service
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud run deploy "${GCP_NUDGE_DISPATCH_SERVICE_NAME}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_NUDGE_SERVICE_REGION}" \
+            --image "${{ steps.nudge_dispatch_image.outputs.image_uri }}" \
+            --platform managed \
+            --allow-unauthenticated \
+            --ingress all \
+            --service-account "800681558445-compute@developer.gserviceaccount.com" \
+            --execution-environment gen2 \
+            --network default \
+            --subnet default \
+            --vpc-egress private-ranges-only \
+            --cpu 1 \
+            --memory 1Gi \
+            --concurrency 4 \
+            --timeout 300 \
+            --min-instances 0 \
+            --max-instances 5 \
+            --port 8080 \
+            --set-env-vars "NUDGE_SERVICE_ROLE=dispatch,NUDGE_SERVICE_ENV_FILE=/secrets/app_env/.env,GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID},GCP_PROJECT_ID=${GCP_PROJECT_ID},PUBLIC_API_BASE_URL=https://astroroshni.com,NUDGE_TASKS_TARGET_BASE_URL=${{ steps.deploy_nudge_worker_service.outputs.service_url }}" \
+            --update-secrets "/secrets/app_env/.env=APP_ENV_FILE:latest,NUDGE_CRON_SECRET=NUDGE_CRON_SECRET:latest,NUDGE_TASKS_SECRET=NUDGE_TASKS_SECRET:latest"
+
+          SERVICE_URL="$(gcloud run services describe "${GCP_NUDGE_DISPATCH_SERVICE_NAME}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_NUDGE_SERVICE_REGION}" \
+            --format='value(status.url)')"
+          echo "service_url=${SERVICE_URL}" >> "${GITHUB_OUTPUT}"
+
+      - name: Repoint nudge scheduler jobs to nudge dispatch service
+        shell: bash
+        run: |
+          set -euo pipefail
+          DISPATCH_URL="${{ steps.deploy_nudge_dispatch_service.outputs.service_url }}"
+          CRON_SECRET="$(gcloud secrets versions access latest --secret=NUDGE_CRON_SECRET --project "${GCP_PROJECT_ID}" | tr -d '\r\n')"
+          gcloud scheduler jobs update http nudge-campaign-dispatch \
+            --project "${GCP_PROJECT_ID}" \
+            --location asia-south1 \
+            --uri "${DISPATCH_URL}/api/nudge/cron/campaign/dispatch-due?limit=20" \
+            --http-method POST \
+            --update-headers "X-Cron-Secret=${CRON_SECRET}"
+          gcloud scheduler jobs update http astroroshni-broadcast-dispatch-due \
+            --project "${GCP_PROJECT_ID}" \
+            --location asia-south1 \
+            --uri "${DISPATCH_URL}/api/nudge/cron/broadcast/dispatch-due?limit=100" \
+            --http-method POST \
+            --update-headers "X-Cron-Secret=${CRON_SECRET}"
+          gcloud scheduler jobs update http astroroshni-chat-followup-hourly \
+            --project "${GCP_PROJECT_ID}" \
+            --location asia-south1 \
+            --uri "${DISPATCH_URL}/api/nudge/cron/chat-followup/dispatch-recent?limit_users=200&lookback_minutes=60" \
+            --http-method POST \
+            --update-headers "X-Cron-Secret=${CRON_SECRET}"
+          gcloud scheduler jobs update http astroroshni-nudge-scan-daily \
+            --project "${GCP_PROJECT_ID}" \
+            --location asia-south1 \
+            --uri "${DISPATCH_URL}/api/nudge/scan" \
+            --http-method POST \
+            --update-headers "X-Cron-Secret=${CRON_SECRET}"
+
+  frontend:
+    if: ${{ (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') && needs.detect_changes.outputs.frontend_required == 'true' }}
+    needs: [detect_changes, backend_and_chat]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend-next/package-lock.json
+
+      - name: Build frontend artifact once
+        shell: bash
+        env:
+          CI: 'true'
+          GENERATE_SOURCEMAP: 'false'
+          INLINE_RUNTIME_CHUNK: 'true'
+          PRERENDER: 'true'
+        run: |
+          set -euo pipefail
+          npm --prefix frontend ci
+          npm --prefix frontend-next ci
+          unset PRERENDER_ROUTES
+          SITEMAP_URL="https://astroroshni.com/sitemap.xml" \
+          BLOG_API_URL="https://astroroshni.com" \
+          npm --prefix frontend run build:ci
+          tar -czf "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" -C frontend build
+
+      - name: Publish frontend artifact to GCS
+        shell: bash
+        env:
+          GCP_FRONTEND_ARTIFACT_BUCKET: ${{ vars.GCP_FRONTEND_ARTIFACT_BUCKET }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${GCP_FRONTEND_ARTIFACT_BUCKET}" ]]; then
+            echo "❌ GCP_FRONTEND_ARTIFACT_BUCKET GitHub variable is required to publish frontend artifacts"
+            exit 1
+          fi
+          gcloud config set project "${GCP_PROJECT_ID}"
+          VERSIONED_URI="gs://${GCP_FRONTEND_ARTIFACT_BUCKET}/prod/frontend-build-${GITHUB_SHA}.tgz"
+          LATEST_URI="gs://${GCP_FRONTEND_ARTIFACT_BUCKET}/prod/frontend-build-latest.tgz"
+          gcloud storage cp "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" "${VERSIONED_URI}"
+          gcloud storage cp "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" "${LATEST_URI}"
+
+      - name: Publish frontend site build to GCS
+        if: ${{ vars.GCP_FRONTEND_SITE_BUCKET != '' }}
+        shell: bash
+        env:
+          GCP_FRONTEND_SITE_BUCKET: ${{ vars.GCP_FRONTEND_SITE_BUCKET }}
+        run: |
+          set -euo pipefail
+          gcloud config set project "${GCP_PROJECT_ID}"
+          gsutil -m rsync -r -d frontend/build "gs://${GCP_FRONTEND_SITE_BUCKET}"
+          gsutil -m setmeta -h "Cache-Control:no-cache" "gs://${GCP_FRONTEND_SITE_BUCKET}/**/*.html" || true
+          gsutil -m setmeta -h "Cache-Control:public, max-age=31536000, immutable" "gs://${GCP_FRONTEND_SITE_BUCKET}/static/**" || true
+          gsutil -m setmeta -h "Cache-Control:public, max-age=31536000, immutable" "gs://${GCP_FRONTEND_SITE_BUCKET}/_next/static/**" || true
+          gsutil -m setmeta -h "Cache-Control:public, max-age=3600" "gs://${GCP_FRONTEND_SITE_BUCKET}/manifest.json" || true
+          gsutil -m setmeta -h "Cache-Control:public, max-age=3600" "gs://${GCP_FRONTEND_SITE_BUCKET}/robots.txt" || true
+          gsutil -m setmeta -h "Cache-Control:public, max-age=3600" "gs://${GCP_FRONTEND_SITE_BUCKET}/sitemap.xml" || true
+
+  finalize_app_deploy:
+    if: ${{ always() && (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') }}
+    needs:
+      - backend_and_chat
+      - detect_changes
+      - payment_service
+      - nudge_services
+      - frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Final public site health check
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 20 "https://astroroshni.com/api/health" >/dev/null
           curl -fsS --max-time 20 "https://astroroshni.com/" >/dev/null
-        fi
-        echo "========== GitHub Actions: rolling app deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
 
-    - name: Build baked backend release image
-      id: baked_image
-      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
-      shell: bash
-      env:
-        GCP_RELEASE_BASE_IMAGE: ${{ vars.GCP_RELEASE_BASE_IMAGE || 'astroroshni-release-backend-cad234c4eae9-855' }}
-      run: |
-        set -euo pipefail
-        SHORT_SHA="${GITHUB_SHA::12}"
-        IMAGE_NAME="astroroshni-release-backend-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
-        echo "image_name=${IMAGE_NAME}" >> "${GITHUB_OUTPUT}"
-        APP_ROOT="${GITHUB_WORKSPACE}" \
-        GCLOUD_BIN="gcloud" \
-        GCLOUD_CONFIG="${CLOUDSDK_CONFIG:-}" \
-        PROJECT_ID="${GCP_PROJECT_ID}" \
-        ZONE="${GCP_API_MIG_ZONE}" \
-        MACHINE_TYPE="${GCP_IMAGE_BUILDER_MACHINE_TYPE}" \
-        BASE_IMAGE="${GCP_RELEASE_BASE_IMAGE}" \
-        BASE_IMAGE_PROJECT="${GCP_PROJECT_ID}" \
-        IMAGE_NAME="${IMAGE_NAME}" \
-        IMAGE_FAMILY="astroroshni-release-backend" \
-        STORAGE_LOCATION="asia-south2" \
-        KEEP_BUILDER_VM="false" \
-        SERVE_FRONTEND_LOCALLY="false" \
-        INSTALL_GCP_OPS_AGENT="false" \
-        bash "${GITHUB_WORKSPACE}/scripts/build-gce-release-image.sh"
+  replace_vms:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'replace_vms' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
 
-    - name: Refresh API MIG baked-image template for future replacements
-      id: baked_template_api
-      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
-      shell: bash
-      run: |
-        set -euo pipefail
-        SHORT_SHA="${GITHUB_SHA::12}"
-        TEMPLATE_NAME="astro-baked-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
-        SUBNET_REGION="${GCP_API_MIG_ZONE%-*}"
-        SUBNET_SELF_LINK="projects/${GCP_PROJECT_ID}/regions/${SUBNET_REGION}/subnetworks/default"
-        echo "template_name=${TEMPLATE_NAME}" >> "${GITHUB_OUTPUT}"
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
 
-        gcloud compute instance-templates create "${TEMPLATE_NAME}" \
-          --project="${GCP_PROJECT_ID}" \
-          --machine-type="${GCP_BACKEND_MACHINE_TYPE}" \
-          --network=default \
-          --subnet="${SUBNET_SELF_LINK}" \
-          --no-address \
-          --maintenance-policy=MIGRATE \
-          --provisioning-model=STANDARD \
-          --service-account="800681558445-compute@developer.gserviceaccount.com" \
-          --scopes="https://www.googleapis.com/auth/cloud-platform" \
-          --tags="web-server" \
-          --image="${{ steps.baked_image.outputs.image_name }}" \
-          --image-project="${GCP_PROJECT_ID}" \
-          --metadata-from-file="startup-script=${GITHUB_WORKSPACE}/scripts/gce-startup-bootstrap.sh"
-
-        gcloud compute instance-groups managed set-instance-template "${GCP_API_MIG_NAME}" \
-          --project="${GCP_PROJECT_ID}" \
-          --zone="${GCP_API_MIG_ZONE}" \
-          --template="${TEMPLATE_NAME}"
-
-        echo "Updated API future replacement template to ${TEMPLATE_NAME}"
-
-    - name: Refresh chat worker MIG baked-image template for future replacements
-      id: baked_template_chat_worker
-      if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
-      shell: bash
-      run: |
-        set -euo pipefail
-        SHORT_SHA="${GITHUB_SHA::12}"
-        TEMPLATE_NAME="astro-chat-worker-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
-        SUBNET_REGION="${GCP_CHAT_WORKER_MIG_ZONE%-*}"
-        SUBNET_SELF_LINK="projects/${GCP_PROJECT_ID}/regions/${SUBNET_REGION}/subnetworks/default"
-        echo "template_name=${TEMPLATE_NAME}" >> "${GITHUB_OUTPUT}"
-
-        gcloud compute instance-templates create "${TEMPLATE_NAME}" \
-          --project="${GCP_PROJECT_ID}" \
-          --machine-type="${GCP_BACKEND_MACHINE_TYPE}" \
-          --network=default \
-          --subnet="${SUBNET_SELF_LINK}" \
-          --no-address \
-          --maintenance-policy=MIGRATE \
-          --provisioning-model=STANDARD \
-          --service-account="800681558445-compute@developer.gserviceaccount.com" \
-          --scopes="https://www.googleapis.com/auth/cloud-platform" \
-          --tags="web-server" \
-          --image="${{ steps.baked_image.outputs.image_name }}" \
-          --image-project="${GCP_PROJECT_ID}" \
-          --metadata-from-file="startup-script=${GITHUB_WORKSPACE}/scripts/gce-startup-bootstrap.sh"
-
-        gcloud compute instance-groups managed set-instance-template "${GCP_CHAT_WORKER_MIG_NAME}" \
-          --project="${GCP_PROJECT_ID}" \
-          --zone="${GCP_CHAT_WORKER_MIG_ZONE}" \
-          --template="${TEMPLATE_NAME}"
-
-        echo "Updated chat-worker future replacement template to ${TEMPLATE_NAME}"
-
-    - name: Emergency rolling VM replacement
-      if: ${{ github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'replace_vms' }}
-      run: |
-        set -euo pipefail
-        echo "========== GitHub Actions: MIG replacement start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
-        gcloud config set project "${GCP_PROJECT_ID}"
-        gcloud compute instance-groups managed rolling-action replace "${GCP_API_MIG_NAME}" \
-          --project "${GCP_PROJECT_ID}" \
-          --zone "${GCP_API_MIG_ZONE}" \
-          --max-unavailable 1 \
-          --max-surge 1
-        gcloud compute instance-groups managed wait-until "${GCP_API_MIG_NAME}" \
-          --project "${GCP_PROJECT_ID}" \
-          --stable \
-          --zone "${GCP_API_MIG_ZONE}" \
-          --timeout 3600
-        gcloud compute instance-groups managed list-instances "${GCP_API_MIG_NAME}" \
-          --project "${GCP_PROJECT_ID}" \
-          --zone "${GCP_API_MIG_ZONE}"
-        gcloud compute instance-groups managed rolling-action replace "${GCP_CHAT_WORKER_MIG_NAME}" \
-          --project "${GCP_PROJECT_ID}" \
-          --zone "${GCP_CHAT_WORKER_MIG_ZONE}" \
-          --max-unavailable 1 \
-          --max-surge 1
-        gcloud compute instance-groups managed wait-until "${GCP_CHAT_WORKER_MIG_NAME}" \
-          --project "${GCP_PROJECT_ID}" \
-          --stable \
-          --zone "${GCP_CHAT_WORKER_MIG_ZONE}" \
-          --timeout 3600
-        gcloud compute instance-groups managed list-instances "${GCP_CHAT_WORKER_MIG_NAME}" \
-          --project "${GCP_PROJECT_ID}" \
-          --zone "${GCP_CHAT_WORKER_MIG_ZONE}"
-        echo "========== GitHub Actions: MIG replacement end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
+      - name: Emergency rolling VM replacement
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "========== GitHub Actions: MIG replacement start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
+          gcloud config set project "${GCP_PROJECT_ID}"
+          gcloud compute instance-groups managed rolling-action replace "${GCP_API_MIG_NAME}" \
+            --project "${GCP_PROJECT_ID}" \
+            --zone "${GCP_API_MIG_ZONE}" \
+            --max-unavailable 1 \
+            --max-surge 1
+          gcloud compute instance-groups managed wait-until "${GCP_API_MIG_NAME}" \
+            --project "${GCP_PROJECT_ID}" \
+            --stable \
+            --zone "${GCP_API_MIG_ZONE}" \
+            --timeout 3600
+          gcloud compute instance-groups managed list-instances "${GCP_API_MIG_NAME}" \
+            --project "${GCP_PROJECT_ID}" \
+            --zone "${GCP_API_MIG_ZONE}"
+          gcloud compute instance-groups managed rolling-action replace "${GCP_CHAT_WORKER_MIG_NAME}" \
+            --project "${GCP_PROJECT_ID}" \
+            --zone "${GCP_CHAT_WORKER_MIG_ZONE}" \
+            --max-unavailable 1 \
+            --max-surge 1
+          gcloud compute instance-groups managed wait-until "${GCP_CHAT_WORKER_MIG_NAME}" \
+            --project "${GCP_PROJECT_ID}" \
+            --stable \
+            --zone "${GCP_CHAT_WORKER_MIG_ZONE}" \
+            --timeout 3600
+          gcloud compute instance-groups managed list-instances "${GCP_CHAT_WORKER_MIG_NAME}" \
+            --project "${GCP_PROJECT_ID}" \
+            --zone "${GCP_CHAT_WORKER_MIG_ZONE}"
+          echo "========== GitHub Actions: MIG replacement end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="

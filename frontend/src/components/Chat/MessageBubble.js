@@ -217,13 +217,44 @@ const MessageBubble = ({
         if (!insightsKey) return;
         if (!chartInsights.length) return;
 
+        console.log('[MessageBubble] chart insights init', {
+            insightsKey,
+            messageId: message?.messageId,
+            processingClientId: message?.processingClientId,
+            chartInsightsCount: chartInsights.length,
+            houses: chartInsights.map((item) => item?.house_number ?? item?.house ?? item?.houseNumber),
+        });
+
         setInsightIndex(0);
         const interval = setInterval(() => {
-            setInsightIndex((prev) => (prev + 1) % chartInsights.length);
-        }, 10000);
+            setInsightIndex((prev) => {
+                const next = (prev + 1) % chartInsights.length;
+                console.log('[MessageBubble] chart insight rotate', {
+                    insightsKey,
+                    prev,
+                    next,
+                    chartInsightsCount: chartInsights.length,
+                    currentHouse: chartInsights[next]?.house_number ?? chartInsights[next]?.house ?? chartInsights[next]?.houseNumber,
+                });
+                return next;
+            });
+        }, 2500);
 
         return () => clearInterval(interval);
     }, [insightsKey, chartInsights.length]);
+
+    useEffect(() => {
+        if (!chartInsights.length) return;
+        console.log('[MessageBubble] render state', {
+            insightsKey,
+            insightIndex,
+            chartInsightsCount: chartInsights.length,
+            currentHouse: chartInsights[insightIndex]?.house_number ?? chartInsights[insightIndex]?.house ?? chartInsights[insightIndex]?.houseNumber,
+            messageId: message?.messageId,
+            processingClientId: message?.processingClientId,
+            isProcessing: message?.isProcessing,
+        });
+    }, [insightsKey, insightIndex, chartInsights, message?.messageId, message?.processingClientId, message?.isProcessing]);
 
     const [podcastModalOpen, setPodcastModalOpen] = useState(false);
     const [podcastModalMode, setPodcastModalMode] = useState('loading');

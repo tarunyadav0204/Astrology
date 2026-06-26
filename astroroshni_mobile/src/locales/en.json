@@ -533,6 +533,7 @@
   "chat": {
     "chartEssence": "{{name}}'s Chart Essence",
     "welcomeMessage": "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nTap a question below, or ask me anything in your own words.",
+    "nativeGateTapInstruction": "Please choose one of the options below instead of typing a reply.",
     "welcomeSuggestionsTitle": "Try asking",
     "insufficientCreditsTitle": "Not enough credits",
     "insufficientCreditsMessage": "This question needs {{cost}} credits — you have {{balance}}. Add credits to continue your reading.",

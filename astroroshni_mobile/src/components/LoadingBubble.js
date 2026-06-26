@@ -32,6 +32,19 @@ const LoadingBubble = ({
 
     const hasChartInsights = chartInsights && Array.isArray(chartInsights) && chartInsights.length > 0;
     const hasChartData = chartData && (chartData.planets || chartData.houses);
+    const chartInsightsCount = Array.isArray(chartInsights) ? chartInsights.length : 0;
+
+    useEffect(() => {
+        if (!hasChartInsights) {
+            if (currentIndex !== 0) {
+                setCurrentIndex(0);
+            }
+            return;
+        }
+        if (currentIndex >= chartInsightsCount) {
+            setCurrentIndex(0);
+        }
+    }, [hasChartInsights, chartInsightsCount, currentIndex]);
 
     useEffect(() => {
         const total = Math.max(0, Number(expectedWaitSeconds) || 0);
@@ -124,15 +137,15 @@ const LoadingBubble = ({
                 stopInsightFade();
                 const fadeOut = Animated.timing(fadeAnim, {
                     toValue: 0,
-                    duration: 500,
+                    duration: 250,
                     useNativeDriver: true,
                 });
                 fadeOut.start(({ finished }) => {
                     if (!mountedRef.current || !finished) return;
-                    setCurrentIndex((prevIndex) => (prevIndex + 1) % chartInsights.length);
+                    setCurrentIndex((prevIndex) => (prevIndex + 1) % chartInsightsCount);
                     const fadeIn = Animated.timing(fadeAnim, {
                         toValue: 1,
-                        duration: 500,
+                        duration: 250,
                         useNativeDriver: true,
                     });
                     insightFadeHandleRef.current = {
@@ -140,7 +153,7 @@ const LoadingBubble = ({
                     };
                     fadeIn.start();
                 });
-            }, 15000);
+            }, 12000);
         } else {
             const pulseLoop = Animated.loop(
                 Animated.sequence([
@@ -181,7 +194,7 @@ const LoadingBubble = ({
             stopAnimatedValue(shimmerAnim, 0);
             stopAnimatedValue(fadeAnim, 1);
         };
-    }, [hasChartInsights, chartInsights]);
+    }, [hasChartInsights, chartInsightsCount]);
 
     const isDarkMode = theme === 'dark';
     const minutes = Math.floor(remainingSeconds / 60);

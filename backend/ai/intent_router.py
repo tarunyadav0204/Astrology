@@ -44,6 +44,16 @@ _MONTH_NAME_TO_NUM = {
 }
 
 _MONTH_TOKEN_RE = r"(?:january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)"
+_CHART_INSIGHT_PLACEHOLDER_RE = re.compile(
+    r"\[(?:sign|planet|house|nakshatra|degree|real insight|message|placeholder|.*language.*?)\]",
+    re.IGNORECASE,
+)
+
+
+def _ordinal_suffix(value: int) -> str:
+    if 10 <= value % 100 <= 20:
+        return "th"
+    return {1: "st", 2: "nd", 3: "rd"}.get(value % 10, "th")
 
 
 # Canonical divisional bundles per intent category (keep in sync with IntentRouter._get_default_divisional_charts).
@@ -795,6 +805,86 @@ class IntentRouter:
             logger.warning("intent router model %s not available (%s), using fallback", name, e)
             return self.model
 
+    def _chart_insight_message_is_valid(self, message: Any) -> bool:
+        if not isinstance(message, str):
+            return False
+        text = message.strip()
+        if not text:
+            return False
+        if _CHART_INSIGHT_PLACEHOLDER_RE.search(text):
+            return False
+        lowered = text.lower()
+        blocked_snippets = (
+            "real insight in inferred",
+            "current question language",
+            "replace bracketed text",
+            "generic house meaning",
+            "specific insight about this native",
+        )
+        return not any(snippet in lowered for snippet in blocked_snippets)
+
+    def _build_fallback_chart_insights(self, d1_chart: Dict[str, Any] | None) -> list[Dict[str, Any]]:
+        if not isinstance(d1_chart, dict):
+            return []
+
+        planets = d1_chart.get("planets")
+        if not isinstance(planets, dict):
+            return []
+
+        ascendant_info = d1_chart.get("ascendant_info") or d1_chart.get("ascendant") or {}
+        asc_sign_name = ""
+        if isinstance(ascendant_info, dict):
+            asc_sign_name = str(
+                ascendant_info.get("sign_name")
+                or ascendant_info.get("sign")
+                or ascendant_info.get("formatted")
+                or ""
+            ).strip()
+
+        house_to_planets: dict[int, list[str]] = {}
+        for planet_name, pdata in planets.items():
+            if not isinstance(pdata, dict):
+                continue
+            try:
+                house = int(pdata.get("house"))
+            except (TypeError, ValueError):
+                continue
+            if not 1 <= house <= 12:
+                continue
+            display_name = str(planet_name).strip()
+            if not display_name:
+                continue
+            house_to_planets.setdefault(house, []).append(display_name)
+
+        insights: list[Dict[str, Any]] = []
+        if asc_sign_name:
+            insights.append(
+                {
+                    "house_number": 1,
+                    "message": f"The Ascendant is in {asc_sign_name}, shaping how this person naturally approaches life and presents themselves.",
+                    "highlight_type": "ascendant",
+                }
+            )
+
+        for house in range(1, 13):
+            occupants = house_to_planets.get(house, [])
+            if not occupants:
+                continue
+            joined = ", ".join(occupants[:3])
+            plural = "s" if len(occupants) > 1 else ""
+            verb = "are" if len(occupants) > 1 else "is"
+            insights.append(
+                {
+                    "house_number": house,
+                    "message": f"{joined} {verb} placed in the {house}{_ordinal_suffix(house)} house, making this area of life more prominent in the chart.",
+                    "highlight_type": "planets",
+                }
+            )
+            if len(insights) >= 6:
+                break
+
+        return insights[:6]
+
     def _finalize_router_result(
         self,
         result: Dict[str, Any],
@@ -805,6 +895,7 @@ class IntentRouter:
         resolved_now: datetime,
         normalized_query_context: Dict[str, Any] | None,
         include_chart_insights: bool,
+        d1_chart: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         if 'status' not in result:
             result['status'] = 'READY'
@@ -845,10 +936,18 @@ class IntentRouter:
         if include_chart_insights:
             raw_insights = result.get('chart_insights')
             if isinstance(raw_insights, list) and raw_insights:
-                valid = [x for x in raw_insights if isinstance(x, dict) and x.get('house_number') and x.get('message')]
-                result['chart_insights'] = valid
+                valid = []
+                for item in raw_insights:
+                    if not isinstance(item, dict):
+                        continue
+                    house_number = item.get('house_number')
+                    message = item.get('message')
+                    if not house_number or not self._chart_insight_message_is_valid(message):
+                        continue
+                    valid.append(item)
+                result['chart_insights'] = valid or self._build_fallback_chart_insights(d1_chart)
             else:
-                result['chart_insights'] = []
+                result['chart_insights'] = self._build_fallback_chart_insights(d1_chart)
         else:
             result['chart_insights'] = []
 
@@ -1169,6 +1268,7 @@ Return ONLY this JSON shape:
                 resolved_now=resolved_now,
                 normalized_query_context=normalized_query_context,
                 include_chart_insights=False,
+                d1_chart=d1_chart,
             )
             final["_llm_usage_stage"] = _build_usage_stage(
                 stage="instant_intent_router",
@@ -1292,7 +1392,7 @@ The app-selected language is "{app_language}", but this is only UI context. Do n
 
 You must infer the language of CURRENT QUESTION yourself and use that same language and natural script for every user-visible JSON string:
 1) If status is "CLARIFY": "clarification_question" MUST be in the language of CURRENT QUESTION.
-2) If status is "READY": every "message" inside "chart_insights" MUST be in the language of CURRENT QUESTION.
+2) If status is "READY": do not generate UI preview insight text; the backend computes those separately.
 
 Examples:
 - English question -> English strings.
@@ -1304,19 +1404,6 @@ Examples:
 Only if CURRENT QUESTION is too short or language-ambiguous, use app-selected language "{app_language}" as fallback.
 JSON keys stay English; only end-user string values change language.
 """
-
-        chart_insights_message_spec = (
-            '- message: SPECIFIC insight about THIS native\'s chart, written in the language and natural script '
-            'you infer from CURRENT QUESTION. Keep script consistent with CURRENT QUESTION (do not transliterate scripts).'
-        )
-        chart_insights_example_block = """
-        Example structure only. Replace bracketed text with real chart-specific prose in the inferred CURRENT QUESTION language:
-        "chart_insights": [
-            {"house_number": 1, "message": "[real insight in inferred CURRENT QUESTION language]", "highlight_type": "ascendant"},
-            {"house_number": 2, "message": "[real insight in inferred CURRENT QUESTION language]", "highlight_type": "planets"},
-            {"house_number": 5, "message": "[real insight in inferred CURRENT QUESTION language]", "highlight_type": "planets"}
-        ]
-        """
 
         force_ready_instruction = ""
         if force_ready:
@@ -1363,12 +1450,6 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
 
         prompt = f"""
         You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification, and to classify the user's intent.
-        
-        🚨 CRITICAL INSTRUCTION FOR chart_insights:
-        - When status is "READY", you MUST generate chart_insights array with 5-7 house insights
-        - When status is "CLARIFY", set chart_insights to null
-        - chart_insights is MANDATORY when status="READY"
-        - DO NOT return null for chart_insights when status="READY"
         
         🚨 ABSOLUTE PROHIBITION - NEVER ASK FOR BIRTH DETAILS:
         - The user's complete birth chart data is ALREADY PROVIDED in the D1_CHART_DATA below
@@ -1524,30 +1605,11 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
           - "Marriage prospects in my birth chart"
         - Mentioning "chart" alone is NOT enough. Only set `chart_focus` when a specific lens/chart is actually the requested object.
 
-        CHART INSIGHTS:
-        🚨 MANDATORY REQUIREMENT 🚨
-        When status is "READY", you MUST generate chart_insights using the D1 chart data provided.
-        DO NOT set chart_insights to null when status is "READY".
-        
-        D1 CHART DATA PROVIDED:
-        {json.dumps(d1_chart) if d1_chart else 'No chart data available'}
-        
-        Generate a `chart_insights` array with 5-7 objects analyzing THIS NATIVE'S SPECIFIC CHART.
-        Look at which planets are in which houses and signs, then provide SPECIFIC insights.
-        
-        Each object MUST have:
-        - house_number: (1-12)
-        {chart_insights_message_spec}
-        - highlight_type: "ascendant" | "planets" | "empty"
-        
-        DO NOT give generic house meanings. Analyze the ACTUAL planetary placements in the chart.
-        {chart_insights_example_block}
-
         Return ONLY a JSON object:
         {{
             "status": "CLARIFY" or "READY",
             "clarification_question": "Your clarifying question here (only if status=CLARIFY; when giving options, use lettered quick replies like Type A/Type B with variable count, not fixed 3; keep same language + script as CURRENT QUESTION)",
-            "chart_insights": [{{"house_number": 1, "message": "Message must match CURRENT QUESTION language and script style", "highlight_type": "ascendant"}}],
+            "chart_insights": [],
             "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "PREDICT_EVENT_TIMING" or "PREDICT_EVENTS_FOR_PERIOD" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "ANALYZE_ROOT_CAUSE" or "RECOMMEND_REMEDY_FOR_PROBLEM",
             "chart_focus": {{
                 "kind": "chart_specific",
@@ -1611,7 +1673,8 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
                 current_month=current_month,
                 resolved_now=resolved_now,
                 normalized_query_context=normalized_query_context,
-                include_chart_insights=True,
+                include_chart_insights=False,
+                d1_chart=d1_chart,
             )
         except Exception as e:
             total_time = time.time() - intent_start

@@ -205,6 +205,12 @@ def _house_ordinal(house_num: int) -> str:
     return f"{house_num}th"
 
 
+def _ordinal_suffix(house_num: int) -> str:
+    if 10 <= house_num % 100 <= 20:
+        return "th"
+    return {1: "st", 2: "nd", 3: "rd"}.get(house_num % 10, "th")
+
+
 def _chart_display_name(chart_id: str) -> str:
     labels = {
         "lagna": "Lagna (D1)",
@@ -830,3 +836,159 @@ def build_house_insight(
         chart_id=chart_id,
         transit_date=transit_date,
     )
+
+
+def _preview_highlight_type(chart_data: Dict[str, Any], house_num: int) -> str:
+    planets = chart_data.get("planets") or {}
+    for data in planets.values():
+        if isinstance(data, dict) and int(data.get("house", 0) or 0) == house_num:
+            return "planets"
+    return "ascendant" if house_num == 1 else "empty"
+
+
+def _preview_house_topic(insight: Dict[str, Any]) -> str:
+    significance = str(insight.get("significance") or "")
+    primary = significance.split(",")[0].strip().lower()
+    return primary or "this area of life"
+
+
+def _preview_resident_names(chart_data: Dict[str, Any], house_num: int) -> List[str]:
+    planets = chart_data.get("planets") or {}
+    residents: List[str] = []
+    for planet_name, data in planets.items():
+        if isinstance(data, dict) and int(data.get("house", 0) or 0) == house_num:
+            residents.append(str(planet_name))
+    return residents
+
+
+def _preview_opening(insight: Dict[str, Any], chart_data: Dict[str, Any], house_num: int) -> str:
+    topic = _preview_house_topic(insight)
+    residents = _preview_resident_names(chart_data, house_num)
+    if house_num == 1:
+        sign_name = insight.get("sign_name") or "the ascendant sign"
+        return f"The 1st house stands out strongly through {sign_name}, so personality and self-direction come forward first."
+    if residents:
+        if len(residents) == 1:
+            return f"{residents[0]} anchors the {house_num}{_ordinal_suffix(house_num)} house, making {topic} a visible life theme."
+        if len(residents) == 2:
+            return f"{residents[0]} and {residents[1]} concentrate energy in the {house_num}{_ordinal_suffix(house_num)} house, so {topic} becomes a major focus."
+        joined = ", ".join(residents[:3])
+        return f"{joined} all emphasize the {house_num}{_ordinal_suffix(house_num)} house, making {topic} one of the stronger chart signatures."
+    return f"The {house_num}{_ordinal_suffix(house_num)} house quietly shapes {topic}, even without a heavy planetary pile-up there."
+
+
+def _preview_reason_sentence(label: str, prefix: str) -> str:
+    clean = str(label or "").strip().rstrip(".")
+    if not clean:
+        return ""
+    return f"{prefix} {clean}."
+
+
+def _preview_message_from_house_insight(insight: Dict[str, Any]) -> str:
+    support = [item.get("label") for item in (insight.get("support_factors") or []) if item.get("label")]
+    stress = [item.get("label") for item in (insight.get("stress_factors") or []) if item.get("label")]
+    activation = [item.get("label") for item in (insight.get("activation_factors") or []) if item.get("label")]
+    topic = _preview_house_topic(insight)
+    house_num = int(insight.get("house_num") or insight.get("house_number") or 0)
+    raw = insight.get("raw") or {}
+    lord = insight.get("house_lord") or "The house lord"
+
+    parts: List[str] = []
+    verdict = (insight.get("verdict") or {}).get("label")
+    if verdict:
+        chart_data = insight.get("_chart_data") or {}
+        parts.append(_preview_opening(insight, chart_data, house_num))
+        parts.append(f"Overall it looks {str(verdict).lower()}.")
+    else:
+        parts.append("This house has a clear chart signature.")
+
+    if support:
+        parts.append(_preview_reason_sentence(support[0], "Support comes from"))
+    if stress:
+        parts.append(_preview_reason_sentence(stress[0], "Pressure comes from"))
+
+    if activation:
+        parts.append(_preview_reason_sentence(activation[0], "Right now this house is active because"))
+    elif raw.get("activation_count", 0):
+        parts.append(f"Timing is also live here, so {topic} may be easier to notice in day-to-day life.")
+
+    if not support and not stress:
+        parts.append(f"{topic.capitalize()} depends more on {lord} and timing than on a single dominant placement.")
+
+    return " ".join(parts)
+
+
+def _preview_score(insight: Dict[str, Any], chart_data: Dict[str, Any], house_num: int) -> float:
+    raw = insight.get("raw") or {}
+    support_count = float(raw.get("support_count") or 0)
+    stress_count = float(raw.get("stress_count") or 0)
+    activation_count = float(raw.get("activation_count") or 0)
+    occupant_count = len(_preview_resident_names(chart_data, house_num))
+    occupant_bonus = float(occupant_count) * 2.0
+    asc_bonus = 2.5 if house_num == 1 else 0.0
+    angle_bonus = 1.8 if house_num in {1, 4, 7, 10} else 0.0
+    trikona_bonus = 1.4 if house_num in {1, 5, 9} else 0.0
+    relationship_bonus = 1.2 if house_num in {2, 5, 7, 8, 11} else 0.0
+    dignity_bonus = 1.5 if raw.get("lord_dignity") in {"own_sign", "exalted", "moolatrikona", "favorable"} else 0.0
+    stress_signal_bonus = min(stress_count, 3.0) * 0.8
+    support_signal_bonus = min(support_count, 3.0) * 1.0
+    timing_bonus = activation_count * 1.6
+    return (
+        occupant_bonus
+        + asc_bonus
+        + angle_bonus
+        + trikona_bonus
+        + relationship_bonus
+        + dignity_bonus
+        + stress_signal_bonus
+        + support_signal_bonus
+        + timing_bonus
+    )
+
+
+def build_chart_preview_insights(
+    birth_data: Dict[str, Any],
+    chart_data: Dict[str, Any],
+    chart_id: str = "lagna",
+    transit_date: Optional[str] = None,
+    limit: int = 6,
+) -> List[Dict[str, Any]]:
+    normalized_chart = _normalize_chart_data(chart_data or {})
+    if not isinstance(normalized_chart, dict) or not isinstance(normalized_chart.get("planets"), dict):
+        birth_obj = _birth_obj(birth_data)
+        natal_chart = ChartCalculator({}).calculate_chart(birth_obj)
+        normalized_chart = _normalize_chart_data(natal_chart)
+    ranked: List[Dict[str, Any]] = []
+
+    for house_num in range(1, 13):
+        try:
+            insight = _collect_house_factors(
+                birth_data=birth_data,
+                chart_data=normalized_chart,
+                house_num=house_num,
+                chart_id=chart_id,
+                transit_date=transit_date,
+            )
+        except Exception:
+            continue
+
+        ranked.append(
+            {
+                "house_number": house_num,
+                "message": _preview_message_from_house_insight(
+                    {
+                        **insight,
+                        "house_number": house_num,
+                        "_chart_data": normalized_chart,
+                    }
+                ),
+                "highlight_type": _preview_highlight_type(normalized_chart, house_num),
+                "_score": _preview_score(insight, normalized_chart, house_num),
+            }
+        )
+
+    ranked.sort(key=lambda item: (-float(item.get("_score") or 0), int(item.get("house_number") or 99)))
+    trimmed = ranked[: max(1, limit)]
+    for item in trimmed:
+        item.pop("_score", None)
+    return trimmed

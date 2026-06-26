@@ -32,12 +32,27 @@ const MessageList = ({
     podcastAutoLaunchKey = 0,
     instantLoaderRevealWords = 1,
 }) => {
+    React.useEffect(() => {
+        const processingMessages = (messages || []).filter((message) => message?.isProcessing);
+        if (!processingMessages.length) return;
+        console.log(
+            '[MessageList] processing rows',
+            processingMessages.map((message, index) => ({
+                index,
+                key: message.processingClientId || message.id || message.messageId || index,
+                messageId: message.messageId,
+                processingClientId: message.processingClientId,
+                chartInsightsCount: Array.isArray(message.chartInsights) ? message.chartInsights.length : 0,
+            }))
+        );
+    }, [messages]);
+
     return (
         <div className="message-list">
             {messages.map((message, index) => (
                 !messageRowShouldRender(message) ? null : (
                 <div
-                    key={message.id || message.messageId || index}
+                    key={message.processingClientId || message.id || message.messageId || index}
                     className={`message-list-item message-list-item--${message.role === 'user' ? 'user' : 'assistant'}`}
                     data-chat-message-index={index}
                     data-chat-scroll-id={

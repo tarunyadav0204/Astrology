@@ -13,6 +13,7 @@ import os
 import time
 from auth import get_current_user
 from db import get_conn, execute
+from charts.house_insight_service import build_chart_preview_insights
 
 logger = logging.getLogger(__name__)
 _CHAT_SCHEMA_FLAGS: set[str] = set()
@@ -286,6 +287,208 @@ def _load_chat_history_and_state(session_id: str):
         "history": _build_answer_history_from_rows(history_rows),
         "clarification_count": state_row[0] if state_row else 0,
         "extracted_context": extracted_context,
+    }
+
+
+def _ensure_conversation_state_pending_gate_cols(conn):
+    if _schema_already_ready("conversation_state_pending_gate_cols"):
+        return
+    execute(conn, "ALTER TABLE conversation_state ADD COLUMN IF NOT EXISTS pending_gate_type TEXT")
+    execute(conn, "ALTER TABLE conversation_state ADD COLUMN IF NOT EXISTS pending_gate_metadata TEXT")
+    execute(conn, "ALTER TABLE conversation_state ADD COLUMN IF NOT EXISTS pending_gate_message_id INTEGER")
+    _mark_schema_ready("conversation_state_pending_gate_cols")
+
+
+def _conversation_state_pending_gate_cols_exist(conn) -> bool:
+    cur = execute(
+        conn,
+        """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'conversation_state'
+              AND column_name IN ('pending_gate_type', 'pending_gate_metadata', 'pending_gate_message_id')
+        """,
+    )
+    names = {row[0] for row in (cur.fetchall() or []) if row and row[0]}
+    return {
+        "pending_gate_type",
+        "pending_gate_metadata",
+        "pending_gate_message_id",
+    }.issubset(names)
+
+
+def _ensure_conversation_state_pending_gate_cols_verified(conn):
+    if _conversation_state_pending_gate_cols_exist(conn):
+        _mark_schema_ready("conversation_state_pending_gate_cols")
+        return
+    _CHAT_SCHEMA_FLAGS.discard("conversation_state_pending_gate_cols")
+    _ensure_conversation_state_pending_gate_cols(conn)
+
+
+def _load_pending_native_gate(conn, session_id: str):
+    _ensure_conversation_state_pending_gate_cols_verified(conn)
+    try:
+        cur = execute(
+            conn,
+            """
+                SELECT pending_gate_type, pending_gate_metadata, pending_gate_message_id
+                FROM conversation_state
+                WHERE session_id = %s
+            """,
+            (session_id,),
+        )
+    except Exception as exc:
+        if 'pending_gate_type' in str(exc):
+            _CHAT_SCHEMA_FLAGS.discard("conversation_state_pending_gate_cols")
+            _ensure_conversation_state_pending_gate_cols_verified(conn)
+            cur = execute(
+                conn,
+                """
+                    SELECT pending_gate_type, pending_gate_metadata, pending_gate_message_id
+                    FROM conversation_state
+                    WHERE session_id = %s
+                """,
+                (session_id,),
+            )
+        else:
+            raise
+    row = cur.fetchone()
+    if not row or not row[0] or not row[1]:
+        return None
+    try:
+        metadata = json.loads(row[1]) if row[1] else {}
+    except Exception:
+        metadata = {}
+    return {
+        "pending_gate_type": row[0],
+        "pending_gate_metadata": metadata if isinstance(metadata, dict) else {},
+        "pending_gate_message_id": row[2],
+    }
+
+
+def _set_pending_native_gate(conn, session_id: str, gate_metadata: dict, message_id: int):
+    _ensure_conversation_state_pending_gate_cols_verified(conn)
+    cur = execute(
+        conn,
+        "SELECT clarification_count, extracted_context FROM conversation_state WHERE session_id = %s",
+        (session_id,),
+    )
+    row = cur.fetchone()
+    clarification_count = int(row[0] or 0) if row else 0
+    extracted_context = row[1] if row and row[1] is not None else json.dumps({})
+    execute(
+        conn,
+        """
+            INSERT INTO conversation_state (
+                session_id, clarification_count, extracted_context, pending_gate_type, pending_gate_metadata, pending_gate_message_id
+            )
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (session_id) DO UPDATE SET
+                pending_gate_type = EXCLUDED.pending_gate_type,
+                pending_gate_metadata = EXCLUDED.pending_gate_metadata,
+                pending_gate_message_id = EXCLUDED.pending_gate_message_id,
+                last_updated = CURRENT_TIMESTAMP
+        """,
+        (
+            session_id,
+            clarification_count,
+            extracted_context,
+            "native_gate",
+            json.dumps(gate_metadata or {}, ensure_ascii=False),
+            message_id,
+        ),
+    )
+
+
+def _clear_pending_native_gate(conn, session_id: str):
+    _ensure_conversation_state_pending_gate_cols_verified(conn)
+    cur = execute(
+        conn,
+        "SELECT clarification_count, extracted_context FROM conversation_state WHERE session_id = %s",
+        (session_id,),
+    )
+    row = cur.fetchone()
+    clarification_count = int(row[0] or 0) if row else 0
+    extracted_context = row[1] if row and row[1] is not None else json.dumps({})
+    execute(
+        conn,
+        """
+            INSERT INTO conversation_state (
+                session_id, clarification_count, extracted_context, pending_gate_type, pending_gate_metadata, pending_gate_message_id
+            )
+            VALUES (%s, %s, %s, NULL, NULL, NULL)
+            ON CONFLICT (session_id) DO UPDATE SET
+                pending_gate_type = NULL,
+                pending_gate_metadata = NULL,
+                pending_gate_message_id = NULL,
+                last_updated = CURRENT_TIMESTAMP
+        """,
+        (session_id, clarification_count, extracted_context),
+    )
+
+
+def _create_native_gate_response(
+    conn,
+    *,
+    session_id: str,
+    question: str,
+    gate_metadata: dict,
+    assistant_content: str,
+    client_request_id: str | None,
+    userid: int,
+    nudge_id: str = "",
+    chat_tier: str = "standard",
+):
+    _ensure_chat_messages_gate_metadata(conn)
+    _ensure_conversation_state_pending_gate_cols(conn)
+    cur = execute(
+        conn,
+        """
+            INSERT INTO chat_messages (session_id, sender, content, status, completed_at)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING message_id
+        """,
+        (session_id, "user", sanitize_text(question), "completed", datetime.now()),
+    )
+    user_message_id = cur.fetchone()[0]
+    _record_nudge_conversion_safe(
+        conn,
+        nudge_id=nudge_id,
+        userid=userid,
+        question=sanitize_text(question),
+    )
+    cur = execute(
+        conn,
+        """
+            INSERT INTO chat_messages
+                (session_id, sender, content, status, message_type, gate_metadata, completed_at, client_request_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING message_id
+        """,
+        (
+            session_id,
+            "assistant",
+            sanitize_text(assistant_content),
+            "completed",
+            "native_gate",
+            json.dumps(gate_metadata, ensure_ascii=False),
+            datetime.now(),
+            client_request_id,
+        ),
+    )
+    assistant_message_id = cur.fetchone()[0]
+    _set_pending_native_gate(conn, session_id, gate_metadata, assistant_message_id)
+    return {
+        "user_message_id": user_message_id,
+        "message_id": assistant_message_id,
+        "status": "completed",
+        "message_type": "native_gate",
+        "intent_gate": gate_metadata.get("intent_gate"),
+        "gate_metadata": gate_metadata,
+        "chat_tier": chat_tier,
+        "content": assistant_content,
+        "chart_insights": [],
+        "loading_messages": [],
     }
 
 
@@ -1227,6 +1430,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
 
     with get_conn() as conn:
         # Verify the session before any no-charge gates or credit checks.
+        _ensure_conversation_state_pending_gate_cols(conn)
         cur = execute(
             conn,
             "SELECT user_id, birth_chart_id FROM chat_sessions WHERE session_id = %s",
@@ -1295,6 +1499,121 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                         pass
                 return response
 
+        if subject_gate_override in {
+            "selected_chart_only",
+            "single_chart_only",
+            "relationship_context_provided",
+        } or partnership_mode:
+            _clear_pending_native_gate(conn, session_id)
+            conn.commit()
+
+        pending_gate_state = _load_pending_native_gate(conn, session_id)
+        if pending_gate_state and subject_gate_override == "":
+            from ai.chat_subject_gate import ChatSubjectGate, build_subject_gate_message
+
+            pending_gate_metadata = pending_gate_state.get("pending_gate_metadata") or {}
+            resolved_gate = await ChatSubjectGate().resolve_pending_gate_reply(
+                pending_gate=pending_gate_metadata,
+                user_message=sanitize_text(question),
+                birth_details=birth_details,
+                partner_birth_details=partner_birth_details,
+                language=language,
+            )
+            resolved_action = str(resolved_gate.get("action") or "").strip()
+            _chat_log_event(
+                "native_gate_resolved",
+                session_id=session_id,
+                action=resolved_action,
+                confidence=resolved_gate.get("confidence"),
+                reason=resolved_gate.get("reason"),
+            )
+            if resolved_action == "continue_selected_chart":
+                subject_gate_override = "selected_chart_only"
+                _clear_pending_native_gate(conn, session_id)
+                conn.commit()
+            elif resolved_action == "start_partnership":
+                extracted_hint = pending_gate_metadata.get("extracted_birth_hint") or {}
+                hint_complete = all(
+                    str(extracted_hint.get(field) or "").strip()
+                    for field in ("name", "date", "time", "place")
+                )
+                if not partnership_mode and hint_complete:
+                    partner_birth_details = {
+                        "name": extracted_hint.get("name") or "",
+                        "date": extracted_hint.get("date") or "",
+                        "time": extracted_hint.get("time") or "",
+                        "place": extracted_hint.get("place") or "",
+                        "latitude": extracted_hint.get("latitude"),
+                        "longitude": extracted_hint.get("longitude"),
+                        "gender": extracted_hint.get("gender") or "",
+                        "partnership_relationship": extracted_hint.get("relation_to_user") or "",
+                    }
+                    partnership_mode = True
+                    _clear_pending_native_gate(conn, session_id)
+                    conn.commit()
+                else:
+                    refreshed_gate = dict(pending_gate_metadata)
+                    refreshed_gate["intent_gate"] = "partnership_offer"
+                    refreshed_gate["user_message"] = (
+                        refreshed_gate.get("user_message")
+                        or "To start partnership analysis, please add the other person's birth details or tap the partnership option."
+                    )
+                    response = _create_native_gate_response(
+                        conn,
+                        session_id=session_id,
+                        question=question,
+                        gate_metadata=refreshed_gate,
+                        assistant_content=build_subject_gate_message(refreshed_gate),
+                        client_request_id=client_request_id,
+                        userid=current_user.userid,
+                        nudge_id=nudge_id,
+                        chat_tier=effective_chat_tier,
+                    )
+                    conn.commit()
+                    return response
+            elif resolved_action in {"need_relationship_context", "need_other_person_chart", "need_partner_birth_details", "repeat_gate"}:
+                refreshed_gate = dict(pending_gate_metadata)
+                if resolved_action == "need_relationship_context":
+                    refreshed_gate["intent_gate"] = "relationship_setup"
+                elif resolved_action == "need_other_person_chart":
+                    refreshed_gate["intent_gate"] = pending_gate_metadata.get("intent_gate") or "create_subject_chart"
+                elif resolved_action == "need_partner_birth_details":
+                    refreshed_gate["intent_gate"] = "partnership_offer"
+                response = _create_native_gate_response(
+                    conn,
+                    session_id=session_id,
+                    question=question,
+                    gate_metadata=refreshed_gate,
+                    assistant_content=build_subject_gate_message(refreshed_gate),
+                    client_request_id=client_request_id,
+                    userid=current_user.userid,
+                    nudge_id=nudge_id,
+                    chat_tier=effective_chat_tier,
+                )
+                conn.commit()
+                return response
+            elif resolved_action == "treat_as_new_question":
+                refreshed_gate = dict(pending_gate_metadata)
+                existing_message = str(refreshed_gate.get("user_message") or "").strip()
+                if not existing_message:
+                    existing_message = (
+                        "Please choose one of the options below to continue."
+                    )
+                refreshed_gate["user_message"] = existing_message
+                response = _create_native_gate_response(
+                    conn,
+                    session_id=session_id,
+                    question=question,
+                    gate_metadata=refreshed_gate,
+                    assistant_content=build_subject_gate_message(refreshed_gate),
+                    client_request_id=client_request_id,
+                    userid=current_user.userid,
+                    nudge_id=nudge_id,
+                    chat_tier=effective_chat_tier,
+                )
+                conn.commit()
+                return response
+
         cur = execute(
             conn,
             "SELECT COUNT(*) FROM chat_messages WHERE session_id = %s AND sender = 'user'",
@@ -1344,56 +1663,19 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                     "source": "chat_subject_gate",
                 }
                 with get_conn() as conn:
-                    _ensure_chat_messages_gate_metadata(conn)
-                    cur = execute(
+                    response = _create_native_gate_response(
                         conn,
-                        """
-                            INSERT INTO chat_messages (session_id, sender, content, status, completed_at)
-                            VALUES (%s, %s, %s, %s, %s)
-                            RETURNING message_id
-                        """,
-                        (session_id, "user", sanitize_text(question), "completed", datetime.now()),
-                    )
-                    user_message_id = cur.fetchone()[0]
-                    _record_nudge_conversion_safe(
-                        conn,
-                        nudge_id=nudge_id,
+                        session_id=session_id,
+                        question=question,
+                        gate_metadata=gate_metadata,
+                        assistant_content=assistant_content,
+                        client_request_id=client_request_id,
                         userid=current_user.userid,
-                        question=sanitize_text(question),
+                        nudge_id=nudge_id,
+                        chat_tier=effective_chat_tier,
                     )
-                    cur = execute(
-                        conn,
-                        """
-                            INSERT INTO chat_messages
-                                (session_id, sender, content, status, message_type, gate_metadata, completed_at, client_request_id)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                            RETURNING message_id
-                        """,
-                        (
-                            session_id,
-                            "assistant",
-                            sanitize_text(assistant_content),
-                            "completed",
-                            "native_gate",
-                            json.dumps(gate_metadata, ensure_ascii=False),
-                            datetime.now(),
-                            client_request_id,
-                        ),
-                    )
-                    assistant_message_id = cur.fetchone()[0]
                     conn.commit()
-                return {
-                    "user_message_id": user_message_id,
-                    "message_id": assistant_message_id,
-                    "status": "completed",
-                    "message_type": "native_gate",
-                    "intent_gate": gate_metadata.get("intent_gate"),
-                    "gate_metadata": gate_metadata,
-                    "chat_tier": effective_chat_tier,
-                    "content": assistant_content,
-                    "chart_insights": [],
-                    "loading_messages": [],
-                }
+                return response
         except Exception as gate_exc:
             logger.warning("chat subject gate skipped after error: %s", gate_exc)
 
@@ -1619,6 +1901,26 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         logger.warning("fetal sex gate skipped after error: %s", exc)
 
     chart_insights = []
+    if effective_chat_tier != "instant" and not partnership_mode and isinstance(birth_details, dict):
+        try:
+            chart_insights = build_chart_preview_insights(
+                birth_data=birth_details,
+                chart_data={},
+                chart_id="lagna",
+                limit=6,
+            )
+            if chart_insights:
+                with get_conn() as conn:
+                    _ensure_chat_messages_chart_insights(conn)
+                    execute(
+                        conn,
+                        "UPDATE chat_messages SET chart_insights = %s WHERE message_id = %s",
+                        (json.dumps(chart_insights, ensure_ascii=False), assistant_message_id),
+                    )
+                    conn.commit()
+        except Exception as exc:
+            logger.exception("failed to build early chart insights message_id=%s: %s", assistant_message_id, exc)
+
     worker_intent_metadata = {
         "query_context": request.get("query_context") or request.get("queryContext"),
     }
@@ -2421,6 +2723,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
     from chat.chat_context_builder import ChatContextBuilder
     from credits.credit_service import CreditService
     from ai.intent_router import IntentRouter
+    from charts.house_insight_service import build_chart_preview_insights
     from chat.fact_extractor import FactExtractor
     from ai.death_query_guard import is_death_override_unlocked, is_death_related, REFUSAL_MESSAGE
     from chat.instant_chat_pipeline import generate_instant_chat_response
@@ -2670,28 +2973,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     if cached_intent.get(channel_key) is not None:
                         intent[channel_key] = cached_intent.get(channel_key)
 
-            raw_chart_insights = intent.get("chart_insights")
-            if isinstance(raw_chart_insights, list):
-                persisted_chart_insights = [
-                    item
-                    for item in raw_chart_insights
-                    if isinstance(item, dict) and item.get("house_number") and item.get("message")
-                ]
-            else:
-                persisted_chart_insights = []
-            if persisted_chart_insights:
-                try:
-                    with get_conn() as conn:
-                        _ensure_chat_messages_chart_insights(conn)
-                        execute(
-                            conn,
-                            "UPDATE chat_messages SET chart_insights = %s WHERE message_id = %s",
-                            (json.dumps(persisted_chart_insights, ensure_ascii=False), message_id),
-                        )
-                        conn.commit()
-                except Exception:
-                    logger.exception("failed to persist chart insights message_id=%s", message_id)
-
             # Special handling for LIFESPAN_EVENT_TIMING transit range (full answer only, not clarification turn)
             if intent.get('mode') == 'LIFESPAN_EVENT_TIMING' and intent.get('status') == 'READY':
                 # Calculate age 18 to +25 years
@@ -2913,7 +3194,26 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             duration_ms=round((time.time() - context_start) * 1000, 1),
             mode=intent.get('mode', 'birth'),
         )
-        
+
+        if not is_instant_chat and isinstance(context, dict):
+            try:
+                preview_chart_insights = build_chart_preview_insights(
+                    birth_data=birth_data,
+                    chart_data=context.get("d1_chart") or {},
+                    chart_id="lagna",
+                    limit=6,
+                )
+                with get_conn() as conn:
+                    _ensure_chat_messages_chart_insights(conn)
+                    execute(
+                        conn,
+                        "UPDATE chat_messages SET chart_insights = %s WHERE message_id = %s",
+                        (json.dumps(preview_chart_insights, ensure_ascii=False), message_id),
+                    )
+                    conn.commit()
+            except Exception:
+                logger.exception("failed to build/persist calculator chart insights message_id=%s", message_id)
+
         # Get conversation history
         history = chat_state["history"]
 

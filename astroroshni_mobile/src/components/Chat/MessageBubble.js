@@ -1602,6 +1602,12 @@ function MessageBubble({
 
         {isNativeGate && !message.isTyping && (
           <View style={styles.nativeGateActionsWrap}>
+            <Text style={styles.nativeGateHelperText}>
+              {t(
+                'chat.nativeGateTapInstruction',
+                'Please choose one of the options below instead of typing a reply.'
+              )}
+            </Text>
             {isRelationshipSetupGate ? (
               <View style={styles.nativeGateOptionsWrap}>
                 {(gateMetadata.relationship_setup?.options || []).map((option, index) => {
@@ -2043,7 +2049,7 @@ const areMessageBubblePropsEqual = (prevProps, nextProps) => {
 
 export default React.memo(MessageBubble, areMessageBubblePropsEqual);
 
-const styles = StyleSheet.create({
+  const styles = StyleSheet.create({
   container: {
     marginVertical: 4,
   },
@@ -2913,5 +2919,12 @@ const styles = StyleSheet.create({
     color: '#57534e',
     fontSize: 13,
     fontWeight: '700',
+  },
+  nativeGateHelperText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#7c2d12',
+    fontWeight: '600',
+    marginBottom: 12,
   },
 });

@@ -494,6 +494,7 @@ export default function ChatScreen({ navigation, route }) {
   const freeUsedThisSendRef = useRef(false);
   const subjectGateOverrideRef = useRef(null);
   const subjectGateMemoryRef = useRef([]);
+  const sendMessageRef = useRef(null);
   /** True after chart/session 409 → new session; second /chat-v2/ask attempt uses this for admin log gating. */
   const pendingChartMismatchSecondAttemptRef = useRef(false);
   /** Delivery group id from a tapped nudge (push/inbox); attached to the next /chat-v2/ask for conversion attribution. */
@@ -2049,14 +2050,17 @@ export default function ChatScreen({ navigation, route }) {
     ].slice(-8);
   }, []);
 
-  const handleContinueSingleChartGate = useCallback((gateMetadata = {}) => {
+  const handleContinueSingleChartGate = useCallback(async (gateMetadata = {}) => {
     const originalQuestion = String(gateMetadata?.original_question || '').trim();
     const nextQuestion = originalQuestion || '';
+    if (!nextQuestion) return;
     subjectGateOverrideRef.current = { mode: 'selected_chart_only', question: nextQuestion, gateMetadata };
-    setInputText(nextQuestion);
+    if (typeof sendMessageRef.current === 'function') {
+      await sendMessageRef.current(nextQuestion);
+    }
   }, []);
 
-  const handleRelationshipContextGate = useCallback((gateMetadata = {}, relationshipContext = '', nextQuestion = '') => {
+  const handleRelationshipContextGate = useCallback(async (gateMetadata = {}, relationshipContext = '', nextQuestion = '') => {
     const question = String(nextQuestion || '').trim();
     if (!question) return;
     subjectGateOverrideRef.current = {
@@ -2067,7 +2071,9 @@ export default function ChatScreen({ navigation, route }) {
         chosen_relationship_context: relationshipContext,
       },
     };
-    setInputText(question);
+    if (typeof sendMessageRef.current === 'function') {
+      await sendMessageRef.current(question);
+    }
   }, []);
 
   function startPrefilledPartnership(prefill) {
@@ -2971,6 +2977,8 @@ export default function ChatScreen({ navigation, route }) {
       if (response.ok) {
         const data = await response.json();
         const newSessionId = data.session_id;
+        subjectGateOverrideRef.current = null;
+        subjectGateMemoryRef.current = [];
         setSessionId(newSessionId);
         
         if (!isMundane) {
@@ -4434,6 +4442,7 @@ export default function ChatScreen({ navigation, route }) {
       setIsTyping(false);
     }
   };
+  sendMessageRef.current = sendMessage;
 
   const handleSendRetry = async (failedMessage) => {
     const { clientRequestId, userMessageId, failedQuestion } = failedMessage || {};
@@ -4547,6 +4556,8 @@ export default function ChatScreen({ navigation, route }) {
     setSessionId(null);
     setLoading(false);
     setIsTyping(false);
+    subjectGateOverrideRef.current = null;
+    subjectGateMemoryRef.current = [];
     const nativeName = birthData?.name || 'there';
     let welcomeMessage;
     if (isMundaneRef.current) {
@@ -4942,11 +4953,13 @@ export default function ChatScreen({ navigation, route }) {
             style={styles.messagesContainer}
             contentContainerStyle={styles.messagesContent}
             data={visibleMessages}
-            keyExtractor={(item, index) =>
-              item?.id != null && String(item.id) !== ''
-                ? `${String(item.id)}-${index}`
-                : `chat-row-${index}`
-            }
+            keyExtractor={(item, index) => {
+              if (item?.clientRequestId) return `client-${String(item.clientRequestId)}`;
+              if (item?.id != null && String(item.id) !== '') return `id-${String(item.id)}`;
+              if (item?.messageId != null && String(item.messageId) !== '') return `message-${String(item.messageId)}`;
+              if (item?.timestamp) return `ts-${String(item.timestamp)}-${item?.role || 'row'}`;
+              return `chat-row-${index}`;
+            }}
             showsVerticalScrollIndicator={false}
             onScroll={handleMessagesScroll}
             scrollEventThrottle={120}
