@@ -148,11 +148,29 @@ async def get_feedback_stats(
             offset = (page - 1) * limit
 
             feedback_query = f"""
-                SELECT mf.rating, mf.comment, mf.created_at, COALESCE(u.name, 'Unknown User') as user_name
+                SELECT
+                    mf.rating,
+                    mf.comment,
+                    mf.created_at,
+                    COALESCE(u.name, 'Unknown User') as user_name,
+                    u.phone as user_phone,
+                    question_msg.content as feedback_question
                 FROM message_feedback mf
                 LEFT JOIN chat_messages cm ON mf.message_id = cm.message_id
                 LEFT JOIN chat_sessions cs ON cm.session_id = cs.session_id
                 LEFT JOIN users u ON cs.user_id = u.userid
+                LEFT JOIN LATERAL (
+                    SELECT user_cm.content
+                    FROM chat_messages user_cm
+                    WHERE user_cm.session_id = cm.session_id
+                      AND user_cm.sender = 'user'
+                      AND (
+                        user_cm.timestamp <= COALESCE(cm.timestamp, mf.created_at)
+                        OR user_cm.message_id < cm.message_id
+                      )
+                    ORDER BY user_cm.timestamp DESC NULLS LAST, user_cm.message_id DESC
+                    LIMIT 1
+                ) question_msg ON TRUE
                 {where_clause}
                 ORDER BY mf.created_at DESC
                 LIMIT %s OFFSET %s
@@ -165,7 +183,9 @@ async def get_feedback_stats(
                 "rating": row[0],
                 "comment": row[1] or '',
                 "created_at": row[2],
-                "user_name": row[3]
+                "user_name": row[3],
+                "user_phone": row[4] or '',
+                "question": row[5] or '',
             }
             for row in feedback_results
         ]

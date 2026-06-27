@@ -8,6 +8,7 @@ import {
   Animated,
   Dimensions,
   Image,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -114,60 +115,74 @@ export default function AnalysisHubScreen({ navigation }) {
     const baseTypes = [
       {
         id: 'career',
-        title: 'Career Analysis',
-        subtitle: 'Professional success & opportunities',
+        title: Platform.OS === 'ios' ? 'Chart Study' : 'Career Analysis',
+        subtitle: Platform.OS === 'ios' ? 'Review your chart for work themes and direction' : 'Professional success & opportunities',
         icon: '💼',
         gradient: ['#6366F1', '#8B5CF6'],
-        description: 'Discover your career potential, ideal industries, and professional timing with AI-powered insights'
+        description: Platform.OS === 'ios'
+          ? 'Read your chart, understand your patterns, or review the next step you want to study.'
+          : 'Discover your career potential, ideal industries, and professional timing with AI-powered insights'
       },
       {
         id: 'wealth',
-        title: 'Wealth Analysis',
-        subtitle: 'Financial prospects & opportunities',
+        title: Platform.OS === 'ios' ? 'Yearly Chart Study' : 'Wealth Analysis',
+        subtitle: Platform.OS === 'ios' ? 'Review the year month by month with chart-based timing notes' : 'Financial prospects & opportunities',
         icon: '💰',
         gradient: ['#FFD700', '#FF8C00'],
-        description: 'Discover your financial potential, investment timing, and wealth accumulation patterns'
+        description: Platform.OS === 'ios'
+          ? 'Review the year month by month with chart-based timing notes for the areas you care about.'
+          : 'Discover your financial potential, investment timing, and wealth accumulation patterns'
       },
       {
         id: 'health',
-        title: 'Health Analysis',
-        subtitle: 'Wellness insights & precautions',
+        title: Platform.OS === 'ios' ? 'Wellness Review' : 'Health Analysis',
+        subtitle: Platform.OS === 'ios' ? 'Study health routines and care points' : 'Wellness review & care points',
         icon: '🏥',
         gradient: ['#32CD32', '#228B22'],
-        description: 'Understand health vulnerabilities, body constitution, and preventive measures'
+        description: Platform.OS === 'ios'
+          ? 'Review health themes, routines, and points to watch.'
+          : 'Understand health vulnerabilities, body constitution, and preventive measures'
       },
       {
         id: 'relationshipMatch',
-        title: 'Kundli Matching',
-        subtitle: 'Two-chart relationship compatibility',
+        title: Platform.OS === 'ios' ? 'Chart Comparison' : 'Kundli Matching',
+        subtitle: Platform.OS === 'ios' ? 'Compare two charts and review relationship patterns' : 'Two-chart relationship compatibility',
         icon: '💞',
         gradient: ['#fb7185', '#f97316'],
-        description: 'See a trust-first compatibility verdict, timing climate, strengths, and caution areas before going deeper',
+        description: Platform.OS === 'ios'
+          ? 'Compare two birth charts and review shared strengths, caution areas, and timing context.'
+          : 'See a trust-first compatibility verdict, timing climate, strengths, and caution areas before going deeper',
         isFree: true,
       },
       {
         id: 'marriage',
-        title: 'My Marriage Analysis',
-        subtitle: 'Your marriage timing & partner patterns',
+        title: Platform.OS === 'ios' ? 'Shared Chart Study' : 'My Marriage Analysis',
+        subtitle: Platform.OS === 'ios' ? 'Review relationship patterns, strengths, and points to watch' : 'Your relationship patterns & timing',
         icon: '💕',
         gradient: ['#FF69B4', '#DC143C'],
-        description: 'Explore relationship patterns, marriage timing, and partner compatibility'
+        description: Platform.OS === 'ios'
+          ? 'Compare two charts and review relationship patterns, strengths, and points to watch.'
+          : 'Explore relationship patterns, marriage timing, and partner compatibility'
       },
       {
         id: 'education',
-        title: 'Education Analysis',
-        subtitle: 'Learning path & career guidance',
+        title: Platform.OS === 'ios' ? 'Chart Guidance' : 'Education Analysis',
+        subtitle: Platform.OS === 'ios' ? 'Ask about your chart, your patterns, or the next step you want to understand' : 'Learning path & skill growth',
         icon: '🎓',
         gradient: ['#4169E1', '#1E90FF'],
-        description: 'Identify educational strengths, career paths, and learning opportunities'
+        description: Platform.OS === 'ios'
+          ? 'Read your chart, understand your patterns, or review the next step you want to study.'
+          : 'Identify educational strengths, career paths, and learning opportunities'
       },
       {
         id: 'progeny',
-        title: 'Progeny Analysis',
-        subtitle: 'Children & family expansion',
+        title: Platform.OS === 'ios' ? 'Family Study' : 'Progeny Analysis',
+        subtitle: Platform.OS === 'ios' ? 'Review child and family timing patterns' : 'Children & family planning',
         icon: '👶',
         gradient: ['#FF69B4', '#FFB6C1'],
-        description: 'Explore fertility potential, timing for children, and family expansion insights'
+        description: Platform.OS === 'ios'
+          ? 'Review child-related timing, family patterns, and the questions you want to study.'
+          : 'Explore fertility potential, timing for children, and family expansion insights'
       }
     ];
     
@@ -214,7 +229,9 @@ export default function AnalysisHubScreen({ navigation }) {
               <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <View style={styles.headerCenter}>
-              <Text style={[styles.headerTitle, { color: colors.text }]}>Life Analysis</Text>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>
+                {Platform.OS === 'ios' ? 'Chart Study' : 'Life Analysis'}
+              </Text>
               {birthData && (
                 <NativeSelectorChip 
                   birthData={birthData}
@@ -272,10 +289,12 @@ export default function AnalysisHubScreen({ navigation }) {
                     resizeMode="contain"
                   />
                 </Animated.View>
-                <Text style={[styles.heroTitle, { color: colors.text }]}>Unlock Your Life's Mysteries</Text>
-                <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-                  Deep astrological insights into the four pillars of life
-                </Text>
+              <Text style={[styles.heroTitle, { color: colors.text }]}>{Platform.OS === 'ios' ? 'Study Your Life Patterns' : "Unlock Your Life's Mysteries"}</Text>
+              <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+                  {Platform.OS === 'ios'
+                    ? 'Explore chart patterns across career, relationships, health, and growth'
+                    : 'Deep astrological insights into the four pillars of life'}
+              </Text>
               </View>
 
               {/* Analysis Cards */}
@@ -341,13 +360,11 @@ export default function AnalysisHubScreen({ navigation }) {
                   colors={isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
                   style={[styles.infoCard, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
                 >
-                  <Text style={[styles.infoTitle, { color: colors.text }]}>✨ Premium Analysis Features</Text>
+                  <Text style={[styles.infoTitle, { color: colors.text }]}>{Platform.OS === 'ios' ? '✨ Premium Study Features' : '✨ Premium Analysis Features'}</Text>
                   <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                    • Detailed astrological calculations{'\n'}
-                    • Personalized remedies & suggestions{'\n'}
-                    • Timing predictions & favorable periods{'\n'}
-                    • Interactive Q&A format{'\n'}
-                    • Follow-up questions for deeper insights
+                    {Platform.OS === 'ios'
+                      ? '• Detailed chart calculations\n• Personalized suggestions\n• Timing context and useful periods\n• Interactive Q&A format\n• Follow-up questions for deeper study'
+                      : '• Detailed astrological calculations\n• Personalized remedies & suggestions\n• Timing predictions & favorable periods\n• Interactive Q&A format\n• Follow-up questions for deeper insights'}
                   </Text>
                 </LinearGradient>
               </View>

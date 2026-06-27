@@ -291,7 +291,7 @@ export default function ChildbirthPlannerScreen({ navigation }) {
                 {results.recommendations.length === 0 ? (
                   <View style={styles.noDataCard}>
                     <Text style={styles.noDataText}>No auspicious dates found in this period</Text>
-                    <Text style={styles.noDataHint}>Vedic astrology has strict rules for auspicious timing. Try:</Text>
+                <Text style={styles.noDataHint}>Try widening the date range and checking different chart conditions:</Text>
                     <Text style={styles.noDataTip}>• Extending the date range to 60-90 days</Text>
                     <Text style={styles.noDataTip}>• Avoiding eclipse periods and inauspicious months</Text>
                     <Text style={styles.noDataTip}>• Checking different lunar months</Text>

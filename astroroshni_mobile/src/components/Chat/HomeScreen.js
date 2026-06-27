@@ -184,6 +184,7 @@ export default function HomeScreen({
   useAnalytics('HomeScreen');
   const { theme, colors, androidLightCardFixStyle } = useTheme();
   const isDark = theme === 'dark';
+  const isIOS = Platform.OS === 'ios';
   const { freeQuestionAvailable, pricing, pricingOriginal, fetchPricing } = useCredits();
   const [showFirstQuestionFreeModal, setShowFirstQuestionFreeModal] = useState(false);
   const [showMonthlyWelcomeModal, setShowMonthlyWelcomeModal] = useState(false);
@@ -884,7 +885,7 @@ const loadHomeData = async (nativeData = null) => {
                 {t('birthProfileIntro.emptyStateTitle', 'Add your birth profile')}
               </Text>
               <Text style={[styles.emptyStateBody, { color: colors.textSecondary }]}>
-                {t('birthProfileIntro.emptyStateBody', 'Your date, time and place of birth unlock your Vedic chart, personalized insights, and cosmic guidance. You can add or change this anytime.')}
+                {t('birthProfileIntro.emptyStateBody', 'Your date, time and place of birth unlock your Vedic chart, personalized chart insights, and analysis tools. You can add or change this anytime.')}
               </Text>
               <TouchableOpacity
                 onPress={() => navigation.navigate('BirthForm', { returnTo: 'Home' })}
@@ -998,7 +999,54 @@ const loadHomeData = async (nativeData = null) => {
     }
   };
 
-  const options = [
+  const options = isIOS ? [
+    {
+      id: 'question',
+      icon: '💬',
+      title: t('home.options.questionIosTitle', 'Chart Study'),
+      description: t('home.options.questionIosDescription', 'Read your chart, understand your patterns, or review the next step you want to study'),
+      action: 'question',
+      cost: pricing.chat ?? 1,
+      originalCost: pricingOriginal.chat
+    },
+    {
+      id: 'partnership',
+      icon: '👥',
+      title: t('home.options.partnershipIosTitle', 'Shared Chart Study'),
+      description: t('home.options.partnershipIosDescription', 'Compare two charts and review relationship patterns, strengths, and points to watch'),
+      action: 'partnership',
+      cost: pricing.partnership ?? 2,
+      originalCost: pricingOriginal.partnership
+    },
+    {
+      id: 'kundliMatch',
+      icon: '💞',
+      title: t('home.options.kundliMatchIosTitle', 'Chart Comparison'),
+      description: t('home.options.kundliMatchIosDescription', 'Compare two birth charts and review shared strengths, caution areas, and timing context'),
+      teaser: t('home.options.kundliMatchIosTeaser', 'Start with a comparison, then continue if you want more detail.'),
+      action: 'relationshipMatch',
+      cost: 0,
+      originalCost: null,
+    },
+    {
+      id: 'mundane',
+      icon: '🌍',
+      title: t('home.options.mundaneIosTitle', 'World Signals'),
+      description: t('home.options.mundaneIosDescription', 'Review broader patterns across markets, public events, and cycle movements'),
+      action: 'mundane',
+      cost: pricing.chat ?? 1,
+      originalCost: pricingOriginal.chat
+    },
+    {
+      id: 'events',
+      icon: '📅',
+      title: t('home.options.eventsIosTitle', 'Yearly Chart Study'),
+      description: t('home.options.eventsIosDescription', 'Review the year month by month with chart-based timing notes for the areas you care about'),
+      action: 'events',
+      cost: pricing.events ?? 100,
+      originalCost: pricingOriginal.events
+    }
+  ] : [
     {
       id: 'question',
       icon: '💬',
@@ -1036,14 +1084,6 @@ const loadHomeData = async (nativeData = null) => {
       cost: pricing.chat ?? 1,
       originalCost: pricingOriginal.chat
     },
-    // Commented out in favor of Event Timeline tile for now
-    // {
-    //   id: 'periods',
-    //   icon: '🎯',
-    //   title: 'Find Event Periods',
-    //   description: 'Discover high-probability periods when specific events might happen',
-    //   action: 'periods'
-    // },
     {
       id: 'events',
       icon: '📅',
@@ -1055,7 +1095,19 @@ const loadHomeData = async (nativeData = null) => {
     }
   ];
 
-  const analysisOptions = [
+  const analysisOptions = isIOS ? [
+    { id: 'karma', title: t('home.analysis.karmaIosTitle', 'Karma Patterns'), icon: '🕉️', description: t('home.analysis.karmaIosDescription', 'Explore repeating themes and life lessons in the chart'), gradient: ['#334155', '#64748B'], cost: pricing.karma ?? 25, originalCost: pricingOriginal.karma },
+    { id: 'career', title: t('home.analysis.careerIosTitle', 'Career Study'), icon: '💼', description: t('home.analysis.careerIosDescription', 'Review work style, direction, and strengths to build on'), gradient: ['#1D4ED8', '#2563EB'], cost: pricing.career ?? 12, originalCost: pricingOriginal.career },
+    { id: 'wealth', title: t('home.analysis.wealthIosTitle', 'Resources & Earnings'), icon: '💰', description: t('home.analysis.wealthIosDescription', 'Study money flow, resources, and practical support patterns'), gradient: ['#0F766E', '#14B8A6'], cost: pricing.wealth ?? 5, originalCost: pricingOriginal.wealth },
+    { id: 'marriage', title: t('home.analysis.marriageIosTitle', 'Relationship Study'), icon: '💕', description: t('home.analysis.marriageIosDescription', 'Review relationship style, shared patterns, and compatibility notes'), gradient: ['#C026D3', '#DB2777'], cost: pricing.marriage ?? 3, originalCost: pricingOriginal.marriage },
+    { id: 'health', title: t('home.analysis.healthIosTitle', 'Wellness Study'), icon: '🏥', description: t('home.analysis.healthIosDescription', 'Review balance, recovery, and areas to support'), gradient: ['#15803D', '#22C55E'], cost: pricing.health ?? 3, originalCost: pricingOriginal.health },
+    { id: 'education', title: t('home.analysis.educationIosTitle', 'Learning Path'), icon: '🎓', description: t('home.analysis.educationIosDescription', 'Study learning style, focus, and areas that support growth'), gradient: ['#1E40AF', '#3B82F6'], cost: pricing.education ?? 3, originalCost: pricingOriginal.education },
+    { id: 'progeny', title: t('home.analysis.progenyIosTitle', 'Family Study'), icon: '👨‍👩‍👧‍👦', description: t('home.analysis.progenyIosDescription', 'Explore family themes, support, and expansion patterns'), gradient: ['#7C3AED', '#A855F7'], cost: pricing.progeny ?? 15, originalCost: pricingOriginal.progeny },
+    { id: 'trading', title: t('home.analysis.tradingIosTitle', 'Market Study'), icon: '📈', description: t('home.analysis.tradingIosDescription', 'Review market cycles and sector context for timing study'), gradient: ['#B45309', '#F97316'], cost: pricing.trading ?? 5, originalCost: pricingOriginal.trading },
+    { id: 'financial', title: t('home.analysis.financialIosTitle', 'Market Context'), icon: '💹', description: t('home.analysis.financialIosDescription', 'Study sector rhythm and broader market context'), gradient: ['#047857', '#10B981'], cost: 0, originalCost: null },
+    { id: 'childbirth', title: t('home.analysis.childbirthIosTitle', 'Family Timing'), icon: '🤱', description: t('home.analysis.childbirthIosDescription', 'Review supportive timing for family planning and delivery'), gradient: ['#BE185D', '#EC4899'], cost: pricing.childbirth ?? 8, originalCost: pricingOriginal.childbirth },
+    { id: 'muhurat', title: t('home.analysis.muhuratIosTitle', 'Timing Windows'), icon: '🕉️', description: t('home.analysis.muhuratIosDescription', 'Review supportive windows for important actions'), gradient: ['#4338CA', '#7C3AED'], cost: 0, originalCost: null },
+  ] : [
     {
       id: 'karma',
       title: t('home.analysis.karma.title', 'Past Life Karma'),
@@ -1066,13 +1118,13 @@ const loadHomeData = async (nativeData = null) => {
       originalCost: pricingOriginal.karma,
     },
     { id: 'career', title: t('home.analysis.career.title', 'Career Analysis'), icon: '💼', description: t('home.analysis.career.description', 'Professional success & opportunities'), gradient: ['#6366F1', '#8B5CF6'], cost: pricing.career ?? 12, originalCost: pricingOriginal.career },
-    { id: 'wealth', title: t('home.analysis.wealth.title', 'Wealth Analysis'), icon: '💰', description: t('home.analysis.wealth.description', 'Financial prospects & opportunities'), gradient: ['#0EA5E9', '#38BDF8'], cost: pricing.wealth ?? 5, originalCost: pricingOriginal.wealth },
+    { id: 'wealth', title: t('home.analysis.wealth.title', 'Wealth Analysis'), icon: '💰', description: isIOS ? 'Financial patterns, resources, and practical timing' : t('home.analysis.wealth.description', 'Financial prospects & opportunities'), gradient: ['#0EA5E9', '#38BDF8'], cost: pricing.wealth ?? 5, originalCost: pricingOriginal.wealth },
     { id: 'marriage', title: t('home.analysis.marriage.title', 'Marriage Analysis'), icon: '💕', description: t('home.analysis.marriage.description', 'Relationship compatibility & timing'), gradient: ['#FF69B4', '#DC143C'], cost: pricing.marriage ?? 3, originalCost: pricingOriginal.marriage },
     { id: 'health', title: t('home.analysis.health.title', 'Health Analysis'), icon: '🏥', description: t('home.analysis.health.description', 'Wellness insights & precautions'), gradient: ['#32CD32', '#228B22'], cost: pricing.health ?? 3, originalCost: pricingOriginal.health },
     { id: 'education', title: t('home.analysis.education.title', 'Education Analysis'), icon: '🎓', description: t('home.analysis.education.description', 'Learning path & career guidance'), gradient: ['#4169E1', '#1E90FF'], cost: pricing.education ?? 3, originalCost: pricingOriginal.education },
     { id: 'progeny', title: t('home.analysis.progeny.title', 'Progeny Analysis'), icon: '👨‍👩‍👧‍👦', description: t('home.analysis.progeny.description', 'Fertility potential & family expansion'), gradient: ['#FF69B4', '#FF1493'], cost: pricing.progeny ?? 15, originalCost: pricingOriginal.progeny },
-    { id: 'trading', title: t('home.analysis.trading.title', 'Trading Forecast'), icon: '📈', description: t('home.analysis.trading.description', 'Stock market predictions & timing'), gradient: ['#FFD700', '#FF8C00'], cost: pricing.trading ?? 5, originalCost: pricingOriginal.trading },
-    { id: 'financial', title: t('home.analysis.financial.title', 'Market Astrology'), icon: '💹', description: t('home.analysis.financial.description', 'Sector forecasts & investment timing'), gradient: ['#10b981', '#059669'], cost: 0, originalCost: null },
+    { id: 'trading', title: t('home.analysis.trading.title', 'Trading Study'), icon: '📈', description: isIOS ? 'Market timing and sector context' : t('home.analysis.trading.description', 'Market timing and sector context'), gradient: ['#FFD700', '#FF8C00'], cost: pricing.trading ?? 5, originalCost: pricingOriginal.trading },
+    { id: 'financial', title: t('home.analysis.financial.title', 'Market Astrology'), icon: '💹', description: isIOS ? 'Sector timing and market context' : t('home.analysis.financial.description', 'Sector forecasts & investment timing'), gradient: ['#10b981', '#059669'], cost: 0, originalCost: null },
     { id: 'childbirth', title: t('home.analysis.childbirth.title', 'Childbirth Planner'), icon: '🤱', description: t('home.analysis.childbirth.description', 'Auspicious dates for delivery'), gradient: ['#FF69B4', '#FF1493'], cost: pricing.childbirth ?? 8, originalCost: pricingOriginal.childbirth },
     { id: 'muhurat', title: t('home.analysis.muhurat.title', 'Muhurat Planner'), icon: '🕉️', description: t('home.analysis.muhurat.description', 'Auspicious timing for all events'), gradient: ['#9C27B0', '#7B1FA2'], cost: 0, originalCost: null },
   ];
@@ -1130,7 +1182,7 @@ const loadHomeData = async (nativeData = null) => {
               </View>
               <NativeSelectorChip 
                 birthData={displayData}
-                onPress={() => navigation.navigate('SelectNative', { returnTo: 'Home' })}
+                onPress={() => navigation.navigate('SelectNative', { returnTo: 'Home', returnParams: { stayOnGreeting: true } })}
                 maxLength={10}
                 showIcon={false}
                 style={styles.headerNativeChip}
@@ -1274,7 +1326,11 @@ const loadHomeData = async (nativeData = null) => {
         /> */}
 
         <View style={styles.optionsContainer}>
-          <Text style={[styles.optionsTitle, { color: colors.text }]}>{t('home.sections.choosePath', 'Choose Your Path')}</Text>
+          <Text style={[styles.optionsTitle, { color: colors.text }]}>
+            {isIOS
+              ? t('home.sections.chooseStudy', 'Choose what you want to study')
+              : t('home.sections.choosePath', 'Choose Your Path')}
+          </Text>
           {options.map((option, index) => (
             <OptionCard
               key={option.id}
@@ -1287,7 +1343,11 @@ const loadHomeData = async (nativeData = null) => {
 
         {/* Life Analysis Options */}
         <View style={styles.analysisContainer}>
-          <Text style={[styles.analysisTitle, { color: colors.text }]}>{t('home.sections.lifeAnalysis', '🧘 Life Analysis')}</Text>
+          <Text style={[styles.analysisTitle, { color: colors.text }]}>
+            {isIOS
+              ? t('home.sections.lifeStudy', 'Chart Study')
+              : t('home.sections.lifeAnalysis', '🧘 Life Analysis')}
+          </Text>
           <View style={styles.lifeAnalysisGrid}>
             {analysisOptions.slice(0, 7).map((option, index) => (
               <LifeAnalysisCard
@@ -1300,30 +1360,32 @@ const loadHomeData = async (nativeData = null) => {
           </View>
         </View>
 
-        {/* Timing Planners - Cosmic Ribbon (Horizontal Snap-Gallery) */}
-        <View style={styles.ribbonContainer}>
-          <Text style={[styles.analysisTitle, { color: colors.text, paddingHorizontal: 20 }]}>
-            {t('home.sections.timingPlanners', '⏰ Timing Planners')}
-          </Text>
-          <GHScrollView
-            horizontal
-            nestedScrollEnabled
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={width * 0.72 + 16}
-            decelerationRate="fast"
-            scrollEventThrottle={16}
-            contentContainerStyle={styles.ribbonScrollContent}
-          >
-            {analysisOptions.slice(7).map((option, index) => (
-              <CosmicRibbonCard
-                key={option.id}
-                option={option}
-                index={index}
-                onOptionSelect={onOptionSelect}
-              />
-            ))}
-          </GHScrollView>
-        </View>
+        {/* Timing Planners - hidden on iOS for the first release */}
+        {!isIOS && (
+          <View style={styles.ribbonContainer}>
+            <Text style={[styles.analysisTitle, { color: colors.text, paddingHorizontal: 20 }]}>
+              {t('home.sections.timingPlanners', '⏰ Timing Planners')}
+            </Text>
+            <GHScrollView
+              horizontal
+              nestedScrollEnabled
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={width * 0.72 + 16}
+              decelerationRate="fast"
+              scrollEventThrottle={16}
+              contentContainerStyle={styles.ribbonScrollContent}
+            >
+              {analysisOptions.slice(7).map((option, index) => (
+                <CosmicRibbonCard
+                  key={option.id}
+                  option={option}
+                  index={index}
+                  onOptionSelect={onOptionSelect}
+                />
+              ))}
+            </GHScrollView>
+          </View>
+        )}
 
         {/* Blog & Articles Section */}
         {latestBlogPosts.length > 0 && (
@@ -2637,7 +2699,7 @@ const loadHomeData = async (nativeData = null) => {
             />
           </View>
           <Text style={[styles.tabLabel, { color: activeTab === 'events' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'events' ? '800' : '600' }]}>
-            {t('home.tabs.events', 'Predictions')}
+            {t('home.tabs.events', 'Timing')}
           </Text>
         </TouchableOpacity>
 
@@ -2706,7 +2768,15 @@ function OptionCard({ option, index, onOptionSelect }) {
   const { t } = useTranslation();
   
   if (!option) return null;
-  const gradientColors = option.id === 'events' 
+  const gradientColors = Platform.OS === 'ios'
+    ? option.id === 'events'
+      ? ['#4F46E5', '#7C3AED']
+      : option.id === 'kundliMatch'
+      ? ['#0EA5E9', '#2563EB']
+      : option.id === 'mundane'
+      ? ['#0F766E', '#14B8A6']
+      : ['#334155', '#64748B']
+    : option.id === 'events' 
     ? ['#FFD700', '#FF8C00'] 
     : option.id === 'ashtakvarga'
     ? ['#9C27B0', '#E91E63']
@@ -2716,9 +2786,13 @@ function OptionCard({ option, index, onOptionSelect }) {
 
   // Glass gradient for the card background – same look on iOS and Android
   const cardGlassGradientColors =
-    theme === 'dark'
-      ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
-      : ['rgba(251, 146, 60, 0.2)', 'rgba(249, 115, 22, 0.1)'];
+    Platform.OS === 'ios'
+      ? theme === 'dark'
+        ? ['rgba(255, 255, 255, 0.10)', 'rgba(255, 255, 255, 0.04)']
+        : ['rgba(255, 255, 255, 0.94)', 'rgba(241, 245, 249, 0.90)']
+      : theme === 'dark'
+        ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
+        : ['rgba(251, 146, 60, 0.2)', 'rgba(249, 115, 22, 0.1)'];
   
   return (
     <View 
@@ -2740,7 +2814,7 @@ function OptionCard({ option, index, onOptionSelect }) {
               <Text style={styles.optionEmoji}>{option.icon}</Text>
             </LinearGradient>
           </View>
-          <View style={styles.optionContent}>
+          <View style={[styles.optionContent, Platform.OS === 'ios' ? styles.optionContentIOS : null]}>
             <Text style={[styles.optionTitle, { color: colors.text }]}>{option.title}</Text>
             <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>{option.description}</Text>
             {option.teaser ? (
@@ -3243,6 +3317,9 @@ const styles = StyleSheet.create({
   optionContent: {
     flex: 1,
   },
+  optionContentIOS: {
+    paddingRight: 42,
+  },
   optionTitle: {
     fontSize: 18,
     fontWeight: '700',
@@ -3490,12 +3567,12 @@ const styles = StyleSheet.create({
   },
   costBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 10,
+    right: 10,
     backgroundColor: 'rgba(255, 215, 0, 0.98)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 11,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
@@ -3510,7 +3587,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.24)',
   },
   costText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '800',
     color: '#854d0e',
     marginLeft: 3,
@@ -3524,7 +3601,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   costOriginal: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '800',
     color: '#000000',
     opacity: 1,

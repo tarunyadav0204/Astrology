@@ -280,7 +280,9 @@ export default function App() {
 
       loadSavedLanguage();
 
-      initFacebookAnalytics().catch(() => {});
+      if (Constants.appOwnership !== 'expo') {
+        initFacebookAnalytics().catch(() => {});
+      }
 
       try {
         const { sendAcquisitionFirstOpenOnce } = require('./src/services/acquisitionTracking');

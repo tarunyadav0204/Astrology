@@ -370,7 +370,7 @@ const YogaScreen = ({ navigation }) => {
                                         Your Astrological Yogas
                                     </Text>
                                     <Text style={[styles.introText, { color: colors.textSecondary }]}>
-                                        Yogas are special planetary combinations that shape your destiny and life path
+                                        Yogas are special planetary combinations that shape chart patterns and life themes
                                     </Text>
                                 </LinearGradient>
                             </View>

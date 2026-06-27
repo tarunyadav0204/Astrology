@@ -9,7 +9,6 @@ import {
   Alert,
   Animated,
   Easing,
-  Clipboard,
   Share,
   ActivityIndicator,
   Modal,
@@ -480,7 +479,10 @@ function MessageBubble({
         .replace(/•\s*/g, '• ')
         .trim();
 
-      await Clipboard.setString(cleanText);
+      const clipboard = require('expo-clipboard');
+      if (clipboard?.setStringAsync) {
+        await clipboard.setStringAsync(cleanText);
+      }
       Alert.alert('Copied!', 'Message copied to clipboard');
     } catch (error) {
       // Error copying to clipboard
@@ -1414,16 +1416,16 @@ function MessageBubble({
             ) : null}
             {message.isTyping && (
               <View style={styles.typingIndicatorBadge}>
-                <Text style={styles.typingIndicatorText}>Analyzing Chart...</Text>
+                <Text style={styles.typingIndicatorText}>{Platform.OS === 'ios' ? 'Reviewing chart...' : 'Analyzing Chart...'}</Text>
               </View>
             )}
           </View>
         )}
         
-        {/* Beta Notice for Timeline Predictions */}
+        {/* Beta Notice for timeline-based interpretations */}
         {message.role === 'assistant' && !isClarification && !isNativeGate && (
           <View style={styles.betaNotice}>
-            <Text style={styles.betaNoticeText}>{t('chat.betaNotice', '⚠️ BETA: Timeline predictions are experimental. Use logic and discretion.')}</Text>
+            <Text style={styles.betaNoticeText}>{Platform.OS === 'ios' ? '⚠️ BETA: Timeline studies are experimental. Use judgment and discretion.' : t('chat.betaNotice', '⚠️ BETA: Timeline interpretations are experimental. Use judgment and discretion.')}</Text>
           </View>
         )}
         
@@ -1605,7 +1607,7 @@ function MessageBubble({
             <Text style={styles.nativeGateHelperText}>
               {t(
                 'chat.nativeGateTapInstruction',
-                'Please choose one of the options below instead of typing a reply.'
+                'Please tap one of the options below to continue.'
               )}
             </Text>
             {isRelationshipSetupGate ? (
@@ -1696,11 +1698,11 @@ function MessageBubble({
                         onPress={() => onStartPartnershipGate && onStartPartnershipGate(gateMetadata)}
                         activeOpacity={0.85}
                         accessibilityRole="button"
-                        accessibilityLabel={t('chat.startPartnershipA11y', 'Start partnership analysis')}
+                        accessibilityLabel={t('chat.startPartnershipA11y', 'Start partnership study')}
                       >
                         <Ionicons name="people-outline" size={16} color="#ea580c" style={{ marginRight: 6 }} />
                         <Text style={styles.nativeGateSecondaryCtaText}>
-                          {t('chat.startPartnershipAnalysis', 'Start Partnership Analysis')}
+                        {t('chat.startPartnershipAnalysis', Platform.OS === 'ios' ? 'Start partnership study' : 'Start Partnership Analysis')}
                         </Text>
                       </TouchableOpacity>
                     )}
@@ -1745,7 +1747,7 @@ function MessageBubble({
           </View>
         )}
 
-        {/* Hint when analysis timed out or send failed: tell user to tap refresh or retry */}
+        {/* Hint when a response timed out or send failed: tell user to tap refresh or retry */}
         {(message.showRestartButton || message.showSendRetryButton) && (
           <View style={styles.timeoutHint}>
             <Text style={styles.timeoutHintText}>

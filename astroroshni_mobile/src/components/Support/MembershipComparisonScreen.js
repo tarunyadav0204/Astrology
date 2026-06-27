@@ -28,7 +28,7 @@ const FEATURE_ROWS = [
   { key: 'progeny', label: 'Progeny analysis' },
   { key: 'karma', label: 'Karma analysis' },
   { key: 'partnership', label: 'Partnership compatibility analysis' },
-  { key: 'ashtakavarga', label: 'Ashtakavarga life predictions' },
+  { key: 'ashtakavarga', label: 'Ashtakavarga study' },
   { key: 'events', label: 'Yearly event timeline analysis' },
   { key: 'business', label: 'Business opening muhurat' },
   { key: 'childbirth', label: 'Childbirth muhurat planning' },

@@ -686,7 +686,7 @@ export default function LoginScreen({ navigation }) {
                 <Text style={styles.subtitle}>
                   {resetIndiaForgot
                     ? 'Enter your mobile number — we will send a code by SMS.'
-                    : 'Secure your cosmic journey'}
+                    : 'Secure your chart journey'}
                 </Text>
               </View>
 

@@ -202,7 +202,7 @@ const LoadingBubble = ({
     const timerText = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     const timerProgress = Math.max(0, Math.min(1, remainingSeconds / Math.max(1, Number(expectedWaitSeconds) || 1)));
     const trafficNotice = remainingSeconds === 0
-        ? "High traffic right now - your reading is still being prepared and may take a little longer than usual."
+        ? "High traffic right now - your study is still being prepared and may take a little longer than usual."
         : null;
     const showZodiacLoop = remainingSeconds === 0;
 
@@ -221,7 +221,7 @@ const LoadingBubble = ({
                         style={styles.welcomeBubble}
                     >
                         <Text style={[styles.welcomeTitle, { color: isDarkMode ? '#ffd700' : '#ff6b35' }]}>☀️ AstroRoshni</Text>
-                        <Text style={[styles.welcomeSubtext, { color: isDarkMode ? '#fff' : '#1a1a1a' }]}>{t('chat.preparingInsights', 'Preparing your cosmic insights...')}</Text>
+                        <Text style={[styles.welcomeSubtext, { color: isDarkMode ? '#fff' : '#1a1a1a' }]}>{t('chat.preparingInsights', 'Preparing your chart insights...')}</Text>
                     </LinearGradient>
                 </View>
             );
@@ -340,7 +340,7 @@ const LoadingBubble = ({
                 </Text>
                 
                 <Text style={[styles.welcomeSubtext, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.85)' : '#4b5563' }]}>
-                    {t('chat.deeplyAnalyzing', 'I am deeply analyzing your celestial chart to provide you with the most accurate insights. This sacred process takes a moment...')}
+                    {t('chat.deeplyAnalyzing', 'I am reviewing your chart to provide the most relevant insights. This process takes a moment...')}
                 </Text>
                 
                 <View style={styles.cosmicDots}>

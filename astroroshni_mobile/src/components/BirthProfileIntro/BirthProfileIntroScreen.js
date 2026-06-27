@@ -82,7 +82,7 @@ export default function BirthProfileIntroScreen({ navigation, route }) {
             {t('birthProfileIntro.title', 'Your birth chart powers your experience')}
           </Text>
           <Text style={styles.body}>
-            {t('birthProfileIntro.body', 'We use your date, time and place of birth to calculate your Vedic chart and personalize insights. You can add or change this anytime in Profile.')}
+          {t('birthProfileIntro.body', 'We use your date, time and place of birth to calculate your Vedic chart and personalize chart-based insights. You can add or change this anytime in Profile.')}
           </Text>
 
           {loading ? (

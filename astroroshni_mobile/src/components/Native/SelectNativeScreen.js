@@ -352,7 +352,7 @@ export default function SelectNativeScreen({ navigation, route }) {
       } else {
         await storage.setBirthDetails(profileWithId);
         setSelectedProfile(profile.name);
-        navigation.navigate('Home', { resetToGreeting: true });
+        navigation.navigate('Home', { resetToGreeting: true, stayOnGreeting: true });
       }
     } catch (error) {
       let errorMessage = '❌ Unable to select profile. Please try again.';
@@ -510,7 +510,12 @@ export default function SelectNativeScreen({ navigation, route }) {
 
   const handleHeaderBack = () => {
     if (returnTo === 'Home') {
-      navigation.navigate('Home', returnParams.returnToChat ? returnParams : { resetToGreeting: true });
+      navigation.navigate(
+        'Home',
+        returnParams.returnToChat
+          ? returnParams
+          : { resetToGreeting: true, stayOnGreeting: true }
+      );
       return;
     }
     if (returnTo) {

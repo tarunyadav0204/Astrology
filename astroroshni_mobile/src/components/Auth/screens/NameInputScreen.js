@@ -61,7 +61,7 @@ export default function NameInputScreen({
     <AuthKeyboardScreen
       emoji="👋"
       title="What's your name?"
-      subtitle="Help us personalize your cosmic experience"
+      subtitle="Help us personalize your chart experience"
       onBack={() => navigateToScreen('otp', 'back')}
       action={(
         <Animated.View

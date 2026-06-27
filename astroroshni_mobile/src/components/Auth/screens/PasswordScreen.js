@@ -314,7 +314,7 @@ export default function PasswordScreen({
     <AuthKeyboardScreen
       emoji="🔐"
       title={isLogin ? 'Enter your password' : 'Create a password'}
-      subtitle={isLogin ? 'Welcome back to your cosmic journey' : 'Choose a strong password to secure your account'}
+      subtitle={isLogin ? 'Welcome back to your chart journey' : 'Choose a strong password to secure your account'}
       onBack={() => navigateToScreen(isLogin ? 'phone' : 'name', 'back')}
       action={(
         <Animated.View

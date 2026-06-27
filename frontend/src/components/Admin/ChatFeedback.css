@@ -207,6 +207,13 @@
   line-height: 1.4;
 }
 
+.question-cell {
+  max-width: 360px;
+  min-width: 240px;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
 .no-data {
   text-align: center;
   color: #666;
@@ -310,7 +317,7 @@
   }
   
   .feedback-table {
-    min-width: 600px;
+    min-width: 900px;
   }
   
   .chat-feedback-pagination {

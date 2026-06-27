@@ -9,7 +9,8 @@ import {
   RefreshControl,
   Dimensions,
   Alert,
-  Modal
+  Modal,
+  Platform,
 } from 'react-native';
 import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -98,6 +99,7 @@ export default function EventScreen({ route }) {
   const { t } = useTranslation();
   const { credits, fetchBalance } = useCredits();
   const { theme, colors } = useTheme();
+  const isIOS = Platform.OS === 'ios';
   const onPrimaryText = '#ffffff';
   const cachedChip = CHIP_CACHED[theme] || CHIP_CACHED.dark;
   const bgGradient = theme === 'dark'
@@ -191,7 +193,7 @@ export default function EventScreen({ route }) {
     { icon: '🌟', text: 'Analyzing planetary positions...' },
     { icon: '🔮', text: `Calculating dasha periods for ${selectedYear}...` },
     { icon: '✨', text: 'Examining transit patterns...' },
-    { icon: '🌙', text: 'Consulting the cosmic calendar...' },
+    { icon: '🌙', text: isIOS ? 'Reviewing the timing calendar...' : 'Consulting the cosmic calendar...' },
     { icon: '⭐', text: 'Mapping celestial influences...' },
     { icon: '🪐', text: 'Decoding planetary alignments...' },
     { icon: '💫', text: 'Synthesizing astrological insights...' },
@@ -205,19 +207,19 @@ export default function EventScreen({ route }) {
     { icon: '☿', text: 'Analyzing Mercury patterns...' },
     { icon: '🔱', text: 'Computing Rahu-Ketu axis...' },
     { icon: '📊', text: 'Calculating house strengths...' },
-    { icon: '🎯', text: 'Identifying key life events...' },
+    { icon: '🎯', text: isIOS ? 'Identifying key timing windows...' : 'Identifying key life events...' },
     { icon: '🌈', text: 'Mapping yogas and combinations...' },
     { icon: '⚡', text: 'Detecting planetary aspects...' },
     { icon: '🧭', text: 'Determining auspicious periods...' },
-    { icon: '📅', text: 'Analyzing monthly forecasts...' },
+    { icon: '📅', text: isIOS ? 'Preparing a chart study...' : 'Analyzing monthly forecasts...' },
     { icon: '🔬', text: 'Examining divisional charts...' },
-    { icon: '🎨', text: 'Painting your cosmic picture...' },
+    { icon: '🎨', text: 'Building your chart summary...' },
     { icon: '🌊', text: 'Flowing through time cycles...' },
-    { icon: '🔥', text: 'Igniting predictive insights...' },
+    { icon: '🔥', text: isIOS ? 'Refining the chart study...' : 'Igniting predictive insights...' },
     { icon: '🌸', text: 'Blooming astrological wisdom...' },
     { icon: '🎭', text: 'Revealing karmic patterns...' },
-    { icon: '🗝️', text: 'Unlocking celestial secrets...' },
-    { icon: '💎', text: 'Polishing your predictions...' },
+    { icon: '🗝️', text: isIOS ? 'Opening chart details...' : 'Unlocking celestial secrets...' },
+    { icon: '💎', text: isIOS ? 'Polishing the final study...' : 'Polishing the timeline insights...' },
     { icon: '🌺', text: 'Cultivating cosmic clarity...' },
     { icon: '🦋', text: 'Transforming raw data...' },
     { icon: '🌻', text: 'Growing your timeline...' },
@@ -225,9 +227,9 @@ export default function EventScreen({ route }) {
     { icon: '🏔️', text: 'Scaling astrological peaks...' },
     { icon: '🌅', text: 'Dawning new insights...' },
     { icon: '🎼', text: 'Composing cosmic symphony...' },
-    { icon: '🔭', text: 'Peering into your future...' },
+    { icon: '🔭', text: isIOS ? 'Reviewing your chart context...' : 'Reviewing the timing context...' },
     { icon: '🌌', text: 'Navigating the cosmos...' },
-    { icon: '✅', text: 'Finalizing your predictions...' }
+    { icon: '✅', text: isIOS ? 'Finalizing your chart study...' : 'Finalizing the timing study...' }
   ];
 
   const getYearlyPendingPayload = useCallback((jobId, year, birthChartId, startedAt = new Date().toISOString()) => ({
@@ -464,7 +466,7 @@ export default function EventScreen({ route }) {
                   t('eventScreen.noSavedYetTitle', 'No saved result yet'),
                   t(
                     'eventScreen.noSavedYetBody',
-                    'Try again in a little while if the analysis is still running.'
+                    'Try again in a little while if the study is still running.'
                   )
                 );
               }
@@ -538,7 +540,7 @@ export default function EventScreen({ route }) {
           t('eventScreen.timelineRecoveredTitle', 'Timeline ready'),
           t(
             'eventScreen.timelineLongRunBody',
-            'Your analysis finished — loaded from saved results.'
+          'Your study finished — loaded from saved results.'
           )
         );
         return;
@@ -563,7 +565,7 @@ export default function EventScreen({ route }) {
                   t('eventScreen.noSavedYetTitle', 'No saved result yet'),
                   t(
                     'eventScreen.noSavedYetBody',
-                    'Try again in a little while if the analysis is still running.'
+                    'Try again in a little while if the study is still running.'
                   )
                 );
               }
@@ -1170,11 +1172,11 @@ export default function EventScreen({ route }) {
     console.log('📋 Context data:', JSON.stringify(context, null, 2));
     console.log('📋 Events count:', context.events?.length);
     
-    let predictionText = `${context.month} Predictions:\n\n`;
+    let predictionText = `${context.month} Study:\n\n`;
     
     if (context.events && context.events.length > 0) {
       context.events.forEach((event, idx) => {
-        predictionText += `Event ${idx + 1}: ${event.type}\n`;
+        predictionText += `Item ${idx + 1}: ${event.type}\n`;
         predictionText += `${event.prediction}\n`;
         if (event.start_date && event.end_date) {
           predictionText += `Period: ${event.start_date} to ${event.end_date}\n`;
@@ -1182,7 +1184,7 @@ export default function EventScreen({ route }) {
         
         // Include manifestations if available
         if (event.possible_manifestations && event.possible_manifestations.length > 0) {
-          predictionText += `\nPossible Scenarios (${event.possible_manifestations.length}):\n`;
+          predictionText += `\nPossible scenarios (${event.possible_manifestations.length}):\n`;
           event.possible_manifestations.forEach((manifest, mIdx) => {
             const scenario = typeof manifest === 'string' ? manifest : manifest.scenario;
             predictionText += `${mIdx + 1}. ${scenario}\n`;
@@ -1192,9 +1194,9 @@ export default function EventScreen({ route }) {
       });
     }
     
-    predictionText += `Please explain these predictions in more detail.`;
+    predictionText += `Please explain these results in more detail.`;
     
-    console.log('📋 Final prediction text:', predictionText);
+    console.log('📋 Final study text:', predictionText);
     
     navigation.navigate('Home', {
       startChat: true,
@@ -1365,7 +1367,7 @@ export default function EventScreen({ route }) {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.backgroundSecondary, borderColor: colors.cardBorder }]}>
             <Ionicons name="refresh-circle" size={48} color={colors.primary} style={styles.modalIcon} />
-            <Text style={[styles.modalTitle, { color: colors.primary }]}>{t('eventScreen.regenerateTitle', 'Regenerate Predictions?')}</Text>
+            <Text style={[styles.modalTitle, { color: colors.primary }]}>{t('eventScreen.regenerateTitle', 'Refresh Study?')}</Text>
             <Text style={[styles.modalText, { color: colors.textSecondary }]}>
               {t('eventScreen.regenerateMessage', { cost: creditCost, year: selectedYear })}
             </Text>
@@ -1393,7 +1395,7 @@ export default function EventScreen({ route }) {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {analysisStarted ? t('eventScreen.headerPredictions', { year: selectedYear }) : t('eventScreen.headerTitle', 'Major Life Events')}
+            {analysisStarted ? t('eventScreen.headerPredictions', { year: selectedYear }) : t('eventScreen.headerTitle', 'Annual Chart Review')}
           </Text>
           {birthData && (
             <NativeSelectorChip 
@@ -1427,12 +1429,19 @@ export default function EventScreen({ route }) {
       </View>
 
       {!analysisStarted ? (
-        <View style={[styles.selectionContainer, { backgroundColor: 'transparent' }]}>
-          <Text style={[styles.selectionTitle, { color: colors.text }]}>🌟 {t('eventScreen.chooseReading', 'Choose your reading')}</Text>
+        <ScrollView
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.selectionContainer,
+            { backgroundColor: 'transparent' },
+          ]}
+        >
+          <Text style={[styles.selectionTitle, { color: colors.text }]}>🌟 {t('eventScreen.chooseReading', 'Choose your chart review')}</Text>
           <Text style={[styles.selectionSubtitle, { color: colors.textSecondary }]}>
             {readingMode === 'yearly'
-              ? t('eventScreen.yearlySubtitle', 'You’ll get the year’s vibe with 12 monthly story arcs. Tap any month to go deeper.')
-              : t('eventScreen.monthlySubtitle', 'Pick your month—then we’ll generate an in-depth, one-month deep dive with dasha activation and many scenarios.')}
+              ? t('eventScreen.yearlySubtitle', 'You’ll get a year-level chart review with 12 monthly notes. Tap any month to go deeper.')
+              : t('eventScreen.monthlySubtitle', 'Pick your month—then we’ll generate a one-month chart review with dasha activation and multiple scenarios.')}
           </Text>
 
           <View style={styles.modeToggleContainer}>
@@ -1454,7 +1463,7 @@ export default function EventScreen({ route }) {
                   },
                 ]}
               >
-                {t('eventScreen.yearlyOverviewDesc', '12 monthly chapters')}
+                {t('eventScreen.yearlyOverviewDesc', '12 monthly notes')}
               </Text>
             </TouchableOpacity>
 
@@ -1583,22 +1592,22 @@ export default function EventScreen({ route }) {
 
           {/* What's Included */}
           <View style={[styles.featuresContainer, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
-            <Text style={[styles.featuresTitle, { color: colors.text }]}>{t('eventScreen.whatsIncluded', "What's Included:")}</Text>
+            <Text style={[styles.featuresTitle, { color: colors.text }]}>{t('eventScreen.whatsIncluded', "What you'll see:")}</Text>
             <View style={styles.featureItem}>
               <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
               <Text style={[styles.featureText, { color: colors.text }]}>
                 {readingMode === 'yearly'
-                  ? t('eventScreen.monthlyForecasts', '12 Monthly Forecasts')
-                  : t('eventScreen.oneMonthDeep', 'One Month Deep Dive')}
+                  ? t('eventScreen.monthlyForecasts', '12 Monthly Chart Notes')
+                  : t('eventScreen.oneMonthDeep', 'One Month Chart Review')}
               </Text>
             </View>
             <View style={styles.featureItem}>
               <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-              <Text style={[styles.featureText, { color: colors.text }]}>{t('eventScreen.majorLifeEvents', 'Major Life Events')}</Text>
+              <Text style={[styles.featureText, { color: colors.text }]}>{t('eventScreen.majorLifeEvents', 'Key timing themes')}</Text>
             </View>
             <View style={styles.featureItem}>
               <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-              <Text style={[styles.featureText, { color: colors.text }]}>{t('eventScreen.timingGuidance', 'Timing Guidance')}</Text>
+              <Text style={[styles.featureText, { color: colors.text }]}>{t('eventScreen.timingGuidance', 'Chart notes')}</Text>
             </View>
             <View style={styles.featureItem}>
               <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
@@ -1640,7 +1649,7 @@ export default function EventScreen({ route }) {
                     <Text style={[styles.unlockButtonText, { color: onPrimaryText }]}>
                       {readingMode === 'yearly'
                         ? t('eventScreen.continue', 'Continue')
-                        : t('eventScreen.generateMonth', 'Generate my month reading')}
+                        : t('eventScreen.generateMonth', 'Generate my month study')}
                     </Text>
                     <Ionicons name="arrow-forward" size={22} color={onPrimaryText} />
                   </>
@@ -1648,7 +1657,7 @@ export default function EventScreen({ route }) {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        </View>
+        </ScrollView>
       ) : (
         <ScrollView
         nestedScrollEnabled
@@ -1720,7 +1729,7 @@ export default function EventScreen({ route }) {
           </View>
         ) : monthlyData?.monthly_predictions && monthlyData.monthly_predictions.length > 0 ? (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>📅 {t('eventScreen.monthlyGuide', 'Monthly Guide')}</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>📅 {t('eventScreen.monthlyGuide', 'Monthly Chart Notes')}</Text>
             <View style={styles.accordionContainer}>
               {monthlyData?.monthly_predictions?.map((month, index) => (
                 <MonthlyAccordion
@@ -1735,7 +1744,7 @@ export default function EventScreen({ route }) {
         ) : monthlyData ? (
           <View style={styles.section}>
             <View style={styles.loadingContainer}>
-              <Text style={[styles.loadingText, { color: colors.text }]}>⚠️ {t('eventScreen.noPredictions', 'No predictions generated. Please try regenerating.')}</Text>
+              <Text style={[styles.loadingText, { color: colors.text }]}>⚠️ {t('eventScreen.noPredictions', 'No timeline insights generated. Please try again.')}</Text>
             </View>
           </View>
         ) : null}
@@ -1856,8 +1865,8 @@ const styles = StyleSheet.create({
   accordionContainer: { paddingHorizontal: 20 },
   
   selectionContainer: {
-    flex: 1,
     padding: 16,
+    paddingBottom: 22,
   },
   selectionTitle: {
     fontSize: 18,
@@ -2004,12 +2013,12 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   unlockButtonContainer: {
-    marginTop: 'auto',
+    marginTop: 10,
     paddingTop: 12,
-    paddingBottom: 6,
+    paddingBottom: 10,
   },
   unlockButtonContainerMonthly: {
-    paddingBottom: 28,
+    paddingBottom: 16,
   },
   unlockButton: {
     borderRadius: 14,

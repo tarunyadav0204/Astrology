@@ -145,7 +145,7 @@ export default function SadeSatiScreen({ navigation, route }) {
                 {t('home.sadeSati.ctaHeadline', 'Will my Sade Sati be challenging or more manageable?')}
               </Text>
               <Text style={[styles.ctaSubtext, { color: colors.textSecondary }]}>
-                {t('home.sadeSati.ctaSubtext', 'Get a reading based on your chart — intensity, timing, and remedies.')}
+                {t('home.sadeSati.ctaSubtext', 'Review your chart for intensity, timing, and remedies.')}
               </Text>
               <TouchableOpacity
                 style={[styles.ctaButton, { backgroundColor: colors.primary }]}

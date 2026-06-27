@@ -60,6 +60,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   const screenGradientWithAccent = isDark
     ? [...screenGradient, colors.primary]
     : [...screenGradient, colors.primary];
+  const isIosKarmaStudy = Platform.OS === 'ios';
   const [karmaCost, setKarmaCost] = useState(25);
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState(null);
@@ -70,6 +71,35 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   const [nativeName, setNativeName] = useState(() =>
     i18n.t('karmaAnalysis.defaultNativeName', 'Native')
   );
+  const uiText = {
+    pdfShareTitle: isIosKarmaStudy ? 'Share Chart Study' : t('karmaAnalysis.pdfShareTitle'),
+    pdfDocTitle: isIosKarmaStudy ? 'Chart Pattern Study' : t('karmaAnalysis.pdfDocTitle'),
+    pdfDocSubtitle: isIosKarmaStudy ? 'A study of repeating chart themes' : t('karmaAnalysis.pdfDocSubtitle'),
+    pdfFooterLine1: isIosKarmaStudy ? 'Analyzed by AstroRoshni' : t('karmaAnalysis.pdfFooterLine1'),
+    pdfFooterLine2: isIosKarmaStudy ? 'Chart Study • Vedic Astrology' : t('karmaAnalysis.pdfFooterLine2'),
+    loadingTitle: isIosKarmaStudy ? 'Studying Chart Patterns' : t('karmaAnalysis.loadingTitle'),
+    loadingSubtitleProgress: isIosKarmaStudy
+      ? 'Reviewing repeating themes and timing markers...'
+      : t('karmaAnalysis.loadingSubtitleProgress'),
+    loadingSubtitleSlow: isIosKarmaStudy
+      ? 'This is taking longer than usual...'
+      : t('karmaAnalysis.loadingSubtitleSlow'),
+    errorTitle: isIosKarmaStudy ? 'Unable to Load Study' : t('karmaAnalysis.errorTitle'),
+    startTitle: isIosKarmaStudy ? 'Chart Pattern Study' : t('karmaAnalysis.startTitle'),
+    startSubtitle: isIosKarmaStudy
+      ? 'Review repeating themes and chart patterns'
+      : t('karmaAnalysis.startSubtitle'),
+    confirmStartTitle: isIosKarmaStudy ? 'Start Chart Study' : t('karmaAnalysis.confirmStartTitle'),
+    confirmRegenerateTitle: isIosKarmaStudy
+      ? 'Regenerate Chart Study'
+      : t('karmaAnalysis.confirmRegenerateTitle'),
+    resultTitle: isIosKarmaStudy ? 'Chart Patterns' : t('karmaAnalysis.resultTitle'),
+    resultSubtitle: isIosKarmaStudy
+      ? 'A study of repeating chart themes'
+      : t('karmaAnalysis.resultSubtitle'),
+    footerAnalyzedBy: isIosKarmaStudy ? 'Study prepared by AstroRoshni' : t('karmaAnalysis.footerAnalyzedBy'),
+    footerAI: isIosKarmaStudy ? 'Chart Study • Vedic Astrology' : t('karmaAnalysis.footerAI'),
+  };
 
   const resolveSectionTitle = useCallback(
     (sectionTitle) => {
@@ -540,15 +570,15 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
             <div class="container">
               <div class="header">
                 <div class="logo">🕉️</div>
-                <div class="title">${t('karmaAnalysis.pdfDocTitle')}</div>
-                <div class="subtitle">${t('karmaAnalysis.pdfDocSubtitle')}</div>
+                <div class="title">${uiText.pdfDocTitle}</div>
+                <div class="subtitle">${uiText.pdfDocSubtitle}</div>
                 <div class="native-name">${nativeName}</div>
                 <div class="timestamp">${new Date().toLocaleString()}</div>
               </div>
               ${contentHTML}
               <div class="footer">
-                ${t('karmaAnalysis.pdfFooterLine1')}<br>
-                ${t('karmaAnalysis.pdfFooterLine2')}
+                ${uiText.pdfFooterLine1}<br>
+                ${uiText.pdfFooterLine2}
               </div>
             </div>
           </body>
@@ -568,7 +598,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
       
       await Sharing.shareAsync(uri, {
         mimeType: 'application/pdf',
-        dialogTitle: t('karmaAnalysis.pdfShareTitle'),
+        dialogTitle: uiText.pdfShareTitle,
         UTI: 'com.adobe.pdf',
       });
       
@@ -660,9 +690,9 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
             <Text style={styles.omSymbol}>🕉️</Text>
           </View>
           <ActivityIndicator size="large" color={colors.primary} style={styles.spinner} />
-          <Text style={[styles.loadingTitle, { color: colors.accent }]}>{t('karmaAnalysis.loadingTitle')}</Text>
+          <Text style={[styles.loadingTitle, { color: colors.accent }]}>{uiText.loadingTitle}</Text>
           <Text style={[styles.loadingSubtitle, { color: colors.textSecondary }]}>
-            {showProgress ? t('karmaAnalysis.loadingSubtitleProgress') : t('karmaAnalysis.loadingSubtitleSlow')}
+            {showProgress ? uiText.loadingSubtitleProgress : uiText.loadingSubtitleSlow}
           </Text>
           {showProgress && (
             <View style={styles.progressBarContainer}>
@@ -689,7 +719,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
         {renderKarmaTopBar({ rightSlot: <View style={styles.headerRightSpacer} /> })}
         <View style={styles.errorContainer}>
           <Text style={styles.errorIcon}>⚠️</Text>
-          <Text style={[styles.errorTitle, { color: colors.accent }]}>{t('karmaAnalysis.errorTitle')}</Text>
+          <Text style={[styles.errorTitle, { color: colors.accent }]}>{uiText.errorTitle}</Text>
           <Text style={[styles.errorText, { color: colors.textSecondary }]}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => initiateAnalysis(false)}>
             <LinearGradient colors={[colors.primary, colors.secondary]} style={styles.retryGradient}>
@@ -721,11 +751,11 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
         })}
         <View style={styles.startContainer}>
           <Text style={styles.omSymbol}>🕉️</Text>
-          <Text style={[styles.startTitle, { color: colors.accent }]}>{t('karmaAnalysis.startTitle')}</Text>
-          <Text style={[styles.startSubtitle, { color: colors.textSecondary }]}>{t('karmaAnalysis.startSubtitle')}</Text>
+          <Text style={[styles.startTitle, { color: colors.accent }]}>{uiText.startTitle}</Text>
+          <Text style={[styles.startSubtitle, { color: colors.textSecondary }]}>{uiText.startSubtitle}</Text>
           <TouchableOpacity style={styles.startButton} onPress={handleStartAnalysis}>
             <LinearGradient colors={[colors.primary, colors.secondary]} style={styles.startGradient}>
-              <Text style={[styles.startButtonText, { color: '#fff' }]}>{t('karmaAnalysis.startButton')}</Text>
+              <Text style={[styles.startButtonText, { color: '#fff' }]}>{isIosKarmaStudy ? 'Start Study' : t('karmaAnalysis.startButton')}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -735,7 +765,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           onConfirm={confirmStartAnalysis}
           credits={credits}
           cost={karmaCost}
-          title={t('karmaAnalysis.confirmStartTitle')}
+          title={uiText.confirmStartTitle}
           colors={colors}
           isDark={isDark}
         />
@@ -789,7 +819,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           onConfirm={confirmRegenerate}
           credits={credits}
           cost={karmaCost}
-          title={t('karmaAnalysis.confirmRegenerateTitle')}
+          title={uiText.confirmRegenerateTitle}
           colors={colors}
           isDark={isDark}
         />
@@ -802,8 +832,8 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
             <View style={[styles.headerContainer, { backgroundColor: isDark ? 'rgba(255,215,0,0.08)' : colors.surface }]}>
               <View style={[styles.headerGlow, { backgroundColor: isDark ? 'rgba(255,215,0,0.15)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.3)' : colors.cardBorder }]}>
                 <Text style={styles.omHeader}>🕉️</Text>
-                <Text style={[styles.title, { color: colors.accent }]}>{t('karmaAnalysis.resultTitle')}</Text>
-                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t('karmaAnalysis.resultSubtitle')}</Text>
+                <Text style={[styles.title, { color: colors.accent }]}>{uiText.resultTitle}</Text>
+                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{uiText.resultSubtitle}</Text>
                 <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,215,0,0.3)' : colors.cardBorder }]} />
               </View>
             </View>
@@ -823,8 +853,8 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
             <View style={styles.footerContainer}>
               <View style={[styles.footerGradient, { backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.15)' : colors.cardBorder }]}>
                 <Text style={styles.footerIcon}>✨</Text>
-                <Text style={[styles.footerText, { color: colors.textSecondary }]}>{t('karmaAnalysis.footerAnalyzedBy')}</Text>
-                <Text style={[styles.footerSubtext, { color: colors.textSecondary }]}>{t('karmaAnalysis.footerAI')}</Text>
+                <Text style={[styles.footerText, { color: colors.textSecondary }]}>{uiText.footerAnalyzedBy}</Text>
+                <Text style={[styles.footerSubtext, { color: colors.textSecondary }]}>{uiText.footerAI}</Text>
               </View>
             </View>
           </Animated.View>

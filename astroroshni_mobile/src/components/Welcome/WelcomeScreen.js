@@ -9,6 +9,7 @@ import {
   Dimensions,
   StatusBar,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -72,6 +73,7 @@ const FeatureCard = ({ icon, title, description, delay = 0 }) => {
 };
 
 const WelcomeScreen = ({ navigation }) => {
+  const isIOS = Platform.OS === 'ios';
   const logoScale = useRef(new Animated.Value(0)).current;
   const titleOpacity = useRef(new Animated.Value(0)).current;
   const subtitleOpacity = useRef(new Animated.Value(0)).current;
@@ -80,12 +82,24 @@ const WelcomeScreen = ({ navigation }) => {
 
   
   const features = [
-    { icon: '📊', title: 'Live Birth Charts', description: 'North & South Indian styles with real-time calculations' },
-    { icon: '🔮', title: 'Life Analysis Suite', description: 'Wealth, Health, Marriage & Education insights' },
-    { icon: '⏰', title: 'Real-Time Transits', description: 'Current planetary positions affecting you now' },
-    { icon: '💬', title: 'Chat with Cosmos', description: 'Ask anything, get instant astrological guidance' },
-    { icon: '⊞', title: 'Ashtakvarga Oracle', description: 'Unlock planetary strength secrets for precise predictions' },
-    { icon: '🌀', title: 'Multi-Dasha System', description: 'Vimshottari, Yogini, Char & Kalachakra timing mastery' },
+    isIOS
+      ? { icon: '📊', title: 'Chart Builder', description: 'North & South Indian chart layouts with live calculations' }
+      : { icon: '📊', title: 'Live Birth Charts', description: 'North & South Indian styles with real-time calculations' },
+    isIOS
+      ? { icon: '🔎', title: 'Chart Analysis', description: 'Explore life areas like wealth, health, marriage, and education' }
+      : { icon: '🔮', title: 'Life Analysis Suite', description: 'Wealth, Health, Marriage & Education insights' },
+    isIOS
+      ? { icon: '🗓️', title: 'Transit Study', description: 'See current planetary positions and chart context' }
+      : { icon: '⏰', title: 'Real-Time Transits', description: 'Current planetary positions affecting you now' },
+    isIOS
+      ? { icon: '💬', title: 'Chart Chat', description: 'Ask questions and get chart-based guidance' }
+      : { icon: '💬', title: 'Chat with Cosmos', description: 'Ask anything, get instant astrological guidance' },
+    isIOS
+      ? { icon: '⊞', title: 'Ashtakvarga Study', description: 'Review planetary strength patterns and timing context' }
+      : { icon: '⊞', title: 'Ashtakvarga', description: 'Review planetary strength patterns and timing context' },
+    isIOS
+      ? { icon: '🧭', title: 'Dasha Timing', description: 'Vimshottari, Yogini, Char, and Kalachakra periods' }
+      : { icon: '🌀', title: 'Multi-Dasha System', description: 'Vimshottari, Yogini, Char & Kalachakra timing mastery' },
   ];
 
   useEffect(() => {
@@ -198,8 +212,12 @@ const WelcomeScreen = ({ navigation }) => {
           </Animated.Text>
           <View style={styles.titleAccent} />
           <Animated.View style={[styles.taglineContainer, { opacity: subtitleOpacity }]}>
-            <Text style={styles.tagline}>Your Personal Cosmic Guide</Text>
-            <Text style={styles.subtitle}>Ancient Wisdom • Modern Precision</Text>
+            <Text style={styles.tagline}>
+              {isIOS ? 'Vedic chart study and interpretation' : 'Your Personal Cosmic Guide'}
+            </Text>
+            <Text style={styles.subtitle}>
+              {isIOS ? 'Birth charts • Transits • Timing patterns' : 'Ancient Wisdom • Modern Precision'}
+            </Text>
             <TouchableOpacity
               onPress={() => navigation.navigate('Login')}
               activeOpacity={0.88}
@@ -212,7 +230,7 @@ const WelcomeScreen = ({ navigation }) => {
                 style={styles.heroCtaButton}
               >
                 <Text style={styles.heroCtaText} numberOfLines={1} adjustsFontSizeToFit>
-                  Begin Your Cosmic Journey
+                  {isIOS ? 'Study your chart' : 'Begin Your Cosmic Journey'}
                 </Text>
                 <Text style={styles.buttonIcon}>✦</Text>
               </LinearGradient>
@@ -222,7 +240,7 @@ const WelcomeScreen = ({ navigation }) => {
 
         {/* Trust & Privacy — single merged section */}
         <View style={styles.trustSection}>
-          <Text style={styles.sectionTitle}>Trust & Privacy</Text>
+          <Text style={styles.sectionTitle}>{isIOS ? 'How the app works' : 'Trust & Privacy'}</Text>
           <LinearGradient
             colors={['rgba(255, 255, 255, 0.95)', 'rgba(248, 249, 250, 0.95)']}
             style={styles.trustPrivacyCard}
@@ -234,7 +252,7 @@ const WelcomeScreen = ({ navigation }) => {
               </View>
               <View style={styles.trustPrivacyItem}>
                 <Ionicons name="telescope" size={20} color="#FF6B35" style={styles.trustPrivacyIcon} />
-                <Text style={styles.trustPrivacyText}>Swiss Ephemeris for precise calculations</Text>
+                <Text style={styles.trustPrivacyText}>{isIOS ? 'Swiss Ephemeris for chart calculations' : 'Swiss Ephemeris for precise calculations'}</Text>
               </View>
               <View style={styles.trustPrivacyItem}>
                 <Ionicons name="eye-off" size={20} color="#4CAF50" style={styles.trustPrivacyIcon} />
@@ -242,7 +260,7 @@ const WelcomeScreen = ({ navigation }) => {
               </View>
               <View style={styles.trustPrivacyItem}>
                 <Ionicons name="ribbon" size={20} color="#FF6B35" style={styles.trustPrivacyIcon} />
-                <Text style={styles.trustPrivacyText}>Rooted in traditional Vedic astrology</Text>
+                <Text style={styles.trustPrivacyText}>{isIOS ? 'Rooted in Vedic chart interpretation' : 'Rooted in traditional Vedic astrology'}</Text>
               </View>
               <View style={styles.trustPrivacyItem}>
                 <Ionicons name="gift" size={20} color="#4CAF50" style={styles.trustPrivacyIcon} />
@@ -254,7 +272,7 @@ const WelcomeScreen = ({ navigation }) => {
 
         {/* Features Section */}
         <View style={styles.featuresSection}>
-          <Text style={styles.sectionTitle}>Unlock Cosmic Insights</Text>
+          <Text style={styles.sectionTitle}>{isIOS ? 'What the app helps you study' : 'Unlock Cosmic Insights'}</Text>
           <View style={styles.featuresGrid}>
             {features.map((feature, index) => (
               <FeatureCard
@@ -278,7 +296,9 @@ const WelcomeScreen = ({ navigation }) => {
                 end={{ x: 1, y: 1 }}
                 style={styles.getStartedButton}
               >
-                <Text style={styles.buttonText} numberOfLines={1} adjustsFontSizeToFit>Begin Your Cosmic Journey</Text>
+                <Text style={styles.buttonText} numberOfLines={1} adjustsFontSizeToFit>
+                  {isIOS ? 'Explore your chart' : 'Begin Your Cosmic Journey'}
+                </Text>
                 <Text style={styles.buttonIcon}>✦</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -413,7 +433,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     fontSize: width < 375 ? 19 : 22,
-    color: '#FFD700',
+    color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 8,
     fontWeight: '600',
@@ -423,7 +443,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: width < 375 ? 14 : 16,
-    color: 'rgba(255, 255, 255, 0.82)',
+    color: 'rgba(255, 255, 255, 0.88)',
     textAlign: 'center',
     lineHeight: 24,
     fontWeight: '400',

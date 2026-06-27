@@ -181,6 +181,8 @@ const ChatFeedback = () => {
             <thead>
               <tr>
                 <th>User Name</th>
+                <th>Phone</th>
+                <th>Question</th>
                 <th>Rating</th>
                 <th>Comment</th>
                 <th>Created Time</th>
@@ -191,6 +193,10 @@ const ChatFeedback = () => {
                 feedbacks.map((feedback, index) => (
                   <tr key={index}>
                     <td>{feedback.user_name || 'Anonymous'}</td>
+                    <td>{feedback.user_phone || '—'}</td>
+                    <td className="question-cell">
+                      {feedback.question || 'Question not found'}
+                    </td>
                     <td className="rating-cell">
                       <span className="stars">{renderStars(feedback.rating)}</span>
                       <span className="rating-number">({feedback.rating}/5)</span>
@@ -203,7 +209,7 @@ const ChatFeedback = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="4" className="no-data">No feedback data available</td>
+                  <td colSpan="6" className="no-data">No feedback data available</td>
                 </tr>
               )}
             </tbody>

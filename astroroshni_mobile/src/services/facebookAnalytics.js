@@ -11,6 +11,10 @@ function getExtra() {
   return Constants.expoConfig?.extra || {};
 }
 
+function isExpoGoRuntime() {
+  return Constants.appOwnership === 'expo' || Constants.executionEnvironment === 'storeClient';
+}
+
 /** Logs to logcat (tag ReactNativeJS) when __DEV__ or EXPO_PUBLIC_FACEBOOK_DEBUG_LOG=1. */
 function fbLog(...args) {
   const extra = getExtra();
@@ -32,12 +36,12 @@ function flushAppEventsIfDebug(AppEventsLogger) {
 }
 
 export function isFacebookAnalyticsConfigured() {
+  if (isExpoGoRuntime()) return false;
   const { facebookAppId, facebookClientToken } = getExtra();
   if (facebookAppId && facebookClientToken) return true;
   // Standalone / dev-client builds often embed App ID in native manifest/plist but omit
   // EXPO_PUBLIC_* from Constants.expoConfig.extra on CI — still log via native SDK.
   if (Platform.OS === 'web') return false;
-  if (Constants.appOwnership === 'expo') return false;
   if (sdkUnavailable) return false;
   const sdk = getSdk();
   return Boolean(sdk?.Settings);
@@ -394,6 +398,11 @@ async function configureFacebookSdk() {
 export async function initFacebookAnalytics() {
   if (initStarted) return sdkReady;
   initStarted = true;
+  if (isExpoGoRuntime()) {
+    sdkUnavailable = true;
+    sdkReady = false;
+    return false;
+  }
 
   return new Promise((resolve) => {
     InteractionManager.runAfterInteractions(() => {

@@ -8,7 +8,6 @@ import {
   Dimensions,
   Modal,
   StatusBar,
-  Clipboard,
   Alert,
   ActivityIndicator,
   StyleSheet,
@@ -671,16 +670,16 @@ export default function AshtakvargaOracle({ navigation }) {
           <Ionicons name="person-circle-outline" size={24} color={colors.primary} />
         </View>
         <View style={styles.analysisPanelTitleBlock}>
-          <Text style={[styles.analysisPanelTitle, { color: colors.text }]}>Birth Chart Ashtakvarga Predictions</Text>
+          <Text style={[styles.analysisPanelTitle, { color: colors.text }]}>Birth Chart Ashtakvarga Study</Text>
           <Text style={[styles.analysisPanelSubtitle, { color: colors.textSecondary }]}>
-            A full natal reading from your bindus, houses, dasha context, and life-area strengths.
+            A full chart study from your bindus, houses, dasha context, and life-area strengths.
           </Text>
         </View>
       </View>
       <View style={styles.analysisBenefits}>
         {renderAnalysisBenefit('home-outline', 'Lifelong strengths and weaker houses')}
         {renderAnalysisBenefit('briefcase-outline', 'Career, relationship, money, and health themes')}
-        {renderAnalysisBenefit('refresh-circle-outline', 'Saved readings reopen without using credits')}
+        {renderAnalysisBenefit('refresh-circle-outline', 'Saved studies reopen without using credits')}
       </View>
       {renderLifePredictionsCta()}
     </View>
@@ -701,7 +700,7 @@ export default function AshtakvargaOracle({ navigation }) {
               <Ionicons name="today-outline" size={24} color={colors.primary} />
             </View>
             <View style={styles.analysisPanelTitleBlock}>
-              <Text style={[styles.analysisPanelTitle, { color: colors.text }]}>Transit Ashtakvarga Predictions</Text>
+              <Text style={[styles.analysisPanelTitle, { color: colors.text }]}>Transit Ashtakvarga Study</Text>
               <Text style={[styles.analysisPanelSubtitle, { color: colors.textSecondary }]}>
                 See how the selected date activates your birth chart strengths and pressure points.
               </Text>
@@ -822,7 +821,7 @@ export default function AshtakvargaOracle({ navigation }) {
                 What would you like to understand from your Ashtakvarga?
               </Text>
               <Text style={[styles.askAssistantBullet, { color: colors.textSecondary }]}>
-                Start with one life area, then ask follow-ups as the reading unfolds.
+                Start with one life area, then ask follow-ups as the study unfolds.
               </Text>
             </View>
           </View>
@@ -907,9 +906,9 @@ export default function AshtakvargaOracle({ navigation }) {
         keyboardDismissMode="none"
       >
         <View style={styles.titleContainer}>
-          <Text style={[styles.mapTitle, { color: colors.text }]}>Ashtakvarga Predictions</Text>
+          <Text style={[styles.mapTitle, { color: colors.text }]}>Ashtakvarga Study</Text>
           <Text style={[styles.mapSubtitle, { color: colors.textSecondary }]}>
-            Choose the kind of reading you want before using credits.
+            Choose the kind of study you want before using credits.
           </Text>
         </View>
 
@@ -1000,7 +999,7 @@ export default function AshtakvargaOracle({ navigation }) {
                     <Text style={styles.lifePredictionsIconLarge}>✨</Text>
                   </Animated.View>
                   <Text style={styles.lifePredictionsText}>
-                    Consulting Dots of Destiny...
+                    Reviewing chart strength patterns...
                   </Text>
                   <View style={styles.progressContainer}>
                     <View style={styles.progressBar}>
@@ -1012,7 +1011,7 @@ export default function AshtakvargaOracle({ navigation }) {
               ) : (
                 <View style={styles.loadingContent}>
                   <ActivityIndicator size="small" color="#fff" style={{ marginBottom: 8 }} />
-                  <Text style={styles.lifePredictionsText}>Checking saved reading…</Text>
+                  <Text style={styles.lifePredictionsText}>Checking saved study…</Text>
                 </View>
               )}
             </LinearGradient>
@@ -1036,9 +1035,9 @@ export default function AshtakvargaOracle({ navigation }) {
           >
             <>
               <Text style={styles.lifePredictionsIconLarge}>🌟</Text>
-              <Text style={styles.lifePredictionsHeadline}>Dots of Destiny</Text>
+              <Text style={styles.lifePredictionsHeadline}>Ashtakvarga Study</Text>
               <Text style={styles.lifePredictionsTeaser}>
-                Full reading from your bindus — career, relationships, timing windows, dasha & remedies.
+                Full study from your bindus — career, relationships, timing windows, dasha & remedies.
               </Text>
               <View style={styles.lifePredictionsChips}>
                 <Text style={styles.lifePredictionsChip}>12 houses</Text>
@@ -1046,11 +1045,11 @@ export default function AshtakvargaOracle({ navigation }) {
                 <Text style={styles.lifePredictionsChip}>Dasha</Text>
               </View>
               <View style={styles.lifePredictionsCtaRow}>
-                <Text style={styles.lifePredictionsCtaText}>Open life predictions</Text>
+                <Text style={styles.lifePredictionsCtaText}>{Platform.OS === 'ios' ? 'Open life study' : 'Open life insights'}</Text>
                 <Ionicons name="chevron-forward" size={20} color="#fff" style={{ opacity: 0.95, marginLeft: 4 }} />
               </View>
               <Text style={styles.lifePredictionsCreditHint}>
-                {lifePredictionsCreditCost} credits first run · saved reading replays free
+                {lifePredictionsCreditCost} credits first run · saved study replays free
               </Text>
               <Text style={styles.lifePredictionsSubtext}>Vinay Aditya · Ashtakavarga methodology</Text>
             </>
@@ -1237,7 +1236,7 @@ export default function AshtakvargaOracle({ navigation }) {
 
   const generateLifePredictions = async (forceRegenerate = false) => {
     if (!birthData) {
-      console.error('No birth data available for life predictions');
+      console.error('No birth data available for life study');
       return;
     }
 
@@ -1292,7 +1291,7 @@ export default function AshtakvargaOracle({ navigation }) {
           } catch (pollErr) {
             const msg =
               pollErr?.message === 'TIMEOUT'
-                ? 'Still processing after 6 minutes. Try opening Life predictions again later for your saved reading.'
+                ? 'Still processing after 6 minutes. Try opening Life Study again later for your saved study.'
                 : pollErr?.message || 'Could not complete predictions.';
             Alert.alert('Life predictions', msg);
           }
@@ -1321,14 +1320,14 @@ export default function AshtakvargaOracle({ navigation }) {
         } else if (data?.error) {
           message = String(data.error);
         }
-        console.error('Failed to generate life predictions:', response.status, message);
+        console.error('Failed to generate life study:', response.status, message);
         Alert.alert('Life predictions', message);
         if (response.status === 402) {
           fetchBalance();
         }
       }
     } catch (error) {
-      console.error('Error generating life predictions:', error);
+      console.error('Error generating life study:', error);
     } finally {
       clearInterval(progressInterval);
       loadingRotateAnim.stopAnimation();
@@ -1344,7 +1343,7 @@ export default function AshtakvargaOracle({ navigation }) {
     setLifePredictionsCreditModalMode('regenerate');
   };
 
-  /** Main CTA: open cached reading immediately, or credit modal only if a new generation is needed */
+  /** Main CTA: open cached study immediately, or credit modal only if a new generation is needed */
   const onLifePredictionsMainCta = async () => {
     if (!birthData) return;
     setLifePredictionsCacheChecking(true);
@@ -1396,7 +1395,7 @@ export default function AshtakvargaOracle({ navigation }) {
       console.error('Life predictions cache probe:', err);
       Alert.alert(
         'Life predictions',
-        'Could not check for a saved reading. Check your connection and try again.'
+        'Could not check for a saved study. Check your connection and try again.'
       );
     } finally {
       setLifePredictionsCacheChecking(false);
@@ -1413,13 +1412,13 @@ export default function AshtakvargaOracle({ navigation }) {
 
   const lifePredictionsCreditModalTitle =
     lifePredictionsCreditModalMode === 'regenerate'
-      ? 'Regenerate Dots of Destiny?'
-      : 'Dots of Destiny reading';
+      ? 'Refresh Ashtakvarga study?'
+      : 'Ashtakvarga study';
 
   const lifePredictionsCreditModalDescription =
     lifePredictionsCreditModalMode === 'regenerate'
-      ? `This runs a fresh AI reading and replaces your saved one. It will use ${lifePredictionsCreditCost} credits if the generation succeeds. Your balance: ${credits} credits.`
-      : `Starting a new AI reading uses up to ${lifePredictionsCreditCost} credits if you do not already have one saved for this profile. Your balance: ${credits} credits.`;
+      ? `This runs a fresh AI study and replaces your saved one. It will use ${lifePredictionsCreditCost} credits if the generation succeeds. Your balance: ${credits} credits.`
+      : `Starting a new AI study uses up to ${lifePredictionsCreditCost} credits if you do not already have one saved for this profile. Your balance: ${credits} credits.`;
 
   const fetchYearlyStrength = async (houseNumber) => {
     setLoadingYearly(true);
@@ -1611,16 +1610,16 @@ export default function AshtakvargaOracle({ navigation }) {
                   {loadingLifePredictions && lifePredictions ? (
                     <View style={styles.predictionsRegenOverlay}>
                       <ActivityIndicator size="large" color="#ffd700" />
-                      <Text style={styles.predictionsRegenOverlayText}>Updating reading…</Text>
+                      <Text style={styles.predictionsRegenOverlayText}>Updating study…</Text>
                     </View>
                   ) : null}
                   
                   <ScrollView showsVerticalScrollIndicator={false}>
-                    <Text style={[styles.predictionsTitle, { color: colors.text }]}>Life Predictions</Text>
-                    <Text style={[styles.predictionsSubtitle, { color: colors.primary }]}>{lifePredictions?.methodology || lifePredictions?.predictions?.methodology || "Vinay Aditya's Dots of Destiny"}</Text>
+                    <Text style={[styles.predictionsTitle, { color: colors.text }]}>{Platform.OS === 'ios' ? 'Life Study' : 'Life Insights'}</Text>
+                    <Text style={[styles.predictionsSubtitle, { color: colors.primary }]}>{lifePredictions?.methodology || lifePredictions?.predictions?.methodology || (Platform.OS === 'ios' ? 'Vedic chart strength analysis' : 'Chart strength analysis')}</Text>
                     {lifePredictions?.cached ? (
                       <Text style={[styles.predictionsCachedBadge, { color: colors.textSecondary }]}>
-                        Saved reading — no credits used to view again. Regenerate for a fresh AI pass ({lifePredictionsCreditCost} credits).
+                        Saved study — no credits used to view again. Refresh for a fresh AI pass ({lifePredictionsCreditCost} credits).
                       </Text>
                     ) : null}
                     
@@ -1977,7 +1976,9 @@ export default function AshtakvargaOracle({ navigation }) {
                 <View style={[styles.infoSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249,115,22,0.08)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.2)' }]}>
                   <Text style={[styles.infoSectionTitle, { color: colors.primary }]}>🎯 What is Ashtakvarga?</Text>
                   <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                    Ashtakvarga is an ancient Vedic astrology system that measures planetary strength through numerical points called "bindus" or "dots". It provides precise predictions about life events and timing.
+                    {Platform.OS === 'ios'
+                      ? 'Ashtakvarga is an ancient Vedic astrology system that measures planetary strength through numerical points called "bindus" or "dots". It helps interpret support levels, timing patterns, and chart strength.'
+                      : 'Ashtakvarga is an ancient Vedic astrology system that measures planetary strength through numerical points called "bindus" or "dots". It helps interpret support levels, timing patterns, and chart strength.'}
                   </Text>
                 </View>
 

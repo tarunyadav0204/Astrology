@@ -314,6 +314,12 @@ const CreditScreen = ({ navigation }) => {
   const slideAnim = useRef(new Animated.Value(30)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scrollViewRef = useRef(null);
+  const creditHeaderTitle =
+    Platform.OS === 'ios' ? 'Study Credits' : t('credits.page.title');
+  const creditHeaderSubtitle =
+    Platform.OS === 'ios'
+      ? 'Credits for chart study tools'
+      : t('credits.page.subtitle');
   /**
    * IMPORTANT: Always force endConnection on the very first mount of this screen.
    * Google Play's BillingClient can sometimes get stuck in a default state if the app
@@ -1462,8 +1468,8 @@ const CreditScreen = ({ navigation }) => {
                   </LinearGradient>
                 </View>
 
-                <Text style={[styles.headerTitle, { color: colors.text }]}>{t('credits.page.title')}</Text>
-                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{t('credits.page.subtitle')}</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>{creditHeaderTitle}</Text>
+                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{creditHeaderSubtitle}</Text>
               </View>
             </Animated.View>
 

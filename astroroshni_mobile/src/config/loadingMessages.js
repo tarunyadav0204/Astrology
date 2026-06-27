@@ -12,7 +12,7 @@ export const loadingMessages = [
         icon: "yogas",
     },
     {
-        text: "Synthesizing the final reading...",
-        icon: "reading",
+        text: "Preparing the final study...",
+        icon: "study",
     },
 ];

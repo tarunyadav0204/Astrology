@@ -64,6 +64,7 @@ const cardWidth = screenWidth * 0.3;
 const fontSize = isSmallScreen ? 11 : 13;
 const smallFontSize = isSmallScreen ? 9 : 10;
 const CHAT_RATING_PROMPT_STATE_KEY = 'chatRatingPromptState_v1';
+const PARALLEL_CHAT_POLL_BUDGET_SECONDS = 8 * 60;
 const INSTANT_LOADER_LINES = [
   'chat.instantLoader.lineChart',
   'chat.instantLoader.lineDasha',
@@ -83,7 +84,7 @@ const INSTANT_LOADER_LINES = [
   'chat.instantLoader.lineFinal',
 ];
 const INSTANT_LOADER_FALLBACKS = [
-  'I am reading the main chart focus first, so the answer stays connected to the right part of life instead of becoming generic.',
+  'I am reviewing the main chart focus first, so the answer stays connected to the right part of life instead of becoming generic.',
   'Now I am checking the running dasha pattern and seeing which planet is currently carrying more weight in the question.',
   'I am comparing the present transits with the natal promise to separate a short-term signal from a deeper pattern.',
   'The relevant houses are being matched with the question, so the answer can stay specific and practical.',
@@ -92,7 +93,7 @@ const INSTANT_LOADER_FALLBACKS = [
   'I am narrowing the dasha timing so past, current, and upcoming influences are not mixed together.',
   'The transit picture is being checked against the question, especially where it activates the same houses again.',
   'I am looking for repeated house patterns because repeated signals are more useful than one isolated placement.',
-  'Your exact question and recent chat context are being kept in view so the reply does not drift into a general reading.',
+  'Your exact question and recent chat context are being kept in view so the reply does not drift into a general study.',
   'I am separating stronger chart evidence from weaker hints, so the answer can say what is clear and what is uncertain.',
   'Now I am turning the astrology into practical language, without losing the main chart reasoning.',
   'I am keeping the response short enough for instant mode while still answering the real question.',
@@ -479,8 +480,8 @@ export default function ChatScreen({ navigation, route }) {
   const [chatCostOriginal, setChatCostOriginal] = useState(null);
   const [instantChatCostOriginal, setInstantChatCostOriginal] = useState(null);
   const [premiumChatCostOriginal, setPremiumChatCostOriginal] = useState(null);
-  const [standardChatCountdownSeconds, setStandardChatCountdownSeconds] = useState(110);
-  const [premiumChatCountdownSeconds, setPremiumChatCountdownSeconds] = useState(210);
+  const [standardChatCountdownSeconds, setStandardChatCountdownSeconds] = useState(PARALLEL_CHAT_POLL_BUDGET_SECONDS);
+  const [premiumChatCountdownSeconds, setPremiumChatCountdownSeconds] = useState(PARALLEL_CHAT_POLL_BUDGET_SECONDS);
   const [instantChatEnabled, setInstantChatEnabled] = useState(false);
   const [speechChatEnabled, setSpeechChatEnabled] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
@@ -1522,10 +1523,18 @@ export default function ChatScreen({ navigation, route }) {
       suppressAutoOpenChatRef.current = true;
       nativeSwitchInProgressRef.current = false;
       keepChatOpenAfterAskEntryRef.current = false;
+      setForceGreeting(true);
       setShowGreeting(true);
-      navigation.setParams({ resetToGreeting: undefined });
+      navigation.setParams({
+        resetToGreeting: undefined,
+        stayOnGreeting: undefined,
+        startChat: undefined,
+        initialMessage: undefined,
+        returnToChat: undefined,
+      });
       setTimeout(() => {
         suppressAutoOpenChatRef.current = false;
+        setForceGreeting(false);
       }, 800);
     }
 
@@ -1710,7 +1719,18 @@ export default function ChatScreen({ navigation, route }) {
     const adminSuggestions = Array.isArray(features.chat_static_suggestions)
       ? features.chat_static_suggestions.map((item) => String(item || '').trim()).filter(Boolean)
       : [];
-    setSuggestions(adminSuggestions.length ? adminSuggestions : DEFAULT_CHAT_SUGGESTIONS);
+    const iosSuggestions = [
+      'What does my chart say about my current direction?',
+      'Which house looks strongest in my chart?',
+      'How should I read my D9 and D10?',
+      'What timing themes should I study right now?',
+      'Which chart factors matter most for my next step?'
+    ];
+    setSuggestions(
+      Platform.OS === 'ios'
+        ? iosSuggestions
+        : (adminSuggestions.length ? adminSuggestions : DEFAULT_CHAT_SUGGESTIONS)
+    );
     const premiumVal = priceMap.premium_chat != null ? Number(priceMap.premium_chat) : 3;
     const premiumOriginal = origMap.premium_chat != null ? Number(origMap.premium_chat) : null;
     setPremiumChatCost(Number.isNaN(premiumVal) || premiumVal <= 0 ? 3 : premiumVal);
@@ -1731,6 +1751,7 @@ export default function ChatScreen({ navigation, route }) {
       const shouldKeepChatOpen =
         keepChatOpenAfterNativeSelectRef.current || keepChatOpenAfterAskEntryRef.current;
       const shouldStartFreshSession = startFreshSessionAfterNativeSelectRef.current;
+      const shouldReturnToChat = shouldKeepChatOpen || shouldStartFreshSession;
       const personId = chatPersonStorageKey(birthData);
       const switchedFromAnotherNative = Boolean(currentPersonId) && currentPersonId !== personId;
 
@@ -1747,11 +1768,38 @@ export default function ChatScreen({ navigation, route }) {
           loadDashaData(birthData);
         }
 
+        if (switchedFromAnotherNative && !shouldReturnToChat) {
+          (async () => {
+            try {
+              await AsyncStorage.multiRemove([`chatMessages_${personId}`, `chatSessions_${personId}`]);
+            } catch {
+              /* ignore */
+            }
+          })();
+
+          setMessages([]);
+          setSessionId(null);
+          setLoading(false);
+          setIsTyping(false);
+          setPendingMessages(new Set());
+          setShowGreeting(true);
+          nativeSwitchInProgressRef.current = false;
+          keepChatOpenAfterAskEntryRef.current = false;
+          keepChatOpenAfterNativeSelectRef.current = false;
+          startFreshSessionAfterNativeSelectRef.current = false;
+
+          setTimeout(() => {
+            checkPendingResponses(personId);
+          }, 200);
+          return;
+        }
+
         // Changing native (or explicit returnToChat fresh): blank thread + welcome only — no local/server restore.
         const forceBlankWelcomeOnly =
           !partnershipMode &&
           !partnershipPrefillInProgressRef.current &&
           !isMundane &&
+          shouldReturnToChat &&
           (switchedFromAnotherNative || shouldStartFreshSession);
 
         if (forceBlankWelcomeOnly) {
@@ -1798,22 +1846,22 @@ export default function ChatScreen({ navigation, route }) {
             
             // Check for processing messages and resume polling.
             // This prevents a stuck "Analyzing..." state after app/background refresh.
-            const hasResumedPending = switchedFromAnotherNative
+            const hasResumedPending = shouldReturnToChat && switchedFromAnotherNative
               ? false
               : resumePendingProcessingMessage(storedMessages, sessionId);
             if (hasResumedPending) {
               setShowGreeting(false);
             }
-            if (!hasResumedPending && shouldKeepChatOpen) {
+            if (!hasResumedPending && shouldReturnToChat) {
               setShowGreeting(false);
             }
           } else {
             await hydrateSelectedChatMode([], personId);
-            if (!shouldKeepChatOpen && !partnershipPrefillInProgressRef.current && !partnershipMode) {
+            if (!shouldReturnToChat && !partnershipPrefillInProgressRef.current && !partnershipMode) {
               setShowGreeting(true);
             }
           }
-          if (shouldKeepChatOpen) {
+          if (shouldReturnToChat) {
             setShowGreeting(false);
             nativeSwitchInProgressRef.current = false;
             keepChatOpenAfterAskEntryRef.current = false;
@@ -1884,7 +1932,12 @@ export default function ChatScreen({ navigation, route }) {
           }
           return {
             ...msg,
-            content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nTap a question below, or ask me anything in your own words.", { name: birthData?.name || 'there' }),
+            content: t('chat.welcomeMessage',
+              Platform.OS === 'ios'
+                ? "🌟 Welcome {{name}}! I can help you study your chart and answer practical questions.\n\nTap a suggestion below, or type your own question."
+                : "🌟 Welcome {{name}}! I can help you study your chart and answer practical questions.\n\nTap a suggestion below, or type your own question.",
+              { name: birthData?.name || 'there' }
+            ),
           };
         });
         return sortMessagesForDisplay(refreshed);
@@ -1917,11 +1970,16 @@ export default function ChatScreen({ navigation, route }) {
         nativeSwitchInProgressRef.current ||
         keepChatOpenAfterNativeSelectRef.current ||
         route.params?.returnToChat ||
+        route.params?.stayOnGreeting ||
         startFreshSessionAfterNativeSelectRef.current;
       if (skipFocusRestore) {
         return;
       }
-      const shouldStayOnGreeting = forceGreeting || route.params?.resetToGreeting || suppressAutoOpenChatRef.current;
+      const shouldStayOnGreeting =
+        forceGreeting ||
+        route.params?.resetToGreeting ||
+        route.params?.stayOnGreeting ||
+        suppressAutoOpenChatRef.current;
       if (currentPersonId) {
         loadMessagesFromStorage(currentPersonId).then(async storedMessages => {
           if (storedMessages.length > 0) {
@@ -2697,7 +2755,12 @@ export default function ChatScreen({ navigation, route }) {
         } else {
           welcomeMessage = {
             id: Date.now().toString(),
-            content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nTap a question below, or ask me anything in your own words.", { name: nativeName }),
+            content: t('chat.welcomeMessage',
+              Platform.OS === 'ios'
+                ? "🌟 Welcome {{name}}! I can help you study your chart and answer practical questions.\n\nTap a suggestion below, or type your own question."
+                : "🌟 Welcome {{name}}! I can help you study your chart and answer practical questions.\n\nTap a suggestion below, or type your own question.",
+              { name: nativeName }
+            ),
             role: 'assistant',
             isWelcome: true,
             timestamp: new Date().toISOString(),
@@ -2755,7 +2818,12 @@ export default function ChatScreen({ navigation, route }) {
     }
     return {
       id: Date.now().toString(),
-      content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nTap a question below, or ask me anything in your own words.", { name: nativeName }),
+      content: t('chat.welcomeMessage',
+        Platform.OS === 'ios'
+          ? "🌟 Welcome {{name}}! I can help you study your chart and answer practical questions.\n\nTap a suggestion below, or type your own question."
+          : "🌟 Welcome {{name}}! I can help you study your chart and answer practical questions.\n\nTap a suggestion below, or type your own question.",
+        { name: nativeName }
+      ),
       role: 'assistant',
       isWelcome: true,
       timestamp: new Date().toISOString(),
@@ -3008,6 +3076,7 @@ export default function ChatScreen({ navigation, route }) {
 
   const getLoadingMessages = (messageText) => {
     const lowerCaseMessage = messageText.toLowerCase();
+    const isIOS = Platform.OS === 'ios';
     
     // Keywords for different categories
     const careerKeywords = ['career', 'job', 'profession', 'work', 'employment'];
@@ -3018,78 +3087,78 @@ export default function ChatScreen({ navigation, route }) {
 
     if (careerKeywords.some(keyword => lowerCaseMessage.includes(keyword))) {
       return [
-        '💼 Analyzing career prospects in your chart...',
-        '🏢 Evaluating professional strengths and weaknesses...',
-        '📈 Identifying key periods for career growth...',
-        '🌟 Uncovering hidden talents and opportunities...',
-        '🎯 Aligning your career with your life purpose...',
-        '☀️ Predicting potential challenges in your professional life...',
-        '✨ Providing guidance for career advancement...',
-        'Congratulations on taking this important step in your career exploration! I am now examining the intricate details of your birth chart to provide you with the most accurate and personalized insights available.',
-        'I am analyzing the placement of Saturn, the planet of career and responsibility, in your birth chart. This will help me understand your professional potential and challenges.',
-        'I am also looking at the 10th house, which represents your career and public life. This will give me a better understanding of your professional path.',
-        'Your birth chart is a unique cosmic blueprint that holds valuable information about your career. I am now decoding this information to provide you with a detailed analysis of your professional life.',
-        'I am examining the placement of Jupiter, the planet of expansion and opportunities, in your birth chart. This will help me identify potential career opportunities for you.',
-        'I am also looking at the 6th house, which represents your daily work and service. This will give me a better understanding of your work environment and professional relationships.',
+        isIOS ? '💼 Reviewing career factors in your chart...' : '💼 Analyzing career prospects in your chart...',
+        '🏢 Looking at professional strengths and pressure points...',
+        '📈 Identifying periods for career growth...',
+        '🌟 Noticing talents and useful opportunities...',
+        '🎯 Aligning your career with your broader life pattern...',
+        isIOS ? '☀️ Reviewing potential challenges in your work life...' : '☀️ Predicting potential challenges in your professional life...',
+        '✨ Sharing practical guidance for career growth...',
+        isIOS ? 'I am now reviewing the chart factors that shape your career pattern.' : 'Congratulations on taking this important step in your career exploration! I am now examining the intricate details of your birth chart to provide you with the most accurate and personalized insights available.',
+        'I am looking at Saturn, which often shapes work, responsibility, and endurance in a chart.',
+        'I am also checking the 10th house, which relates to career and public life.',
+        'I am comparing the chart signals that point to career strengths and pressure points.',
+        'I am also checking Jupiter, which can show growth, support, and opportunities.',
+        'I am also looking at the 6th house, which relates to daily work and service.',
       ];
     }
     if (marriageKeywords.some(keyword => lowerCaseMessage.includes(keyword))) {
       return [
-        '💍 Assessing marital compatibility and timing...',
-        '❤️ Exploring romantic connections in your chart...',
-        '💑 Understanding partnership dynamics...',
-        '☀️ Predicting potential challenges in your married life...',
-        '✨ Providing guidance for a harmonious relationship...',
-        'Now, I am delving into the complexities of your birth chart to provide you with a comprehensive analysis of your marital prospects. This is an important step in understanding your future, and I am committed to providing you with the most accurate and personalized insights available.',
-        'I am analyzing the placement of Venus, the planet of love and relationships, in your birth chart. This will help me understand your romantic potential and challenges.',
-        'I am also looking at the 7th house, which represents your marriage and partnerships. This will give me a better understanding of your marital path.',
-        'Your birth chart is a unique cosmic blueprint that holds valuable information about your relationships. I am now decoding this information to provide you with a detailed analysis of your marital life.',
-        'I am examining the placement of Jupiter, the planet of expansion and opportunities, in your birth chart. This will help me identify potential marital opportunities for you.',
+        '💍 Reviewing relationship patterns...',
+        '❤️ Exploring romantic and partnership themes...',
+        '💑 Understanding how connection works in the chart...',
+        isIOS ? '☀️ Reviewing possible relationship pressure points...' : '☀️ Predicting potential challenges in your married life...',
+        '✨ Sharing guidance for a steadier relationship picture...',
+        isIOS ? 'Now, I am reviewing the chart factors behind your relationship patterns.' : 'Now, I am reviewing the chart factors behind your relationship patterns so the answer stays grounded in the chart.',
+        'I am looking at Venus, which often reflects affection, attraction, and relationship style.',
+        'I am also checking the 7th house, which relates to marriage and partnership.',
+        'I am comparing the chart signals that point to relationship strengths and pressure points.',
+        'I am also checking Jupiter, which can add support and growth to partnership themes.',
       ];
     }
     if (healthKeywords.some(keyword => lowerCaseMessage.includes(keyword))) {
       return [
-        '⚕️ Examining health indicators and vulnerabilities...',
-        '🌿 Looking into planetary influences on your well-being...',
-        '🏃‍♂️ Identifying periods for focusing on health...',
-        'Congratulations on taking this important step in understanding your health from an astrological perspective. I am now examining the intricate details of your birth chart to provide you with the most accurate and personalized insights available.',
-        'I am analyzing the placement of Mars, the planet of energy and vitality, in your birth chart. This will help me understand your physical potential and challenges.',
-        'I am also looking at the 6th house, which represents your health and daily routines. This will give me a better understanding of your health path.',
-        'Your birth chart is a unique cosmic blueprint that holds valuable information about your health. I am now decoding this information to provide you with a detailed analysis of your physical well-being.',
-        'I am examining the placement of Saturn, the planet of limitations and discipline, in your birth chart. This will help me identify potential health challenges for you.',
+        '⚕️ Reviewing health-related indicators...',
+        '🌿 Looking at patterns connected to balance and routine...',
+        '🏃‍♂️ Noticing periods for focusing on self-care...',
+        isIOS ? 'I am reviewing the chart factors connected to health and balance.' : 'Congratulations on taking this important step in understanding your health from an astrological perspective. I am now examining the intricate details of your birth chart to provide you with the most accurate and personalized insights available.',
+        'I am looking at Mars, which can show energy, drive, and effort in the chart.',
+        'I am also checking the 6th house, which relates to routines and daily maintenance.',
+        'I am comparing the chart signals that relate to balance, support, and stress points.',
+        'I am also checking Saturn, which can show structure, limits, and discipline.',
       ];
     }
     if (financeKeywords.some(keyword => lowerCaseMessage.includes(keyword))) {
         return [
-            '💰 Scrutinizing financial planets and houses...',
-            '🏦 Identifying opportunities for wealth creation...',
-            '💸 Analyzing potential for financial challenges...',
+            '💰 Reviewing money-related signals...',
+            '🏦 Noticing patterns around resources and support...',
+            '💸 Checking possible pressure points with money flow...',
             'Congratulations on taking this important step in understanding your financial situation from an astrological perspective. I am now examining the intricate details of your birth chart to provide you with the most accurate and personalized insights available.',
-            'I am analyzing the placement of Jupiter, the planet of expansion and opportunities, in your birth chart. This will help me identify potential financial opportunities for you.',
-            'I am also looking at the 2nd house, which represents your wealth and possessions. This will give me a better understanding of your financial path.',
-            'Your birth chart is a unique cosmic blueprint that holds valuable information about your finances. I am now decoding this information to provide you with a detailed analysis of your financial situation.',
-            'I am examining the placement of Saturn, the planet of limitations and discipline, in your birth chart. This will help me identify potential financial challenges for you.',
+            'I am looking at Jupiter, which can point to growth and support around resources.',
+            'I am also checking the 2nd house, which relates to wealth and possessions.',
+            'I am comparing the chart signals that relate to resources, support, and constraint.',
+            'I am also checking Saturn, which can show structure and restraint around money.',
         ];
     }
     if (spiritualKeywords.some(keyword => lowerCaseMessage.includes(keyword))) {
         return [
-            '🧘‍♀️ Exploring your spiritual path and purpose...',
-            '🕉️ Examining karmic influences and lessons...',
-            '✨ Delving into your soul\'s journey...',
+            '🧘‍♀️ Reviewing purpose and inner-life themes...',
+            '🕉️ Looking at repeating patterns and lessons...',
+            '✨ Paying attention to the deeper side of the chart...',
             'Congratulations on taking this important step in understanding your spiritual path from an astrological perspective. I am now examining the intricate details of your birth chart to provide you with the most accurate and personalized insights available.',
-            'I am analyzing the placement of Neptune, the planet of spirituality and intuition, in your birth chart. This will help me understand your spiritual potential and challenges.',
-            'I am also looking at the 12th house, which represents your subconscious and spiritual life. This will give me a better understanding of your spiritual path.',
-            'Your birth chart is a unique cosmic blueprint that holds valuable information about your spirituality. I am now decoding this information to provide you with a detailed analysis of your spiritual journey.',
+            'I am looking at Neptune, which often reflects intuition and inner sensitivity.',
+            'I am also checking the 12th house, which relates to solitude, rest, and inward focus.',
+            'I am comparing the chart signals that point to reflection, meaning, and inner growth.',
         ];
     }
     
     // Default messages
     return [
-      '☀️ Analyzing your birth chart...',
-      '⭐ Consulting the cosmic energies...',
+      isIOS ? '☀️ Reviewing your chart...' : '☀️ Analyzing your birth chart...',
+      isIOS ? '⭐ Checking the main chart factors...' : '⭐ Consulting the cosmic energies...',
       '📊 Calculating planetary positions...',
-      '🌟 Interpreting astrological patterns...',
-      '✨ Preparing your personalized insights...'
+      isIOS ? '🌟 Interpreting chart patterns...' : '🌟 Interpreting astrological patterns...',
+      '✨ Preparing your response...'
     ];
   };
 
@@ -3172,7 +3241,7 @@ export default function ChatScreen({ navigation, route }) {
           { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : '#fff7ed' },
         ]}>
           <Text style={[styles.waitConversationTitle, { color: colors.text }]}>
-            Preparing your full reading
+            Preparing your full study
           </Text>
           <Text style={[styles.waitConversationSubtitle, { color: colors.textSecondary }]}>
             Keep chatting here until the detailed answer is ready.
@@ -3830,7 +3899,14 @@ export default function ChatScreen({ navigation, route }) {
         pendingNudgeIdRef.current = null;
 
         const result = await response.json();
-        const { user_message_id, message_id: assistantMessageId, loading_messages, chart_insights, chat_tier } = result;
+        const {
+          user_message_id,
+          message_id: assistantMessageId,
+          loading_messages,
+          chart_insights,
+          chat_tier,
+          expectedWaitSeconds: serverExpectedWaitSeconds,
+        } = result;
         const rawServerTier = String(chat_tier || '').trim().toLowerCase();
         const serverTier = String(
           rawServerTier || requestedTier || (useInstantChat ? 'instant' : (isPremiumAnalysis ? 'premium' : 'standard'))
@@ -3914,6 +3990,9 @@ export default function ChatScreen({ navigation, route }) {
                 ...msg,
                 messageId: assistantMessageId,
                 chatTier: effectiveTier,
+                expectedWaitSeconds: Number(serverExpectedWaitSeconds) > 0
+                  ? Number(serverExpectedWaitSeconds)
+                  : msg.expectedWaitSeconds,
                 chartInsights: effectiveTier === 'instant' ? [] : chart_insights,
                 showSendRetryButton: false,
               };
@@ -4050,7 +4129,9 @@ export default function ChatScreen({ navigation, route }) {
       key: 'premium',
       icon: 'sparkles',
       name: t('chat.modeIntro.premium.name', 'Premium'),
-      benefit: t('chat.modeIntro.premium.benefit', 'Deepest analysis for important decisions and complex topics.'),
+      benefit: t('chat.modeIntro.premium.benefit', Platform.OS === 'ios'
+        ? 'Detailed chart study for important decisions and complex topics.'
+        : 'Detailed chart study for important decisions and complex topics.'),
       bestFor: t('chat.modeIntro.premium.bestFor', 'Best when accuracy and detail matter more than speed.'),
       cost: premiumChatCost,
       originalCost: premiumChatCostOriginal,
@@ -4380,7 +4461,9 @@ export default function ChatScreen({ navigation, route }) {
       
       // Partnership mode validation
       if (partnershipMode && (!nativeChart || !partnerChart)) {
-        Alert.alert('Error', 'Please select both charts for partnership analysis');
+        Alert.alert('Error', Platform.OS === 'ios'
+          ? 'Please select both charts for partnership study'
+          : 'Please select both charts for partnership analysis');
         setMessagesWithStorage(prev => prev.filter(msg => msg.id !== processingMessageId));
         setLoading(false);
         setIsTyping(false);
@@ -4571,7 +4654,9 @@ export default function ChatScreen({ navigation, route }) {
     } else {
       welcomeMessage = {
         id: Date.now().toString(),
-        content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nTap a question below, or ask me anything in your own words.", { name: nativeName }),
+        content: t('chat.welcomeMessage', Platform.OS === 'ios'
+          ? "🌟 Welcome {{name}}! I can help you study your chart and answer practical questions.\n\nTap a suggestion below, or type your own question."
+          : "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nTap a question below, or ask me anything in your own words.", { name: nativeName }),
         role: 'assistant',
         isWelcome: true,
         timestamp: new Date().toISOString(),
@@ -5078,7 +5163,7 @@ export default function ChatScreen({ navigation, route }) {
                   <View style={styles.welcomeSuggestionHeader}>
                     <Ionicons name="sparkles-outline" size={16} color={colors.primary} />
                     <Text style={[styles.welcomeSuggestionTitle, { color: colors.text }]}>
-                      {t('chat.welcomeSuggestionsTitle', 'Try asking')}
+                      {t('chat.welcomeSuggestionsTitle', Platform.OS === 'ios' ? 'Try asking from your chart' : 'Try asking')}
                     </Text>
                   </View>
                   {suggestions.map((item, index) => (
@@ -5108,8 +5193,8 @@ export default function ChatScreen({ navigation, route }) {
                           },
                         ]}
                       >
-                        <Text style={[styles.welcomeSuggestionCardText, { color: colors.text }]}>
-                          {item}
+                    <Text style={[styles.welcomeSuggestionCardText, { color: colors.text }]}>
+                          {Platform.OS === 'ios' ? item : item}
                         </Text>
                         <View
                           style={[
@@ -5888,7 +5973,9 @@ export default function ChatScreen({ navigation, route }) {
                       resizeMode="contain"
                     />
                   </Animated.View>
-                  <Text style={[styles.drawerTitle, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.title')}</Text>
+                  <Text style={[styles.drawerTitle, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>
+                    {Platform.OS === 'ios' ? 'Study Menu' : t('menu.title')}
+                  </Text>
                   <Text style={[styles.drawerSubtitle, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(31, 41, 55, 0.7)' }]}>{t('menu.subtitle')}</Text>
                 </View>
 
@@ -6181,7 +6268,9 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🧘</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.lifeAnalysis')}</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>
+                        {Platform.OS === 'ios' ? 'Chart Study' : t('menu.lifeAnalysis')}
+                      </Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -6525,8 +6614,8 @@ export default function ChatScreen({ navigation, route }) {
                       <Text style={styles.popupIcon}>✨</Text>
                     </LinearGradient>
                   </View>
-                  <Text style={styles.popupTitle}>Enhanced Deep Analysis</Text>
-                  <Text style={styles.popupSubtitle}>Unlock Advanced Cosmic Insights</Text>
+                  <Text style={styles.popupTitle}>{Platform.OS === 'ios' ? 'Enhanced Chart Study' : 'Enhanced Deep Analysis'}</Text>
+                  <Text style={styles.popupSubtitle}>{Platform.OS === 'ios' ? 'Unlock advanced chart study tools' : 'Unlock Advanced Cosmic Insights'}</Text>
                 </View>
               </View>
               
@@ -6536,7 +6625,9 @@ export default function ChatScreen({ navigation, route }) {
                 showsVerticalScrollIndicator={false}
               >
                 <Text style={styles.popupIntro}>
-                  Experience the most sophisticated astrological analysis with advanced calculations and deeper interpretation techniques for comprehensive cosmic insights.
+                  {Platform.OS === 'ios'
+                    ? 'Experience the most detailed chart study with advanced calculations and deeper interpretation techniques for comprehensive context.'
+                    : 'Experience the most sophisticated chart analysis with advanced calculations and deeper interpretation techniques for comprehensive insights.'}
                 </Text>
                 
                 <View style={styles.benefitItem}>
@@ -6549,8 +6640,10 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </View>
                   <View style={styles.benefitText}>
-                    <Text style={styles.benefitTitle}>Multi-Layered Chart Analysis</Text>
-                    <Text style={styles.benefitDesc}>Examines Lagna, Navamsa, and divisional charts with intricate planetary relationships and house lordships</Text>
+                    <Text style={styles.benefitTitle}>{Platform.OS === 'ios' ? 'Multi-Layered Chart Study' : 'Multi-Layered Chart Analysis'}</Text>
+                    <Text style={styles.benefitDesc}>{Platform.OS === 'ios'
+                      ? 'Studies Lagna, Navamsa, and divisional charts with the related planetary and house patterns'
+                      : 'Examines Lagna, Navamsa, and divisional charts with intricate planetary relationships and house lordships'}</Text>
                   </View>
                 </View>
                 
@@ -6564,8 +6657,8 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </View>
                   <View style={styles.benefitText}>
-                    <Text style={styles.benefitTitle}>Advanced Dasha Interpretation</Text>
-                    <Text style={styles.benefitDesc}>Analyzes Mahadasha, Antardasha, and Pratyantardasha periods with precise event timing predictions</Text>
+                    <Text style={styles.benefitTitle}>{Platform.OS === 'ios' ? 'Advanced Timing Study' : 'Advanced Dasha Interpretation'}</Text>
+                    <Text style={styles.benefitDesc}>{Platform.OS === 'ios' ? 'Studies Mahadasha, Antardasha, and Pratyantardasha layers for timing context and chart interpretation' : 'Analyzes Mahadasha, Antardasha, and Pratyantardasha periods with precise timing context'}</Text>
                   </View>
                 </View>
                 
@@ -6579,8 +6672,10 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </View>
                   <View style={styles.benefitText}>
-                    <Text style={styles.benefitTitle}>Yoga & Dosha Detection</Text>
-                    <Text style={styles.benefitDesc}>Identifies powerful yogas like Raja, Dhana, Gaja Kesari and doshas affecting your life trajectory</Text>
+                    <Text style={styles.benefitTitle}>{Platform.OS === 'ios' ? 'Yoga & Dosha Study' : 'Yoga & Dosha Detection'}</Text>
+                    <Text style={styles.benefitDesc}>{Platform.OS === 'ios'
+                      ? 'Highlights useful yogas and dosha patterns that can shape the chart study'
+                      : 'Identifies powerful yogas like Raja, Dhana, Gaja Kesari and doshas affecting your life trajectory'}</Text>
                   </View>
                 </View>
                 
@@ -6594,8 +6689,8 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </View>
                   <View style={styles.benefitText}>
-                    <Text style={styles.benefitTitle}>Nakshatra Deep Dive</Text>
-                    <Text style={styles.benefitDesc}>Reveals hidden personality traits, karmic patterns, and life purpose through nakshatra analysis</Text>
+                    <Text style={styles.benefitTitle}>{Platform.OS === 'ios' ? 'Nakshatra Deep Study' : 'Nakshatra Deep Dive'}</Text>
+                    <Text style={styles.benefitDesc}>{Platform.OS === 'ios' ? 'Highlights personality themes, repeating patterns, and life-direction clues through nakshatra study' : 'Reveals hidden personality themes, repeating patterns, and life-purpose clues through nakshatra analysis'}</Text>
                   </View>
                 </View>
                 
@@ -6609,8 +6704,8 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </View>
                   <View style={styles.benefitText}>
-                    <Text style={styles.benefitTitle}>Transit Correlation</Text>
-                    <Text style={styles.benefitDesc}>Maps current planetary transits against your birth chart for accurate timing of events</Text>
+                    <Text style={styles.benefitTitle}>{Platform.OS === 'ios' ? 'Transit Context' : 'Transit Correlation'}</Text>
+                    <Text style={styles.benefitDesc}>{Platform.OS === 'ios' ? 'Maps current planetary transits against your birth chart for timing context' : 'Maps current planetary transits against your birth chart for accurate timing of events'}</Text>
                   </View>
                 </View>
                 
@@ -6806,7 +6901,7 @@ export default function ChatScreen({ navigation, route }) {
         title={t('chat.insufficientCreditsTitle', 'Not enough credits')}
         message={t(
           'chat.insufficientCreditsMessage',
-          'This question needs {{cost}} credits — you have {{balance}}. Add credits to continue your reading.',
+          'This question needs {{cost}} credits — you have {{balance}}. Add credits to continue the study.',
           { cost: effectiveChatCost, balance: credits }
         )}
         primaryText={t('chat.insufficientCreditsCta', 'Get credits')}
@@ -6897,7 +6992,9 @@ export default function ChatScreen({ navigation, route }) {
         onClose={() => setShowPartnershipModal(false)}
         onConfirm={confirmPartnershipMode}
         title="Partnership Mode"
-        description="Partnership mode uses credits per question for comprehensive compatibility analysis between two charts."
+        description={Platform.OS === 'ios'
+          ? 'Partnership mode uses credits per question for detailed compatibility study between two charts.'
+          : 'Partnership mode uses credits per question for compatibility study between two charts.'}
         cost={partnershipModalCost}
         credits={credits}
         confirmLabel="Continue"
@@ -6907,7 +7004,9 @@ export default function ChatScreen({ navigation, route }) {
         onClose={() => setShowMundaneModal(false)}
         onConfirm={confirmMundaneMode}
         title="Global Markets & Events"
-        description="Global Markets & Events analysis uses credits per question for deep mundane astrology of nations, markets, and world events."
+        description={Platform.OS === 'ios'
+          ? 'Global Markets & Events uses credits per question for detailed mundane study of nations, markets, and world events.'
+          : 'Global Markets & Events analysis uses credits per question for deep mundane chart study of nations, markets, and world events.'}
         cost={mundaneModalCost}
         credits={credits}
         confirmLabel="Continue"

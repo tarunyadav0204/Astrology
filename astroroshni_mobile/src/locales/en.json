@@ -10,8 +10,8 @@
     "emptyStateCta": "Add birth profile"
   },
   "menu": {
-    "title": "Cosmic Menu",
-    "subtitle": "Navigate Your Journey",
+    "title": "Study Menu",
+    "subtitle": "Navigate your chart tools",
     "myProfile": "My Profile",
     "selectNative": "Select Native",
     "newNative": "New Native",
@@ -50,13 +50,13 @@
     "pdfFooterLine1": "✨ Analyzed by AstroRoshni",
     "pdfFooterLine2": "Artificial Intelligence • Vedic Astrology",
     "loadingTitle": "Accessing Akashic Records",
-    "loadingSubtitleProgress": "Analyzing your soul's journey through time...",
+    "loadingSubtitleProgress": "Reviewing your chart journey through time...",
     "loadingSubtitleSlow": "This is taking longer than usual...",
     "errorTitle": "Unable to Access Records",
     "tryAgain": "Try Again",
     "goBack": "Go back",
     "startTitle": "Past Life Karma Analysis",
-    "startSubtitle": "Discover your soul's eternal journey",
+    "startSubtitle": "Discover your chart journey",
     "startButton": "Start Analysis",
     "confirmStartTitle": "Start Karma Analysis",
     "confirmRegenerateTitle": "Regenerate Karma Analysis",
@@ -147,8 +147,8 @@
     "heroBody": "Get a free match first: overall compatibility, current relationship timing, key strengths, caution areas, and the next favorable window.",
     "freeBadge": "Relationship Match",
     "freeCompare": "Free",
-    "ruleProfileActive": "Your match summary includes compatibility, relationship strengths, caution areas, and important timing guidance.",
-    "ruleProfilePending": "Once you compare, we will show the main compatibility signals and timing guidance for this match.",
+    "ruleProfileActive": "Your match summary includes compatibility, relationship strengths, caution areas, and important timing notes.",
+    "ruleProfilePending": "Once you compare, we will show the main compatibility signals and timing notes for this match.",
     "selectionTitle": "Match two Kundlis",
     "selectionBody": "Select the boy's and girl's birth charts to get a free compatibility summary first.",
     "boyChart": "Boy's chart",
@@ -243,15 +243,15 @@
     "premiumErrorTitle": "Could not unlock premium report",
     "premiumErrorBody": "Please try again in a moment.",
     "practicalMeaning": "Practical meaning",
-    "decisionGuidance": "Decision guidance",
+    "decisionGuidance": "Decision notes",
     "finalSummary": "Final summary",
     "priorityActions": "Priority actions",
     "premiumTitle": "Want the full marriage decision report?",
     "premiumTease": "Unlock a clearer report for family discussions, long-term stability risks, timing, and practical next steps.",
     "locked": {
-      "one": "Clearer go/no-go guidance for this match",
+      "one": "Clearer go/no-go notes for this match",
       "two": "Hidden long-term stability risks",
-      "three": "Timing guidance for next steps",
+      "three": "Timing notes for next steps",
       "four": "Practical advice for families and decisions"
     },
     "askAiCta": "Ask AI About This Match • {{credits}} credits",
@@ -342,7 +342,7 @@
     }
   },
   "chartScreen": {
-    "loadingText": "Calculating Cosmic Alignments...",
+    "loadingText": "Calculating chart alignments...",
     "loadingSubtext": "Reading planetary positions",
     "emptyTitle": "Welcome to AstroRoshni",
     "emptyText": "Add a birth profile to unlock your charts and personalized insights.",
@@ -506,7 +506,7 @@
     "version": "Version {{version}}",
     "versionWithCode": "Version {{version}} (code {{code}})",
     "versionWithBuild": "Version {{version}} (build {{build}})",
-    "description": "AstroRoshni combines Vedic astrology with intelligent guidance to help you understand your life path, timing, and hidden potentials.",
+    "description": "AstroRoshni combines Vedic chart study with intelligent guidance to help you understand timing, patterns, and hidden potentials.",
     "legalHeading": "Legal & Policies",
     "privacyPolicy": "Privacy Policy",
     "termsOfService": "Terms of Service",
@@ -523,10 +523,10 @@
     "chooseLanguageSubtitle": "We'll use this across the app. You can change it anytime in Profile.",
     "continue": "Continue",
     "welcomeTitle": "Welcome to AstroRoshni, {{name}}!",
-    "welcomeSubtitle": "Your account has been created successfully.\nLet's create your personalized birth chart to unlock cosmic insights.",
-    "featureChart": "Detailed Birth Chart Analysis",
-    "featureAi": "AI-Powered Predictions",
-    "featureDaily": "Daily Cosmic Guidance",
+    "welcomeSubtitle": "Your account has been created successfully.\nLet's create your personalized birth chart to unlock chart insights.",
+    "featureChart": "Detailed Birth Chart Study",
+    "featureAi": "AI-Powered Study",
+    "featureDaily": "Daily Chart Notes",
     "createBirthChart": "Create My Birth Chart",
     "skipForNow": "Skip for now"
   },
@@ -536,20 +536,20 @@
     "nativeGateTapInstruction": "Please choose one of the options below instead of typing a reply.",
     "welcomeSuggestionsTitle": "Try asking",
     "insufficientCreditsTitle": "Not enough credits",
-    "insufficientCreditsMessage": "This question needs {{cost}} credits — you have {{balance}}. Add credits to continue your reading.",
+    "insufficientCreditsMessage": "This question needs {{cost}} credits — you have {{balance}}. Add credits to continue the study.",
     "insufficientCreditsCta": "Get credits",
     "insufficientCreditsLater": "Not now",
-    "betaNotice": "⚠️ BETA: Timeline predictions are experimental. Use logic and discretion.",
+    "betaNotice": "⚠️ BETA: Timeline studies are experimental. Use logic and discretion.",
     "disclaimerNotice": "⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.",
     "verified": "AstroRoshni Verified",
     "inquiry": "AstroRoshni Inquiry",
     "you": "You",
-    "preparingInsights": "Preparing your cosmic insights...",
+    "preparingInsights": "Preparing your chart insights...",
     "fascinatingInsights": "Meanwhile, let me show you some fascinating insights about your chart...",
     "thankYou": "Thank you for reaching out to AstroRoshni with your question.",
     "deeplyAnalyzing": "I am deeply analyzing your celestial chart to provide you with the most accurate insights. This sacred process takes a moment...",
     "instantLoader": {
-      "lineChart": "I am reading the main chart focus first, so the answer stays connected to the right part of life instead of becoming generic.",
+      "lineChart": "I am reviewing the main chart focus first, so the answer stays connected to the right part of life instead of becoming generic.",
       "lineDasha": "Now I am checking the running dasha pattern and seeing which planet is currently carrying more weight in the question.",
       "lineTransits": "I am comparing the present transits with the natal promise to separate a short-term signal from a deeper pattern.",
       "lineHouses": "The relevant houses are being matched with the question, so the answer can stay specific and practical.",
@@ -558,7 +558,7 @@
       "lineDashaTiming": "I am narrowing the dasha timing so past, current, and upcoming influences are not mixed together.",
       "lineTransitTiming": "The transit picture is being checked against the question, especially where it activates the same houses again.",
       "lineHousePattern": "I am looking for repeated house patterns because repeated signals are more useful than one isolated placement.",
-      "lineContext": "Your exact question and recent chat context are being kept in view so the reply does not drift into a general reading.",
+      "lineContext": "Your exact question and recent chat context are being kept in view so the reply does not drift into a general study.",
       "lineConfidence": "I am separating stronger chart evidence from weaker hints, so the answer can say what is clear and what is uncertain.",
       "linePractical": "Now I am turning the astrology into practical language, without losing the main chart reasoning.",
       "lineTone": "I am keeping the response short enough for instant mode while still answering the real question.",
@@ -652,12 +652,12 @@
   },
   "home": {
     "greeting": {
-      "subtitle": "Your cosmic blueprint awaits. Choose your path to enlightenment.",
+      "subtitle": "Your chart blueprint awaits. Choose your path to understanding.",
       "lifePath": "{{name}}'s Life Path"
     },
     "firstQuestionFree": {
       "title": "Your first question is free!",
-      "subtext": "Ask anything — no credits needed.\nGet personalized astrological guidance right now.",
+      "subtext": "Ask anything — no credits needed.\nGet personalized chart guidance right now.",
       "cta": "Ask your first question free",
       "later": "Maybe later"
     },
@@ -669,7 +669,7 @@
       "bullet1": "Career, love, money & health event timelines.",
       "bullet2": "See exactly which dashas and houses are firing.",
       "bullet3": "Multiple scenarios so you can prepare with clarity.",
-      "cta": "Explore {{month}} predictions",
+      "cta": "Explore {{month}} chart notes",
       "later": "Maybe later",
       "disclaimer": "For guidance only — not medical, legal or financial advice.",
       "months": {
@@ -689,16 +689,18 @@
     },
     "multiChartTip": {
       "title": "Add charts for family & friends",
-      "body": "You can save more than one birth profile in AstroRoshni. Add your spouse, children, parents, or friends to get predictions for them, or switch profiles anytime from the home header.",
+      "body": "You can save more than one birth profile in AstroRoshni. Add your spouse, children, parents, or friends to review their charts, or switch profiles anytime from the home header.",
       "cta": "Add a birth profile",
       "gotIt": "I know",
       "neverAgain": "Don't show this again"
     },
     "sections": {
       "choosePath": "Choose Your Path",
+      "chooseStudy": "Choose what you want to study",
       "lifeAnalysis": "🧘 Life Analysis",
+      "lifeStudy": "Chart Study",
       "timingPlanners": "⏰ Timing Planners",
-      "cosmicDashboard": "✨ Your Cosmic Dashboard",
+    "cosmicDashboard": "✨ Your Chart Dashboard",
       "currentDasha": "⏰ Current Dasha Periods",
       "astrologyTools": "🔧 Astrology Tools",
       "planetaryTransits": "🪐 Current Planetary Transits",
@@ -709,25 +711,58 @@
         "title": "Ask Any Question",
         "description": "Get insights about your personality, relationships, career, or any astrological topic"
       },
-    "partnership": {
-      "title": "Partnership Analysis",
-      "description": "Analyze compatibility and relationship dynamics between two people"
-    },
-    "kundliMatch": {
-      "title": "Kundli Matching",
-      "description": "Get a structured free compatibility verdict, timing climate, strengths, and caution areas",
-      "teaser": "Free match first. Deeper insight only if you want it."
-    },
-    "mundane": {
-      "title": "Global Markets & Events",
-      "description": "Analyze world events, stock markets, politics, and economic trends"
+      "questionIosTitle": "Chart Guidance",
+      "questionIosDescription": "Ask about your chart, your patterns, or the next step you want to understand",
+      "partnership": {
+        "title": "Partnership Analysis",
+        "description": "Analyze compatibility and relationship dynamics between two people"
       },
+      "partnershipIosTitle": "Shared Chart Study",
+      "partnershipIosDescription": "Compare two charts and review relationship patterns, strengths, and points to watch",
+      "kundliMatch": {
+        "title": "Kundli Matching",
+        "description": "Get a structured free compatibility verdict, timing climate, strengths, and caution areas",
+        "teaser": "Free match first. Deeper insight only if you want it."
+      },
+      "kundliMatchIosTitle": "Chart Comparison",
+      "kundliMatchIosDescription": "Compare two birth charts and review shared strengths, caution areas, and timing context",
+      "kundliMatchIosTeaser": "Start with a comparison, then continue if you want more detail.",
+      "mundane": {
+        "title": "Global Markets & Events",
+        "description": "Analyze world events, stock markets, politics, and economic trends"
+      },
+      "mundaneIosTitle": "World Signals",
+      "mundaneIosDescription": "Review broader patterns across markets, public events, and cycle movements",
       "events": {
         "title": "What Will Manifest",
         "description": "See what the year holds — career, love, money, health — month by month."
       }
+      ,"eventsIosTitle": "Yearly Chart Study",
+      "eventsIosDescription": "Review the year month by month with chart-based timing notes for the areas you care about"
     },
     "analysis": {
+      "karmaIosTitle": "Karma Patterns",
+      "karmaIosDescription": "Explore repeating themes and life lessons in the chart",
+      "careerIosTitle": "Career Study",
+      "careerIosDescription": "Review work style, direction, and strengths to build on",
+      "wealthIosTitle": "Resources & Earnings",
+      "wealthIosDescription": "Study money flow, resources, and practical support patterns",
+      "marriageIosTitle": "Relationship Study",
+      "marriageIosDescription": "Review relationship style, shared patterns, and compatibility notes",
+      "healthIosTitle": "Wellness Study",
+      "healthIosDescription": "Review balance, recovery, and areas to support",
+      "educationIosTitle": "Learning Path",
+      "educationIosDescription": "Study learning style, focus, and areas that support growth",
+      "progenyIosTitle": "Family Study",
+      "progenyIosDescription": "Explore family themes, support, and expansion patterns",
+      "tradingIosTitle": "Market Study",
+      "tradingIosDescription": "Review market cycles and sector context for timing study",
+      "financialIosTitle": "Market Context",
+      "financialIosDescription": "Study sector rhythm and broader market context",
+      "childbirthIosTitle": "Family Timing",
+      "childbirthIosDescription": "Review supportive timing for family planning and delivery",
+      "muhuratIosTitle": "Timing Windows",
+      "muhuratIosDescription": "Review supportive windows for important actions",
       "career": {
         "title": "Career Analysis",
         "description": "Professional success & opportunities"
@@ -746,7 +781,7 @@
       },
       "education": {
         "title": "Education Analysis",
-        "description": "Learning path & career guidance"
+        "description": "Learning path & career notes"
       },
       "progeny": {
         "title": "Progeny Analysis",
@@ -754,11 +789,11 @@
       },
       "trading": {
         "title": "Trading Forecast",
-        "description": "Stock market predictions & timing"
+        "description": "Stock market timing & context"
       },
       "financial": {
         "title": "Market Astrology",
-        "description": "Sector forecasts & investment timing"
+        "description": "Sector timing & investment context"
       },
       "childbirth": {
         "title": "Childbirth Planner",
@@ -770,7 +805,7 @@
       },
       "karma": {
         "title": "Past Life Karma",
-        "description": "Your soul's eternal journey"
+        "description": "Your chart's ongoing journey"
       }
     },
     "planet_names": {
@@ -913,7 +948,7 @@
       "loadError": "Could not load Sade Sati periods.",
       "noPeriods": "No periods found.",
       "ctaHeadline": "Will my Sade Sati be challenging or more manageable?",
-      "ctaSubtext": "Get a reading based on your chart — intensity, timing, and remedies.",
+      "ctaSubtext": "Review your chart for intensity, timing, and remedies.",
       "ctaButton": "Ask in Chat",
       "infoTitle": "What is Sade Sati?",
       "infoBody": "Sade Sati is the roughly 7.5-year period when transiting Saturn passes through the Moon sign, the sign before it, and the sign after it in your birth chart. In Vedic astrology it is considered a significant transit that can bring challenges, delays, and life lessons, but also maturity and growth. The intensity and effects depend on your chart. This screen shows when your Sade Sati periods occur and which one is currently active."
@@ -929,32 +964,32 @@
     "tabs": {
       "ask": "Ask",
       "charts": "Charts",
-      "events": "Predictions",
+      "events": "Timing",
       "dashas": "Dashas",
       "you": "You"
     },
     "askFAB": "Ask AstroRoshni"
   },
   "eventScreen": {
-    "headerTitle": "Major Life Events",
-    "headerPredictions": "{{year}} Predictions",
-    "monthlyGuide": "Monthly Guide",
+    "headerTitle": "Annual Chart Review",
+    "headerPredictions": "{{year}} Chart Review",
+    "monthlyGuide": "Monthly Chart Notes",
     "selectYear": "Select Your Year",
     "selectYearSubtitle": "Which year would you like to explore?",
     "continue": "Continue",
-    "regenerateTitle": "Regenerate Predictions?",
-    "regenerateMessage": "This will cost {{cost}} credits to generate fresh predictions for {{year}}.",
+    "regenerateTitle": "Refresh Study?",
+    "regenerateMessage": "This will cost {{cost}} credits to generate a fresh chart review for {{year}}.",
     "cancel": "Cancel",
     "confirm": "Confirm",
-    "whatsIncluded": "What's Included:",
-    "monthlyForecasts": "12 Monthly Forecasts",
-    "majorLifeEvents": "Major Life Events",
-    "timingGuidance": "Timing Guidance",
+    "whatsIncluded": "What you'll see:",
+    "monthlyForecasts": "12 Monthly Chart Notes",
+    "majorLifeEvents": "Key timing themes",
+    "timingGuidance": "Chart notes",
     "aiInsights": "Using classic vedic methods including Parashari, Nadi and Jaimini",
     "thisYear": "This Year",
     "nextYear": "Next Year",
     "cachedHint": "Already saved — select and open, no extra credits.",
-    "noPredictions": "No predictions generated. Please try regenerating.",
+    "noPredictions": "No timeline insights generated. Please try again.",
     "almostThere": "Almost there..."
   },
   "monthlyAccordion": {
@@ -985,7 +1020,7 @@
     },
     "page": {
       "title": "Cosmic Credits",
-      "subtitle": "Fuel your astrological journey",
+      "subtitle": "Fuel your chart journey",
       "yourBalance": "Your Balance",
       "creditsLabel": "Credits",
       "promoHeading": "Have a Promo Code?",

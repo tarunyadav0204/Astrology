@@ -55,7 +55,8 @@ env:
   GCP_NUDGE_DISPATCH_SERVICE_NAME: astroroshni-nudge-dispatch
   GCP_NUDGE_WORKER_SERVICE_NAME: astroroshni-nudge-worker
   GCP_NUDGE_SERVICE_REGION: asia-south1
-  GCP_BACKEND_MACHINE_TYPE: c3-highmem-4
+  GCP_API_BACKEND_MACHINE_TYPE: e2-standard-4
+  GCP_CHAT_WORKER_MACHINE_TYPE: c3-highmem-4
   GCP_IMAGE_BUILDER_MACHINE_TYPE: ${{ vars.GCP_IMAGE_BUILDER_MACHINE_TYPE || 'e2-standard-4' }}
 
 jobs:
@@ -287,7 +288,7 @@ jobs:
 
           gcloud compute instance-templates create "${TEMPLATE_NAME}" \
             --project="${GCP_PROJECT_ID}" \
-            --machine-type="${GCP_BACKEND_MACHINE_TYPE}" \
+            --machine-type="${GCP_API_BACKEND_MACHINE_TYPE}" \
             --network=default \
             --subnet="${SUBNET_SELF_LINK}" \
             --no-address \
@@ -316,7 +317,7 @@ jobs:
 
           gcloud compute instance-templates create "${TEMPLATE_NAME}" \
             --project="${GCP_PROJECT_ID}" \
-            --machine-type="${GCP_BACKEND_MACHINE_TYPE}" \
+            --machine-type="${GCP_CHAT_WORKER_MACHINE_TYPE}" \
             --network=default \
             --subnet="${SUBNET_SELF_LINK}" \
             --no-address \

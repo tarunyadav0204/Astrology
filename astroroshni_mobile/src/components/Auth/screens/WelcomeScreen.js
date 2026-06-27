@@ -126,7 +126,7 @@ export default function WelcomeScreen({ navigateToScreen, setIsLogin, navigation
         >
           <Text style={styles.title}>AstroRoshni</Text>
           <View style={styles.subtitleLine} />
-          <Text style={styles.subtitle}>Unlock Your Cosmic Journey</Text>
+          <Text style={styles.subtitle}>Unlock Your Chart Journey</Text>
         </Animated.View>
 
         <Animated.View
@@ -174,7 +174,7 @@ export default function WelcomeScreen({ navigateToScreen, setIsLogin, navigation
           <View style={[styles.dot, styles.dot2]} />
           <View style={[styles.dot, styles.dot3]} />
         </View>
-        <Text style={styles.footerText}>Your cosmic insights await</Text>
+        <Text style={styles.footerText}>Your chart insights await</Text>
       </View>
     </ScrollView>
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { height: screenHeight } = Dimensions.get('window');
@@ -27,21 +27,23 @@ const PremiumAnalysisModal = ({ visible, onClose, premiumCost, standardCost }) =
               style={styles.header}
             >
               <Text style={styles.headerIcon}>⚡</Text>
-              <Text style={styles.headerTitle}>Premium Deep Analysis</Text>
-              <Text style={styles.headerSubtitle}>Advanced Astrological Insights</Text>
+              <Text style={styles.headerTitle}>{Platform.OS === 'ios' ? 'Premium Chart Study' : 'Premium Deep Analysis'}</Text>
+              <Text style={styles.headerSubtitle}>{Platform.OS === 'ios' ? 'Advanced chart reading tools' : 'Advanced Astrological Insights'}</Text>
             </LinearGradient>
 
             {/* Content */}
             <View style={styles.content}>
               {/* What You Get */}
-              <Text style={styles.sectionTitle}>What You Get:</Text>
+              <Text style={styles.sectionTitle}>{Platform.OS === 'ios' ? 'What this includes:' : 'What You Get:'}</Text>
               
               <View style={styles.featureItem}>
                 <Text style={styles.featureIcon}>🧠</Text>
                 <View style={styles.featureText}>
                   <Text style={styles.featureTitle}>Deep Thinking AI</Text>
                   <Text style={styles.featureDescription}>
-                    Advanced AI model that analyzes charts with highest level of accuracy
+                    {Platform.OS === 'ios'
+                      ? 'Advanced AI support for detailed chart reading with high accuracy'
+                      : 'Advanced AI model that analyzes charts with highest level of accuracy'}
                   </Text>
                 </View>
               </View>
@@ -51,7 +53,9 @@ const PremiumAnalysisModal = ({ visible, onClose, premiumCost, standardCost }) =
                 <View style={styles.featureText}>
                   <Text style={styles.featureTitle}>Deeper Insights</Text>
                   <Text style={styles.featureDescription}>
-                    Advanced astrological calculations beyond basic analysis
+                    {Platform.OS === 'ios'
+                      ? 'Detailed calculations beyond the basic chart view'
+                      : 'Advanced astrological calculations beyond basic analysis'}
                   </Text>
                 </View>
               </View>
@@ -59,9 +63,11 @@ const PremiumAnalysisModal = ({ visible, onClose, premiumCost, standardCost }) =
               <View style={styles.featureItem}>
                 <Text style={styles.featureIcon}>🎯</Text>
                 <View style={styles.featureText}>
-                  <Text style={styles.featureTitle}>Precise Predictions</Text>
+                  <Text style={styles.featureTitle}>{Platform.OS === 'ios' ? 'Detailed Chart Reading' : 'Precise Predictions'}</Text>
                   <Text style={styles.featureDescription}>
-                    Uses divisional charts (D9, D10, D12) for accuracy
+                    {Platform.OS === 'ios'
+                      ? 'Uses divisional charts (D9, D10, D12) to study the chart in more detail'
+                      : 'Uses divisional charts (D9, D10, D12) for accuracy'}
                   </Text>
                 </View>
               </View>
@@ -69,9 +75,11 @@ const PremiumAnalysisModal = ({ visible, onClose, premiumCost, standardCost }) =
               <View style={styles.featureItem}>
                 <Text style={styles.featureIcon}>📊</Text>
                 <View style={styles.featureText}>
-                  <Text style={styles.featureTitle}>Multi-System Analysis</Text>
+                  <Text style={styles.featureTitle}>{Platform.OS === 'ios' ? 'Multiple Reading Methods' : 'Multi-System Analysis'}</Text>
                   <Text style={styles.featureDescription}>
-                    Combines Vimshottari, Chara, and Yogini Dashas
+                    {Platform.OS === 'ios'
+                      ? 'Looks at Vimshottari, Chara, and Yogini timing layers together'
+                      : 'Combines Vimshottari, Chara, and Yogini Dashas'}
                   </Text>
                 </View>
               </View>
@@ -81,7 +89,9 @@ const PremiumAnalysisModal = ({ visible, onClose, premiumCost, standardCost }) =
                 <View style={styles.featureText}>
                   <Text style={styles.featureTitle}>Comprehensive Context</Text>
                   <Text style={styles.featureDescription}>
-                    Analyzes planetary strengths, yogas, and aspects
+                    {Platform.OS === 'ios'
+                      ? 'Studies planetary strengths, yogas, and aspects'
+                      : 'Analyzes planetary strengths, yogas, and aspects'}
                   </Text>
                 </View>
               </View>
@@ -89,9 +99,11 @@ const PremiumAnalysisModal = ({ visible, onClose, premiumCost, standardCost }) =
               <View style={styles.featureItem}>
                 <Text style={styles.featureIcon}>⏱️</Text>
                 <View style={styles.featureText}>
-                  <Text style={styles.featureTitle}>Better Timing</Text>
+                  <Text style={styles.featureTitle}>{Platform.OS === 'ios' ? 'Timing Context' : 'Better Timing'}</Text>
                   <Text style={styles.featureDescription}>
-                    Includes transit activations and dasha-bhukti periods
+                    {Platform.OS === 'ios'
+                      ? 'Includes transit activations and dasha-bhukti timing context'
+                      : 'Includes transit activations and dasha-bhukti periods'}
                   </Text>
                 </View>
               </View>
@@ -108,19 +120,23 @@ const PremiumAnalysisModal = ({ visible, onClose, premiumCost, standardCost }) =
 
               {/* Comparison */}
               <View style={styles.comparisonContainer}>
-                <Text style={styles.comparisonTitle}>Example Comparison:</Text>
+                <Text style={styles.comparisonTitle}>{Platform.OS === 'ios' ? 'Example Reading:' : 'Example Comparison:'}</Text>
                 
                 <View style={styles.comparisonBox}>
-                  <Text style={styles.comparisonLabel}>Standard Analysis:</Text>
+                  <Text style={styles.comparisonLabel}>{Platform.OS === 'ios' ? 'Standard Reading:' : 'Standard Analysis:'}</Text>
                   <Text style={styles.comparisonText}>
-                    "Your career looks promising in the next 2 years"
+                    {Platform.OS === 'ios'
+                      ? '"Your chart shows a steady career phase over the next two years."'
+                      : '"Your career looks promising in the next 2 years"'}
                   </Text>
                 </View>
 
                 <View style={[styles.comparisonBox, styles.premiumBox]}>
-                  <Text style={[styles.comparisonLabel, styles.premiumLabel]}>Premium Analysis:</Text>
+                  <Text style={[styles.comparisonLabel, styles.premiumLabel]}>{Platform.OS === 'ios' ? 'Premium Reading:' : 'Premium Analysis:'}</Text>
                   <Text style={styles.comparisonText}>
-                    "Your 10th lord Jupiter in D10 chart shows strong career potential. During Jupiter-Venus dasha (Mar 2024 - Jul 2026), with Jupiter transiting your 10th house, expect promotion or business growth. Your Gajakesari yoga activates, bringing recognition."
+                    {Platform.OS === 'ios'
+                      ? '"Your D10, dasha, and transit layers together point to a career phase with stronger visibility and practical growth."'
+                      : '"Your 10th lord Jupiter in D10 chart shows strong career potential. During Jupiter-Venus dasha (Mar 2024 - Jul 2026), with Jupiter transiting your 10th house, expect promotion or business growth. Your Gajakesari yoga activates, bringing recognition."'}
                   </Text>
                 </View>
               </View>
@@ -143,9 +159,11 @@ const PremiumAnalysisModal = ({ visible, onClose, premiumCost, standardCost }) =
 
               {/* Perfect For */}
               <View style={styles.perfectForContainer}>
-                <Text style={styles.perfectForTitle}>Perfect for:</Text>
+                <Text style={styles.perfectForTitle}>{Platform.OS === 'ios' ? 'Best for:' : 'Perfect for:'}</Text>
                 <Text style={styles.perfectForText}>
-                  Career timing • Marriage compatibility • Health analysis • Wealth predictions • Important life decisions
+                  {Platform.OS === 'ios'
+                    ? 'Career study • Relationship study • Wellness review • Resource patterns • Important decisions'
+                    : 'Career timing • Marriage compatibility • Health analysis • Wealth predictions • Important life decisions'}
                 </Text>
               </View>
             </View>

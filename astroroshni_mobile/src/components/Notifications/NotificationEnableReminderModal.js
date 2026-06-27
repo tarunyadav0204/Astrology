@@ -108,8 +108,7 @@ export default function NotificationEnableReminderModal({ homeActive }) {
           </View>
           <Text style={[styles.title, { color: colors.text }]}>Never miss what matters</Text>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            Turn on notifications to get a ping when your readings, chat updates, or special offers are ready — so
-            you don't miss them by accident.
+            Turn on notifications to hear when your chart reviews, chat updates, or special offers are ready.
           </Text>
           <TouchableOpacity
             style={[styles.primaryBtn, busy && styles.btnDisabled]}
