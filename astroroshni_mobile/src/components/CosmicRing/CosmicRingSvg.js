@@ -128,6 +128,7 @@ const SPECIAL_POINT_STYLES = {
   mrityuBhaga: { color: '#dc2626', shape: 'cross', label: 'Mrityu Bhaga', size: 5 },
   navamsa64th: { color: '#ea580c', shape: 'triangle', label: '64th N', size: 5 },
   kharesh: { color: '#b45309', shape: 'square', label: 'Kharesh', size: 5 },
+  mudakku: { color: '#f97316', shape: 'circle', label: 'MN', size: 5 },
   yogi: { color: '#16a34a', shape: 'circle', label: 'Yogi', size: 5 },
   avayogi: { color: '#ca8a04', shape: 'circleOutline', label: 'Avayogi', size: 5 },
   dagdha: { color: '#7c3aed', shape: 'circle', label: 'Dagdha', size: 5 },
@@ -144,6 +145,7 @@ export default function CosmicRingSvg({
   mrityuBhagaPoints = [],
   navamsa64th = null,
   kharesh = null,
+  mudakkuPoint = null,
   yogiPoints = null,
   width = 800,
   height = 800,
@@ -407,6 +409,29 @@ export default function CosmicRingSvg({
             <G key="kharesh">
               <Line x1={positionOnRing(pos.sign, pos.degree, R_INNER + 10).x} y1={positionOnRing(pos.sign, pos.degree, R_INNER + 10).y} x2={x} y2={y} stroke={style.color} strokeWidth={1} strokeDasharray="2 2" opacity={0.7} />
               <Path d={squarePath(x, y, style.size)} fill="none" stroke={style.color} strokeWidth={1.5} opacity={0.95} />
+              <SvgText x={x} y={y + 16} fill={style.color} fontSize={8} fontWeight="700" textAnchor="middle">{style.label}</SvgText>
+            </G>
+          );
+        })()}
+
+        {/* Mudakku / Modakku */}
+        {toPosition(mudakkuPoint) != null && (() => {
+          const pos = toPosition(mudakkuPoint);
+          const { x, y } = positionOnRing(pos.sign, pos.degree, R_PLANET);
+          const style = SPECIAL_POINT_STYLES.mudakku;
+          return (
+            <G key="mudakku">
+              <Line
+                x1={positionOnRing(pos.sign, pos.degree, R_INNER + 10).x}
+                y1={positionOnRing(pos.sign, pos.degree, R_INNER + 10).y}
+                x2={x}
+                y2={y}
+                stroke={style.color}
+                strokeWidth={1}
+                strokeDasharray="2 2"
+                opacity={0.75}
+              />
+              <Circle cx={x} cy={y} r={style.size} fill={style.color} opacity={0.9} />
               <SvgText x={x} y={y + 16} fill={style.color} fontSize={8} fontWeight="700" textAnchor="middle">{style.label}</SvgText>
             </G>
           );

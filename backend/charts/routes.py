@@ -16,6 +16,7 @@ from calculators.sniper_points_calculator import SniperPointsCalculator
 from calculators.pushkara_calculator import PushkaraCalculator
 from calculators.gandanta_calculator import GandantaCalculator
 from calculators.yogi_calculator import YogiCalculator
+from calculators.mudakku_calculator import MudakkuCalculator
 from calculators.indu_lagna_calculator import InduLagnaCalculator
 from calculators.jaimini_chart_calculator import JaiminiChartCalculator
 from charts.house_insight_service import build_house_insight
@@ -1009,6 +1010,39 @@ async def calculate_yogi_points(request: dict, current_user: User = Depends(get_
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Failed to calculate Yogi points")
+
+@router.post("/mudakku-analysis")
+async def calculate_mudakku_analysis(request: dict, current_user: User = Depends(get_current_user)):
+    """Calculate Mudakku / Modakku nakshatra and rashi using the Sun's position."""
+    try:
+        chart_data = request.get('chart_data', {})
+
+        if not chart_data or not chart_data.get('planets'):
+            raise HTTPException(status_code=400, detail="Chart data with planets required")
+
+        calculator = MudakkuCalculator(chart_data)
+        mudakku_analysis = calculator.calculate()
+
+        mudakku_nakshatra = mudakku_analysis.get("mudakku_nakshatra") or {}
+        mudakku_point = mudakku_analysis.get("mudakku_point") or {}
+
+        return {
+            "success": True,
+            "mudakku_analysis": {
+                **mudakku_analysis,
+                "mudakku_point": mudakku_point,
+                "mudakku_nakshatra_label": mudakku_nakshatra.get("name"),
+            },
+        }
+    except HTTPException:
+        raise
+    except (ValueError, TypeError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error calculating Mudakku analysis: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to calculate Mudakku analysis")
 
 @router.post("/indu-lagna")
 async def calculate_indu_lagna(request: dict, current_user: User = Depends(get_current_user)):

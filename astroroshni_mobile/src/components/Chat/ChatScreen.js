@@ -65,6 +65,8 @@ const fontSize = isSmallScreen ? 11 : 13;
 const smallFontSize = isSmallScreen ? 9 : 10;
 const CHAT_RATING_PROMPT_STATE_KEY = 'chatRatingPromptState_v1';
 const PARALLEL_CHAT_POLL_BUDGET_SECONDS = 8 * 60;
+const DEFAULT_STANDARD_CHAT_COUNTDOWN_SECONDS = 110;
+const DEFAULT_PREMIUM_CHAT_COUNTDOWN_SECONDS = 210;
 const INSTANT_LOADER_LINES = [
   'chat.instantLoader.lineChart',
   'chat.instantLoader.lineDasha',
@@ -480,8 +482,8 @@ export default function ChatScreen({ navigation, route }) {
   const [chatCostOriginal, setChatCostOriginal] = useState(null);
   const [instantChatCostOriginal, setInstantChatCostOriginal] = useState(null);
   const [premiumChatCostOriginal, setPremiumChatCostOriginal] = useState(null);
-  const [standardChatCountdownSeconds, setStandardChatCountdownSeconds] = useState(PARALLEL_CHAT_POLL_BUDGET_SECONDS);
-  const [premiumChatCountdownSeconds, setPremiumChatCountdownSeconds] = useState(PARALLEL_CHAT_POLL_BUDGET_SECONDS);
+  const [standardChatCountdownSeconds, setStandardChatCountdownSeconds] = useState(DEFAULT_STANDARD_CHAT_COUNTDOWN_SECONDS);
+  const [premiumChatCountdownSeconds, setPremiumChatCountdownSeconds] = useState(DEFAULT_PREMIUM_CHAT_COUNTDOWN_SECONDS);
   const [instantChatEnabled, setInstantChatEnabled] = useState(false);
   const [speechChatEnabled, setSpeechChatEnabled] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
@@ -3310,12 +3312,8 @@ export default function ChatScreen({ navigation, route }) {
       : fallbackTier === 'premium'
         ? premiumChatCountdownSeconds
         : standardChatCountdownSeconds;
-    const countdownBudgetSeconds = Number.isFinite(expectedWaitSeconds) && expectedWaitSeconds > 0
-      ? expectedWaitSeconds
-      : 110;
-    // Extra slack beyond UI countdown so ~2min analyses are not cut off at 110+30s.
-    const graceSeconds = 60;
-    const maxProcessingMs = Math.max((countdownBudgetSeconds + graceSeconds) * 1000, 120 * 1000);
+    const pollBudgetSeconds = PARALLEL_CHAT_POLL_BUDGET_SECONDS;
+    const maxProcessingMs = Math.max(pollBudgetSeconds * 1000, 120 * 1000);
     const pollAnchorMs = Date.now();
     const initialStartedAtMs = new Date(
       processingMessage?.processingStartedAt ||

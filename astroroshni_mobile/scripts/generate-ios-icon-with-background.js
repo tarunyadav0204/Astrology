@@ -1,6 +1,6 @@
 const path = require('path');
 const fs = require('fs');
-const SRC = path.join(__dirname, '..', 'assets', 'icon.png');
+const SRC = path.join(__dirname, '..', 'assets', 'icon-512.png');
 const OUT = path.join(__dirname, '..', 'ios', 'AstroRoshni', 'Images.xcassets', 'AppIcon.appiconset', 'App-Icon-1024x1024@1x.png');
 
 async function main() {

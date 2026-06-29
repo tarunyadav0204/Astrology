@@ -5,6 +5,8 @@ import * as Sentry from '@sentry/react-native';
 import { API_BASE_URL, getEndpoint, API_TIMEOUT, DEBUG_API_REQUESTS, PAYMENT_SERVICE_BASE_URL } from '../utils/constants';
 import { buildQueryContext } from '../utils/queryContext';
 import { Alert } from 'react-native';
+import { calculateMudakkuLocal } from '../utils/mudakku';
+import { calculateGandantaLocal } from '../utils/gandanta';
 
 // Same JWT as Authorization; some CDNs/proxies strip Authorization on mobile — backend accepts this too.
 const AUTH_FALLBACK_HEADER = 'X-AstroRoshni-Authorization';
@@ -667,6 +669,34 @@ export const chartAPI = {
   
   calculatePushkaraNavamsha: (chartData, d9Chart = {}) =>
     api.post(getEndpoint('/pushkara-analysis'), { chart_data: chartData, d9_chart: d9Chart }),
+
+  calculateMudakkuAnalysis: async (chartData) => {
+    try {
+      return await api.post(getEndpoint('/mudakku-analysis'), { chart_data: chartData });
+    } catch (error) {
+      if (error?.response?.status === 404 || !error?.response) {
+        const mudakku = calculateMudakkuLocal(chartData);
+        if (mudakku) {
+          return { data: { success: true, mudakku_analysis: mudakku }, status: 200 };
+        }
+      }
+      throw error;
+    }
+  },
+
+  calculateGandantaAnalysis: async (chartData) => {
+    try {
+      return await api.post(getEndpoint('/gandanta-analysis'), { chart_data: chartData });
+    } catch (error) {
+      if (error?.response?.status === 404 || !error?.response) {
+        const gandanta = calculateGandantaLocal(chartData);
+        if (gandanta) {
+          return { data: { success: true, gandanta_analysis: gandanta }, status: 200 };
+        }
+      }
+      throw error;
+    }
+  },
   
   calculateKarkamsaChart: (chartData, atmakaraka) =>
     api.post(getEndpoint('/karkamsa-chart'), { chart_data: chartData, atmakaraka }),

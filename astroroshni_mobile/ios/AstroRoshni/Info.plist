@@ -40,7 +40,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>106</string>
+	<string>107</string>
 	<key>FacebookAdvertiserIDCollectionEnabled</key>
 	<false/>
 	<key>FacebookAppID</key>
@@ -73,6 +73,10 @@
 	</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>AstroRoshni uses the microphone so you can ask chat questions by speaking.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>AstroRoshni does not access your photo library for core features. If a future feature lets you save an image, we will ask for permission first.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>AstroRoshni does not access your photo library for core features. If a future feature lets you attach an image, we will ask for permission first.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>AstroRoshni uses speech recognition to turn your spoken question into text.</string>
 	<key>NSUserTrackingUsageDescription</key>

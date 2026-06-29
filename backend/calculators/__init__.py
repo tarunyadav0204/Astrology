@@ -12,6 +12,7 @@ from .chart_calculator import ChartCalculator
 from .transit_calculator import TransitCalculator
 from .panchang_calculator import PanchangCalculator
 from .friendship_calculator import FriendshipCalculator
+from .mudakku_calculator import MudakkuCalculator
 from .classical_shadbala import calculate_classical_shadbala
 
 __all__ = [
@@ -29,6 +30,7 @@ __all__ = [
     'TransitCalculator',
     'PanchangCalculator',
     'FriendshipCalculator',
+    'MudakkuCalculator',
     'calculate_classical_shadbala',
     'CharaKarakaCalculator',
     'NakshatraCalculator',

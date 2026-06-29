@@ -25,6 +25,8 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   const [yogiPoints, setYogiPoints] = React.useState(null);
   const [sniperPoints, setSniperPoints] = React.useState(null);
   const [pushkaraData, setPushkaraData] = React.useState(null);
+  const [mudakkuData, setMudakkuData] = React.useState(null);
+  const [gandantaData, setGandantaData] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [lagnasLoading, setLagnasLoading] = React.useState(false);
   const [specialLoading, setSpecialLoading] = React.useState(false);
@@ -86,14 +88,18 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     try {
       const { chartAPI } = require('../../services/api');
       const d9Chart = route.params?.d9Chart || {};
-      const [yogiResponse, sniperResponse, pushkaraResponse] = await Promise.all([
+      const [yogiResponse, sniperResponse, pushkaraResponse, mudakkuResponse, gandantaResponse] = await Promise.all([
         chartAPI.calculateYogiPoints(birthData),
         chartAPI.calculateSniperPoints(chartData),
-        chartAPI.calculatePushkaraNavamsha(chartData, d9Chart)
+        chartAPI.calculatePushkaraNavamsha(chartData, d9Chart),
+        chartAPI.calculateMudakkuAnalysis(chartData),
+        chartAPI.calculateGandantaAnalysis(chartData),
       ]);
       setYogiPoints(yogiResponse.data.yogi_points);
       setSniperPoints(sniperResponse.data.sniper_points);
       setPushkaraData(pushkaraResponse.data.pushkara_analysis);
+      setMudakkuData(mudakkuResponse?.data?.mudakku_analysis);
+      setGandantaData(gandantaResponse?.data?.gandanta_analysis);
     } catch (error) {
       console.error('Error loading special points:', error);
     } finally {
@@ -404,6 +410,55 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
             </View>
           )}
 
+          {/* Mudakku / Modakku */}
+          {mudakkuData && (
+            <View style={styles.specialSection}>
+              <Text style={[styles.specialSectionTitle, { color: colors.text }]}>🧩 Mudakku / Modakku</Text>
+              <View style={[styles.specialCard, { backgroundColor: specialCardBg, borderColor: specialCardBorder }]}>
+                <Text style={[styles.specialPointName, { color: colors.text }]}>
+                  {mudakkuData.sun_nakshatra?.name || mudakkuData.method?.count_from || 'Sun Nakshatra'}
+                </Text>
+                <Text style={[styles.specialPointValue, { color: colors.primary }]}>
+                  Count to Mula: {mudakkuData.count_to_mula}
+                </Text>
+                <Text style={[styles.specialPointDesc, { color: colors.textSecondary }]}>
+                  Mudakku Nakshatra: {mudakkuData.mudakku_nakshatra?.name}
+                  {'\n'}
+                  Mudakku Rashi: {mudakkuData.mudakku_rashi} • Lord: {mudakkuData.mudakku_rashi_lord}
+                  {'\n'}
+                  {mudakkuData.is_split_nakshatra ? 'Split nakshatra rule applied.' : 'Single sign landing.'}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Gandanta */}
+          {gandantaData && (
+            <View style={styles.specialSection}>
+              <Text style={[styles.specialSectionTitle, { color: colors.text }]}>🧶 Gandamoola (Gandanta)</Text>
+              <View style={[styles.specialCard, { backgroundColor: specialCardBg, borderColor: specialCardBorder }]}>
+                <Text style={[styles.specialPointName, { color: colors.text }]}>
+                  {gandantaData.lagna_gandanta?.is_gandanta
+                    ? `Lagna: ${gandantaData.lagna_gandanta?.gandanta_info?.gandanta_name || 'Gandanta'}`
+                    : gandantaData.moon_gandanta?.is_gandanta
+                      ? `Moon: ${gandantaData.moon_gandanta?.gandanta_info?.gandanta_name || 'Gandanta'}`
+                      : 'Chart Gandanta'}
+                </Text>
+                <Text style={[styles.specialPointValue, { color: colors.primary }]}>
+                  Planets in Gandanta: {gandantaData.planets_in_gandanta?.length || 0}
+                </Text>
+                <Text style={[styles.specialPointDesc, { color: colors.textSecondary }]}>
+                  {gandantaData.lagna_gandanta?.is_gandanta ? `Lagna is in ${gandantaData.lagna_gandanta?.gandanta_info?.gandanta_name}.` : 'Lagna is not in Gandanta.'}
+                  {'\n'}
+                  {gandantaData.moon_gandanta?.is_gandanta ? `Moon is in ${gandantaData.moon_gandanta?.gandanta_info?.gandanta_name}.` : 'Moon is not in Gandanta.'}
+                  {gandantaData.planets_in_gandanta?.length
+                    ? `\n${gandantaData.planets_in_gandanta.map((item) => `${item.planet} (${item.gandanta_info?.gandanta_name || 'Gandanta'})`).join(', ')}`
+                    : '\nNo planets are in Gandanta.'}
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* Bhrigu Bindu */}
           {sniperPoints?.bhrigu_bindu && !sniperPoints.bhrigu_bindu.error && (
             <View style={styles.specialSection}>
@@ -438,7 +493,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
             </View>
           )}
 
-          {!yogiPoints && !sniperPoints && !pushkaraData && (
+          {!yogiPoints && !sniperPoints && !pushkaraData && !mudakkuData && !gandantaData && (
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No special points data available</Text>
           )}
         </View>

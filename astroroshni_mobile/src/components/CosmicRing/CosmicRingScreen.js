@@ -164,6 +164,7 @@ export default function CosmicRingScreen({ navigation }) {
   const [sniperPoints, setSniperPoints] = useState(null);
   const [pushkaraData, setPushkaraData] = useState(null);
   const [yogiPoints, setYogiPoints] = useState(null);
+  const [mudakkuAnalysis, setMudakkuAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -200,16 +201,19 @@ export default function CosmicRingScreen({ navigation }) {
           chartAPI.calculateSniperPoints(chartData, {}, d9Chart).then((r) => r?.data?.sniper_points).catch(() => null),
           chartAPI.calculatePushkaraNavamsha(chartData, d9Chart).then((r) => r?.data?.pushkara_analysis).catch(() => null),
           chartAPI.calculateYogiPoints(formatted).then((r) => r?.data?.yogi_points).catch(() => null),
-        ]).then(([sniper, pushkara, yogi]) => {
+          chartAPI.calculateMudakkuAnalysis(chartData).then((r) => r?.data?.mudakku_analysis).catch(() => null),
+        ]).then(([sniper, pushkara, yogi, mudakku]) => {
           setSniperPoints(sniper || null);
           setPushkaraData(pushkara || null);
           setYogiPoints(yogi || null);
+          setMudakkuAnalysis(mudakku || null);
         });
       } else {
         setBirthChart(null);
         setSniperPoints(null);
         setPushkaraData(null);
         setYogiPoints(null);
+        setMudakkuAnalysis(null);
       }
     } catch (e) {
       setError(e?.message || 'Failed to load data');
@@ -219,6 +223,7 @@ export default function CosmicRingScreen({ navigation }) {
       setSniperPoints(null);
       setPushkaraData(null);
       setYogiPoints(null);
+      setMudakkuAnalysis(null);
     } finally {
       setLoading(false);
     }
@@ -381,6 +386,7 @@ export default function CosmicRingScreen({ navigation }) {
                     mrityuBhagaPoints={activeTab === 'birth' ? mrityuBhagaPoints : []}
                     navamsa64th={activeTab === 'birth' ? navamsa64thLongitude : null}
                     kharesh={activeTab === 'birth' ? khareshLongitude : null}
+                    mudakkuPoint={activeTab === 'birth' ? mudakkuAnalysis?.mudakku_point : null}
                     yogiPoints={activeTab === 'birth' ? yogiPoints : null}
                     width={size}
                     height={size}

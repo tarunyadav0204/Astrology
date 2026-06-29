@@ -33,6 +33,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { getGrahaDrishtiToHouseSign } from '../../utils/grahaDrishti';
+import { calculateGandantaLocal, getGandantaHouseMatches } from '../../utils/gandanta';
 
 const { width, height } = Dimensions.get('window');
 export default function ChartScreen({ navigation, route }) {
@@ -61,6 +62,8 @@ export default function ChartScreen({ navigation, route }) {
   const [isSharing, setIsSharing] = useState(false);
   const [houseInsight, setHouseInsight] = useState(null);
   const [houseInsightLoading, setHouseInsightLoading] = useState(false);
+  const [mudakkuAnalysis, setMudakkuAnalysis] = useState(null);
+  const [gandantaAnalysis, setGandantaAnalysis] = useState(null);
   const drawerAnim = useRef(new Animated.Value(height)).current;
   const houseInsightRequestKeyRef = useRef(null);
 
@@ -296,6 +299,13 @@ export default function ChartScreen({ navigation, route }) {
     return getGrahaDrishtiToHouseSign(cd, selectedHouse.rashiIndex);
   }, [selectedHouse]);
 
+  const gandantaHouseMatches = useMemo(() => {
+    if (!selectedHouse?.chartData) {
+      return { planets: [], lagna: { is_gandanta: false }, moon: { is_gandanta: false } };
+    }
+    return getGandantaHouseMatches(selectedHouse.chartData, selectedHouse.planets || []);
+  }, [selectedHouse]);
+
   const buildBirthPayload = useCallback((data) => ({
     ...data,
     date: typeof data?.date === 'string' ? data.date.split('T')[0] : data?.date,
@@ -400,6 +410,60 @@ export default function ChartScreen({ navigation, route }) {
     buildBirthPayload,
     buildAshtakavargaSummary,
   ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadMudakkuAnalysis = async () => {
+      if (!chartData) {
+        if (!cancelled) setMudakkuAnalysis(null);
+        return;
+      }
+
+      try {
+        const response = await chartAPI.calculateMudakkuAnalysis(chartData);
+        if (!cancelled) {
+          setMudakkuAnalysis(response?.data?.mudakku_analysis || null);
+        }
+      } catch (error) {
+        console.log('[ChartScreen] mudakku analysis load failed', error?.message || String(error));
+        if (!cancelled) setMudakkuAnalysis(null);
+      }
+    };
+
+    loadMudakkuAnalysis();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chartData]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadGandantaAnalysis = async () => {
+      if (!chartData) {
+        if (!cancelled) setGandantaAnalysis(null);
+        return;
+      }
+
+      try {
+        const response = await chartAPI.calculateGandantaAnalysis(chartData);
+        if (!cancelled) {
+          setGandantaAnalysis(response?.data?.gandanta_analysis || null);
+        }
+      } catch (error) {
+        console.log('[ChartScreen] gandanta analysis load failed', error?.message || String(error));
+        if (!cancelled) setGandantaAnalysis(calculateGandantaLocal(chartData));
+      }
+    };
+
+    loadGandantaAnalysis();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chartData]);
   
   const handleShare = async () => {
     try {
@@ -728,6 +792,77 @@ export default function ChartScreen({ navigation, route }) {
                         {getHouseSignificance(selectedHouse.houseNum).desc}
                       </Text>
                     </View>
+
+                    {mudakkuAnalysis && selectedHouse.rashiIndex === mudakkuAnalysis?.mudakku_point?.sign && (
+                      <View style={[styles.drawerSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249, 115, 22, 0.08)' }]}>
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Mudakku / Modakku</Text>
+                        <Text style={[styles.sectionDesc, { color: colors.text }]}>
+                          This house contains the Mudakku point for your chart.
+                        </Text>
+
+                        <View style={styles.mudakkuDetailGrid}>
+                          <View style={[styles.mudakkuDetailCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(15, 23, 42, 0.04)' }]}>
+                            <Text style={[styles.mudakkuDetailLabel, { color: colors.textSecondary }]}>Sun Nakshatra</Text>
+                            <Text style={[styles.mudakkuDetailValue, { color: colors.text }]}>
+                              {mudakkuAnalysis.sun_nakshatra?.name || '-'}
+                            </Text>
+                          </View>
+
+                          <View style={[styles.mudakkuDetailCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(15, 23, 42, 0.04)' }]}>
+                            <Text style={[styles.mudakkuDetailLabel, { color: colors.textSecondary }]}>Count to Mula</Text>
+                            <Text style={[styles.mudakkuDetailValue, { color: colors.text }]}>
+                              {mudakkuAnalysis.count_to_mula ?? '-'}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text style={[styles.mudakkuNote, { color: colors.textSecondary }]}>
+                          Landing nakshatra: {mudakkuAnalysis.mudakku_nakshatra?.name || '-'} · Rashi: {mudakkuAnalysis.mudakku_rashi || '-'}
+                        </Text>
+                        <Text style={[styles.mudakkuNote, { color: colors.textSecondary }]}>
+                          {mudakkuAnalysis.is_split_nakshatra ? 'Split nakshatra rule applied.' : 'Single sign landing.'}
+                        </Text>
+                      </View>
+                    )}
+
+                    {(gandantaHouseMatches.planets.length > 0 || (selectedHouse.houseNum === 1 && gandantaAnalysis?.lagna_gandanta?.is_gandanta) || (selectedHouse.houseNum === 1 && gandantaHouseMatches.lagna?.is_gandanta)) && (
+                      <View style={[styles.drawerSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(220, 38, 38, 0.08)' }]}>
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Gandamoola (Gandanta)</Text>
+                        <Text style={[styles.sectionDesc, { color: colors.text }]}>
+                          {selectedHouse.houseNum === 1 && (gandantaAnalysis?.lagna_gandanta?.is_gandanta || gandantaHouseMatches.lagna?.is_gandanta)
+                            ? `This is a Gandanta Lagna house (${gandantaAnalysis?.lagna_gandanta?.gandanta_info?.gandanta_name || gandantaHouseMatches.lagna?.gandanta_info?.gandanta_name || 'junction'}).`
+                            : 'This house contains one or more planets in Gandanta.'}
+                        </Text>
+
+                        {gandantaHouseMatches.planets.length > 0 && (
+                          <View style={styles.mudakkuDetailGrid}>
+                            {gandantaHouseMatches.planets.map(({ planet, gandanta_info }, idx) => (
+                              <View key={`${planet?.name || 'planet'}-${idx}`} style={[styles.mudakkuDetailCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(15, 23, 42, 0.04)' }]}>
+                                <Text style={[styles.mudakkuDetailLabel, { color: colors.textSecondary }]}>{planet?.name || 'Planet'}</Text>
+                                <Text style={[styles.mudakkuDetailValue, { color: colors.text }]}>
+                                  {gandanta_info?.gandanta_name || 'Gandanta'}
+                                </Text>
+                                <Text style={[styles.mudakkuNote, { color: colors.textSecondary, marginTop: 4 }]}>
+                                  {gandanta_info?.intensity || 'Medium'} · {gandanta_info?.distance_from_junction ?? '-'}°
+                                </Text>
+                              </View>
+                            ))}
+                        </View>
+                      )}
+
+                        {selectedHouse.houseNum === 1 && (gandantaAnalysis?.lagna_gandanta?.is_gandanta || gandantaHouseMatches.lagna?.is_gandanta) && (
+                          <Text style={[styles.mudakkuNote, { color: colors.textSecondary }]}>
+                            Lagna point: {gandantaAnalysis?.lagna_gandanta?.gandanta_info?.gandanta_name || gandantaHouseMatches.lagna?.gandanta_info?.gandanta_name || 'Gandanta'}
+                          </Text>
+                        )}
+
+                        {(gandantaAnalysis?.moon_gandanta?.is_gandanta || gandantaHouseMatches.moon?.is_gandanta) && currentChartIndex === 0 && (
+                          <Text style={[styles.mudakkuNote, { color: colors.textSecondary }]}>
+                            Moon also falls in {gandantaAnalysis?.moon_gandanta?.gandanta_info?.gandanta_name || gandantaHouseMatches.moon?.gandanta_info?.gandanta_name || 'Gandanta'}.
+                          </Text>
+                        )}
+                      </View>
+                    )}
 
                     {houseInsight && (
                       <View style={[styles.drawerSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249, 115, 22, 0.06)' }]}>
@@ -1388,6 +1523,33 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   ashtakavargaDetail: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 8,
+  },
+  mudakkuDetailGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  mudakkuDetailCard: {
+    flex: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  mudakkuDetailLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  mudakkuDetailValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  mudakkuNote: {
     fontSize: 13,
     lineHeight: 19,
     marginTop: 8,

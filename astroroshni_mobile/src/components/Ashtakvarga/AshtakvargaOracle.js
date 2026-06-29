@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   TextInput,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
