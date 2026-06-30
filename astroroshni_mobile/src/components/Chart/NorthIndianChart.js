@@ -572,7 +572,7 @@ const styles = StyleSheet.create({
   svg: { width: '100%', height: '100%', aspectRatio: 1 },
   tooltip: { position: 'absolute', top: 20, left: 20, right: 20, padding: 12, borderRadius: 12, alignItems: 'center', zIndex: 100 },
   tooltipText: { color: 'white', fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
-  instructionText: { textAlign: 'center', fontSize: 12, fontStyle: 'italic', marginTop: 24, marginBottom: 12 },
+  instructionText: { textAlign: 'center', fontSize: 12, fontStyle: 'italic', marginTop: 12, marginBottom: 18 },
 });
 
 export default NorthIndianChart;

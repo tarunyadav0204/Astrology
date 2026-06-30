@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Pressable,
+  ActivityIndicator,
   StatusBar,
   Animated,
   Dimensions,
@@ -15,6 +16,7 @@ import {
 } from 'react-native';
 import { PanGestureHandler, State, GestureHandlerRootView, ScrollView } from 'react-native-gesture-handler';
 import { BlurView } from 'expo-blur';
+import { Audio, Video, ResizeMode } from 'expo-av';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -64,6 +66,9 @@ export default function ChartScreen({ navigation, route }) {
   const [houseInsightLoading, setHouseInsightLoading] = useState(false);
   const [mudakkuAnalysis, setMudakkuAnalysis] = useState(null);
   const [gandantaAnalysis, setGandantaAnalysis] = useState(null);
+  const [showGuidePlayer, setShowGuidePlayer] = useState(false);
+  const [guidePlayerStatus, setGuidePlayerStatus] = useState('idle');
+  const [chartGuideVideoUrl, setChartGuideVideoUrl] = useState(route.params?.chartGuideVideoUrl || '');
   const drawerAnim = useRef(new Animated.Value(height)).current;
   const houseInsightRequestKeyRef = useRef(null);
 
@@ -100,6 +105,61 @@ export default function ChartScreen({ navigation, route }) {
   const resetChartTranslation = useCallback(() => {
     Animated.spring(chartTranslateX, { toValue: 0, friction: 8, tension: 80, useNativeDriver: true }).start();
   }, [chartTranslateX]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadGuideVideoUrl = async () => {
+      try {
+        const response = await chartAPI.getChartGuideVideoUrl();
+        const url = String(response?.data?.url || '').trim();
+        console.log('[ChartScreen] guide video url fetched:', url || '(empty)');
+        if (!cancelled && url) {
+          setChartGuideVideoUrl(url);
+        }
+      } catch (error) {
+        if (__DEV__) {
+          console.log('[ChartScreen] guide video URL load skipped:', error?.message || error);
+        }
+      }
+    };
+    loadGuideVideoUrl();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!showGuidePlayer) return;
+    let cancelled = false;
+    const enableAudio = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          allowsRecordingIOS: false,
+          shouldDuckAndroid: true,
+          interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
+          interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+        });
+      } catch (error) {
+        if (__DEV__) {
+          console.log('[ChartScreen] audio mode setup skipped:', error?.message || error);
+        }
+      }
+    };
+    enableAudio();
+    return () => {
+      cancelled = true;
+      if (cancelled) {
+        Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          allowsRecordingIOS: false,
+          shouldDuckAndroid: true,
+        }).catch(() => {});
+      }
+    };
+  }, [showGuidePlayer]);
 
   const handleSwipe = useCallback((event) => {
     const { translationX, state, velocityX } = event.nativeEvent;
@@ -618,6 +678,29 @@ export default function ChartScreen({ navigation, route }) {
                       : { backgroundColor: '#fff5f0' }
                   ]}
                 >
+                  <TouchableOpacity
+                    activeOpacity={0.88}
+                    onPress={() => {
+                      setGuidePlayerStatus('loading');
+                      setShowGuidePlayer(true);
+                    }}
+                    style={[
+                      styles.guideStrip,
+                      {
+                        backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
+                        borderColor: theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.08)',
+                      },
+                    ]}
+                  >
+                    <View style={styles.guideStripText}>
+                      <Text style={[styles.guideStripLabel, { color: colors.textSecondary }]}>Watch guide</Text>
+                      <Text style={[styles.guideStripTitle, { color: colors.text }]}>How to read this chart</Text>
+                    </View>
+                    <View style={[styles.guideStripMeta, { borderColor: colors.primary + '25' }]}>
+                      <Text style={[styles.guideStripMetaText, { color: colors.primary }]}>4 min</Text>
+                    </View>
+                  </TouchableOpacity>
+
                   <View style={styles.chartAndNavContainer}>
                     <PanGestureHandler 
                       onGestureEvent={onGestureEvent}
@@ -735,6 +818,51 @@ export default function ChartScreen({ navigation, route }) {
         </SafeAreaView>
         
         <CascadingDashaBrowser visible={showDashaBrowser} onClose={() => setShowDashaBrowser(false)} birthData={birthData} onRequireBirthData={() => navigation.replace('BirthProfileIntro', { returnTo: 'Chart' })} selectNativeReturnTo="Chart" />
+
+        <Modal
+          visible={showGuidePlayer}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowGuidePlayer(false)}
+        >
+          <View style={styles.guidePlayerOverlay}>
+            <StatusBar hidden />
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowGuidePlayer(false)} />
+            <View style={styles.guidePlayerBackplate} />
+            <TouchableOpacity onPress={() => setShowGuidePlayer(false)} style={styles.guidePlayerClose}>
+              <Ionicons name="close" size={22} color="#fff" />
+            </TouchableOpacity>
+            {chartGuideVideoUrl ? (
+              <View style={styles.guidePlayerVideoFrame}>
+                <Video
+                  source={{ uri: chartGuideVideoUrl }}
+                  style={styles.guidePlayerVideo}
+                  useNativeControls
+                  resizeMode={ResizeMode.COVER}
+                  shouldPlay
+                  isLooping={false}
+                  isMuted={false}
+                  volume={1.0}
+                  onLoadStart={() => setGuidePlayerStatus('loading')}
+                  onReadyForDisplay={() => setGuidePlayerStatus('ready')}
+                  onError={(error) => {
+                    console.log('[ChartScreen] guide video native error:', error);
+                    setGuidePlayerStatus('error');
+                  }}
+                />
+                {guidePlayerStatus === 'loading' && (
+                  <View style={styles.guidePlayerLoadingOverlay}>
+                    <ActivityIndicator size="large" color="#fff" />
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View style={styles.guidePlayerLoadingOverlay}>
+                <ActivityIndicator size="large" color="#fff" />
+              </View>
+            )}
+          </View>
+        </Modal>
         
         {/* House Insights Drawer */}
         <Modal
@@ -1206,6 +1334,43 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 0,
   },
+  guideStrip: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  guideStripText: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  guideStripLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  guideStripTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  guideStripMeta: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  guideStripMetaText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
   chartAndNavContainer: {
     flex: 1,
   },
@@ -1215,6 +1380,9 @@ const styles = StyleSheet.create({
   captureGradient: {
     flex: 1,
     padding: 0,
+  },
+  chartContentStack: {
+    flex: 1,
   },
   captureHeader: {
     flexDirection: 'row',
@@ -1632,6 +1800,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     flexWrap: 'wrap',
+  },
+  guidePlayerOverlay: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 0,
+  },
+  guidePlayerBackplate: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
+  },
+  guidePlayerClose: {
+    position: 'absolute',
+    top: 18,
+    right: 18,
+    zIndex: 5,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guidePlayerVideoFrame: {
+    width: '100%',
+    height: '100%',
+    alignSelf: 'stretch',
+    borderRadius: 0,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+  },
+  guidePlayerVideo: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000',
+  },
+  guidePlayerLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
   actionButton: {
     flexGrow: 1,

@@ -892,6 +892,11 @@ def get_chat_static_suggestions() -> list[str]:
     ][:20]
 
 
+def get_chart_guide_video_url() -> str:
+    """Public guide video URL shown on the chart screen."""
+    return (get_setting("chart_guide_video_url") or "").strip()
+
+
 PODCAST_PROVIDER_TTS = "tts"
 PODCAST_PROVIDER_NOTEBOOK_LM = "notebook_lm"
 

@@ -10,7 +10,7 @@
     "emptyStateCta": "Add birth profile"
   },
   "menu": {
-    "title": "Study Menu",
+    "title": "Cosmic Menu",
     "subtitle": "Navigate your chart tools",
     "myProfile": "My Profile",
     "selectNative": "Select Native",
@@ -964,18 +964,18 @@
     "tabs": {
       "ask": "Ask",
       "charts": "Charts",
-      "events": "Timing",
+      "events": "Predictions",
       "dashas": "Dashas",
       "you": "You"
     },
     "askFAB": "Ask AstroRoshni"
   },
-  "eventScreen": {
-    "headerTitle": "Annual Chart Review",
-    "headerPredictions": "{{year}} Chart Review",
-    "monthlyGuide": "Monthly Chart Notes",
-    "selectYear": "Select Your Year",
-    "selectYearSubtitle": "Which year would you like to explore?",
+    "eventScreen": {
+      "headerTitle": "Annual Chart Review",
+    "headerPredictions": "{{year}} Predictions",
+      "monthlyGuide": "Monthly Chart Notes",
+      "selectYear": "Select Your Year",
+      "selectYearSubtitle": "Which year would you like to explore?",
     "continue": "Continue",
     "regenerateTitle": "Refresh Study?",
     "regenerateMessage": "This will cost {{cost}} credits to generate a fresh chart review for {{year}}.",
@@ -983,13 +983,13 @@
     "confirm": "Confirm",
     "whatsIncluded": "What you'll see:",
     "monthlyForecasts": "12 Monthly Chart Notes",
-    "majorLifeEvents": "Key timing themes",
-    "timingGuidance": "Chart notes",
+    "majorLifeEvents": "Major Life Events",
+    "timingGuidance": "Timing Guidance",
     "aiInsights": "Using classic vedic methods including Parashari, Nadi and Jaimini",
     "thisYear": "This Year",
     "nextYear": "Next Year",
     "cachedHint": "Already saved — select and open, no extra credits.",
-    "noPredictions": "No timeline insights generated. Please try again.",
+    "noPredictions": "No predictions generated. Please try again.",
     "almostThere": "Almost there..."
   },
   "monthlyAccordion": {

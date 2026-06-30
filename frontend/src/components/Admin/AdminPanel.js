@@ -313,6 +313,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [playPaymentServiceUserAllowlist, setPlayPaymentServiceUserAllowlist] = useState('');
   const [playPaymentServiceBaseUrl, setPlayPaymentServiceBaseUrl] = useState('');
   const [playPaymentServiceSaving, setPlayPaymentServiceSaving] = useState(false);
+  const [chartGuideVideoUrl, setChartGuideVideoUrl] = useState('');
+  const [chartGuideVideoSaving, setChartGuideVideoSaving] = useState(false);
   const [deathQueryUnlockKeyword, setDeathQueryUnlockKeyword] = useState('');
   const [deathQueryUnlockSaving, setDeathQueryUnlockSaving] = useState(false);
   const [instantChatEnabled, setInstantChatEnabled] = useState(false);
@@ -723,6 +725,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setPlayPaymentServiceEnabled(Boolean(data.play_payment_service_enabled));
       setPlayPaymentServiceUserAllowlist(data.play_payment_service_user_allowlist || '');
       setPlayPaymentServiceBaseUrl(data.play_payment_service_base_url || '');
+      setChartGuideVideoUrl(data.chart_guide_video_url || '');
       setDeathQueryUnlockKeyword(deathUnlockKeyword?.value || '');
       setInstantChatEnabled(Boolean(data.instant_chat_enabled));
       setInstantChatUserAllowlist(data.instant_chat_user_allowlist || '');
@@ -1656,6 +1659,35 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert('Failed to save chat suggestions.');
     } finally {
       setChatStaticSuggestionsSaving(false);
+    }
+  };
+
+  const handleSaveChartGuideVideoUrl = async () => {
+    const trimmed = chartGuideVideoUrl.trim();
+    setChartGuideVideoSaving(true);
+    try {
+      const response = await fetch('/api/admin/settings/chart_guide_video_url', {
+        method: 'PUT',
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: 'chart_guide_video_url',
+          value: trimmed,
+          description: 'Public chart guide video URL shown on the chart screen guide teaser',
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        alert('Failed to save chart guide video URL: ' + (err.detail || 'unknown error'));
+        return;
+      }
+      setChartGuideVideoUrl(trimmed);
+      alert('Chart guide video URL saved.');
+      fetchAdminSettings();
+    } catch (e) {
+      console.error('Error saving chart guide video URL:', e);
+      alert('Failed to save chart guide video URL.');
+    } finally {
+      setChartGuideVideoSaving(false);
     }
   };
 
@@ -4928,6 +4960,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 Chat
               </button>
               <button
+                className={`subtab ${settingsSubTab === 'guideVideos' ? 'active' : ''}`}
+                onClick={() => setSettingsSubTab('guideVideos')}
+              >
+                Guide Videos
+              </button>
+              <button
                 className={`subtab ${settingsSubTab === 'firstPurchaseBonus' ? 'active' : ''}`}
                 onClick={() => setSettingsSubTab('firstPurchaseBonus')}
               >
@@ -5228,6 +5266,41 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 </button>
               </div>
             </div>
+              </div>
+            )}
+
+            {settingsSubTab === 'guideVideos' && (
+              <div className="settings-subtab-group">
+                <div className="settings-section">
+                  <h3>Guide videos</h3>
+                  <p className="settings-hint">
+                    Set public video links that the mobile app can open from chart guidance cards.
+                    Use a direct playable video URL or embeddable watch URL. XML/feed links will not play correctly.
+                  </p>
+                  <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div className="setting-info">
+                      <strong>Chart guide video URL</strong>
+                      <p>Shown on the chart screen guide teaser and opened when the user taps the video button.</p>
+                    </div>
+                    <input
+                      type="text"
+                      value={chartGuideVideoUrl}
+                      onChange={(e) => setChartGuideVideoUrl(e.target.value)}
+                      placeholder="https://..."
+                      style={{ width: '100%', maxWidth: '640px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                    />
+                  </div>
+                  <div className="form-buttons" style={{ marginTop: '12px' }}>
+                    <button
+                      type="button"
+                      className="create-btn"
+                      onClick={handleSaveChartGuideVideoUrl}
+                      disabled={chartGuideVideoSaving}
+                    >
+                      {chartGuideVideoSaving ? 'Saving…' : 'Save guide video URL'}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 

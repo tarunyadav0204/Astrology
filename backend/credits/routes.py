@@ -17,6 +17,7 @@ from utils.env_json import parse_json_from_env
 from activity.publisher import publish_activity
 from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
 from .razorpay_routes import refund_razorpay_payment, fetch_razorpay_payment
+from utils.admin_settings import get_chart_guide_video_url
 
 router = APIRouter()
 credit_service = CreditService()
@@ -2162,6 +2163,11 @@ async def get_chat_cost():
 async def get_wealth_cost():
     cost = credit_service.get_credit_setting('wealth_analysis_cost')
     return {"cost": cost}
+
+
+@router.get("/settings/chart-guide-video-url")
+async def get_chart_guide_video_url_public():
+    return {"url": get_chart_guide_video_url()}
 
 @router.get("/settings/marriage-cost")
 async def get_marriage_cost():

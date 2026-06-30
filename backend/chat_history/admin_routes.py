@@ -2472,6 +2472,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             is_play_payment_service_enabled,
             get_play_payment_service_user_allowlist,
             get_play_payment_service_base_url,
+            get_chart_guide_video_url,
             is_chat_worker_mode_enabled,
             get_chat_worker_user_allowlist,
             is_free_question_parashari_only_enabled,
@@ -2564,6 +2565,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
                 str(uid) for uid in sorted(get_play_payment_service_user_allowlist())
             ),
             "play_payment_service_base_url": get_play_payment_service_base_url() or "",
+            "chart_guide_video_url": get_chart_guide_video_url(),
             "chat_worker_mode_enabled": is_chat_worker_mode_enabled(),
             "chat_worker_user_allowlist": ",".join(
                 str(uid) for uid in sorted(get_chat_worker_user_allowlist())

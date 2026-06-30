@@ -449,6 +449,7 @@ export const healthAPI = {
 };
 
 export const chartAPI = {
+  getChartGuideVideoUrl: () => api.get(getEndpoint('/credits/settings/chart-guide-video-url')),
   calculateChart: (birthData) => {
     // console.log('[API] Calling calculateChart');
     const startTime = Date.now();
