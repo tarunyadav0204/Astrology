@@ -603,7 +603,37 @@
       "dashas": "दशा",
       "you": "तुम्ही"
     },
-    "askFAB": "AstroRoshni ला विचारा"
+    "askFAB": "AstroRoshni ला विचारा",
+    "nakshatraGuide": {
+      "cardTitle": "Know yourself",
+      "cardSubtitle": "Open your Moon Nakshatra and watch a short study video.",
+      "metaLabel": "Moon Nakshatra",
+      "metaFallback": "Loaded from your chart",
+      "screenTitle": "Know your Nakshatra",
+      "heroLabel": "Know yourself",
+      "heroTitle": "Your Moon Nakshatra",
+      "subtitle": "तुमचे चंद्र नक्षत्र हेच इथले मुख्य तपशील आहे.",
+      "nakshatraLabel": "Nakshatra",
+      "padaLabel": "Pada",
+      "note": "Your Moon Nakshatra gives a gentle study lens for how you experience patterns, habits, and emotional rhythm.",
+      "videoTitle": "मार्गदर्शक",
+      "videoSubtitle": "A short guided walkthrough for this Nakshatra.",
+      "videoMissingHint": "We will show the video once your chart is available.",
+      "loading": "तुमची मार्गदर्शिका लोड होत आहे...",
+      "comingSoonTitle": "Video coming soon",
+      "comingSoonBody": "Video coming up. Check this space in a few days.",
+      "tipLabel": "Study lens",
+      "tipTitle": "Explore one Nakshatra at a time",
+      "tipBody": "This screen keeps the focus on one Moon Nakshatra so the explanation feels clear, calm, and easy to return to later.",
+      "loadError": "Could not load guide videos.",
+      "playerFallbackTitle": "Open video",
+      "playerFallbackBody": "The embedded player could not start here, but the video is still available on YouTube.",
+      "openYouTube": "Watch on YouTube",
+      "watchTitle": "नक्षत्र मार्गदर्शिका",
+      "watchHint": "तुमच्या चंद्र नक्षत्रासाठी छोटा व्हिडिओ उघडण्यासाठी Play दाबा.",
+      "watchHintMissing": "तुमचा मार्गदर्शक व्हिडिओ तुमचा चार्ट तयार झाल्यावर इथे दिसेल.",
+      "openVideo": "व्हिडिओ उघडा"
+    }
   },
   "eventScreen": {
     "headerTitle": "मुख्य जीवन घटना",

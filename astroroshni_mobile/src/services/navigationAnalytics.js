@@ -44,6 +44,7 @@ const ROUTE_VIEW_META = {
   KPSystem: { content_id: 'kp_system', content_type: 'chart' },
   SadeSati: { content_id: 'sade_sati', content_type: 'chart' },
   NakshatraCalendar: { content_id: 'nakshatra_calendar', content_type: 'panchang' },
+  NakshatraGuide: { content_id: 'nakshatra_guide', content_type: 'education' },
   CosmicRing: { content_id: 'cosmic_ring', content_type: 'tools' },
   BlogList: { content_id: 'blog_list', content_type: 'content' },
   BlogPostDetail: { content_type: 'blog' },

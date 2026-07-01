@@ -3,6 +3,7 @@ from threading import Lock
 import os
 import time
 import asyncio
+import json
 
 ADMIN_SETTINGS_CACHE_TTL_SECONDS = int(os.getenv("ADMIN_SETTINGS_CACHE_TTL_SECONDS", "60"))
 _ADMIN_SETTINGS_CACHE: Dict[str, tuple[float, Optional[str]]] = {}
@@ -895,6 +896,32 @@ def get_chat_static_suggestions() -> list[str]:
 def get_chart_guide_video_url() -> str:
     """Public guide video URL shown on the chart screen."""
     return (get_setting("chart_guide_video_url") or "").strip()
+
+
+def get_nakshatra_guide_videos_json() -> str:
+    """Raw JSON mapping of nakshatra guide videos keyed by nakshatra name."""
+    return (get_setting("nakshatra_guide_videos_json") or "").strip()
+
+
+def get_nakshatra_guide_videos() -> Dict[str, Any]:
+    """
+    Parsed nakshatra guide video mapping.
+    Expected shape:
+      {
+        "Ashwini": {"url": "...", "title": "...", "description": "...", "enabled": true},
+        ...
+      }
+    """
+    raw = get_nakshatra_guide_videos_json()
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        return {}
+    if isinstance(parsed, dict):
+        return parsed
+    return {}
 
 
 PODCAST_PROVIDER_TTS = "tts"

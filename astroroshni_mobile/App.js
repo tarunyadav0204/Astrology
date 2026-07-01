@@ -52,6 +52,7 @@ import YogaScreen from './src/components/Yogas/YogaScreen';
 import KPScreen from './src/screens/KPScreen';
 import SadeSatiScreen from './src/components/SadeSati/SadeSatiScreen';
 import NakshatraCalendarScreen from './src/components/NakshatraCalendar/NakshatraCalendarScreen';
+import NakshatraGuideScreen from './src/components/NakshatraGuide/NakshatraGuideScreen';
 import CosmicRingScreen from './src/components/CosmicRing/CosmicRingScreen';
 import MundaneHubScreen from './src/components/Chat/MundaneHubScreen';
 import BlogListScreen from './src/components/Blog/BlogListScreen';
@@ -97,6 +98,7 @@ const linking = {
       MuhuratHub: 'muhurat-finder',
       UniversalMuhurat: 'muhurat',
       NakshatraCalendar: 'nakshatras',
+      NakshatraGuide: 'nakshatra-study',
       AnalysisHub: 'analysis',
     },
   },
@@ -815,6 +817,11 @@ export default function App() {
           <Stack.Screen 
             name="NakshatraCalendar"
             component={NakshatraCalendarScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="NakshatraGuide"
+            component={NakshatraGuideScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 

@@ -603,7 +603,37 @@
       "dashas": "Dashas",
       "you": "Du"
     },
-    "askFAB": "AstroRoshni fragen"
+    "askFAB": "AstroRoshni fragen",
+    "nakshatraGuide": {
+      "cardTitle": "Know yourself",
+      "cardSubtitle": "Open your Moon Nakshatra and watch a short study video.",
+      "metaLabel": "Moon Nakshatra",
+      "metaFallback": "Loaded from your chart",
+      "screenTitle": "Know your Nakshatra",
+      "heroLabel": "Know yourself",
+      "heroTitle": "Your Moon Nakshatra",
+      "subtitle": "Dein Mond-Nakshatra ist hier das wichtigste Detail.",
+      "nakshatraLabel": "Nakshatra",
+      "padaLabel": "Pada",
+      "note": "Your Moon Nakshatra gives a gentle study lens for how you experience patterns, habits, and emotional rhythm.",
+      "videoTitle": "Guide",
+      "videoSubtitle": "A short guided walkthrough for this Nakshatra.",
+      "videoMissingHint": "We will show the video once your chart is available.",
+      "loading": "Dein Guide wird geladen...",
+      "comingSoonTitle": "Video coming soon",
+      "comingSoonBody": "Video coming up. Check this space in a few days.",
+      "tipLabel": "Study lens",
+      "tipTitle": "Explore one Nakshatra at a time",
+      "tipBody": "This screen keeps the focus on one Moon Nakshatra so the explanation feels clear, calm, and easy to return to later.",
+      "loadError": "Could not load guide videos.",
+      "playerFallbackTitle": "Open video",
+      "playerFallbackBody": "The embedded player could not start here, but the video is still available on YouTube.",
+      "openYouTube": "Watch on YouTube",
+      "watchTitle": "Nakshatra-Guide",
+      "watchHint": "Tippe auf Play, um ein kurzes Video zu deinem Mond-Nakshatra zu öffnen.",
+      "watchHintMissing": "Dein Guide-Video erscheint hier, sobald dein Chart bereit ist.",
+      "openVideo": "Video öffnen"
+    }
   },
   "eventScreen": {
     "headerTitle": "Wichtige Lebensereignisse",

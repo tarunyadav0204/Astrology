@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -154,6 +154,50 @@ const NAKSHATRA_KEY_BY_NAME = {
   'Purva Bhadrapada': 'Purva_Bhadrapada',
   'Uttara Bhadrapada': 'Uttara_Bhadrapada',
   'Revati': 'Revati',
+};
+
+const LONGITUDE_TO_NAKSHATRA_NAMES = [
+  'Ashwini',
+  'Bharani',
+  'Krittika',
+  'Rohini',
+  'Mrigashira',
+  'Ardra',
+  'Punarvasu',
+  'Pushya',
+  'Ashlesha',
+  'Magha',
+  'Purva Phalguni',
+  'Uttara Phalguni',
+  'Hasta',
+  'Chitra',
+  'Swati',
+  'Vishakha',
+  'Anuradha',
+  'Jyeshtha',
+  'Mula',
+  'Purva Ashadha',
+  'Uttara Ashadha',
+  'Shravana',
+  'Dhanishta',
+  'Shatabhisha',
+  'Purva Bhadrapada',
+  'Uttara Bhadrapada',
+  'Revati',
+];
+
+const getNakshatraFromLongitude = (longitude) => {
+  if (longitude == null) return null;
+  const lon = ((Number(longitude) || 0) % 360 + 360) % 360;
+  const span = 360 / 27;
+  const index = Math.min(26, Math.max(0, Math.floor(lon / span)));
+  const degreeInNakshatra = lon % span;
+  const pada = Math.min(4, Math.floor(degreeInNakshatra / (span / 4)) + 1);
+  return {
+    index,
+    name: LONGITUDE_TO_NAKSHATRA_NAMES[index],
+    pada,
+  };
 };
 /** Format ISO date "YYYY-MM-DD" as "2nd April 1980" */
 const formatDateOrdinal = (isoDate) => {
@@ -857,6 +901,10 @@ const loadHomeData = async (nativeData = null) => {
   
   // Use current native data for display
   const displayData = currentNativeData || birthData;
+  const moonNakshatra = useMemo(
+    () => getNakshatraFromLongitude(chartData?.planets?.Moon?.longitude),
+    [chartData]
+  );
 
   if (!colors) {
     return null;
@@ -1188,6 +1236,33 @@ const loadHomeData = async (nativeData = null) => {
                 style={styles.headerNativeChip}
               />
             </View>
+
+            <TouchableOpacity
+              activeOpacity={0.88}
+              onPress={() => navigation.navigate('NakshatraGuide', { birthData: displayData, chartData })}
+              style={[
+                styles.headerNakshatraPill,
+                {
+                  backgroundColor: isDark ? 'rgba(99,102,241,0.16)' : 'rgba(79, 70, 229, 0.08)',
+                  borderColor: isDark ? 'rgba(167,139,250,0.22)' : 'rgba(79, 70, 229, 0.16)',
+                },
+              ]}
+            >
+              <View style={[styles.headerNakshatraIcon, { backgroundColor: isDark ? 'rgba(139,92,246,0.25)' : 'rgba(79, 70, 229, 0.16)' }]}>
+                <Icon name="book-outline" size={14} color={colors.primary} />
+              </View>
+              <View style={styles.headerNakshatraTextWrap}>
+                <Text style={[styles.headerNakshatraTitle, { color: colors.text }]}>
+                  {t('home.nakshatraGuide.cardTitle', 'Know yourself')}
+                </Text>
+                <Text style={[styles.headerNakshatraSubtitle, { color: colors.textSecondary }]}>
+                  {moonNakshatra?.name
+                    ? `${moonNakshatra.name} · Pada ${moonNakshatra.pada}`
+                    : t('home.nakshatraGuide.cardSubtitle', 'Open your Moon Nakshatra study video')}
+                </Text>
+              </View>
+              <Icon name="chevron-forward" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
 
             <View style={[styles.headerBigThree, theme === 'light' && { backgroundColor: colors.surface }]}>
               <TouchableOpacity 
@@ -3133,6 +3208,37 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 16,
     padding: 12,
+  },
+  headerNakshatraPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    gap: 10,
+  },
+  headerNakshatraIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  headerNakshatraTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerNakshatraTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 1,
+  },
+  headerNakshatraSubtitle: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   headerSignItem: {
     flexDirection: 'row',

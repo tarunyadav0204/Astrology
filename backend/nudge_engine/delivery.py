@@ -8,6 +8,7 @@ app and the chat ask endpoint can attribute "user asked a question" conversions.
 """
 import json
 import logging
+import os
 import uuid
 from datetime import date
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -20,7 +21,11 @@ from .whatsapp_fallback import send_whatsapp_nudge, send_whatsapp_nudge_template
 logger = logging.getLogger(__name__)
 
 SUPPORTED_CHANNELS: Tuple[str, ...] = ("push", "whatsapp", "email")
-DEFAULT_WATERFALL_CHANNELS: Tuple[str, ...] = ("push", "whatsapp")
+DEFAULT_WATERFALL_CHANNELS: Tuple[str, ...] = ("push",)
+
+
+def _push_only_mode() -> bool:
+    return (os.getenv("NUDGE_PUSH_ONLY") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def new_delivery_group_id() -> str:
@@ -89,9 +94,12 @@ def deliver_nudge(
     sent_at = sent_at or date.today()
     group_id = new_delivery_group_id()
     policy = (policy or "waterfall").strip().lower()
-    requested = [c for c in (channels or []) if c in SUPPORTED_CHANNELS] or list(
-        DEFAULT_WATERFALL_CHANNELS
-    )
+    if _push_only_mode():
+        requested = ["push"]
+    else:
+        requested = [c for c in (channels or []) if c in SUPPORTED_CHANNELS] or list(
+            DEFAULT_WATERFALL_CHANNELS
+        )
 
     push_data: Dict[str, Any] = {
         "trigger_id": trigger_id,

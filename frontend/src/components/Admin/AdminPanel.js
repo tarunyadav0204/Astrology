@@ -315,6 +315,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [playPaymentServiceSaving, setPlayPaymentServiceSaving] = useState(false);
   const [chartGuideVideoUrl, setChartGuideVideoUrl] = useState('');
   const [chartGuideVideoSaving, setChartGuideVideoSaving] = useState(false);
+  const [nakshatraGuideVideosJson, setNakshatraGuideVideosJson] = useState('');
+  const [nakshatraGuideVideosSaving, setNakshatraGuideVideosSaving] = useState(false);
   const [deathQueryUnlockKeyword, setDeathQueryUnlockKeyword] = useState('');
   const [deathQueryUnlockSaving, setDeathQueryUnlockSaving] = useState(false);
   const [instantChatEnabled, setInstantChatEnabled] = useState(false);
@@ -726,6 +728,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setPlayPaymentServiceUserAllowlist(data.play_payment_service_user_allowlist || '');
       setPlayPaymentServiceBaseUrl(data.play_payment_service_base_url || '');
       setChartGuideVideoUrl(data.chart_guide_video_url || '');
+      const nakshatraVideosRaw = data.nakshatra_guide_videos_json || '';
+      try {
+        setNakshatraGuideVideosJson(nakshatraVideosRaw ? JSON.stringify(JSON.parse(nakshatraVideosRaw), null, 2) : '');
+      } catch (_) {
+        setNakshatraGuideVideosJson(nakshatraVideosRaw);
+      }
       setDeathQueryUnlockKeyword(deathUnlockKeyword?.value || '');
       setInstantChatEnabled(Boolean(data.instant_chat_enabled));
       setInstantChatUserAllowlist(data.instant_chat_user_allowlist || '');
@@ -1688,6 +1696,44 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert('Failed to save chart guide video URL.');
     } finally {
       setChartGuideVideoSaving(false);
+    }
+  };
+
+  const handleSaveNakshatraGuideVideos = async () => {
+    const trimmed = nakshatraGuideVideosJson.trim();
+    setNakshatraGuideVideosSaving(true);
+    try {
+      if (trimmed) {
+        JSON.parse(trimmed);
+      }
+    } catch (error) {
+      alert('Nakshatra guide videos must be valid JSON.');
+      setNakshatraGuideVideosSaving(false);
+      return;
+    }
+    try {
+      const response = await fetch('/api/admin/settings/nakshatra_guide_videos_json', {
+        method: 'PUT',
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: 'nakshatra_guide_videos_json',
+          value: trimmed,
+          description: 'Public map of Nakshatra study videos keyed by nakshatra name',
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        alert('Failed to save nakshatra guide videos: ' + (err.detail || 'unknown error'));
+        return;
+      }
+      setNakshatraGuideVideosJson(trimmed ? JSON.stringify(JSON.parse(trimmed), null, 2) : '');
+      alert('Nakshatra guide videos saved.');
+      fetchAdminSettings();
+    } catch (e) {
+      console.error('Error saving nakshatra guide videos:', e);
+      alert('Failed to save nakshatra guide videos.');
+    } finally {
+      setNakshatraGuideVideosSaving(false);
     }
   };
 
@@ -5298,6 +5344,30 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       disabled={chartGuideVideoSaving}
                     >
                       {chartGuideVideoSaving ? 'Saving…' : 'Save guide video URL'}
+                    </button>
+                  </div>
+                </div>
+                <div className="settings-section">
+                  <h3>Nakshatra study videos</h3>
+                  <p className="settings-hint">
+                    Store a JSON object keyed by Nakshatra name. Each entry can contain url, title, description, and enabled.
+                    Example: <code>{"{\"Ashwini\":{\"url\":\"https://youtu.be/...\",\"title\":\"Ashwini study\",\"enabled\":true}}"}</code>
+                  </p>
+                  <textarea
+                    value={nakshatraGuideVideosJson}
+                    onChange={(e) => setNakshatraGuideVideosJson(e.target.value)}
+                    placeholder={`{\n  "Ashwini": {\n    "url": "https://youtu.be/VIDEO_ID",\n    "title": "Ashwini study",\n    "description": "..." \n  }\n}`}
+                    rows={12}
+                    style={{ width: '100%', maxWidth: '900px', minHeight: '220px', padding: '10px', fontFamily: 'monospace', fontSize: '13px' }}
+                  />
+                  <div className="form-buttons" style={{ marginTop: '12px' }}>
+                    <button
+                      type="button"
+                      className="create-btn"
+                      onClick={handleSaveNakshatraGuideVideos}
+                      disabled={nakshatraGuideVideosSaving}
+                    >
+                      {nakshatraGuideVideosSaving ? 'Saving…' : 'Save nakshatra videos'}
                     </button>
                   </div>
                 </div>
