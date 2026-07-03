@@ -126,7 +126,7 @@ const BlogPost = () => {
                 title={`${post.title} | AstroRoshni Blog`}
                 description={post.excerpt || post.content.substring(0, 160)}
                 keywords={post.tags ? post.tags.join(', ') : 'vedic astrology, astrology blog'}
-                canonical={`https://astroroshni.com/blog/${post.slug}`}
+                canonical={`https://astroroshni.com/blog/${post.slug}/`}
                 ogImage={post.featured_image || 'https://astroroshni.com/og-image.jpg'}
                 structuredData={{
                     "@context": "https://schema.org",

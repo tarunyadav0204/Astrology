@@ -18,6 +18,7 @@ export const NAKSHATRA_SLUGS = [
 const HOROSCOPE_PERIODS = ['daily', 'weekly', 'monthly'];
 const DIRECTORY_CANONICAL_PATHS = new Set([
   '/about',
+  '/blog',
   '/beginners-guide',
   '/contact',
   '/panchang',
@@ -124,7 +125,7 @@ export const PUBLIC_ROUTE_SEO_RULES = [
     path: '/blog/:slug',
     resolve: ({ slug }) =>
       generatePageSEO('blogPost', {
-        path: `/blog/${slug}`,
+        path: `/blog/${slug}/`,
         title: 'Blog | AstroRoshni',
         description: 'Vedic astrology articles, guides, and insights from AstroRoshni.',
       }),

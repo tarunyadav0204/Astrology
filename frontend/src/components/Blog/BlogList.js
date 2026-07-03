@@ -68,7 +68,7 @@ const BlogList = () => {
                 title="Vedic Astrology Blog - Insights & Predictions | AstroRoshni"
                 description="Explore our collection of Vedic astrology articles, predictions, and cosmic insights. Learn about nakshatras, planetary transits, and astrological wisdom."
                 keywords="astrology blog, vedic astrology articles, astrology insights, planetary transits, nakshatra articles, astrology predictions"
-                canonical="https://astroroshni.com/blog"
+                canonical="https://astroroshni.com/blog/"
             />
             <NavigationHeader compact={true} />
             <div className="blog-list-container">
