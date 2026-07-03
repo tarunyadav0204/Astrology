@@ -41,6 +41,7 @@ export function getPrerenderPaths({ year = new Date().getFullYear(), blogSlugs =
     '/blog',
     '/about',
     '/contact',
+    '/order-management',
     '/policy',
     '/terms',
     '/calendar-2026',
@@ -93,7 +94,7 @@ export const PUBLIC_ROUTE_SEO_RULES = [
       const canonicalYear =
         Number.isFinite(yearNum) && yearNum < currentYear ? currentYear : yearNum || currentYear;
       return generatePageSEO('nakshatraDetail', {
-        path: `/nakshatra/${nakshatraName}/${canonicalYear}`,
+        path: `/nakshatra/${nakshatraName}/${canonicalYear}/`,
         title: `${titleName} Nakshatra ${canonicalYear} — Calendar & Predictions | AstroRoshni`,
         description: `${titleName} nakshatra yearly calendar, auspicious dates, and Vedic insights for ${canonicalYear}.`,
         keywords: `${nakshatraName} nakshatra, nakshatra calendar, vedic astrology, ${canonicalYear}`,
@@ -108,7 +109,7 @@ export const PUBLIC_ROUTE_SEO_RULES = [
       const name = String(nakshatraName || '').replace(/-/g, ' ');
       const titleName = name.replace(/\b\w/g, (c) => c.toUpperCase());
       return generatePageSEO('nakshatraDetail', {
-        path: `/nakshatra/${nakshatraName}/${year}`,
+        path: `/nakshatra/${nakshatraName}/${year}/`,
         title: `${titleName} Nakshatra ${year} — Calendar & Predictions | AstroRoshni`,
         description: `${titleName} nakshatra yearly calendar, auspicious dates, and Vedic insights for ${year}.`,
         keywords: `${nakshatraName} nakshatra, nakshatra calendar, vedic astrology, ${year}`,
@@ -130,6 +131,7 @@ export const PUBLIC_ROUTE_SEO_RULES = [
   },
   { path: '/about', pageKey: 'about' },
   { path: '/contact', pageKey: 'contact' },
+  { path: '/order-management', noIndex: true },
   { path: '/policy', pageKey: 'policy' },
   { path: '/terms', pageKey: 'terms' },
   { path: '/calendar-2026', pageKey: 'calendar2026' },

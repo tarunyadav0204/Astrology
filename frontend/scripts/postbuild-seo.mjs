@@ -41,6 +41,7 @@ const STATIC_PRERENDER_PATHS = [
   '/about',
   '/astroroshni',
   '/contact',
+  '/order-management',
   '/account/delete',
   '/policy',
   '/terms',
