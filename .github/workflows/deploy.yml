@@ -162,12 +162,17 @@ jobs:
           echo "========== GitHub Actions: rolling app deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
           gcloud config set project "${GCP_PROJECT_ID}"
 
+          clear_gcloud_known_hosts() {
+            rm -f "${HOME}/.ssh/google_compute_known_hosts" || true
+          }
+
           retry_gcloud_remote() {
             local attempts="$1"
             local sleep_seconds="$2"
             shift 2
             local try
             for try in $(seq 1 "${attempts}"); do
+              clear_gcloud_known_hosts
               if "$@"; then
                 return 0
               fi
