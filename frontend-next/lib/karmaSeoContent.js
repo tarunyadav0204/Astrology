@@ -1,6 +1,6 @@
 /** Public copy + FAQ for /karma-analysis (indexed layer). */
 
-export const KARMA_CANONICAL = 'https://astroroshni.com/karma-analysis';
+export const KARMA_CANONICAL = 'https://astroroshni.com/karma-analysis/';
 
 export const KARMA_REPORT_SECTIONS = [
   { icon: '🕉️', title: 'Introduction', desc: 'Overview of your soul journey and karmic themes from the chart.' },

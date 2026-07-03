@@ -1,6 +1,6 @@
 /** Public copy + FAQ for /chat (indexed layer). */
 
-export const CHAT_CANONICAL = 'https://astroroshni.com/chat';
+export const CHAT_CANONICAL = 'https://astroroshni.com/chat/';
 
 export const CHAT_MODES = [
   {

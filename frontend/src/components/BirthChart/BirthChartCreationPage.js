@@ -95,7 +95,7 @@ const BirthChartCreationPage = ({
   const { birthData, chartData } = useAstrology();
   const [showBirthModal, setShowBirthModal] = useState(false);
   const [birthModalTab, setBirthModalTab] = useState('new');
-  const seoData = generatePageSEO('birthChartCreation', { path: '/ai-kundli-generator' });
+  const seoData = generatePageSEO('birthChartCreation', { path: '/ai-kundli-generator/' });
 
   const structuredData = useMemo(
     () => ({

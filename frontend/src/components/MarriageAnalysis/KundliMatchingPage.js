@@ -171,7 +171,7 @@ const KundliMatchingPage = ({
         title="Free Kundli Matching by Date of Birth | Ashtakoot Guna Milan | AstroRoshni"
         description="Match two Kundlis with free Ashtakoot Guna Milan, Manglik compatibility, D1/D9 marriage support, timing climate, strengths, caution areas, and an optional detailed report."
         keywords="kundli matching, free kundli matching, horoscope matching, guna milan, ashtakoot matching, manglik matching, marriage compatibility, kundali milan, birth chart compatibility"
-        canonical="https://astroroshni.com/kundli-matching"
+        canonical="https://astroroshni.com/kundli-matching/"
         structuredData={structuredData}
       />
       <NavigationHeader

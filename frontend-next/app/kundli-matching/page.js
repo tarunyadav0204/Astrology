@@ -19,13 +19,13 @@ export const metadata = {
     'Match two Kundlis with Ashtakoot Guna Milan, Manglik analysis, Navamsa, timing climate, and AI-based marriage compatibility guidance.',
   keywords: KEYWORDS,
   alternates: {
-    canonical: 'https://astroroshni.com/kundli-matching',
+    canonical: 'https://astroroshni.com/kundli-matching/',
   },
   openGraph: {
     title: 'Kundli Matching | AstroRoshni',
     description:
       'Vedic Kundli matching with 36-point Guna Milan, Manglik checks, Navamsa, timing, and AI compatibility report.',
-    url: 'https://astroroshni.com/kundli-matching',
+    url: 'https://astroroshni.com/kundli-matching/',
     siteName: 'AstroRoshni',
     type: 'website',
     images: [{ url: 'https://astroroshni.com/images/astroroshni-og-image.jpg' }],

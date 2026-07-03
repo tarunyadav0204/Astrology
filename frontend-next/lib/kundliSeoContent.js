@@ -1,6 +1,6 @@
 /** Public copy + FAQ for /kundli-matching (indexed layer). */
 
-export const KUNDLI_CANONICAL = 'https://astroroshni.com/kundli-matching';
+export const KUNDLI_CANONICAL = 'https://astroroshni.com/kundli-matching/';
 
 export const ASHTAKOOTA_KOOTS = [
   {

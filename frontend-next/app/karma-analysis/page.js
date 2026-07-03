@@ -20,13 +20,13 @@ export const metadata = {
     'Discover past-life themes and karmic patterns from your Vedic chart (D9, D60, 12th house, Rahu–Ketu). Free guide plus personalised karma report on AstroRoshni.',
   keywords: KEYWORDS,
   alternates: {
-    canonical: 'https://astroroshni.com/karma-analysis',
+    canonical: 'https://astroroshni.com/karma-analysis/',
   },
   openGraph: {
     title: 'Past Life Karma Analysis | AstroRoshni',
     description:
       'Vedic past-life & karmic pattern analysis from your birth chart. Free guide + personalised report.',
-    url: 'https://astroroshni.com/karma-analysis',
+    url: 'https://astroroshni.com/karma-analysis/',
     siteName: 'AstroRoshni',
     type: 'website',
     images: [{ url: 'https://astroroshni.com/images/astroroshni-og-image.jpg' }],
