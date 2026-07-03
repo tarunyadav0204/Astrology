@@ -27,6 +27,7 @@ const NAKSHATRA_SLUGS = [
 
 const STATIC_PRERENDER_PATHS = [
   '/',
+  '/ai-kundli-generator',
   '/panchang',
   '/muhurat-finder',
   '/monthly-panchang',
