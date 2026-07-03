@@ -16,6 +16,12 @@ export const NAKSHATRA_SLUGS = [
 ];
 
 const HOROSCOPE_PERIODS = ['daily', 'weekly', 'monthly'];
+const DIRECTORY_CANONICAL_PATHS = new Set([
+  '/about',
+  '/beginners-guide',
+  '/contact',
+  '/panchang',
+]);
 
 /** Static public paths to prerender at build time (no auth). */
 export function getPrerenderPaths({ year = new Date().getFullYear(), blogSlugs = [] } = {}) {
@@ -161,7 +167,8 @@ export function resolveSeoForPathname(pathname) {
       return { ...data, noIndex: rule.noIndex };
     }
     if (rule.pageKey) {
-      const data = generatePageSEO(rule.pageKey, { path });
+      const canonicalPath = DIRECTORY_CANONICAL_PATHS.has(path) ? `${path}/` : path;
+      const data = generatePageSEO(rule.pageKey, { path: canonicalPath });
       return { ...data, noIndex: rule.noIndex };
     }
     return { noIndex: rule.noIndex };
