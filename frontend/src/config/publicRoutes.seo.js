@@ -23,6 +23,7 @@ const DIRECTORY_CANONICAL_PATHS = new Set([
   '/beginners-guide',
   '/contact',
   '/panchang',
+  '/policy',
 ]);
 
 /** Static public paths to prerender at build time (no auth). */

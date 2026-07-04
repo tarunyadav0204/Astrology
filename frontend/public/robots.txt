@@ -8,7 +8,6 @@ Sitemap: https://astroroshni.com/sitemap.xml
 Disallow: /admin/
 Disallow: /api/
 Disallow: /private/
-Disallow: /policy/
 
 # Allow important pages
 Allow: /marriage-analysis
