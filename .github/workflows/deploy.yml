@@ -64,6 +64,7 @@ jobs:
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
     runs-on: ubuntu-latest
     outputs:
+      backend_required: ${{ steps.detect.outputs.backend_required }}
       payment_required: ${{ steps.detect.outputs.payment_required }}
       nudge_required: ${{ steps.detect.outputs.nudge_required }}
       frontend_required: ${{ steps.detect.outputs.frontend_required }}
@@ -78,6 +79,7 @@ jobs:
         id: detect
         shell: bash
         env:
+          FORCE_BACKEND_PIP: ${{ github.event_name == 'workflow_dispatch' && inputs.force_backend_pip || false }}
           FORCE_FRONTEND_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_frontend_deploy || false }}
           FORCE_FULL_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_full_deploy || false }}
           BEFORE_SHA: ${{ github.event.before }}
@@ -96,17 +98,28 @@ jobs:
           echo "Changed files:"
           printf '%s\n' "${changed_files}"
 
+          backend_required=false
           payment_required=false
           nudge_required=false
           frontend_required=false
 
           if [[ "${FORCE_FULL_DEPLOY}" == "true" ]]; then
+            backend_required=true
             payment_required=true
             nudge_required=true
             frontend_required=true
           else
+            if [[ "${FORCE_BACKEND_PIP}" == "true" ]]; then
+              backend_required=true
+            fi
+
             if [[ "${FORCE_FRONTEND_DEPLOY}" == "true" ]]; then
               frontend_required=true
+            fi
+
+            if printf '%s\n' "${changed_files}" | grep -E -q \
+              '^(backend/|deploy\.sh|scripts/(deploy-release|build-gce-release-image|prepare-image-release|bootstrap-runtime|gce-startup-bootstrap|install_runtime_watchdog)\.sh|\.github/workflows/deploy\.yml)$'; then
+              backend_required=true
             fi
 
             if printf '%s\n' "${changed_files}" | grep -E -q \
@@ -124,12 +137,14 @@ jobs:
             fi
           fi
 
+          echo "backend_required=${backend_required}" >> "${GITHUB_OUTPUT}"
           echo "payment_required=${payment_required}" >> "${GITHUB_OUTPUT}"
           echo "nudge_required=${nudge_required}" >> "${GITHUB_OUTPUT}"
           echo "frontend_required=${frontend_required}" >> "${GITHUB_OUTPUT}"
 
   backend_and_chat:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
+    if: ${{ (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') && needs.detect_changes.outputs.backend_required == 'true' }}
+    needs: [detect_changes]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -192,6 +207,18 @@ jobs:
             local mig_label="$4"
             local frontend_required="${FRONTEND_ARTIFACT_REQUIRED:-false}"
 
+            instance_is_running() {
+              local instance_name="$1"
+              local status
+              status="$(
+                gcloud compute instances describe "${instance_name}" \
+                  --project "${GCP_PROJECT_ID}" \
+                  --zone "${mig_zone}" \
+                  --format="value(status)" 2>/dev/null || true
+              )"
+              [ "${status}" = "RUNNING" ]
+            }
+
             mapfile -t INSTANCES < <(
               gcloud compute instance-groups managed list-instances "${mig_name}" \
                 --project "${GCP_PROJECT_ID}" \
@@ -209,41 +236,70 @@ jobs:
             echo "📋 Deploying to ${#INSTANCES[@]} ${mig_label} instance(s): ${INSTANCES[*]}"
             for INSTANCE in "${INSTANCES[@]}"; do
               echo "========== Deploying ${mig_label} instance ${INSTANCE} $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
-              retry_gcloud_remote 3 10 \
+              if ! instance_is_running "${INSTANCE}"; then
+                echo "⚠️ Skipping ${mig_label} instance ${INSTANCE}: no longer RUNNING in ${mig_name}"
+                continue
+              fi
+
+              if ! retry_gcloud_remote 3 10 \
                 gcloud compute ssh "tarun_yadav@${INSTANCE}" \
                   --project "${GCP_PROJECT_ID}" \
                   --zone "${mig_zone}" \
                   --tunnel-through-iap \
                   --quiet \
-                  --command "for i in \$(seq 1 60); do if [ -f /home/tarun_yadav/AstrologyApp/deploy.sh ] && [ -d /home/tarun_yadav/AstrologyApp/backend ] && [ -f /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key ]; then exit 0; fi; sleep 5; done; echo 'AstrologyApp repo or deploy key not ready on ${INSTANCE}'; exit 1"
+                  --command "for i in \$(seq 1 60); do if [ -f /home/tarun_yadav/AstrologyApp/deploy.sh ] && [ -d /home/tarun_yadav/AstrologyApp/backend ] && [ -f /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key ]; then exit 0; fi; sleep 5; done; echo 'AstrologyApp repo or deploy key not ready on ${INSTANCE}'; exit 1"; then
+                if ! instance_is_running "${INSTANCE}"; then
+                  echo "⚠️ Skipping ${mig_label} instance ${INSTANCE}: it disappeared during readiness check"
+                  continue
+                fi
+                exit 1
+              fi
 
               FRONTEND_REMOTE_ARCHIVE=""
               if [ "${serve_frontend_locally}" = "true" ] && [ "${frontend_required}" = "true" ]; then
                 FRONTEND_REMOTE_ARCHIVE="/tmp/frontend-build-${GITHUB_SHA}.tgz"
-                retry_gcloud_remote 3 10 \
+                if ! retry_gcloud_remote 3 10 \
                   gcloud compute scp "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" "tarun_yadav@${INSTANCE}:${FRONTEND_REMOTE_ARCHIVE}" \
                     --project "${GCP_PROJECT_ID}" \
                     --zone "${mig_zone}" \
                     --tunnel-through-iap \
-                    --quiet
+                    --quiet; then
+                  if ! instance_is_running "${INSTANCE}"; then
+                    echo "⚠️ Skipping ${mig_label} instance ${INSTANCE}: it disappeared during frontend artifact copy"
+                    continue
+                  fi
+                  exit 1
+                fi
               fi
 
-              retry_gcloud_remote 3 15 \
+              if ! retry_gcloud_remote 3 15 \
                 gcloud compute ssh "tarun_yadav@${INSTANCE}" \
                   --project "${GCP_PROJECT_ID}" \
                   --zone "${mig_zone}" \
                   --tunnel-through-iap \
                   --quiet \
-                  --command "cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' DEPLOY_BRANCH='main' FORCE_BACKEND_PIP='${FORCE_BACKEND_PIP}' FORCE_FRONTEND_DEPLOY='${FORCE_FRONTEND_DEPLOY}' FORCE_FULL_DEPLOY='${FORCE_FULL_DEPLOY}' FRONTEND_PREBUILT_ARCHIVE='${FRONTEND_REMOTE_ARCHIVE}' SERVE_FRONTEND_LOCALLY='${serve_frontend_locally}' SYNC_GCP_SECRETS='true' && bash deploy.sh && if [ -n '${FRONTEND_REMOTE_ARCHIVE}' ]; then rm -f '${FRONTEND_REMOTE_ARCHIVE}'; fi"
+                  --command "cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' DEPLOY_BRANCH='main' FORCE_BACKEND_PIP='${FORCE_BACKEND_PIP}' FORCE_FRONTEND_DEPLOY='${FORCE_FRONTEND_DEPLOY}' FORCE_FULL_DEPLOY='${FORCE_FULL_DEPLOY}' FRONTEND_PREBUILT_ARCHIVE='${FRONTEND_REMOTE_ARCHIVE}' SERVE_FRONTEND_LOCALLY='${serve_frontend_locally}' SYNC_GCP_SECRETS='true' && bash deploy.sh && if [ -n '${FRONTEND_REMOTE_ARCHIVE}' ]; then rm -f '${FRONTEND_REMOTE_ARCHIVE}'; fi"; then
+                if ! instance_is_running "${INSTANCE}"; then
+                  echo "⚠️ Skipping ${mig_label} instance ${INSTANCE}: it disappeared during deploy"
+                  continue
+                fi
+                exit 1
+              fi
 
               echo "🔎 Waiting for ${mig_label} instance ${INSTANCE} local app health"
-              retry_gcloud_remote 3 10 \
+              if ! retry_gcloud_remote 3 10 \
                 gcloud compute ssh "tarun_yadav@${INSTANCE}" \
                   --project "${GCP_PROJECT_ID}" \
                   --zone "${mig_zone}" \
                   --tunnel-through-iap \
                   --quiet \
-                  --command "for i in \$(seq 1 30); do curl -fsS --max-time 5 http://127.0.0.1:8001/api/health >/dev/null && exit 0; sleep 5; done; echo 'backend health check failed on ${INSTANCE}'; exit 1"
+                  --command "for i in \$(seq 1 30); do curl -fsS --max-time 5 http://127.0.0.1:8001/api/health >/dev/null && exit 0; sleep 5; done; echo 'backend health check failed on ${INSTANCE}'; exit 1"; then
+                if ! instance_is_running "${INSTANCE}"; then
+                  echo "⚠️ Skipping ${mig_label} instance ${INSTANCE}: it disappeared during health check"
+                  continue
+                fi
+                exit 1
+              fi
 
               echo "✅ ${mig_label} instance ${INSTANCE} deployed and healthy"
             done
@@ -342,7 +398,7 @@ jobs:
 
   payment_service:
     if: ${{ (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') && needs.detect_changes.outputs.payment_required == 'true' }}
-    needs: [detect_changes, backend_and_chat]
+    needs: [detect_changes]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -407,7 +463,7 @@ jobs:
 
   nudge_services:
     if: ${{ (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') && needs.detect_changes.outputs.nudge_required == 'true' }}
-    needs: [detect_changes, backend_and_chat]
+    needs: [detect_changes]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -558,7 +614,7 @@ jobs:
 
   frontend:
     if: ${{ (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') && needs.detect_changes.outputs.frontend_required == 'true' }}
-    needs: [detect_changes, backend_and_chat]
+    needs: [detect_changes]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
