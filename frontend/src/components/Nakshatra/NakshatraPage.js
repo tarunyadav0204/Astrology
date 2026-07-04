@@ -26,12 +26,12 @@ const NakshatraPage = () => {
     Number.isFinite(yearFromUrl) && yearFromUrl < currentYear ? currentYear : selectedYear;
   const canonicalSlug = slugifyNakshatra(nakshatraData?.slug || nakshatraName);
   const displayName = nakshatraData?.nakshatra || titleizeNakshatra(nakshatraName);
-  const canonicalUrl = `${SITE_ORIGIN}/nakshatra/${canonicalSlug}/${canonicalYear}`;
+  const canonicalUrl = `${SITE_ORIGIN}/nakshatra/${canonicalSlug}/${canonicalYear}/`;
 
   // Old year URLs (e.g. /2025) were in sitemap earlier; consolidate to current year for Google.
   useEffect(() => {
     if (Number.isFinite(yearFromUrl) && yearFromUrl < currentYear) {
-      navigate(`/nakshatra/${nakshatraName}/${currentYear}`, { replace: true });
+      navigate(`/nakshatra/${nakshatraName}/${currentYear}/`, { replace: true });
     }
   }, [yearFromUrl, currentYear, nakshatraName, navigate]);
 
@@ -63,7 +63,7 @@ const NakshatraPage = () => {
   const handleYearChange = (newYear) => {
     const yearNum = parseInt(newYear);
     setSelectedYear(yearNum);
-    navigate(`/nakshatra/${nakshatraName}/${yearNum}`);
+    navigate(`/nakshatra/${nakshatraName}/${yearNum}/`);
   };
 
   if (loading) {
@@ -107,7 +107,7 @@ const NakshatraPage = () => {
       
       <div className="nakshatra-navigation">
         <button 
-          onClick={() => navigate(`/nakshatra/${nakshatraData.navigation.previous_slug || slugifyNakshatra(nakshatraData.navigation.previous)}/${selectedYear}`)}
+          onClick={() => navigate(`/nakshatra/${nakshatraData.navigation.previous_slug || slugifyNakshatra(nakshatraData.navigation.previous)}/${selectedYear}/`)}
           className="nav-button prev"
         >
           « {nakshatraData.navigation.previous}

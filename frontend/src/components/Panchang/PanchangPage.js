@@ -199,7 +199,7 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
     }
   };
 
-  const seoData = generatePageSEO('panchang', { path: '/panchang' });
+  const seoData = generatePageSEO('panchang', { path: '/panchang/' });
   const structuredData = {
     "@context": "https://schema.org",
     "@graph": [

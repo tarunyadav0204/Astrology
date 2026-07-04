@@ -125,7 +125,7 @@ const BeginnersGuide = ({
         title="Beginner's Guide to Astrology - Learn Vedic Astrology Basics | AstroRoshni"
         description="Complete beginner's guide to astrology with step-by-step lessons. Learn zodiac signs, birth charts, planets, houses and Vedic astrology fundamentals."
         keywords="astrology for beginners, learn astrology, vedic astrology basics, zodiac signs guide, birth chart tutorial, astrology lessons"
-        canonical="https://astroroshni.com/beginners-guide"
+        canonical="https://astroroshni.com/beginners-guide/"
         structuredData={{
           "@context": "https://schema.org",
           "@type": "Course",

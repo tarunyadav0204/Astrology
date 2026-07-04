@@ -133,7 +133,13 @@ export const PUBLIC_ROUTE_SEO_RULES = [
   },
   { path: '/about', pageKey: 'about' },
   { path: '/contact', pageKey: 'contact' },
-  { path: '/order-management', noIndex: true },
+  {
+    path: '/order-management',
+    noIndex: true,
+    resolve: () => ({
+      canonical: `${SITE_URL}/order-management/`,
+    }),
+  },
   { path: '/policy', pageKey: 'policy' },
   { path: '/terms', pageKey: 'terms' },
   { path: '/calendar-2026', pageKey: 'calendar2026' },
