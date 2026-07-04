@@ -2860,6 +2860,7 @@ export default function ChatScreen({ navigation, route }) {
         intent_gate: m.intent_gate,
         gate_metadata: m.gate_metadata,
         follow_up_questions: m.follow_up_questions || [],
+        next_action: m.next_action || null,
         waitConversation: isProcessing
           ? normalizeWaitConversation(m.wait_conversation) || local?.waitConversation
           : local?.waitConversation,
@@ -3423,6 +3424,7 @@ export default function ChatScreen({ navigation, route }) {
                       threadMode: resolvedChatTier || msg.threadMode || msg.chatTier,
                       summary_image: status.summary_image || null,
                       follow_up_questions: status.follow_up_questions || [],
+                      next_action: status.next_action || null,
                       native_name: chartName,
                       intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
                       gate_metadata: status.gate_metadata || null,
@@ -3757,6 +3759,7 @@ export default function ChatScreen({ navigation, route }) {
     userMessageId,
     clientRequestId,
     subjectGateOverride = null,
+    queryContextOverride = null,
   }) => {
     const token = await AsyncStorage.getItem('authToken');
     let activeSessionId = currentSessionId;
@@ -3773,10 +3776,15 @@ export default function ChatScreen({ navigation, route }) {
           ? `[Relationship: ${partnershipRelation}] ${messageText}`
           : messageText;
 
+        const requestQueryContext = {
+          ...buildQueryContext(),
+          ...(queryContextOverride && typeof queryContextOverride === 'object' ? queryContextOverride : {}),
+        };
+
         const requestBody = {
           session_id: activeSessionId,
           question: finalQuestion,
-          query_context: buildQueryContext(),
+          query_context: requestQueryContext,
           language: language || 'english',
           response_style: 'detailed',
           premium_analysis: useFreeQuestion ? false : (useInstantChat ? false : isPremiumAnalysis),
@@ -3949,6 +3957,7 @@ export default function ChatScreen({ navigation, route }) {
                     terms: [],
                     glossary: {},
                     follow_up_questions: [],
+                    next_action: null,
                     chartInsights: [],
                     intent_gate: result.intent_gate || (result.gate_metadata && result.gate_metadata.intent_gate),
                     gate_metadata: result.gate_metadata || null,
@@ -4270,7 +4279,19 @@ export default function ChatScreen({ navigation, route }) {
     }
   };
 
-  const sendMessage = async (messageText = inputText) => {
+  const sendMessage = async (messageText = inputText, sendOptions = {}) => {
+    const queryContextOverride =
+      sendOptions && typeof sendOptions.queryContext === 'object'
+        ? sendOptions.queryContext
+        : null;
+    console.log('[Mobile ChatScreen] sendMessage called', {
+      messageText,
+      queryContextOverride,
+      activeWaitSideMessage: Boolean(activeWaitSideMessage),
+      partnershipMode,
+      partnershipStep,
+      hasBirthData: Boolean(birthData),
+    });
     if (activeWaitSideMessage) {
       await sendWaitConversationReply(messageText);
       return;
@@ -4480,6 +4501,7 @@ export default function ChatScreen({ navigation, route }) {
         userMessageId,
         clientRequestId,
         subjectGateOverride,
+        queryContextOverride,
       });
 
     } catch (error) {
@@ -4524,6 +4546,22 @@ export default function ChatScreen({ navigation, route }) {
     }
   };
   sendMessageRef.current = sendMessage;
+
+  const handleRemedyFollowUpSend = async (questionText, metadata = {}) => {
+    if (!questionText || !String(questionText).trim()) {
+      return;
+    }
+    await sendMessageRef.current?.(String(questionText).trim(), {
+      queryContext: {
+        follow_up_type: 'remedy_action',
+        remedy_followup: true,
+        remedy_action: true,
+        open_remedy: true,
+        remedy_card_source: metadata.source || 'remedy_card',
+        remedy_next_action_title: metadata.nextAction?.title || null,
+      },
+    });
+  };
 
   const handleSendRetry = async (failedMessage) => {
     const { clientRequestId, userMessageId, failedQuestion } = failedMessage || {};
@@ -5276,10 +5314,11 @@ export default function ChatScreen({ navigation, route }) {
               return (
                 <View>
                   <View ref={isLastMessage ? lastMessageRef : null}>
-                    <MessageBubble
+                      <MessageBubble
                       message={item}
                       language={language}
                       onFollowUpClick={setInputText}
+                      onRemedyFollowUpClick={handleRemedyFollowUpSend}
                       partnership={partnershipMode}
                       onDelete={handleDeleteMessage}
                       onRestart={restartPolling}

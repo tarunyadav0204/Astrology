@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import time
@@ -28,6 +29,36 @@ async def _run_task(task: dict) -> None:
     payload = dict(task["payload"] or {})
     if not payload.get("claim_id"):
         payload["claim_id"] = task.get("claim_id")
+    logger.info(
+        "local_worker_task_payload task_id=%s message_id=%s payload=%s",
+        task.get("id"),
+        task.get("message_id"),
+        json.dumps(
+            {
+                "session_id": payload.get("session_id"),
+                "user_id": payload.get("user_id"),
+                "mode": payload.get("intent", {}).get("mode") if isinstance(payload.get("intent"), dict) else None,
+                "follow_up_type": (
+                    payload.get("query_context", {}).get("follow_up_type")
+                    if isinstance(payload.get("query_context"), dict)
+                    else None
+                ),
+                "remedy_followup": (
+                    payload.get("query_context", {}).get("remedy_followup")
+                    if isinstance(payload.get("query_context"), dict)
+                    else None
+                ),
+                "open_remedy": (
+                    payload.get("query_context", {}).get("open_remedy")
+                    if isinstance(payload.get("query_context"), dict)
+                    else None
+                ),
+            },
+            ensure_ascii=False,
+            default=str,
+            sort_keys=True,
+        ),
+    )
     await process_chat_task(payload, x_chat_task_secret=chat_task_secret())
 
 

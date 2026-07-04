@@ -28,6 +28,11 @@ from contextlib import asynccontextmanager
 from collections import defaultdict
 from utils.timezone_service import parse_timezone_offset
 from utils.calendar_date import parse_calendar_date_y_m_d
+from utils.account_deletion_bigquery import (
+    AccountDeletionBackupError,
+    backup_user_deletion_to_bigquery,
+    list_deleted_account_backups,
+)
 from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
 import bcrypt
 import jwt
@@ -1928,7 +1933,13 @@ def _anonymize_user_account_tx(conn, userid: int) -> None:
     )
 
 
-def _hard_delete_user_tx(conn, userid: int) -> None:
+def _hard_delete_user_tx(
+    conn,
+    userid: int,
+    *,
+    deleted_by_userid: Optional[int] = None,
+    deletion_source: str = "unknown",
+) -> None:
     """
     Delete/scrub personal data tied to userid in an order that respects foreign keys.
     Payment/credit audit rows are intentionally retained:
@@ -1937,6 +1948,13 @@ def _hard_delete_user_tx(conn, userid: int) -> None:
     - user_credits and credit_transactions are preserved for support/refund/audit.
     Must run inside a single transaction (caller commits).
     """
+    backup_user_deletion_to_bigquery(
+        conn,
+        userid=userid,
+        deleted_by_userid=deleted_by_userid,
+        deletion_source=deletion_source,
+    )
+
     session_subquery = "SELECT session_id FROM chat_sessions WHERE user_id = %s"
 
     execute(conn, "DELETE FROM event_timeline_jobs WHERE user_id = %s", (userid,))
@@ -2038,7 +2056,12 @@ def _anonymize_user_account(userid: int) -> None:
         conn.commit()
 
 
-def delete_user_data(userid: int) -> None:
+def delete_user_data(
+    userid: int,
+    *,
+    deleted_by_userid: Optional[int] = None,
+    deletion_source: str = "unknown",
+) -> None:
     """
     Delete/scrub personal data linked to a user id, then anonymize the user row.
     Credit/payment audit rows are retained, so refunds and support remain possible.
@@ -2046,8 +2069,20 @@ def delete_user_data(userid: int) -> None:
     """
     with get_conn() as conn:
         try:
-            _hard_delete_user_tx(conn, userid)
+            _hard_delete_user_tx(
+                conn,
+                userid,
+                deleted_by_userid=deleted_by_userid,
+                deletion_source=deletion_source,
+            )
             conn.commit()
+        except AccountDeletionBackupError:
+            logger.exception("Account deletion backup failed for userid=%s; aborting delete", userid)
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
         except Exception:
             logger.exception("Hard delete failed for userid=%s; rolling back and anonymizing", userid)
             try:
@@ -2075,7 +2110,10 @@ async def admin_delete_user(userid: int, current_user: User = Depends(get_curren
     if not row:
         raise HTTPException(status_code=404, detail="User not found")
 
-    delete_user_data(userid)
+    try:
+        delete_user_data(userid, deleted_by_userid=current_user.userid, deletion_source="admin")
+    except AccountDeletionBackupError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {"status": "anonymized", "userid": userid}
 
 
@@ -2086,7 +2124,14 @@ async def delete_own_account(current_user: User = Depends(get_current_user)):
     Payment audit rows are retained against an anonymized account.
     Intended to be called from the mobile app's 'Delete account' flow.
     """
-    delete_user_data(current_user.userid)
+    try:
+        delete_user_data(
+            current_user.userid,
+            deleted_by_userid=current_user.userid,
+            deletion_source="self_service",
+        )
+    except AccountDeletionBackupError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {"status": "anonymized"}
 
 @app.post("/api/login")
@@ -5378,8 +5423,53 @@ async def delete_admin_user(user_id: int, current_user: User = Depends(get_curre
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
 
-    delete_user_data(user_id)
+    try:
+        delete_user_data(user_id, deleted_by_userid=current_user.userid, deletion_source="admin")
+    except AccountDeletionBackupError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {"message": "User anonymized successfully"}
+
+
+@app.get("/api/admin/deleted-accounts")
+async def get_admin_deleted_accounts(
+    current_user: User = Depends(get_current_user),
+    date_from: Optional[str] = Query(None, description="Deleted on or after (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Deleted on or before (YYYY-MM-DD)"),
+    user_id: Optional[int] = Query(None, description="Deleted user id"),
+    q: Optional[str] = Query(None, description="Search phone, name, or email"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(25, ge=1, le=100),
+):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    from_date = (date_from or "").strip() or today
+    to_date = (date_to or "").strip() or today
+    offset = (page - 1) * limit
+    try:
+        result = list_deleted_account_backups(
+            date_from=from_date,
+            date_to=to_date,
+            user_id=user_id,
+            query_text=(q or "").strip(),
+            limit=limit,
+            offset=offset,
+        )
+    except AccountDeletionBackupError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Admin deleted account backup query failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Deleted account query failed: {exc}") from exc
+
+    total = int(result.get("total") or 0)
+    return {
+        "backups": result.get("backups") or [],
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": (total + limit - 1) // limit if limit else 0,
+    }
 
 @app.delete("/api/admin/charts/{chart_id}")
 async def delete_admin_chart(chart_id: int, current_user: User = Depends(get_current_user)):

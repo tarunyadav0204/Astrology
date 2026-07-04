@@ -174,6 +174,16 @@ FAQ_META: {"category": "<one of: career, marriage, health, education, progeny, w
 - canonical_question: a concise FAQ-style phrase; similar questions should get the same or very similar phrase so they group together.
 """
 
+NEXT_ACTION_META_INSTRUCTION = """
+CRITICAL - NEXT ACTION METADATA (do not include this line in the main answer the user sees):
+At the very end of your response, before FAQ_META, output exactly one line in this exact format:
+NEXT_ACTION_META: {"type":"<remedy|diagnosis|timing|clarification|comparison|chart_explanation|none>","title":"<short label>","reason":"<short reason in the same language as the answer>","confidence":"<high|medium|low>","follow_up_questions":["<up to 3 short user-facing options>"],"source":"merge"}
+- If no follow-up is needed, set type to "none" and follow_up_questions to an empty array.
+- If the best immediate next step is a practical remedy reading, you MUST use type="remedy" and keep the title/remedy language clear enough for the UI card to say the user can click for remedies.
+- For remedy follow-ups, the follow_up_questions should be practical remedy layers or remedy-entry prompts, not generic reading prompts.
+- Keep the line valid JSON and short.
+"""
+
 
 def _single_native_format_guard(analysis_type: str) -> str:
     if analysis_type in ("synastry", "relational"):
@@ -232,6 +242,28 @@ TEMPLATE_EVENT_PREDICTION = """
 
 ### Guidance for the Period
 [Actionable advice on how to navigate the predicted events]
+"""
+
+TEMPLATE_REMEDIAL_GUIDANCE = """
+### Guidance and Remedies
+[A practical remedy reading based on the strongest live chart pressure.]
+
+### What needs attention now
+[State the most pressing issue, the active planet(s), and why this area needs care.]
+
+### Remedy layers
+- **Core planetary remedy**: the main planet-focused remedy
+- **Gemstone / ratna**: only if suitable for the strongest planet; keep it optional and specific
+- **Behavioral support**: routine, speech, discipline, or relationship adjustments
+- **Charity / seva**: service-oriented or giving-based support
+- **Mantra / sound**: the relevant mantra or sound practice
+- **Special blockage layers**: Mudakku / Gandanta / Mrityu Bhaga only if present
+
+### What to avoid
+[Brief caution on overdoing remedies, gemstone suitability, or fear-based language.]
+
+### Follow-up
+[One to three natural follow-up prompts for the next remedy layer.]
 """
 
 # Template C: Daily Summary
@@ -466,6 +498,7 @@ SCHEMA_MAPPING = {
     'PREDICT_PERIOD_OUTLOOK': TEMPLATE_DEEP_DIVE,
     'PREDICT_EVENTS_FOR_PERIOD': TEMPLATE_DEV_EVENT_LOG,
     'PREDICT_DAILY': TEMPLATE_DAILY_SUMMARY,
+    'REMEDIAL_GUIDANCE': TEMPLATE_REMEDIAL_GUIDANCE,
     'MUNDANE': TEMPLATE_MUNDANE,
     'DEV_EVENT_LOG': TEMPLATE_DEV_EVENT_LOG,
     'LIFESPAN_EVENT_TIMING': TEMPLATE_LIFESPAN_TIMELINE,
@@ -798,6 +831,7 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
     prompt_parts.append(build_multi_question_focus_instruction(_lang))
     prompt_parts.append(f"{history_text}\nCURRENT QUESTION: {user_question}")
     prompt_parts.append(final_check)
+    prompt_parts.append(NEXT_ACTION_META_INSTRUCTION.strip())
     prompt_parts.append(FAQ_META_INSTRUCTION.strip())
     
     return "\n\n".join(prompt_parts)

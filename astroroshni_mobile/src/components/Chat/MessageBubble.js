@@ -37,6 +37,7 @@ function MessageBubble({
   message,
   language,
   onFollowUpClick,
+  onRemedyFollowUpClick,
   partnership,
   onDelete,
   onRestart,
@@ -1747,6 +1748,58 @@ function MessageBubble({
           </View>
         )}
 
+        {message.next_action?.type === 'remedy' && (
+          <View style={styles.remedyCard}>
+            {console.log('[Mobile MessageBubble] remedy card render', {
+              messageId: message.messageId,
+              nextAction: message.next_action,
+            })}
+            <View style={styles.remedyCardHeader}>
+              <View style={styles.remedyBadge}>
+                <Ionicons name="leaf-outline" size={14} color="#16a34a" />
+                <Text style={styles.remedyBadgeText}>
+                  {t('chat.remedyCardLabel', 'Remedy')}
+                </Text>
+              </View>
+            </View>
+            {message.next_action?.title ? (
+              <Text style={styles.remedyCardTitle}>{message.next_action.title}</Text>
+            ) : null}
+            {message.next_action?.reason ? (
+              <Text style={styles.remedyCardReason}>{message.next_action.reason}</Text>
+            ) : (
+              <Text style={styles.remedyCardReason}>
+                {t('chat.remedyCardDefaultReason', 'A practical next step based on your chart answer.')}
+              </Text>
+            )}
+            <TouchableOpacity
+              style={styles.remedyCardButton}
+              onPress={() => {
+                const remedyPrompt = (
+                  message.next_action?.follow_up_questions?.[0]
+                  || message.next_action?.title
+                  || t('chat.askForRemedy', 'Show me the remedy')
+                ).trim();
+                if (onRemedyFollowUpClick) {
+                  onRemedyFollowUpClick(remedyPrompt, {
+                    source: 'remedy_card',
+                    nextAction: message.next_action || null,
+                    messageId: message.messageId || null,
+                  });
+                  return;
+                }
+                onFollowUpClick && onFollowUpClick(remedyPrompt);
+              }}
+              activeOpacity={0.88}
+            >
+              <Text style={styles.remedyCardButtonText}>
+                {t('chat.openRemedy', 'Open remedy')}
+              </Text>
+              <Ionicons name="arrow-forward" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Hint when a response timed out or send failed: tell user to tap refresh or retry */}
         {(message.showRestartButton || message.showSendRetryButton) && (
           <View style={styles.timeoutHint}>
@@ -2523,6 +2576,64 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     flexWrap: 'wrap',
     marginVertical: 6,
     gap: 6,
+  },
+  remedyCard: {
+    backgroundColor: Platform.OS === 'android' ? 'rgba(22, 163, 74, 0.12)' : 'rgba(22, 163, 74, 0.08)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(22, 163, 74, 0.25)',
+    padding: 14,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  remedyCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  remedyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(22, 163, 74, 0.14)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    gap: 6,
+  },
+  remedyBadgeText: {
+    color: '#15803d',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  remedyCardTitle: {
+    color: '#14532d',
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  remedyCardReason: {
+    color: '#166534',
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 12,
+    fontWeight: '500',
+  },
+  remedyCardButton: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#16a34a',
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  remedyCardButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
   },
   followUpButton: {
     backgroundColor: Platform.OS === 'android' ? 'rgba(255, 107, 53, 0.18)' : 'rgba(255, 107, 53, 0.12)',

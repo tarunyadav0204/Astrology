@@ -55,6 +55,26 @@ def normalize_query_context(query_context: Optional[Dict[str, Any]]) -> Dict[str
         except (TypeError, ValueError):
             continue
 
+    # Preserve follow-up / action flags so downstream chat mode routing can
+    # distinguish remedy clicks, native gates, and other explicit follow-ups.
+    # These values are intentionally copied through without transformation.
+    for key in (
+        "follow_up_type",
+        "followUpType",
+        "chat_action",
+        "chatAction",
+        "mode",
+        "answer_mode",
+        "remedy_followup",
+        "remedy_action",
+        "open_remedy",
+        "openRemedy",
+        "remedy_card_source",
+        "remedy_next_action_title",
+    ):
+        if key in query_context and key not in out and query_context.get(key) is not None:
+            out[key] = query_context.get(key)
+
     return out
 
 

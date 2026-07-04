@@ -228,6 +228,7 @@ const ChatPage = ({ onLogin }) => {
     /** BirthForm tab: 'saved' = Saved Charts, 'new' = New Chart (native gate Add opens create tab). */
     const [birthFormDefaultTab, setBirthFormDefaultTab] = useState('saved');
     const [pendingFollowUpQuestion, setPendingFollowUpQuestion] = useState('');
+    const [pendingFollowUpQueryContext, setPendingFollowUpQueryContext] = useState(null);
     const [podcastPromoOpen, setPodcastPromoOpen] = useState(false);
     const [podcastPromoMessageId, setPodcastPromoMessageId] = useState(null);
     const [podcastAutoLaunchKey, setPodcastAutoLaunchKey] = useState(0);
@@ -332,6 +333,26 @@ const ChatPage = ({ onLogin }) => {
         }
     };
 
+    const handleFollowUpClick = (question, followUpOptions = {}) => {
+        const text = String(question || '').trim();
+        if (!text) return;
+        const queryContextExtras = followUpOptions?.query_context || followUpOptions?.queryContext || null;
+        console.log('[ChatPage] handleFollowUpClick unconditional', {
+            text,
+            followUpOptions,
+            queryContextExtras,
+        });
+        if (followUpOptions?.directSend) {
+            handleSendMessage(text, {
+                ...(followUpOptions || {}),
+                query_context: queryContextExtras || undefined,
+            });
+            return;
+        }
+        setPendingFollowUpQuestion(text);
+        setPendingFollowUpQueryContext(queryContextExtras || null);
+    };
+
     const handleRelationshipContextGate = (gateMetadata = {}, relationshipContext = '', nextQuestion = '') => {
         const question = String(nextQuestion || '').trim();
         if (!question) return;
@@ -344,6 +365,7 @@ const ChatPage = ({ onLogin }) => {
             },
         };
         setPendingFollowUpQuestion(question);
+        setPendingFollowUpQueryContext(null);
     };
 
     const handleStartPartnershipGate = (gateMetadata = {}) => {
@@ -358,6 +380,7 @@ const ChatPage = ({ onLogin }) => {
         }
         if (originalQuestion) {
             setPendingFollowUpQuestion(originalQuestion);
+            setPendingFollowUpQueryContext(null);
         }
     };
     /** Set when navigating from analysis follow-up chips; consumed when single-chart chat is ready. */
@@ -1306,6 +1329,10 @@ const ChatPage = ({ onLogin }) => {
                                     glossary: status.glossary || {},
                                     summary_image: status.summary_image || null,
                                     follow_up_questions: status.follow_up_questions || [],
+                                    next_action: status.next_action || null,
+                                    next_best_need: status.next_best_need || null,
+                                    next_best_need_title: status.next_best_need_title || null,
+                                    next_best_need_reason: status.next_best_need_reason || null,
                                     autoSpeakReply: Boolean(m.autoSpeakReply),
                                 }
                                 : m
@@ -1521,7 +1548,11 @@ const ChatPage = ({ onLogin }) => {
         const requestData = {
             session_id: askSessionId,
             question: questionForApi,
-            query_context: buildQueryContext(),
+            query_context: buildQueryContext({
+                ...(pendingFollowUpQueryContext || {}),
+                ...(options?.query_context || {}),
+                ...(options?.queryContext || {}),
+            }),
             language: 'english',
             response_style: useInstantChat || options?.instant_chat ? 'concise' : 'detailed',
             premium_analysis: useFreeQuestion || useInstantChat ? false : !!options.premium_analysis,
@@ -1575,6 +1606,12 @@ const ChatPage = ({ onLogin }) => {
         }
 
         try {
+            console.log('[ChatPage] /api/chat-v2/ask requestData', {
+                session_id: requestData.session_id,
+                question: requestData.question,
+                chat_tier: requestData.chat_tier || 'standard',
+                query_context: requestData.query_context || null,
+            });
             let response = await fetch('/api/chat-v2/ask', {
                 method: 'POST',
                 headers: {
@@ -1627,6 +1664,7 @@ const ChatPage = ({ onLogin }) => {
             const serverUserMessageId = result.user_message_id;
             const chartInsights = Array.isArray(result.chart_insights) ? result.chart_insights : [];
             const loadingMessages = Array.isArray(result.loading_messages) ? result.loading_messages : [];
+            setPendingFollowUpQueryContext(null);
 
             setMessages(prev =>
                 prev.map(m => (m.messageId === userMessageId ? { ...m, messageId: serverUserMessageId, isFromDatabase: true } : m))
@@ -1725,7 +1763,14 @@ const ChatPage = ({ onLogin }) => {
             // console.log('Token exists:', !!token);
             // console.log('Token preview:', token ? token.substring(0, 20) + '...' : 'No token');
             
-            const requestBody = { ...birthData, question: message, query_context: buildQueryContext() };
+            const requestBody = {
+                ...birthData,
+                question: message,
+                query_context: buildQueryContext({
+                    ...(pendingFollowUpQueryContext || {}),
+                    ...(options.query_context || {}),
+                }),
+            };
             if (isAdmin) {
                 requestBody.include_context = true;
             }
@@ -2800,7 +2845,7 @@ const ChatPage = ({ onLogin }) => {
                         <MessageList
                             messages={messages}
                             sessionId={isMundaneMode ? mundaneSessionId : chatV2SessionId}
-                            onFollowUpClick={(q) => setPendingFollowUpQuestion(q)}
+                            onFollowUpClick={handleFollowUpClick}
                             onDeleteMessage={handleDeleteMessage}
                             onNativeGateOpenSelectNative={openBirthModalEmpty}
                             onNativeGateOpenAddProfile={handleNativeGateOpenAddProfile}
@@ -2826,7 +2871,9 @@ const ChatPage = ({ onLogin }) => {
                     onSendMessage={handleSendMessage}
                     isLoading={isLoading}
                     followUpQuestion={pendingFollowUpQuestion}
-                    onFollowUpUsed={() => setPendingFollowUpQuestion('')}
+                    onFollowUpUsed={() => {
+                        setPendingFollowUpQuestion('');
+                    }}
                     onOpenCreditsModal={() => setShowCreditsModal(true)}
                     isPartnershipMode={isPartnershipMode}
                     isMundaneMode={isMundaneMode}

@@ -20,6 +20,7 @@ from chat.chat_context_builder import ChatContextBuilder
 from chat.chat_session_manager import ChatSessionManager
 from ai.gemini_chat_analyzer import GeminiChatAnalyzer
 from ai.intent_router import IntentRouter
+from ai.response_parser import ResponseParser
 from calculators.chart_calculator import ChartCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
 from calculators.event_predictor_ai import EventPredictor
@@ -517,13 +518,32 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                         # print(f"Response preview: {clean_response[:100]}...")
                         # print(f"Will chunk response: {len(clean_response) > max_chunk_size}")
                         
-                        # Use json.dumps with proper error handling
+                        parsed_response = ResponseParser.parse_images_in_chat_response(clean_response)
+                        next_action = parsed_response.get("next_action") or {}
+                        combined_followups = list(next_action.get("follow_up_questions") or parsed_response.get("follow_up_questions", []))
+                        if not combined_followups:
+                            combined_followups = list(ai_result.get("follow_up_questions", []))
+                        logger.info(
+                            "chat_response_next_action message_id=%s session_id=%s type=%s title=%s confidence=%s follow_up_count=%s",
+                            assistant_message_id,
+                            session_id,
+                            next_action.get("type"),
+                            next_action.get("title"),
+                            next_action.get("confidence"),
+                            len(combined_followups),
+                        )
                         response_data = {
                             'status': 'complete', 
-                            'response': clean_response,
+                            'response': parsed_response.get('content') or clean_response,
                             'terms': ai_result.get('terms', []),
                             'glossary': ai_result.get('glossary', {}),
-                            'follow_up_questions': ai_result.get('follow_up_questions', []),
+                            'follow_up_questions': combined_followups,
+                            'recommended_follow_up_questions': combined_followups,
+                            'next_best_need': next_action.get('type'),
+                            'next_best_need_confidence': next_action.get('confidence'),
+                            'next_best_need_title': next_action.get('title'),
+                            'next_best_need_reason': next_action.get('reason'),
+                            'next_action': next_action or None,
                             'analysis_steps': ai_result.get('analysis_steps', [])
                         }
                         
@@ -542,11 +562,12 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                         # Smart chunking that preserves markdown structure
                         max_chunk_size = 3500
                         
-                        if len(clean_response) > max_chunk_size:
+                        rendered_response = response_data['response']
+                        if len(rendered_response) > max_chunk_size:
                             # print(f"Response too long ({len(clean_response)} chars), using smart chunking")
                             
                             # Smart chunking that respects markdown sections
-                            chunks = _smart_chunk_response(clean_response, max_chunk_size)
+                            chunks = _smart_chunk_response(rendered_response, max_chunk_size)
                             
                             for i, chunk in enumerate(chunks):
                                 chunk_data = {
@@ -566,13 +587,30 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                                 yield f"data: {chunk_json}\n\n"
                             
                             # Send completion signal
-                            complete_data = {'status': 'complete'}
+                            complete_data = {
+                                'status': 'complete',
+                                'follow_up_questions': combined_followups,
+                                'recommended_follow_up_questions': combined_followups,
+                                'next_best_need': next_action.get('type'),
+                                'next_best_need_confidence': next_action.get('confidence'),
+                                'next_best_need_title': next_action.get('title'),
+                                'next_best_need_reason': next_action.get('reason'),
+                                'next_action': next_action or None,
+                            }
                             # Context already sent earlier for admin users
                             complete_json = json.dumps(complete_data, ensure_ascii=True)
                             yield f"data: {complete_json}\n\n"
                         else:
                             # Send as single response if small enough
                             response_json = json.dumps(response_data, ensure_ascii=True, separators=(',', ':'))
+                            logger.info(
+                                "chat_response_payload_ready message_id=%s session_id=%s has_next_action=%s response_chars=%s follow_up_count=%s",
+                                assistant_message_id,
+                                session_id,
+                                bool(next_action),
+                                len(response_data.get('response') or ''),
+                                len(combined_followups),
+                            )
                             
                             # print(f"JSON length: {len(response_json)}")
                             # print(f"JSON preview: {response_json[:200]}...")

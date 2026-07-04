@@ -639,7 +639,6 @@ class GeminiChatAnalyzer:
         }
 
         intent_mode = str(intent_block.get("mode") or mode or "").upper()
-
         if intent_mode == "PREDICT_DAILY":
             from daily.daily_orchestrator import run_daily_chat_pipeline
 
@@ -655,10 +654,38 @@ class GeminiChatAnalyzer:
             )
 
         # Optional parallel pipelines. Relational/partnership is gated separately so legacy stays default.
-        from ai.parallel_chat.config import should_use_parallel_chat, should_use_parallel_relational_chat
+        from ai.parallel_chat.config import (
+            evaluate_parallel_chat_gate,
+            should_use_parallel_chat,
+            should_use_parallel_relational_chat,
+        )
         force_free_question_parashari_only = bool(
             using_free_question and is_free_question_parashari_only_enabled()
         )
+
+        try:
+            natal_allowed, natal_reason, natal_diag = evaluate_parallel_chat_gate(
+                enhanced_context,
+                user_id=user_id,
+            )
+            logger.info(
+                "parallel_chat_gate_decision allowed=%s reason=%s enabled=%s allowlist_present=%s allowlist_size=%s user_id=%s context_analysis_type=%s context_mode=%s is_synastry=%s partner_birth_pair=%s provider_blocked=%s premium_analysis=%s free_question=%s",
+                bool(natal_allowed),
+                natal_reason,
+                natal_diag.get("enabled"),
+                natal_diag.get("allowlist_present"),
+                natal_diag.get("allowlist_size"),
+                natal_diag.get("user_id"),
+                natal_diag.get("context_analysis_type"),
+                natal_diag.get("context_mode"),
+                natal_diag.get("is_synastry"),
+                natal_diag.get("is_partner_birth_pair"),
+                natal_diag.get("provider_blocked"),
+                bool(premium_analysis),
+                bool(using_free_question),
+            )
+        except Exception as gate_log_exc:
+            logger.info("parallel_chat_gate_decision_failed: %s", gate_log_exc)
 
         if should_use_parallel_relational_chat(enhanced_context, user_id=user_id):
             from ai.parallel_chat.relational_orchestrator import run_parallel_relational_chat_pipeline
@@ -697,13 +724,32 @@ class GeminiChatAnalyzer:
                 total_request_start=total_request_start,
                 using_free_question=bool(using_free_question),
             )
+        try:
+            from ai.parallel_chat.config import parallel_chat_enabled, parallel_chat_user_allowlist
+            context_analysis_type = str((enhanced_context or {}).get("analysis_type") or "").strip()
+            context_mode = str(((enhanced_context or {}).get("intent") or {}).get("mode") or "").strip()
+            context_is_synastry = bool((enhanced_context or {}).get("analysis_type") == "synastry")
+            allow = parallel_chat_user_allowlist()
+            logger.info(
+                "parallel_chat_gate_check enabled=%s allowlist_present=%s allowlist_size=%s user_id=%s context_analysis_type=%s context_mode=%s is_synastry=%s premium_analysis=%s free_question=%s",
+                bool(parallel_chat_enabled()),
+                allow is not None,
+                len(allow) if isinstance(allow, frozenset) else -1,
+                user_id,
+                context_analysis_type,
+                context_mode,
+                context_is_synastry,
+                bool(premium_analysis),
+                bool(using_free_question),
+            )
+        except Exception as gate_log_exc:
+            logger.info("parallel_chat_gate_check_failed: %s", gate_log_exc)
         
         # Prune context to reduce token load
         # print("✂️ Pruning context to reduce token load...")
         pruned_context = self._prune_context(enhanced_context)
         
         # DEBUG: Check size reduction
-        import json
         original_size = len(json.dumps(enhanced_context, default=str))
         pruned_size = len(json.dumps(pruned_context, default=str))
         # print(f"📉 Context compressed: {original_size} -> {pruned_size} chars (Saved {original_size - pruned_size} chars)")
@@ -964,11 +1010,30 @@ class GeminiChatAnalyzer:
             
             # Parse and strip FAQ_META line (category + canonical_question for dashboard/FAQs)
             cleaned_text, faq_metadata = ResponseParser.parse_faq_metadata(cleaned_text)
+            cleaned_text, next_action = ResponseParser.parse_next_action_metadata(cleaned_text)
             if faq_metadata and debug_logging:
                 logger.debug(
                     "faq_meta_detected category=%s canonical_question_preview=%s",
                     faq_metadata.get("category"),
                     (faq_metadata.get("canonical_question", "")[:50]),
+                )
+            if next_action:
+                logger.info(
+                    "next_action_meta_detected type=%s title=%s confidence=%s reason=%s follow_up_count=%s",
+                    next_action.get("type"),
+                    next_action.get("title"),
+                    next_action.get("confidence"),
+                    next_action.get("reason"),
+                    len(next_action.get("follow_up_questions") or []),
+                )
+                logger.info(
+                    "next_action_meta_raw %s",
+                    json.dumps(next_action, default=str, ensure_ascii=False, sort_keys=True),
+                )
+            if os.environ.get("ASTRO_PARALLEL_LOG_MERGE_BODY", "").strip().lower() in {"1", "true", "yes"}:
+                logger.info(
+                    "CHAT_RAW_RESPONSE_START\n%s\nCHAT_RAW_RESPONSE_END",
+                    cleaned_text,
                 )
             
             # Ensure response doesn't end abruptly (minimum length check)
@@ -994,7 +1059,6 @@ class GeminiChatAnalyzer:
                 json_matches = re.findall(json_pattern, cleaned_text)
                 if json_matches:
                     try:
-                        import json
                         transit_request = json.loads(json_matches[0])
                         start_year = transit_request.get('startYear')
                         end_year = transit_request.get('endYear')
@@ -1096,6 +1160,7 @@ class GeminiChatAnalyzer:
                 'follow_up_questions': parsed_response.get('follow_up_questions', []),
                 'analysis_steps': parsed_response.get('analysis_steps', []),
                 'faq_metadata': faq_metadata,
+                'next_action': next_action,
                 'raw_response': response_text,
                 'has_transit_request': has_transit_request,
                 'chat_llm_model': model_name or None,

@@ -655,6 +655,14 @@ def _ensure_chat_messages_parallel_llm_usage(conn):
     _mark_schema_ready("chat_messages_parallel_llm_usage")
 
 
+def _ensure_chat_messages_next_action_col(conn):
+    """JSON blob of the best next action / follow-up metadata."""
+    if _schema_already_ready("chat_messages_next_action"):
+        return
+    execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS next_action TEXT")
+    _mark_schema_ready("chat_messages_next_action")
+
+
 def _ensure_chat_messages_chart_insights(conn):
     """JSON array of chart insights shown in the loading bubble while processing."""
     if _schema_already_ready("chat_messages_chart_insights"):
@@ -875,6 +883,7 @@ def init_chat_tables():
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type TEXT")
         _ensure_chat_messages_gate_metadata(conn)
         _ensure_chat_messages_parallel_llm_usage(conn)
+        _ensure_chat_messages_next_action_col(conn)
         _ensure_chat_messages_chart_insights(conn)
         _ensure_chat_messages_engagement_updates(conn)
         _ensure_chat_messages_task_claim_cols(conn)
@@ -1245,7 +1254,7 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
             conn,
             """
                 SELECT message_id, sender, content, timestamp, completed_at, terms, glossary, images,
-                       message_type, gate_metadata, parallel_llm_usage, status, started_at, follow_up_questions
+                       message_type, gate_metadata, parallel_llm_usage, next_action, status, started_at, follow_up_questions
                 FROM chat_messages
                 WHERE session_id = %s
                 ORDER BY timestamp ASC
@@ -1297,9 +1306,10 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
         mt = msg[8] if len(msg) > 8 else None
         gm = msg[9] if len(msg) > 9 else None
         plu = msg[10] if len(msg) > 10 else None
-        status = msg[11] if len(msg) > 11 else None
-        started_at = msg[12] if len(msg) > 12 else None
-        follow_up_questions = msg[13] if len(msg) > 13 else None
+        next_action_json = msg[11] if len(msg) > 11 else None
+        status = msg[12] if len(msg) > 12 else None
+        started_at = msg[13] if len(msg) > 13 else None
+        follow_up_questions = msg[14] if len(msg) > 14 else None
         message_data["message_type"] = mt
         message_data["status"] = status
         message_data["started_at"] = started_at
@@ -1320,6 +1330,11 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
                 message_data["follow_up_questions"] = []
         else:
             message_data["follow_up_questions"] = []
+        if next_action_json:
+            try:
+                message_data["next_action"] = json.loads(next_action_json)
+            except Exception:
+                message_data["next_action"] = None
         if status == "processing":
             with get_conn() as wait_conn:
                 wait_side_payload = _fetch_wait_side_payload(wait_conn, msg[0])
@@ -1926,6 +1941,12 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     worker_intent_metadata = {
         "query_context": request.get("query_context") or request.get("queryContext"),
     }
+    logger.info(
+        "chat_task_intent_metadata message_id=%s session_id=%s intent=%s",
+        assistant_message_id,
+        session_id,
+        json.dumps(worker_intent_metadata, ensure_ascii=False, default=str, sort_keys=True),
+    )
     if mode == "lab":
         worker_intent_metadata["lab_mode"] = True
     if delivery_channel:
@@ -1934,6 +1955,13 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         worker_intent_metadata["render_target"] = render_target
     if delivery_channel == "whatsapp" or render_target == "plain_text":
         worker_intent_metadata["plain_text_output"] = True
+    if worker_intent_metadata.get("query_context"):
+        logger.info(
+            "chat_task_query_context message_id=%s session_id=%s query_context=%s",
+            assistant_message_id,
+            session_id,
+            json.dumps(worker_intent_metadata.get("query_context"), ensure_ascii=False, default=str, sort_keys=True),
+        )
     
     # Start processing. Cloud Tasks gives us durable retry across VM restarts; BackgroundTasks remains
     # the local/dev fallback and keeps the rollout safe until queue env is enabled.
@@ -1942,6 +1970,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         "session_id": session_id,
         "question": sanitize_text(question),
         "user_id": current_user.userid,
+        "mode": mode,
         "language": language,
         "response_style": response_style,
         "premium_analysis": premium_analysis,
@@ -1950,6 +1979,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         "partnership_mode": partnership_mode,
         "partner_birth_details": partner_birth_details,
         "cached_intent": worker_intent_metadata,
+        "query_context": worker_intent_metadata.get("query_context"),
         "user_message_id": user_message_id,
         "using_free_question": using_free_question,
         "effective_cost": effective_cost,
@@ -2031,6 +2061,24 @@ async def process_chat_task(request: dict, x_chat_task_secret: Optional[str] = H
         user_id=request.get("user_id"),
         chat_tier=request.get("chat_tier", "standard"),
     )
+    logger.info(
+        "chat_task_worker_payload message_id=%s session_id=%s user_id=%s payload=%s",
+        message_id,
+        request.get("session_id"),
+        request.get("user_id"),
+        json.dumps(
+            {
+                "mode": (request.get("intent") or {}).get("mode") if isinstance(request.get("intent"), dict) else None,
+                "follow_up_type": (request.get("query_context") or {}).get("follow_up_type") if isinstance(request.get("query_context"), dict) else None,
+                "remedy_followup": (request.get("query_context") or {}).get("remedy_followup") if isinstance(request.get("query_context"), dict) else None,
+                "open_remedy": (request.get("query_context") or {}).get("open_remedy") if isinstance(request.get("query_context"), dict) else None,
+                "remedy_action": (request.get("query_context") or {}).get("remedy_action") if isinstance(request.get("query_context"), dict) else None,
+            },
+            ensure_ascii=False,
+            default=str,
+            sort_keys=True,
+        ),
+    )
 
     claim_id = str(request.get("claim_id") or uuid.uuid4())
     claim_minutes = int(os.getenv("CHAT_TASK_CLAIM_MINUTES", "35") or "35")
@@ -2089,6 +2137,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         with get_conn() as conn:
             _ensure_chat_messages_gate_metadata(conn)
             _ensure_chat_messages_parallel_llm_usage(conn)
+            _ensure_chat_messages_next_action_col(conn)
             _ensure_chat_messages_chart_insights(conn)
             _ensure_chat_messages_engagement_updates(conn)
             _ensure_chat_messages_task_claim_cols(conn)
@@ -2098,9 +2147,9 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
             cur = execute(
                 conn,
                 """
-                    SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at,
+            SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at,
                            cs.user_id, cm.message_type, cm.terms, cm.glossary, cm.images, cm.follow_up_questions,
-                           cm.gate_metadata, cm.parallel_llm_usage, cm.chart_insights, cm.engagement_updates,
+                           cm.gate_metadata, cm.parallel_llm_usage, cm.next_action, cm.chart_insights, cm.engagement_updates,
                            cm.task_claimed_until, cm.task_enqueued_at
                     FROM chat_messages cm
                     JOIN chat_sessions cs ON cm.session_id = cs.session_id
@@ -2115,7 +2164,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         if not result:
             raise HTTPException(status_code=404, detail="Message not found")
         
-        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions, gate_metadata, parallel_llm_usage, chart_insights_json, engagement_updates, task_claimed_until, task_enqueued_at = result
+        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions, gate_metadata, parallel_llm_usage, next_action_json, chart_insights_json, engagement_updates, task_claimed_until, task_enqueued_at = result
         
         # Verify message belongs to user
         if user_id != current_user.userid:
@@ -2144,6 +2193,11 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
                 follow_up_questions=follow_up_questions,
                 gate_metadata=gate_metadata,
             )
+            if next_action_json:
+                try:
+                    response["next_action"] = json.loads(next_action_json)
+                except Exception:
+                    response["next_action"] = None
         elif status == "failed" and (content or "").strip():
             _attach_completed_status_payload(
                 response,
@@ -2155,6 +2209,11 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
                 follow_up_questions=follow_up_questions,
                 gate_metadata=gate_metadata,
             )
+            if next_action_json:
+                try:
+                    response["next_action"] = json.loads(next_action_json)
+                except Exception:
+                    response["next_action"] = None
             response["recovered_after_failure"] = True
             response["postprocess_error_message"] = error_message or None
         elif status == "failed":
@@ -3178,6 +3237,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 requested_period,
                 intent,
             )
+            context["analysis_type"] = "birth"
             context_time = time.time() - context_start
             _chat_log_event(
                 "chat_context_built",
@@ -3185,6 +3245,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 message_id=message_id,
                 mode="birth",
                 context_ms=round(context_time * 1000, 1),
+                analysis_type=context.get("analysis_type"),
                 has_transit_period=bool(requested_period),
                 divisional_charts=intent.get('divisional_charts') or [],
             )
@@ -3389,6 +3450,32 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 user_id=user_id,
                 using_free_question=using_free_question,
             )
+        raw_llm_response = str(
+            result.get("raw_response")
+            or result.get("response")
+            or result.get("content")
+            or ""
+        )
+        parsed_next_action = result.get("next_action") or {}
+        logger.info(
+            "chat_llm_response message_id=%s session_id=%s success=%s mode=%s response_chars=%s next_action_type=%s next_action_title=%s next_action_confidence=%s follow_up_count=%s raw_preview=%r",
+            message_id,
+            session_id,
+            bool(result.get("success")),
+            intent.get("mode", "default"),
+            len(raw_llm_response),
+            parsed_next_action.get("type"),
+            parsed_next_action.get("title"),
+            parsed_next_action.get("confidence"),
+            len(result.get("follow_up_questions") or []),
+            raw_llm_response[:800],
+        )
+        logger.info(
+            "chat_llm_response_next_action_raw message_id=%s session_id=%s next_action=%s",
+            message_id,
+            session_id,
+            json.dumps(parsed_next_action, default=str, ensure_ascii=False, sort_keys=True) if parsed_next_action else "null",
+        )
         _chat_log_event(
             "chat_processing_phase",
             message_id=message_id,
@@ -3542,6 +3629,12 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     parallel_usage_json = (
                         json.dumps(parallel_usage_blob) if parallel_usage_blob else None
                     )
+                    next_action_payload = result.get("next_action")
+                    next_action_json = (
+                        json.dumps(next_action_payload)
+                        if isinstance(next_action_payload, dict) and next_action_payload
+                        else None
+                    )
                     token_usage_to_store = result.get("token_usage") or {}
                     prompt_chars_to_store = result.get("llm_prompt_chars")
                     response_chars_to_store = result.get("llm_response_chars")
@@ -3610,7 +3703,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                                 llm_input_tokens = %s, llm_output_tokens = %s,
                                 llm_cached_input_tokens = %s, llm_non_cached_input_tokens = %s,
                                 llm_prompt_chars = %s, llm_response_chars = %s,
-                                parallel_llm_usage = %s, gate_metadata = %s
+                                parallel_llm_usage = %s, next_action = %s, gate_metadata = %s
                             WHERE message_id = %s
                         """,
                         (
@@ -3631,6 +3724,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             int(prompt_chars_to_store) if prompt_chars_to_store is not None else None,
                             int(response_chars_to_store) if response_chars_to_store is not None else None,
                             parallel_usage_json,
+                            next_action_json,
                             json.dumps(answer_gate_metadata) if answer_gate_metadata else None,
                             message_id,
                         ),

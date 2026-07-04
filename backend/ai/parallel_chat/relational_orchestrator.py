@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from ai.output_schema import FAQ_META_INSTRUCTION, build_multi_question_focus_instruction
+from ai.output_schema import FAQ_META_INSTRUCTION, NEXT_ACTION_META_INSTRUCTION, build_multi_question_focus_instruction
 from ai.parallel_chat.orchestrator import (
     _create_gemini_parallel_cache,
     _delete_parallel_cache,
@@ -41,6 +42,10 @@ from utils.admin_settings import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _parallel_log_merge_body_enabled() -> bool:
+    return os.environ.get("ASTRO_PARALLEL_LOG_MERGE_BODY", "").strip().lower() in ("1", "true", "yes")
 
 _CORE_RELATIONAL_BRANCHES = (
     "parashari_relational",
@@ -166,9 +171,13 @@ async def run_parallel_relational_chat_pipeline(
         f"RELATIONAL_EVIDENCE_SPINE_JSON:\n{_json_compact(evidence_spine)}\n\n"
         f"SPECIALIST_BRANCH_OUTPUTS_JSON:\n{_json_compact(merge_bundle)}\n"
         f"{hist_text}\n{mq_focus}\nCURRENT QUESTION: {user_question}\n"
-        f"{FAQ_META_INSTRUCTION.strip()}"
+        f"{NEXT_ACTION_META_INSTRUCTION.strip()}\n{FAQ_META_INSTRUCTION.strip()}"
     )
     merge_prompt = f"{merge_static}\n\n{merge_user}"
+    if os.environ.get("ASTRO_PARALLEL_LOG_PROMPT_BODIES", "").strip().lower() in {"1", "true", "yes"}:
+        preview_chars = int(os.environ.get("ASTRO_PARALLEL_LOG_PROMPT_BODIES_MAX_CHARS", "6000") or "6000")
+        prompt_preview = merge_prompt if preview_chars <= 0 else merge_prompt[:preview_chars]
+        logger.info("PARALLEL_RELATIONAL_MERGE_PROMPT_START\n%s\nPARALLEL_RELATIONAL_MERGE_PROMPT_END", prompt_preview)
 
     t_syn = time.time()
     syn = await analyzer.generate_text_from_prompt(
@@ -253,6 +262,17 @@ async def run_parallel_relational_chat_pipeline(
             },
         }
 
+    if _parallel_log_merge_body_enabled():
+        logger.info(
+            "PARALLEL_RELATIONAL_MERGE_RAW_RESPONSE_START\n%s\nPARALLEL_RELATIONAL_MERGE_RAW_RESPONSE_END",
+            cleaned_text,
+        )
+    cleaned_text, next_action = ResponseParser.parse_next_action_metadata(cleaned_text)
+    if _parallel_log_merge_body_enabled():
+        logger.info(
+            "PARALLEL_RELATIONAL_PARSED_NEXT_ACTION %s",
+            json.dumps(next_action, default=str, ensure_ascii=False, sort_keys=True) if next_action else "null",
+        )
     parsed = ResponseParser.parse_images_in_chat_response(cleaned_text)
     contract_ok, contract_errors = RelationalResponseContract.validate(
         parsed["content"] + ("\nFAQ_META: " + json.dumps(faq_metadata) if faq_metadata else ""),
@@ -289,6 +309,7 @@ async def run_parallel_relational_chat_pipeline(
         "follow_up_questions": parsed.get("follow_up_questions", []),
         "analysis_steps": parsed.get("analysis_steps", []),
         "faq_metadata": faq_metadata,
+        "next_action": next_action,
         "raw_response": merge_raw,
         "has_transit_request": False,
         "chat_llm_model": syn.get("chat_llm_model"),

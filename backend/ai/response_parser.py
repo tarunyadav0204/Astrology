@@ -7,6 +7,7 @@ class ResponseParser:
     """Extracts technical terms and glossary from Gemini responses"""
 
     _FOLLOW_UP_OPEN_CANONICAL = '<div class="follow-up-questions">'
+    _NEXT_ACTION_PREFIX = "NEXT_ACTION_META:"
 
     @staticmethod
     def _normalize_follow_up_div_opening(text: str) -> str:
@@ -124,6 +125,35 @@ class ResponseParser:
             return text, None
 
     @staticmethod
+    def parse_next_action_metadata(text: str) -> Tuple[str, Optional[Dict[str, object]]]:
+        """
+        Find NEXT_ACTION_META: {...} line in text, parse JSON, strip the line from text.
+        Returns (stripped_text, next_action or None).
+        """
+        pattern = re.compile(r'\n?\s*NEXT_ACTION_META:\s*(\{[^}]+\})\s*$', re.IGNORECASE | re.DOTALL)
+        match = pattern.search(text)
+        if not match:
+            return text, None
+        try:
+            meta = json.loads(match.group(1))
+            if not isinstance(meta, dict):
+                return text, None
+            next_action = {
+                "type": str(meta.get("type") or meta.get("next_best_need") or "").strip().lower(),
+                "title": str(meta.get("title") or "").strip(),
+                "reason": str(meta.get("reason") or "").strip(),
+                "confidence": str(meta.get("confidence") or "").strip().lower(),
+                "follow_up_questions": [
+                    str(q).strip() for q in (meta.get("follow_up_questions") or []) if str(q).strip()
+                ][:3],
+                "source": str(meta.get("source") or "merge").strip(),
+            }
+            stripped = text[:match.start()].rstrip()
+            return stripped, next_action
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return text, None
+
+    @staticmethod
     def _strip_analysis_steps_section(content: str) -> str:
         """Remove Analysis Steps blocks (###/##/plain heading, * or • bullets)."""
         stripped = content
@@ -169,6 +199,7 @@ class ResponseParser:
         parsed_glossary = {}
         term_ids = []
         follow_up_questions = []
+        faq_metadata = None
         # 1. Extract Summary Image Prompt
         if 'SUMMARY_IMAGE_START' in content and 'SUMMARY_IMAGE_END' in content:
             try:
@@ -256,8 +287,12 @@ class ResponseParser:
         if follow_up_questions:
             print(f"   📋 Questions: {follow_up_questions}")
 
-        # 4. Strip Analysis Steps section (never shown; models may still emit variants)
+        # 4. Strip FAQ meta and Analysis Steps section (never shown; models may still emit variants)
+        content, faq_metadata = ResponseParser.parse_faq_metadata(content)
         content = ResponseParser._strip_analysis_steps_section(content)
+
+        # 4b. Extract next-action metadata if the merge model emitted it.
+        content, next_action = ResponseParser.parse_next_action_metadata(content)
 
         # 5. Get all Term IDs from the content and glossary
         term_ids_from_content = re.findall(r'<term id="([^"]+)">', content)
@@ -276,6 +311,8 @@ class ResponseParser:
             'summary_image_prompt': summary_image_prompt,
             'follow_up_questions': follow_up_questions,
             'analysis_steps': [],
+            'faq_metadata': faq_metadata,
+            'next_action': next_action,
         }
         
         return result

@@ -61,7 +61,35 @@ def enqueue_local_chat_task(*, message_id: int, payload: Dict[str, Any]) -> bool
                 (int(message_id), json.dumps(payload, ensure_ascii=False, default=str)),
             )
             conn.commit()
-        logger.info("enqueued local chat task message_id=%s", message_id)
+        logger.info(
+            "enqueued local chat task message_id=%s payload_summary=%s",
+            message_id,
+            json.dumps(
+                {
+                    "session_id": payload.get("session_id"),
+                    "user_id": payload.get("user_id"),
+                    "mode": payload.get("intent", {}).get("mode") if isinstance(payload.get("intent"), dict) else None,
+                    "follow_up_type": (
+                        payload.get("query_context", {}).get("follow_up_type")
+                        if isinstance(payload.get("query_context"), dict)
+                        else None
+                    ),
+                    "remedy_followup": (
+                        payload.get("query_context", {}).get("remedy_followup")
+                        if isinstance(payload.get("query_context"), dict)
+                        else None
+                    ),
+                    "open_remedy": (
+                        payload.get("query_context", {}).get("open_remedy")
+                        if isinstance(payload.get("query_context"), dict)
+                        else None
+                    ),
+                },
+                ensure_ascii=False,
+                default=str,
+                sort_keys=True,
+            ),
+        )
         return True
     except Exception as exc:
         logger.exception("failed to enqueue local chat task message_id=%s: %s", message_id, exc)

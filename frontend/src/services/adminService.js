@@ -83,6 +83,25 @@ export const adminService = {
     return response.json();
   },
 
+  async getDeletedAccountBackups(params = {}) {
+    const sp = new URLSearchParams();
+    if (params.date_from != null && params.date_from !== '') sp.set('date_from', params.date_from);
+    if (params.date_to != null && params.date_to !== '') sp.set('date_to', params.date_to);
+    if (params.user_id != null && params.user_id !== '') sp.set('user_id', String(params.user_id));
+    if (params.q != null && params.q !== '') sp.set('q', params.q);
+    if (params.page != null) sp.set('page', String(params.page));
+    if (params.limit != null) sp.set('limit', String(params.limit));
+    const qs = sp.toString();
+    const response = await fetch(getAdminEndpoint('/admin/deleted-accounts') + (qs ? `?${qs}` : ''), {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to fetch deleted account backups');
+    }
+    return response.json();
+  },
+
   async updateUser(phone, updates) {
     const response = await fetch(getAdminEndpoint(`/admin/users/${phone}`), {
       method: 'PUT',
@@ -124,6 +143,20 @@ export const adminService = {
 
     if (!response.ok) {
       throw new Error('Failed to delete chart');
+    }
+
+    return response.json();
+  },
+
+  async deleteUser(userId) {
+    const response = await fetch(getAdminEndpoint(`/admin/users/${userId}`), {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to delete user');
     }
 
     return response.json();

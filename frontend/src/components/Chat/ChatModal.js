@@ -615,7 +615,10 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
             const requestData = {
                 session_id: currentSessionId,
                 question: message,
-                query_context: buildQueryContext(),
+                query_context: buildQueryContext({
+                    ...(options.query_context || {}),
+                    ...(options.queryContext || {}),
+                }),
                 language,
                 response_style: responseStyle,
                 premium_analysis: useFreeQuestion ? false : !!(options.premium_analysis),
@@ -642,6 +645,12 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
             
             // console.log('Chat request data:', requestData);
             // console.log('Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+            console.log('[ChatModal] /api/chat-v2/ask requestData', {
+                session_id: requestData.session_id,
+                question: requestData.question,
+                chat_tier: requestData.chat_tier || 'standard',
+                query_context: requestData.query_context || null,
+            });
             
             // Start async processing
             const response = await fetch('/api/chat-v2/ask', {
@@ -768,7 +777,11 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                 message_type: status.message_type || 'answer',
                                 intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
                                 gate_metadata: status.gate_metadata || null,
-                                summary_image: status.summary_image || null // Add summary_image from backend response
+                                summary_image: status.summary_image || null, // Add summary_image from backend response
+                                next_action: status.next_action || null,
+                                next_best_need: status.next_best_need || null,
+                                next_best_need_title: status.next_best_need_title || null,
+                                next_best_need_reason: status.next_best_need_reason || null
                             }
                             : msg
                     ));
@@ -987,8 +1000,14 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const [contextData, setContextData] = useState(null);
     const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
     
-    const handleFollowUpClick = (question) => {
-        setFollowUpQuestion(question);
+    const handleFollowUpClick = (question, followUpOptions = {}) => {
+        const text = String(question || '').trim();
+        if (!text) return;
+        if (followUpOptions?.directSend) {
+            handleSendMessage(text, followUpOptions || {});
+            return;
+        }
+        setFollowUpQuestion(text);
     };
     
     const handleChartRefClick = (chartRef) => {

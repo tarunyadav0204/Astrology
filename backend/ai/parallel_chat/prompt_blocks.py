@@ -255,6 +255,42 @@ Use this exact structure for the final user-facing answer:
 """
 
 
+def build_remedy_only_response_format() -> str:
+    return """
+### RESPONSE FORMAT (REMEDY-ONLY, MANDATORY)
+Use this exact structure for the final user-facing answer:
+
+1. <div class="quick-answer-card">**Quick Answer**: [Give the direct remedy verdict in plain language. State the most pressing issue, the main remedy direction, and the strongest practical action. This must be a remedy response, not a general reading.]</div>
+
+2. ### What Needs Attention Now
+[2-4 crisp bullets naming the active pressure, why it needs care, and what the user should focus on first.]
+
+3. ### Remedy Layers
+- #### Core Remedy
+[The main remedy direction for the issue.]
+- #### Gemstone / Ratna
+[Only if suitable and supported by the remedy blueprint. Keep it optional, specific to the strongest planet, and never overstate certainty.]
+- #### Behavioral Support
+[Routine, discipline, speech, boundaries, or habit changes.]
+- #### Charity / Seva
+[Giving / service / practical support that fits the issue.]
+- #### Mantra / Sound / Spiritual Practice
+[Any relevant mantra or sound practice if appropriate.]
+- #### Special Blockage Layers
+[Mudakku / Gandanta / other blockage layers only if present and relevant.]
+
+4. ### What To Do Next
+[A short practical checklist the user can act on now.]
+
+5. <div class="final-thoughts-card">**Final Verdict**: [One concise closing judgment focused on remedy.]</div>
+
+### ABSOLUTE RESTRICTIONS
+- Do NOT give a full career / marriage / finance / health analysis unless it is directly needed to justify the remedy.
+- Do NOT produce a generic chart reading.
+- Do NOT mention or imply other schools or branches such as Jaimini, KP, Nadi, Ashtakavarga, or Sudarshana.
+"""
+
+
 def build_kp_branch_static(intent_category: str, death_analysis_unlocked: bool = False) -> str:
     parts = [
         CORE_PERSONA,

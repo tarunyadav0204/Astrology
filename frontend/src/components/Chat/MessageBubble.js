@@ -206,6 +206,24 @@ const MessageBubble = ({
     const chartInsights = Array.isArray(message?.chartInsights) ? message.chartInsights : [];
     const [insightIndex, setInsightIndex] = useState(0);
     const messageChatTier = String(message?.chatTier || message?.chat_tier || '').trim().toLowerCase();
+    const nextAction = message?.next_action || message?.nextAction || null;
+    const nextActionType = String(nextAction?.type || '').trim().toLowerCase();
+    const hasNextAction = Boolean(nextAction && nextActionType && nextActionType !== 'none');
+    const isRemedyNextAction = nextActionType === 'remedy';
+    const nextActionTitle = String(nextAction?.title || '').trim();
+    const nextActionReason = String(nextAction?.reason || '').trim();
+    const nextActionFollowUps = Array.isArray(nextAction?.follow_up_questions)
+        ? nextAction.follow_up_questions.map((item) => String(item || '').trim()).filter(Boolean)
+        : [];
+    const remedyClickPrompt = isRemedyNextAction
+        ? [
+              'Generate a remedy-only reading.',
+              nextActionTitle ? `Issue: ${nextActionTitle}` : null,
+              nextActionReason ? `Why this matters: ${nextActionReason}` : null,
+              nextActionFollowUps.length > 0 ? `Possible remedy layers: ${nextActionFollowUps.join(' | ')}` : null,
+              'Do not give a general chart reading. Give practical remedies only.',
+          ].filter(Boolean).join('\n')
+        : '';
     const isInstantTypingBubble =
         (message.isTyping || message.isProcessing) && messageChatTier === 'instant';
     const instantTypingState = useMemo(
@@ -1162,6 +1180,108 @@ const MessageBubble = ({
                         </>
                     )}
                 </div>
+
+                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && hasNextAction && (
+                    <div
+                        className="remedy-next-action-card"
+                        style={{
+                            marginTop: 12,
+                            padding: '14px 14px 12px',
+                            borderRadius: 16,
+                            background: isRemedyNextAction
+                                ? 'linear-gradient(180deg, rgba(255,111,76,0.14), rgba(255,111,76,0.08))'
+                                : 'linear-gradient(180deg, rgba(91, 112, 255, 0.12), rgba(91, 112, 255, 0.06))',
+                            border: isRemedyNextAction
+                                ? '1px solid rgba(255,111,76,0.24)'
+                                : '1px solid rgba(91, 112, 255, 0.22)',
+                        }}
+                    >
+                        <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.02em', color: isRemedyNextAction ? '#9a3412' : '#3347a3', marginBottom: 8 }}>
+                            {isRemedyNextAction ? 'Practical remedy plan' : (nextActionTitle || 'Next step')}
+                        </div>
+                        {isRemedyNextAction && (
+                            <div style={{ fontSize: 13, lineHeight: 1.45, color: isRemedyNextAction ? '#14532d' : '#334155', marginBottom: 10, fontWeight: 700 }}>
+                                Tap to generate practical remedies for this issue.
+                            </div>
+                        )}
+                        {!isRemedyNextAction && nextActionReason && (
+                            <div style={{ fontSize: 14, lineHeight: 1.45, color: isRemedyNextAction ? '#7c2d12' : '#334155', marginBottom: 10 }}>
+                                {nextActionReason}
+                            </div>
+                        )}
+                        <button
+                            type="button"
+                            className="follow-up-btn"
+                            onClick={() => {
+                                const nextQuestion = isRemedyNextAction
+                                    ? remedyClickPrompt
+                                    : (
+                                        nextActionFollowUps[0]
+                                            ? String(nextActionFollowUps[0]).trim()
+                                        : String(nextActionTitle || 'Open follow-up').trim()
+                                    );
+                                console.log('[MessageBubble] remedy card clicked', {
+                                    hasNextAction,
+                                    isRemedyNextAction,
+                                    nextActionType,
+                                    nextActionTitle,
+                                    nextActionReason,
+                                    nextActionFollowUps,
+                                    nextQuestion,
+                                });
+                                if (onFollowUpClick && nextQuestion) {
+                                    try {
+                                        console.log('[MessageBubble] remedy button click payload', {
+                                            question: nextQuestion,
+                                            query_context: {
+                                                follow_up_type: isRemedyNextAction ? 'remedy_action' : (nextActionType || 'follow_up'),
+                                                remedy_followup: isRemedyNextAction,
+                                                open_remedy: isRemedyNextAction,
+                                                source_next_action: nextAction,
+                                                remedy_title: nextActionTitle || undefined,
+                                                remedy_reason: nextActionReason || undefined,
+                                                remedy_follow_up_questions: nextActionFollowUps,
+                                            },
+                                        });
+                                    } catch (err) {
+                                        // ignore logging failures
+                                    }
+                                    onFollowUpClick(nextQuestion, {
+                                        directSend: false,
+                                        query_context: {
+                                            follow_up_type: isRemedyNextAction ? 'remedy_action' : (nextActionType || 'follow_up'),
+                                            remedy_followup: isRemedyNextAction,
+                                            open_remedy: isRemedyNextAction,
+                                            source_next_action: nextAction,
+                                            remedy_title: nextActionTitle || undefined,
+                                            remedy_reason: nextActionReason || undefined,
+                                            remedy_follow_up_questions: nextActionFollowUps,
+                                        },
+                                    });
+                                }
+                            }}
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 8,
+                                background: isRemedyNextAction ? '#ff6b35' : '#5167e8',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 999,
+                                padding: '10px 16px',
+                                fontWeight: 800,
+                                fontSize: 14,
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 14px rgba(255,107,53,0.22)',
+                            }}
+                        >
+                            {isRemedyNextAction
+                                ? 'Generate remedies'
+                                : (nextActionFollowUps[0] ? String(nextActionFollowUps[0]) : 'Open follow-up')}
+                        </button>
+                    </div>
+                )}
 
                 {isNativeGate && !message.isTyping && !message.isProcessing && (
                     <div

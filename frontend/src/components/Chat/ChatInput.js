@@ -168,6 +168,23 @@ const ChatInput = ({
         if (isInstantSend && !canSendInstantMessage) return false;
         if (!isInstantSend && !canSendMessage) return false;
         const premiumForSend = useFreeQuestionEligible ? false : (premiumOverride ?? isPremiumAnalysis);
+        console.log('[ChatInput] commitSend unconditional', {
+            trimmed,
+            premiumForSend,
+            sendOptions,
+            isInstantSend,
+            isPartnershipMode,
+            isMundaneMode,
+        });
+        try {
+            console.log('[ChatInput] send button submit payload', {
+                text: trimmed,
+                premium_analysis: premiumForSend,
+                sendOptions,
+            });
+        } catch (err) {
+            // ignore logging failures
+        }
         onSendMessage(trimmed, {
             premium_analysis: premiumForSend,
             ...sendOptions,

@@ -88,38 +88,70 @@ def should_use_parallel_chat(context: dict, *, user_id: Optional[int] = None) ->
     Self-hosted Gemma (HTTP) is incompatible with this pipeline: branches expect vendor JSON/tooling
     and fan out many specialist prompts; use the single-call ``generate_chat_response`` path instead.
     """
-    if not parallel_chat_enabled():
-        return False
+    allowed, _reason, _diag = evaluate_parallel_chat_gate(context, user_id=user_id)
+    return allowed
+
+
+def evaluate_parallel_chat_gate(context: dict, *, user_id: Optional[int] = None) -> tuple[bool, str, dict]:
+    """
+    Evaluate the natal parallel gate with a human-readable reason.
+
+    Returns ``(allowed, reason, diagnostics)`` where ``reason`` is stable enough for logs.
+    """
+    diagnostics = {
+        "enabled": parallel_chat_enabled(),
+        "allowlist_present": False,
+        "allowlist_size": -1,
+        "user_id": user_id,
+        "context_analysis_type": "",
+        "context_mode": "",
+        "is_synastry": False,
+        "is_partner_birth_pair": False,
+        "provider_blocked": False,
+    }
+    if not diagnostics["enabled"]:
+        return False, "feature_flag_off", diagnostics
     try:
         from utils.admin_settings import CHAT_LLM_GEMMA, get_chat_llm_provider, get_chat_llm_provider_premium
 
         if get_chat_llm_provider() == CHAT_LLM_GEMMA or get_chat_llm_provider_premium() == CHAT_LLM_GEMMA:
-            return False
+            diagnostics["provider_blocked"] = True
+            return False, "gemma_provider_blocked", diagnostics
     except Exception:
         pass
     allow = parallel_chat_user_allowlist()
+    diagnostics["allowlist_present"] = allow is not None
+    diagnostics["allowlist_size"] = len(allow) if isinstance(allow, frozenset) else -1
     if allow is not None:
         if not allow:
-            return False
+            return False, "allowlist_empty", diagnostics
         if user_id is None or user_id not in allow:
-            return False
+            return False, "user_not_in_allowlist", diagnostics
     if not isinstance(context, dict):
-        return False
-    if context.get("analysis_type") == "synastry":
-        return False
-    if isinstance(context.get("native"), dict) and isinstance(context.get("partner"), dict):
-        if context["native"].get("birth_details") and context["partner"].get("birth_details"):
-            return False
-    analysis_type = context.get("analysis_type") or "birth"
-    if analysis_type != "birth":
-        return False
+        return False, "context_not_dict", diagnostics
+    analysis_type = str(context.get("analysis_type") or "").strip().lower()
     intent = context.get("intent") or {}
-    mode = (intent.get("mode") or "").lower()
+    mode = str(intent.get("mode") or "").strip().lower()
+    diagnostics["context_analysis_type"] = analysis_type or "birth"
+    diagnostics["context_mode"] = mode
+    diagnostics["is_synastry"] = bool(context.get("analysis_type") == "synastry")
+    diagnostics["is_partner_birth_pair"] = bool(
+        isinstance(context.get("native"), dict)
+        and isinstance(context.get("partner"), dict)
+        and context["native"].get("birth_details")
+        and context["partner"].get("birth_details")
+    )
+    if analysis_type == "synastry":
+        return False, "analysis_type_synastry", diagnostics
+    if diagnostics["is_partner_birth_pair"]:
+        return False, "partner_birth_pair_present", diagnostics
+    if analysis_type and analysis_type != "birth":
+        return False, f"analysis_type_{analysis_type}", diagnostics
     if mode in ("prashna", "annual"):
-        return False
+        return False, f"mode_{mode}", diagnostics
     if mode.startswith("predict_daily"):
-        return False
-    return True
+        return False, "mode_predict_daily", diagnostics
+    return True, "allowed", diagnostics
 
 
 def should_use_parallel_relational_chat(context: dict, *, user_id: Optional[int] = None) -> bool:

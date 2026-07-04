@@ -81,6 +81,15 @@ function formatDateTimeIST(value) {
   });
 }
 
+function formatDeletedRowCounts(rowCounts) {
+  if (!rowCounts || typeof rowCounts !== 'object') return '—';
+  const entries = Object.entries(rowCounts)
+    .filter(([, count]) => Number(count) > 0)
+    .sort((a, b) => Number(b[1]) - Number(a[1]));
+  if (!entries.length) return 'No rows';
+  return entries.map(([table, count]) => `${table}: ${count}`).join(', ');
+}
+
 const PARALLEL_BRANCH_MODEL_CONFIG = [
   { key: 'parashari', label: 'Parashari', fallbackLabel: 'Premium chat model' },
   { key: 'jaimini', label: 'Jaimini', fallbackLabel: 'Standard chat model' },
@@ -209,6 +218,18 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     today: { users_count: 0, mobile_users_count: 0, web_users_count: 0, push_enabled_count: 0 },
     total: { users_count: 0, mobile_users_count: 0, web_users_count: 0, push_enabled_count: 0 },
   });
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const [deletedBackups, setDeletedBackups] = useState([]);
+  const [deletedBackupsLoading, setDeletedBackupsLoading] = useState(false);
+  const [deletedBackupsError, setDeletedBackupsError] = useState('');
+  const [deletedBackupsPage, setDeletedBackupsPage] = useState(1);
+  const [deletedBackupsTotal, setDeletedBackupsTotal] = useState(0);
+  const [deletedBackupsTotalPages, setDeletedBackupsTotalPages] = useState(0);
+  const [deletedBackupsDateFrom, setDeletedBackupsDateFrom] = useState(todayIso);
+  const [deletedBackupsDateTo, setDeletedBackupsDateTo] = useState(todayIso);
+  const [deletedBackupsUserId, setDeletedBackupsUserId] = useState('');
+  const [deletedBackupsQuery, setDeletedBackupsQuery] = useState('');
+  const [expandedDeletedBackupId, setExpandedDeletedBackupId] = useState(null);
   const [userFacts, setUserFacts] = useState([]);
   const [factsSearch, setFactsSearch] = useState('');
   const [factsPage, setFactsPage] = useState(1);
@@ -264,6 +285,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [editFormData, setEditFormData] = useState({});
   const [campaignDraftPrefill, setCampaignDraftPrefill] = useState(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState(null);
+  const [userDeleteConfirmation, setUserDeleteConfirmation] = useState(null);
+  const [userDeleteConfirmText, setUserDeleteConfirmText] = useState('');
+  const [userDeleteSaving, setUserDeleteSaving] = useState(false);
   const [creditRequests, setCreditRequests] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [approvingRequest, setApprovingRequest] = useState(null);
@@ -530,6 +554,14 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setLedgerJumpContext({ query, nonce: Date.now() });
     setActiveTab('credits');
     setActiveSubTab('ledger');
+  }, [usersRowMenu, closeUsersRowMenu]);
+
+  const handleUsersMenuDelete = useCallback(() => {
+    const rowUser = usersRowMenu?.user;
+    if (!rowUser) return;
+    closeUsersRowMenu();
+    setUserDeleteConfirmText('');
+    setUserDeleteConfirmation(rowUser);
   }, [usersRowMenu, closeUsersRowMenu]);
 
   useEffect(() => {
@@ -1859,6 +1891,34 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   };
 
+  const fetchDeletedBackups = async (pageOverride = null) => {
+    const page = pageOverride != null ? pageOverride : deletedBackupsPage;
+    if (pageOverride != null) setDeletedBackupsPage(page);
+    setDeletedBackupsLoading(true);
+    setDeletedBackupsError('');
+    try {
+      const data = await adminService.getDeletedAccountBackups({
+        date_from: deletedBackupsDateFrom || undefined,
+        date_to: deletedBackupsDateTo || undefined,
+        user_id: deletedBackupsUserId.trim() || undefined,
+        q: deletedBackupsQuery.trim() || undefined,
+        page,
+        limit: 25,
+      });
+      setDeletedBackups(data.backups || []);
+      setDeletedBackupsTotal(data.total ?? 0);
+      setDeletedBackupsTotalPages(data.total_pages ?? 0);
+    } catch (error) {
+      console.error('Error fetching deleted account backups:', error);
+      setDeletedBackups([]);
+      setDeletedBackupsTotal(0);
+      setDeletedBackupsTotalPages(0);
+      setDeletedBackupsError(error.message || 'Failed to fetch deleted account backups');
+    } finally {
+      setDeletedBackupsLoading(false);
+    }
+  };
+
   const fetchUsersForNotifications = async (pageOverride = null) => {
     setLoading(true);
     const page = pageOverride != null ? pageOverride : notifPage;
@@ -1983,6 +2043,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   }, [activeTab, activeSubTab, factsPage]);
 
+  useEffect(() => {
+    if (activeTab === 'users' && activeSubTab === 'deletedBackups') {
+      fetchDeletedBackups();
+    }
+  }, [activeTab, activeSubTab, deletedBackupsPage]);
+
   const fetchCharts = async (pageOverride = null) => {
     setLoading(true);
     const page = pageOverride != null ? pageOverride : chartsPage;
@@ -2027,6 +2093,31 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setPendingSubscription(null);
     } catch (error) {
       console.error('Error updating subscription:', error);
+    }
+  };
+
+  const handleConfirmDeleteUser = async () => {
+    const target = userDeleteConfirmation;
+    if (!target?.userid || userDeleteConfirmText.trim() !== String(target.userid)) return;
+    if (String(user?.userid ?? '') === String(target.userid ?? '')) {
+      alert('You cannot delete the currently signed-in admin account from this session.');
+      return;
+    }
+    setUserDeleteSaving(true);
+    try {
+      await adminService.deleteUser(target.userid);
+      setUserDeleteConfirmation(null);
+      setUserDeleteConfirmText('');
+      await Promise.all([
+        fetchUsers(usersPage),
+        fetchDeletedBackups(1),
+      ]);
+      alert('User account deleted and backed up successfully.');
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert(error.message || 'Failed to delete user');
+    } finally {
+      setUserDeleteSaving(false);
     }
   };
 
@@ -3000,6 +3091,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Activity
           </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'deletedBackups' ? 'active' : ''}`}
+            onClick={() => {
+              setDeletedBackupsPage(1);
+              setActiveSubTab('deletedBackups');
+            }}
+          >
+            Deleted backups
+          </button>
           <button 
             className={`subtab ${activeSubTab === 'userProfile' ? 'active' : ''}`}
             onClick={() => {
@@ -3435,6 +3536,152 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               setActiveSubTab('userProfile');
             }}
           />
+        )}
+
+        {activeTab === 'users' && activeSubTab === 'deletedBackups' && (
+          <div className="users-management">
+            <div className="users-filters-panel">
+              <div className="users-management-filters">
+                <label>
+                  <span>Deleted from</span>
+                  <input
+                    type="date"
+                    value={deletedBackupsDateFrom}
+                    onChange={(e) => setDeletedBackupsDateFrom(e.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Deleted to</span>
+                  <input
+                    type="date"
+                    value={deletedBackupsDateTo}
+                    onChange={(e) => setDeletedBackupsDateTo(e.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>User ID</span>
+                  <input
+                    type="number"
+                    placeholder="Exact user id"
+                    value={deletedBackupsUserId}
+                    onChange={(e) => setDeletedBackupsUserId(e.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Phone, name, email</span>
+                  <input
+                    type="text"
+                    placeholder="Search backup"
+                    value={deletedBackupsQuery}
+                    onChange={(e) => setDeletedBackupsQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setDeletedBackupsPage(1);
+                        fetchDeletedBackups(1);
+                      }
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="users-search-btn"
+                  onClick={() => {
+                    setDeletedBackupsPage(1);
+                    fetchDeletedBackups(1);
+                  }}
+                >
+                  Search
+                </button>
+              </div>
+            </div>
+            {deletedBackupsError && (
+              <div className="users-table-empty" style={{ marginBottom: 12 }}>
+                {deletedBackupsError}
+              </div>
+            )}
+            <div className="users-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Deleted</th>
+                    <th>User ID</th>
+                    <th>Source</th>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Rows</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deletedBackupsLoading ? (
+                    <tr><td colSpan={8} className="users-table-empty">Loading deleted account backups...</td></tr>
+                  ) : deletedBackups.length === 0 ? (
+                    <tr><td colSpan={8} className="users-table-empty">No deleted account backups match the filters.</td></tr>
+                  ) : (
+                    deletedBackups.map((backup) => (
+                      <React.Fragment key={backup.deletion_id}>
+                        <tr>
+                          <td>{formatDateTimeIST(backup.deleted_at)}</td>
+                          <td>{backup.userid}</td>
+                          <td>{backup.deletion_source || '—'}</td>
+                          <td>{backup.user_name || '—'}</td>
+                          <td>{backup.user_phone || '—'}</td>
+                          <td>{backup.user_email || '—'}</td>
+                          <td title={formatDeletedRowCounts(backup.row_counts)}>
+                            {formatDeletedRowCounts(backup.row_counts)}
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="edit-btn"
+                              onClick={() => setExpandedDeletedBackupId((prev) => (
+                                prev === backup.deletion_id ? null : backup.deletion_id
+                              ))}
+                            >
+                              {expandedDeletedBackupId === backup.deletion_id ? 'Hide' : 'View'}
+                            </button>
+                          </td>
+                        </tr>
+                        {expandedDeletedBackupId === backup.deletion_id && (
+                          <tr>
+                            <td colSpan={8}>
+                              <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 420, overflow: 'auto', margin: 0 }}>
+                                {JSON.stringify(backup.backup_payload || {}, null, 2)}
+                              </pre>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))
+                  )}
+                </tbody>
+              </table>
+              {deletedBackupsTotalPages > 0 && (
+                <div className="users-pagination">
+                  <span className="users-pagination-info">
+                    Page {deletedBackupsPage} of {deletedBackupsTotalPages} ({deletedBackupsTotal} total)
+                  </span>
+                  <button
+                    type="button"
+                    className="users-pagination-btn"
+                    disabled={deletedBackupsPage <= 1 || deletedBackupsLoading}
+                    onClick={() => fetchDeletedBackups(deletedBackupsPage - 1)}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    className="users-pagination-btn"
+                    disabled={deletedBackupsPage >= deletedBackupsTotalPages || deletedBackupsLoading}
+                    onClick={() => fetchDeletedBackups(deletedBackupsPage + 1)}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {activeTab === 'users' && activeSubTab === 'userProfile' && (
@@ -6758,6 +7005,104 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         </div>
       )}
 
+      {userDeleteConfirmation && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1700
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            color: '#111',
+            padding: '20px',
+            borderRadius: '8px',
+            minWidth: '360px',
+            maxWidth: '520px'
+          }}>
+            <h3 style={{ marginTop: 0 }}>Delete User Account</h3>
+            <p>
+              This will delete and anonymize the account after writing a backup to BigQuery.
+            </p>
+            <p>
+              <strong>User ID:</strong> {userDeleteConfirmation.userid}<br />
+              <strong>Name:</strong> {userDeleteConfirmation.name || '—'}<br />
+              <strong>Phone:</strong> {userDeleteConfirmation.phone || '—'}<br />
+              <strong>Email:</strong> {userDeleteConfirmation.email || '—'}
+            </p>
+            <label style={{ display: 'block', marginTop: 14 }}>
+              <span>Type user ID to confirm</span>
+              <input
+                type="text"
+                value={userDeleteConfirmText}
+                onChange={(e) => setUserDeleteConfirmText(e.target.value)}
+                placeholder={String(userDeleteConfirmation.userid || '')}
+                style={{ display: 'block', width: '100%', marginTop: 6, padding: '8px' }}
+              />
+            </label>
+            {String(user?.userid ?? '') === String(userDeleteConfirmation.userid ?? '') && (
+              <p style={{ color: '#b91c1c', marginBottom: 0 }}>
+                You cannot delete the currently signed-in admin account from this session.
+              </p>
+            )}
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setUserDeleteConfirmation(null);
+                  setUserDeleteConfirmText('');
+                }}
+                disabled={userDeleteSaving}
+                style={{
+                  backgroundColor: '#ccc',
+                  color: 'black',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  cursor: userDeleteSaving ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteUser}
+                disabled={
+                  userDeleteSaving ||
+                  userDeleteConfirmText.trim() !== String(userDeleteConfirmation.userid) ||
+                  String(user?.userid ?? '') === String(userDeleteConfirmation.userid ?? '')
+                }
+                style={{
+                  backgroundColor: '#f44336',
+                  color: 'white',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  cursor: (
+                    userDeleteSaving ||
+                    userDeleteConfirmText.trim() !== String(userDeleteConfirmation.userid) ||
+                    String(user?.userid ?? '') === String(userDeleteConfirmation.userid ?? '')
+                  ) ? 'not-allowed' : 'pointer',
+                  opacity: (
+                    userDeleteSaving ||
+                    userDeleteConfirmText.trim() !== String(userDeleteConfirmation.userid) ||
+                    String(user?.userid ?? '') === String(userDeleteConfirmation.userid ?? '')
+                  ) ? 0.65 : 1
+                }}
+              >
+                {userDeleteSaving ? 'Deleting...' : 'Delete account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {usersRowMenu && usersRowMenu.top != null ? (
         <ul
           ref={usersMenuDropdownRef}
@@ -6789,6 +7134,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               onClick={handleUsersMenuTransactions}
             >
               Transactions
+            </button>
+          </li>
+          <li role="none">
+            <button
+              type="button"
+              role="menuitem"
+              className="ledger-action-menu-item"
+              onClick={handleUsersMenuDelete}
+            >
+              Delete account
             </button>
           </li>
         </ul>

@@ -289,6 +289,9 @@ CRITICAL: You are the ONLY voice the user hears. The user DOES NOT see the speci
 [MERGE-TRUTH-OVER-TONE] Accuracy outranks niceness. Do not modify hard astrological conclusions to sound pleasant.
 
 [MERGE-HTML] Follow-up questions block: output **real HTML** for the user, not JSON string escaping. The opening tag MUST be exactly `<div class="follow-up-questions">` using normal straight double-quote characters (ASCII 0x22). Do **not** copy backslash sequences from SPECIALIST_BRANCH_OUTPUTS_JSON (JSON shows `\\"` around strings for encoding only—your HTML must not include those backslashes).
+[MERGE-NEXT-ACTION] After the main answer and before the final FAQ_META line, append exactly one line:
+NEXT_ACTION_META: {"type":"<remedy|diagnosis|timing|clarification|comparison|chart_explanation|none>","title":"<short label>","reason":"<short reason>","confidence":"<high|medium|low>","follow_up_questions":["<up to 3 short user-facing options>"],"source":"merge"}
+Use the same language as the answer. If no follow-up is needed, set type to "none" and follow_up_questions to an empty list. Keep the line valid JSON and short.
 """
 
 # Single-pass / legacy `build_system_instruction` (not parallel merge).
@@ -344,7 +347,8 @@ GENERAL_ADVICE_STRUCTURE = """
 [GENERAL_ADVICE-3] CONTENT:
     * **Strengths to Leverage**: Identify the strongest planets/houses and suggest how to use them.
     * **Weaknesses to Manage**: Identify the weakest planets/houses and suggest remedies.
-    * **Remedies**: Suggest specific remedies (mantras, charity, etc.) for afflicted planets.
+    * **Remedies**: Suggest specific remedies (mantras, charity, seva, diet, color, routine, gemstone only when suitable) for afflicted planets.
+    * **Remedy Layers**: Separate short-term behavior changes, supportive practices, and special blockage layers like Mudakku / Gandanta / Mrityu Bhaga if present.
     * **Spiritual Path**: Provide guidance based on the 9th house, Atmakaraka, and D9 chart.
 [GENERAL_ADVICE-4] AVOID: Do not predict specific events. Focus on self-improvement and karmic management.
 """

@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional
 import asyncio
 
 from ai.parallel_chat.parallel_agent_payloads import build_parashari_agent_payload
+from ai.response_parser import ResponseParser
+from calculators import RemedyEngine
 from calculators.chart_calculator import ChartCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
 from chat.chat_context_builder import ChatContextBuilder
@@ -2732,6 +2734,33 @@ def _looks_like_remedy_question(question: str) -> bool:
     return any(marker in q for marker in markers)
 
 
+def _explicit_remedy_followup_requested(intent: Optional[Dict[str, Any]]) -> bool:
+    """
+    Remedy should only run when the client explicitly marks the request as a remedy follow-up.
+    We do not infer it from generic wording because that can hijack the first answer.
+    """
+    query_context = (intent or {}).get("query_context")
+    if not isinstance(query_context, dict):
+        return False
+
+    candidate_values = [
+        query_context.get("follow_up_type"),
+        query_context.get("followUpType"),
+        query_context.get("chat_action"),
+        query_context.get("chatAction"),
+        query_context.get("mode"),
+        query_context.get("answer_mode"),
+    ]
+    normalized = {str(value or "").strip().lower() for value in candidate_values if str(value or "").strip()}
+    if normalized & {"remedy", "remedy_followup", "remedy_action"}:
+        return True
+    if bool(query_context.get("remedy_followup")) or bool(query_context.get("remedy_action")):
+        return True
+    if bool(query_context.get("open_remedy")) or bool(query_context.get("openRemedy")):
+        return True
+    return False
+
+
 def _looks_like_potential_question(question: str, intent: Optional[Dict[str, Any]]) -> bool:
     q = str(question or "").lower()
     cat = str((intent or {}).get("category") or "").lower()
@@ -2824,7 +2853,7 @@ def _looks_like_event_prediction_question(question: str, intent: Optional[Dict[s
 def _infer_answer_mode(question: str, intent: Optional[Dict[str, Any]], history: List[Dict[str, Any]]) -> str:
     if _looks_like_explanatory_followup(question, history):
         return "explanation_mechanism"
-    if _looks_like_remedy_question(question):
+    if _explicit_remedy_followup_requested(intent):
         return "remedy_action"
     if _looks_like_comparison_question(question):
         return "comparison_choice"
@@ -3487,10 +3516,15 @@ def _build_answer_mode_contract(answer_mode: str, category: str, period_window: 
     elif answer_mode == "remedy_action":
         base.update(
             {
-                "primary_evidence": ["top_risks", "active_dashas_formatted", "activation_mechanisms"],
-                "secondary_evidence": ["divisional_support.current_topic"],
-                "avoid_drift": ["too many remedies", "non-astrological lecture"],
-                "answer_skeleton": "Problem focus -> Why this needs remedy/action -> Short practical steps -> One caution",
+                "primary_evidence": ["remedy_blueprint.priority_order", "remedy_blueprint.special_points", "top_risks", "active_dashas_formatted"],
+                "secondary_evidence": ["divisional_support.current_topic", "remedy_blueprint.remedy_sections"],
+                "avoid_drift": [
+                    "too many remedies",
+                    "non-astrological lecture",
+                    "generic remedy dump",
+                    "mixing diagnosis with remedy instructions",
+                ],
+                "answer_skeleton": "Problem focus -> What is most pressing now -> Constructive house expression -> Remedy layers by category -> Special blockage notes -> One caution",
             }
         )
     else:
@@ -3679,6 +3713,30 @@ def _normalize_instant_evidence(
         "contradiction_flags": contradiction_flags,
         "avoid_drift": contract.get("avoid_drift") or [],
     }
+    if answer_mode == "remedy_action":
+        try:
+            remedy_blueprint = RemedyEngine(
+                chart_data=chart_data,
+                divisional_charts=chart_data.get("divisional_charts") or {},
+            ).build_remedy_blueprint(
+                question=question,
+                category=category,
+                instant_parashari=instant_parashari,
+                normalized_evidence=normalized,
+                current_dashas_context=current_dashas_context,
+                target_chart_context=target_chart_context,
+            )
+            if isinstance(remedy_blueprint, dict):
+                normalized["remedy_blueprint"] = remedy_blueprint
+                normalized["question_focus"] = remedy_blueprint.get("question_focus") or normalized.get("question_focus")
+                normalized["primary_drivers"] = list(remedy_blueprint.get("candidate_planets") or normalized.get("primary_drivers") or [])
+                normalized["top_risks"] = list(remedy_blueprint.get("priority_order") or normalized.get("top_risks") or [])
+                normalized["special_points"] = remedy_blueprint.get("special_points") or {}
+                normalized["remedy_sections"] = remedy_blueprint.get("remedy_sections") or {}
+                normalized["follow_up_prompts"] = remedy_blueprint.get("follow_up_prompts") or []
+                normalized["caution"] = remedy_blueprint.get("caution") or ""
+        except Exception as exc:
+            logger.warning("remedy blueprint build failed: %s", exc)
     if answer_mode == "event_prediction":
         normalized["timing_policy"] = instant_parashari.get("timing_policy") or {}
         normalized["forward_event_dasha_scan"] = instant_parashari.get("forward_event_dasha_scan") or {}
@@ -3862,6 +3920,36 @@ def _instant_parashari_instruction_block(
                 "Do not use dramatic phrases like high-intensity, specifically targeted, double-hit, double-activation, perfect storm, final spotlight, karmic knot, wear-and-tear, or physical resilience was at a low point unless the evidence is unusually explicit and you immediately prove it.",
                 "Do not treat one house, one transit, or one planet as a complete injury verdict by itself. Show the vulnerability pattern first, then the activation, then only a limited trigger claim if supported.",
                 "Do not widen the answer into generic personality or broad fate narrative. Stay with the mechanism of the asked problem.",
+            ]
+        )
+    if answer_mode == "remedy_action":
+        primary = ", ".join(str(v) for v in (contract.get("primary_evidence") or [])) or "remedy blueprint and active pressure"
+        secondary = ", ".join(str(v) for v in (contract.get("secondary_evidence") or [])) or "supporting modifiers"
+        avoid = "; ".join(str(v) for v in (contract.get("avoid_drift") or [])) or "generic remedy dump"
+        skeleton = str(contract.get("answer_skeleton") or "Problem focus -> What is most pressing now -> Remedy layers by category -> Special blockage notes -> One caution")
+        return "\n".join(
+            [
+                f"This answer uses universal answer mode `{answer_mode}`.",
+                "CRITICAL: Follow the method instructions below exactly.",
+                "CRITICAL: This is a remedy-only answer, not a full predictive reading.",
+                "CRITICAL: Do not give all astrological schools or a generic upaya list. Build remedies only from the remedy blueprint and the strongest active chart pressure.",
+                "CRITICAL: Keep the remedy language practical, layered, and non-dramatic.",
+                f"Answer skeleton: {skeleton}.",
+                f"Primary evidence priority: {primary}.",
+                f"Secondary evidence only after primary evidence: {secondary}.",
+                f"Avoid these drifts: {avoid}.",
+                "- `normalized_evidence.remedy_blueprint`: this is the main source for what is most pressing now, the priority planet order, special blockages, and the remedy sections.",
+                "- `normalized_evidence.remedy_blueprint.remedy_sections`: use these sections to organize the reply. Prefer the strongest 2-4 sections, not every possible remedy layer.",
+                "- `normalized_evidence.remedy_blueprint.constructive_house_expression`: this is the biggest remedy layer. Use it first when the user can solve the issue by expressing the planet through a positive house function.",
+                "- `normalized_evidence.remedy_blueprint.remedy_sections.gemstones`: surface this when suitable. Keep gemstone advice optional, specific to the strongest planet, and suitability-dependent.",
+                "- `normalized_evidence.remedy_blueprint.special_points`: use Mudakku, Gandanta, and Mrityu Bhaga only when present. Explain them briefly and precisely.",
+                "- `normalized_evidence.remedy_blueprint.follow_up_prompts`: use these to propose the next remedy question, not as a new diagnosis.",
+                "- `normalized_evidence.remedy_blueprint.caution`: use this to avoid overcommitting to gemstones or too many remedies at once.",
+                "- `normalized_evidence.current_timing` and `active_dashas_formatted`: use these only to identify the planet(s) currently pressing the issue.",
+                "- `normalized_evidence.divisional_specifics`: use only if the blueprint actually points there. Do not widen into general astrology.",
+                "The user should see a focused remedy card, with the strongest remedy layers first and one clear follow-up question if needed.",
+                "Do not turn the answer into a broad horoscope or a long explanation of all planets.",
+                "If the user is already positively channeling the planet through study, research, service, teaching, building, or disciplined work, say that directly and treat it as the strongest remedy layer.",
             ]
         )
     if answer_mode == "event_prediction":
@@ -4477,6 +4565,48 @@ def _build_instant_context(
         current_dashas_context = {}
         birth_summary = evidence_birth_summary
         recent_history = recent_history[-1:]
+    if answer_mode == "remedy_action":
+        prompt_instant_parashari = {
+            k: v
+            for k, v in prompt_instant_parashari.items()
+            if k in {
+                "source",
+                "category",
+                "focus_houses",
+                "topic_key",
+                "divisional_support",
+                "activation_mechanisms",
+                "answer_mode",
+                "period_window",
+                "time_relation",
+                "top_risks",
+                "top_supports",
+                "active_dashas_formatted",
+                "remedy_blueprint",
+            }
+        }
+        prompt_normalized_evidence = {
+            k: v
+            for k, v in prompt_normalized_evidence.items()
+            if k in {
+                "answer_mode_contract",
+                "primary_drivers",
+                "secondary_modifiers",
+                "target_subject",
+                "target_chart_context",
+                "divisional_specifics",
+                "claim_gates",
+                "avoid_drift",
+                "remedy_blueprint",
+                "question_focus",
+                "special_points",
+                "remedy_sections",
+                "follow_up_prompts",
+                "caution",
+                "current_timing",
+                "topic_confirmation",
+            }
+        }
     if not claim_gates.get("allow_divisional_mentions"):
         prompt_instant_parashari.pop("divisional_support", None)
         prompt_instant_parashari.pop("navamsa_root_fruit", None)
@@ -4487,7 +4617,7 @@ def _build_instant_context(
                 for k, v in prompt_normalized_evidence["topic_confirmation"].items()
                 if k not in {"topic_support", "current_topic_support"}
             }
-    if not claim_gates.get("allow_abstract_risk_labels"):
+    if answer_mode != "remedy_action" and not claim_gates.get("allow_abstract_risk_labels"):
         prompt_instant_parashari.pop("top_risks", None)
         prompt_normalized_evidence["secondary_modifiers"] = []
         prompt_normalized_evidence.pop("risk_specifics", None)
@@ -4640,6 +4770,13 @@ Follow-up rules:
 - If the user's last message was very short (e.g. "in general"), start the follow-up with a brief topic anchor so they know what it refers to (e.g. "Eating habits — want a timeframe next?").
 - Do not repeat the same clarification dimension you already resolved (e.g. don't ask general vs timed again if they just chose general).
 - Valid JSON array of strings only inside the markers; no trailing comma."""
+    next_action_tail = """
+
+At the very end of the answer, append exactly one line in this format:
+NEXT_ACTION_META: {"type":"<remedy|diagnosis|timing|clarification|comparison|chart_explanation|none>","title":"<short label>","reason":"<short reason in the same language as the answer>","confidence":"<high|medium|low>","follow_up_questions":["<up to 3 short user-facing options>"],"source":"instant"}
+Always include this line. If no follow-up is needed, set type to "none" and follow_up_questions to an empty array.
+Keep it short and valid JSON.
+"""
     return f"""
 {identity_block}
 
@@ -4658,6 +4795,7 @@ Style rules:
 - If the question is about a specific facet inside a broader area, answer that facet directly from the house activation and dasha logic instead of widening the answer into a whole life summary.
 - If `intent_summary.target_subject.key` is not `self`, treat `target_chart_context` as the primary chart frame for that person instead of reading only from the native's direct Lagna context.
 - No decorative headers unless absolutely needed.
+{next_action_tail}
 
 USER QUESTION:
 {question}
@@ -4751,9 +4889,22 @@ async def generate_instant_chat_response(
     else:
         response_text = raw_response
         speech_followups = []
+    parsed_response = ResponseParser.parse_images_in_chat_response(response_text)
+    next_action = parsed_response.get("next_action") or {}
+    combined_followups = list(next_action.get("follow_up_questions") or parsed_response.get("follow_up_questions", []))
+    if not combined_followups and speech_followups:
+        combined_followups = list(speech_followups)
+    logger.info(
+        "instant_chat_next_action_decoded type=%s title=%s confidence=%s follow_up_count=%s speech_mode=%s",
+        next_action.get("type"),
+        next_action.get("title"),
+        next_action.get("confidence"),
+        len(combined_followups),
+        bool(speech_mode),
+    )
     return {
         "success": True,
-        "response": response_text,
+        "response": parsed_response.get("content") or response_text,
         "error": None,
         "chat_llm_model": llm_result.get("chat_llm_model") or model_name,
         "timing": {
@@ -4764,7 +4915,7 @@ async def generate_instant_chat_response(
         },
         "token_usage": llm_result.get("token_usage") or {},
         "llm_prompt_chars": len(prompt),
-        "llm_response_chars": len(response_text),
+        "llm_response_chars": len(parsed_response.get("content") or response_text),
         "instant_llm_usage_stage": _build_instant_usage_stage(
             "instant_answer",
             llm_result.get("chat_llm_model") or model_name,
@@ -4776,7 +4927,13 @@ async def generate_instant_chat_response(
         ),
         "terms": [],
         "glossary": {},
-        "follow_up_questions": speech_followups if speech_mode else [],
+        "follow_up_questions": combined_followups,
+        "recommended_follow_up_questions": combined_followups,
+        "next_best_need": next_action.get("type"),
+        "next_best_need_confidence": next_action.get("confidence"),
+        "next_best_need_title": next_action.get("title"),
+        "next_best_need_reason": next_action.get("reason"),
+        "next_action": next_action or None,
         "summary_image": None,
         "analysis_steps": [],
         "faq_metadata": None,

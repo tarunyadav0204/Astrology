@@ -35,6 +35,29 @@ OPTIONS(
   require_partition_filter = false
 );
 
+-- 3. Create partitioned table for account-deletion backups
+-- The app writes one row here before it deletes/scrubs account data in Postgres.
+
+CREATE TABLE IF NOT EXISTS `PROJECT_ID.DATASET_ID.deleted_account_backups` (
+  deletion_id STRING NOT NULL OPTIONS(description = "Unique account deletion backup id"),
+  deleted_at TIMESTAMP NOT NULL OPTIONS(description = "Deletion time UTC"),
+  userid INT64 NOT NULL OPTIONS(description = "Deleted app user id"),
+  deleted_by_userid INT64 OPTIONS(description = "Admin/self user id that requested deletion"),
+  deletion_source STRING OPTIONS(description = "self_service, admin, or another deletion source"),
+  user_phone STRING OPTIONS(description = "Original phone before users.phone is scrubbed"),
+  user_name STRING OPTIONS(description = "Original name before users.name is scrubbed"),
+  user_email STRING OPTIONS(description = "Original email before users.email is scrubbed"),
+  signup_client STRING OPTIONS(description = "Original users.signup_client"),
+  row_counts_json STRING OPTIONS(description = "JSON object of backed-up row counts by source table"),
+  backup_payload STRING OPTIONS(description = "Full JSON account snapshot grouped by source table")
+)
+PARTITION BY DATE(deleted_at)
+CLUSTER BY userid, deletion_source
+OPTIONS(
+  description = "Point-in-time snapshots captured before account deletion/anonymization",
+  require_partition_filter = false
+);
+
 -- Example queries:
 -- Last 7 days for a user (by phone):
 -- SELECT * FROM `PROJECT_ID.DATASET_ID.user_activity`

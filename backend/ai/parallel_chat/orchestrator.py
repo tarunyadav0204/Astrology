@@ -53,6 +53,26 @@ def _chart_focus_branch_plan(intent: Dict[str, Any]) -> Tuple[List[str], Optiona
     return ordered, reason
 
 
+def _has_remedy_followup_request(intent: Dict[str, Any]) -> bool:
+    if not isinstance(intent, dict):
+        return False
+    query_context = intent.get("query_context")
+    if not isinstance(query_context, dict):
+        query_context = {}
+    normalized = {
+        str(intent.get("follow_up_type") or "").strip().lower(),
+        str(query_context.get("follow_up_type") or "").strip().lower(),
+    }
+    if normalized & {"remedy", "remedy_followup", "remedy_action"}:
+        return True
+    return bool(
+        query_context.get("remedy_followup")
+        or query_context.get("remedy_action")
+        or query_context.get("open_remedy")
+        or query_context.get("openRemedy")
+    )
+
+
 def _skipped_branch_output(branch_label: str, reason: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     return (
         {
@@ -100,6 +120,10 @@ def _planner_metrics(plan: Optional[Dict[str, Any]], *, success: bool, selected_
 
 def _parallel_diag_enabled(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in ("1", "true", "yes")
+
+
+def _parallel_log_merge_body_enabled() -> bool:
+    return os.environ.get("ASTRO_PARALLEL_LOG_MERGE_BODY", "").strip().lower() in ("1", "true", "yes")
 
 
 def _log_parallel_branch_diagnostics(
@@ -166,6 +190,7 @@ from ai.output_schema import (
     VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION,
     build_multi_question_focus_instruction,
     get_response_schema_for_mode,
+    NEXT_ACTION_META_INSTRUCTION,
 )
 from ai.parallel_chat.agent_context_factory import (
     merged_context_to_agent_context,
@@ -206,6 +231,7 @@ from ai.parallel_chat.prompt_blocks import (
     build_parashari_branch_static_agent,
     build_sudarshan_branch_static,
     build_sudarshan_branch_static_agent,
+    build_remedy_only_response_format,
 )
 from ai.response_parser import ResponseParser
 from ai.term_matcher import find_terms_in_text
@@ -637,18 +663,25 @@ async def run_parallel_chat_pipeline(
     )
 
     ctx = astrological_context
+    cleaned_text = ""
+    next_action = None
+    parsed_response: Dict[str, Any] = {"content": ""}
     intent = ctx.get("intent") or {}
     category = intent.get("category", "general")
     death_analysis_unlocked = bool(ctx.get("death_analysis_unlocked"))
     free_question_parashari_only = bool(
         using_free_question and is_free_question_parashari_only_enabled()
     )
+    remedy_followup_requested = _has_remedy_followup_request(intent)
     enabled_branches, branch_scope_reason = _chart_focus_branch_plan(intent)
     if free_question_parashari_only:
         enabled_branches = ["parashari"]
         branch_scope_reason = "free_question:parashari_only"
+    if remedy_followup_requested:
+        enabled_branches = ["parashari"]
+        branch_scope_reason = "remedy_followup:parashari_only"
     planner_result: Optional[Dict[str, Any]] = None
-    if not free_question_parashari_only and is_parallel_branch_planner_enabled():
+    if not (free_question_parashari_only or remedy_followup_requested) and is_parallel_branch_planner_enabled():
         try:
             planner_result = await plan_parallel_branches(
                 analyzer,
@@ -730,6 +763,18 @@ async def run_parallel_chat_pipeline(
     sd_payload = build_sudarshan_branch_payload(ctx, user_question)
     classical_rule_matches = ctx.get("classical_rule_matches")
     _attach_classical_rule_matches(par_payload, classical_rule_matches)
+
+    if remedy_followup_requested:
+        remedy_followup_note = (
+            "REMEDY FOLLOW-UP MODE: This is not a new chart diagnosis. Use the existing chart context to explain "
+            "only the remedy path the user clicked. Do not restate the full answer, do not branch-by-branch analyze, "
+            "and do not drift into generic predictions. Prioritize practical remedy layers, behavioral correction, "
+            "and one next-step follow-up prompt."
+        )
+        if isinstance(par_static, str):
+            par_static = f"{par_static}\n\n{remedy_followup_note}"
+        if isinstance(sd_static, str):
+            sd_static = f"{sd_static}\n\n{remedy_followup_note}"
 
     stagger_s = parallel_branch_stagger_s()
     if stagger_s > 0:
@@ -1008,7 +1053,7 @@ async def run_parallel_chat_pipeline(
 
     parallel_ms = round((time.time() - t_parallel) * 1000, 1)
 
-    if free_question_parashari_only:
+    if free_question_parashari_only or remedy_followup_requested:
         intent_mode = _intent_mode(ctx, mode)
         (
             language_instruction,
@@ -1021,6 +1066,8 @@ async def run_parallel_chat_pipeline(
         ) = _merge_instruction_blocks(
             user_question, ctx, language, response_style, user_context, premium_analysis, mode
         )
+        if remedy_followup_requested:
+            response_format_instruction = build_remedy_only_response_format()
         current_date = datetime.now()
         ascendant_info = ctx.get("ascendant_info", {})
         ascendant_summary = (
@@ -1041,7 +1088,7 @@ async def run_parallel_chat_pipeline(
                 language_instruction,
                 delivery_format_instruction,
                 elaborate_instruction,
-                build_parashari_only_response_format(),
+                response_format_instruction,
                 user_context_instruction,
                 CLASSICAL_RULE_MATCH_INSTRUCTION,
             ]
@@ -1061,7 +1108,15 @@ async def run_parallel_chat_pipeline(
             f"SPECIALIST_BRANCH_OUTPUTS_JSON:\n{_json_compact(parashari_branch_bundle)}\n"
             f"CURRENT QUESTION: {user_question}\n"
             f"{final_check}\n{FAQ_META_INSTRUCTION.strip()}"
+            f"\n{NEXT_ACTION_META_INSTRUCTION.strip()}"
         )
+        if remedy_followup_requested:
+            final_user = (
+                f"{final_user}\n"
+                "REMEDY FOLLOW-UP MODE: Use the specialist output to give a remedy-only reading. "
+                "Do not return a general chart reading or branch-by-branch synthesis. "
+                "The answer must be a remedy card response with practical steps only."
+            )
         final_prompt = f"{final_static}\n\n{final_user}"
         t_final = time.time()
         final_runtime = _runtime_for("parashari")
@@ -1152,6 +1207,27 @@ async def run_parallel_chat_pipeline(
                     "parallel_agent_context": use_agent_ctx,
                 },
             }
+        if _parallel_log_merge_body_enabled():
+            logger.info(
+                "PARALLEL_MERGE_RAW_RESPONSE_START\n%s\nPARALLEL_MERGE_RAW_RESPONSE_END",
+                cleaned_text,
+            )
+        cleaned_text, next_action = ResponseParser.parse_next_action_metadata(cleaned_text)
+        if _parallel_log_merge_body_enabled():
+            logger.info(
+                "PARALLEL_MERGE_PARSED_NEXT_ACTION %s",
+                json.dumps(next_action, default=str, ensure_ascii=False, sort_keys=True) if next_action else "null",
+            )
+        if next_action:
+            logger.info(
+                "PARALLEL_NEXT_ACTION_META type=%s title=%s confidence=%s reason=%s follow_up_count=%s raw=%s",
+                next_action.get("type"),
+                next_action.get("title"),
+                next_action.get("confidence"),
+                next_action.get("reason"),
+                len(next_action.get("follow_up_questions") or []),
+                json.dumps(next_action, default=str, ensure_ascii=False, sort_keys=True),
+            )
         parsed_response = ResponseParser.parse_images_in_chat_response(cleaned_text)
         matched_term_ids, matched_glossary = find_terms_in_text(parsed_response["content"], language=language)
         model_name = syn.get("chat_llm_model")
@@ -1175,6 +1251,7 @@ async def run_parallel_chat_pipeline(
             "follow_up_questions": parsed_response.get("follow_up_questions", []),
             "analysis_steps": parsed_response.get("analysis_steps", []),
             "faq_metadata": faq_metadata,
+            "next_action": next_action,
             "raw_response": response_text,
             "has_transit_request": "transitRequest" in response_text and '"requestType"' in response_text,
             "chat_llm_model": model_name,
@@ -1268,6 +1345,7 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
         f"{mq_focus}\n"
         f"{'' if _runtime_for('merge')['cached_model'] else f'CURRENT QUESTION: {user_question}' + chr(10)}"
         f"{final_check}\n{FAQ_META_INSTRUCTION.strip()}"
+        f"\n{NEXT_ACTION_META_INSTRUCTION.strip()}"
     )
     merge_static = "\n\n".join(
         [
@@ -1292,6 +1370,10 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
             len(merge_user),
             len(merge_prompt),
         )
+    if _parallel_diag_enabled("ASTRO_PARALLEL_LOG_PROMPT_BODIES"):
+        preview_chars = int(os.environ.get("ASTRO_PARALLEL_LOG_PROMPT_BODIES_MAX_CHARS", "6000") or "6000")
+        prompt_preview = merge_prompt if preview_chars <= 0 else merge_prompt[:preview_chars]
+        logger.info("PARALLEL_MERGE_PROMPT_START\n%s\nPARALLEL_MERGE_PROMPT_END", prompt_preview)
 
     t_syn = time.time()
     merge_runtime = _runtime_for("merge")
@@ -1416,6 +1498,27 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
             },
         }
 
+    if _parallel_log_merge_body_enabled():
+        logger.info(
+            "PARALLEL_MERGE_RAW_RESPONSE_START\n%s\nPARALLEL_MERGE_RAW_RESPONSE_END",
+            cleaned_text,
+        )
+    cleaned_text, next_action = ResponseParser.parse_next_action_metadata(cleaned_text)
+    if _parallel_log_merge_body_enabled():
+        logger.info(
+            "PARALLEL_MERGE_PARSED_NEXT_ACTION %s",
+            json.dumps(next_action, default=str, ensure_ascii=False, sort_keys=True) if next_action else "null",
+        )
+    if next_action:
+        logger.info(
+            "PARALLEL_NEXT_ACTION_META type=%s title=%s confidence=%s reason=%s follow_up_count=%s raw=%s",
+            next_action.get("type"),
+            next_action.get("title"),
+            next_action.get("confidence"),
+            next_action.get("reason"),
+            len(next_action.get("follow_up_questions") or []),
+            json.dumps(next_action, default=str, ensure_ascii=False, sort_keys=True),
+        )
     parsed_response = ResponseParser.parse_images_in_chat_response(cleaned_text)
     matched_term_ids, matched_glossary = find_terms_in_text(parsed_response["content"], language=language)
 
@@ -1450,9 +1553,10 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
         "glossary": matched_glossary,
         "summary_image": summary_image_url,
         "follow_up_questions": parsed_response.get("follow_up_questions", []),
-        "analysis_steps": parsed_response.get("analysis_steps", []),
-        "faq_metadata": faq_metadata,
-        "raw_response": response_text,
+            "analysis_steps": parsed_response.get("analysis_steps", []),
+            "faq_metadata": faq_metadata,
+            "next_action": next_action,
+            "raw_response": response_text,
         "has_transit_request": "transitRequest" in response_text and '"requestType"' in response_text,
         "chat_llm_model": model_name,
         "token_usage": token_usage,
