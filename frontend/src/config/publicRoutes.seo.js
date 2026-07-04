@@ -16,6 +16,7 @@ export const NAKSHATRA_SLUGS = [
 ];
 
 const HOROSCOPE_PERIODS = ['daily', 'weekly', 'monthly'];
+// Static GCS directory pages serve the trailing-slash URL as the canonical 200.
 const DIRECTORY_CANONICAL_PATHS = new Set([
   '/about',
   '/blog',
