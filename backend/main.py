@@ -110,6 +110,7 @@ from credits.credit_request_routes import router as credit_request_router
 from blank_chart.routes import router as blank_chart_router
 from education.routes import router as education_router
 from marriage.marriage_routes import router as marriage_router
+from reports.routes import router as reports_router
 from progeny.progeny_routes import router as progeny_router
 from routes.mundane_routes import router as mundane_router
 from routes.places_routes import router as places_router
@@ -925,6 +926,7 @@ app.include_router(credit_request_router, prefix="/api")
 app.include_router(blank_chart_router, prefix="/api")
 app.include_router(education_router, prefix="/api")
 app.include_router(marriage_router, prefix="/api")
+app.include_router(reports_router, prefix="/api")
 app.include_router(progeny_router, prefix="/api")
 app.include_router(trading_router, prefix="/api")
 app.include_router(yogini_dasha_router, prefix="/api")

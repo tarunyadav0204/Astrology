@@ -28,6 +28,9 @@ import AccountSecurityScreen from './src/components/Profile/AccountSecurityScree
 import AnalysisHubScreen from './src/components/Analysis/AnalysisHubScreen';
 import AnalysisDetailScreen from './src/components/Analysis/AnalysisDetailScreen';
 import RelationshipMatchScreen from './src/components/Relationship/RelationshipMatchScreen';
+import ReportsStudioScreen from './src/components/Reports/ReportsStudioScreen';
+import ReportViewerScreen from './src/components/Reports/ReportViewerScreen';
+import ReportHistoryScreen from './src/components/Reports/ReportHistoryScreen';
 import KarmaAnalysisScreen from './src/components/KarmaAnalysis/KarmaAnalysisScreen';
 import ChartScreen from './src/components/Chart/ChartScreen';
 import PlanetaryPositionsScreen from './src/components/Chart/PlanetaryPositionsScreen';
@@ -89,6 +92,9 @@ const linking = {
       Home: '',
       KarmaAnalysis: 'karma-analysis',
       RelationshipMatch: 'kundli-matching',
+      ReportsStudio: 'reports',
+      ReportViewer: 'reports/view',
+      ReportHistory: 'reports/history',
       BlogList: 'blog',
       BlogPostDetail: 'blog/:slug',
       Profile: 'profile',
@@ -692,6 +698,21 @@ export default function App() {
           <Stack.Screen
             name="RelationshipMatch"
             component={RelationshipMatchScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ReportsStudio"
+            component={ReportsStudioScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ReportViewer"
+            component={ReportViewerScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ReportHistory"
+            component={ReportHistoryScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 

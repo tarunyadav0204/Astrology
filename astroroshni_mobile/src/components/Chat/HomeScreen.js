@@ -1390,6 +1390,15 @@ const loadHomeData = async (nativeData = null) => {
           </GHScrollView>
         </View>
 
+        <ReportStudioCard
+          navigation={navigation}
+          isDark={isDark}
+          colors={colors}
+          cost={pricing.partnership_report ?? pricing.partnership ?? 9}
+          originalCost={pricingOriginal.partnership_report ?? pricingOriginal.partnership}
+          t={t}
+        />
+
 
         {/* Biometric Teaser Card - COMMENTED OUT */}
         {/* <BiometricTeaserCard 
@@ -3072,6 +3081,64 @@ function CosmicRibbonCard({ option, index, onOptionSelect }) {
         </View>
       </TouchableOpacity>
     </View>
+  );
+}
+
+function ReportStudioCard({ navigation, isDark, colors, cost, originalCost, t }) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.92}
+      onPress={() => navigation.navigate('ReportsStudio')}
+      style={styles.reportStudioCardWrap}
+    >
+      <LinearGradient
+        colors={isDark ? ['#1f2937', '#111827'] : ['#0f172a', '#1e293b']}
+        style={styles.reportStudioCard}
+      >
+        <View style={styles.reportStudioTopRow}>
+          <View style={styles.reportStudioIconWrap}>
+            <Text style={styles.reportStudioEmoji}>📄</Text>
+          </View>
+          <View style={styles.reportStudioTextWrap}>
+            <Text style={styles.reportStudioTitle}>
+              {t('reports.homeTitle', 'Authentic Deep Vedic Analysis')}
+            </Text>
+            <Text style={styles.reportStudioSubtitle}>
+              {t('reports.homeSubtitle', 'A 20-page premium report with chart overlays, timing, remedies, and clear takeaways.')}
+            </Text>
+          </View>
+          <Icon name="chevron-forward" size={22} color="#fff" />
+        </View>
+        <View style={styles.reportStudioFooterRow}>
+          <View style={styles.reportStudioBadge}>
+            <Text style={styles.reportStudioBadgeText}>
+              {t('reports.homePages', '20-page report')}
+            </Text>
+          </View>
+          <View style={styles.reportStudioBadge}>
+            <Text style={styles.reportStudioBadgeText}>
+              {t('reports.homePicker', 'Choose what to analyze')}
+            </Text>
+          </View>
+          <View style={styles.reportStudioBadge}>
+            {originalCost != null && originalCost > cost ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.reportStudioBadgeText, { textDecorationLine: 'line-through', opacity: 0.7 }]}>
+                  {originalCost}
+                </Text>
+                <Text style={styles.reportStudioBadgeText}>
+                  {cost} {t('credits.label', 'credits')}
+                </Text>
+              </View>
+            ) : (
+              <Text style={styles.reportStudioBadgeText}>
+                {cost} {t('credits.label', 'credits')}
+              </Text>
+            )}
+          </View>
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
   );
 }
 
@@ -5091,6 +5158,69 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     overflow: 'hidden',
+  },
+  reportStudioCardWrap: {
+    marginBottom: 24,
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  reportStudioCard: {
+    borderRadius: 24,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 5,
+  },
+  reportStudioTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  reportStudioIconWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reportStudioEmoji: {
+    fontSize: 28,
+  },
+  reportStudioTextWrap: {
+    flex: 1,
+  },
+  reportStudioTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  reportStudioSubtitle: {
+    color: 'rgba(255,255,255,0.84)',
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  reportStudioFooterRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  reportStudioBadge: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  reportStudioBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
   },
   tickerContent: {
     paddingVertical: 12,

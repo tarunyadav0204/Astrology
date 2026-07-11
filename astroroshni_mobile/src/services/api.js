@@ -909,6 +909,35 @@ export const relationshipAPI = {
     }),
 };
 
+export const reportAPI = {
+  listTypes: () => api.get(getEndpoint('/reports/types')),
+  getHistory: ({ reportType = null, status = null, limit = 30, offset = 0 } = {}) => {
+    const params = new URLSearchParams();
+    if (reportType) params.append('report_type', reportType);
+    if (status) params.append('status', status);
+    params.append('limit', String(limit));
+    params.append('offset', String(offset));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return api.get(getEndpoint(`/reports/history${suffix}`));
+  },
+  startPartnershipReport: (personA, personB, language = 'english', options = {}) =>
+    api.post(getEndpoint('/reports/partnership/start'), {
+      report_type: 'partnership',
+      boy_birth_data: personA,
+      girl_birth_data: personB,
+      language,
+      chart_style: options.chartStyle || 'both',
+      force_regenerate: Boolean(options.forceRegenerate),
+      include_images: options.includeImages !== false,
+    }),
+  getPartnershipReportStatus: (reportId) =>
+    api.get(getEndpoint(`/reports/partnership/status/${encodeURIComponent(reportId)}`)),
+  getPartnershipReport: (reportId) =>
+    api.get(getEndpoint(`/reports/partnership/${encodeURIComponent(reportId)}`)),
+  getReportPdfUrl: (reportId) =>
+    api.get(getEndpoint(`/reports/pdf/${encodeURIComponent(reportId)}`)),
+};
+
 export const pricingAPI = {
   /** Base pricing (unauthenticated). */
   getAnalysisPricing: () => api.get(getEndpoint('/credits/settings/analysis-pricing')),

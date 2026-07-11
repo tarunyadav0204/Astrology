@@ -434,6 +434,11 @@ class CreditService:
                 ("business_opening_cost", 20, "Credits per business opening muhurat"),
                 ("event_timeline_cost", 100, "Credits per yearly event timeline analysis"),
                 ("partnership_analysis_cost", 2, "Credits per partnership compatibility analysis"),
+                ("partnership_report_cost", 9, "Credits per partnership PDF report"),
+                ("career_report_cost", 15, "Credits per career PDF report"),
+                ("wealth_report_cost", 9, "Credits per wealth PDF report"),
+                ("health_report_cost", 9, "Credits per health PDF report"),
+                ("progeny_report_cost", 15, "Credits per progeny PDF report"),
                 ("karma_analysis_cost", 25, "Credits per karma analysis"),
                 ("ashtakavarga_life_predictions_cost", 15, "Credits per Ashtakavarga life predictions (Dots of Destiny)"),
                 ("podcast_cost", 2, "Credits per podcast (listen to message as audio)"),
@@ -3141,7 +3146,8 @@ class CreditService:
         keys = (
             'chat_question_cost', 'instant_chat_cost', 'speech_chat_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost',
             'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost',
-            'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
+            'progeny_analysis_cost', 'partnership_report_cost', 'career_report_cost', 'wealth_report_cost',
+            'health_report_cost', 'progeny_report_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
             'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost',
             'event_timeline_cost', 'karma_analysis_cost', 'ashtakavarga_life_predictions_cost', 'podcast_cost'
         )
@@ -3200,6 +3206,34 @@ class CreditService:
                         "key": "podcast_cost",
                         "value": 2,
                         "description": "Credits per podcast (listen to message as audio)",
+                        "discount": None,
+                    })
+                except Exception:
+                    pass
+            report_defaults = [
+                ("partnership_report_cost", 9, "Credits per partnership PDF report"),
+                ("career_report_cost", 15, "Credits per career PDF report"),
+                ("wealth_report_cost", 9, "Credits per wealth PDF report"),
+                ("health_report_cost", 9, "Credits per health PDF report"),
+                ("progeny_report_cost", 15, "Credits per progeny PDF report"),
+            ]
+            for key, value, desc in report_defaults:
+                if any(s["key"] == key for s in settings):
+                    continue
+                try:
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO credit_settings (setting_key, setting_value, description)
+                        VALUES (?, ?, ?)
+                        """,
+                        (key, int(value), desc),
+                    )
+                    conn.commit()
+                    settings.append({
+                        "key": key,
+                        "value": int(value),
+                        "description": desc,
                         "discount": None,
                     })
                 except Exception:
