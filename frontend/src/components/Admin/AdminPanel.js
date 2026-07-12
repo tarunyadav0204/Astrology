@@ -852,331 +852,155 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setGeminiModelsSaving(true);
     try {
       const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
-      const parallelBranchRequests = PARALLEL_BRANCH_MODEL_CONFIG.map((branch) =>
-        fetch(`/api/admin/settings/parallel_branch_gemini_model_${branch.key}`, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: `parallel_branch_gemini_model_${branch.key}`,
-            value: parallelBranchGeminiModels[branch.key],
-            description: `Gemini model override for parallel ${branch.label} branch`,
-          }),
-        })
-      );
-      const plannerSettingsRequests = [
-        fetch('/api/admin/settings/parallel_branch_planner_enabled', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'parallel_branch_planner_enabled',
-            value: parallelBranchPlannerEnabled ? 'true' : 'false',
-            description: 'Enable multilingual LLM planner that selects which parallel specialist branches to run',
-          }),
-        }),
-        fetch('/api/admin/settings/parallel_branch_planner_model', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'parallel_branch_planner_model',
-            value: parallelBranchPlannerModel,
-            description: 'Gemini model used for the parallel branch planner step',
-          }),
-        }),
+      // Prod API DB pool is small (~4). Saving ~30 settings via Promise.all exhausts it
+      // and returns 500s. Batch with limited concurrency instead.
+      const ADMIN_SETTINGS_SAVE_CONCURRENCY = 3;
+      const settingPayloads = [
+        {
+          key: 'gemini_chat_model',
+          value: geminiChatModel,
+          description: 'Gemini model for standard chat',
+        },
+        {
+          key: 'gemini_premium_model',
+          value: geminiPremiumModel,
+          description: 'Gemini model for premium chat',
+        },
+        {
+          key: 'gemini_analysis_model',
+          value: geminiAnalysisModel,
+          description: 'Gemini model for analysis (health, wealth, career, karma, physical, events, etc.)',
+        },
+        {
+          key: 'gemini_report_model',
+          value: geminiReportModel,
+          description: 'Gemini model for Reports Studio PDF chapters (partnership, wealth, etc.)',
+        },
+        {
+          key: 'event_timeline_model',
+          value: eventTimelineModel,
+          description: 'Gemini model for yearly/monthly event timeline generation',
+        },
+        {
+          key: 'analysis_llm_vendor',
+          value: analysisLlmVendor,
+          description: 'Vendor for non-chat analysis: gemini or deepseek',
+        },
+        {
+          key: 'report_llm_vendor',
+          value: reportLlmVendor,
+          description: 'Vendor for Reports Studio PDF generation: gemini or deepseek',
+        },
+        {
+          key: 'timeline_llm_vendor',
+          value: timelineLlmVendor,
+          description: 'Vendor for event timeline generation: gemini or deepseek',
+        },
+        {
+          key: 'deepseek_analysis_model',
+          value: deepseekAnalysisModel,
+          description: 'DeepSeek model id when analysis vendor is deepseek',
+        },
+        {
+          key: 'deepseek_report_model',
+          value: deepseekReportModel,
+          description: 'DeepSeek model id when report vendor is deepseek',
+        },
+        {
+          key: 'deepseek_timeline_model',
+          value: deepseekTimelineModel,
+          description: 'DeepSeek model id when timeline vendor is deepseek',
+        },
+        {
+          key: 'chat_llm_provider',
+          value: chatLlmProvider,
+          description: 'Chat LLM vendor for standard (non-premium) chat: gemini, openai, deepseek, or gemma',
+        },
+        {
+          key: 'chat_llm_provider_premium',
+          value: chatLlmProviderPremium,
+          description: 'Chat LLM vendor for premium chat; empty = same as standard (gemini, openai, deepseek, gemma)',
+        },
+        {
+          key: 'openai_chat_model',
+          value: openaiChatModel,
+          description: 'OpenAI model id for standard chat',
+        },
+        {
+          key: 'openai_premium_model',
+          value: openaiPremiumModel,
+          description: 'OpenAI model id for premium chat',
+        },
+        {
+          key: 'deepseek_chat_model',
+          value: deepseekChatModel,
+          description: 'DeepSeek model id for standard chat',
+        },
+        {
+          key: 'deepseek_premium_model',
+          value: deepseekPremiumModel,
+          description: 'DeepSeek model id for premium chat',
+        },
+        {
+          key: 'gemma_chat_generate_url',
+          value: gemmaChatGenerateUrl.trim(),
+          description:
+            'Full URL for self-hosted Gemma chat POST (e.g. http://host:8000/generate-analysis). Empty = use built-in default; env GEMMA_CHAT_GENERATE_URL overrides when set.',
+        },
+        ...PARALLEL_BRANCH_MODEL_CONFIG.map((branch) => ({
+          key: `parallel_branch_gemini_model_${branch.key}`,
+          value: parallelBranchGeminiModels[branch.key],
+          description: `Gemini model override for parallel ${branch.label} branch`,
+        })),
+        {
+          key: 'parallel_branch_planner_enabled',
+          value: parallelBranchPlannerEnabled ? 'true' : 'false',
+          description: 'Enable multilingual LLM planner that selects which parallel specialist branches to run',
+        },
+        {
+          key: 'parallel_branch_planner_model',
+          value: parallelBranchPlannerModel,
+          description: 'Gemini model used for the parallel branch planner step',
+        },
+        ...PARALLEL_BRANCH_MODEL_CONFIG.map((branch) => ({
+          key: `parallel_branch_word_limit_${branch.key}`,
+          value: String(parallelBranchWordLimits[branch.key] || DEFAULT_PARALLEL_BRANCH_WORD_LIMITS[branch.key]),
+          description: `Target output word budget for parallel ${branch.label} branch`,
+        })),
       ];
-      const parallelBranchWordLimitRequests = PARALLEL_BRANCH_MODEL_CONFIG.map((branch) =>
-        fetch(`/api/admin/settings/parallel_branch_word_limit_${branch.key}`, {
+
+      const putSetting = async (payload) => {
+        const response = await fetch(`/api/admin/settings/${encodeURIComponent(payload.key)}`, {
           method: 'PUT',
           headers,
-          body: JSON.stringify({
-            key: `parallel_branch_word_limit_${branch.key}`,
-            value: String(parallelBranchWordLimits[branch.key] || DEFAULT_PARALLEL_BRANCH_WORD_LIMITS[branch.key]),
-            description: `Target output word budget for parallel ${branch.label} branch`,
-          }),
-        })
-      );
-      const [
-        chatRes,
-        premiumRes,
-        analysisRes,
-        reportRes,
-        timelineRes,
-        analysisVendorRes,
-        reportVendorRes,
-        timelineVendorRes,
-        deepseekAnalysisRes,
-        deepseekReportRes,
-        deepseekTimelineRes,
-        providerRes,
-        premiumProviderRes,
-        openaiChatRes,
-        openaiPremiumRes,
-        deepseekChatRes,
-        deepseekPremiumRes,
-        gemmaUrlRes,
-        ...parallelSettingsResponses
-      ] = await Promise.all([
-        fetch('/api/admin/settings/gemini_chat_model', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'gemini_chat_model',
-            value: geminiChatModel,
-            description: 'Gemini model for standard chat',
-          }),
-        }),
-        fetch('/api/admin/settings/gemini_premium_model', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'gemini_premium_model',
-            value: geminiPremiumModel,
-            description: 'Gemini model for premium chat',
-          }),
-        }),
-        fetch('/api/admin/settings/gemini_analysis_model', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'gemini_analysis_model',
-            value: geminiAnalysisModel,
-            description: 'Gemini model for analysis (health, wealth, career, karma, physical, events, etc.)',
-          }),
-        }),
-        fetch('/api/admin/settings/gemini_report_model', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'gemini_report_model',
-            value: geminiReportModel,
-            description: 'Gemini model for Reports Studio PDF chapters (partnership, wealth, etc.)',
-          }),
-        }),
-        fetch('/api/admin/settings/event_timeline_model', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'event_timeline_model',
-            value: eventTimelineModel,
-            description: 'Gemini model for yearly/monthly event timeline generation',
-          }),
-        }),
-        fetch('/api/admin/settings/analysis_llm_vendor', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'analysis_llm_vendor',
-            value: analysisLlmVendor,
-            description: 'Vendor for non-chat analysis: gemini or deepseek',
-          }),
-        }),
-        fetch('/api/admin/settings/report_llm_vendor', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'report_llm_vendor',
-            value: reportLlmVendor,
-            description: 'Vendor for Reports Studio PDF generation: gemini or deepseek',
-          }),
-        }),
-        fetch('/api/admin/settings/timeline_llm_vendor', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'timeline_llm_vendor',
-            value: timelineLlmVendor,
-            description: 'Vendor for event timeline generation: gemini or deepseek',
-          }),
-        }),
-        fetch('/api/admin/settings/deepseek_analysis_model', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'deepseek_analysis_model',
-            value: deepseekAnalysisModel,
-            description: 'DeepSeek model id when analysis vendor is deepseek',
-          }),
-        }),
-        fetch('/api/admin/settings/deepseek_report_model', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'deepseek_report_model',
-            value: deepseekReportModel,
-            description: 'DeepSeek model id when report vendor is deepseek',
-          }),
-        }),
-        fetch('/api/admin/settings/deepseek_timeline_model', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'deepseek_timeline_model',
-            value: deepseekTimelineModel,
-            description: 'DeepSeek model id when timeline vendor is deepseek',
-          }),
-        }),
-        fetch('/api/admin/settings/chat_llm_provider', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'chat_llm_provider',
-            value: chatLlmProvider,
-            description: 'Chat LLM vendor for standard (non-premium) chat: gemini, openai, deepseek, or gemma',
-          }),
-        }),
-        fetch('/api/admin/settings/chat_llm_provider_premium', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'chat_llm_provider_premium',
-            value: chatLlmProviderPremium,
-            description: 'Chat LLM vendor for premium chat; empty = same as standard (gemini, openai, deepseek, gemma)',
-          }),
-        }),
-        fetch('/api/admin/settings/openai_chat_model', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'openai_chat_model',
-            value: openaiChatModel,
-            description: 'OpenAI model id for standard chat',
-          }),
-        }),
-        fetch('/api/admin/settings/openai_premium_model', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'openai_premium_model',
-            value: openaiPremiumModel,
-            description: 'OpenAI model id for premium chat',
-          }),
-        }),
-        fetch('/api/admin/settings/deepseek_chat_model', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'deepseek_chat_model',
-            value: deepseekChatModel,
-            description: 'DeepSeek model id for standard chat',
-          }),
-        }),
-        fetch('/api/admin/settings/deepseek_premium_model', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'deepseek_premium_model',
-            value: deepseekPremiumModel,
-            description: 'DeepSeek model id for premium chat',
-          }),
-        }),
-        fetch('/api/admin/settings/gemma_chat_generate_url', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'gemma_chat_generate_url',
-            value: gemmaChatGenerateUrl.trim(),
-            description:
-              'Full URL for self-hosted Gemma chat POST (e.g. http://host:8000/generate-analysis). Empty = use built-in default; env GEMMA_CHAT_GENERATE_URL overrides when set.',
-          }),
-        }),
-        ...parallelBranchRequests,
-        ...plannerSettingsRequests,
-        ...parallelBranchWordLimitRequests,
-      ]);
-      const parallelBranchResponses = parallelSettingsResponses.slice(0, PARALLEL_BRANCH_MODEL_CONFIG.length);
-      const plannerResponses = parallelSettingsResponses.slice(PARALLEL_BRANCH_MODEL_CONFIG.length, PARALLEL_BRANCH_MODEL_CONFIG.length + 2);
-      const parallelBranchWordLimitResponses = parallelSettingsResponses.slice(PARALLEL_BRANCH_MODEL_CONFIG.length + 2);
-      if (
-        !chatRes.ok ||
-        !premiumRes.ok ||
-        !analysisRes.ok ||
-        !reportRes.ok ||
-        !timelineRes.ok ||
-        !analysisVendorRes.ok ||
-        !reportVendorRes.ok ||
-        !timelineVendorRes.ok ||
-        !deepseekAnalysisRes.ok ||
-        !deepseekReportRes.ok ||
-        !deepseekTimelineRes.ok ||
-        !providerRes.ok ||
-        !premiumProviderRes.ok ||
-        !openaiChatRes.ok ||
-        !openaiPremiumRes.ok ||
-        !deepseekChatRes.ok ||
-        !deepseekPremiumRes.ok ||
-        !gemmaUrlRes.ok ||
-        parallelBranchResponses.some((response) => !response.ok) ||
-        plannerResponses.some((response) => !response.ok) ||
-        parallelBranchWordLimitResponses.some((response) => !response.ok)
-      ) {
-        const chatErr = await chatRes.json().catch(() => ({}));
-        const premiumErr = await premiumRes.json().catch(() => ({}));
-        const analysisErr = await analysisRes.json().catch(() => ({}));
-        const reportErr = await reportRes.json().catch(() => ({}));
-        const timelineErr = await timelineRes.json().catch(() => ({}));
-        const analysisVendorErr = await analysisVendorRes.json().catch(() => ({}));
-        const reportVendorErr = await reportVendorRes.json().catch(() => ({}));
-        const timelineVendorErr = await timelineVendorRes.json().catch(() => ({}));
-        const dsAnalysisErr = await deepseekAnalysisRes.json().catch(() => ({}));
-        const dsReportErr = await deepseekReportRes.json().catch(() => ({}));
-        const dsTimelineErr = await deepseekTimelineRes.json().catch(() => ({}));
-        const providerErr = await providerRes.json().catch(() => ({}));
-        const premiumProviderErr = await premiumProviderRes.json().catch(() => ({}));
-        const oaChatErr = await openaiChatRes.json().catch(() => ({}));
-        const oaPremErr = await openaiPremiumRes.json().catch(() => ({}));
-        const dsChatErr = await deepseekChatRes.json().catch(() => ({}));
-        const dsPremErr = await deepseekPremiumRes.json().catch(() => ({}));
-        const gemmaUrlErr = await gemmaUrlRes.json().catch(() => ({}));
-        const parallelBranchErr = await (parallelBranchResponses.find((response) => !response.ok)?.json().catch(() => ({})) || Promise.resolve({}));
-        const plannerErr = await (plannerResponses.find((response) => !response.ok)?.json().catch(() => ({})) || Promise.resolve({}));
-        const parallelBranchWordLimitErr = await (parallelBranchWordLimitResponses.find((response) => !response.ok)?.json().catch(() => ({})) || Promise.resolve({}));
-        console.error(
-          'Save failed:',
-          chatErr,
-          premiumErr,
-          analysisErr,
-          reportErr,
-          timelineErr,
-          analysisVendorErr,
-          reportVendorErr,
-          timelineVendorErr,
-          dsAnalysisErr,
-          dsReportErr,
-          dsTimelineErr,
-          providerErr,
-          premiumProviderErr,
-          oaChatErr,
-          oaPremErr,
-          dsChatErr,
-          dsPremErr,
-          gemmaUrlErr,
-          parallelBranchErr,
-          plannerErr,
-          parallelBranchWordLimitErr
-        );
+          body: JSON.stringify(payload),
+        });
+        if (response.ok) {
+          return { ok: true, key: payload.key };
+        }
+        const err = await response.json().catch(() => ({}));
+        return {
+          ok: false,
+          key: payload.key,
+          status: response.status,
+          detail: err.detail || err.message || `HTTP ${response.status}`,
+        };
+      };
+
+      const failures = [];
+      for (let i = 0; i < settingPayloads.length; i += ADMIN_SETTINGS_SAVE_CONCURRENCY) {
+        const batch = settingPayloads.slice(i, i + ADMIN_SETTINGS_SAVE_CONCURRENCY);
+        const results = await Promise.all(batch.map(putSetting));
+        failures.push(...results.filter((result) => !result.ok));
+      }
+
+      if (failures.length) {
+        console.error('Save failed:', failures);
         alert(
-          'Failed to save: ' +
-            (chatErr.detail ||
-              premiumErr.detail ||
-              analysisErr.detail ||
-              reportErr.detail ||
-              timelineErr.detail ||
-              analysisVendorErr.detail ||
-              reportVendorErr.detail ||
-              timelineVendorErr.detail ||
-              dsAnalysisErr.detail ||
-              dsReportErr.detail ||
-              dsTimelineErr.detail ||
-              providerErr.detail ||
-              premiumProviderErr.detail ||
-              oaChatErr.detail ||
-              oaPremErr.detail ||
-              dsChatErr.detail ||
-              dsPremErr.detail ||
-              gemmaUrlErr.detail ||
-              parallelBranchErr.detail ||
-              plannerErr.detail ||
-              parallelBranchWordLimitErr.detail ||
-              'check console')
+          `Failed to save ${failures.length} setting(s): ${failures
+            .slice(0, 3)
+            .map((f) => `${f.key} (${f.detail})`)
+            .join('; ')}${failures.length > 3 ? '…' : ''}`
         );
         return;
       }

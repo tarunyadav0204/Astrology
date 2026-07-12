@@ -2826,7 +2826,14 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
             bump_credits_settings_version()
         return {"message": "Setting updated", "key": key, "value": setting.value}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating setting: {str(e)}")
+        err_name = type(e).__name__
+        # psycopg2.pool.PoolError when many parallel admin PUTs exhaust DB_POOL_MAX_CONN (~4 on API).
+        if "PoolError" in err_name or "connection pool" in str(e).lower():
+            raise HTTPException(
+                status_code=503,
+                detail=f"Database pool busy updating setting '{key}'. Retry with fewer parallel saves.",
+            ) from e
+        raise HTTPException(status_code=500, detail=f"Error updating setting: {str(e)}") from e
 
 
 @router.get("/admin/ops/system-status")
