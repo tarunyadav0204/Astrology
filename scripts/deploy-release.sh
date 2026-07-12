@@ -566,6 +566,7 @@ verify_homepage_prerender() {
 verify_route_marker "/karma-analysis" "Past Life Karma Analysis" "Next SEO HTML (karma)"
 verify_route_marker "/kundli-matching" "Kundli Matching" "Next SEO HTML (kundli)"
 verify_route_marker "/chat" "AI Vedic Astrologer Chat" "Next SEO HTML (chat)"
+verify_route_marker "/reports" "Why Reports Studio?" "CRA prerendered Reports Studio (Partnership + Wealth)"
 verify_homepage_prerender
 deploy_timing "frontend SEO route verification complete"
 else

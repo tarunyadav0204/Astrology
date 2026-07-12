@@ -44,7 +44,7 @@ if (fs.existsSync(path.join(OUT, '_next'))) {
   console.log('[next-karma] Copied _next assets to frontend/build/_next');
 }
 
-const routes = ['karma-analysis', 'kundli-matching', 'chat', 'reports'];
+const routes = ['karma-analysis', 'kundli-matching', 'chat'];
 for (const route of routes) {
   const html = readRouteHtml(route);
   if (!html) {
@@ -59,8 +59,21 @@ for (const route of routes) {
   console.log(`[next-karma] Wrote ${route}.html and ${route}/index.html`);
 }
 
+// /reports is CRA + postbuild Puppeteer prerender (not Next). Remove any stale Next export.
+for (const stale of ['reports.html', path.join('reports', 'index.html')]) {
+  const stalePath = path.join(CRA_BUILD, stale);
+  if (fs.existsSync(stalePath)) {
+    fs.unlinkSync(stalePath);
+    console.log(`[next-karma] Removed stale Next SEO file ${stale}`);
+  }
+}
+const staleReportsDir = path.join(CRA_BUILD, 'reports');
+if (fs.existsSync(staleReportsDir) && fs.readdirSync(staleReportsDir).length === 0) {
+  fs.rmdirSync(staleReportsDir);
+}
+
 // Compatibility only for simple static hosting. Query-aware routing for
-// /?app=1, /karma-analysis?app=1, /kundli-matching?app=1, /chat?app=1, and /reports?app=1 require frontend/scripts/serve-build.mjs.
+// /?app=1, /karma-analysis?app=1, /kundli-matching?app=1, and /chat?app=1 require frontend/scripts/serve-build.mjs.
 const serveJson = {
   rewrites: [
     { source: '/', destination: '/index.html' },
@@ -70,8 +83,6 @@ const serveJson = {
     { source: '/kundli-matching/', destination: '/kundli-matching.html' },
     { source: '/chat', destination: '/chat.html' },
     { source: '/chat/', destination: '/chat.html' },
-    { source: '/reports', destination: '/reports.html' },
-    { source: '/reports/', destination: '/reports.html' },
     { source: '**', destination: '/index.html' },
   ],
 };

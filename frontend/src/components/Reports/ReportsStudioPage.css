@@ -431,6 +431,10 @@
   color: #78716c !important;
 }
 
+.reports-seo-cta-wrap {
+  margin-top: 18px;
+}
+
 .reports-faq-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

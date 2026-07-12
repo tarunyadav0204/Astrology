@@ -2,6 +2,8 @@
 
 Pre-rendered SEO pages for `/karma-analysis`, `/kundli-matching`, and `/chat`, merged into the CRA production build.
 
+`/reports` is **not** Next — it uses CRA + Puppeteer prerender like `/wealth-analysis`.
+
 ## Local dev
 
 **Option A — CRA (recommended, same as rest of the site):**

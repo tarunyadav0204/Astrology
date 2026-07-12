@@ -1,7 +1,8 @@
 /**
  * Production static server for frontend/build.
  * - / (+ trailing slash) → CRA index.html, prerendered after build for homepage SEO
- * - /karma-analysis, /kundli-matching, /chat, /reports → Next SEO HTML by default; ?app=1 → CRA for those paths
+ * - /karma-analysis, /kundli-matching, /chat → Next SEO HTML by default; ?app=1 → CRA for those paths
+ * - /reports → CRA (Puppeteer-prerendered), same pattern as wealth-analysis / marriage-analysis
  * - Everything else → static file, or index.html for SPA routes
  */
 import http from 'http';
@@ -152,11 +153,11 @@ const server = http.createServer(async (req, res) => {
 
     // SEO HTML by default for tool landing URLs; ?app=1 → CRA (full nav, login modal, tool).
     // Root `/` is the real CRA homepage; build-time prerender makes its index.html crawlable.
+    // /reports is CRA + Puppeteer prerender (not Next).
     const nextSeoRoutes = {
       '/karma-analysis': 'karma-analysis.html',
       '/kundli-matching': 'kundli-matching.html',
       '/chat': 'chat.html',
-      '/reports': 'reports.html',
     };
     const seoRouteKey = pathname === '/' ? '/' : pathname.replace(/\/$/, '');
     const seoFileName = nextSeoRoutes[seoRouteKey];
@@ -222,6 +223,5 @@ server.listen(PORT, () => {
   console.log('Kundli app: http://localhost:' + PORT + '/kundli-matching?app=1');
   console.log('Chat SEO:   http://localhost:' + PORT + '/chat');
   console.log('Chat app:   http://localhost:' + PORT + '/chat?app=1');
-  console.log('Reports SEO: http://localhost:' + PORT + '/reports');
-  console.log('Reports app: http://localhost:' + PORT + '/reports?app=1');
+  console.log('Reports:    http://localhost:' + PORT + '/reports  (CRA, prerendered)');
 });

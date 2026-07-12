@@ -885,6 +885,18 @@ const ReportsStudioPage = ({
             Coming next in Reports Studio: Career, Health, and Progeny — same generate / reopen / regenerate
             credit model, languages, and PDF delivery.
           </p>
+          <p className="reports-seo-cta-wrap">
+            <button
+              type="button"
+              className="reports-primary-btn"
+              onClick={() => {
+                const el = document.getElementById('reports-studio-tool');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+            >
+              Open Reports Studio
+            </button>
+          </p>
         </section>
 
         <section className="reports-faq" aria-label="Reports FAQs">
