@@ -198,9 +198,9 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
   override fun onBufferReceived(buffer: ByteArray?) {}
   override fun onEndOfSpeech() {
     emitDebug("onEndOfSpeech")
-    if (latestTranscript.trim().isNotBlank()) {
-      mainHandler.postDelayed({ resolveWithLatestTranscript("end_of_speech") }, 250L)
-    }
+    // Settle shortly after end-of-speech using the best transcript we have.
+    // resolveWithLatestTranscript rejects cleanly if it is still blank.
+    mainHandler.postDelayed({ resolveWithLatestTranscript("end_of_speech") }, 250L)
   }
   override fun onEvent(eventType: Int, params: Bundle?) {
     emitDebug("onEvent", eventType.toString())
@@ -211,7 +211,11 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
       ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
       ?.firstOrNull()
       ?.trim()
-      ?: return
+      .orEmpty()
+    if (partial.isBlank()) {
+      emitDebug("onPartialResultsBlank")
+      return
+    }
     latestTranscript = partial
     emitDebug("onPartialResults", partial)
     mainHandler.removeCallbacks(partialStableRunnable)
@@ -318,7 +322,13 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
     val raw = (locale ?: "").trim().lowercase(Locale.US)
     return when {
       raw.startsWith("hi") || raw == "hindi" -> "hi-IN"
-      raw.startsWith("en") || raw == "english" || raw.isBlank() -> "en-IN"
+      // Preserve explicit English regions (en-US, en-GB, en-IN, …).
+      raw.matches(Regex("^en[-_][a-z]{2}$")) -> {
+        val parts = raw.split('-', '_')
+        "en-${parts[1].uppercase(Locale.US)}"
+      }
+      // App language codes like "english" / "en" / blank → US English (previous default).
+      raw.startsWith("en") || raw == "english" || raw.isBlank() -> "en-US"
       else -> locale ?: Locale.getDefault().toLanguageTag()
     }
   }
@@ -332,24 +342,29 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
     val transcript = latestTranscript.trim()
     val promise = pendingPromise ?: return
     if (transcript.isBlank()) {
-      if (reason == "max_listening") {
-        pendingPromise = null
-        latestTranscript = ""
-        manualStopRequested = false
-        listeningStartedAtMillis = 0L
-        lastRmsDebugAtMillis = 0L
-        clearTimers()
-        emitDebug("resolveBlankMaxListening")
-        promise.reject("no_speech", "No speech detected")
-        mainHandler.post {
-          try {
-            speechRecognizer?.cancel()
-            speechRecognizer?.destroy()
-          } catch (e: Exception) {
-            // ignore cleanup failures
-          }
-          speechRecognizer = null
+      // partial_stable can race with an empty partial overwrite; keep listening and
+      // let max_listening / onResults / onError settle the promise.
+      if (reason == "partial_stable") {
+        emitDebug("resolveBlankIgnored", reason)
+        return
+      }
+      // Terminal reasons must always settle so the JS promise cannot hang.
+      pendingPromise = null
+      latestTranscript = ""
+      manualStopRequested = false
+      listeningStartedAtMillis = 0L
+      lastRmsDebugAtMillis = 0L
+      clearTimers()
+      emitDebug("resolveBlank", reason)
+      promise.reject("no_speech", "No speech detected")
+      mainHandler.post {
+        try {
+          speechRecognizer?.cancel()
+          speechRecognizer?.destroy()
+        } catch (e: Exception) {
+          // ignore cleanup failures
         }
+        speechRecognizer = null
       }
       return
     }
