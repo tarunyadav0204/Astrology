@@ -115,6 +115,45 @@ export const reportService = {
     return parseJson(response);
   },
 
+  lookupExistingHealthReport: async (person, language = 'english', options = {}) => {
+    const response = await fetch('/api/reports/health/existing', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        report_type: 'health',
+        birth_data: person,
+        language,
+        chart_style: options.chartStyle || 'both',
+        force_regenerate: false,
+        include_images: options.includeImages !== false,
+      }),
+    });
+    return parseJson(response);
+  },
+
+  startHealthReport: async (person, language = 'english', options = {}) => {
+    const response = await fetch('/api/reports/health/start', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        report_type: 'health',
+        birth_data: person,
+        language,
+        chart_style: options.chartStyle || 'both',
+        force_regenerate: Boolean(options.forceRegenerate),
+        include_images: options.includeImages !== false,
+      }),
+    });
+    return parseJson(response);
+  },
+
+  getHealthReportStatus: async (reportId) => {
+    const response = await fetch(`/api/reports/health/status/${encodeURIComponent(reportId)}`, {
+      headers: authHeaders(),
+    });
+    return parseJson(response);
+  },
+
   getReportPdfUrl: async (reportId) => {
     const response = await fetch(`/api/reports/pdf/${encodeURIComponent(reportId)}`, {
       headers: authHeaders(),

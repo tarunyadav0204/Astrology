@@ -57,11 +57,11 @@ const REPORT_TYPE_FALLBACKS = [
   {
     key: 'health',
     title: 'Health Report',
-    subtitle: 'Coming soon',
-    description: 'A future report for body constitution, care points, and wellness habits.',
+    subtitle: 'Best for constitution, care points, and the next 12 months of wellness timing',
+    description: 'A premium 27-page PDF with D1/D9/D30 layers, vitality themes, lifestyle triggers, and dasha-based monthly health timing.',
     icon: '🏥',
     gradient: ['#22c55e', '#15803d'],
-    enabled: false,
+    enabled: true,
   },
   {
     key: 'progeny',
@@ -138,10 +138,12 @@ const isSameReportPair = (personA, personB, otherA, otherB) => {
   );
 };
 
+const isSingleChartReport = (reportType) => reportType === 'wealth' || reportType === 'health';
+
 const isSameReportSelection = (reportType, personA, personB, otherA, otherB) => {
   if (!personA || !otherA) return false;
   if (chartIdentityKey(personA) !== chartIdentityKey(otherA)) return false;
-  if (reportType === 'wealth') return true;
+  if (isSingleChartReport(reportType)) return true;
   return isSameReportPair(personA, personB, otherA, otherB);
 };
 
@@ -260,12 +262,20 @@ export default function ReportsStudioScreen({ navigation, route }) {
 
   const reportCost = useMemo(() => {
     const key = `${selectedReportType}_report`;
-    return Number(pricing?.[key] ?? pricing?.partnership_report ?? pricing?.partnership ?? 9) || 0;
+    const fallbackKey = selectedReportType === 'health' ? 'health_report_cost' : null;
+    return Number(
+      pricing?.[key]
+      ?? (fallbackKey ? pricing?.[fallbackKey] : null)
+      ?? pricing?.partnership_report
+      ?? pricing?.partnership
+      ?? 9
+    ) || 0;
   }, [pricing, selectedReportType]);
 
   const reportOriginalCost = useMemo(() => {
     const key = `${selectedReportType}_report`;
-    return pricingOriginal?.[key] ?? null;
+    const fallbackKey = selectedReportType === 'health' ? 'health_report_cost' : null;
+    return pricingOriginal?.[key] ?? (fallbackKey ? pricingOriginal?.[fallbackKey] : null) ?? null;
   }, [pricingOriginal, selectedReportType]);
 
   const selectedTypeMeta = reportTypeMap.get(selectedReportType) || REPORT_TYPE_FALLBACKS[0];
@@ -273,12 +283,12 @@ export default function ReportsStudioScreen({ navigation, route }) {
   const step1Ready = !!selectedReportType && selectedTypeEnabled;
   const step2Ready = selectedReportType === 'partnership'
     ? (!!selectedPersonA && !!selectedPersonB)
-    : selectedReportType === 'wealth'
+    : isSingleChartReport(selectedReportType)
       ? !!selectedPersonA
       : false;
   const readyToGenerate = (
     (selectedReportType === 'partnership' && !!selectedPersonA && !!selectedPersonB)
-    || (selectedReportType === 'wealth' && !!selectedPersonA)
+    || (isSingleChartReport(selectedReportType) && !!selectedPersonA)
   ) && !loadingReport;
 
   const genericReportError = t('reports.genericError', 'Something went wrong while preparing your report. Please try again in a moment.');
@@ -514,9 +524,11 @@ export default function ReportsStudioScreen({ navigation, route }) {
     clearPollTimer();
     const reportType = options.reportType || selectedReportType;
     try {
-      const statusResponse = reportType === 'wealth'
-        ? await reportAPI.getWealthReportStatus(reportId)
-        : await reportAPI.getPartnershipReportStatus(reportId);
+      const statusResponse = reportType === 'health'
+        ? await reportAPI.getHealthReportStatus(reportId)
+        : reportType === 'wealth'
+          ? await reportAPI.getWealthReportStatus(reportId)
+          : await reportAPI.getPartnershipReportStatus(reportId);
       const statusPayload = statusResponse?.data || {};
       const status = String(statusPayload.status || '').toLowerCase();
       setProcessingStatus(status || 'pending');
@@ -664,9 +676,9 @@ export default function ReportsStudioScreen({ navigation, route }) {
   useEffect(() => {
     let cancelled = false;
     const isPartnership = selectedReportType === 'partnership';
-    const isWealth = selectedReportType === 'wealth';
+    const isSoloChart = isSingleChartReport(selectedReportType);
     if (
-      (!isPartnership && !isWealth)
+      (!isPartnership && !isSoloChart)
       || !selectedPersonA
       || (isPartnership && !selectedPersonB)
       || !reportLanguage
@@ -705,14 +717,16 @@ export default function ReportsStudioScreen({ navigation, route }) {
       existingLookupKeyRef.current = lookupKey;
       if (mountedRef.current) setCheckingExistingReport(true);
       try {
-        const response = isWealth
-          ? await reportAPI.lookupExistingWealthReport(selectedPersonA, reportLanguage, { chartStyle: 'both' })
-          : await reportAPI.lookupExistingPartnershipReport(
-            selectedPersonA,
-            selectedPersonB,
-            reportLanguage,
-            { chartStyle: 'both' }
-          );
+        const response = selectedReportType === 'health'
+          ? await reportAPI.lookupExistingHealthReport(selectedPersonA, reportLanguage, { chartStyle: 'both' })
+          : selectedReportType === 'wealth'
+            ? await reportAPI.lookupExistingWealthReport(selectedPersonA, reportLanguage, { chartStyle: 'both' })
+            : await reportAPI.lookupExistingPartnershipReport(
+              selectedPersonA,
+              selectedPersonB,
+              reportLanguage,
+              { chartStyle: 'both' }
+            );
         if (cancelled || !mountedRef.current || existingLookupKeyRef.current !== lookupKey) {
           return;
         }
@@ -799,7 +813,12 @@ export default function ReportsStudioScreen({ navigation, route }) {
   ]);
 
   const startReportGeneration = async ({ forceRegenerate = false } = {}) => {
-    if (!selectedTypeMeta?.enabled && selectedReportType !== 'partnership' && selectedReportType !== 'wealth') {
+    if (
+      !selectedTypeMeta?.enabled
+      && selectedReportType !== 'partnership'
+      && selectedReportType !== 'wealth'
+      && selectedReportType !== 'health'
+    ) {
       Alert.alert(
         t('reports.comingSoonTitle', 'Coming soon'),
         t('reports.comingSoonBody', 'This report type is not available yet. We are building it next.')
@@ -807,10 +826,14 @@ export default function ReportsStudioScreen({ navigation, route }) {
       return;
     }
 
-    if (selectedReportType !== 'partnership' && selectedReportType !== 'wealth') {
+    if (
+      selectedReportType !== 'partnership'
+      && selectedReportType !== 'wealth'
+      && selectedReportType !== 'health'
+    ) {
       Alert.alert(
         t('reports.unavailableTitle', 'Not ready yet'),
-        t('reports.unavailableBody', 'Only partnership and wealth reports are available in this release.')
+        t('reports.unavailableBody', 'Only partnership, wealth, and health reports are available in this release.')
       );
       return;
     }
@@ -823,10 +846,12 @@ export default function ReportsStudioScreen({ navigation, route }) {
       return;
     }
 
-    if (selectedReportType === 'wealth' && !selectedPersonA) {
+    if (isSingleChartReport(selectedReportType) && !selectedPersonA) {
       Alert.alert(
         t('reports.missingChartTitle', 'Choose a chart'),
-        t('reports.missingChartBody', 'Please select a birth chart before generating your wealth report.')
+        selectedReportType === 'health'
+          ? t('reports.missingChartBodyHealth', 'Please select a birth chart before generating your health report.')
+          : t('reports.missingChartBody', 'Please select a birth chart before generating your wealth report.')
       );
       return;
     }
@@ -853,18 +878,24 @@ export default function ReportsStudioScreen({ navigation, route }) {
       setReportDocument(null);
       setGeneratedPdfUri('');
       setProcessingStatus('pending');
-      const response = selectedReportType === 'wealth'
-        ? await reportAPI.startWealthReport(selectedPersonA, reportLanguage, {
+      const response = selectedReportType === 'health'
+        ? await reportAPI.startHealthReport(selectedPersonA, reportLanguage, {
           includeImages: true,
           forceRegenerate,
           chartStyle: 'both',
         })
-        : await reportAPI.startPartnershipReport(
-          selectedPersonA,
-          selectedPersonB,
-          reportLanguage,
-          { includeImages: true, forceRegenerate, chartStyle: 'both' }
-        );
+        : selectedReportType === 'wealth'
+          ? await reportAPI.startWealthReport(selectedPersonA, reportLanguage, {
+            includeImages: true,
+            forceRegenerate,
+            chartStyle: 'both',
+          })
+          : await reportAPI.startPartnershipReport(
+            selectedPersonA,
+            selectedPersonB,
+            reportLanguage,
+            { includeImages: true, forceRegenerate, chartStyle: 'both' }
+          );
       const reportId = response?.data?.report_id;
       if (!reportId) {
         throw new Error(t('reports.startFailed', 'Could not start the report.'));
@@ -930,7 +961,11 @@ export default function ReportsStudioScreen({ navigation, route }) {
 
   const statusMessage = loadingReport
     ? (processingStatus === 'processing'
-      ? t('reports.processing', 'We are reading both charts and assembling the report now.')
+      ? (isSingleChartReport(selectedReportType)
+        ? (selectedReportType === 'health'
+          ? t('reports.processingHealth', 'We are reading your chart and assembling the health report now.')
+          : t('reports.processingWealth', 'We are reading your chart and assembling the wealth report now.'))
+        : t('reports.processing', 'We are reading both charts and assembling the report now.'))
       : t('reports.pending', "We're getting started on your report. This usually takes just a moment."))
     : reportDocument
       ? (generatedPdfUri
@@ -1015,12 +1050,16 @@ export default function ReportsStudioScreen({ navigation, route }) {
   const availableReportTypes = displayReportTypes.filter((item) => item.enabled !== false);
   const upcomingReportTypes = displayReportTypes.filter((item) => item.enabled === false);
   const headerSubtitleText = canRegenerateCurrentPair
-    ? (selectedReportType === 'wealth'
-      ? t('reports.subtitleReadyWealth', 'Your wealth report for this chart is ready. Open it anytime, or regenerate for a fresh reading.')
+    ? (isSingleChartReport(selectedReportType)
+      ? (selectedReportType === 'health'
+        ? t('reports.subtitleReadyHealth', 'Your health report for this chart is ready. Open it anytime, or regenerate for a fresh reading.')
+        : t('reports.subtitleReadyWealth', 'Your wealth report for this chart is ready. Open it anytime, or regenerate for a fresh reading.'))
       : t('reports.subtitleReady', 'Your report for this pair is ready. Open it anytime, or regenerate for a fresh reading.'))
     : activeStep === 2
-      ? (selectedReportType === 'wealth'
-        ? t('reports.subtitleStep2Wealth', 'Pick the birth chart this wealth report should study.')
+      ? (isSingleChartReport(selectedReportType)
+        ? (selectedReportType === 'health'
+          ? t('reports.subtitleStep2Health', 'Pick the birth chart this health report should study.')
+          : t('reports.subtitleStep2Wealth', 'Pick the birth chart this wealth report should study.'))
         : t('reports.subtitleStep2', 'Pick the two charts this report should study.'))
       : activeStep === 3
         ? t('reports.subtitleStep3', 'Confirm language, then open or generate the PDF.')
@@ -1199,8 +1238,10 @@ export default function ReportsStudioScreen({ navigation, route }) {
                 {activeStep === 1
                   ? t('reports.step1Subtitle', 'Choose the report that feels most relevant right now.')
                   : activeStep === 2
-                    ? (selectedReportType === 'wealth'
-                      ? t('reports.step2SubtitleWealth', 'Choose the birth chart for this wealth report.')
+                    ? (isSingleChartReport(selectedReportType)
+                      ? (selectedReportType === 'health'
+                        ? t('reports.step2SubtitleHealth', 'Choose the birth chart for this health report.')
+                        : t('reports.step2SubtitleWealth', 'Choose the birth chart for this wealth report.'))
                       : t('reports.step2Subtitle', 'Choose the two charts for this report.'))
                     : t('reports.step3Subtitle', 'Choose the language and then generate the report.')}
               </Text>
@@ -1210,8 +1251,16 @@ export default function ReportsStudioScreen({ navigation, route }) {
                   <View style={styles.reportTypeList}>
                     {availableReportTypes.map((item) => {
                       const costKey = `${item.key}_report`;
-                      const itemCost = Number(pricing?.[costKey] ?? pricing?.partnership_report ?? pricing?.partnership ?? 0) || 0;
-                      const itemOriginal = pricingOriginal?.[costKey] ?? null;
+                      const itemCost = Number(
+                        pricing?.[costKey]
+                        ?? (item.key === 'health' ? pricing?.health_report_cost : null)
+                        ?? pricing?.partnership_report
+                        ?? pricing?.partnership
+                        ?? 0
+                      ) || 0;
+                      const itemOriginal = pricingOriginal?.[costKey]
+                        ?? (item.key === 'health' ? pricingOriginal?.health_report_cost : null)
+                        ?? null;
                       const selected = selectedReportType === item.key;
                       return (
                         <TouchableOpacity
@@ -1219,7 +1268,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                           activeOpacity={0.9}
                           onPress={() => {
                             setSelectedReportType(item.key);
-                            if (item.key === 'wealth') setSelectedPersonB(null);
+                            if (isSingleChartReport(item.key)) setSelectedPersonB(null);
                           }}
                           style={[
                             styles.reportTypeCard,
@@ -1352,18 +1401,26 @@ export default function ReportsStudioScreen({ navigation, route }) {
                         />
                       </View>
                     </>
-                  ) : selectedReportType === 'wealth' ? (
+                  ) : isSingleChartReport(selectedReportType) ? (
                     <View style={styles.nativeSlotsStack}>
                       <NativePreviewCard
-                        title={t('reports.selectWealthChart', 'Select your chart')}
-                        subtitle={t('reports.selectWealthChartDesc', 'Single birth chart for this wealth report')}
+                        title={
+                          selectedReportType === 'health'
+                            ? t('reports.selectHealthChart', 'Select your chart')
+                            : t('reports.selectWealthChart', 'Select your chart')
+                        }
+                        subtitle={
+                          selectedReportType === 'health'
+                            ? t('reports.selectHealthChartDesc', 'Single birth chart for this health report')
+                            : t('reports.selectWealthChartDesc', 'Single birth chart for this wealth report')
+                        }
                         chart={selectedPersonA}
                         isEmpty={!selectedPersonA}
                         onPress={() => openNativeSelector('personA')}
                         theme={theme}
                         colors={colors}
-                        icon="💰"
-                        accent="#0EA5E9"
+                        icon={selectedReportType === 'health' ? '🏥' : '💰'}
+                        accent={selectedReportType === 'health' ? '#22c55e' : '#0EA5E9'}
                         slotLabel={t('reports.personA', 'You')}
                         emptyHint={t('reports.tapToChoose', 'Tap to choose')}
                       />
@@ -1372,7 +1429,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                     <View style={[styles.comingSoonPanel, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.surface, borderColor: colors.cardBorder }]}>
                       <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
                       <Text style={[styles.comingSoonText, { color: colors.textSecondary }]}>
-                        {t('reports.comingSoonPairing', 'This report type will get its own chart flow soon. Partnership and Wealth are live now.')}
+                        {t('reports.comingSoonPairing', 'This report type will get its own chart flow soon. Partnership, Wealth, and Health are live now.')}
                       </Text>
                     </View>
                   )}
@@ -1416,12 +1473,12 @@ export default function ReportsStudioScreen({ navigation, route }) {
                     </Text>
                     <View style={styles.reviewRow}>
                       <Text style={[styles.reviewLabel, { color: colors.textSecondary }]}>
-                        {selectedReportType === 'wealth'
+                        {isSingleChartReport(selectedReportType)
                           ? t('reports.reviewChart', 'Chart')
                           : t('reports.reviewPair', 'Pair')}
                       </Text>
                       <Text style={[styles.reviewValue, { color: colors.text }]} numberOfLines={1}>
-                        {selectedReportType === 'wealth'
+                        {isSingleChartReport(selectedReportType)
                           ? (selectedPersonA?.name || '—')
                           : `${selectedPersonA?.name || '—'} · ${selectedPersonB?.name || '—'}`}
                       </Text>

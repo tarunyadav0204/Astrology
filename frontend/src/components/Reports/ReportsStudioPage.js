@@ -43,9 +43,9 @@ const REPORT_TYPES = [
   {
     key: 'health',
     title: 'Health Report',
-    subtitle: 'Coming soon',
-    description: 'A future report for body constitution, care points, and wellness habits.',
-    enabled: false,
+    subtitle: 'Constitution, care points, and 12-month wellness timing',
+    description: 'A premium 27-page PDF with D1/D9/D30 layers, vitality themes, lifestyle triggers, and dasha-based monthly health timing.',
+    enabled: true,
   },
   {
     key: 'progeny',
@@ -59,7 +59,7 @@ const REPORT_TYPES = [
 const STUDIO_HIGHLIGHTS = [
   {
     title: 'Choose the report that fits the question',
-    desc: 'Partnership for two-person studies, Wealth for income and assets, with Career, Health, and Progeny planned next — all from one Reports Studio flow.',
+    desc: 'Partnership for two-person studies, Wealth for income and assets, Health for wellness timing — with Career and Progeny planned next — all from one Reports Studio flow.',
   },
   {
     title: 'Chart-grounded PDF chapters',
@@ -101,6 +101,21 @@ const WEALTH_CONTENTS = [
   },
 ];
 
+const HEALTH_CONTENTS = [
+  {
+    title: 'Constitution, vitality & core houses',
+    desc: 'Dosha tone, immunity and vitality cues, 1st/6th/8th/12th house reading, and planet-to-body-system themes grounded in calculator evidence.',
+  },
+  {
+    title: 'D9/D30 resilience & lifestyle triggers',
+    desc: 'Navamsa durability, Trimsamsa confirmation, mental/emotional recovery, digestion and metabolism, yogas/afflictions, and sleep/stress habits.',
+  },
+  {
+    title: '12-month dasha wellness plan',
+    desc: 'Current MD/AD/PD health theme, quarterly timing chapters, peak/caution windows, remedies, a 90-day checklist, and clear medical-safety guidance.',
+  },
+];
+
 const faqItems = [
   {
     question: 'What is Reports Studio?',
@@ -110,7 +125,7 @@ const faqItems = [
   {
     question: 'Which reports are available now?',
     answer:
-      'Partnership Report (two charts, 20+ pages) and Wealth Report (single chart, 27 pages) are available now. Career, Health, and Progeny reports are coming soon in the same studio.',
+      'Partnership Report (two charts, 20+ pages), Wealth Report (single chart, 27 pages), and Health Report (single chart, 27 pages) are available now. Career and Progeny reports are coming soon in the same studio.',
   },
   {
     question: 'What is inside the Partnership Report?',
@@ -121,6 +136,11 @@ const faqItems = [
     question: 'What is inside the Wealth Report?',
     answer:
       'The Wealth Report studies earning, saving, and growth across D1/D2/D10 layers, money yogas, Indu/AL/HL image, KP and nakshatra wealth cues, spouse/joint-money framing, speculation vs investing, and a 12-month dasha timing plan.',
+  },
+  {
+    question: 'What is inside the Health Report?',
+    answer:
+      'The Health Report studies constitution and vitality across D1/D9/D30 layers, core health houses, mental/emotional recovery, lifestyle triggers, KP confirmation, and a 12-month dasha wellness plan with remedies and safety guidance.',
   },
   {
     question: 'How is this different from free matching or chat?',
@@ -135,7 +155,7 @@ const faqItems = [
   {
     question: 'Do I need exact birth times?',
     answer:
-      'Yes for best results. Accurate date, time, and place improve houses, divisional charts, Manglik assessment, wealth lords, and timing windows.',
+      'Yes for best results. Accurate date, time, and place improve houses, divisional charts, Manglik assessment, wealth lords, health lords, and timing windows.',
   },
   {
     question: 'Which languages are supported?',
@@ -164,14 +184,14 @@ const structuredData = {
       applicationCategory: 'LifestyleApplication',
       operatingSystem: 'Web',
       description:
-        'Premium Vedic PDF reports from AstroRoshni — Partnership compatibility and Wealth timing reports with chart overlays, dasha windows, and remedies. Career, Health, and Progeny coming soon.',
+        'Premium Vedic PDF reports from AstroRoshni — Partnership compatibility, Wealth timing, and Health wellness reports with chart overlays, dasha windows, and remedies. Career and Progeny coming soon.',
       publisher: { '@type': 'Organization', name: 'AstroRoshni', url: 'https://astroroshni.com' },
       offers: {
         '@type': 'AggregateOffer',
         lowPrice: '9',
         priceCurrency: 'INR',
-        offerCount: 2,
-        description: 'Credit-priced Partnership and Wealth PDF reports; reopen free for the same chart set and language.',
+        offerCount: 3,
+        description: 'Credit-priced Partnership, Wealth, and Health PDF reports; reopen free for the same chart set and language.',
       },
     },
     {
@@ -208,14 +228,14 @@ const structuredData = {
         {
           '@type': 'ListItem',
           position: 3,
-          name: 'Career Report',
-          description: 'Coming soon — work style, timing, and career direction.',
+          name: 'Health Report',
+          description: 'Premium 27-page single-chart Vedic health PDF with D1/D9/D30 layers and 12-month wellness timing.',
         },
         {
           '@type': 'ListItem',
           position: 4,
-          name: 'Health Report',
-          description: 'Coming soon — body constitution, care points, and wellness habits.',
+          name: 'Career Report',
+          description: 'Coming soon — work style, timing, and career direction.',
         },
         {
           '@type': 'ListItem',
@@ -256,6 +276,18 @@ const formatBirthLine = (person) => {
   if (person.place) parts.push(person.place);
   return parts.join(' · ');
 };
+
+const singleChartProcessingMessage = (reportType) => (
+  reportType === 'health'
+    ? 'We are reading your chart and assembling the health report now.'
+    : 'We are reading your chart and assembling the wealth report now.'
+);
+
+const singleChartReadyMessage = (reportType) => (
+  reportType === 'health'
+    ? 'Your health report for this chart is ready. Open it anytime, or regenerate for a fresh reading.'
+    : 'Your wealth report for this chart is ready. Open it anytime, or regenerate for a fresh reading.'
+);
 
 const ChartSlotCard = ({
   title,
@@ -318,7 +350,7 @@ const ReportsStudioPage = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { birthData } = useAstrology();
-  const { credits, partnershipReportCost, wealthReportCost, fetchBalance } = useCredits();
+  const { credits, partnershipReportCost, wealthReportCost, healthReportCost, fetchBalance } = useCredits();
 
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [activeStep, setActiveStep] = useState(1);
@@ -340,8 +372,14 @@ const ReportsStudioPage = ({
   const mountedRef = useRef(true);
 
   const isWealth = selectedType === 'wealth';
+  const isHealth = selectedType === 'health';
+  const isSingleChart = isWealth || isHealth;
   const reportCost = Number(
-    isWealth ? (wealthReportCost || 9) : (partnershipReportCost || 9)
+    isHealth
+      ? (healthReportCost || 9)
+      : isWealth
+        ? (wealthReportCost || 9)
+        : (partnershipReportCost || 9)
   ) || 9;
 
   useEffect(() => {
@@ -379,9 +417,11 @@ const ReportsStudioPage = ({
   const pollStatus = useCallback(async (id, reportType = 'partnership') => {
     clearPoll();
     try {
-      const payload = reportType === 'wealth'
-        ? await reportService.getWealthReportStatus(id)
-        : await reportService.getPartnershipReportStatus(id);
+      const payload = reportType === 'health'
+        ? await reportService.getHealthReportStatus(id)
+        : reportType === 'wealth'
+          ? await reportService.getWealthReportStatus(id)
+          : await reportService.getPartnershipReportStatus(id);
       const status = String(payload?.status || '').toLowerCase();
       if (!mountedRef.current) return;
 
@@ -406,8 +446,8 @@ const ReportsStudioPage = ({
 
       setStatusMessage(
         status === 'processing'
-          ? (reportType === 'wealth'
-            ? 'We are reading your chart and assembling the wealth report now.'
+          ? ((reportType === 'wealth' || reportType === 'health')
+            ? singleChartProcessingMessage(reportType)
             : 'We are reading both charts and assembling the report now.')
           : "We're getting started on your report. This usually takes just a moment."
       );
@@ -424,7 +464,7 @@ const ReportsStudioPage = ({
 
   useEffect(() => {
     let cancelled = false;
-    const typeOk = selectedType === 'partnership' || selectedType === 'wealth';
+    const typeOk = selectedType === 'partnership' || selectedType === 'wealth' || selectedType === 'health';
     if (!user || !personA || !typeOk || (selectedType === 'partnership' && !personB)) {
       setExistingReady(false);
       setReportId(null);
@@ -436,9 +476,11 @@ const ReportsStudioPage = ({
     const timer = setTimeout(async () => {
       setCheckingExisting(true);
       try {
-        const data = selectedType === 'wealth'
-          ? await reportService.lookupExistingWealthReport(personA, language)
-          : await reportService.lookupExistingPartnershipReport(personA, personB, language);
+        const data = selectedType === 'health'
+          ? await reportService.lookupExistingHealthReport(personA, language)
+          : selectedType === 'wealth'
+            ? await reportService.lookupExistingWealthReport(personA, language)
+            : await reportService.lookupExistingPartnershipReport(personA, personB, language);
         if (cancelled || !mountedRef.current) return;
         if (data?.exists && data?.report_id) {
           const status = String(data.status || '').toLowerCase();
@@ -452,8 +494,8 @@ const ReportsStudioPage = ({
             setActiveStep(3);
             setStatusMessage(
               status === 'processing'
-                ? (selectedType === 'wealth'
-                  ? 'We are reading your chart and assembling the wealth report now.'
+                ? ((selectedType === 'wealth' || selectedType === 'health')
+                  ? singleChartProcessingMessage(selectedType)
                   : 'We are reading both charts and assembling the report now.')
                 : "We're getting started on your report. This usually takes just a moment."
             );
@@ -461,8 +503,8 @@ const ReportsStudioPage = ({
           } else {
             setExistingReady(true);
             setStatusMessage(
-              selectedType === 'wealth'
-                ? 'Your wealth report for this chart is ready. Open it anytime, or regenerate for a fresh reading.'
+              (selectedType === 'wealth' || selectedType === 'health')
+                ? singleChartReadyMessage(selectedType)
                 : 'Your report for this pair is ready. Open it anytime, or regenerate for a fresh reading.'
             );
           }
@@ -495,7 +537,7 @@ const ReportsStudioPage = ({
 
   const startGeneration = async ({ forceRegenerate = false } = {}) => {
     if (!requireLogin()) return;
-    if (selectedType === 'wealth') {
+    if (selectedType === 'wealth' || selectedType === 'health') {
       if (!personA) {
         setError('Please select a birth chart before generating.');
         return;
@@ -522,15 +564,20 @@ const ReportsStudioPage = ({
     setActiveStep(3);
 
     try {
-      const started = selectedType === 'wealth'
-        ? await reportService.startWealthReport(personA, language, {
+      const started = selectedType === 'health'
+        ? await reportService.startHealthReport(personA, language, {
           forceRegenerate,
           chartStyle: 'both',
         })
-        : await reportService.startPartnershipReport(personA, personB, language, {
-          forceRegenerate,
-          chartStyle: 'both',
-        });
+        : selectedType === 'wealth'
+          ? await reportService.startWealthReport(personA, language, {
+            forceRegenerate,
+            chartStyle: 'both',
+          })
+          : await reportService.startPartnershipReport(personA, personB, language, {
+            forceRegenerate,
+            chartStyle: 'both',
+          });
       const id = started?.report_id;
       if (!id) throw new Error('Could not start the report.');
       setReportId(id);
@@ -591,11 +638,11 @@ const ReportsStudioPage = ({
   const singleChartReady = Boolean(
     personA?.name && personA?.date && personA?.time && personA?.latitude != null && personA?.longitude != null
   );
-  const chartsReady = isWealth ? singleChartReady : bothChartsReady;
+  const chartsReady = isSingleChart ? singleChartReady : bothChartsReady;
 
   const goToLanguageStep = () => {
     if (!chartsReady) {
-      setError(isWealth
+      setError(isSingleChart
         ? 'Please select or create a birth chart before continuing.'
         : 'Please select or create both charts before continuing.');
       return;
@@ -610,8 +657,8 @@ const ReportsStudioPage = ({
     <div className="reports-studio-page">
       <SEOHead
         title="Reports Studio — Premium Vedic PDF Reports | AstroRoshni"
-        description="Create premium Vedic PDF reports in AstroRoshni Reports Studio: Partnership compatibility and Wealth timing reports with charts, dasha windows, remedies, and clear takeaways. Career, Health, and Progeny coming soon."
-        keywords="vedic reports studio, partnership compatibility PDF, wealth astrology report, kundli PDF report, dasha timing report, marriage matching report, vedic wealth report, premium kundli report"
+        description="Create premium Vedic PDF reports in AstroRoshni Reports Studio: Partnership compatibility, Wealth timing, and Health wellness reports with charts, dasha windows, remedies, and clear takeaways. Career and Progeny coming soon."
+        keywords="vedic reports studio, partnership compatibility PDF, wealth astrology report, health astrology report, kundli PDF report, dasha timing report, marriage matching report, vedic wealth report, vedic health report, premium kundli report"
         canonical="https://astroroshni.com/reports/"
         structuredData={structuredData}
       />
@@ -641,8 +688,8 @@ const ReportsStudioPage = ({
           </p>
           <div className="reports-studio-proof" aria-label="Report coverage">
             <div><strong>27</strong><span>Wealth pages</span></div>
+            <div><strong>27</strong><span>Health pages</span></div>
             <div><strong>20+</strong><span>Partnership pages</span></div>
-            <div><strong>AI</strong><span>Chapter narrative</span></div>
           </div>
         </header>
 
@@ -677,7 +724,7 @@ const ReportsStudioPage = ({
                   onClick={() => {
                     if (!item.enabled) return;
                     setSelectedType(item.key);
-                    if (item.key === 'wealth') setPersonB(null);
+                    if (item.key === 'wealth' || item.key === 'health') setPersonB(null);
                     setActiveStep(2);
                   }}
                 >
@@ -691,9 +738,9 @@ const ReportsStudioPage = ({
 
           {activeStep === 2 ? (
             <div className="reports-charts-panel">
-              <h2>{isWealth ? 'Choose your chart' : 'Choose both charts'}</h2>
+              <h2>{isSingleChart ? 'Choose your chart' : 'Choose both charts'}</h2>
               <p>
-                {isWealth
+                {isSingleChart
                   ? 'Select a saved chart or create a new one. Details stay read-only after selection.'
                   : 'Select a saved chart or create a new one for each person. Details stay read-only after selection.'}
               </p>
@@ -708,14 +755,14 @@ const ReportsStudioPage = ({
                 <>
                   <div className="reports-chart-slots">
                     <ChartSlotCard
-                      title={isWealth ? 'Native' : 'Person A'}
-                      subtitle={isWealth ? 'Birth chart' : 'First chart'}
+                      title={isSingleChart ? 'Native' : 'Person A'}
+                      subtitle={isSingleChart ? 'Birth chart' : 'First chart'}
                       person={personA}
                       onSelect={() => openChartPicker('personA', 'saved')}
                       onCreate={() => openChartPicker('personA', 'new')}
                       onClear={() => setPersonA(null)}
                     />
-                    {!isWealth ? (
+                    {!isSingleChart ? (
                       <ChartSlotCard
                         title="Person B"
                         subtitle="Second chart"
@@ -759,9 +806,9 @@ const ReportsStudioPage = ({
                   <strong>{selectedTypeMeta.title}</strong>
                 </div>
                 <div>
-                  <span>{isWealth ? 'Chart' : 'Pair'}</span>
+                  <span>{isSingleChart ? 'Chart' : 'Pair'}</span>
                   <strong>
-                    {isWealth
+                    {isSingleChart
                       ? (personA?.name || 'Native')
                       : `${personA?.name || 'Person A'} · ${personB?.name || 'Person B'}`}
                   </strong>
@@ -841,8 +888,8 @@ const ReportsStudioPage = ({
             choose.
           </p>
           <p>
-            Start with Partnership for any two-person study, or Wealth for a single-chart money roadmap. Career,
-            Health, and Progeny will join the same studio flow when ready.
+            Start with Partnership for any two-person study, Wealth for a single-chart money roadmap, or Health for a
+            single-chart wellness plan. Career and Progeny will join the same studio flow when ready.
           </p>
           <h3 className="reports-seo-subheading">What every report shares</h3>
           <ul className="reports-contents-grid">
@@ -881,8 +928,22 @@ const ReportsStudioPage = ({
               </li>
             ))}
           </ul>
+
+          <h3 className="reports-seo-subheading">Health Report</h3>
+          <p>
+            A 27-page single-chart wellness study: constitution and vitality, D9/D30 resilience, lifestyle triggers,
+            mental/emotional recovery, and a deterministic 12-month dasha plan with remedies and medical-safety notes.
+          </p>
+          <ul className="reports-contents-grid">
+            {HEALTH_CONTENTS.map((item) => (
+              <li key={item.title}>
+                <h4>{item.title}</h4>
+                <p>{item.desc}</p>
+              </li>
+            ))}
+          </ul>
           <p className="reports-seo-note">
-            Coming next in Reports Studio: Career, Health, and Progeny — same generate / reopen / regenerate
+            Coming next in Reports Studio: Career and Progeny — same generate / reopen / regenerate
             credit model, languages, and PDF delivery.
           </p>
           <p className="reports-seo-cta-wrap">
@@ -955,10 +1016,10 @@ const ReportsStudioPage = ({
           chartPickerTab === 'new'
             ? (chartPickerTarget === 'personB'
               ? 'Create chart for Person B'
-              : (isWealth ? 'Create birth chart' : 'Create chart for Person A'))
+              : (isSingleChart ? 'Create birth chart' : 'Create chart for Person A'))
             : (chartPickerTarget === 'personB'
               ? 'Select chart for Person B'
-              : (isWealth ? 'Select birth chart' : 'Select chart for Person A'))
+              : (isSingleChart ? 'Select birth chart' : 'Select chart for Person A'))
         }
         description={
           chartPickerTab === 'new'

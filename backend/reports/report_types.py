@@ -44,10 +44,10 @@ WEALTH_REPORT_CONFIG = ReportTypeConfig(
 HEALTH_REPORT_CONFIG = ReportTypeConfig(
     key="health",
     title="Health Report",
-    page_count=20,
-    required_branches=("kp", "jaimini", "nadi", "nakshatra", "d6"),
-    enabled=False,
-    summary="Coming soon",
+    page_count=27,
+    required_branches=("kp", "jaimini", "nadi", "nakshatra", "d30"),
+    enabled=True,
+    summary="Premium single-chart health report with constitution, D30 confirmation, and next 12 months of dasha timing.",
 )
 
 PROGENY_REPORT_CONFIG = ReportTypeConfig(

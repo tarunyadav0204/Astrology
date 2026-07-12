@@ -42,6 +42,8 @@ const HOME_DATA_TTL_MS = 5 * 60 * 1000;
 const BLOG_FETCH_TTL_MS = 15 * 60 * 1000;
 const MULTI_CHART_TIP_NEVER_KEY = 'home_multi_chart_tip_never';
 const MULTI_CHART_TIP_SNOOZE_KEY = 'home_multi_chart_tip_snooze_until';
+const KNOW_YOURSELF_DISMISS_KEY = 'home_know_yourself_dismissed_date';
+const todayDateKey = () => new Date().toISOString().slice(0, 10);
 const roundPanchangCoord = (value) => Math.round(parseFloat(value) * 100) / 100;
 
 const getPanchangCoords = (birthData) => {
@@ -233,8 +235,10 @@ export default function HomeScreen({
   const [showFirstQuestionFreeModal, setShowFirstQuestionFreeModal] = useState(false);
   const [showMonthlyWelcomeModal, setShowMonthlyWelcomeModal] = useState(false);
   const [showMultiChartTipModal, setShowMultiChartTipModal] = useState(false);
+  const [showKnowYourselfPrompt, setShowKnowYourselfPrompt] = useState(false);
   const [showInfoOnlyModal, setShowInfoOnlyModal] = useState(false);
   const [infoOnlyModalContent, setInfoOnlyModalContent] = useState({ title: '', body: '' });
+  const knowYourselfAnim = useRef(new Animated.Value(0)).current;
 
   const [dashData, setDashData] = useState(null);
   const [chartData, setChartData] = useState(null);
@@ -527,6 +531,66 @@ export default function HomeScreen({
     }
     setShowMultiChartTipModal(false);
   }, []);
+
+  const dismissKnowYourselfForToday = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem(KNOW_YOURSELF_DISMISS_KEY, todayDateKey());
+    } catch (e) {
+      /* ignore */
+    }
+    Animated.timing(knowYourselfAnim, {
+      toValue: 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(() => setShowKnowYourselfPrompt(false));
+  }, [knowYourselfAnim]);
+
+  const openKnowYourselfGuide = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem(KNOW_YOURSELF_DISMISS_KEY, todayDateKey());
+    } catch (e) {
+      /* ignore */
+    }
+    setShowKnowYourselfPrompt(false);
+    navigation.navigate('NakshatraGuide', {
+      birthData: currentNativeData || birthData,
+      chartData,
+    });
+  }, [navigation, currentNativeData, birthData, chartData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      const timer = setTimeout(async () => {
+        try {
+          if (!birthData?.id) return;
+          const dismissedDate = await AsyncStorage.getItem(KNOW_YOURSELF_DISMISS_KEY);
+          if (dismissedDate === todayDateKey()) return;
+          if (!cancelled) setShowKnowYourselfPrompt(true);
+        } catch (e) {
+          /* ignore */
+        }
+      }, 900);
+      return () => {
+        cancelled = true;
+        clearTimeout(timer);
+      };
+    }, [birthData?.id])
+  );
+
+  useEffect(() => {
+    if (!showKnowYourselfPrompt) {
+      knowYourselfAnim.setValue(0);
+      return;
+    }
+    knowYourselfAnim.setValue(0);
+    Animated.spring(knowYourselfAnim, {
+      toValue: 1,
+      friction: 8,
+      tension: 68,
+      useNativeDriver: true,
+    }).start();
+  }, [showKnowYourselfPrompt, knowYourselfAnim]);
 
   useEffect(() => {
     // Update Panchang daily at midnight
@@ -1236,33 +1300,6 @@ const loadHomeData = async (nativeData = null) => {
                 style={styles.headerNativeChip}
               />
             </View>
-
-            <TouchableOpacity
-              activeOpacity={0.88}
-              onPress={() => navigation.navigate('NakshatraGuide', { birthData: displayData, chartData })}
-              style={[
-                styles.headerNakshatraPill,
-                {
-                  backgroundColor: isDark ? 'rgba(99,102,241,0.16)' : 'rgba(79, 70, 229, 0.08)',
-                  borderColor: isDark ? 'rgba(167,139,250,0.22)' : 'rgba(79, 70, 229, 0.16)',
-                },
-              ]}
-            >
-              <View style={[styles.headerNakshatraIcon, { backgroundColor: isDark ? 'rgba(139,92,246,0.25)' : 'rgba(79, 70, 229, 0.16)' }]}>
-                <Icon name="book-outline" size={14} color={colors.primary} />
-              </View>
-              <View style={styles.headerNakshatraTextWrap}>
-                <Text style={[styles.headerNakshatraTitle, { color: colors.text }]}>
-                  {t('home.nakshatraGuide.cardTitle', 'Know yourself')}
-                </Text>
-                <Text style={[styles.headerNakshatraSubtitle, { color: colors.textSecondary }]}>
-                  {moonNakshatra?.name
-                    ? `${moonNakshatra.name} · Pada ${moonNakshatra.pada}`
-                    : t('home.nakshatraGuide.cardSubtitle', 'Open your Moon Nakshatra study video')}
-                </Text>
-              </View>
-              <Icon name="chevron-forward" size={18} color={colors.textSecondary} />
-            </TouchableOpacity>
 
             <View style={[styles.headerBigThree, theme === 'light' && { backgroundColor: colors.surface }]}>
               <TouchableOpacity 
@@ -2669,6 +2706,89 @@ const loadHomeData = async (nativeData = null) => {
       
       </LinearGradient>
 
+      {showKnowYourselfPrompt ? (
+        <Animated.View
+          pointerEvents="box-none"
+          style={[
+            styles.knowYourselfFloat,
+            {
+              bottom: 158 + insets.bottom,
+              opacity: knowYourselfAnim,
+              transform: [
+                {
+                  translateY: knowYourselfAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [18, 0],
+                  }),
+                },
+                {
+                  scale: knowYourselfAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.96, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.knowYourselfFloatInner,
+              androidLightCardFixStyle,
+              {
+                backgroundColor: isDark ? 'rgba(28, 25, 23, 0.96)' : 'rgba(255, 251, 235, 0.98)',
+                borderColor: isDark ? 'rgba(245, 158, 11, 0.28)' : 'rgba(245, 158, 11, 0.35)',
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={
+                isDark
+                  ? ['rgba(245,158,11,0.22)', 'rgba(249,115,22,0.08)', 'transparent']
+                  : ['rgba(253,230,138,0.95)', 'rgba(254,243,199,0.55)', 'rgba(255,251,235,0)']
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.knowYourselfFloatGlow}
+            />
+            <TouchableOpacity
+              activeOpacity={0.88}
+              onPress={openKnowYourselfGuide}
+              style={styles.knowYourselfFloatTap}
+            >
+              <View style={[styles.knowYourselfFloatIcon, { backgroundColor: isDark ? 'rgba(245,158,11,0.22)' : 'rgba(245, 158, 11, 0.18)' }]}>
+                <Icon name="play" size={14} color={isDark ? '#FBBF24' : '#B45309'} />
+              </View>
+              <View style={styles.knowYourselfFloatTextWrap}>
+                <Text style={[styles.knowYourselfFloatTitle, { color: colors.text }]} numberOfLines={1}>
+                  {t('home.nakshatraGuide.cardTitle', 'Know yourself')}
+                </Text>
+                <Text style={[styles.knowYourselfFloatSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {moonNakshatra?.name
+                    ? t('home.nakshatraGuide.floatMeta', '{{name}} · Pada {{pada}}', {
+                        name: moonNakshatra.name,
+                        pada: moonNakshatra.pada,
+                      })
+                    : t('home.nakshatraGuide.floatSubtitle', 'Short Moon Nakshatra video guide')}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={dismissKnowYourselfForToday}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={[
+                styles.knowYourselfFloatClose,
+                { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(120, 53, 15, 0.08)' },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('home.nakshatraGuide.dismiss', 'Dismiss')}
+            >
+              <Icon name="close" size={14} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      ) : null}
+
       {/* Floating Action Button (FAB) - Outside of ScrollView and Gradient to ensure absolute positioning */}
       <Animated.View 
         style={[
@@ -3283,36 +3403,73 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
   },
-  headerNakshatraPill: {
+  knowYourselfFloat: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 1001,
+  },
+  knowYourselfFloatInner: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 22,
     paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginBottom: 12,
-    gap: 10,
+    paddingLeft: 10,
+    paddingRight: 8,
+    gap: 6,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#B45309',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.18,
+        shadowRadius: 14,
+      },
+      android: {
+        elevation: 10,
+      },
+    }),
   },
-  headerNakshatraIcon: {
+  knowYourselfFloatTap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 0,
+  },
+  knowYourselfFloatGlow: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  knowYourselfFloatIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  knowYourselfFloatTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  knowYourselfFloatTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.1,
+  },
+  knowYourselfFloatSubtitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  knowYourselfFloatClose: {
     width: 28,
     height: 28,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
-  },
-  headerNakshatraTextWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-  headerNakshatraTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: 1,
-  },
-  headerNakshatraSubtitle: {
-    fontSize: 11,
-    fontWeight: '600',
   },
   headerSignItem: {
     flexDirection: 'row',

@@ -1024,6 +1024,28 @@ export const reportAPI = {
     api.get(getEndpoint(`/reports/wealth/status/${encodeURIComponent(reportId)}`)),
   getWealthReport: (reportId) =>
     api.get(getEndpoint(`/reports/wealth/${encodeURIComponent(reportId)}`)),
+  startHealthReport: (person, language = 'english', options = {}) =>
+    api.post(getEndpoint('/reports/health/start'), {
+      report_type: 'health',
+      birth_data: person,
+      language,
+      chart_style: options.chartStyle || 'both',
+      force_regenerate: Boolean(options.forceRegenerate),
+      include_images: options.includeImages !== false,
+    }),
+  lookupExistingHealthReport: (person, language = 'english', options = {}) =>
+    api.post(getEndpoint('/reports/health/existing'), {
+      report_type: 'health',
+      birth_data: person,
+      language,
+      chart_style: options.chartStyle || 'both',
+      force_regenerate: false,
+      include_images: options.includeImages !== false,
+    }),
+  getHealthReportStatus: (reportId) =>
+    api.get(getEndpoint(`/reports/health/status/${encodeURIComponent(reportId)}`)),
+  getHealthReport: (reportId) =>
+    api.get(getEndpoint(`/reports/health/${encodeURIComponent(reportId)}`)),
   getReportPdfUrl: (reportId) =>
     api.get(getEndpoint(`/reports/pdf/${encodeURIComponent(reportId)}`)),
 };

@@ -577,6 +577,7 @@ def _chart_block(report_document: Dict[str, Any], ref: str, styles: Dict[str, Pa
     boy_d7 = _chart_payload(chart_data.get("boy_d7"))
     girl_d7 = _chart_payload(chart_data.get("girl_d7"))
     native_d10 = _chart_payload(chart_data.get("native_d10") or chart_data.get("boy_d10"))
+    native_d30 = _chart_payload(chart_data.get("native_d30") or chart_data.get("boy_d30"))
 
     ref_map = {
         "d1_north": (boy_d1, _chart_title(boy_d1, boy_name, "D1 Rashi"), style),
@@ -595,6 +596,8 @@ def _chart_block(report_document: Dict[str, Any], ref: str, styles: Dict[str, Pa
         "native_d2": (boy_d2, _chart_title(boy_d2, native_name, "D2 Hora"), style),
         "native_d9": (boy_d9, _chart_title(boy_d9, native_name, "D9 Navamsa"), style),
         "native_d10": (native_d10, _chart_title(native_d10, native_name, "D10 Dasamsa"), style),
+        "native_d30": (native_d30, _chart_title(native_d30, native_name, "D30 Trimsamsa"), style),
+        "boy_d30": (native_d30, _chart_title(native_d30, native_name, "D30 Trimsamsa"), style),
     }
     chart_info = ref_map.get(ref)
     if not chart_info:
@@ -713,6 +716,8 @@ def _render_cover(report_document: Dict[str, Any], page: Dict[str, Any], styles:
     report_type = str(report_document.get("report_type") or "").lower()
     if report_type == "wealth":
         return _render_wealth_cover(report_document, page, styles)
+    if report_type == "health":
+        return _render_health_cover(report_document, page, styles)
 
     pair = report_document.get("pair") or {}
     boy = pair.get("boy") or {}
@@ -849,6 +854,72 @@ def _render_wealth_cover(report_document: Dict[str, Any], page: Dict[str, Any], 
     ))
     if _safe_text(verdict):
         story.append(_p(_safe_text(verdict), styles["ARBody"]))
+
+    native_chart = _chart_block(report_document, "native_d1", styles, width=_CONTENT_WIDTH)
+    if native_chart is not None:
+        story.append(Spacer(1, 3 * mm))
+        story.append(native_chart)
+
+    return story
+
+
+def _render_health_cover(report_document: Dict[str, Any], page: Dict[str, Any], styles: Dict[str, ParagraphStyle]) -> List[Any]:
+    pair = report_document.get("pair") or {}
+    native = pair.get("native") or pair.get("boy") or {}
+    score = report_document.get("score_summary") or {}
+    premium = report_document.get("premium_report") or {}
+    dashas = score.get("current_dashas") or {}
+    verdict = (
+        premium.get("health_verdict")
+        or score.get("verdict")
+        or page.get("summary")
+        or premium.get("headline")
+        or "This report studies vitality, constitution, and wellness timing through classical Vedic health layers."
+    )
+    disclaimer = _safe_text(
+        score.get("medical_disclaimer")
+        or (
+            "This report is Vedic astrological wellness guidance only. It is not a medical diagnosis, "
+            "prescription, or substitute for professional healthcare."
+        )
+    )
+    generated_label = _format_generated_at(report_document.get("generated_at"))
+
+    story: List[Any] = []
+    logo_bytes = _load_logo_bytes()
+    if logo_bytes:
+        story.append(Image(io.BytesIO(logo_bytes), width=14 * mm, height=14 * mm))
+        story.append(Spacer(1, 3 * mm))
+
+    story.append(_p("Health Report", styles["ARCoverTitle"]))
+    story.append(_p(_safe_text(native.get("name") or "Native"), styles["ARCoverSubtitle"]))
+    story.append(_p(f"Generated on {generated_label}", styles["ARCoverSubtitle"]))
+    story.append(Spacer(1, 3 * mm))
+
+    col_width = _CONTENT_WIDTH
+    story.append(_person_birth_card(native, styles, col_width))
+    story.append(Spacer(1, 4 * mm))
+
+    metrics = [
+        {"label": "Health score", "value": _short_chip(score.get("health_score") or score.get("grade") or "See summary", 18)},
+        {"label": "Constitution", "value": _short_chip(score.get("constitution_type") or "--", 18)},
+        {"label": "Current MD", "value": _short_chip(dashas.get("mahadasha") or "--", 18)},
+        {"label": "Current AD", "value": _short_chip(dashas.get("antardasha") or "--", 18)},
+    ]
+    story.append(_metric_row(metrics, styles))
+    story.append(Spacer(1, 4 * mm))
+
+    story.append(_p("How to read this report", styles["ARSectionSubtitle"]))
+    story.append(_p(
+        "Start with constitution and vitality, then D1/D9/D30 confirmation, then the 12-month dasha wellness plan. "
+        "This is astrological guidance for awareness and habits — not a medical diagnosis.",
+        styles["ARBody"],
+    ))
+    if _safe_text(verdict):
+        story.append(_p(_safe_text(verdict), styles["ARBody"]))
+    if disclaimer:
+        story.append(Spacer(1, 2 * mm))
+        story.append(_p(disclaimer, styles["ARBodySmall"]))
 
     native_chart = _chart_block(report_document, "native_d1", styles, width=_CONTENT_WIDTH)
     if native_chart is not None:

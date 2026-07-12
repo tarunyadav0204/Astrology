@@ -41,6 +41,15 @@ class WealthReportRequest(BaseModel):
     include_images: bool = True
 
 
+class HealthReportRequest(BaseModel):
+    report_type: Literal["health"] = "health"
+    birth_data: BirthInput
+    language: str = "english"
+    chart_style: Literal["north", "south", "both"] = "both"
+    force_regenerate: bool = False
+    include_images: bool = True
+
+
 class ReportMetric(BaseModel):
     label: str
     value: str

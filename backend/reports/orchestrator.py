@@ -10,14 +10,20 @@ from marriage_matching.engine import KundliMatchingEngine
 from .assembly.page_assembler import assemble_partnership_pages, build_chart_manifest
 from .assembly.pdf_manifest_builder import build_pdf_manifest
 from .assembly.wealth_page_assembler import assemble_wealth_pages, build_wealth_chart_manifest
+from .assembly.health_page_assembler import assemble_health_pages, build_health_chart_manifest
 from .cache.report_hash import build_pair_hash, build_subject_hash, normalize_birth_data
 from .cache.report_storage import get_cached_report, upsert_report_cache
 from .context.base_context_builder import calculate_divisional_chart
 from .context.partnership_context_builder import build_partnership_report_context
 from .context.wealth_context_builder import build_wealth_report_context
-from .llm.report_llm_service import generate_partnership_premium_report, generate_wealth_premium_report
+from .context.health_context_builder import build_health_report_context
+from .llm.report_llm_service import (
+    generate_partnership_premium_report,
+    generate_wealth_premium_report,
+    generate_health_premium_report,
+)
 from .models import ReportDocument
-from .report_types import PARTNERSHIP_REPORT_CONFIG, WEALTH_REPORT_CONFIG
+from .report_types import PARTNERSHIP_REPORT_CONFIG, WEALTH_REPORT_CONFIG, HEALTH_REPORT_CONFIG
 from .pdf_service import store_report_pdf
 
 
@@ -491,6 +497,184 @@ async def process_wealth_report_job(
     execute_fn=execute,
 ) -> Dict[str, Any]:
     return await build_and_cache_wealth_report(
+        userid,
+        request,
+        credit_service=credit_service,
+        get_conn=get_conn,
+        execute_fn=execute_fn,
+        report_id=report_id,
+    )
+
+
+async def build_and_cache_health_report(
+    userid: int,
+    request: Any,
+    *,
+    credit_service: CreditService,
+    get_conn: Any,
+    execute_fn=execute,
+    report_id: str | None = None,
+) -> Dict[str, Any]:
+    subject_hash = build_subject_hash(request.birth_data, request.report_type, request.language)
+    report_version = HEALTH_REPORT_CONFIG.key + "_v1"
+    resolved_report_id = report_id or subject_hash[:16]
+    effective_cost = credit_service.get_effective_cost(
+        userid,
+        credit_service.get_credit_setting("health_report_cost"),
+        "health_report_cost",
+    )
+
+    if not request.force_regenerate:
+        cached = get_cached_report(
+            userid, request.report_type, subject_hash, request.language, report_version, get_conn, execute_fn
+        )
+        if cached:
+            cached = _apply_document_cache_usage(cached)
+            cached["report_id"] = resolved_report_id
+            cached["cached"] = True
+            cached["credits_charged"] = 0
+            if not cached.get("pdf_gcs_path"):
+                cached_pdf = store_report_pdf(cached)
+                cached.update(cached_pdf)
+                upsert_report_cache(
+                    userid,
+                    request.report_type,
+                    subject_hash,
+                    request.language,
+                    report_version,
+                    cached,
+                    get_conn,
+                    execute_fn,
+                )
+            return cached
+
+    if credit_service.get_user_credits(userid) < effective_cost:
+        return {"ok": False, "error": f"Insufficient credits. You need {effective_cost} credits."}
+
+    context = build_health_report_context(request)
+    person = normalize_birth_data(request.birth_data)
+
+    premium = await generate_health_premium_report(
+        userid,
+        context,
+        language=context["language"],
+        force_regenerate=bool(request.force_regenerate),
+        effective_cost=effective_cost,
+        credit_service=credit_service,
+        get_conn=get_conn,
+        execute_fn=execute_fn,
+        spend_on_success=False,
+    )
+    if not premium.get("ok"):
+        return {"ok": False, "error": premium.get("error") or "Health report generation failed"}
+
+    health = context.get("health") or {}
+    dashas = context.get("current_dashas") or {}
+    faq_items = [
+        {"question": q, "answer": "See the timing and action chapters in this report."}
+        for q in (premium.get("report") or {}).get("follow_up_questions") or []
+    ]
+
+    report_payload = ReportDocument(
+        report_id=resolved_report_id,
+        report_type=request.report_type,
+        language=context["language"],
+        generated_at=datetime.now(),
+        report_version=report_version,
+        status="completed",
+        pair={"native": person, "boy": person},
+        score_summary={
+            "health_score": health.get("health_score"),
+            "grade": health.get("health_score"),
+            "constitution_type": health.get("constitution_type"),
+            "verdict": (premium.get("report") or {}).get("health_verdict"),
+            "medical_disclaimer": context.get("medical_disclaimer"),
+            "health_agent": context.get("health_agent") or {},
+            "current_dashas": {
+                "mahadasha": (dashas.get("mahadasha") or {}).get("planet"),
+                "antardasha": (dashas.get("antardasha") or {}).get("planet"),
+                "pratyantardasha": (dashas.get("pratyantardasha") or {}).get("planet"),
+            },
+            "twelve_month_dasha": context.get("twelve_month_dasha") or [],
+            "priority_body_zones": (context.get("body_zone_map") or {}).get("top_zone_names") or [],
+            "health_event_patterns": [
+                p.get("key") for p in ((context.get("body_zone_map") or {}).get("event_patterns") or [])
+            ],
+        },
+        branch_payloads=context.get("branches") or {},
+        pages=assemble_health_pages(
+            {
+                "person": person,
+                "chart_style": request.chart_style,
+                "health": health,
+                "health_agent": context.get("health_agent") or {},
+                "medical_disclaimer": context.get("medical_disclaimer"),
+                "current_dashas": dashas,
+                "twelve_month_dasha": context.get("twelve_month_dasha") or [],
+                "lords_nakshatra": context.get("lords_nakshatra") or {},
+                "planet_system_ranks": context.get("planet_system_ranks") or [],
+                "attention_houses": context.get("attention_houses") or [],
+                "body_zone_map": context.get("body_zone_map") or {},
+                "vitality_analysis": context.get("vitality_analysis") or {},
+                "d30_analysis": context.get("d30_analysis") or {},
+            },
+            premium.get("report") or {},
+        ),
+        chart_manifest=build_health_chart_manifest({"chart_style": request.chart_style}),
+        faq=faq_items,
+        cta={"text": "Download the app or book a consultation."},
+        premium_report=premium.get("report") or {},
+        chart_data={
+            "boy": _annotate_chart(context["chart"], person),
+            "native": _annotate_chart(context["chart"], person),
+            "boy_d9": _annotate_chart(context.get("d9_chart"), person),
+            "native_d9": _annotate_chart(context.get("d9_chart"), person),
+            "native_d30": _annotate_chart(context.get("d30_chart"), person),
+            "boy_d30": _annotate_chart(context.get("d30_chart"), person),
+        },
+        chart_style=("south" if getattr(request, "chart_style", "both") == "south" else "north"),
+        cached=False,
+    ).model_dump()
+
+    report_payload["pdf_manifest"] = build_pdf_manifest(report_payload)
+    report_payload.update(store_report_pdf(report_payload))
+
+    if not credit_service.spend_credits(
+        userid,
+        effective_cost,
+        "health_report",
+        f"Health report for {person.get('name') or 'native'}",
+    ):
+        return {"ok": False, "error": "Credit deduction failed"}
+
+    report_payload["credits_charged"] = int(effective_cost)
+    premium_report = premium.get("report") if isinstance(premium.get("report"), dict) else {}
+    if isinstance(premium_report.get("llm_usage"), dict):
+        report_payload["llm_usage"] = premium_report["llm_usage"]
+
+    upsert_report_cache(
+        userid,
+        request.report_type,
+        subject_hash,
+        request.language,
+        report_version,
+        report_payload,
+        get_conn,
+        execute_fn,
+    )
+    return report_payload
+
+
+async def process_health_report_job(
+    report_id: str,
+    userid: int,
+    request: Any,
+    *,
+    credit_service: CreditService,
+    get_conn: Any,
+    execute_fn=execute,
+) -> Dict[str, Any]:
+    return await build_and_cache_health_report(
         userid,
         request,
         credit_service=credit_service,

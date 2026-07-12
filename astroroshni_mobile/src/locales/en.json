@@ -1107,6 +1107,9 @@
     "nakshatraGuide": {
       "cardTitle": "Know yourself",
       "cardSubtitle": "Open your Moon Nakshatra and watch a short study video.",
+      "floatSubtitle": "Short Moon Nakshatra video guide",
+      "floatMeta": "{{name}} · Pada {{pada}}",
+      "dismiss": "Dismiss",
       "metaLabel": "Moon Nakshatra",
       "metaFallback": "Loaded from your chart",
       "screenTitle": "Know your Nakshatra",
