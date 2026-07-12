@@ -343,7 +343,7 @@ async def generate_wealth_premium_report(
     static_report = build_static_wealth_report(context)
     bypass = bool(force_regenerate)
 
-    analyzer = StructuredAnalysisAnalyzer()
+    analyzer = StructuredAnalysisAnalyzer(llm_lane="report")
     chapter_payloads: List[Dict[str, Any]] = []
     missing: List[Dict[str, Any]] = []
     chapters_from_db = 0

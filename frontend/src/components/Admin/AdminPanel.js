@@ -365,9 +365,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [deepseekPremiumModel, setDeepseekPremiumModel] = useState('');
   const [gemmaChatGenerateUrl, setGemmaChatGenerateUrl] = useState('');
   const [analysisLlmVendor, setAnalysisLlmVendor] = useState('gemini');
+  const [reportLlmVendor, setReportLlmVendor] = useState('gemini');
   const [timelineLlmVendor, setTimelineLlmVendor] = useState('gemini');
   const [deepseekAnalysisModel, setDeepseekAnalysisModel] = useState('');
+  const [deepseekReportModel, setDeepseekReportModel] = useState('');
   const [deepseekTimelineModel, setDeepseekTimelineModel] = useState('');
+  const [geminiReportModel, setGeminiReportModel] = useState('');
   const [geminiModelsSaving, setGeminiModelsSaving] = useState(false);
   const [chatCountdownStandardSeconds, setChatCountdownStandardSeconds] = useState('110');
   const [chatCountdownPremiumSeconds, setChatCountdownPremiumSeconds] = useState('210');
@@ -720,6 +723,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setGeminiChatModel(data.gemini_chat_model || '');
       setGeminiPremiumModel(data.gemini_premium_model || '');
       setGeminiAnalysisModel(data.gemini_analysis_model || '');
+      setGeminiReportModel(data.gemini_report_model || data.gemini_analysis_model || '');
       setGeminiInstantChatModel(data.gemini_instant_chat_model || '');
       setParallelBranchGeminiModels({
         ...DEFAULT_PARALLEL_BRANCH_MODELS,
@@ -788,8 +792,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setDeepseekPremiumModel(data.deepseek_premium_model || '');
       setGemmaChatGenerateUrl(data.gemma_chat_generate_url || '');
       setAnalysisLlmVendor(data.analysis_llm_vendor || 'gemini');
+      setReportLlmVendor(data.report_llm_vendor || data.analysis_llm_vendor || 'gemini');
       setTimelineLlmVendor(data.timeline_llm_vendor || 'gemini');
       setDeepseekAnalysisModel(data.deepseek_analysis_model || '');
+      setDeepseekReportModel(data.deepseek_report_model || data.deepseek_analysis_model || '');
       setDeepseekTimelineModel(data.deepseek_timeline_model || '');
       setPodcastProvider(data.podcast_provider || 'tts');
     } catch (error) {
@@ -892,10 +898,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         chatRes,
         premiumRes,
         analysisRes,
+        reportRes,
         timelineRes,
         analysisVendorRes,
+        reportVendorRes,
         timelineVendorRes,
         deepseekAnalysisRes,
+        deepseekReportRes,
         deepseekTimelineRes,
         providerRes,
         premiumProviderRes,
@@ -933,6 +942,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             description: 'Gemini model for analysis (health, wealth, career, karma, physical, events, etc.)',
           }),
         }),
+        fetch('/api/admin/settings/gemini_report_model', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'gemini_report_model',
+            value: geminiReportModel,
+            description: 'Gemini model for Reports Studio PDF chapters (partnership, wealth, etc.)',
+          }),
+        }),
         fetch('/api/admin/settings/event_timeline_model', {
           method: 'PUT',
           headers,
@@ -951,6 +969,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             description: 'Vendor for non-chat analysis: gemini or deepseek',
           }),
         }),
+        fetch('/api/admin/settings/report_llm_vendor', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'report_llm_vendor',
+            value: reportLlmVendor,
+            description: 'Vendor for Reports Studio PDF generation: gemini or deepseek',
+          }),
+        }),
         fetch('/api/admin/settings/timeline_llm_vendor', {
           method: 'PUT',
           headers,
@@ -967,6 +994,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             key: 'deepseek_analysis_model',
             value: deepseekAnalysisModel,
             description: 'DeepSeek model id when analysis vendor is deepseek',
+          }),
+        }),
+        fetch('/api/admin/settings/deepseek_report_model', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'deepseek_report_model',
+            value: deepseekReportModel,
+            description: 'DeepSeek model id when report vendor is deepseek',
           }),
         }),
         fetch('/api/admin/settings/deepseek_timeline_model', {
@@ -1053,10 +1089,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         !chatRes.ok ||
         !premiumRes.ok ||
         !analysisRes.ok ||
+        !reportRes.ok ||
         !timelineRes.ok ||
         !analysisVendorRes.ok ||
+        !reportVendorRes.ok ||
         !timelineVendorRes.ok ||
         !deepseekAnalysisRes.ok ||
+        !deepseekReportRes.ok ||
         !deepseekTimelineRes.ok ||
         !providerRes.ok ||
         !premiumProviderRes.ok ||
@@ -1072,10 +1111,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         const chatErr = await chatRes.json().catch(() => ({}));
         const premiumErr = await premiumRes.json().catch(() => ({}));
         const analysisErr = await analysisRes.json().catch(() => ({}));
+        const reportErr = await reportRes.json().catch(() => ({}));
         const timelineErr = await timelineRes.json().catch(() => ({}));
         const analysisVendorErr = await analysisVendorRes.json().catch(() => ({}));
+        const reportVendorErr = await reportVendorRes.json().catch(() => ({}));
         const timelineVendorErr = await timelineVendorRes.json().catch(() => ({}));
         const dsAnalysisErr = await deepseekAnalysisRes.json().catch(() => ({}));
+        const dsReportErr = await deepseekReportRes.json().catch(() => ({}));
         const dsTimelineErr = await deepseekTimelineRes.json().catch(() => ({}));
         const providerErr = await providerRes.json().catch(() => ({}));
         const premiumProviderErr = await premiumProviderRes.json().catch(() => ({}));
@@ -1092,10 +1134,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           chatErr,
           premiumErr,
           analysisErr,
+          reportErr,
           timelineErr,
           analysisVendorErr,
+          reportVendorErr,
           timelineVendorErr,
           dsAnalysisErr,
+          dsReportErr,
           dsTimelineErr,
           providerErr,
           premiumProviderErr,
@@ -1113,10 +1158,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             (chatErr.detail ||
               premiumErr.detail ||
               analysisErr.detail ||
+              reportErr.detail ||
               timelineErr.detail ||
               analysisVendorErr.detail ||
+              reportVendorErr.detail ||
               timelineVendorErr.detail ||
               dsAnalysisErr.detail ||
+              dsReportErr.detail ||
               dsTimelineErr.detail ||
               providerErr.detail ||
               premiumProviderErr.detail ||
@@ -1133,7 +1181,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         return;
       }
       alert(
-        'Chat vendors, chat models, branch planner, parallel branch models, branch word limits, Gemma URL, analysis/timeline vendors, and model picks saved. New requests use them immediately.'
+        'Chat vendors, chat models, branch planner, parallel branch models, branch word limits, Gemma URL, analysis/report/timeline vendors, and model picks saved. New requests use them immediately.'
       );
     } catch (error) {
       console.error('Error saving Gemini models:', error);
@@ -6484,16 +6532,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             </div>
 
             <div className="settings-section">
-              <h3>Analysis &amp; event timeline models</h3>
+              <h3>Analysis, Reports Studio &amp; event timeline models</h3>
               <p className="settings-hint">
                 <strong>Vendor</strong> picks which API is active for that lane (independent from chat vendors above).{' '}
-                <strong>Model rows below are always shown</strong> so you can keep e.g. DeepSeek for chat while choosing and saving Gemini and DeepSeek model ids for analysis/timeline without switching vendor to edit the other list. Only the vendor matching the active lane is used at runtime. Requires{' '}
+                <strong>Model rows below are always shown</strong> so you can keep e.g. DeepSeek for chat while choosing and saving Gemini and DeepSeek model ids for analysis/reports/timeline without switching vendor to edit the other list. Only the vendor matching the active lane is used at runtime. Requires{' '}
                 <code>GEMINI_API_KEY</code> and/or <code>DEEPSEEK_API_KEY</code> on the backend. If timeline vendor is DeepSeek, Gemini-only parallel cache flags (<code>EVENT_TIMELINE_PARALLEL_*</code>) are skipped automatically.
               </p>
               <div className="setting-item">
                 <div className="setting-info">
                   <strong>Analysis — vendor</strong>
-                  <p>Which API runs non-chat analysis features.</p>
+                  <p>Which API runs non-chat analysis features (health, career, karma tools, etc.).</p>
                 </div>
                 <select
                   value={analysisLlmVendor}
@@ -6531,6 +6579,50 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 >
                   {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-chat', label: 'DeepSeek Chat (V3.2)' }]).map((opt) => (
                     <option key={`dsa-${opt.value}`} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Reports Studio — vendor</strong>
+                  <p>Which API runs Partnership, Wealth, and other PDF report chapters.</p>
+                </div>
+                <select
+                  value={reportLlmVendor}
+                  onChange={(e) => setReportLlmVendor(e.target.value)}
+                  style={{ minWidth: '200px' }}
+                >
+                  <option value="gemini">Gemini</option>
+                  <option value="deepseek">DeepSeek</option>
+                </select>
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Reports Studio — Gemini model</strong>
+                  <p>Used when report vendor is Gemini (independent from analysis).</p>
+                </div>
+                <select
+                  value={geminiReportModel}
+                  onChange={(e) => setGeminiReportModel(e.target.value)}
+                  style={{ minWidth: '280px' }}
+                >
+                  {geminiModelOptions.map((opt) => (
+                    <option key={`rpt-${opt.value}`} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Reports Studio — DeepSeek model</strong>
+                  <p>Used when report vendor is DeepSeek (independent from analysis).</p>
+                </div>
+                <select
+                  value={deepseekReportModel}
+                  onChange={(e) => setDeepseekReportModel(e.target.value)}
+                  style={{ minWidth: '280px' }}
+                >
+                  {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-chat', label: 'DeepSeek Chat (V3.2)' }]).map((opt) => (
+                    <option key={`dsr-${opt.value}`} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
               </div>
@@ -6580,7 +6672,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
               <div className="form-buttons" style={{ marginTop: '12px' }}>
                 <button type="button" className="create-btn" onClick={handleSaveGeminiModels} disabled={geminiModelsSaving}>
-                  {geminiModelsSaving ? 'Saving…' : 'Save chat vendors, models, analysis & timeline'}
+                  {geminiModelsSaving ? 'Saving…' : 'Save chat vendors, models, analysis, reports & timeline'}
                 </button>
               </div>
             </div>

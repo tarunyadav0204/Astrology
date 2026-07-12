@@ -1,8 +1,9 @@
 """
-Non-chat analysis & event-timeline LLM routing (Gemini vs DeepSeek) from admin_settings.
+Non-chat analysis, Reports Studio, & event-timeline LLM routing (Gemini vs DeepSeek) from admin_settings.
 
 Provides a small adapter so existing code can keep calling ``.generate_content`` /
-``.generate_content_async`` while honoring ``analysis_llm_vendor`` and ``timeline_llm_vendor``.
+``.generate_content_async`` while honoring ``analysis_llm_vendor``, ``report_llm_vendor``,
+and ``timeline_llm_vendor``.
 """
 
 from __future__ import annotations
@@ -18,9 +19,12 @@ from utils.admin_settings import (
     GEMINI_MODEL_OPTIONS,
     get_analysis_llm_vendor,
     get_deepseek_analysis_model,
+    get_deepseek_report_model,
     get_deepseek_timeline_model,
     get_event_timeline_model,
     get_gemini_analysis_model,
+    get_gemini_report_model,
+    get_report_llm_vendor,
     get_timeline_llm_vendor,
 )
 
@@ -138,6 +142,22 @@ def build_analysis_llm_model() -> Tuple[Any, str, str]:
         mid = get_deepseek_analysis_model()
         return DeepSeekGenerativeAdapter(mid), mid, CHAT_LLM_DEEPSEEK
     preferred = get_gemini_analysis_model()
+    m, name = _build_gemini_with_fallbacks(preferred)
+    return m, name, CHAT_LLM_GEMINI
+
+
+def build_report_llm_model() -> Tuple[Any, str, str]:
+    """
+    Model for Reports Studio PDF chapters (partnership, wealth, etc.).
+
+    Returns:
+        (model, resolved_model_id, vendor) where vendor is ``gemini`` or ``deepseek``.
+    """
+    vendor = get_report_llm_vendor()
+    if vendor == CHAT_LLM_DEEPSEEK:
+        mid = get_deepseek_report_model()
+        return DeepSeekGenerativeAdapter(mid), mid, CHAT_LLM_DEEPSEEK
+    preferred = get_gemini_report_model()
     m, name = _build_gemini_with_fallbacks(preferred)
     return m, name, CHAT_LLM_GEMINI
 

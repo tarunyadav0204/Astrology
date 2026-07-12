@@ -951,7 +951,7 @@ function App() {
                   <div style={{ marginBottom: '20px' }}>
                     <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Sign in required</h2>
                     <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>
-                      Sign in to select saved charts and generate premium partnership reports.
+                      Sign in to select saved charts and generate premium PDF reports.
                     </p>
                     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
                       <button

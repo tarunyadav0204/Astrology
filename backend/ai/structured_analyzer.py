@@ -43,19 +43,29 @@ def _strip_shadbala_from_context_for_llm(obj: Any) -> Any:
 class StructuredAnalysisAnalyzer:
     """Dedicated analyzer for JSON-only astrological reports"""
     
-    def __init__(self):
-        from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
+    def __init__(self, *, llm_lane: str = "analysis"):
+        from utils.admin_settings import (
+            CHAT_LLM_DEEPSEEK,
+            get_analysis_llm_vendor,
+            get_report_llm_vendor,
+        )
 
-        if get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
+        lane = (llm_lane or "analysis").strip().lower()
+        use_report = lane == "report"
+        vendor = get_report_llm_vendor() if use_report else get_analysis_llm_vendor()
+
+        if vendor == CHAT_LLM_DEEPSEEK:
             if not os.getenv("DEEPSEEK_API_KEY"):
                 raise ValueError("DEEPSEEK_API_KEY not set")
         else:
             api_key = os.getenv('GEMINI_API_KEY')
             if not api_key:
                 raise ValueError("GEMINI_API_KEY not set")
-        from ai.analysis_llm_backend import build_analysis_llm_model
+        from ai.analysis_llm_backend import build_analysis_llm_model, build_report_llm_model
 
-        self.model, self.model_name, self.vendor = build_analysis_llm_model()
+        builder = build_report_llm_model if use_report else build_analysis_llm_model
+        self.model, self.model_name, self.vendor = builder()
+        self.llm_lane = "report" if use_report else "analysis"
 
     async def generate_structured_report(
         self,

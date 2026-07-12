@@ -50,6 +50,7 @@ GEMINI_MODEL_OPTIONS = [
 DEFAULT_GEMINI_CHAT_MODEL = "models/gemini-3.1-flash-lite"
 DEFAULT_GEMINI_PREMIUM_MODEL = "models/gemini-3.1-pro-preview"
 DEFAULT_GEMINI_ANALYSIS_MODEL = "models/gemini-3.1-flash-lite"
+DEFAULT_GEMINI_REPORT_MODEL = DEFAULT_GEMINI_ANALYSIS_MODEL
 DEFAULT_GEMINI_INSTANT_MODEL = "models/gemini-2.5-flash-lite"
 DEFAULT_PARALLEL_BRANCH_PLANNER_MODEL = DEFAULT_GEMINI_INSTANT_MODEL
 PARALLEL_BRANCH_GEMINI_MODEL_KEYS = {
@@ -88,7 +89,7 @@ _DEPRECATED_GEMINI_31_FLASH_LITE_PREVIEW = "models/gemini-3.1-flash-lite-preview
 _GEMINI_31_FLASH_LITE_GA = "models/gemini-3.1-flash-lite"
 
 # Chat: which vendor handles `GeminiChatAnalyzer.generate_chat_response`.
-# Non-chat analysis & event timelines use `analysis_llm_vendor` / `timeline_llm_vendor` (Gemini or DeepSeek).
+# Non-chat analysis, event timelines, and PDF reports use separate vendor settings (Gemini or DeepSeek).
 CHAT_LLM_GEMINI = "gemini"
 CHAT_LLM_OPENAI = "openai"
 CHAT_LLM_DEEPSEEK = "deepseek"
@@ -120,6 +121,7 @@ DEEPSEEK_CHAT_MODEL_OPTIONS = [
 DEFAULT_DEEPSEEK_CHAT_MODEL = "deepseek-chat"
 DEFAULT_DEEPSEEK_PREMIUM_MODEL = "deepseek-reasoner"
 DEFAULT_DEEPSEEK_ANALYSIS_MODEL = "deepseek-chat"
+DEFAULT_DEEPSEEK_REPORT_MODEL = DEFAULT_DEEPSEEK_ANALYSIS_MODEL
 DEFAULT_DEEPSEEK_TIMELINE_MODEL = "deepseek-reasoner"
 
 
@@ -302,6 +304,15 @@ def get_gemini_analysis_model() -> str:
     return DEFAULT_GEMINI_ANALYSIS_MODEL
 
 
+def get_gemini_report_model() -> str:
+    """Model ID for Reports Studio PDF chapters (partnership, wealth, etc.). Independent of analysis."""
+    value = get_setting("gemini_report_model")
+    if value and value.strip():
+        return value.strip()
+    # Until an explicit report model is saved, keep prior behavior (analysis model).
+    return get_gemini_analysis_model()
+
+
 def get_gemini_instant_model() -> str:
     """Model ID for instant chat. From admin_settings or default."""
     value = get_setting("gemini_instant_chat_model")
@@ -365,11 +376,22 @@ def get_parallel_branch_planner_model() -> str:
 
 
 def get_analysis_llm_vendor() -> str:
-    """Vendor for non-chat analysis (health, wealth, karma, structured reports, etc.): gemini or deepseek."""
+    """Vendor for non-chat analysis (health, wealth, karma, career tools, etc.): gemini or deepseek."""
     value = (get_setting("analysis_llm_vendor") or "").strip().lower()
     if value == CHAT_LLM_DEEPSEEK:
         return CHAT_LLM_DEEPSEEK
     return CHAT_LLM_GEMINI
+
+
+def get_report_llm_vendor() -> str:
+    """Vendor for Reports Studio PDF generation: gemini or deepseek."""
+    value = (get_setting("report_llm_vendor") or "").strip().lower()
+    if value == CHAT_LLM_DEEPSEEK:
+        return CHAT_LLM_DEEPSEEK
+    if value == CHAT_LLM_GEMINI:
+        return CHAT_LLM_GEMINI
+    # Until an explicit report vendor is saved, keep prior behavior (analysis vendor).
+    return get_analysis_llm_vendor()
 
 
 def get_timeline_llm_vendor() -> str:
@@ -385,6 +407,13 @@ def get_deepseek_analysis_model() -> str:
     if value and value.strip():
         return _normalize_deepseek_model_id(value.strip())
     return DEFAULT_DEEPSEEK_ANALYSIS_MODEL
+
+
+def get_deepseek_report_model() -> str:
+    value = get_setting("deepseek_report_model")
+    if value and value.strip():
+        return _normalize_deepseek_model_id(value.strip())
+    return get_deepseek_analysis_model()
 
 
 def get_deepseek_timeline_model() -> str:

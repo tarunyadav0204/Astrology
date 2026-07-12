@@ -56,54 +56,48 @@ const REPORT_TYPES = [
   },
 ];
 
-const REPORT_CONTENTS = [
+const STUDIO_HIGHLIGHTS = [
+  {
+    title: 'Choose the report that fits the question',
+    desc: 'Partnership for two-person studies, Wealth for income and assets, with Career, Health, and Progeny planned next — all from one Reports Studio flow.',
+  },
+  {
+    title: 'Chart-grounded PDF chapters',
+    desc: 'Each report is a multi-page PDF with chart overlays, deterministic timing tables where relevant, AI narrative in your language, and clear next steps.',
+  },
+  {
+    title: 'Generate once, reopen free',
+    desc: 'Credits are used for fresh generate and regenerate. Reopening the same report for the same chart(s) and language stays free.',
+  },
+];
+
+const PARTNERSHIP_CONTENTS = [
   {
     title: 'Executive verdict & score layers',
-    desc: 'A clear go / caution / wait reading, plus how Guna Milan, Manglik balance, chart support, and timing fit together — not a single score in isolation.',
+    desc: 'A clear go / caution / wait reading, plus how Guna Milan, Manglik balance, chart support, and timing fit together.',
   },
   {
     title: 'Nakshatra nature for both people',
-    desc: 'Moon, Venus, and 7th-lord nakshatra/pada for each person: emotional style, desire pattern, partner-seeking nature, and where the two natures mesh or friction.',
+    desc: 'Moon, Venus, and 7th-lord nakshatra/pada for each person: emotional style, desire pattern, and where the two natures mesh or friction.',
   },
   {
-    title: 'Emotional rhythm & communication',
-    desc: 'How both people feel and seek comfort, mental rapport, daily repair style, and communication patterns that help or harden conflict.',
+    title: 'D1, D9, Jaimini & timing',
+    desc: 'Marriage foundations, Navamsa maturity, Upapada/Darapada, KP materialization checks, dasha windows, and remedies in one shareable PDF.',
+  },
+];
+
+const WEALTH_CONTENTS = [
+  {
+    title: 'Wealth foundation & yogas',
+    desc: 'D1 2nd/11th/lagna/9th promise, Dhana and related yogas, Indu Lagna and Arudha/HL money image grounded in calculator evidence.',
   },
   {
-    title: 'Physical chemistry & biology',
-    desc: 'Venus–Mars attraction flow, intimacy tone, and Nadi-related biological compatibility signals explained in practical language.',
+    title: 'D2, D10 & income sources',
+    desc: 'Hora materialization, career-to-cashflow from D10, ranked income modes, assets/inheritance, debt risk, and KP wealth signals.',
   },
   {
-    title: 'Each person’s D1 marriage foundation',
-    desc: 'Separate Rashi-chart chapters for both natives: 7th house, 7th lord, Venus/Jupiter support, and visible relationship karma — kept person-attributed.',
-  },
-  {
-    title: 'Jaimini Upapada & Darapada (A7)',
-    desc: 'Inner marriage environment (UL) and how the relationship tends to show up in real life (A7) for both people.',
-  },
-  {
-    title: 'D9 Navamsa maturity & pair durability',
-    desc: 'Individual Navamsa chapters plus a pair-level durability reading: whether the bond tends to deepen or drift after commitment.',
-  },
-  {
-    title: 'Wealth, career, progeny & shared dharma',
-    desc: 'Financial synergy and D2/KP wealth signals, career and public life together, progeny and D7 parenting legacy, plus beliefs and shared dharma.',
-  },
-  {
-    title: 'Dosha demystification & karmic layer',
-    desc: 'Manglik, Bhakoot, Gana, Nadi and cancellations explained without scare tactics, plus D60 karmic patterns that can repeat in the bond.',
-  },
-  {
-    title: 'Timing, event materialization & remedies',
-    desc: 'KP alliance materialization checks, dasha/transit windows for engagement or marriage pacing, behavioral guidance, and safe Vedic remedy direction.',
-  },
-  {
-    title: 'Charts inside the PDF',
-    desc: 'Relevant D1, D9, D2, D7 and related chart overlays so the narrative is grounded in the actual charts, not only prose.',
-  },
-  {
-    title: 'Shareable 20+ page PDF',
-    desc: 'A polished document you can reopen, download, and share — structured for families and decision-makers, not only for astrologers.',
+    title: '12-month dasha money plan',
+    desc: 'Current MD/AD/PD theme, month-by-month timing tables, quarterly chapters, peak/caution windows, remedies, and a 90-day checklist.',
   },
 ];
 
@@ -111,27 +105,37 @@ const faqItems = [
   {
     question: 'What is Reports Studio?',
     answer:
-      'Reports Studio creates premium structured Vedic PDF reports. Partnership Report is available now for any two-person relationship study.',
+      'Reports Studio is AstroRoshni’s premium PDF report builder. You choose a report type, select the required birth chart(s), pick a language, and generate a structured Vedic PDF with charts, timing, and clear takeaways.',
+  },
+  {
+    question: 'Which reports are available now?',
+    answer:
+      'Partnership Report (two charts, 20+ pages) and Wealth Report (single chart, 27 pages) are available now. Career, Health, and Progeny reports are coming soon in the same studio.',
   },
   {
     question: 'What is inside the Partnership Report?',
     answer:
-      'A typical report is 20+ pages covering compatibility overview, Ashtakoot and Manglik context, chart overlays, timing climate, strengths, friction points, remedies, and clear next steps.',
+      'A typical partnership PDF covers compatibility overview, Ashtakoot and Manglik context, nakshatra nature, D1/D9 foundations, Jaimini signals, timing climate, strengths, friction points, remedies, and next steps.',
   },
   {
-    question: 'How is this different from free Kundli matching?',
+    question: 'What is inside the Wealth Report?',
     answer:
-      'Kundli matching gives a fast Ashtakoot score and core signals. Reports Studio builds a deeper multi-chapter PDF with AI narrative, visuals, timing, and remedy-oriented guidance.',
+      'The Wealth Report studies earning, saving, and growth across D1/D2/D10 layers, money yogas, Indu/AL/HL image, KP and nakshatra wealth cues, spouse/joint-money framing, speculation vs investing, and a 12-month dasha timing plan.',
+  },
+  {
+    question: 'How is this different from free matching or chat?',
+    answer:
+      'Chat and free matching answer focused questions quickly. Reports Studio builds a deeper multi-chapter PDF with visuals, deterministic timing evidence, AI narrative, and remedy-oriented guidance you can reopen and share.',
   },
   {
     question: 'Do I pay credits every time I open a report?',
     answer:
-      'No. Fresh generate and regenerate use credits. Reopening an existing report for the same pair and language is free.',
+      'No. Fresh generate and regenerate use credits. Reopening an existing report for the same subject(s) and language is free.',
   },
   {
     question: 'Do I need exact birth times?',
     answer:
-      'Yes for best results. Accurate date, time, and place improve houses, Navamsa, Manglik assessment, and timing windows.',
+      'Yes for best results. Accurate date, time, and place improve houses, divisional charts, Manglik assessment, wealth lords, and timing windows.',
   },
   {
     question: 'Which languages are supported?',
@@ -141,7 +145,7 @@ const faqItems = [
   {
     question: 'How long does generation take?',
     answer:
-      'Most partnership reports finish within a few minutes. Progress appears while charts are read and chapters are assembled.',
+      'Most reports finish within a few minutes. Progress appears while charts are read and chapters are assembled.',
   },
   {
     question: 'Is my birth data private?',
@@ -160,8 +164,15 @@ const structuredData = {
       applicationCategory: 'LifestyleApplication',
       operatingSystem: 'Web',
       description:
-        'Premium Vedic partnership PDF reports with chart overlays, timing, strengths, friction points, and remedies.',
+        'Premium Vedic PDF reports from AstroRoshni — Partnership compatibility and Wealth timing reports with chart overlays, dasha windows, and remedies. Career, Health, and Progeny coming soon.',
       publisher: { '@type': 'Organization', name: 'AstroRoshni', url: 'https://astroroshni.com' },
+      offers: {
+        '@type': 'AggregateOffer',
+        lowPrice: '9',
+        priceCurrency: 'INR',
+        offerCount: 2,
+        description: 'Credit-priced Partnership and Wealth PDF reports; reopen free for the same chart set and language.',
+      },
     },
     {
       '@type': 'FAQPage',
@@ -176,6 +187,42 @@ const structuredData = {
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://astroroshni.com/' },
         { '@type': 'ListItem', position: 2, name: 'Reports Studio', item: 'https://astroroshni.com/reports' },
+      ],
+    },
+    {
+      '@type': 'ItemList',
+      name: 'AstroRoshni premium Vedic reports',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: 'Partnership Report',
+          description: 'Premium 20+ page two-chart Vedic compatibility PDF for marriage, business, or family partnerships.',
+        },
+        {
+          '@type': 'ListItem',
+          position: 2,
+          name: 'Wealth Report',
+          description: 'Premium 27-page single-chart Vedic wealth PDF with D1/D2/D10 layers and 12-month dasha timing.',
+        },
+        {
+          '@type': 'ListItem',
+          position: 3,
+          name: 'Career Report',
+          description: 'Coming soon — work style, timing, and career direction.',
+        },
+        {
+          '@type': 'ListItem',
+          position: 4,
+          name: 'Health Report',
+          description: 'Coming soon — body constitution, care points, and wellness habits.',
+        },
+        {
+          '@type': 'ListItem',
+          position: 5,
+          name: 'Progeny Report',
+          description: 'Coming soon — progeny timing and related chart indicators.',
+        },
       ],
     },
   ],
@@ -562,9 +609,9 @@ const ReportsStudioPage = ({
   return (
     <div className="reports-studio-page">
       <SEOHead
-        title="Reports Studio — Premium Vedic Partnership PDF Reports | AstroRoshni"
-        description="Create premium Vedic partnership PDF reports from two birth charts with timing, strengths, remedies, and clear takeaways."
-        keywords="vedic partnership report, marriage compatibility PDF, premium kundli report, reports studio"
+        title="Reports Studio — Premium Vedic PDF Reports | AstroRoshni"
+        description="Create premium Vedic PDF reports in AstroRoshni Reports Studio: Partnership compatibility and Wealth timing reports with charts, dasha windows, remedies, and clear takeaways. Career, Health, and Progeny coming soon."
+        keywords="vedic reports studio, partnership compatibility PDF, wealth astrology report, kundli PDF report, dasha timing report, marriage matching report, vedic wealth report, premium kundli report"
         canonical="https://astroroshni.com/reports/"
         structuredData={structuredData}
       />
@@ -787,18 +834,47 @@ const ReportsStudioPage = ({
         </section>
 
         <section className="reports-seo-section" aria-labelledby="reports-method-heading">
-          <h2 id="reports-method-heading">Why a full Partnership Report?</h2>
+          <h2 id="reports-method-heading">Why Reports Studio?</h2>
           <p>
-            Free matching answers “how do the Gunas look?” A Partnership Report answers “what does this relationship
-            tend to feel like over time, where is the friction, when is the climate supportive, and what should we do next?”
+            Free tools answer one score or one chat question. Reports Studio builds a full, shareable Vedic PDF —
+            chart overlays, timing evidence, strengths, risks, remedies, and next steps — for the life area you
+            choose.
           </p>
           <p>
-            It is a multi-chapter Vedic study of two charts together — marriage, business, parent–child, or any close
-            partnership — written as a readable 20+ page PDF with chart overlays, timing windows, and an action plan.
+            Start with Partnership for any two-person study, or Wealth for a single-chart money roadmap. Career,
+            Health, and Progeny will join the same studio flow when ready.
           </p>
-          <h3 className="reports-seo-subheading">What you get in the Partnership Report</h3>
+          <h3 className="reports-seo-subheading">What every report shares</h3>
           <ul className="reports-contents-grid">
-            {REPORT_CONTENTS.map((item) => (
+            {STUDIO_HIGHLIGHTS.map((item) => (
+              <li key={item.title}>
+                <h4>{item.title}</h4>
+                <p>{item.desc}</p>
+              </li>
+            ))}
+          </ul>
+
+          <h3 className="reports-seo-subheading">Partnership Report</h3>
+          <p>
+            A multi-chapter study of two charts together — marriage, business, parent–child, or any close
+            partnership — as a readable 20+ page PDF with timing windows and an action plan.
+          </p>
+          <ul className="reports-contents-grid">
+            {PARTNERSHIP_CONTENTS.map((item) => (
+              <li key={item.title}>
+                <h4>{item.title}</h4>
+                <p>{item.desc}</p>
+              </li>
+            ))}
+          </ul>
+
+          <h3 className="reports-seo-subheading">Wealth Report</h3>
+          <p>
+            A 27-page single-chart money study: foundation and yogas, D2/D10 manifestation, income sources, risk
+            bands, spouse/joint-finance framing, and a deterministic 12-month dasha plan the narrative must follow.
+          </p>
+          <ul className="reports-contents-grid">
+            {WEALTH_CONTENTS.map((item) => (
               <li key={item.title}>
                 <h4>{item.title}</h4>
                 <p>{item.desc}</p>
@@ -806,9 +882,8 @@ const ReportsStudioPage = ({
             ))}
           </ul>
           <p className="reports-seo-note">
-            Typical chapters include executive verdict, nakshatra nature, emotional and physical chemistry, each person’s
-            D1 and D9 foundations, Jaimini UL/A7, wealth–career–progeny domains, dosha and D60 context, dasha/transit
-            timing, and remedies — assembled into one shareable PDF.
+            Coming next in Reports Studio: Career, Health, and Progeny — same generate / reopen / regenerate
+            credit model, languages, and PDF delivery.
           </p>
         </section>
 

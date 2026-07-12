@@ -1267,7 +1267,7 @@ async def generate_compatibility_premium_report(
         "premium_static_report": static_report,
     }
 
-    analyzer = StructuredAnalysisAnalyzer()
+    analyzer = StructuredAnalysisAnalyzer(llm_lane="report")
     try:
         merged = await generate_cached_chapter_report(
             userid=userid,

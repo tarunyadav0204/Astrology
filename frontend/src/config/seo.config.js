@@ -116,9 +116,9 @@ export const SEO_CONFIG = {
     },
 
     reportsStudio: {
-      title: "Reports Studio — Premium Vedic Partnership PDF Reports | AstroRoshni",
-      description: "Create premium Vedic partnership PDF reports from two birth charts with timing, strengths, remedies, and clear takeaways in a shareable 20+ page report.",
-      keywords: "vedic partnership report, marriage compatibility PDF, premium kundli report, reports studio, two chart astrology report"
+      title: "Reports Studio — Premium Vedic PDF Reports | AstroRoshni",
+      description: "Create premium Vedic PDF reports in AstroRoshni Reports Studio: Partnership compatibility and Wealth timing reports with charts, dasha windows, remedies, and clear takeaways. Career, Health, and Progeny coming soon.",
+      keywords: "vedic reports studio, partnership compatibility PDF, wealth astrology report, kundli PDF report, dasha timing report, marriage matching report, vedic wealth report, premium kundli report"
     },
 
     birthChartCreation: {
