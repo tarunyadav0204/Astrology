@@ -117,18 +117,20 @@ jobs:
               frontend_required=true
             fi
 
+            # Prefix patterns must not use a trailing `$` after `backend/` / `play_payment_service/`
+            # or only the exact directory path would match (never files under it).
             if printf '%s\n' "${changed_files}" | grep -E -q \
-              '^(backend/|deploy\.sh|scripts/(deploy-release|build-gce-release-image|prepare-image-release|bootstrap-runtime|gce-startup-bootstrap|install_runtime_watchdog)\.sh|\.github/workflows/deploy\.yml)$'; then
+              '^backend/|^deploy\.sh$|^scripts/(deploy-release|build-gce-release-image|prepare-image-release|bootstrap-runtime|gce-startup-bootstrap|install_runtime_watchdog)\.sh$|^\.github/workflows/deploy\.yml$'; then
               backend_required=true
             fi
 
             if printf '%s\n' "${changed_files}" | grep -E -q \
-              '^(play_payment_service/|backend/(credits/|activity/|utils/admin_settings\.py|utils/birth_hash\.py|utils/env_json\.py|auth\.py|db\.py)|scripts/prepare-play-payment-build-context\.sh)$'; then
+              '^play_payment_service/|^backend/credits/|^backend/activity/|^backend/utils/admin_settings\.py$|^backend/utils/birth_hash\.py$|^backend/utils/env_json\.py$|^backend/auth\.py$|^backend/db\.py$|^scripts/prepare-play-payment-build-context\.sh$'; then
               payment_required=true
             fi
 
             if printf '%s\n' "${changed_files}" | grep -E -q \
-              '^(nudge_worker_service/|nudge_dispatch_service/|backend/|scripts/prepare-nudge-service-build-context\.sh)$'; then
+              '^nudge_worker_service/|^nudge_dispatch_service/|^backend/|^scripts/prepare-nudge-service-build-context\.sh$'; then
               nudge_required=true
             fi
 
