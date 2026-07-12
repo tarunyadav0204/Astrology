@@ -155,6 +155,9 @@ def _resolve_behavior(conn, ids: List[int], params: Dict[int, Dict[str, str]]) -
 
 
 def _resolve_wallet(conn, ids: List[int], params: Dict[int, Dict[str, str]]) -> None:
+    from utils.admin_settings import is_free_question_enabled
+
+    free_feature_on = is_free_question_enabled()
     cur = execute(
         conn,
         """
@@ -167,7 +170,9 @@ def _resolve_wallet(conn, ids: List[int], params: Dict[int, Dict[str, str]]) -> 
     for uid, credits, free_used in cur.fetchall() or []:
         p = params[int(uid)]
         p["credits_balance"] = str(int(credits or 0))
-        p["free_question_available"] = "no" if int(free_used or 0) else "yes"
+        p["free_question_available"] = (
+            "no" if (not free_feature_on or int(free_used or 0)) else "yes"
+        )
 
 
 def _self_charts_for_users(conn, ids: List[int]) -> Dict[int, Dict[str, Any]]:

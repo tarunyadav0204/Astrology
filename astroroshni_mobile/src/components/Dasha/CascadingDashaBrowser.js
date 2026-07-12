@@ -50,7 +50,14 @@ const getShortSign = (sign) => {
 };
 
 
-const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData, selectNativeReturnTo = 'Home' }) => {
+const CascadingDashaBrowser = ({
+  visible,
+  onClose,
+  birthData,
+  onRequireBirthData,
+  selectNativeReturnTo = 'Home',
+  embedded = false,
+}) => {
   const { t } = useTranslation();
   const navigation = useNavigation();
   const { theme, colors } = useTheme();
@@ -74,13 +81,15 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const isActive = embedded || visible;
+
   // When visible but no birth data, stop loading and show empty state
   useEffect(() => {
-    if (visible && (!birthData || !birthData.name)) {
+    if (isActive && (!birthData || !birthData.name)) {
       setLoading(false);
       setError(null);
     }
-  }, [visible, birthData]);
+  }, [isActive, birthData]);
   const [transitDate, setTransitDate] = useState(new Date());
   const [selectedDashas, setSelectedDashas] = useState({});
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -165,7 +174,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
   };
 
   useEffect(() => {
-    if (visible && birthData) {
+    if (isActive && birthData) {
       if (dashaType === 'vimshottari') {
         fetchCascadingDashas();
       } else if (dashaType === 'kalchakra') {
@@ -177,7 +186,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
       }
       trackAstrologyEvent.dashaViewed(dashaType);
     }
-  }, [visible, birthData, transitDate, dashaType]);
+  }, [isActive, birthData, transitDate, dashaType]);
 
   useEffect(() => {
     if (dashaType === 'vimshottari' && cascadingData) {
@@ -2177,143 +2186,121 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
     );
   };
 
-  // No birth data: show empty state instead of loader
-  if (visible && (!birthData || !birthData.name)) {
+  const wrapShell = (content) => {
+    if (embedded) return content;
     return (
       <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-        <View
-          style={{ flex: 1, backgroundColor: dashaColors.background, paddingTop: insets.top }}
-          {...modalSwipeHandlers}
-        >
-          <StatusBar barStyle={colors.statusBarStyle} />
+        {content}
+      </Modal>
+    );
+  };
 
-          <PanGestureHandler onHandlerStateChange={handleEdgeSwipeClose}>
-            <View style={styles.edgeSwipeZone} />
-          </PanGestureHandler>
-          <View style={[styles.header, { backgroundColor: dashaColors.surface, borderBottomColor: dashaColors.border }]}>
-            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: dashaColors.softControl }]}>
-              <Icon name="arrow-back" size={22} color={colors.text} />
+  const renderBrowserHeader = (centerContent) => (
+    <View style={[styles.header, { backgroundColor: dashaColors.surface, borderBottomColor: dashaColors.border }]}>
+      {embedded ? (
+        <View style={styles.placeholder} />
+      ) : (
+        <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: dashaColors.softControl }]}>
+          <Icon name="arrow-back" size={22} color={colors.text} />
+        </TouchableOpacity>
+      )}
+      {centerContent}
+      <View style={styles.placeholder} />
+    </View>
+  );
+
+  const renderShellBody = (headerCenter, body) => (
+    <View
+      style={{ flex: 1, backgroundColor: dashaColors.background, paddingTop: embedded ? 0 : insets.top }}
+      {...(embedded ? {} : modalSwipeHandlers)}
+    >
+      {!embedded ? <StatusBar barStyle={colors.statusBarStyle} /> : null}
+      {!embedded ? (
+        <PanGestureHandler onHandlerStateChange={handleEdgeSwipeClose}>
+          <View style={styles.edgeSwipeZone} />
+        </PanGestureHandler>
+      ) : null}
+      {renderBrowserHeader(headerCenter)}
+      {body}
+    </View>
+  );
+
+  // No birth data: show empty state instead of loader
+  if (isActive && (!birthData || !birthData.name)) {
+    return wrapShell(
+      renderShellBody(
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>,
+        <View style={[styles.loadingContainer, { justifyContent: 'center', paddingHorizontal: 24 }]}>
+          <Text style={[styles.loadingText, { color: colors.text, textAlign: 'center', marginBottom: 8 }]}>
+            {t('dasha.birthDataRequired', 'Birth data is required to view dashas.')}
+          </Text>
+          <Text style={[styles.loadingText, { color: colors.textSecondary, textAlign: 'center', fontSize: 14, marginBottom: 24 }]}>
+            {t('dasha.addBirthProfileHint', 'Add your birth profile from the home screen to continue.')}
+          </Text>
+          {onRequireBirthData ? (
+            <TouchableOpacity
+              onPress={() => { onRequireBirthData(); if (!embedded) onClose?.(); }}
+              style={[styles.retryButton, { backgroundColor: colors.primary, alignSelf: 'center', paddingHorizontal: 24 }]}
+            >
+              <Text style={[styles.retryText, { color: '#fff' }]}>{t('birthProfileIntro.emptyStateCta', 'Add birth profile')}</Text>
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>
-            <View style={styles.placeholder} />
-          </View>
-          <View style={[styles.loadingContainer, { justifyContent: 'center', paddingHorizontal: 24 }]}>
-            <Text style={[styles.loadingText, { color: colors.text, textAlign: 'center', marginBottom: 8 }]}>
-              {t('dasha.birthDataRequired', 'Birth data is required to view dashas.')}
-            </Text>
-            <Text style={[styles.loadingText, { color: colors.textSecondary, textAlign: 'center', fontSize: 14, marginBottom: 24 }]}>
-              {t('dasha.addBirthProfileHint', 'Add your birth profile from the home screen to continue.')}
-            </Text>
-            {onRequireBirthData ? (
-              <TouchableOpacity
-                onPress={() => { onRequireBirthData(); onClose(); }}
-                style={[styles.retryButton, { backgroundColor: colors.primary, alignSelf: 'center', paddingHorizontal: 24 }]}
-              >
-                <Text style={[styles.retryText, { color: '#fff' }]}>{t('birthProfileIntro.emptyStateCta', 'Add birth profile')}</Text>
-              </TouchableOpacity>
-            ) : null}
+          ) : null}
+          {!embedded ? (
             <TouchableOpacity
               onPress={onClose}
               style={{ marginTop: 16, paddingVertical: 12, paddingHorizontal: 24, alignSelf: 'center' }}
             >
               <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>{t('common.close', 'Close')}</Text>
             </TouchableOpacity>
-          </View>
+          ) : null}
         </View>
-      </Modal>
+      )
     );
   }
 
   if (loading) {
-    return (
-      <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-        <View
-          style={{ flex: 1, backgroundColor: dashaColors.background, paddingTop: insets.top }}
-          {...modalSwipeHandlers}
-        >
-          <StatusBar barStyle={colors.statusBarStyle} />
-
-          <PanGestureHandler onHandlerStateChange={handleEdgeSwipeClose}>
-            <View style={styles.edgeSwipeZone} />
-          </PanGestureHandler>
-          <View style={[styles.header, { backgroundColor: dashaColors.surface, borderBottomColor: dashaColors.border }]}>
-            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: dashaColors.softControl }]}>
-              <Icon name="arrow-back" size={22} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>
-            <View style={styles.placeholder} />
-          </View>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('dasha.loading')}</Text>
-          </View>
+    return wrapShell(
+      renderShellBody(
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>,
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('dasha.loading')}</Text>
         </View>
-      </Modal>
+      )
     );
   }
 
   if (error) {
-    return (
-      <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-        <View
-          style={{ flex: 1, backgroundColor: dashaColors.background, paddingTop: insets.top }}
-          {...modalSwipeHandlers}
-        >
-          <StatusBar barStyle={colors.statusBarStyle} />
-
-          <PanGestureHandler onHandlerStateChange={handleEdgeSwipeClose}>
-            <View style={styles.edgeSwipeZone} />
-          </PanGestureHandler>
-          <View style={[styles.header, { backgroundColor: dashaColors.surface, borderBottomColor: dashaColors.border }]}>
-            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: dashaColors.softControl }]}>
-              <Icon name="arrow-back" size={22} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>
-            <View style={styles.placeholder} />
-          </View>
-          <View style={styles.errorContainer}>
-            <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
-            <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={fetchCascadingDashas}>
-              <Text style={[styles.retryText, { color: '#fff' }]}>{t('common.retry')}</Text>
-            </TouchableOpacity>
-          </View>
+    return wrapShell(
+      renderShellBody(
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>,
+        <View style={styles.errorContainer}>
+          <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+          <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={fetchCascadingDashas}>
+            <Text style={[styles.retryText, { color: '#fff' }]}>{t('common.retry')}</Text>
+          </TouchableOpacity>
         </View>
-      </Modal>
+      )
     );
   }
 
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <View
-        style={{ flex: 1, backgroundColor: dashaColors.background, paddingTop: insets.top }}
-        {...modalSwipeHandlers}
-      >
-        <StatusBar barStyle={colors.statusBarStyle} />
-
-          <PanGestureHandler onHandlerStateChange={handleEdgeSwipeClose}>
-            <View style={styles.edgeSwipeZone} />
-          </PanGestureHandler>
-        <View style={[styles.header, { backgroundColor: dashaColors.surface, borderBottomColor: dashaColors.border }]}>
-          <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: dashaColors.softControl }]}>
-            <Icon name="arrow-back" size={22} color={colors.text} />
-          </TouchableOpacity>
-          <View style={styles.headerCenter}>
-            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-              {t('dasha.browserTitle')}
-            </Text>
-            {birthData ? (
-              <NativeSelectorChip
-                birthData={birthData}
-                onPress={handleSelectNative}
-                maxLength={12}
-                showIcon={false}
-                style={styles.headerNativeChip}
-              />
-            ) : null}
-          </View>
-          <View style={styles.placeholder} />
-        </View>
-        
+  return wrapShell(
+    renderShellBody(
+      <View style={styles.headerCenter}>
+        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+          {t('dasha.browserTitle')}
+        </Text>
+        {birthData ? (
+          <NativeSelectorChip
+            birthData={birthData}
+            onPress={handleSelectNative}
+            maxLength={12}
+            showIcon={false}
+            style={styles.headerNativeChip}
+          />
+        ) : null}
+      </View>,
+      <>
         <GHScrollView
           style={[styles.content, { backgroundColor: dashaColors.background }]}
           contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 32, 56) }}
@@ -2321,7 +2308,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
           {renderDashaTypeSelector()}
           {dashaType === 'vimshottari' && renderDateNavigation()}
           {renderBreadcrumb()}
-          
+
           <View style={styles.selectorsContainer}>
             {dashaType === 'vimshottari' ? (
               <React.Fragment>
@@ -2342,10 +2329,10 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData
             ) : null}
           </View>
         </GHScrollView>
-        
+
         {renderSystemInfoModal()}
-      </View>
-    </Modal>
+      </>
+    )
   );
 };
 

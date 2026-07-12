@@ -143,6 +143,7 @@ class RemedyEngine:
         remedy_sections = {
             "house_expression": self._house_expression_guidance(active_planets, focus_houses, current_dashas_context),
             "gemstones": self._section_for_planets(active_planets, "gemstone"),
+            "nakshatra": self._section_for_planets(active_planets, "nakshatra"),
             "mantras": self._section_for_planets(active_planets, "mantra"),
             "biological": self._section_for_planets(active_planets, "biological"),
             "ritual": self._section_for_planets(active_planets, "ritual"),
@@ -243,6 +244,23 @@ class RemedyEngine:
             row = self._planet_summary(planet, (self.chart_data.get("planets") or {}).get(planet) or {})
             if section == "gemstone":
                 out.append({"planet": planet, "text": row.get("gemstone")})
+            elif section == "nakshatra":
+                nk = row.get("nakshatra_remedy") or {}
+                text = None
+                if nk:
+                    text = " | ".join(
+                        part
+                        for part in [
+                            f"Shakti: {nk.get('shakti')}",
+                            f"Deity: {nk.get('deity')}",
+                            f"Vriksha: {nk.get('vriksha')}",
+                            f"Pada syllable: {nk.get('pada_syllable')}",
+                        ]
+                        if part and not part.endswith(": None")
+                    )
+                if not text:
+                    text = f"Use the nakshatra-specific remedy layer for {planet}."
+                out.append({"planet": planet, "text": text, "details": nk})
             elif section == "mantra":
                 text = row.get("mantra")
                 if row.get("nakshatra_remedy") and row["nakshatra_remedy"].get("tier_2_sound"):

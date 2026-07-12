@@ -81,18 +81,13 @@ class ResponseParser:
                 result['terms'] = list(result['glossary'].keys())
                 # Remove the glossary block from the visible content
                 result['content'] = text.split("GLOSSARY_START")[0].strip()
-                print(f"✅ Glossary parsed: {len(result['terms'])} terms found")
             except Exception as e:
-                print(f"⚠️ Marker-based glossary parse failed: {e}")
-                print(f"   Glossary part: {glossary_part[:200] if 'glossary_part' in locals() else 'N/A'}...")
+                pass
 
         # 4. Extract Terms via Regex (if not already found via glossary keys)
         if not result['terms']:
             term_matches = re.findall(r'<term id="([^"]+)">', text)
             result['terms'] = list(set(term_matches))
-            print(f"🔍 Extracted {len(result['terms'])} terms via regex: {result['terms'][:5]}...")
-        else:
-            print(f"🔍 Using {len(result['terms'])} terms from glossary")
 
         return result
 
@@ -182,7 +177,6 @@ class ResponseParser:
         in a specific order and cleans the content for display.
         """
         import html
-        print(f"\n🔍 ROBUST PARSER V3 DEBUG:")
         
         # Decode ALL HTML entities in the raw text FIRST
         # Manual replacement FIRST for literal entity strings
@@ -206,9 +200,8 @@ class ResponseParser:
                 prompt_section = content.split('SUMMARY_IMAGE_START')[1].split('SUMMARY_IMAGE_END')[0]
                 summary_image_prompt = prompt_section.strip()
                 content = re.sub(r'SUMMARY_IMAGE_START.*?SUMMARY_IMAGE_END', '', content, flags=re.DOTALL)
-                print(f"   ✅ Extracted summary image prompt.")
             except Exception as e:
-                print(f"   ⚠️ Summary image extraction failed: {e}")
+                pass
 
         # 2. Extract and Parse Glossary
         if 'GLOSSARY_START' in content and 'GLOSSARY_END' in content:
@@ -244,18 +237,15 @@ class ResponseParser:
                             parsed_glossary[term_text.lower().strip()] = definition.strip()
 
                 content = re.sub(r'GLOSSARY_START.*?GLOSSARY_END', '', content, flags=re.DOTALL)
-                print(f"   ✅ Glossary parsed ({len(parsed_glossary)} terms).")
             except Exception as e:
-                print(f"   ⚠️ Glossary error: {e}")
+                pass
         
         # 3. Extract Follow-up Questions from DECODED content (Hybrid Parser)
         follow_up_div = '<div class="follow-up-questions">'
-        print(f"   Checking for follow-up in decoded content: {follow_up_div in content}")
         follow_up_match = re.search(r'<div class="follow-up-questions">(.*?)</div>', content, re.DOTALL)
         if follow_up_match:
-            print(f"   Found follow-up match!")
+            pass
             question_block = follow_up_match.group(1).strip()
-            print(f"   Question block: {question_block[:250]}")
 
             # 1. Try parsing as a list first (the new preferred format)
             possible_questions = question_block.split('\n')
@@ -266,13 +256,11 @@ class ResponseParser:
                     if question_text:
                         follow_up_questions.append(question_text)
             
-            print(f"   Found {len(follow_up_questions)} questions from list format.")
 
             # 2. If list parsing fails, fall back to div-based parsing
             if not follow_up_questions:
-                print(f"   List parsing failed, falling back to div parsing.")
+                pass
                 q_matches = re.findall(r'<div>(.*?)</div>', question_block, re.DOTALL)
-                print(f"   Found {len(q_matches)} questions from div format.")
                 for q in q_matches:
                     cleaned_q = re.sub(r'^[\s❓*•-]+', '', q).strip()
                     if cleaned_q:
@@ -281,11 +269,10 @@ class ResponseParser:
             # Remove the entire follow-up questions block from the content
             content = re.sub(r'<div class="follow-up-questions">.*?</div>', '', content, flags=re.DOTALL)
         else:
-            print(f"   No follow-up match found")
+            pass
         
-        print(f"   ✅ Extracted {len(follow_up_questions)} follow-up questions.")
         if follow_up_questions:
-            print(f"   📋 Questions: {follow_up_questions}")
+            pass
 
         # 4. Strip FAQ meta and Analysis Steps section (never shown; models may still emit variants)
         content, faq_metadata = ResponseParser.parse_faq_metadata(content)
@@ -298,10 +285,8 @@ class ResponseParser:
         term_ids_from_content = re.findall(r'<term id="([^"]+)">', content)
         term_ids_from_glossary = list(parsed_glossary.keys())
         term_ids = list(set(term_ids_from_content) | set(term_ids_from_glossary))
-        print(f"   ✅ Final term list: {len(term_ids)} unique terms.")
         
         # NOTE: Term tags are intentionally NOT stripped. The UI will handle them.
-        print(f"   ✅ Term tags intentionally left in content for UI parsing.")
 
         # 6. Assemble final result
         result = {

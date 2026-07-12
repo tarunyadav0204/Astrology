@@ -10,11 +10,29 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
+from ai.evidence_planner_schema import normalize_evidence_plan
 from ai.output_schema import resolve_output_language_policy
 from daily.daily_micro_intents import classify_daily_micro_intent
 from utils.query_context import normalize_query_context, resolve_query_now
 
 logger = logging.getLogger(__name__)
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return default
+
 
 _MONTH_NAME_TO_NUM = {
     "january": 1,
@@ -805,6 +823,30 @@ class IntentRouter:
             logger.warning("intent router model %s not available (%s), using fallback", name, e)
             return self.model
 
+    def _get_instant_model(self):
+        """Resolve the fast instant/speech router model without changing standard chat routing."""
+        from utils.admin_settings import get_setting
+
+        name = (
+            get_setting("gemini_instant_intent_model")
+            or get_setting("gemini_intent_model")
+            or "models/gemini-3.1-flash-lite"
+        ).strip()
+        if "pro" in name.lower():
+            name = "models/gemini-3.1-flash-lite"
+        if "2.0-flash-lite" in name.lower():
+            name = "models/gemini-3.1-flash-lite"
+        if name in self._model_cache:
+            return self._model_cache[name]
+        try:
+            self._model_cache[name] = genai.GenerativeModel(name, generation_config=self._gen_config)
+            return self._model_cache[name]
+        except Exception as e:
+            fallback_fast = "models/gemini-3.1-flash-lite"
+            logger.warning("instant intent router model %s not available (%s), using %s", name, e, fallback_fast)
+            self._model_cache[fallback_fast] = genai.GenerativeModel(fallback_fast, generation_config=self._gen_config)
+            return self._model_cache[fallback_fast]
+
     def _chart_insight_message_is_valid(self, message: Any) -> bool:
         if not isinstance(message, str):
             return False
@@ -960,6 +1002,10 @@ class IntentRouter:
         apply_daily_micro_intent_guards(result, user_question)
         if normalized_query_context:
             result["query_context"] = normalized_query_context
+        result["evidence_plan"] = normalize_evidence_plan(
+            result.get("evidence_plan"),
+            question=user_question,
+        )
 
         if result.get('needs_transits') and 'transit_request' not in result:
             result['transit_request'] = {
@@ -997,6 +1043,7 @@ class IntentRouter:
             _force_life_termination_research_mode(result, current_year=current_year)
             if normalized_query_context:
                 result["query_context"] = normalized_query_context
+            result["evidence_plan"] = normalize_evidence_plan(None, question=user_question)
             apply_chart_focus_guards(result, user_question)
             return result
 
@@ -1015,6 +1062,7 @@ class IntentRouter:
             merge_divisional_charts_with_category_defaults(result)
             if normalized_query_context:
                 result["query_context"] = normalized_query_context
+            result["evidence_plan"] = normalize_evidence_plan(None, question=user_question)
             apply_chart_focus_guards(result, user_question)
             return result
         result = {
@@ -1024,6 +1072,7 @@ class IntentRouter:
         }
         if normalized_query_context:
             result["query_context"] = normalized_query_context
+        result["evidence_plan"] = normalize_evidence_plan(None, question=user_question)
         apply_chart_focus_guards(result, user_question)
         return result
 
@@ -1042,6 +1091,129 @@ class IntentRouter:
             if a:
                 lines.append(f"Assistant: {a[:260]}")
         return "\n".join(lines)
+
+    def _build_compact_instant_router_prompt(
+        self,
+        *,
+        user_question: str,
+        history_text: str,
+        app_language: str,
+        current_date: str,
+        current_year: int,
+        current_month: str,
+        clarification_limit_text: str,
+        force_ready_instruction: str,
+        force_clarify_instruction: str,
+    ) -> str:
+        return f"""
+You are AstroRoshni's multilingual semantic intent router for instant/speech astrology chat.
+Return ONLY valid JSON. Do not explain. Do not generate chart insights or birth-detail requests.
+
+App language fallback: {app_language}
+Today: {current_date}; current year: {current_year}; current month: {current_month}
+
+{clarification_limit_text}
+{force_ready_instruction}
+{force_clarify_instruction}
+{history_text}
+
+Current question: "{user_question}"
+
+Task:
+1. Semantically understand the user's question in any language/script.
+2. Decide READY vs CLARIFY. Clarify only when the core topic/event is genuinely unclear, the user asks multiple unrelated life areas, or a reference like "this/that" cannot be resolved from recent history. Do not clarify for one clear domain with multiple facets, follow-up challenges, or natural messy phrasing.
+3. Select the astrology mode, answer mode, subject, category, timeframe/date, chart focus, transit need, and compact divisional chart list.
+
+Modes:
+- PREDICT_DAILY: one exact day, today, tomorrow, or a named date.
+- PREDICT_PERIOD_OUTLOOK: a period/window like this year, next 3 months, second half of 2028.
+- LIFESPAN_EVENT_TIMING: when/if one specific event happens.
+- LIFE_TERMINATION_RESEARCH: only with the configured unlock phrase and explicit death/longevity-end timing.
+- ANALYZE_PERSONALITY: nature, traits, temperament, self-understanding.
+- ANALYZE_TOPIC_POTENTIAL: "how is my career/marriage/health/money/relationship" style readings.
+- RECOMMEND_REMEDY_FOR_PROBLEM: remedy/upay/action for a specific problem.
+
+Answer modes:
+- explanation_mechanism: how/why a previous chart claim was made.
+- trait_nature: personality, behavior, speech, temperament.
+- relationship_person: spouse/partner/child/relative/person characteristics.
+- timing_window: outlook for a named period/window.
+- event_prediction: when/if one specific event happens.
+- potential_capacity: suitability, promise, aptitude, capacity.
+- comparison_choice: choosing between options.
+- problem_diagnosis: why something is blocked, delayed, unstable, difficult.
+- remedy_action: remedy/upay/fix/action.
+- topic_reading: focused reading when no other answer mode fits.
+
+Categories:
+career, job, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, learning, travel, visa, foreign, gain, wish, general, son, daughter, mother, father, spouse, siblings, children, family, soul, spirituality, purpose, dharma, vehicles, timing.
+For "when will I..." choose the life area category, not generic timing, when identifiable.
+
+Target subjects:
+self, spouse, wife, husband, partner, child, first_child, second_child, third_child, mother, father, sibling, brother, sister, younger_brother, younger_sister, younger_sibling, elder_brother, elder_sister, elder_sibling, maternal_uncle, uncle.
+Use self only when the question is about the native directly. If the user asks about "my wife", "my husband", "spouse", "partner", child, parent, or sibling, use that person as target_subject_key.
+
+Date/time rules:
+- Use current date only to resolve relative dates; never set specific_date just because today is available.
+- Date ranges/periods are not daily; put them in extracted_context.timeframe.
+- specific_date_basis: explicit_user_day, relative_user_day, or not_date_bound.
+- context_type is annual only for whole-year forecast style asks; otherwise birth.
+- needs_transits true for daily, timing, and period outlook questions.
+
+Divisional charts:
+Always keep small. D1/D9 default. Add D10 career/job/business, D7 relationship/children/pregnancy, D30 health/disease, D24 education, D4 property/home, D12 parents/family, Karkamsa/Swamsa soul/purpose.
+
+Evidence planner:
+- Build an `evidence_plan` that describes what data agents must collect; do not write astrology rule combinations as text.
+- Use enum values only.
+- Split compound questions into multiple `question_parts`.
+- Add one `evidence_needs` item per data need, not per sentence.
+- For "When will I get married?", use event_timing + future_dasha_event_windows + transit_event_windows + natal_topic_foundation with event_profile marriage.
+- For "When will my Mercury dasha start and how will my career be?", use two parts: factual_chart_lookup for dasha_timeline_lookup and topic_outlook for career evidence.
+- Always include safety.blocked_content_checks for death_prediction and fetal_sex_determination.
+
+Calibration:
+- "How is my relationship with my wife?" -> READY, ANALYZE_TOPIC_POTENTIAL, category relationship or marriage, answer_mode topic_reading, target_subject_key wife, needs_transits false.
+- "How will my health be this year?" -> READY, PREDICT_PERIOD_OUTLOOK, category health, answer_mode timing_window, target_subject_key self, context_type annual, needs_transits true, timeframe this year.
+- "How will my career be in the second half of 2028?" -> READY, PREDICT_PERIOD_OUTLOOK, category career, answer_mode timing_window, target_subject_key self, needs_transits true, timeframe second half of 2028.
+
+Return exactly this JSON shape:
+{{
+  "status": "CLARIFY" or "READY",
+  "clarification_question": "same language/script as user, only when CLARIFY",
+  "chart_insights": [],
+  "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_REMEDY_FOR_PROBLEM",
+  "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
+  "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "problem_diagnosis" or "remedy_action" or "topic_reading",
+  "target_subject_key": "one allowed target subject",
+  "needs_year_clarification": false,
+  "daily_intent_confirmed": true or false,
+  "extracted_context": {{"timeframe":"", "aspect":"", "specific_date": null, "specific_date_basis":"not_date_bound"}},
+  "context_type": "birth" or "annual",
+  "category": "general",
+  "year": "year only when annual is clearly asked",
+  "needs_transits": true or false,
+  "divisional_charts": ["D1","D9"],
+  "transit_request": null,
+  "evidence_plan": {{
+    "schema_version": "evidence_plan.v1",
+    "question_parts": [
+      {{"part_id":"p1","text":"part text","intent_families":["event_timing"],"life_domain":"marriage","event_profile":"marriage","subject":"self","timeframe":{{"kind":"open_future"}},"confidence":"high"}}
+    ],
+    "evidence_needs": [
+      {{"need_id":"n1","kind":"natal_topic_foundation","system":"parashari","topic":"marriage","supports_parts":["p1"],"params":{{"event_profile":"marriage","required_charts":["D1","D9"]}},"priority":"required"}}
+    ],
+    "safety": {{
+      "blocked_content_checks": [
+        {{"check_id":"death_prediction","action_if_detected":"refuse_and_redirect"}},
+        {{"check_id":"fetal_sex_determination","action_if_detected":"refuse_and_redirect"}}
+      ],
+      "answer_safety_checks": ["no_fatalism","no_guaranteed_prediction","no_unsupported_exact_date"]
+    }},
+    "answer_plan": {{"style":"speech_concise","must_answer_parts":["p1"],"answer_order":["p1"]}}
+  }}
+}}
+""".strip()
 
     async def classify_instant_intent(
         self,
@@ -1063,6 +1235,7 @@ class IntentRouter:
         current_year = resolved_now.year
         current_month = resolved_now.strftime('%B')
         current_date = resolved_now.strftime('%Y-%m-%d')
+        d1_chart = None
 
         history_text = self._build_instant_history_text(chat_history)
         _lang = str(language or "english").strip() or "english"
@@ -1099,6 +1272,8 @@ Your job:
 - classify the user's current question
 - decide if clarification is needed
 - identify if it is a daily / exact-date / timing / personality / topic-potential / remedy style question
+- classify the universal answer mode needed by the response generator
+- identify the target subject/person being asked about
 - extract an exact `specific_date` in YYYY-MM-DD when the user is asking about one exact day
 
 Do NOT generate chart insights.
@@ -1174,6 +1349,31 @@ Rules:
 - Keep `divisional_charts` small but sensible. D1 and D9 are enough for most instant routing. Add D10 for career/work, D7 for relationships/children, D30 for health/disease, D24 for education, D4 for property/home.
 - When you do return `CLARIFY`, ask only one short narrowing question and give 2-4 quick options when helpful.
 
+UNIVERSAL ANSWER MODE:
+- `explanation_mechanism`: user asks how/why a previous chart claim was made
+- `trait_nature`: behavior, temperament, nature, personality, speech style
+- `relationship_person`: nature/characteristics of spouse/partner/child/relative/person
+- `timing_window`: overall outlook for a named period such as this month, this year, next 6 months
+- `event_prediction`: when/if one specific life event will happen
+- `potential_capacity`: suitability, promise, capacity, aptitude
+- `comparison_choice`: choice between two or more options
+- `problem_diagnosis`: why something is blocked, unstable, delayed, difficult, or leaking
+- `remedy_action`: what to do, remedy, upay, fix, action
+- `topic_reading`: focused reading when no other answer mode fits
+
+EVIDENCE PLAN:
+- Return `evidence_plan` as the data-collection plan for backend agents.
+- Use enum values only.
+- Split compound questions into multiple `question_parts`.
+- Planner chooses evidence needs; agents own detailed astrology rule combinations.
+- Always include blocked content checks for `death_prediction` and `fetal_sex_determination`.
+- For direct dasha/date questions, add evidence need kind `dasha_timeline_lookup` with params like {{"planet":"Mercury","level":"mahadasha","operation":"find_start_end"}}.
+- For event timing like marriage, add `natal_topic_foundation`, `future_dasha_event_windows`, and `transit_event_windows` with `event_profile":"marriage"`.
+
+TARGET SUBJECT:
+- Use `self` for the native unless the user clearly asks about spouse, child, sibling, parent, etc.
+- Allowed values: self, spouse, wife, husband, partner, child, first_child, second_child, third_child, mother, father, sibling, brother, sister, younger_brother, younger_sister, younger_sibling, elder_brother, elder_sister, elder_sibling, maternal_uncle, uncle.
+
 CATEGORY for "when will I…" life-event questions (CRITICAL):
 - Never use `category: "timing"` as a substitute for the life area. `timing` is only when there is no identifiable topic (e.g. "when will it happen?" with no subject).
 - Pick the most specific `category` from the allowed list: job, career, marriage, love, relationship, child, pregnancy, wealth, money, health, property, visa, travel, etc.
@@ -1186,6 +1386,9 @@ Return ONLY this JSON shape:
   "chart_insights": [],
   "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_REMEDY_FOR_PROBLEM",
   "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
+  "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "problem_diagnosis" or "remedy_action" or "topic_reading",
+  "target_subject_key": "self" or "spouse" or "wife" or "husband" or "partner" or "child" or "first_child" or "second_child" or "third_child" or "mother" or "father" or "sibling" or "brother" or "sister" or "younger_brother" or "younger_sister" or "younger_sibling" or "elder_brother" or "elder_sister" or "elder_sibling" or "maternal_uncle" or "uncle",
+  "needs_year_clarification": false,
   "daily_intent_confirmed": true or false,
   "extracted_context": {{"timeframe":"...", "aspect":"...", "specific_date":"YYYY-MM-DD only when daily_intent_confirmed=true", "specific_date_basis":"explicit_user_day or relative_user_day or not_date_bound"}},
   "context_type": "birth" or "annual",
@@ -1193,16 +1396,38 @@ Return ONLY this JSON shape:
   "year": "year only when annual is clearly asked",
   "needs_transits": true or false,
   "divisional_charts": ["D1","D9"],
-  "transit_request": {{"startYear": 2026, "endYear": 2026, "yearMonthMap": {{"2026":["January"]}}}}
+  "transit_request": {{"startYear": 2026, "endYear": 2026, "yearMonthMap": {{"2026":["January"]}}}},
+  "evidence_plan": {{
+    "schema_version":"evidence_plan.v1",
+    "question_parts":[{{"part_id":"p1","text":"...","intent_families":["topic_outlook"],"life_domain":"general","event_profile":null,"subject":"self","timeframe":{{"kind":"none"}},"confidence":"high"}}],
+    "evidence_needs":[{{"need_id":"n1","kind":"natal_topic_foundation","system":"parashari","topic":"general","supports_parts":["p1"],"params":{{}},"priority":"required"}}],
+    "safety":{{"blocked_content_checks":[{{"check_id":"death_prediction","action_if_detected":"refuse_and_redirect"}},{{"check_id":"fetal_sex_determination","action_if_detected":"refuse_and_redirect"}}],"answer_safety_checks":["no_fatalism","no_guaranteed_prediction","no_unsupported_exact_date"]}},
+    "answer_plan":{{"style":"speech_concise","must_answer_parts":["p1"],"answer_order":["p1"]}}
+  }}
 }}
 """
 
-        model = self._get_model()
+        compact_prompt_enabled = _env_flag("INSTANT_INTENT_ROUTER_COMPACT_PROMPT", True)
+        if compact_prompt_enabled:
+            prompt = self._build_compact_instant_router_prompt(
+                user_question=user_question,
+                history_text=history_text,
+                app_language=app_language,
+                current_date=current_date,
+                current_year=current_year,
+                current_month=current_month,
+                clarification_limit_text=clarification_limit_text,
+                force_ready_instruction=force_ready_instruction,
+                force_clarify_instruction=force_clarify_instruction,
+            )
+
+        model = self._get_instant_model()
         model_name = model._model_name if hasattr(model, '_model_name') else 'Unknown'
-        logger.debug(
-            "instant_intent_router_request model=%s prompt_chars=%s",
+        logger.info(
+            "SPEECH_PERF instant_intent_router_request model=%s prompt_chars=%s compact_prompt=%s",
             model_name,
             len(prompt),
+            compact_prompt_enabled,
         )
         token_usage: Dict[str, Any] = {}
         response_chars = 0
@@ -1211,10 +1436,22 @@ Return ONLY this JSON shape:
             response = None
             gemini_start = time.time()
             last_error: Exception | None = None
+            first_request_timeout = _env_float("INSTANT_INTENT_ROUTER_TIMEOUT_S", 8.0)
+            retry_request_timeout = _env_float("INSTANT_INTENT_ROUTER_RETRY_TIMEOUT_S", 10.0)
+            first_wall_timeout = max(first_request_timeout + 2.0, _env_float("INSTANT_INTENT_ROUTER_WALL_TIMEOUT_S", 10.0))
+            retry_wall_timeout = max(retry_request_timeout + 2.0, _env_float("INSTANT_INTENT_ROUTER_RETRY_WALL_TIMEOUT_S", 12.0))
             for attempt in range(2):
                 try:
-                    per_request_timeout = 18 if attempt == 0 else 22
-                    wall_timeout = 22.0 if attempt == 0 else 26.0
+                    per_request_timeout = first_request_timeout if attempt == 0 else retry_request_timeout
+                    wall_timeout = first_wall_timeout if attempt == 0 else retry_wall_timeout
+                    attempt_started = time.time()
+                    logger.info(
+                        "SPEECH_PERF instant_intent_router_attempt attempt=%s model=%s request_timeout_s=%.1f wall_timeout_s=%.1f",
+                        attempt + 1,
+                        model_name,
+                        per_request_timeout,
+                        wall_timeout,
+                    )
                     response = await asyncio.wait_for(
                         model.generate_content_async(
                             prompt,
@@ -1222,10 +1459,21 @@ Return ONLY this JSON shape:
                         ),
                         timeout=wall_timeout,
                     )
+                    logger.info(
+                        "SPEECH_PERF instant_intent_router_attempt_done attempt=%s elapsed_ms=%.1f",
+                        attempt + 1,
+                        (time.time() - attempt_started) * 1000.0,
+                    )
                     break
                 except Exception as attempt_exc:
                     last_error = attempt_exc
                     if attempt == 0 and _is_transient_intent_error(attempt_exc):
+                        logger.warning(
+                            "SPEECH_PERF instant_intent_router_retry attempt=%s elapsed_ms=%.1f error=%s",
+                            attempt + 1,
+                            (time.time() - attempt_started) * 1000.0,
+                            str(attempt_exc)[:180],
+                        )
                         await asyncio.sleep(0.35 + random.uniform(0.05, 0.2))
                         continue
                     raise
@@ -1252,13 +1500,16 @@ Return ONLY this JSON shape:
                 pass
             result = json.loads(cleaned)
             total_time = time.time() - intent_start
-            logger.debug(
-                "instant_intent_router_response status=%s mode=%s category=%s llm_s=%.2f total_s=%.2f",
+            logger.info(
+                "SPEECH_PERF instant_intent_router_response status=%s mode=%s category=%s llm_s=%.2f total_s=%.2f response_chars=%s tokens_in=%s tokens_out=%s",
                 result.get("status"),
                 result.get("mode"),
                 result.get("category"),
                 gemini_time,
                 total_time,
+                response_chars,
+                token_usage.get("input_tokens"),
+                token_usage.get("output_tokens"),
             )
             final = self._finalize_router_result(
                 result,

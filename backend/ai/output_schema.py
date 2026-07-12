@@ -254,6 +254,8 @@ TEMPLATE_REMEDIAL_GUIDANCE = """
 ### Remedy layers
 - **Core planetary remedy**: the main planet-focused remedy
 - **Gemstone / ratna**: only if suitable for the strongest planet; keep it optional and specific
+- **Biological / vriksha**: tree, leaf, wood, body-routine, or other physical-support remedy if present
+- **Nakshatra remedy**: shakti, deity, vriksha, mantra, and the most direct star-specific action if present
 - **Behavioral support**: routine, speech, discipline, or relationship adjustments
 - **Charity / seva**: service-oriented or giving-based support
 - **Mantra / sound**: the relevant mantra or sound practice

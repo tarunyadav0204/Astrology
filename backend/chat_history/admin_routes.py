@@ -398,22 +398,28 @@ def _timestamp_to_ist_iso(val) -> Optional[str]:
 # Rough USD rates per 1M tokens for chat-history cost estimates.
 # Gemini 3.1 published pricing (USD per 1M tokens unless noted). INR ≈ USD × rate from _usd_to_inr_rate().
 _CHAT_MODEL_RATE_USD_PER_1M: Dict[str, Dict[str, float]] = {
-    # Gemini 3.1 (current product pricing)
+    # Gemini 3.1 (current product pricing). Cached input ≈ 10% of standard input (context-cache reads).
     "models/gemini-3.1-flash-lite": {
         "input_le_200k": 0.25,
         "input_gt_200k": 0.25,
+        "cached_input_le_200k": 0.025,
+        "cached_input_gt_200k": 0.025,
         "output_le_200k": 1.50,
         "output_gt_200k": 1.50,
     },
     "models/gemini-3.1-pro-preview": {
         "input_le_200k": 2.00,
         "input_gt_200k": 4.00,
+        "cached_input_le_200k": 0.20,
+        "cached_input_gt_200k": 0.40,
         "output_le_200k": 12.00,
         "output_gt_200k": 18.00,
     },
     "models/gemini-3.1-flash-live-preview": {
         "input_le_200k": 0.75,
         "input_gt_200k": 0.75,
+        "cached_input_le_200k": 0.075,
+        "cached_input_gt_200k": 0.075,
         "output_le_200k": 4.50,
         "output_gt_200k": 4.50,
     },
@@ -421,12 +427,16 @@ _CHAT_MODEL_RATE_USD_PER_1M: Dict[str, Dict[str, float]] = {
     "models/gemini-3.1-flash-image-preview": {
         "input_le_200k": 0.25,
         "input_gt_200k": 0.25,
+        "cached_input_le_200k": 0.025,
+        "cached_input_gt_200k": 0.025,
         "output_le_200k": 1.50,
         "output_gt_200k": 1.50,
     },
     "models/gemini-3.1-flash-tts-preview": {
         "input_le_200k": 1.00,
         "input_gt_200k": 1.00,
+        "cached_input_le_200k": 0.10,
+        "cached_input_gt_200k": 0.10,
         "output_le_200k": 20.00,
         "output_gt_200k": 20.00,
     },
@@ -441,7 +451,12 @@ _CHAT_MODEL_RATE_USD_PER_1M: Dict[str, Dict[str, float]] = {
     },
     # Gemini 3 (non-3.1) legacy preview ids
     "models/gemini-3-pro-preview": {
-        "input_le_200k": 2.00, "input_gt_200k": 4.00, "output_le_200k": 12.00, "output_gt_200k": 18.00
+        "input_le_200k": 2.00,
+        "input_gt_200k": 4.00,
+        "cached_input_le_200k": 0.20,
+        "cached_input_gt_200k": 0.40,
+        "output_le_200k": 12.00,
+        "output_gt_200k": 18.00,
     },
     "models/gemini-3-flash-preview": {
         "input_le_200k": 0.50,
@@ -453,20 +468,45 @@ _CHAT_MODEL_RATE_USD_PER_1M: Dict[str, Dict[str, float]] = {
     },
     # Gemini 2.5 family
     "models/gemini-2.5-pro": {
-        "input_le_200k": 1.25, "input_gt_200k": 2.50, "output_le_200k": 10.00, "output_gt_200k": 15.00
+        "input_le_200k": 1.25,
+        "input_gt_200k": 2.50,
+        "cached_input_le_200k": 0.125,
+        "cached_input_gt_200k": 0.25,
+        "output_le_200k": 10.00,
+        "output_gt_200k": 15.00,
     },
     "models/gemini-2.5-flash": {
-        "input_le_200k": 0.30, "input_gt_200k": 0.30, "output_le_200k": 2.50, "output_gt_200k": 2.50
+        "input_le_200k": 0.30,
+        "input_gt_200k": 0.30,
+        "cached_input_le_200k": 0.03,
+        "cached_input_gt_200k": 0.03,
+        "output_le_200k": 2.50,
+        "output_gt_200k": 2.50,
     },
     "models/gemini-2.5-flash-lite": {
-        "input_le_200k": 0.10, "input_gt_200k": 0.10, "output_le_200k": 0.40, "output_gt_200k": 0.40
+        "input_le_200k": 0.10,
+        "input_gt_200k": 0.10,
+        "cached_input_le_200k": 0.01,
+        "cached_input_gt_200k": 0.01,
+        "output_le_200k": 0.40,
+        "output_gt_200k": 0.40,
     },
     # Gemini 2.0 family
     "models/gemini-2.0-flash-001": {
-        "input_le_200k": 0.10, "input_gt_200k": 0.10, "output_le_200k": 0.40, "output_gt_200k": 0.40
+        "input_le_200k": 0.10,
+        "input_gt_200k": 0.10,
+        "cached_input_le_200k": 0.01,
+        "cached_input_gt_200k": 0.01,
+        "output_le_200k": 0.40,
+        "output_gt_200k": 0.40,
     },
     "models/gemini-2.0-flash-lite-001": {
-        "input_le_200k": 0.075, "input_gt_200k": 0.075, "output_le_200k": 0.30, "output_gt_200k": 0.30
+        "input_le_200k": 0.075,
+        "input_gt_200k": 0.075,
+        "cached_input_le_200k": 0.0075,
+        "cached_input_gt_200k": 0.0075,
+        "output_le_200k": 0.30,
+        "output_gt_200k": 0.30,
     },
     # OpenAI (approx)
     "gpt-4o-mini": {"input": 0.15, "output": 0.60},
@@ -478,24 +518,32 @@ _CHAT_MODEL_RATE_USD_PER_1M: Dict[str, Dict[str, float]] = {
     "deepseek-chat": {
         "input_le_200k": 0.28,
         "input_gt_200k": 0.28,
+        "cached_input_le_200k": 0.28,
+        "cached_input_gt_200k": 0.28,
         "output_le_200k": 0.42,
         "output_gt_200k": 0.42,
     },
     "deepseek-reasoner": {
         "input_le_200k": 0.28,
         "input_gt_200k": 0.28,
+        "cached_input_le_200k": 0.28,
+        "cached_input_gt_200k": 0.28,
         "output_le_200k": 0.42,
         "output_gt_200k": 0.42,
     },
     "deepseek-v4": {
         "input_le_200k": 0.28,
         "input_gt_200k": 0.28,
+        "cached_input_le_200k": 0.28,
+        "cached_input_gt_200k": 0.28,
         "output_le_200k": 0.42,
         "output_gt_200k": 0.42,
     },
     "deepseek-v4-reasoner": {
         "input_le_200k": 0.28,
         "input_gt_200k": 0.28,
+        "cached_input_le_200k": 0.28,
+        "cached_input_gt_200k": 0.28,
         "output_le_200k": 0.42,
         "output_gt_200k": 0.42,
     },
@@ -536,12 +584,22 @@ def _resolve_model_rate(model_name: Optional[str], input_tokens_est: int = 0) ->
     tier = "gt_200k" if int(input_tokens_est or 0) > 200_000 else "le_200k"
     if m in _CHAT_MODEL_RATE_USD_PER_1M:
         cfg = _CHAT_MODEL_RATE_USD_PER_1M[m]
+        if "input_le_200k" not in cfg:
+            in_rate = float(cfg.get("input") or 0.10)
+            return {
+                "input": in_rate,
+                "cached_input": float(cfg.get("cached_input") or in_rate),
+                "output": float(cfg.get("output") or 0.40),
+                "tier": tier,
+            }
         if tier == "gt_200k":
             in_rate = float(cfg["input_gt_200k"])
-            cached_rate = float(cfg.get("cached_input_gt_200k", in_rate))
+            default_cached = in_rate * (0.1 if "gemini" in m.lower() else 1.0)
+            cached_rate = float(cfg.get("cached_input_gt_200k", default_cached))
             return {"input": in_rate, "cached_input": cached_rate, "output": float(cfg["output_gt_200k"]), "tier": tier}
         in_rate = float(cfg["input_le_200k"])
-        cached_rate = float(cfg.get("cached_input_le_200k", in_rate))
+        default_cached = in_rate * (0.1 if "gemini" in m.lower() else 1.0)
+        cached_rate = float(cfg.get("cached_input_le_200k", default_cached))
         return {"input": in_rate, "cached_input": cached_rate, "output": float(cfg["output_le_200k"]), "tier": tier}
     ml = m.lower()
     # Safe fallback by family if exact key not configured.
@@ -2476,6 +2534,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_nakshatra_guide_videos_json,
             is_chat_worker_mode_enabled,
             get_chat_worker_user_allowlist,
+            is_free_question_enabled,
             is_free_question_parashari_only_enabled,
             is_first_purchase_bonus_enabled,
             is_purchase_discount_enabled,
@@ -2572,6 +2631,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "chat_worker_user_allowlist": ",".join(
                 str(uid) for uid in sorted(get_chat_worker_user_allowlist())
             ),
+            "free_question_enabled": is_free_question_enabled(),
             "free_question_parashari_only_enabled": is_free_question_parashari_only_enabled(),
         }
     except Exception as e:

@@ -270,6 +270,10 @@ Use this exact structure for the final user-facing answer:
 [The main remedy direction for the issue.]
 - #### Gemstone / Ratna
 [Only if suitable and supported by the remedy blueprint. Keep it optional, specific to the strongest planet, and never overstate certainty.]
+- #### Biological / Vriksha
+[Planting, nurturing, touch-the-tree, leaf, wood, or body-based support if present in the remedy blueprint.]
+- #### Nakshatra Remedy
+[If the blueprint provides nakshatra-specific remedies, show them as a distinct layer with shakti, deity, vriksha, mantra, and the most relevant practical action.]
 - #### Behavioral Support
 [Routine, discipline, speech, boundaries, or habit changes.]
 - #### Charity / Seva

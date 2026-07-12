@@ -33,3 +33,11 @@ export function chatAppHref({ login = false, hash = '' } = {}) {
   const h = hash ? (hash.startsWith('#') ? hash : `#${hash}`) : '';
   return `/chat?${params.toString()}${h}`;
 }
+
+/** Interactive Reports Studio: CRA shell + login modal + partnership PDF flow */
+export function reportsAppHref({ login = false, hash = '' } = {}) {
+  const params = new URLSearchParams({ app: '1' });
+  if (login) params.set('login', '1');
+  const h = hash ? (hash.startsWith('#') ? hash : `#${hash}`) : '';
+  return `/reports?${params.toString()}${h}`;
+}

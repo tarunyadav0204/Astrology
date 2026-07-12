@@ -7,6 +7,8 @@ import logging
 import os
 import re
 import time
+import math
+import uuid
 import requests
 from collections import OrderedDict
 from threading import Lock
@@ -33,6 +35,7 @@ GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_TTL_SECONDS = int(os.getenv("GOOGLE_PLAY_SU
 GOOGLE_PLAY_PRODUCTS_CACHE_MAX = 8
 GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_MAX = 32
 PLAY_PAYMENT_SERVICE_TIMEOUT_SECONDS = float(os.getenv("PLAY_PAYMENT_SERVICE_TIMEOUT_SECONDS", "8.0"))
+SPEECH_BILLING_MIN_START_MINUTES = 5
 
 # Env var name preferred; GOOGLE_SERVICE_ACCOUNT_KEY accepted as fallback.
 # Keep trying fallback values if the preferred env points at a missing file.
@@ -77,6 +80,41 @@ def _get_play_credentials_candidates():
 def _get_play_credentials_path():
     candidates = _get_play_credentials_candidates()
     return candidates[0][1] if candidates else None
+
+
+def _ensure_speech_billing_table(conn) -> None:
+    execute(
+        conn,
+        """
+        CREATE TABLE IF NOT EXISTS speech_billing_sessions (
+            session_id TEXT PRIMARY KEY,
+            userid INTEGER NOT NULL,
+            started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            ended_at TIMESTAMP,
+            status TEXT NOT NULL DEFAULT 'active',
+            per_minute_cost INTEGER NOT NULL,
+            original_per_minute_cost INTEGER NOT NULL,
+            discount_percent INTEGER NOT NULL DEFAULT 0,
+            required_start_credits INTEGER NOT NULL,
+            starting_balance INTEGER NOT NULL,
+            charged_credits INTEGER NOT NULL DEFAULT 0,
+            elapsed_seconds INTEGER NOT NULL DEFAULT 0,
+            ended_reason TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        (),
+    )
+
+
+def _speech_minutes_from_seconds(seconds: int) -> int:
+    return max(1, int(math.ceil(max(1, int(seconds or 0)) / 60.0)))
+
+
+def _iso_utc_now() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _get_play_credentials():
@@ -1740,6 +1778,212 @@ async def spend_credits(request: dict, current_user: User = Depends(get_current_
     
     return {"success": True, "message": f"Successfully spent {amount} credits"}
 
+
+@router.post("/speech-session/start")
+async def start_speech_billing_session(current_user: User = Depends(get_current_user)):
+    """Start a live speech billing session.
+
+    Requires at least 5 minutes worth of the user's discounted per-minute price in wallet.
+    Actual deduction happens when /speech-session/end is called.
+    """
+    base_cost = int(credit_service.get_credit_setting("speech_chat_per_minute_cost") or 1)
+    per_minute_cost = int(
+        credit_service.get_effective_cost(
+            current_user.userid,
+            base_cost,
+            "speech_chat_per_minute_cost",
+        )
+        or base_cost
+    )
+    per_minute_cost = max(1, per_minute_cost)
+    original_cost = int(credit_service.get_credit_setting_and_original("speech_chat_per_minute_cost")[1] or base_cost)
+    discount_percent = int(credit_service.get_subscription_discount_percent(current_user.userid) or 0)
+    required_start_credits = per_minute_cost * SPEECH_BILLING_MIN_START_MINUTES
+    balance = int(credit_service.get_user_credits(current_user.userid) or 0)
+    if balance < required_start_credits:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "message": (
+                    f"Speech chat requires at least {required_start_credits} credits "
+                    f"for {SPEECH_BILLING_MIN_START_MINUTES} minutes."
+                ),
+                "required_credits": required_start_credits,
+                "balance": balance,
+                "per_minute_cost": per_minute_cost,
+                "minimum_minutes": SPEECH_BILLING_MIN_START_MINUTES,
+            },
+        )
+
+    billing_session_id = f"speech_{uuid.uuid4().hex}"
+    with get_conn() as conn:
+        _ensure_speech_billing_table(conn)
+        execute(
+            conn,
+            """
+            INSERT INTO speech_billing_sessions (
+                session_id, userid, per_minute_cost, original_per_minute_cost,
+                discount_percent, required_start_credits, starting_balance
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                billing_session_id,
+                current_user.userid,
+                per_minute_cost,
+                original_cost,
+                discount_percent,
+                required_start_credits,
+                balance,
+            ),
+        )
+        conn.commit()
+
+    max_seconds = int((balance // per_minute_cost) * 60)
+    warning_after_seconds = max(0, max_seconds - 60)
+    return {
+        "session_id": billing_session_id,
+        "started_at": _iso_utc_now(),
+        "balance": balance,
+        "per_minute_cost": per_minute_cost,
+        "original_per_minute_cost": original_cost,
+        "subscription_discount_percent": discount_percent,
+        "required_start_credits": required_start_credits,
+        "minimum_minutes": SPEECH_BILLING_MIN_START_MINUTES,
+        "max_seconds": max_seconds,
+        "warning_after_seconds": warning_after_seconds,
+        "warning_interval_seconds": 10,
+    }
+
+
+@router.get("/speech-session/{session_id}/status")
+async def get_speech_billing_session_status(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    with get_conn() as conn:
+        _ensure_speech_billing_table(conn)
+        cur = execute(
+            conn,
+            """
+            SELECT session_id, userid, status, per_minute_cost, charged_credits,
+                   elapsed_seconds, started_at, ended_at
+            FROM speech_billing_sessions
+            WHERE session_id = ? AND userid = ?
+            """,
+            (session_id, current_user.userid),
+        )
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Speech billing session not found")
+    return {
+        "session_id": row[0],
+        "status": row[2],
+        "per_minute_cost": int(row[3] or 0),
+        "charged_credits": int(row[4] or 0),
+        "elapsed_seconds": int(row[5] or 0),
+        "started_at": str(row[6]) if row[6] is not None else None,
+        "ended_at": str(row[7]) if row[7] is not None else None,
+    }
+
+
+@router.post("/speech-session/{session_id}/end")
+async def end_speech_billing_session(
+    session_id: str,
+    request: dict,
+    current_user: User = Depends(get_current_user),
+):
+    reason = str((request or {}).get("reason") or "ended").strip()[:80] or "ended"
+    with get_conn() as conn:
+        _ensure_speech_billing_table(conn)
+        cur = execute(
+            conn,
+            """
+            SELECT session_id, userid, status, per_minute_cost,
+                   EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at))::INTEGER AS elapsed_seconds
+            FROM speech_billing_sessions
+            WHERE session_id = ? AND userid = ?
+            FOR UPDATE
+            """,
+            (session_id, current_user.userid),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Speech billing session not found")
+
+        status = str(row[2] or "")
+        if status != "active":
+            cur = execute(
+                conn,
+                """
+                SELECT charged_credits, elapsed_seconds, per_minute_cost
+                FROM speech_billing_sessions
+                WHERE session_id = ? AND userid = ?
+                """,
+                (session_id, current_user.userid),
+            )
+            existing = cur.fetchone()
+            return {
+                "success": True,
+                "already_ended": True,
+                "session_id": session_id,
+                "charged_credits": int(existing[0] or 0) if existing else 0,
+                "elapsed_seconds": int(existing[1] or 0) if existing else 0,
+                "per_minute_cost": int(existing[2] or 0) if existing else 0,
+            }
+
+        per_minute_cost = max(1, int(row[3] or 1))
+        elapsed_seconds = max(1, int(row[4] or 1))
+        minutes = _speech_minutes_from_seconds(elapsed_seconds)
+        charge = max(1, minutes * per_minute_cost)
+        balance = int(credit_service.get_user_credits(current_user.userid, conn=conn) or 0)
+        charge = min(charge, balance)
+        new_balance = balance - charge
+        execute(
+            conn,
+            "UPDATE user_credits SET credits = ?, updated_at = CURRENT_TIMESTAMP WHERE userid = ?",
+            (new_balance, current_user.userid),
+        )
+        execute(
+            conn,
+            """
+            INSERT INTO credit_transactions
+            (userid, transaction_type, amount, balance_after, source, reference_id, description)
+            VALUES (?, 'spent', ?, ?, 'feature_usage', 'speech_chat_minutes', ?)
+            """,
+            (
+                current_user.userid,
+                -charge,
+                new_balance,
+                f"Speech chat call: {minutes} minute(s), {elapsed_seconds}s ({reason})",
+            ),
+        )
+        execute(
+            conn,
+            """
+            UPDATE speech_billing_sessions
+            SET status = 'ended',
+                ended_at = CURRENT_TIMESTAMP,
+                elapsed_seconds = ?,
+                charged_credits = ?,
+                ended_reason = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE session_id = ? AND userid = ?
+            """,
+            (elapsed_seconds, charge, reason, session_id, current_user.userid),
+        )
+        conn.commit()
+
+    return {
+        "success": True,
+        "session_id": session_id,
+        "elapsed_seconds": elapsed_seconds,
+        "billed_minutes": minutes,
+        "per_minute_cost": per_minute_cost,
+        "charged_credits": charge,
+        "balance_after": new_balance,
+    }
+
 # Admin endpoints
 @router.post("/admin/promo-codes")
 async def create_promo_code(request: CreatePromoCodeRequest, current_user: User = Depends(get_current_user)):
@@ -2205,6 +2449,7 @@ def _get_pricing_with_originals():
         ("chat", "chat_question_cost"),
         ("instant_chat", "instant_chat_cost"),
         ("speech_chat", "speech_chat_cost"),
+        ("speech_chat_per_minute", "speech_chat_per_minute_cost"),
         ("premium_chat", "premium_chat_cost"),
         ("partnership", "partnership_analysis_cost"),
         ("events", "event_timeline_cost"),
@@ -2287,15 +2532,21 @@ _PRICING_KEYS_MAP = [
     ("chat", "chat_question_cost"),
     ("instant_chat", "instant_chat_cost"),
     ("speech_chat", "speech_chat_cost"),
+    ("speech_chat_per_minute", "speech_chat_per_minute_cost"),
     ("premium_chat", "premium_chat_cost"),
     ("partnership", "partnership_analysis_cost"),
+    ("partnership_report", "partnership_report_cost"),
     ("events", "event_timeline_cost"),
     ("career", "career_analysis_cost"),
+    ("career_report", "career_report_cost"),
     ("wealth", "wealth_analysis_cost"),
+    ("wealth_report", "wealth_report_cost"),
     ("health", "health_analysis_cost"),
+    ("health_report", "health_report_cost"),
     ("marriage", "marriage_analysis_cost"),
     ("education", "education_analysis_cost"),
     ("progeny", "progeny_analysis_cost"),
+    ("progeny_report", "progeny_report_cost"),
     ("childbirth", "childbirth_planner_cost"),
     ("trading", "trading_daily_cost"),
     ("trading_monthly", "trading_monthly_cost"),

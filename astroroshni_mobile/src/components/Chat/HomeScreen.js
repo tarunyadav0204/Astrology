@@ -1348,7 +1348,7 @@ const loadHomeData = async (nativeData = null) => {
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => {
-                    if (displayData && setShowDashaBrowser) setShowDashaBrowser(true);
+                    if (displayData) navigation.navigate('ChartsHub', { birthData: displayData, tab: 'dasha' });
                   }}
                 >
                   <TickerItem 
@@ -1389,6 +1389,15 @@ const loadHomeData = async (nativeData = null) => {
             )}
           </GHScrollView>
         </View>
+
+        <ReportStudioCard
+          navigation={navigation}
+          isDark={isDark}
+          colors={colors}
+          cost={pricing.partnership_report ?? pricing.partnership ?? 9}
+          originalCost={pricingOriginal.partnership_report ?? pricingOriginal.partnership}
+          t={t}
+        />
 
 
         {/* Biometric Teaser Card - COMMENTED OUT */}
@@ -1663,7 +1672,7 @@ const loadHomeData = async (nativeData = null) => {
           {dashData && (
             <TouchableOpacity
               style={[styles.dashaTimelineContainer, androidLightCardFixStyle, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-              onPress={() => setShowDashaBrowser && setShowDashaBrowser(true)}
+              onPress={() => navigation.navigate('ChartsHub', { birthData, tab: 'dasha' })}
               activeOpacity={0.85}
             >
               <Text style={[styles.dashaSectionTitle, { color: colors.text }]}>{t('home.sections.currentDasha', '⏰ Current Dasha Periods')}</Text>
@@ -1737,7 +1746,7 @@ const loadHomeData = async (nativeData = null) => {
             >
               <TouchableOpacity 
                 style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => navigation.navigate('Chart', { birthData })}
+                onPress={() => navigation.navigate('ChartsHub', { birthData, tab: 'chart' })}
                 activeOpacity={0.8}
               >
                 <View style={[
@@ -1763,7 +1772,7 @@ const loadHomeData = async (nativeData = null) => {
               
               <TouchableOpacity 
                 style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => setShowDashaBrowser(true)}
+                onPress={() => navigation.navigate('ChartsHub', { birthData, tab: 'dasha' })}
                 activeOpacity={0.8}
               >
                 <View style={[
@@ -1861,7 +1870,7 @@ const loadHomeData = async (nativeData = null) => {
               
               <TouchableOpacity 
                 style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => navigation.navigate('AshtakvargaOracle')}
+                onPress={() => navigation.navigate('ChartsHub', { birthData, tab: 'ashtakvarga' })}
                 activeOpacity={0.8}
               >
                 <View style={[
@@ -2780,7 +2789,24 @@ const loadHomeData = async (nativeData = null) => {
 
         <TouchableOpacity 
           style={styles.tabItem} 
-          onPress={() => navigation.navigate('Chart', { birthData })}
+          onPress={() => navigation.navigate('ReportsStudio')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.tabIconContainer}>
+            <Icon 
+              name="document-text-outline" 
+              size={22} 
+              color={activeTab === 'reports' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} 
+            />
+          </View>
+          <Text style={[styles.tabLabel, { color: activeTab === 'reports' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'reports' ? '800' : '600' }]}>
+            {t('home.tabs.reports', 'Reports')}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.tabItem} 
+          onPress={() => navigation.navigate('ChartsHub', { birthData })}
           activeOpacity={0.7}
         >
           <View style={styles.tabIconContainer}>
@@ -2796,23 +2822,6 @@ const loadHomeData = async (nativeData = null) => {
           </View>
           <Text style={[styles.tabLabel, { color: activeTab === 'charts' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'charts' ? '800' : '600' }]}>
             {t('home.tabs.charts', 'Charts')}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.tabItem} 
-          onPress={() => setShowDashaBrowser(true)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.tabIconContainer}>
-            <Icon 
-              name="time-outline" 
-              size={22} 
-              color={activeTab === 'dashas' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} 
-            />
-          </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'dashas' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'dashas' ? '800' : '600' }]}>
-            {t('home.tabs.dashas', 'Dashas')}
           </Text>
         </TouchableOpacity>
 
@@ -3072,6 +3081,71 @@ function CosmicRibbonCard({ option, index, onOptionSelect }) {
         </View>
       </TouchableOpacity>
     </View>
+  );
+}
+
+function ReportStudioCard({ navigation, isDark, colors, cost, originalCost, t }) {
+  const creditsLabel = originalCost != null && originalCost > cost
+    ? `${originalCost} → ${cost}`
+    : `${cost}`;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.92}
+      onPress={() => navigation.navigate('ReportsStudio')}
+      style={styles.reportStudioCardWrap}
+      accessibilityRole="button"
+      accessibilityLabel={t('reports.homeA11y', 'Open Reports Studio for the deepest premium chart analysis')}
+    >
+      <LinearGradient
+        colors={['#fb7185', '#f97316']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.reportStudioCard}
+      >
+        <View style={styles.reportStudioGlow} />
+        <View style={styles.reportStudioTopRow}>
+          <View style={styles.reportStudioIconWrap}>
+            <Icon name="document-text" size={22} color="#fff" />
+          </View>
+          <View style={styles.reportStudioTextWrap}>
+            <Text style={styles.reportStudioEyebrow}>
+              {t('reports.homeEyebrow', 'Most complete reading')}
+            </Text>
+            <Text style={styles.reportStudioTitle} numberOfLines={1}>
+              {t('reports.homeTitle', 'Reports')}
+            </Text>
+            <Text style={styles.reportStudioSubtitle} numberOfLines={2}>
+              {t('reports.homeSubtitle', 'Our deepest analysis — a full, structured PDF covering charts, timing, strengths, remedies, and clear takeaways.')}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.reportStudioMetaRow}>
+          <View style={styles.reportStudioMetaChip}>
+            <Icon name="layers-outline" size={12} color="rgba(255,255,255,0.95)" />
+            <Text style={styles.reportStudioMetaText}>
+              {t('reports.homePages', '20+ pages')}
+            </Text>
+          </View>
+          <View style={styles.reportStudioMetaChip}>
+            <Icon name="flash-outline" size={12} color="rgba(255,255,255,0.95)" />
+            <Text style={styles.reportStudioMetaText}>
+              {creditsLabel} {t('credits.label', 'credits')}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.reportStudioCtaRow}>
+          <View style={styles.reportStudioCta}>
+            <Text style={styles.reportStudioCtaText}>
+              {t('reports.homeCta', 'Open Reports Studio')}
+            </Text>
+            <Icon name="arrow-forward" size={16} color="#9a3412" />
+          </View>
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
   );
 }
 
@@ -5091,6 +5165,128 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     overflow: 'hidden',
+  },
+  reportStudioCardWrap: {
+    marginBottom: 24,
+    borderRadius: 22,
+    overflow: 'hidden',
+    shadowColor: '#f97316',
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 5,
+  },
+  reportStudioCard: {
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    overflow: 'hidden',
+  },
+  reportStudioGlow: {
+    position: 'absolute',
+    top: -40,
+    right: -30,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  reportStudioTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  reportStudioIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reportStudioEmoji: {
+    fontSize: 28,
+  },
+  reportStudioTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  reportStudioEyebrow: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  reportStudioTitle: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  reportStudioSubtitle: {
+    color: 'rgba(255,255,255,0.92)',
+    marginTop: 5,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
+  },
+  reportStudioMetaRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  reportStudioMetaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(15,23,42,0.18)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  reportStudioMetaText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  reportStudioCtaRow: {
+    marginTop: 14,
+  },
+  reportStudioCta: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fff',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
+  reportStudioCtaText: {
+    color: '#9a3412',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  reportStudioFooterRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  reportStudioBadge: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  reportStudioBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
   },
   tickerContent: {
     paddingVertical: 12,

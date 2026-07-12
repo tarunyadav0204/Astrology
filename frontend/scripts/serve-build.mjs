@@ -1,7 +1,7 @@
 /**
  * Production static server for frontend/build.
  * - / (+ trailing slash) → CRA index.html, prerendered after build for homepage SEO
- * - /karma-analysis, /kundli-matching, /chat → Next SEO HTML by default; ?app=1 → CRA for those paths
+ * - /karma-analysis, /kundli-matching, /chat, /reports → Next SEO HTML by default; ?app=1 → CRA for those paths
  * - Everything else → static file, or index.html for SPA routes
  */
 import http from 'http';
@@ -156,6 +156,7 @@ const server = http.createServer(async (req, res) => {
       '/karma-analysis': 'karma-analysis.html',
       '/kundli-matching': 'kundli-matching.html',
       '/chat': 'chat.html',
+      '/reports': 'reports.html',
     };
     const seoRouteKey = pathname === '/' ? '/' : pathname.replace(/\/$/, '');
     const seoFileName = nextSeoRoutes[seoRouteKey];
@@ -221,4 +222,6 @@ server.listen(PORT, () => {
   console.log('Kundli app: http://localhost:' + PORT + '/kundli-matching?app=1');
   console.log('Chat SEO:   http://localhost:' + PORT + '/chat');
   console.log('Chat app:   http://localhost:' + PORT + '/chat?app=1');
+  console.log('Reports SEO: http://localhost:' + PORT + '/reports');
+  console.log('Reports app: http://localhost:' + PORT + '/reports?app=1');
 });

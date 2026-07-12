@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
@@ -17,6 +19,13 @@ from chat.chat_context_builder import ChatContextBuilder
 from context_agents.base import AgentContext
 from shared.dasha_calculator import DashaCalculator
 from utils.admin_settings import get_gemini_instant_model
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _build_instant_usage_stage(stage: str, model_name: str, prompt_chars: int, response_chars: int, token_usage: Dict[str, Any] | None, success: bool, elapsed_s: float | None = None) -> Dict[str, Any]:
@@ -62,6 +71,9 @@ PLANET_SEQUENCE = ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn
 
 CATEGORY_FOCUS = {
     "career": {"houses": [2, 6, 10, 11], "planets": ["Sun", "Mercury", "Saturn", "Jupiter"]},
+    "job": {"houses": [2, 6, 10, 11], "planets": ["Sun", "Mercury", "Saturn", "Jupiter"]},
+    "promotion": {"houses": [2, 6, 10, 11], "planets": ["Sun", "Mercury", "Saturn", "Jupiter"]},
+    "business": {"houses": [2, 6, 10, 11], "planets": ["Sun", "Mercury", "Saturn", "Jupiter", "Mars"]},
     "wealth": {"houses": [2, 5, 9, 11], "planets": ["Jupiter", "Venus", "Mercury"]},
     "health": {"houses": [1, 6, 8, 12], "planets": ["Sun", "Moon", "Mars", "Saturn"]},
     "marriage": {"houses": [2, 5, 7, 11], "planets": ["Venus", "Moon", "Jupiter", "Mars"]},
@@ -80,6 +92,9 @@ CATEGORY_FOCUS = {
 
 EVENT_CATEGORY_PRIORITIES = {
     "career": {"house_weights": {10: 3.0, 6: 2.5, 11: 2.0, 2: 1.5}, "planet_weights": {"Saturn": 2.0, "Sun": 1.8, "Mercury": 1.8, "Jupiter": 1.4}},
+    "job": {"house_weights": {10: 3.0, 6: 2.5, 11: 2.0, 2: 1.5}, "planet_weights": {"Saturn": 2.0, "Sun": 1.8, "Mercury": 1.8, "Jupiter": 1.4}},
+    "promotion": {"house_weights": {10: 3.0, 6: 2.5, 11: 2.4, 2: 1.5}, "planet_weights": {"Sun": 2.0, "Saturn": 1.8, "Mercury": 1.6, "Jupiter": 1.5}},
+    "business": {"house_weights": {10: 3.0, 7: 2.5, 11: 2.0, 2: 1.5}, "planet_weights": {"Mercury": 2.0, "Sun": 1.8, "Saturn": 1.7, "Jupiter": 1.4, "Mars": 1.3}},
     "wealth": {"house_weights": {2: 3.0, 11: 2.5, 5: 2.0, 9: 1.8}, "planet_weights": {"Jupiter": 2.0, "Venus": 1.8, "Mercury": 1.6, "Moon": 1.2}},
     "health": {"house_weights": {1: 3.0, 6: 2.5, 8: 2.0, 12: 1.8}, "planet_weights": {"Saturn": 1.8, "Mars": 1.8, "Sun": 1.6, "Moon": 1.4}},
     "marriage": {"house_weights": {7: 3.0, 11: 2.2, 2: 1.8, 5: 1.6}, "planet_weights": {"Venus": 2.0, "Jupiter": 1.8, "Moon": 1.5, "Mars": 1.2}},
@@ -96,6 +111,27 @@ EVENT_CATEGORY_PRIORITIES = {
     "general": {"house_weights": {1: 2.0, 4: 2.0, 7: 2.0, 10: 2.0}, "planet_weights": {"Moon": 1.4, "Sun": 1.4, "Jupiter": 1.4}},
 }
 
+EVENT_ANSWER_LABELS = {
+    "career": "career growth",
+    "job": "job matters",
+    "promotion": "promotion",
+    "business": "business growth",
+    "wealth": "wealth growth",
+    "health": "health recovery",
+    "marriage": "marriage",
+    "progeny": "having a child",
+    "education": "education",
+    "trading": "trading or speculation",
+    "property": "property matters",
+    "relocation": "relocation",
+    "visa": "visa or foreign travel",
+    "travel": "travel",
+    "litigation": "legal matters",
+    "surgery": "surgery or medical procedures",
+    "higher_studies": "higher studies",
+    "general": "this event",
+}
+
 HOUSE_THEME_LABELS = {
     1: "self, vitality, personal direction",
     2: "income, family assets, speech, resources",
@@ -109,6 +145,21 @@ HOUSE_THEME_LABELS = {
     10: "career, public role, authority, visibility",
     11: "gains, networks, fulfillment, support circles",
     12: "expenses, retreat, isolation, foreign or hidden matters",
+}
+
+SPEECH_HOUSE_THEME_LABELS = {
+    1: "personal direction and vitality",
+    2: "family resources and financial stability",
+    3: "effort and communication",
+    4: "home and emotional stability",
+    5: "children, creativity, and romance",
+    6: "work routines and responsibilities",
+    7: "partnerships and commitments",
+    8: "pressure, change, and hidden factors",
+    9: "long-range support and guidance",
+    10: "career role and public progress",
+    11: "gains, networks, and fulfillment",
+    12: "expenses, retreat, and foreign links",
 }
 
 SIGN_STYLE_THEMES = {
@@ -187,6 +238,8 @@ EVENT_CATEGORY_ALIASES = {
     "pregnancy": "progeny",
     "pregnant": "progeny",
     "baby": "progeny",
+    "childbirth": "progeny",
+    "conception": "progeny",
     "property_sale": "property",
     "real_estate": "property",
     "home": "property",
@@ -587,6 +640,321 @@ def _compact_divisional_topic_payload(divisional_support: Dict[str, Any]) -> Dic
     return out
 
 
+def _event_divisional_category(category: str) -> str:
+    cat = _normalize_event_category(category)
+    if cat == "progeny":
+        return "child"
+    return cat
+
+
+def _divisional_levels_for_payload(current_dashas_context: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    out: Dict[str, Dict[str, Any]] = {}
+    for level in ("md", "ad", "pd"):
+        row = (current_dashas_context or {}).get(level) or {}
+        if not isinstance(row, dict):
+            continue
+        planet = str(row.get("planet") or row.get("p") or "").strip()
+        if planet:
+            out[level] = {"p": planet}
+    return out
+
+
+def _requested_event_divisional_support(
+    *,
+    birth_data: Dict[str, Any],
+    question: str,
+    intent: Optional[Dict[str, Any]],
+    category: str,
+    focus_houses: List[int],
+    current_dashas_context: Dict[str, Any],
+) -> Dict[str, Any]:
+    requested = [
+        str(code).strip()
+        for code in ((intent or {}).get("divisional_charts") or [])
+        if str(code or "").strip()
+    ]
+    if not requested:
+        return {}
+    try:
+        from context_agents.registry import build_agent
+        from ai.parallel_chat.parallel_agent_payloads import (
+            _collect_divisional_charts,
+            _divisional_current_payload,
+            _divisional_root_fruit,
+            _divisional_topic_payload,
+        )
+
+        birth_hash = _INSTANT_CONTEXT_BUILDER._create_birth_hash(birth_data)
+        static_cache = getattr(_INSTANT_CONTEXT_BUILDER, "static_cache", None)
+        with open(os.devnull, "w", encoding="utf-8") as dn, redirect_stdout(dn), redirect_stderr(dn):
+            if isinstance(static_cache, dict):
+                if birth_hash not in static_cache:
+                    static_cache[birth_hash] = _INSTANT_CONTEXT_BUILDER._build_static_context(birth_data)
+                static = static_cache[birth_hash]
+            else:
+                static = _INSTANT_CONTEXT_BUILDER._build_static_context(birth_data)
+        agent_ctx = AgentContext(
+            birth_data=birth_data,
+            user_question=question,
+            intent_result={**(intent or {}), "divisional_charts": requested},
+            precomputed_static=static,
+            div_intent_omit_codes=frozenset({"D1", "D9"}),
+        )
+        agents = {
+            "core_d1": build_agent("core_d1", agent_ctx),
+            "div_d9": build_agent("div_d9", agent_ctx),
+            "div_intent": build_agent("div_intent", agent_ctx),
+        }
+        div_charts = _collect_divisional_charts(agents)
+        div_category = _event_divisional_category(category)
+        levels = _divisional_levels_for_payload(current_dashas_context)
+        topic = _divisional_topic_payload(div_category, div_charts, focus_houses)
+        current_topic = _divisional_current_payload(div_category, div_charts, levels, focus_houses)
+        navamsa_root_fruit = _divisional_root_fruit(
+            agents.get("core_d1") or {},
+            agents.get("div_d9") or {},
+            div_category,
+            focus_houses,
+        )
+        support: Dict[str, Any] = {
+            "requested_charts": requested,
+            "available_charts": sorted(div_charts.keys()),
+            "topic": topic,
+            "current_topic": current_topic,
+        }
+        skipped = (agents.get("div_intent") or {}).get("S")
+        if skipped:
+            support["skipped_charts"] = list(skipped)
+        return {
+            "divisional_support": support,
+            "navamsa_root_fruit": navamsa_root_fruit,
+        }
+    except Exception as exc:
+        logger.warning("event divisional support build failed: %s", exc)
+        return {}
+
+
+def _event_chain_label(row: Dict[str, Any]) -> str:
+    return " - ".join(
+        str(row.get(key) or "").strip()
+        for key in ("mahadasha", "antardasha", "pratyantardasha")
+        if str(row.get(key) or "").strip()
+    )
+
+
+def _event_row_score(row: Dict[str, Any]) -> int:
+    try:
+        return int(float(row.get("relevance_score") or row.get("score") or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _event_row_window(row: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "start": row.get("start"),
+        "end": row.get("end"),
+        "chain": _event_chain_label(row),
+        "score": _event_row_score(row),
+        "activated_focus_houses": row.get("activated_focus_houses"),
+        "why": row.get("why"),
+        "time_status": row.get("time_status"),
+        "period_strength": row.get("period_strength"),
+        "period_label": row.get("period_label"),
+    }
+
+
+def _event_window_claim_contract(category: str, row: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(row, dict) or not row:
+        return {}
+    activated_houses = [
+        h
+        for h in (_norm_house(h) for h in (row.get("activated_focus_houses") or []))
+        if h is not None
+    ]
+    focus_houses = [
+        h
+        for h in (_norm_house(h) for h in (CATEGORY_FOCUS.get(_normalize_event_category(category), {}).get("houses") or []))
+        if h is not None
+    ]
+    return {
+        "dasha_chain": _event_chain_label(row),
+        "activated_focus_houses": activated_houses,
+        "allowed_house_themes": [
+            {"house": h, "theme": SPEECH_HOUSE_THEME_LABELS.get(h, HOUSE_THEME_LABELS.get(h, ""))}
+            for h in activated_houses
+        ],
+        "inactive_focus_houses": [h for h in focus_houses if h not in activated_houses],
+        "claim_rule": (
+            "Only activated_focus_houses may be described as active/supportive for this timing window. "
+            "Other focus houses are possible topic houses, not active evidence for this window."
+        ),
+    }
+
+
+def _cluster_best_future_event_windows(periods: List[Dict[str, Any]], best_row: Dict[str, Any]) -> Dict[str, Any]:
+    if not best_row:
+        return {}
+    best_chain = _event_chain_label(best_row)
+    best_score = _event_row_score(best_row)
+    selected: List[Dict[str, Any]] = []
+    for row in periods:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("time_status") or "").lower() == "current":
+            continue
+        if _event_chain_label(row) != best_chain:
+            continue
+        if abs(_event_row_score(row) - best_score) > 5:
+            continue
+        selected.append(row)
+    if not selected:
+        selected = [best_row]
+    selected.sort(key=lambda r: str(r.get("start") or ""))
+    reasons: List[str] = []
+    for row in selected:
+        reason = str(row.get("why") or "").strip()
+        if reason:
+            reasons.extend([part.strip() for part in reason.split(";") if part.strip()])
+    return {
+        "start": selected[0].get("start"),
+        "end": selected[-1].get("end"),
+        "chain": best_chain,
+        "score": best_score,
+        "segments": [_event_row_window(row) for row in selected[:6]],
+        "why": list(dict.fromkeys(reasons))[:6],
+    }
+
+
+def _build_event_timing_verdict(
+    *,
+    category: str,
+    forward_scan_periods: List[Dict[str, Any]],
+    horizon_segments: List[Dict[str, Any]],
+    current_chain_rows: List[Dict[str, Any]],
+    timing_policy: Dict[str, Any],
+) -> Dict[str, Any]:
+    periods = [row for row in (forward_scan_periods or []) if isinstance(row, dict)]
+    current_candidates = [
+        row for row in periods if str(row.get("time_status") or "").lower() == "current"
+    ]
+    if not current_candidates:
+        current_candidates = [
+            row for row in (horizon_segments or [])
+            if isinstance(row, dict) and str(row.get("time_status") or "").lower() == "current"
+        ]
+    current_row = max(current_candidates, key=_event_row_score) if current_candidates else {}
+    future_candidates = [
+        row for row in periods
+        if str(row.get("time_status") or "").lower() != "current"
+    ]
+    best_future = max(future_candidates, key=_event_row_score) if future_candidates else {}
+
+    current_score = _event_row_score(current_row) if current_row else 0
+    future_score = _event_row_score(best_future) if best_future else 0
+    score_delta = future_score - current_score
+
+    if current_row and best_future:
+        if abs(score_delta) <= 5:
+            comparison = "current_active_future_slightly_cleaner" if score_delta >= 0 else "current_comparable_or_stronger"
+            answer_rule = (
+                "Say the current period is active, but mixed or less settled if current dasha factors show pressure. "
+                "Say the future window is only slightly cleaner/stronger, not overwhelmingly better. Do not imply current potential is absent."
+            )
+            confidence = "medium"
+        elif score_delta <= 15:
+            comparison = "future_meaningfully_stronger" if score_delta > 0 else "current_meaningfully_stronger"
+            answer_rule = (
+                "Lead with the stronger window, but still acknowledge the other active window. "
+                "Use measured wording: meaningfully stronger, not guaranteed."
+            )
+            confidence = "medium"
+        else:
+            comparison = "future_clearly_stronger" if score_delta > 0 else "current_clearly_stronger"
+            answer_rule = (
+                "Lead with the clearly stronger window and mention the weaker window only as background activation. "
+                "Avoid guaranteed dates."
+            )
+            confidence = "medium_high"
+    elif best_future:
+        comparison = "future_window_available_current_not_prominent"
+        answer_rule = "Lead with the best future window; say current evidence is not the main materialization window."
+        confidence = "medium"
+    elif current_row:
+        comparison = "current_window_available_future_thin"
+        answer_rule = "Lead with current activation; say the scan does not show a cleaner future window inside the horizon."
+        confidence = "medium_low"
+    else:
+        comparison = "thin_timing_evidence"
+        answer_rule = "Do not give a strong timing claim; explain that the current horizon evidence is thin."
+        confidence = "low"
+
+    pressure_factors: List[str] = []
+    support_factors: List[str] = []
+    for row in current_chain_rows:
+        if not isinstance(row, dict):
+            continue
+        planet = str(row.get("planet") or "")
+        level = str(row.get("level") or "")
+        if row.get("lordships"):
+            support_factors.append(f"{level} {planet} carries lordships {row.get('lordships')}.")
+        if row.get("natal_house"):
+            support_factors.append(f"{level} {planet} is placed in natal house {row.get('natal_house')}.")
+        conjunctions = row.get("conjunctions") if isinstance(row.get("conjunctions"), list) else []
+        if conjunctions:
+            pressure_factors.append(
+                f"{level} {planet} is modified by conjunctions with "
+                + ", ".join(str(c.get("planet")) for c in conjunctions[:3] if isinstance(c, dict) and c.get("planet"))
+                + "."
+            )
+        if planet in {"Rahu", "Ketu"}:
+            pressure_factors.append(f"{level} {planet} can make the active window irregular, unconventional, or less settled.")
+        elif planet in {"Saturn", "Mars"} and level in {"AD", "PD"}:
+            pressure_factors.append(f"{level} {planet} can add pressure or delay to materialization.")
+
+    future_cluster = _cluster_best_future_event_windows(periods, best_future) if best_future else {}
+    current_window = _event_row_window(current_row) if current_row else {}
+    current_claim_contract = _event_window_claim_contract(category, current_row)
+    future_claim_contract = _event_window_claim_contract(category, best_future)
+    required_points = []
+    if current_window:
+        required_points.append("Mention current activation and its score relationship to the future window.")
+    if future_cluster:
+        required_points.append("Mention the best future cluster start/end and dasha chain.")
+    if abs(score_delta) <= 5 and current_window and future_cluster:
+        required_points.append("Say the future window is only slightly cleaner/stronger; do not overstate the gap.")
+
+    return {
+        "event_category": _normalize_event_category(category),
+        "answer_event_label": EVENT_ANSWER_LABELS.get(_normalize_event_category(category), EVENT_ANSWER_LABELS["general"]),
+        "timing_policy": timing_policy or {},
+        "current_window": current_window,
+        "best_future_window": _event_row_window(best_future) if best_future else {},
+        "best_future_cluster": future_cluster,
+        "score_delta": score_delta,
+        "comparison": comparison,
+        "confidence": confidence,
+        "support_factors": list(dict.fromkeys(support_factors))[:6],
+        "pressure_factors": list(dict.fromkeys(pressure_factors))[:5],
+        "answer_rule": answer_rule,
+        "claim_contract": {
+            "house_claim_rule": (
+                "For each timing window, treat activated_focus_houses and the exact why text as the only evidence for which houses are active. "
+                "Do not convert a possible focus house into an active house claim unless that house appears in the same window's activated_focus_houses or why text."
+            ),
+            "current_window": current_claim_contract,
+            "best_future_window": future_claim_contract,
+        },
+        "required_answer_points": required_points,
+        "forbidden_answer_moves": [
+            "Do not imply current active evidence is absent when current_window exists.",
+            "Do not call a small score delta a clearly superior future period.",
+            "Do not invent an exact event date beyond the provided windows.",
+            "Do not say a planet rules/supports/activates a named domain house unless that exact house is present in that window's activated_focus_houses or why text.",
+            "Do not translate 'rules focus house(s) [N]' into 'rules the event house' unless N is the primary event house explicitly active in the same window.",
+        ],
+    }
+
+
 def _slim_event_prediction_payload(
     *,
     birth_summary: Dict[str, Any],
@@ -601,6 +969,8 @@ def _slim_event_prediction_payload(
     question: str,
     chart_data: Dict[str, Any],
     house_lordships: Dict[str, List[int]],
+    named_dasha_lookup: Optional[Dict[str, Any]] = None,
+    evidence_plan: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     focus_houses = list((instant_parashari or {}).get("focus_houses") or [])
     safe_current_dashas_levels = current_dashas_levels if isinstance(current_dashas_levels, dict) else {}
@@ -635,6 +1005,14 @@ def _slim_event_prediction_payload(
         for row in list((((instant_parashari or {}).get("forward_event_dasha_scan") or {}).get("periods") or []))
         if not _is_fallback_dasha_triplet(row.get("mahadasha"), row.get("antardasha"), row.get("pratyantardasha"))
     ]
+    timing_policy = dict((normalized_evidence or {}).get("timing_policy") or {})
+    event_timing_verdict = _build_event_timing_verdict(
+        category=category,
+        forward_scan_periods=forward_scan_periods,
+        horizon_segments=horizon_segments,
+        current_chain_rows=current_chain_rows,
+        timing_policy=timing_policy,
+    )
     for seg in horizon_segments[:8]:
         future_windows.append(
             {
@@ -668,7 +1046,8 @@ def _slim_event_prediction_payload(
             "category": category,
             "answer_skeleton": "Apply timing_policy -> Verdict from strongest future windows -> Phase shifts from MD/AD/PD changes -> Support vs obstruction vs uncertainty -> Practical takeaway",
         },
-        "timing_policy": dict((normalized_evidence or {}).get("timing_policy") or {}),
+        "timing_policy": timing_policy,
+        "event_timing_verdict": event_timing_verdict,
         "current_timing": {
             "active_dashas": safe_current_dashas_levels,
             "current_dasha_chain": current_chain,
@@ -692,6 +1071,8 @@ def _slim_event_prediction_payload(
         },
         "topic_houses": _topic_house_rows(focus_houses, house_lordships, chart_data),
         "divisional_topic": _compact_divisional_topic_payload((instant_parashari or {}).get("divisional_support") or {}),
+        "divisional_support": _compact_divisional_support((instant_parashari or {}).get("divisional_support") or {}),
+        "divisional_specifics": list((normalized_evidence or {}).get("divisional_specifics") or [])[:3],
         "transit_contacts": [row.get("current_transit_contact") for row in current_chain_rows if row.get("current_transit_contact")],
         "target_subject": {
             "key": compact_target_context["key"],
@@ -699,13 +1080,30 @@ def _slim_event_prediction_payload(
             "base_house": compact_target_context["anchor_house"],
         },
         "primary_drivers": [
+            f"Asked event: {event_timing_verdict.get('answer_event_label') or event_timing_verdict.get('event_category')}.",
+            f"Event timing verdict: {event_timing_verdict.get('comparison')} (confidence {event_timing_verdict.get('confidence')}; score_delta {event_timing_verdict.get('score_delta')}).",
+            f"Answer rule: {event_timing_verdict.get('answer_rule')}",
             f"Current chain: {current_display}." if current_display else "",
+            *[
+                f"Divisional support: {line}"
+                for line in list((normalized_evidence or {}).get("divisional_specifics") or [])[:2]
+            ],
             *[
                 f"Future window {row.get('start')}–{row.get('end')}: {row.get('chain')} (score {row.get('score')}; houses {row.get('activated_focus_houses')}; {row.get('why')})"
                 for row in future_windows[:4]
             ],
         ],
     }
+    if named_dasha_lookup:
+        slim_normalized["named_dasha_lookup"] = named_dasha_lookup
+        slim_normalized["primary_drivers"] = [
+            *[
+                str(row.get("authoritative_fact") or "")
+                for row in list(named_dasha_lookup.get("matches") or [])[:3]
+                if isinstance(row, dict) and row.get("authoritative_fact")
+            ],
+            *slim_normalized["primary_drivers"],
+        ]
     slim_normalized["primary_drivers"] = [line for line in slim_normalized["primary_drivers"] if line]
     slim_parashari = {
         "source": (instant_parashari or {}).get("source"),
@@ -719,9 +1117,12 @@ def _slim_event_prediction_payload(
         "horizon_dasha_segments": slim_normalized["horizon_dasha_segments"],
         "topic_houses": _topic_house_rows(focus_houses, house_lordships, chart_data),
         "divisional_topic": _compact_divisional_topic_payload((instant_parashari or {}).get("divisional_support") or {}),
+        "divisional_support": _compact_divisional_support((instant_parashari or {}).get("divisional_support") or {}),
         "major_transits": major_transits,
         "horizon_transit_anchors": (instant_parashari or {}).get("horizon_transit_anchors") or {},
     }
+    if named_dasha_lookup:
+        slim_parashari["named_dasha_lookup"] = named_dasha_lookup
     return {
         "birth_summary": birth_summary,
         "intent_summary": {
@@ -734,6 +1135,7 @@ def _slim_event_prediction_payload(
             "extracted_context": {"timeframe": question},
             "target_subject": {"key": "self", "label": "self", "base_house": 1},
         },
+        "evidence_plan": evidence_plan or {},
         "natal_snapshot": {
             "house_lordships": natal_snapshot.get("house_lordships") if isinstance(natal_snapshot, dict) else {},
             "topic_houses": _topic_house_rows(focus_houses, house_lordships, chart_data),
@@ -755,6 +1157,7 @@ def _slim_event_prediction_payload(
         "current_dashas": {
             "as_of": str((period_window or {}).get("start") or ""),
             "levels": safe_current_dashas_levels,
+            "named_dasha_lookup": named_dasha_lookup or {},
         },
         "current_transits": {
             "as_of_local": str((period_window or {}).get("start") or ""),
@@ -765,6 +1168,7 @@ def _slim_event_prediction_payload(
         "normalized_evidence": slim_normalized,
         "recent_history": [],
         "complexity_hint": {"mode": "slim_event_prediction", "question_length": len(question or "")},
+        "named_dasha_lookup": named_dasha_lookup or {},
     }
 
 _INSTANT_CONTEXT_BUILDER = ChatContextBuilder()
@@ -828,6 +1232,50 @@ def _truncate(text: str, limit: int) -> str:
     if len(raw) <= limit:
         return raw
     return raw[: max(0, limit - 1)].rstrip() + "…"
+
+
+def _truncate_speech_answer(text: str, limit: int = 760) -> str:
+    raw = re.sub(r"\s+", " ", str(text or "").strip())
+    if len(raw) <= limit:
+        return raw
+    boundary = max(raw.rfind(".", 0, limit), raw.rfind("?", 0, limit), raw.rfind("!", 0, limit), raw.rfind("।", 0, limit))
+    if boundary >= 500:
+        return raw[: boundary + 1].strip()
+    return _truncate(raw, limit)
+
+
+def _speech_event_label_from_context(instant_context: Dict[str, Any]) -> str:
+    normalized = instant_context.get("normalized_evidence") if isinstance(instant_context.get("normalized_evidence"), dict) else {}
+    verdict = normalized.get("event_timing_verdict") if isinstance(normalized.get("event_timing_verdict"), dict) else {}
+    label = str(verdict.get("answer_event_label") or "").strip()
+    if label and label.lower() not in {"general", "this event"}:
+        return label
+    category = _normalize_event_category(str(((instant_context.get("intent_summary") or {}).get("category") or "")))
+    return EVENT_ANSWER_LABELS.get(category, "")
+
+
+def _polish_speech_event_answer(text: str, instant_context: Dict[str, Any]) -> str:
+    raw = str(text or "").strip()
+    if not raw:
+        return raw
+    label = _speech_event_label_from_context(instant_context)
+    if label:
+        raw = re.sub(r"\bthis event\b", label, raw, flags=re.IGNORECASE)
+        raw = re.sub(r"\bthese matters\b", label, raw, flags=re.IGNORECASE)
+        raw = re.sub(r"\bthese themes\b", label, raw, flags=re.IGNORECASE)
+    replacements = {
+        r"\bthe astrological indicators suggest that?\b": "I would read this as",
+        r"\bthe astrological indicators point toward\b": "I would look toward",
+        r"\bthe astrological indicators point to\b": "I would look to",
+        r"\bmaterialization window\b": "main timing window",
+        r"\bplanetary influences\b": "dasha pattern",
+        r"\bhouse of fortune and dharma\b": "long-range support",
+        r"\bhouses? of fortune and dharma\b": "long-range support",
+        r"\bfortune and dharma\b": "long-range support",
+    }
+    for pattern, replacement in replacements.items():
+        raw = re.sub(pattern, replacement, raw, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", raw).strip()
 
 
 def _normalize_question_text(text: str) -> str:
@@ -1194,12 +1642,14 @@ def _parse_ymd(value: Any) -> Optional[datetime]:
         return None
 
 
-def _resolve_period_window(intent: Optional[Dict[str, Any]], now_local: datetime) -> Dict[str, Any]:
+def _resolve_period_window(intent: Optional[Dict[str, Any]], now_local: datetime, question: str = "") -> Dict[str, Any]:
     ir = intent or {}
     extracted = ir.get("extracted_context") if isinstance(ir.get("extracted_context"), dict) else {}
     tr = ir.get("transit_request") if isinstance(ir.get("transit_request"), dict) else {}
     year_month_map = tr.get("yearMonthMap") if isinstance(tr.get("yearMonthMap"), dict) else {}
     timeframe_text = str(extracted.get("timeframe") or "").strip().lower()
+    if not timeframe_text:
+        timeframe_text = str(question or "").strip().lower()
     
     # Handle "this year" or generic year requests
     if "year" in timeframe_text or str(now_local.year) in timeframe_text:
@@ -1229,7 +1679,8 @@ def _resolve_period_window(intent: Optional[Dict[str, Any]], now_local: datetime
             "use_sk_pr": False,
         }
 
-    # If the router resolved a calendar month/window, prefer that window even if
+    # If the router resolved a calendar month/window, prefer that window.
+    if year_month_map:
         for year_str, months in year_month_map.items():
             for month_name in months or []:
                 if str(month_name or "").strip().lower() in timeframe_text:
@@ -1332,6 +1783,13 @@ def _period_anchor_datetime(period_window: Dict[str, Any], now_local: datetime) 
             except ValueError:
                 pass
     return now_local
+
+
+def _as_naive_local_datetime(value: datetime) -> datetime:
+    """Match standard chat's dasha caller: pass local wall-clock datetimes without tzinfo."""
+    if isinstance(value, datetime) and value.tzinfo is not None:
+        return value.replace(tzinfo=None)
+    return value
 
 
 def _period_time_relation(period_window: Dict[str, Any], now_local: datetime) -> str:
@@ -1544,17 +2002,22 @@ def _build_forward_event_dasha_scan(
     current_dashas: Optional[Dict[str, Any]] = None,
     *,
     limit: int = 12,
+    raw_periods: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Ranked MD/AD/PD segments over the next ~3 years relevant to the event category."""
     cat = str(category or "general").lower()
     karakas = EVENT_CATEGORY_KARAKAS.get(cat, frozenset())
+    now_local = _as_naive_local_datetime(now_local)
     end_local = now_local + timedelta(days=_INSTANT_EVENT_HORIZON_DAYS)
-    calc = DashaCalculator()
-    try:
-        raw_rows = calc.get_dasha_periods_for_range(birth_data, now_local, end_local)
-    except Exception as exc:
-        logger.warning("forward event dasha scan failed: %s", exc)
-        return {"horizon_days": _INSTANT_EVENT_HORIZON_DAYS, "periods": [], "error": str(exc)}
+    if raw_periods is not None:
+        raw_rows = raw_periods
+    else:
+        calc = DashaCalculator()
+        try:
+            raw_rows = calc.get_dasha_periods_for_range(birth_data, now_local, end_local)
+        except Exception as exc:
+            logger.warning("forward event dasha scan failed: %s", exc)
+            return {"horizon_days": _INSTANT_EVENT_HORIZON_DAYS, "periods": [], "error": str(exc)}
 
     focus = {_norm_house(h) for h in (focus_houses or [])}
     focus.discard(None)
@@ -1626,9 +2089,9 @@ def _build_forward_event_dasha_scan(
                     if tr_house == natal_house:
                         score += 2
                         reasons.append(f"{lvl.upper()} {p} transits its natal house {natal_house} (confidence up)")
-                elif _planet_aspects_house_from(tr_house, natal_house, p):
-                    score += 1
-                    reasons.append(f"{lvl.upper()} {p} transits aspect its natal house {natal_house} (confidence up)")
+                    elif _planet_aspects_house_from(tr_house, natal_house, p):
+                        score += 1
+                        reasons.append(f"{lvl.upper()} {p} transits aspect its natal house {natal_house} (confidence up)")
         if len([h for h in activated_focus if _house_priority_weight(cat, h) >= 2.0]) >= 2:
             score += 2
             reasons.append("Multiple category-priority houses are activated together")
@@ -1682,6 +2145,7 @@ def _horizon_dasha_segments_for_event(
     ascendant_longitude: float,
     category: str,
     limit: int = 12,
+    raw_periods: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Ranked MD/AD/PD phase segments across the next bounded event horizon."""
     horizon_window = {
@@ -1703,6 +2167,7 @@ def _horizon_dasha_segments_for_event(
         ascendant_longitude=ascendant_longitude,
         category=category,
         limit=limit,
+        raw_periods=raw_periods,
     )
     if isinstance(segs, dict):
         segs["label"] = "next 3 years"
@@ -1720,18 +2185,20 @@ def _window_dasha_segments_for_period(
     ascendant_longitude: float,
     category: str,
     limit: int = 18,
+    raw_periods: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Build ranked MD/AD/PD window segments with activation + transit-to-natal reinforcement."""
     start_dt = _parse_ymd((period_window or {}).get("start"))
     end_dt = _parse_ymd((period_window or {}).get("end"))
     if not start_dt or not end_dt or end_dt < start_dt:
         return {"enabled": False, "segments": []}
-    calc = DashaCalculator()
-    try:
-        raw_periods = calc.get_dasha_periods_for_range(birth_data, start_dt, end_dt)
-    except Exception as exc:
-        logger.warning("window dasha segments failed: %s", exc)
-        return {"enabled": False, "segments": [], "error": str(exc)}
+    if raw_periods is None:
+        calc = DashaCalculator()
+        try:
+            raw_periods = calc.get_dasha_periods_for_range(birth_data, start_dt, end_dt)
+        except Exception as exc:
+            logger.warning("window dasha segments failed: %s", exc)
+            return {"enabled": False, "segments": [], "error": str(exc)}
 
     focus = {_norm_house(h) for h in (focus_houses or [])}
     focus.discard(None)
@@ -3021,6 +3488,32 @@ async def _infer_answer_mode_with_llm(
     }
 
 
+def _mode_selection_from_intent(intent: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not isinstance(intent, dict):
+        return None
+    mode = str(intent.get("answer_mode") or "").strip()
+    if mode not in ANSWER_MODES:
+        return None
+    target_key = _normalize_relationship_target_key(intent.get("target_subject_key") or "")
+    target_subject: Optional[Dict[str, Any]] = None
+    if target_key in TARGET_SUBJECTS:
+        meta = TARGET_SUBJECTS.get(target_key) or {}
+        target_subject = {
+            "key": target_key,
+            "label": meta.get("label") or target_key.replace("_", " "),
+            "base_house": meta.get("base_house"),
+            "confidence": str(intent.get("answer_mode_confidence") or intent.get("confidence") or "medium"),
+            "source": "intent_router",
+        }
+    if target_subject is None:
+        target_subject = {"key": "self", "label": "self", "base_house": 1, "confidence": "medium", "source": "intent_router_default"}
+    return {
+        "answer_mode": mode,
+        "target_subject": target_subject,
+        "needs_year_clarification": bool(intent.get("needs_year_clarification")),
+    }
+
+
 def _top_dasha_lines(levels: Dict[str, Any], limit: int = 3) -> List[str]:
     rows: List[str] = []
     ordered = sorted(
@@ -3210,6 +3703,26 @@ def _is_fallback_dasha_triplet(md: str, ad: str, pd: str) -> bool:
         and str(ad or "").strip() == "Moon"
         and str(pd or "").strip() == "Mars"
     )
+
+
+def _standard_chat_current_dashas(
+    birth_data: Dict[str, Any],
+    chart_data: Dict[str, Any],
+    house_lordships: Dict[str, List[int]],
+) -> Dict[str, Any]:
+    """Use the same current-dasha path as standard chat when instant's dated anchor fails."""
+    try:
+        builder = _INSTANT_CONTEXT_BUILDER
+        birth_hash = builder._create_birth_hash(birth_data)
+        if birth_hash not in builder.static_cache:
+            builder.static_cache[birth_hash] = builder._build_static_context(birth_data)
+        dynamic_context = builder._build_dynamic_context(birth_data, "", None, None, None)
+        current_dashas = dynamic_context.get("current_dashas") or {}
+        builder.augment_current_dashas_with_chart_hints(current_dashas, chart_data, house_lordships)
+        return current_dashas
+    except Exception as exc:
+        logger.warning("standard chat current dasha fallback failed for instant context: %s", exc)
+        return {}
 
 
 def _format_transit_context(transit_rows: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
@@ -3444,12 +3957,23 @@ def _build_answer_mode_contract(answer_mode: str, category: str, period_window: 
             }
         )
     elif answer_mode == "timing_window":
+        period_kind = str((period_window or {}).get("kind") or "")
+        span_days = int((period_window or {}).get("span_days") or 0)
+        if period_kind == "day":
+            skeleton = "Day verdict -> Exact date anchor -> MD/AD/PD plus Sookshma/Prana roles -> Top 2-3 active areas for that day -> Transit trigger/caution -> Practical use of the day"
+            avoid_drift = ["broad lifetime reading", "month/year generalization", "natal-only reading", "overstating one day as destiny"]
+        elif span_days >= 180:
+            skeleton = "Year verdict -> Phase-wise window_dasha_segments across the year -> Top 2-3 active life areas -> Stronger and weaker phases -> Slow transit confirmation -> Practical use of the year"
+            avoid_drift = ["broad lifetime reading", "single-day transit overreach", "one static dasha summary for the whole year", "unanchored natal-only reading"]
+        else:
+            skeleton = "Window verdict -> Phase-wise window_dasha_segments (MD/AD/PD transitions) -> Top 2-3 active areas in this period -> Exact mechanism for each major area -> Month tone-setter if truly relevant -> Opportunity vs pressure -> Practical use of the period"
+            avoid_drift = ["broad lifetime reading", "unanchored natal-only reading", "whole-month prose from one-day fast-planet snapshots"]
         base.update(
             {
                 "primary_evidence": ["window_dasha_segments", "active_dashas_formatted", "dasha_level_effects", "dasha_chain_synthesis", "active_areas", "transit_pressure"],
                 "secondary_evidence": ["month_tone", "divisional_support.current_topic", "topic_signals"],
-                "avoid_drift": ["broad lifetime reading", "unanchored natal-only reading", "whole-month prose from one-day fast-planet snapshots"],
-                "answer_skeleton": "Window verdict -> Phase-wise window_dasha_segments (MD/AD/PD transitions) -> Top 2-3 active areas in this period -> Exact mechanism for each major area -> Month tone-setter if truly relevant -> Opportunity vs pressure -> Practical use of the period",
+                "avoid_drift": avoid_drift,
+                "answer_skeleton": skeleton,
             }
         )
     elif answer_mode == "event_prediction":
@@ -3627,7 +4151,9 @@ def _normalize_instant_evidence(
         contradiction_flags.append("Both supportive and pressurizing factors are active, so the answer should balance support with caution.")
     if current_topic_support == "weak" and topic_support in {"supportive", "strong"}:
         contradiction_flags.append("The natal/divisional promise looks better than the immediate activation, so current delivery may lag the underlying promise.")
-    if str((period_window or {}).get("kind") or "") == "window":
+    period_kind = str((period_window or {}).get("kind") or "")
+    period_span_days = int((period_window or {}).get("span_days") or 0)
+    if period_kind == "window":
         contradiction_flags.append("Do not narrate the whole month from a one-day Sun or Moon snapshot; use MD/AD/PD first and treat only slow-planet transits as month-wide anchors.")
     horizon_lines: List[str] = []
     horizon_segment_lines: List[str] = []
@@ -3705,10 +4231,13 @@ def _normalize_instant_evidence(
         "month_tone": month_tone,
         "claim_gates": claim_gates,
         "window_rules": {
-            "month_like": str((period_window or {}).get("kind") or "") == "window",
+            "period_kind": period_kind,
+            "day_like": period_kind == "day",
+            "month_like": period_kind == "window" and period_span_days <= 45,
+            "year_like": period_kind == "window" and period_span_days >= 180,
             "use_pd": bool((period_window or {}).get("use_pd")),
             "use_sk_pr": bool((period_window or {}).get("use_sk_pr")),
-            "snapshot_warning": "Do not generalize a whole month from fast-planet snapshots unless explicitly narrowed to a day or very short period.",
+            "snapshot_warning": "Use fast-planet snapshots only for exact-day or very short windows; for months/years, rely first on dasha segments and slow-planet anchors.",
         },
         "contradiction_flags": contradiction_flags,
         "avoid_drift": contract.get("avoid_drift") or [],
@@ -3829,6 +4358,35 @@ def _compact_parashari_evidence(
     return summary
 
 
+def _lightweight_event_parashari_evidence(
+    *,
+    category: str,
+    focus_houses: List[int],
+    answer_mode: str,
+) -> Dict[str, Any]:
+    """Minimal event-timing spine; avoids full parallel-agent context builds in speech/instant event timing."""
+    cat = _normalize_event_category(category)
+    return {
+        "source": "event_lightweight",
+        "category": cat,
+        "focus_houses": list(focus_houses or []),
+        "topic_key": PARASHARI_TOPIC_MAP.get(cat),
+        "active_dashas": {},
+        "active_dashas_formatted": {},
+        "house_activation": {},
+        "transit_pressure": {},
+        "transit_pressure_legend": {},
+        "divisional_support": {},
+        "topic_signals": {},
+        "top_supports": [],
+        "top_risks": [],
+        "topic_band": "mixed",
+        "dominant_houses": [],
+        "activation_mechanisms": [],
+        "answer_mode": answer_mode,
+    }
+
+
 def _instant_parashari_instruction_block(
     category: str,
     mode: str,
@@ -3942,6 +4500,8 @@ def _instant_parashari_instruction_block(
                 "- `normalized_evidence.remedy_blueprint.remedy_sections`: use these sections to organize the reply. Prefer the strongest 2-4 sections, not every possible remedy layer.",
                 "- `normalized_evidence.remedy_blueprint.constructive_house_expression`: this is the biggest remedy layer. Use it first when the user can solve the issue by expressing the planet through a positive house function.",
                 "- `normalized_evidence.remedy_blueprint.remedy_sections.gemstones`: surface this when suitable. Keep gemstone advice optional, specific to the strongest planet, and suitability-dependent.",
+                "- `normalized_evidence.remedy_blueprint.remedy_sections.biological`: include this as the biological / tree-based remedy layer when available.",
+                "- `normalized_evidence.remedy_blueprint.remedy_sections.nakshatra`: include this as a distinct nakshatra remedy layer when available; mention shakti, deity, vriksha, mantra, and the actionable remedy.",
                 "- `normalized_evidence.remedy_blueprint.special_points`: use Mudakku, Gandanta, and Mrityu Bhaga only when present. Explain them briefly and precisely.",
                 "- `normalized_evidence.remedy_blueprint.follow_up_prompts`: use these to propose the next remedy question, not as a new diagnosis.",
                 "- `normalized_evidence.remedy_blueprint.caution`: use this to avoid overcommitting to gemstones or too many remedies at once.",
@@ -3984,12 +4544,15 @@ def _instant_parashari_instruction_block(
                 f"This answer uses universal answer mode `{answer_mode}`.",
                 "CRITICAL: Follow the method instructions below exactly.",
                 "CRITICAL: Act like an investigator — support, obstruction, and uncertainty before the verdict.",
-                "CRITICAL: Use the ranked next ~3-year Vimshottari horizon in `instant_parashari.forward_event_dasha_scan` together with current activation. Do not answer as if only 'right now' exists unless the horizon list is empty.",
+                "CRITICAL: Use the ranked next ~3-year Vimshottari horizon in `normalized_evidence.forward_event_dasha_scan` together with current activation. Do not answer as if only 'right now' exists unless the horizon list is empty.",
                 "CRITICAL: Obey `instant_parashari.timing_policy` as hard rules (especially for children/teens). If restrictions forbid a near-term marriage or similar claim, comply fully.",
                 "CRITICAL: Start with the active dasha chain itself. Usually explain MD first, then AD, then PD if relevant. For each one, say what houses it rules, where it sits natally, and whether a conjunction materially modifies it before you jump to the event verdict.",
                 "CRITICAL: For asked windows (like a year), use `instant_parashari.window_dasha_segments` phase-by-phase. For open-ended lifetime-style event timing, use `instant_parashari.horizon_dasha_segments` phase-by-phase across the next 3 years. Do not collapse the full horizon into one single dasha pair.",
                 "CRITICAL: Score confidence higher when active dasha lords are transiting on or aspecting their natal houses (already encoded in segment scoring and reasons).",
                 "CRITICAL: Your response will be marked failed if you mention only the current MD/AD when `forward_event_dasha_scan` or `horizon_dasha_segments` show stronger later AD/PD windows inside the next 3 years.",
+                "CRITICAL: Use `normalized_evidence.event_timing_verdict` as the final comparison contract. Its `comparison`, `score_delta`, `answer_rule`, `required_answer_points`, and `forbidden_answer_moves` override your own interpretation of raw scores.",
+                "CRITICAL: Use `normalized_evidence.event_timing_verdict.answer_event_label` to name the asked event plainly in the opening sentence. For example: 'For having a child...' or 'For promotion...'. Do not hide the topic behind vague wording like 'this event' unless the label itself is general.",
+                "CRITICAL: If event_timing_verdict says the future is only slightly cleaner/stronger, do not call it clearly superior or overwhelmingly better. If it says current_window exists, acknowledge current activation.",
                 "CRITICAL: When AD or PD changes across the horizon materially change the event support, mention that shift explicitly instead of smoothing all years into one generic trend.",
                 "CRITICAL: If a ranked horizon row is marked `current window`, describe it as already active now or ongoing now. Do not phrase that row as if the same MD/AD/PD combination will start in the future.",
                 "CRITICAL: If the current broader MD/AD pair continues into a later stronger sub-phase, say it is the same ongoing MD/AD period with a later shift in PD or support level. Do not describe that later strengthening as if the MD/AD pair itself begins only then.",
@@ -4012,8 +4575,11 @@ def _instant_parashari_instruction_block(
                 "CRITICAL: Keep two lanes separate: current dasha naming comes only from `normalized_evidence.current_timing.authoritative_current_dasha_display`, while future timing windows come only from `forward_event_dasha_scan` and `horizon_dasha_segments`. Do not let future-window planets overwrite the current chain.",
                 "- `instant_parashari.horizon_transit_anchors`: optional Jupiter/Saturn sign+house at start and end of the horizon; use as a light confirmation layer, not a replacement for dasha.",
                 "- `instant_parashari.window_dasha_segments`: this is the phase timeline for the asked window with MD/AD/PD, activated houses, and reinforcement reasons. Use top segments first.",
-                "- `instant_parashari.horizon_dasha_segments`: this is the ranked next-3-year phase timeline with MD/AD/PD and reinforcement reasons. Use it for open-ended event timing to show where the support strengthens or weakens.",
+                "- `normalized_evidence.horizon_dasha_segments`: this is the ranked next-3-year phase timeline with MD/AD/PD and reinforcement reasons. Use it for open-ended event timing to show where the support strengthens or weakens.",
                 "- `normalized_evidence.primary_drivers`: includes compact horizon lines — cite them when you name future windows.",
+                "- `normalized_evidence.event_timing_verdict`: this is the backend ruleset synthesis for current-vs-future timing strength. Follow it before raw horizon rows.",
+                "- `normalized_evidence.event_timing_verdict.answer_event_label`: use this exact plain-language event label early so the answer is clearly about the user's asked event.",
+                "CRITICAL: If `normalized_evidence.divisional_specifics` contains concrete support and divisional mentions are allowed, mention the strongest relevant divisional chart code in the answer for credibility. Keep it compact, for example: 'D10 also supports the career side...' or 'D7 adds support for children...'.",
                 "- `activation_mechanisms` and `active_dashas_formatted`: current-period mechanisms; combine with horizon windows (near vs later activation).",
                 "- `normalized_evidence.dasha_level_effects`: this is critical. Use it to build explicit astrological reasoning such as 'Mercury rules houses 3 and 12, sits in natal house 8, and is conjunct Ketu, so ...'.",
                 "- `normalized_evidence.current_timing.active_dashas`: this is the authoritative source for the current MD/AD/PD planets and their natal metadata, including conjunctions when present.",
@@ -4022,7 +4588,7 @@ def _instant_parashari_instruction_block(
                 "Do not convert a generic 8th-house, dusthana, or pressure signal into a specific story like paperwork trouble, loan restructuring, legal blocks, or sudden cancellation unless that concrete angle is supported by the provided reasons, topic_signals, or activated focus houses.",
                 "If forward_event_dasha_scan.periods is empty, say horizon scan was thin and lean on current dasha plus divisional/topic signals without inventing dated sub-periods.",
                 "Do not invent calendar dates or months beyond what the ranked periods and current evidence can support.",
-                "Prefer explicit astrological causation over vague prose. Instead of saying 'preparation phase' or 'internal adjustment,' explain which lordship, natal house, aspect pattern, or conjunction is producing that meaning.",
+                "Avoid vague filler such as 'preparation phase', 'internal adjustment', or 'energy is shifting'. If current support is weaker than a later window, name the exact dasha reason, house link, conjunction, or transit reason from the evidence.",
                 "Keep the answer concise: usually 2–5 short paragraphs for instant mode.",
             ]
         )
@@ -4089,6 +4655,8 @@ def _instant_parashari_instruction_block(
             "- `normalized_evidence.claim_gates`: obey these as hard gates. If a gate is false, do not mention that claim type at all.",
             "- `normalized_evidence.stable_transits`: for month-style answers, use these slow-planet placements if you need transit anchors. Do not narrate the whole month from a one-day Sun or Moon snapshot.",
             "- `normalized_evidence.window_rules`: obey these explicitly for month/window answers, especially the snapshot warning.",
+            "If `normalized_evidence.window_rules.day_like` is true, answer as an exact-day outlook: name the date/window, use MD/AD/PD plus Sookshma/Prana when present, and keep fast transits limited to that day.",
+            "If `normalized_evidence.window_rules.year_like` is true, answer as an annual outlook: use phase-wise `window_dasha_segments`, mention stronger/weaker parts of the year, and do not narrate the year from a single transit snapshot.",
             "- `normalized_evidence.contradiction_flags`: if present, explicitly balance the answer instead of sounding absolute.",
             "- `active_dashas`: this is compact activation metadata. Use it for mechanism support only. Do not treat it as the authoritative source for the current MD/AD/PD names when `normalized_evidence.current_timing.active_dashas` or `authoritative_current_dasha_chain` is present.",
             "- `house_activation`: this shows whether the important houses are being activated by rulership, occupation, or aspect from active dasha lords. This should drive the core interpretation.",
@@ -4151,6 +4719,97 @@ def _planet_row(planet_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _fmt_dt_date(value: Any) -> str:
+    if hasattr(value, "strftime"):
+        return value.strftime("%Y-%m-%d")
+    return str(value or "")
+
+
+def _dasha_timeline_needs_from_plan(evidence_plan: Any) -> List[Dict[str, Any]]:
+    if not isinstance(evidence_plan, dict):
+        return []
+    needs = evidence_plan.get("evidence_needs")
+    if not isinstance(needs, list):
+        return []
+    return [
+        need
+        for need in needs
+        if isinstance(need, dict)
+        and str(need.get("kind") or "") == "dasha_timeline_lookup"
+    ]
+
+
+def _build_named_dasha_lookup_from_evidence_plan(
+    *,
+    evidence_plan: Any,
+    current_dashas: Dict[str, Any],
+    as_of: datetime,
+) -> Dict[str, Any]:
+    timeline_needs = _dasha_timeline_needs_from_plan(evidence_plan)
+    if not timeline_needs:
+        return {}
+
+    maha_dashas = list((current_dashas or {}).get("maha_dashas") or [])
+    requested_planets: List[str] = []
+    requested_levels: List[str] = []
+    matches: List[Dict[str, Any]] = []
+
+    for need in timeline_needs:
+        params = need.get("params") if isinstance(need.get("params"), dict) else {}
+        planet = str(params.get("planet") or "").strip()
+        level = str(params.get("level") or "mahadasha").strip().lower()
+        operation = str(params.get("operation") or "find_start_end").strip()
+        if not planet or level != "mahadasha" or operation not in {"get_current", "find_start_end", "find_next", "list_periods"}:
+            continue
+        if planet not in requested_planets:
+            requested_planets.append(planet)
+        if level not in requested_levels:
+            requested_levels.append(level)
+        if maha_dashas:
+            current_match = None
+            future_match = None
+            for row in maha_dashas:
+                if not isinstance(row, dict) or str(row.get("planet") or "") != planet:
+                    continue
+                start = row.get("start")
+                end = row.get("end")
+                if isinstance(start, datetime) and isinstance(end, datetime) and start <= as_of <= end:
+                    current_match = row
+                    break
+                if isinstance(start, datetime) and start > as_of:
+                    if future_match is None or start < future_match.get("start"):
+                        future_match = row
+            row = current_match or future_match
+            if row:
+                relation = "current" if row is current_match else "future"
+                matches.append(
+                    {
+                        "level": "mahadasha",
+                        "planet": planet,
+                        "relation_to_as_of": relation,
+                        "start": _fmt_dt_date(row.get("start")),
+                        "end": _fmt_dt_date(row.get("end")),
+                        "years": row.get("years"),
+                        "authoritative_fact": (
+                            f"{planet} Mahadasha {'started' if relation == 'current' else 'starts'} "
+                            f"on {_fmt_dt_date(row.get('start'))} and ends on {_fmt_dt_date(row.get('end'))}."
+                        ),
+                    }
+                )
+
+    if not matches:
+        return {}
+    return {
+        "source": "shared_dasha_calculator.maha_dashas",
+        "planner_source": "evidence_plan.dasha_timeline_lookup",
+        "as_of": _fmt_dt_date(as_of),
+        "requested_planets": requested_planets,
+        "requested_levels": requested_levels,
+        "matches": matches,
+        "instruction": "For named dasha start/date questions, treat matches[].authoritative_fact as exact. Do not infer or substitute a transit/event window date.",
+    }
+
+
 def _build_instant_context(
     birth_data: Dict[str, Any],
     question: str,
@@ -4175,13 +4834,20 @@ def _build_instant_context(
     query_context = (intent or {}).get("query_context") if isinstance((intent or {}).get("query_context"), dict) else None
     extracted_context = (intent or {}).get("extracted_context") if isinstance((intent or {}).get("extracted_context"), dict) else {}
     now_local = resolve_query_now(query_context)
-    period_window = _resolve_period_window(intent, now_local)
+    period_window = _resolve_period_window(intent, now_local, question)
     time_relation = _period_time_relation(period_window, now_local)
-    dasha_anchor = _period_anchor_datetime(period_window, now_local)
+    dasha_anchor = _as_naive_local_datetime(_period_anchor_datetime(period_window, now_local))
     dasha_calc = DashaCalculator()
     current_dashas = dasha_calc.calculate_current_dashas(birth_data, dasha_anchor)
+    evidence_plan = (intent or {}).get("evidence_plan") if isinstance((intent or {}).get("evidence_plan"), dict) else {}
+    named_dasha_lookup = _build_named_dasha_lookup_from_evidence_plan(
+        evidence_plan=evidence_plan,
+        current_dashas=current_dashas,
+        as_of=dasha_anchor,
+    )
     authoritative_dasha_context: Dict[str, Any] = {}
     dasha_calc_fallback = _is_dasha_calculator_fallback_payload(current_dashas)
+    dasha_payload_untrusted = bool(dasha_calc_fallback)
     if not dasha_calc_fallback:
         authoritative_dasha_context = _authoritative_active_dasha_context(
             current_dashas,
@@ -4191,8 +4857,28 @@ def _build_instant_context(
         )
     else:
         logger.warning(
-            "DashaCalculator fallback payload detected for instant context; retaining payload-derived dasha context."
+            "DashaCalculator fallback payload detected for instant context; trying standard chat current dasha path."
         )
+        standard_current_dashas = _standard_chat_current_dashas(birth_data, chart_data, house_lordships)
+        if standard_current_dashas and not _is_dasha_calculator_fallback_payload(standard_current_dashas):
+            current_dashas = standard_current_dashas
+            dasha_calc_fallback = False
+            authoritative_dasha_context = _authoritative_active_dasha_context(
+                current_dashas,
+                chart_data,
+                house_lordships,
+                period_window,
+            )
+            logger.info(
+                "SPEECH_DEBUG instant_dasha_standard_fallback md=%s ad=%s pd=%s",
+                ((current_dashas.get("mahadasha") or {}).get("planet") or ""),
+                ((current_dashas.get("antardasha") or {}).get("planet") or ""),
+                ((current_dashas.get("pratyantardasha") or {}).get("planet") or ""),
+            )
+        else:
+            logger.warning(
+                "Standard chat current dasha fallback unavailable for instant context; current dasha names will be omitted."
+            )
     specific_date = str(extracted_context.get("specific_date") or (intent or {}).get("dasha_as_of") or "").strip()
     transit_anchor = dasha_anchor
     if specific_date and str((period_window or {}).get("kind") or "") == "day":
@@ -4288,35 +4974,56 @@ def _build_instant_context(
             house_lordships,
             forced_period_window,
         )
-    try:
-        instant_parashari = _compact_parashari_evidence(
-            birth_data=birth_data,
-            question=question,
-            intent=intent,
-            period_window=period_window,
+    if answer_mode == "event_prediction":
+        instant_parashari = _lightweight_event_parashari_evidence(
+            category=category,
+            focus_houses=list(focus["houses"]),
+            answer_mode=answer_mode,
         )
-    except Exception as exc:
-        logger.warning("instant parashari evidence build failed: %s", exc)
-        instant_parashari = {
-            "source": "fallback",
-            "category": category,
-            "focus_houses": focus["houses"],
-            "topic_key": PARASHARI_TOPIC_MAP.get(category),
-            "active_dashas": {},
-            "active_dashas_formatted": {},
-            "house_activation": {},
-            "transit_pressure": {},
-            "divisional_support": {},
-            "topic_signals": {},
-            "top_supports": [],
-            "top_risks": [],
-            "topic_band": "mixed",
-            "dominant_houses": [],
-            "activation_mechanisms": [],
-            "answer_mode": answer_mode,
-        }
     else:
-        instant_parashari["answer_mode"] = answer_mode
+        try:
+            instant_parashari = _compact_parashari_evidence(
+                birth_data=birth_data,
+                question=question,
+                intent=intent,
+                period_window=period_window,
+            )
+        except Exception as exc:
+            logger.warning("instant parashari evidence build failed: %s", exc)
+            instant_parashari = {
+                "source": "fallback",
+                "category": category,
+                "focus_houses": focus["houses"],
+                "topic_key": PARASHARI_TOPIC_MAP.get(category),
+                "active_dashas": {},
+                "active_dashas_formatted": {},
+                "house_activation": {},
+                "transit_pressure": {},
+                "divisional_support": {},
+                "topic_signals": {},
+                "top_supports": [],
+                "top_risks": [],
+                "topic_band": "mixed",
+                "dominant_houses": [],
+                "activation_mechanisms": [],
+                "answer_mode": answer_mode,
+            }
+        else:
+            instant_parashari["answer_mode"] = answer_mode
+    if dasha_payload_untrusted:
+        for key in (
+            "active_dashas",
+            "active_dashas_formatted",
+            "house_activation",
+            "activation_mechanisms",
+            "dominant_houses",
+            "top_supports",
+            "top_risks",
+        ):
+            if key in {"top_supports", "top_risks", "dominant_houses", "activation_mechanisms"}:
+                instant_parashari[key] = []
+            else:
+                instant_parashari[key] = {}
     
     # Refine category and focus from what the compact evidence found (px.get("cat"))
     category = instant_parashari.get("category") or category
@@ -4328,6 +5035,9 @@ def _build_instant_context(
     elif authoritative_dasha_context:
         instant_parashari["active_dashas_formatted"] = authoritative_dasha_context
         instant_parashari["active_dasha_source"] = "dasha_calculator_authoritative"
+    elif dasha_calc_fallback:
+        instant_parashari["active_dashas_formatted"] = {}
+        instant_parashari["active_dasha_source"] = "unavailable"
     instant_parashari["active_dashas_formatted"] = _enrich_active_dasha_context_with_conjunctions(
         instant_parashari.get("active_dashas_formatted") or {},
         chart_data,
@@ -4344,6 +5054,21 @@ def _build_instant_context(
             life_stage=life_stage,
             category=category,
         )
+        event_horizon_raw_periods: Optional[List[Dict[str, Any]]] = None
+        event_horizon_start = datetime.utcnow()
+        try:
+            event_horizon_raw_periods = dasha_calc.get_dasha_periods_for_range(
+                birth_data,
+                _as_naive_local_datetime(now_local),
+                _as_naive_local_datetime(now_local + timedelta(days=_INSTANT_EVENT_HORIZON_DAYS)),
+            )
+            logger.info(
+                "SPEECH_PERF event_horizon_dasha_periods rows=%s elapsed_ms=%s",
+                len(event_horizon_raw_periods or []),
+                round((datetime.utcnow() - event_horizon_start).total_seconds() * 1000, 1),
+            )
+        except Exception as exc:
+            logger.warning("event horizon dasha period prebuild failed: %s", exc)
         instant_parashari["forward_event_dasha_scan"] = _build_forward_event_dasha_scan(
             birth_data=birth_data,
             now_local=now_local,
@@ -4354,6 +5079,7 @@ def _build_instant_context(
             transit_calc=transit_calc,
             ascendant_longitude=ascendant_longitude,
             current_dashas=current_dashas,
+            raw_periods=event_horizon_raw_periods,
         )
         instant_parashari["horizon_transit_anchors"] = _horizon_jupiter_saturn_anchors(
             transit_calc,
@@ -4370,8 +5096,9 @@ def _build_instant_context(
             transit_calc=transit_calc,
             ascendant_longitude=ascendant_longitude,
             category=category,
+            raw_periods=event_horizon_raw_periods,
         )
-    if str((period_window or {}).get("kind") or "") == "window":
+    if str((period_window or {}).get("kind") or "") in {"day", "window"}:
         instant_parashari["window_dasha_segments"] = _window_dasha_segments_for_period(
             birth_data=birth_data,
             chart_data=chart_data,
@@ -4384,6 +5111,36 @@ def _build_instant_context(
         )
 
     current_dashas_context = instant_parashari.get("active_dashas_formatted") or {}
+    try:
+        logger.info(
+            "SPEECH_DEBUG instant_dasha_context answer_mode=%s category=%s source=%s dasha_anchor=%s active_source=%s authoritative_md=%s authoritative_ad=%s authoritative_pd=%s birth=%s %s %s",
+            answer_mode,
+            category,
+            instant_parashari.get("source"),
+            dasha_anchor.strftime("%Y-%m-%d %H:%M:%S"),
+            instant_parashari.get("active_dasha_source"),
+            ((current_dashas_context.get("md") or {}).get("planet") or ""),
+            ((current_dashas_context.get("ad") or {}).get("planet") or ""),
+            ((current_dashas_context.get("pd") or {}).get("planet") or ""),
+            birth_data.get("date"),
+            birth_data.get("time"),
+            birth_data.get("timezone"),
+        )
+    except Exception:
+        pass
+    if answer_mode == "event_prediction":
+        event_divisional = _requested_event_divisional_support(
+            birth_data=birth_data,
+            question=question,
+            intent=intent,
+            category=category,
+            focus_houses=list(focus["houses"]),
+            current_dashas_context=current_dashas_context,
+        )
+        if event_divisional.get("divisional_support"):
+            instant_parashari["divisional_support"] = event_divisional["divisional_support"]
+        if event_divisional.get("navamsa_root_fruit"):
+            instant_parashari["navamsa_root_fruit"] = event_divisional["navamsa_root_fruit"]
     current_transits_context = _format_transit_context(transit_rows)
     target_chart_context = _build_target_chart_context(
         birth_summary,
@@ -4472,6 +5229,8 @@ def _build_instant_context(
             question=question,
             chart_data=chart_data,
             house_lordships=house_lordships,
+            named_dasha_lookup=named_dasha_lookup,
+            evidence_plan=evidence_plan,
         )
 
     is_general_month_window = (
@@ -4646,11 +5405,13 @@ def _build_instant_context(
             "extracted_context": (intent or {}).get("extracted_context") or {},
             "target_subject": target_subject or {"key": "self", "label": "self", "base_house": 1},
         },
+        "evidence_plan": evidence_plan,
         "natal_snapshot": evidence_natal_snapshot if is_non_self_target else natal_snapshot,
         "target_chart_context": target_chart_context,
         "current_dashas": {
             "as_of": dasha_anchor.strftime("%Y-%m-%d"),
             "levels": prompt_current_dashas_levels,
+            "named_dasha_lookup": named_dasha_lookup,
         },
         "current_transits": prompt_current_transits,
         "current_transits_formatted": prompt_transits_context,
@@ -4658,6 +5419,7 @@ def _build_instant_context(
         "normalized_evidence": prompt_normalized_evidence,
         "recent_history": recent_history,
         "complexity_hint": complexity_hint,
+        "named_dasha_lookup": named_dasha_lookup,
     }
 
 
@@ -4697,6 +5459,352 @@ def _parse_speech_followups_from_answer(raw: str) -> tuple[str, List[str]]:
     return answer, out
 
 
+def _strip_speech_answer_greeting(text: str) -> str:
+    """Speech chat already greets the user before the answer; remove model re-introductions."""
+    cleaned = str(text or "").strip()
+    if not cleaned:
+        return ""
+    cleaned = re.sub(
+        r"^\s*(?:hello|hi|hey|namaste|नमस्ते|नमस्कार)\s+[^,.!?।]{1,40}[,.!?।]\s*",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    ).strip()
+    cleaned = re.sub(
+        r"^\s*(?:hello|hi|hey|namaste|नमस्ते|नमस्कार)[,.!?।]\s*",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    ).strip()
+    cleaned = re.sub(
+        r"^\s*(?:i\s*(?:am|'m)\s+tara|this\s+is\s+tara|मैं\s+तारा\s+हूँ)[,.!?।]?\s*",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    ).strip()
+    return cleaned or str(text or "").strip()
+
+
+def _json_size(value: Any) -> int:
+    try:
+        return len(json.dumps(value, ensure_ascii=False, default=str, separators=(",", ":")))
+    except Exception:
+        return 0
+
+
+def _only_keys(value: Any, keys: set[str]) -> Dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    return {k: value.get(k) for k in keys if k in value and value.get(k) not in (None, "", [], {})}
+
+
+def _compact_topic_signals(topic_signals: Any, focus_houses: List[int]) -> Dict[str, Any]:
+    if not isinstance(topic_signals, dict):
+        return {}
+    out = _only_keys(
+        topic_signals,
+        {"score", "tone", "pattern", "risk", "body", "charak", "charak_agent", "dom", "hs", "dv", "yg"},
+    )
+    hh = topic_signals.get("hh") if isinstance(topic_signals.get("hh"), dict) else {}
+    if hh:
+        keep_houses = {str(h) for h in (focus_houses or [])}
+        keep_houses.update(str(h) for h in (topic_signals.get("dom") or [])[:3])
+        out["hh"] = {
+            k: _only_keys(v, {"sc", "cg", "txt"})
+            for k, v in hh.items()
+            if str(k) in keep_houses and isinstance(v, dict)
+        }
+    if isinstance(out.get("body"), list):
+        out["body"] = out["body"][:4]
+    return out
+
+
+def _compact_divisional_support(divisional_support: Any) -> Dict[str, Any]:
+    if not isinstance(divisional_support, dict):
+        return {}
+    out: Dict[str, Any] = {}
+    if divisional_support.get("requested_charts"):
+        out["requested_charts"] = list(divisional_support.get("requested_charts") or [])[:8]
+    if divisional_support.get("available_charts"):
+        out["available_charts"] = list(divisional_support.get("available_charts") or [])[:8]
+    if divisional_support.get("skipped_charts"):
+        out["skipped_charts"] = list(divisional_support.get("skipped_charts") or [])[:8]
+    for bucket_name in ("topic", "current_topic"):
+        bucket = divisional_support.get(bucket_name)
+        if not isinstance(bucket, dict):
+            continue
+        charts_out: Dict[str, Any] = {}
+        charts = bucket.get("charts") if isinstance(bucket.get("charts"), dict) else {}
+        for code, chart in charts.items():
+            if not isinstance(chart, dict):
+                continue
+            charts_out[str(code)] = {
+                "support": chart.get("support"),
+                "best": list(chart.get("best") or [])[:3],
+                "hard": list(chart.get("hard") or [])[:3],
+                "rows": list(chart.get("rows") or [])[:3],
+            }
+        out[bucket_name] = {
+            "support": bucket.get("support"),
+            "codes": bucket.get("codes"),
+            "charts": charts_out,
+        }
+    return out
+
+
+def _compact_window_segments(window_segments: Any, as_of: str, *, limit: int = 6) -> Dict[str, Any]:
+    if not isinstance(window_segments, dict):
+        return {}
+    segments = [s for s in (window_segments.get("segments") or []) if isinstance(s, dict)]
+    if not segments:
+        return _only_keys(window_segments, {"enabled", "label", "focus_houses"})
+    selected: List[Dict[str, Any]] = []
+    as_of_dt = _parse_ymd(as_of)
+
+    def add(seg: Dict[str, Any]) -> None:
+        key = (seg.get("start"), seg.get("end"), seg.get("mahadasha"), seg.get("antardasha"), seg.get("pratyantardasha"))
+        for existing in selected:
+            existing_key = (
+                existing.get("start"),
+                existing.get("end"),
+                existing.get("mahadasha"),
+                existing.get("antardasha"),
+                existing.get("pratyantardasha"),
+            )
+            if existing_key == key:
+                return
+        selected.append(
+            {
+                "start": seg.get("start"),
+                "end": seg.get("end"),
+                "mahadasha": seg.get("mahadasha"),
+                "antardasha": seg.get("antardasha"),
+                "pratyantardasha": seg.get("pratyantardasha"),
+                "relevance_score": seg.get("relevance_score"),
+                "activated_focus_houses": seg.get("activated_focus_houses"),
+                "why": seg.get("why"),
+            }
+        )
+
+    if as_of_dt:
+        for seg in segments:
+            st = _parse_ymd(seg.get("start"))
+            en = _parse_ymd(seg.get("end"))
+            if st and en and st <= as_of_dt <= en:
+                add(seg)
+                break
+        for seg in segments:
+            st = _parse_ymd(seg.get("start"))
+            if st and st > as_of_dt:
+                add(seg)
+                break
+    for seg in sorted(
+        segments,
+        key=lambda row: (-(float(row.get("relevance_score") or 0)), str(row.get("start") or "")),
+    ):
+        add(seg)
+        if len(selected) >= limit:
+            break
+    return {
+        "enabled": bool(window_segments.get("enabled")),
+        "label": window_segments.get("label"),
+        "focus_houses": window_segments.get("focus_houses"),
+        "segments": selected[:limit],
+    }
+
+
+def _compact_forward_event_scan(scan: Any, *, limit: int = 6) -> Dict[str, Any]:
+    if not isinstance(scan, dict):
+        return {}
+    periods = [p for p in (scan.get("periods") or []) if isinstance(p, dict)]
+    compact_periods = [
+        {
+            "start": row.get("start"),
+            "end": row.get("end"),
+            "mahadasha": row.get("mahadasha"),
+            "antardasha": row.get("antardasha"),
+            "pratyantardasha": row.get("pratyantardasha"),
+            "relevance_score": row.get("relevance_score"),
+            "period_strength": row.get("period_strength"),
+            "period_label": row.get("period_label"),
+            "time_status": row.get("time_status"),
+            "activated_focus_houses": row.get("activated_focus_houses"),
+            "why": row.get("why"),
+        }
+        for row in periods[:limit]
+    ]
+    return {
+        "horizon_days": scan.get("horizon_days"),
+        "horizon_end": scan.get("horizon_end"),
+        "focus_houses": scan.get("focus_houses"),
+        "periods": compact_periods,
+    }
+
+
+def _compact_planet_map(planets: Any, keep_planets: set[str]) -> Dict[str, Any]:
+    if not isinstance(planets, dict):
+        return {}
+    out: Dict[str, Any] = {}
+    for planet, row in planets.items():
+        if keep_planets and str(planet) not in keep_planets:
+            continue
+        if isinstance(row, dict):
+            out[str(planet)] = _only_keys(
+                row,
+                {
+                    "sign",
+                    "house",
+                    "house_from_lagna",
+                    "house_from_target",
+                    "native_house",
+                    "degree",
+                    "retrograde",
+                    "nakshatra",
+                },
+            )
+    return out
+
+
+def _compact_context_for_speech(instant_context: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(instant_context, dict):
+        return {}
+    intent_summary = dict(instant_context.get("intent_summary") or {})
+    current_dashas = dict(instant_context.get("current_dashas") or {})
+    named_dasha_lookup = (
+        instant_context.get("named_dasha_lookup")
+        if isinstance(instant_context.get("named_dasha_lookup"), dict)
+        else current_dashas.get("named_dasha_lookup")
+        if isinstance(current_dashas.get("named_dasha_lookup"), dict)
+        else {}
+    )
+    dasha_levels = current_dashas.get("levels") if isinstance(current_dashas.get("levels"), dict) else {}
+    active_planets = {
+        str((row or {}).get("planet"))
+        for row in (dasha_levels or {}).values()
+        if isinstance(row, dict) and row.get("planet")
+    }
+    focus_planets = {str(p) for p in (intent_summary.get("focus_planets") or []) if p}
+    focus_planets.update(str(p) for p in (named_dasha_lookup.get("requested_planets") or []) if p)
+    keep_planets = active_planets | focus_planets | {"Jupiter", "Saturn", "Rahu", "Ketu"}
+    focus_houses = list(intent_summary.get("focus_houses") or [])
+    normalized = instant_context.get("normalized_evidence") if isinstance(instant_context.get("normalized_evidence"), dict) else {}
+    parashari = instant_context.get("instant_parashari") if isinstance(instant_context.get("instant_parashari"), dict) else {}
+    target_ctx = instant_context.get("target_chart_context") if isinstance(instant_context.get("target_chart_context"), dict) else {}
+    is_self_target = str((intent_summary.get("target_subject") or {}).get("key") or target_ctx.get("key") or "self") == "self"
+
+    topic_confirmation = dict(normalized.get("topic_confirmation") or {})
+    topic_signals = topic_confirmation.get("topic_signals") if isinstance(topic_confirmation.get("topic_signals"), dict) else {}
+    topic_confirmation["topic_signals"] = _compact_topic_signals(topic_signals, focus_houses)
+
+    stable_transits = normalized.get("stable_transits") or {}
+    if not stable_transits:
+        stable_transits = (instant_context.get("current_transits") or {}).get("planets") if isinstance(instant_context.get("current_transits"), dict) else {}
+
+    compact_normalized = {
+        "answer_mode_contract": normalized.get("answer_mode_contract"),
+        "primary_drivers": list(normalized.get("primary_drivers") or [])[:5],
+        "secondary_modifiers": list(normalized.get("secondary_modifiers") or [])[:4],
+        "current_timing": normalized.get("current_timing"),
+        "event_timing_verdict": normalized.get("event_timing_verdict"),
+        "named_dasha_lookup": named_dasha_lookup or normalized.get("named_dasha_lookup"),
+        "dasha_level_effects": list(normalized.get("dasha_level_effects") or [])[:5],
+        "dasha_chain_synthesis": list(normalized.get("dasha_chain_synthesis") or [])[:4],
+        "active_areas": list(normalized.get("active_areas") or [])[:4],
+        "window_area_mechanisms": list(normalized.get("window_area_mechanisms") or [])[:4],
+        "topic_confirmation": topic_confirmation,
+        "divisional_specifics": list(normalized.get("divisional_specifics") or [])[:3],
+        "risk_specifics": list(normalized.get("risk_specifics") or [])[:3],
+        "stable_transits": _compact_planet_map(stable_transits, keep_planets),
+        "claim_gates": normalized.get("claim_gates"),
+        "window_rules": normalized.get("window_rules"),
+        "contradiction_flags": list(normalized.get("contradiction_flags") or [])[:3],
+        "avoid_drift": list(normalized.get("avoid_drift") or [])[:4],
+        "window_dasha_segments": _compact_window_segments(
+            normalized.get("window_dasha_segments") or parashari.get("window_dasha_segments"),
+            str(current_dashas.get("as_of") or ""),
+        ),
+        "forward_event_dasha_scan": _compact_forward_event_scan(
+            normalized.get("forward_event_dasha_scan") or parashari.get("forward_event_dasha_scan"),
+        ),
+        "horizon_dasha_segments": _compact_window_segments(
+            normalized.get("horizon_dasha_segments") or parashari.get("horizon_dasha_segments"),
+            str(current_dashas.get("as_of") or ""),
+        ),
+        "target_subject": normalized.get("target_subject") or intent_summary.get("target_subject"),
+    }
+    compact_normalized = {k: v for k, v in compact_normalized.items() if v not in (None, "", [], {})}
+
+    compact_parashari = {
+        "source": parashari.get("source"),
+        "category": parashari.get("category"),
+        "topic_key": parashari.get("topic_key"),
+        "divisional_support": _compact_divisional_support(parashari.get("divisional_support")),
+        "answer_mode": parashari.get("answer_mode"),
+        "period_window": parashari.get("period_window"),
+        "time_relation": parashari.get("time_relation"),
+        "focus_houses": parashari.get("focus_houses"),
+        "active_dasha_source": parashari.get("active_dasha_source"),
+        "active_dashas_formatted": parashari.get("active_dashas_formatted"),
+        "named_dasha_lookup": named_dasha_lookup or parashari.get("named_dasha_lookup"),
+        "activation_mechanisms": list(parashari.get("activation_mechanisms") or [])[:4],
+        "top_supports": list(parashari.get("top_supports") or [])[:4],
+        "top_risks": list(parashari.get("top_risks") or [])[:2],
+        "dominant_houses": list(parashari.get("dominant_houses") or [])[:3],
+        "topic_band": parashari.get("topic_band"),
+        "horizon_transit_anchors": parashari.get("horizon_transit_anchors"),
+    }
+    compact_parashari = {k: v for k, v in compact_parashari.items() if v not in (None, "", [], {})}
+
+    natal_snapshot = instant_context.get("natal_snapshot") if isinstance(instant_context.get("natal_snapshot"), dict) else {}
+    key_planets = natal_snapshot.get("key_planets") if isinstance(natal_snapshot.get("key_planets"), dict) else {}
+    compact_natal = {
+        "house_lordships": natal_snapshot.get("house_lordships"),
+        "key_planets": _compact_planet_map(key_planets, keep_planets),
+    }
+    compact_natal = {k: v for k, v in compact_natal.items() if v not in (None, "", [], {})}
+
+    compact_target = {
+        "key": target_ctx.get("key"),
+        "label": target_ctx.get("label"),
+        "anchor_house": target_ctx.get("anchor_house"),
+        "target_ascendant_sign": target_ctx.get("target_ascendant_sign"),
+        "target_house_lordships": target_ctx.get("target_house_lordships"),
+    }
+    if not is_self_target:
+        compact_target["target_key_planets"] = _compact_planet_map(target_ctx.get("target_key_planets") or {}, keep_planets)
+        compact_target["target_transits"] = _compact_planet_map(target_ctx.get("target_transits") or {}, keep_planets)
+    compact_target = {k: v for k, v in compact_target.items() if v not in (None, "", [], {})}
+
+    compact_transits = {
+        "as_of_local": (instant_context.get("current_transits") or {}).get("as_of_local")
+        if isinstance(instant_context.get("current_transits"), dict)
+        else None,
+        "planets": _compact_planet_map(
+            (instant_context.get("current_transits") or {}).get("planets")
+            if isinstance(instant_context.get("current_transits"), dict)
+            else {},
+            keep_planets,
+        ),
+    }
+    compact_transits = {k: v for k, v in compact_transits.items() if v not in (None, "", [], {})}
+
+    return {
+        "birth_summary": instant_context.get("birth_summary"),
+        "intent_summary": intent_summary,
+        "evidence_plan": instant_context.get("evidence_plan") if isinstance(instant_context.get("evidence_plan"), dict) else {},
+        "natal_snapshot": compact_natal,
+        "target_chart_context": compact_target,
+        "current_dashas": current_dashas,
+        "named_dasha_lookup": named_dasha_lookup,
+        "current_transits": compact_transits,
+        "instant_parashari": compact_parashari,
+        "normalized_evidence": compact_normalized,
+        "recent_history": list(instant_context.get("recent_history") or [])[-1:],
+        "complexity_hint": instant_context.get("complexity_hint"),
+        "context_profile": "speech_compact_v1",
+    }
+
+
 def _build_instant_prompt(
     question: str,
     instant_context: Dict[str, Any],
@@ -4730,11 +5838,12 @@ Your job:
 - Use `instant_parashari` as the primary reasoning spine. That section already compresses the strongest current dasha, house activation, transit pressure, divisional support, and topic-specific Parashari signals.
 - Use the raw natal/dasha/transit fields only to support or clarify the Parashari reading, not to replace it.
 - Prefer short sentences and plain language; avoid lists, bullets, markdown, numbered steps, and long parenthetical asides (they are hard to follow by ear).
+- Avoid report-language in speech. Do not say "the astrological indicators suggest", "materialization window", "this event", or "these matters" when you can name the real topic directly.
 - Do not ask a new clarifying question inside the main answer; give your best answer from the evidence. Optional next steps go only in the follow-up block at the end.
 - Do not output HTML, JSON (except the required follow-up block after the answer), markdown tables, glossary blocks, FAQ_META, or internal tags.
 - Do not mention hidden reasoning, token limits, or model limitations.
 - Never invent missing chart data.
-- Introduce yourself only on the user's true opening turn if `recent_history` in context is empty; otherwise continue naturally without re-introducing Tara."""
+- The app has already played Tara's greeting before this answer. Never say hello, never address the user by name as a greeting, and never introduce yourself as Tara. Start directly with the astrological answer."""
         if speech_mode
         else """You are AstroRoshni Instant Chat, the fast conversational astrology lane.
 
@@ -4788,10 +5897,19 @@ Style rules:
 {length_rule}
 - If the user is only deferring or declining to ask (for example: "nothing for now", "no thanks", "not yet", "I'm good"), reply in one or two warm sentences. Do not analyze the chart, dashas, houses, or transits, and do not say you will look something up in the chart — there is no question to answer yet.
 - Lead with the direct answer in the first 1 to 2 sentences when there is a real astrological question.
+- If `named_dasha_lookup.matches` is present, use its `authoritative_fact` for the requested planet dasha start/end date. Do not infer a different date from transits, event windows, or current dasha summaries.
+- If `normalized_evidence.event_timing_verdict.answer_event_label` is present, name that event plainly in the first sentence. Avoid vague placeholders like "this event" or "these matters" as the only topic name.
+- In speech mode, sound like a live guide, not a report. Prefer openers like "For promotion, I would look most closely at..." or "For having a child, the cleaner window is..." Avoid stiff phrases such as "the astrological indicators suggest", "materialization window", "these matters", "this event", and "planetary influences".
+- In speech mode, do not repeat the same timing noun in every sentence. After naming the window once, use natural phrasing like "that phase", "that stretch", or "then" only when the reference is clear.
+- In speech mode, keep technical proof compact: name the dasha chain and 1 concrete reason from `allowed_house_themes` or `why`; do not narrate every activated house if it makes the answer sound mechanical.
+- If `normalized_evidence.divisional_specifics` has concrete D7, D9, D10, or Karkamsa evidence, mention one relevant chart code naturally. This is good credibility in speech, but keep it to one compact sentence unless the user asks for technical detail.
 - Mention the strongest current dasha or transit factor only when it genuinely helps clarity for this answer mode.
 - Start from `normalized_evidence.primary_drivers` and only then bring in `secondary_modifiers`.
 - Use `normalized_evidence.answer_mode_contract.answer_skeleton` as the structural backbone of the response.
-- If the question is about career, relationship, wealth, or health, use the corresponding `instant_parashari.topic_signals` and `divisional_support` to keep the answer precise.
+- For event-prediction answers, obey `normalized_evidence.event_timing_verdict.claim_contract` as a hard evidence gate. A focus house is only a possible topic house; it is not active in a timing window unless that same window lists it in `activated_focus_houses` or names it in `why`.
+- For event-prediction answers, never translate a raw line like "Jupiter rules focus house(s) [9]" into "Jupiter rules the progeny house" or another named domain house unless that exact domain house number is explicitly active in the same window. Safer wording is "Jupiter activates an event-relevant support house" or the exact house theme from `allowed_house_themes`.
+- For event-prediction answers, do not say "career house", "marriage house", "progeny house", "health house", or similar named-house claims unless the corresponding house number is active in that window. Use the listed `allowed_house_themes` instead.
+- If the question is about career, relationship, wealth, or health, use the corresponding topic signals and divisional specifics from `normalized_evidence` or `instant_parashari` to keep the answer precise.
 - If the question is about a specific facet inside a broader area, answer that facet directly from the house activation and dasha logic instead of widening the answer into a whole life summary.
 - If `intent_summary.target_subject.key` is not `self`, treat `target_chart_context` as the primary chart frame for that person instead of reading only from the native's direct Lagna context.
 - No decorative headers unless absolutely needed.
@@ -4819,12 +5937,20 @@ async def generate_instant_chat_response(
     if _is_conversational_non_question(question):
         return _conversational_ack_response(language, speech_mode=speech_mode)
 
-    mode_selection = await _infer_answer_mode_with_llm(
-        analyzer,
-        question=question,
-        intent=intent,
-        history=history,
-    )
+    mode_selection = _mode_selection_from_intent(intent)
+    if mode_selection:
+        logger.info(
+            "instant_answer_mode_from_intent answer_mode=%s target=%s",
+            mode_selection.get("answer_mode"),
+            (mode_selection.get("target_subject") or {}).get("key"),
+        )
+    else:
+        mode_selection = await _infer_answer_mode_with_llm(
+            analyzer,
+            question=question,
+            intent=intent,
+            history=history,
+        )
     if bool((mode_selection or {}).get("needs_year_clarification")):
         return _instant_lifetime_event_year_clarification_response(language, speech_mode=speech_mode)
     answer_mode = str((mode_selection or {}).get("answer_mode") or "topic_reading")
@@ -4837,7 +5963,39 @@ async def generate_instant_chat_response(
         answer_mode_override=answer_mode,
         target_subject_override=target_subject,
     )
-    prompt = _build_instant_prompt(question, instant_context, language, speech_mode=speech_mode)
+    prompt_context = instant_context
+    if speech_mode and _env_flag("SPEECH_COMPACT_CONTEXT", True):
+        compact_context = _compact_context_for_speech(instant_context)
+        full_chars = _json_size(instant_context)
+        compact_chars = _json_size(compact_context)
+        reduction_pct = round(((full_chars - compact_chars) / full_chars) * 100.0, 1) if full_chars else 0.0
+        logger.info(
+            "SPEECH_PERF speech_context_compact profile=speech_compact_v1 full_chars=%s compact_chars=%s reduction_pct=%s",
+            full_chars,
+            compact_chars,
+            reduction_pct,
+        )
+        prompt_context = compact_context
+    if speech_mode:
+        try:
+            if _env_flag("SPEECH_LOG_FULL_CONTEXT", False):
+                logger.info(
+                    "SPEECH_DEBUG instant_llm_context_full answer_mode=%s target_subject=%s question=%r context_json=%s",
+                    answer_mode,
+                    json.dumps(target_subject, ensure_ascii=False, default=str, sort_keys=True) if target_subject else "null",
+                    question,
+                    json.dumps(instant_context, ensure_ascii=False, default=str, sort_keys=True),
+                )
+            logger.info(
+                "SPEECH_DEBUG instant_llm_context_prompt answer_mode=%s target_subject=%s compact=%s context_json=%s",
+                answer_mode,
+                json.dumps(target_subject, ensure_ascii=False, default=str, sort_keys=True) if target_subject else "null",
+                bool(prompt_context is not instant_context),
+                json.dumps(prompt_context, ensure_ascii=False, default=str, sort_keys=True),
+            )
+        except Exception as exc:
+            logger.warning("SPEECH_DEBUG instant_llm_context_full_log_failed error=%s", str(exc)[:200])
+    prompt = _build_instant_prompt(question, prompt_context, language, speech_mode=speech_mode)
     model_name = get_gemini_instant_model()
     selected_model = analyzer.get_named_gemini_model(model_name, premium_analysis=False)
 
@@ -4886,10 +6044,16 @@ async def generate_instant_chat_response(
     raw_response = (llm_result.get("response") or "").strip()
     if speech_mode:
         response_text, speech_followups = _parse_speech_followups_from_answer(raw_response)
+        response_text = _strip_speech_answer_greeting(response_text)
     else:
         response_text = raw_response
         speech_followups = []
     parsed_response = ResponseParser.parse_images_in_chat_response(response_text)
+    response_content = parsed_response.get("content") or response_text
+    if speech_mode:
+        response_content = _strip_speech_answer_greeting(response_content)
+        response_content = _polish_speech_event_answer(response_content, prompt_context)
+        response_content = _truncate_speech_answer(response_content)
     next_action = parsed_response.get("next_action") or {}
     combined_followups = list(next_action.get("follow_up_questions") or parsed_response.get("follow_up_questions", []))
     if not combined_followups and speech_followups:
@@ -4904,7 +6068,7 @@ async def generate_instant_chat_response(
     )
     return {
         "success": True,
-        "response": parsed_response.get("content") or response_text,
+        "response": response_content,
         "error": None,
         "chat_llm_model": llm_result.get("chat_llm_model") or model_name,
         "timing": {
@@ -4915,7 +6079,7 @@ async def generate_instant_chat_response(
         },
         "token_usage": llm_result.get("token_usage") or {},
         "llm_prompt_chars": len(prompt),
-        "llm_response_chars": len(parsed_response.get("content") or response_text),
+        "llm_response_chars": len(response_content),
         "instant_llm_usage_stage": _build_instant_usage_stage(
             "instant_answer",
             llm_result.get("chat_llm_model") or model_name,

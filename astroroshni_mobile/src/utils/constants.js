@@ -36,6 +36,11 @@ export const COLORS = {
 import { Platform } from 'react-native';
 
 // API Configuration for AstroRoshni
+const ENV_API_BASE_URL = (
+  typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_BASE_URL
+    ? String(process.env.EXPO_PUBLIC_API_BASE_URL).trim()
+    : ''
+).replace(/\/+$/, '');
 // Set to true to test against local backend (emulator: Android 10.0.2.2:8001, iOS localhost:8001). Set false to use PROD (or TEST) below even while __DEV__ / Metro.
 const USE_DEV_API = false;
 // For simulator/emulator leave empty (uses localhost/10.0.2.2). For physical device set your machine IP, e.g. 'http://192.168.1.10:8001'
@@ -47,6 +52,8 @@ const PROD_API_URL = 'https://astroroshni.com';
 export const PAYMENT_SERVICE_BASE_URL = 'https://astroroshni-play-payment-service-800681558445.asia-south2.run.app';
 
 const getApiUrl = () => {
+  if (ENV_API_BASE_URL) return ENV_API_BASE_URL;
+
   if (__DEV__ && USE_DEV_API) {
     if (DEV_API_HOST) return DEV_API_HOST;
     if (Platform.OS === 'ios') return 'http://localhost:8001';
@@ -67,7 +74,15 @@ const getApiUrl = () => {
 export const API_BASE_URL = getApiUrl();
 
 /** Set true temporarily to log each API call (method, URL, whether token was loaded — never the token value). Watch Metro or Xcode console. Turn off before release. */
-export const DEBUG_API_REQUESTS = false;
+export const DEBUG_API_REQUESTS = (
+  __DEV__ ||
+  String(process.env?.EXPO_PUBLIC_DEBUG_API_REQUESTS || '').trim().toLowerCase() === '1' ||
+  String(process.env?.EXPO_PUBLIC_DEBUG_API_REQUESTS || '').trim().toLowerCase() === 'true'
+);
+
+if (__DEV__) {
+  console.log('[Config] API_BASE_URL', API_BASE_URL);
+}
 
 // Timeout configuration
 export const API_TIMEOUT = 6 * 60 * 1000; // 6 minutes (aligned with chat / life-predictions polling window)

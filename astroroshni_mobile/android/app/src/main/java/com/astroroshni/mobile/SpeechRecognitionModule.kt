@@ -12,14 +12,17 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.core.content.ContextCompat
 import com.facebook.react.bridge.*
+import com.facebook.react.modules.core.DeviceEventManagerModule
 import java.util.Locale
 
 class SpeechRecognitionModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext), RecognitionListener {
   companion object {
-    private const val MINIMUM_LISTENING_MILLIS = 2500L
-    private const val COMPLETE_SILENCE_MILLIS = 1800L
-    private const val POSSIBLY_COMPLETE_SILENCE_MILLIS = 1200L
+    private const val MINIMUM_LISTENING_MILLIS = 6500L
+    private const val COMPLETE_SILENCE_MILLIS = 3200L
+    private const val POSSIBLY_COMPLETE_SILENCE_MILLIS = 2200L
+    private const val PARTIAL_STABLE_MILLIS = 1300L
+    private const val MAX_LISTENING_MILLIS = 14000L
   }
 
   private var speechRecognizer: SpeechRecognizer? = null
@@ -27,9 +30,30 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
   private var currentLocale: String = Locale.getDefault().toLanguageTag()
   private var latestTranscript: String = ""
   private var manualStopRequested: Boolean = false
+  private var listeningStartedAtMillis: Long = 0L
+  private var lastRmsDebugAtMillis: Long = 0L
   private val mainHandler = Handler(Looper.getMainLooper())
+  private val partialStableRunnable = Runnable {
+    resolveWithLatestTranscript("partial_stable")
+  }
+  private val maxListeningRunnable = Runnable {
+    resolveWithLatestTranscript("max_listening")
+  }
 
   override fun getName(): String = "SpeechRecognition"
+
+  private fun emitDebug(event: String, details: String = "") {
+    if (!reactContext.hasActiveReactInstance()) return
+    val payload = Arguments.createMap().apply {
+      putString("event", event)
+      putString("details", details)
+      putString("latestTranscript", latestTranscript)
+      putDouble("elapsedMs", if (listeningStartedAtMillis > 0L) (System.currentTimeMillis() - listeningStartedAtMillis).toDouble() else 0.0)
+    }
+    reactContext
+      .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+      .emit("SpeechRecognitionDebug", payload)
+  }
 
   @ReactMethod
   fun isAvailable(promise: Promise) {
@@ -60,10 +84,21 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
       currentLocale = normalizeLocale(locale)
       latestTranscript = ""
       manualStopRequested = false
+      listeningStartedAtMillis = System.currentTimeMillis()
+      lastRmsDebugAtMillis = 0L
+      clearTimers()
       pendingPromise = promise
+      emitDebug("startListening", currentLocale)
       mainHandler.post {
         try {
-          val recognizer = speechRecognizer ?: SpeechRecognizer.createSpeechRecognizer(activity).also {
+          try {
+            speechRecognizer?.cancel()
+            speechRecognizer?.destroy()
+          } catch (e: Exception) {
+            // Ignore stale recognizer cleanup failures before a fresh start.
+          }
+          speechRecognizer = null
+          val recognizer = SpeechRecognizer.createSpeechRecognizer(activity).also {
             it.setRecognitionListener(this)
             speechRecognizer = it
           }
@@ -71,8 +106,9 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
           val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, currentLocale)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, currentLocale)
             putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, reactContext.packageName)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, MINIMUM_LISTENING_MILLIS)
@@ -80,14 +116,20 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, POSSIBLY_COMPLETE_SILENCE_MILLIS)
           }
           recognizer.startListening(intent)
+          emitDebug("recognizerStarted", currentLocale)
+          mainHandler.postDelayed(maxListeningRunnable, MAX_LISTENING_MILLIS)
         } catch (e: Exception) {
           val currentPromise = pendingPromise
           pendingPromise = null
+          clearTimers()
+          emitDebug("startFailed", e.message ?: "")
           currentPromise?.reject("start_failed", e.message ?: "Could not start speech recognition", e)
         }
       }
     } catch (e: Exception) {
       pendingPromise = null
+      clearTimers()
+      emitDebug("startFailedOuter", e.message ?: "")
       promise.reject("start_failed", e.message ?: "Could not start speech recognition", e)
     }
   }
@@ -97,11 +139,15 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
     mainHandler.post {
       try {
         manualStopRequested = true
+        clearTimers()
+        emitDebug("stopListening")
         speechRecognizer?.stopListening()
       } catch (e: Exception) {
         val promise = pendingPromise
         pendingPromise = null
         manualStopRequested = false
+        clearTimers()
+        emitDebug("stopFailed", e.message ?: "")
         promise?.reject("stop_failed", e.message ?: "Could not stop speech recognition", e)
       }
     }
@@ -113,6 +159,10 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
     pendingPromise = null
     latestTranscript = ""
     manualStopRequested = false
+    listeningStartedAtMillis = 0L
+    lastRmsDebugAtMillis = 0L
+    clearTimers()
+    emitDebug("cancelListening")
     mainHandler.post {
       try {
         speechRecognizer?.cancel()
@@ -132,12 +182,29 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
     // Required for NativeEventEmitter compatibility.
   }
 
-  override fun onReadyForSpeech(params: Bundle?) {}
-  override fun onBeginningOfSpeech() {}
-  override fun onRmsChanged(rmsdB: Float) {}
+  override fun onReadyForSpeech(params: Bundle?) {
+    emitDebug("onReadyForSpeech")
+  }
+  override fun onBeginningOfSpeech() {
+    emitDebug("onBeginningOfSpeech")
+  }
+  override fun onRmsChanged(rmsdB: Float) {
+    val now = System.currentTimeMillis()
+    if (now - lastRmsDebugAtMillis >= 700L) {
+      lastRmsDebugAtMillis = now
+      emitDebug("onRmsChanged", rmsdB.toString())
+    }
+  }
   override fun onBufferReceived(buffer: ByteArray?) {}
-  override fun onEndOfSpeech() {}
-  override fun onEvent(eventType: Int, params: Bundle?) {}
+  override fun onEndOfSpeech() {
+    emitDebug("onEndOfSpeech")
+    if (latestTranscript.trim().isNotBlank()) {
+      mainHandler.postDelayed({ resolveWithLatestTranscript("end_of_speech") }, 250L)
+    }
+  }
+  override fun onEvent(eventType: Int, params: Bundle?) {
+    emitDebug("onEvent", eventType.toString())
+  }
 
   override fun onPartialResults(partialResults: Bundle?) {
     val partial = partialResults
@@ -146,6 +213,9 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
       ?.trim()
       ?: return
     latestTranscript = partial
+    emitDebug("onPartialResults", partial)
+    mainHandler.removeCallbacks(partialStableRunnable)
+    mainHandler.postDelayed(partialStableRunnable, PARTIAL_STABLE_MILLIS)
     // RN 0.81 / New Arch: prefer emitDeviceEvent over getJSModule(RCTDeviceEventEmitter).
     if (reactContext.hasActiveReactInstance()) {
       reactContext.emitDeviceEvent("SpeechRecognitionPartial", partial)
@@ -161,8 +231,12 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
       ?: latestTranscript.trim()
     val promise = pendingPromise
     pendingPromise = null
+    clearTimers()
+    emitDebug("onResults", transcript)
     latestTranscript = ""
     manualStopRequested = false
+    listeningStartedAtMillis = 0L
+    lastRmsDebugAtMillis = 0L
     if (transcript.isBlank()) {
       promise?.reject("no_speech", "No speech detected")
     } else {
@@ -181,8 +255,10 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
 
   override fun onError(error: Int) {
     val transcriptFallback = latestTranscript.trim()
+    emitDebug("onError", "${errorCode(error)}:${errorMessage(error)}")
     val promise = pendingPromise
     pendingPromise = null
+    clearTimers()
     val shouldUseTranscriptFallback =
       transcriptFallback.isNotBlank() && (
         manualStopRequested ||
@@ -192,6 +268,8 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
       )
     latestTranscript = ""
     manualStopRequested = false
+    listeningStartedAtMillis = 0L
+    lastRmsDebugAtMillis = 0L
     if (shouldUseTranscriptFallback) {
       promise?.resolve(transcriptFallback)
       mainHandler.post {
@@ -221,6 +299,10 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
     pendingPromise = null
     latestTranscript = ""
     manualStopRequested = false
+    listeningStartedAtMillis = 0L
+    lastRmsDebugAtMillis = 0L
+    clearTimers()
+    emitDebug("invalidate")
     mainHandler.post {
       try {
         speechRecognizer?.destroy()
@@ -236,8 +318,57 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
     val raw = (locale ?: "").trim().lowercase(Locale.US)
     return when {
       raw.startsWith("hi") || raw == "hindi" -> "hi-IN"
-      raw.startsWith("en") || raw == "english" || raw.isBlank() -> "en-US"
+      raw.startsWith("en") || raw == "english" || raw.isBlank() -> "en-IN"
       else -> locale ?: Locale.getDefault().toLanguageTag()
+    }
+  }
+
+  private fun clearTimers() {
+    mainHandler.removeCallbacks(partialStableRunnable)
+    mainHandler.removeCallbacks(maxListeningRunnable)
+  }
+
+  private fun resolveWithLatestTranscript(reason: String) {
+    val transcript = latestTranscript.trim()
+    val promise = pendingPromise ?: return
+    if (transcript.isBlank()) {
+      if (reason == "max_listening") {
+        pendingPromise = null
+        latestTranscript = ""
+        manualStopRequested = false
+        listeningStartedAtMillis = 0L
+        lastRmsDebugAtMillis = 0L
+        clearTimers()
+        emitDebug("resolveBlankMaxListening")
+        promise.reject("no_speech", "No speech detected")
+        mainHandler.post {
+          try {
+            speechRecognizer?.cancel()
+            speechRecognizer?.destroy()
+          } catch (e: Exception) {
+            // ignore cleanup failures
+          }
+          speechRecognizer = null
+        }
+      }
+      return
+    }
+    pendingPromise = null
+    latestTranscript = ""
+    manualStopRequested = false
+    listeningStartedAtMillis = 0L
+    lastRmsDebugAtMillis = 0L
+    clearTimers()
+    emitDebug("resolveWithLatestTranscript", reason)
+    promise.resolve(transcript)
+    mainHandler.post {
+      try {
+        speechRecognizer?.cancel()
+        speechRecognizer?.destroy()
+      } catch (e: Exception) {
+        // ignore cleanup failures
+      }
+      speechRecognizer = null
     }
   }
 

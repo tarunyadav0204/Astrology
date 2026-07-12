@@ -1,9 +1,28 @@
 import copy
 import json
+import logging
 import os
 import re
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from ai.response_parser import ResponseParser
+
+logger = logging.getLogger(__name__)
+
+
+def _usage_from_response(response: Any) -> Dict[str, int]:
+    usage_meta = getattr(response, "usage_metadata", None)
+    input_tokens = int(getattr(usage_meta, "prompt_token_count", 0) or 0)
+    output_tokens = int(getattr(usage_meta, "candidates_token_count", 0) or 0)
+    cached_tokens = int(getattr(usage_meta, "cached_content_token_count", 0) or 0)
+    total_tokens = int(getattr(usage_meta, "total_token_count", 0) or (input_tokens + output_tokens))
+    non_cached = max(input_tokens - cached_tokens, 0) if input_tokens > 0 else 0
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "cached_tokens": cached_tokens,
+        "non_cached_input_tokens": non_cached,
+        "total_tokens": total_tokens,
+    }
 
 
 def _strip_shadbala_from_context_for_llm(obj: Any) -> Any:
@@ -36,9 +55,17 @@ class StructuredAnalysisAnalyzer:
                 raise ValueError("GEMINI_API_KEY not set")
         from ai.analysis_llm_backend import build_analysis_llm_model
 
-        self.model, _, _ = build_analysis_llm_model()
+        self.model, self.model_name, self.vendor = build_analysis_llm_model()
 
-    async def generate_structured_report(self, question: str, context: Dict, language: str = 'english') -> Dict:
+    async def generate_structured_report(
+        self,
+        question: str,
+        context: Dict,
+        language: str = 'english',
+        *,
+        model_override: Optional[Any] = None,
+        shared_context_cached: bool = False,
+    ) -> Dict:
         """Generates a strict JSON report with interactive term tags."""
         
         system_instruction = f"""
@@ -60,27 +87,47 @@ RULES:
         # Serialize context safely (no Shadbala / strength_analysis in LLM payload)
         context_for_llm = _strip_shadbala_from_context_for_llm(copy.deepcopy(context))
         context_json = json.dumps(context_for_llm, indent=2, default=str)
-        prompt = f"{system_instruction}\n\nCONTEXT:\n{context_json}\n\nREQUIRED FIELDS & QUESTIONS:\n{question}"
+        cache_note = ""
+        if shared_context_cached or model_override is not None:
+            cache_note = (
+                "\n\nCACHED SHARED CONTEXT:\n"
+                "Pair-level evidence is already loaded in the cached shared context for this request. "
+                "Use it together with the chapter CONTEXT below. Do not invent facts missing from either."
+            )
+        prompt = (
+            f"{system_instruction}{cache_note}\n\n"
+            f"CONTEXT:\n{context_json}\n\n"
+            f"REQUIRED FIELDS & QUESTIONS:\n{question}"
+        )
 
         try:
-            print(f"🔄 CALLING GEMINI API with prompt length: {len(prompt)} chars")
-            response = await self.model.generate_content_async(
+            selected_model = model_override or self.model
+            logger.debug(
+                "analysis_llm call vendor=%s model=%s prompt_chars=%s cached_model=%s",
+                self.vendor,
+                self.model_name,
+                len(prompt),
+                "yes" if model_override is not None else "no",
+            )
+            response = await selected_model.generate_content_async(
                 prompt,
                 request_options={'timeout': 600}
             )
-            
+
+            usage = _usage_from_response(response)
             raw_text = response.text.strip()
-            print(f"📝 RAW GEMINI RESPONSE:")
-            print(f"   Length: {len(raw_text)} chars")
-            print(f"   First 500 chars: {raw_text[:500]}")
-            print(f"   Last 200 chars: {raw_text[-200:]}")
+            logger.debug(
+                "analysis_llm response vendor=%s model=%s chars=%s input=%s output=%s cached=%s",
+                self.vendor,
+                self.model_name,
+                len(raw_text),
+                usage["input_tokens"],
+                usage["output_tokens"],
+                usage["cached_tokens"],
+            )
             
             # Use the existing ResponseParser to handle accidental markers or leakage
             parsed_result = ResponseParser.parse_response(raw_text)
-            print(f"📊 PARSED RESULT:")
-            print(f"   Content length: {len(parsed_result['content'])} chars")
-            print(f"   Terms count: {len(parsed_result['terms'])}")
-            print(f"   Glossary count: {len(parsed_result['glossary'])}")
             
             # Attempt to parse the content as JSON
             try:
@@ -115,30 +162,31 @@ RULES:
                 
                 json_clean = json_clean[start_idx:end_idx + 1]
                 
-                print(f"🧹 CLEANED JSON (first 300 chars): {json_clean[:300]}")
                 final_data = json.loads(json_clean)
-                print(f"✅ JSON PARSING SUCCESSFUL")
                 
                 return {
                     'success': True,
                     'data': final_data,
                     'terms': parsed_result['terms'],
-                    'glossary': final_data.get('glossary', parsed_result['glossary'])
+                    'glossary': final_data.get('glossary', parsed_result['glossary']),
+                    'usage': usage,
                 }
             except json.JSONDecodeError as json_error:
-                print(f"❌ JSON PARSING FAILED: {json_error}")
-                print(f"   Cleaned content (first 500 chars): {json_clean[:500] if 'json_clean' in locals() else 'N/A'}")
+                logger.warning(
+                    "analysis_llm json parse failed: %s content_preview=%s",
+                    json_error,
+                    (json_clean[:300] if "json_clean" in locals() else "N/A"),
+                )
                 # If JSON fails, we still return the content for the frontend fallback logic
                 return {
                     'success': True,
                     'is_raw': True,
                     'response': parsed_result['content'],
                     'terms': parsed_result['terms'],
-                    'glossary': parsed_result['glossary']
+                    'glossary': parsed_result['glossary'],
+                    'usage': usage,
                 }
 
         except Exception as e:
-            print(f"❌ GEMINI API ERROR: {type(e).__name__}: {str(e)}")
-            import traceback
-            print(f"   Full traceback: {traceback.format_exc()}")
+            logger.exception("analysis_llm api error: %s", e)
             return {'success': False, 'error': str(e)}

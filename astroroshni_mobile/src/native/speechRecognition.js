@@ -45,6 +45,13 @@ export const speechRecognition = {
     return partialEmitter.addListener('SpeechRecognitionPartial', listener);
   },
 
+  addDebugListener(listener) {
+    if (!partialEmitter) {
+      return { remove() {} };
+    }
+    return partialEmitter.addListener('SpeechRecognitionDebug', listener);
+  },
+
   getUnavailableMessage() {
     return unavailableMessage;
   },

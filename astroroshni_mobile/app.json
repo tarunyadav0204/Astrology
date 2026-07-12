@@ -36,13 +36,14 @@
     },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#f97316"
       },
       "package": "com.astroroshni.mobile",
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.astroroshni.mobile",
-      "versionCode": 197,
+      "versionCode": 198,
       "newArchEnabled": false,
       "googleServicesFile": "./google-services.json",
       "permissions": [

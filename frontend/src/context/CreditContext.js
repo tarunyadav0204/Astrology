@@ -15,6 +15,8 @@ export const CreditProvider = ({ children }) => {
     const [chatCost, setChatCost] = useState(1);
     const [premiumChatCost, setPremiumChatCost] = useState(10);
     const [partnershipCost, setPartnershipCost] = useState(2);
+    const [partnershipReportCost, setPartnershipReportCost] = useState(9);
+    const [wealthReportCost, setWealthReportCost] = useState(9);
     const [wealthCost, setWealthCost] = useState(5);
     const [marriageCost, setMarriageCost] = useState(3);
     const [healthCost, setHealthCost] = useState(3);
@@ -120,6 +122,8 @@ export const CreditProvider = ({ children }) => {
             if (pricing.chat != null) setChatCost(Number(pricing.chat) || 1);
             if (pricing.premium_chat != null) setPremiumChatCost(Number(pricing.premium_chat) || 10);
             if (pricing.partnership != null) setPartnershipCost(Number(pricing.partnership) || 2);
+            if (pricing.partnership_report != null) setPartnershipReportCost(Number(pricing.partnership_report) || 9);
+            if (pricing.wealth_report != null) setWealthReportCost(Number(pricing.wealth_report) || 9);
             if (pricing.wealth != null) setWealthCost(Number(pricing.wealth) || 5);
             if (pricing.marriage != null) setMarriageCost(Number(pricing.marriage) || 3);
             if (pricing.health != null) setHealthCost(Number(pricing.health) || 3);
@@ -223,6 +227,8 @@ export const CreditProvider = ({ children }) => {
             chatCost,
             premiumChatCost,
             partnershipCost,
+            partnershipReportCost,
+            wealthReportCost,
             wealthCost,
             marriageCost,
             healthCost,

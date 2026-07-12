@@ -3,6 +3,7 @@ import { getAdminAuthHeaders } from '../../services/adminService';
 import './ChatFeedback.css';
 
 const PAGE_LIMIT = 10;
+const RATING_ORDER = ['5', '4', '3', '2', '1'];
 
 const ChatFeedback = () => {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -99,7 +100,8 @@ const ChatFeedback = () => {
   };
 
   const renderStars = (rating) => {
-    return '★'.repeat(rating) + '☆'.repeat(5 - rating);
+    const n = Math.max(0, Math.min(5, Number(rating) || 0));
+    return '★'.repeat(n) + '☆'.repeat(5 - n);
   };
 
   const formatDate = (dateString) => {
@@ -107,102 +109,95 @@ const ChatFeedback = () => {
   };
 
   if (loading && page === 1 && feedbacks.length === 0) {
-    return <div className="loading">Loading feedback data...</div>;
+    return <div className="chat-feedback-standalone-loading">Loading feedback data…</div>;
   }
-  if (error) return <div className="error">{error}</div>;
+  if (error) return <div className="chat-feedback-standalone-error">{error}</div>;
 
-  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_LIMIT + 1;
-  const rangeEnd = Math.min(page * PAGE_LIMIT, total);
+  const distribution = stats.rating_distribution || {};
+  const avg = Number(stats.average_rating);
+  const avgDisplay = Number.isFinite(avg) ? avg.toFixed(2) : '—';
 
   return (
     <div className="chat-feedback-container">
-      <div className="feedback-header">
-        <h2>Chat Feedback Analysis</h2>
-        <div className="feedback-stats">
-          <div className="stat-card">
-            <h3>Total Feedback</h3>
-            <p className="stat-number">{stats.total_feedback || 0}</p>
-          </div>
-          <div className="stat-card">
-            <h3>Average Rating</h3>
-            <p className="stat-number">{stats.average_rating || 0}/5</p>
-          </div>
-          <div className="stat-card">
-            <h3>Rating Distribution</h3>
-            <div className="rating-dist">
-              {Object.entries(stats.rating_distribution || {}).map(([rating, count]) => (
-                <div key={rating} className="rating-item">
-                  {rating}★: {count}
-                </div>
-              ))}
-            </div>
-          </div>
+      <div className="feedback-toolbar">
+        <div className="feedback-meta">
+          <strong>{stats.total_feedback || 0}</strong> feedback
+          <span className="feedback-meta-sep">·</span>
+          avg <strong>{avgDisplay}</strong>
         </div>
-      </div>
-
-      <div className="feedback-filters">
+        <div className="feedback-rating-row" aria-label="Rating distribution">
+          {RATING_ORDER.map((rating) => {
+            const count = Number(distribution[rating] || 0);
+            return (
+              <div key={rating} className="feedback-rating-chip">
+                <span className="cf-rating-stars" aria-hidden="true">
+                  {renderStars(Number(rating))}
+                </span>
+                <span className="cf-rating-count">{count}</span>
+              </div>
+            );
+          })}
+        </div>
         <div className="filter-group">
           <input
             type="text"
-            placeholder="Search by username..."
+            placeholder="Username…"
             value={searchUsername}
             onChange={(e) => setSearchUsername(e.target.value)}
             className="search-input"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSearch();
+            }}
           />
           <select
             value={searchRating}
             onChange={(e) => setSearchRating(e.target.value)}
             className="rating-filter"
           >
-            <option value="">All Ratings</option>
-            <option value="5">5 Stars</option>
-            <option value="4">4 Stars</option>
-            <option value="3">3 Stars</option>
-            <option value="2">2 Stars</option>
-            <option value="1">1 Star</option>
+            <option value="">All ratings</option>
+            <option value="5">5 stars</option>
+            <option value="4">4 stars</option>
+            <option value="3">3 stars</option>
+            <option value="2">2 stars</option>
+            <option value="1">1 star</option>
           </select>
-          <button onClick={handleSearch} className="search-btn">Search</button>
-          <button onClick={clearFilters} className="clear-btn">Clear</button>
+          <button type="button" onClick={handleSearch} className="search-btn">Search</button>
+          <button type="button" onClick={clearFilters} className="clear-btn">Clear</button>
         </div>
       </div>
 
       <div className="feedback-table-container">
-        <div className="table-header">
-          <h3>Feedback Results</h3>
-          <div className="pagination-info">
-            Showing {rangeStart}-{rangeEnd} of {total}
-          </div>
-        </div>
-
         {loading && page > 1 ? (
           <div className="loading">Loading page…</div>
         ) : (
           <table className="feedback-table">
             <thead>
               <tr>
-                <th>User Name</th>
+                <th>User</th>
                 <th>Phone</th>
                 <th>Question</th>
                 <th>Rating</th>
                 <th>Comment</th>
-                <th>Created Time</th>
+                <th>Created</th>
               </tr>
             </thead>
             <tbody>
               {feedbacks.length > 0 ? (
                 feedbacks.map((feedback, index) => (
-                  <tr key={index}>
+                  <tr key={feedback.id || `${feedback.created_at}-${index}`}>
                     <td>{feedback.user_name || 'Anonymous'}</td>
                     <td>{feedback.user_phone || '—'}</td>
                     <td className="question-cell">
                       {feedback.question || 'Question not found'}
                     </td>
                     <td className="rating-cell">
-                      <span className="stars">{renderStars(feedback.rating)}</span>
-                      <span className="rating-number">({feedback.rating}/5)</span>
+                      <span className="cf-rating-stars" aria-hidden="true">
+                        {renderStars(feedback.rating)}
+                      </span>
+                      <span className="rating-number">{feedback.rating}/5</span>
                     </td>
                     <td className="comment-cell">
-                      {feedback.comment || 'No comment'}
+                      {feedback.comment || '—'}
                     </td>
                     <td>{formatDate(feedback.created_at)}</td>
                   </tr>
@@ -243,7 +238,7 @@ const ChatFeedback = () => {
                 );
               }
               if (pageNum === page - 3 || pageNum === page + 3) {
-                return <span key={pageNum} className="chat-feedback-page-ellipsis">...</span>;
+                return <span key={pageNum} className="chat-feedback-page-ellipsis">…</span>;
               }
               return null;
             })}

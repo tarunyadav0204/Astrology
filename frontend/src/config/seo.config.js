@@ -115,6 +115,12 @@ export const SEO_CONFIG = {
       keywords: "kundli matching for marriage, marriage kundli analysis, smart kundli matching, kundli matching by name"
     },
 
+    reportsStudio: {
+      title: "Reports Studio — Premium Vedic Partnership PDF Reports | AstroRoshni",
+      description: "Create premium Vedic partnership PDF reports from two birth charts with timing, strengths, remedies, and clear takeaways in a shareable 20+ page report.",
+      keywords: "vedic partnership report, marriage compatibility PDF, premium kundli report, reports studio, two chart astrology report"
+    },
+
     birthChartCreation: {
       title: "AI Kundli Generator | Free Janam Kundli Online & Accurate Kundli Prediction | AstroRoshni",
       description: "Use AstroRoshni's AI Kundli Generator to create your free Janam Kundli online with date, time, and place of birth. Get instant Vedic Kundli analysis, horoscope and Kundli insights, dosha analysis, and accurate AI-backed Kundli prediction.",

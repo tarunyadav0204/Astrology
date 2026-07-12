@@ -110,6 +110,13 @@ def _birth_chart_id_from_birth_details(bd) -> int | None:
     return None
 
 
+def _debug_preview(value, limit: int = 240) -> str:
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "…"
+
+
 def _merge_with_original_question_if_present(
     original_question: str | None,
     followup_text: str,
@@ -541,6 +548,18 @@ def _processing_started_at_age_minutes(started_at) -> float | None:
 def _timestamp_is_future(value) -> bool:
     if not value:
         return False
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+    if not hasattr(value, "tzinfo"):
+        return False
+    now = datetime.now(value.tzinfo) if value.tzinfo else datetime.now()
+    try:
+        return value > now
+    except TypeError:
+        return False
 
 
 def _mark_chat_processing_failed(message_id: int, error_message: str) -> None:
@@ -561,18 +580,6 @@ def _mark_chat_processing_failed(message_id: int, error_message: str) -> None:
             ("failed", sanitize_text(error_message), datetime.now(), message_id),
         )
         conn.commit()
-    if isinstance(value, str):
-        try:
-            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except ValueError:
-            return False
-    if not hasattr(value, "tzinfo"):
-        return False
-    now = datetime.now(value.tzinfo) if value.tzinfo else datetime.now()
-    try:
-        return value > now
-    except TypeError:
-        return False
 
 
 def _claim_chat_processing_message(message_id: int, claim_id: str, *, claim_minutes: int = 35) -> str:
@@ -1360,6 +1367,23 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
 async def ask_question_async(request: dict, background_tasks: BackgroundTasks, current_user = Depends(get_current_user)):
     """Start async chat processing - returns immediately with message_id for polling"""
     from credits.credit_service import CreditService
+    ask_started_at = time.time()
+    ask_phase_started_at = ask_started_at
+
+    def log_ask_phase(phase: str, **fields) -> None:
+        nonlocal ask_phase_started_at
+        now = time.time()
+        if speech_chat_requested or instant_chat_requested:
+            _chat_log_event(
+                "chat_ask_phase",
+                session_id=session_id,
+                user_id=current_user.userid,
+                phase=phase,
+                duration_ms=round((now - ask_phase_started_at) * 1000, 1),
+                elapsed_ms=round((now - ask_started_at) * 1000, 1),
+                **fields,
+            )
+        ask_phase_started_at = now
     
     # Validate required fields
     session_id = request.get("session_id")
@@ -1440,9 +1464,29 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         )
     if speech_chat_requested and not speech_chat_enabled_for_user(current_user.userid):
         raise HTTPException(status_code=403, detail="Speech chat is not enabled for your account.")
-    speech_chat_billing = bool(speech_chat_requested and instant_chat_active)
+    speech_billing_requested = request.get("speech_billing", request.get("speechBilling", True))
+    speech_chat_billing = bool(speech_chat_requested and instant_chat_active and speech_billing_requested is not False)
     effective_chat_tier = "instant" if instant_chat_active else "standard"
     chat_worker_mode_active = chat_worker_mode_enabled_for_user(current_user.userid)
+    skip_subject_gate_for_fast_chat = bool(instant_chat_active or speech_chat_requested)
+    if speech_chat_requested or requested_chat_tier == "instant":
+        logger.info(
+            "SPEECH_DEBUG chat_v2_ask user_id=%s session_id=%s requested_tier=%s effective_tier=%s speech_requested=%s speech_billing=%s question=%r birth_chart_id=%s",
+            current_user.userid,
+            session_id,
+            requested_chat_tier,
+            effective_chat_tier,
+            bool(speech_chat_requested),
+            bool(speech_chat_billing),
+            _debug_preview(question),
+            _birth_chart_id_from_birth_details(birth_details),
+        )
+    log_ask_phase(
+        "parse_and_feature_flags",
+        effective_chat_tier=effective_chat_tier,
+        speech_chat=bool(speech_chat_requested),
+        skip_subject_gate=bool(skip_subject_gate_for_fast_chat),
+    )
 
     with get_conn() as conn:
         # Verify the session before any no-charge gates or credit checks.
@@ -1514,6 +1558,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                     except Exception:
                         pass
                 return response
+        log_ask_phase("session_and_idempotency_check")
 
         if subject_gate_override in {
             "selected_chart_only",
@@ -1523,7 +1568,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             _clear_pending_native_gate(conn, session_id)
             conn.commit()
 
-        pending_gate_state = _load_pending_native_gate(conn, session_id)
+        pending_gate_state = None if skip_subject_gate_for_fast_chat else _load_pending_native_gate(conn, session_id)
         if pending_gate_state and subject_gate_override == "":
             from ai.chat_subject_gate import ChatSubjectGate, build_subject_gate_message
 
@@ -1644,9 +1689,12 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                     f"({MAX_USER_MESSAGES_PER_CHAT_SESSION} questions). Please start a new chat to continue."
                 ),
             )
+        log_ask_phase("session_turn_limit_check", user_turn_count=int(user_turn_count or 0))
 
     is_plain_text_channel = delivery_channel == "whatsapp" or render_target == "plain_text"
     if (
+        not skip_subject_gate_for_fast_chat
+        and
         chat_subject_gate_enabled_for_user(current_user.userid)
         and not is_plain_text_channel
         and not partnership_mode
@@ -1694,6 +1742,11 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 return response
         except Exception as gate_exc:
             logger.warning("chat subject gate skipped after error: %s", gate_exc)
+    log_ask_phase(
+        "subject_gate",
+        skipped=bool(skip_subject_gate_for_fast_chat),
+        is_plain_text_channel=bool(is_plain_text_channel),
+    )
 
     # Check credit cost and user balance (first question free for standard chat)
     credit_service = CreditService()
@@ -1705,6 +1758,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         chat_cost = (
             credit_service.get_credit_setting('speech_chat_cost')
             if speech_chat_billing
+            else 0 if speech_chat_requested
             else credit_service.get_credit_setting('instant_chat_cost')
         )
     else:
@@ -1724,12 +1778,20 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             'premium_chat_cost' if premium_analysis
             else (
                 'speech_chat_cost' if instant_chat_active and speech_chat_billing
+                else 'speech_chat_per_minute_cost' if instant_chat_active and speech_chat_requested
                 else 'instant_chat_cost' if instant_chat_active
                 else 'chat_question_cost'
             )
         )
     )
     effective_cost = 0 if using_free_question else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
+    log_ask_phase(
+        "credits",
+        chat_key=chat_key,
+        effective_cost=effective_cost,
+        balance=user_balance,
+        using_free_question=bool(using_free_question),
+    )
 
     if user_balance < effective_cost:
         if partnership_mode:
@@ -1737,9 +1799,19 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         elif premium_analysis:
             analysis_type = "Premium Deep Analysis"
         elif instant_chat_active:
-            analysis_type = "Speech chat" if speech_chat_billing else "Instant Chat"
+            analysis_type = "Speech chat" if speech_chat_requested else "Instant Chat"
         else:
             analysis_type = "Standard Analysis"
+        if speech_chat_billing or instant_chat_active:
+            logger.info(
+                "SPEECH_DEBUG credit_block user_id=%s session_id=%s analysis_type=%s balance=%s effective_cost=%s question=%r",
+                current_user.userid,
+                session_id,
+                analysis_type,
+                user_balance,
+                effective_cost,
+                _debug_preview(question),
+            )
         raise HTTPException(
             status_code=402,
             detail=f"Insufficient credits for {analysis_type}. You need {effective_cost} credits but have {user_balance}."
@@ -1856,6 +1928,11 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         )
         assistant_message_id = cur.fetchone()[0]
         conn.commit()
+    log_ask_phase(
+        "persist_messages",
+        message_id=assistant_message_id,
+        user_message_id=user_message_id,
+    )
     
     # Refuse death-related questions without calling Gemini
     from ai.death_query_guard import is_death_related, REFUSAL_MESSAGE
@@ -1881,41 +1958,45 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 "chart_insights": [],
         }
 
-    # Fetal / unborn sex determination: LLM classifier (multilingual), no keyword heuristics
-    from ai.fetal_sex_query_classifier import FETAL_SEX_REFUSAL_MESSAGE, should_refuse_fetal_sex_determination
-    try:
-        if await should_refuse_fetal_sex_determination(
-            question=sanitize_text(question),
-            language=str(language or "english"),
-        ):
-            with get_conn() as conn:
-                execute(
-                    conn,
-                    """
-                        UPDATE chat_messages
-                        SET content = %s, status = %s, message_type = %s, completed_at = %s
-                        WHERE message_id = %s
-                    """,
-                    (
-                        sanitize_text(FETAL_SEX_REFUSAL_MESSAGE),
-                        "completed",
-                        "answer",
-                        datetime.now(),
-                        assistant_message_id,
-                    ),
-                )
-                conn.commit()
-            return {
-                "user_message_id": user_message_id,
-                "message_id": assistant_message_id,
-                "status": "completed",
-                "message_type": "answer",
-                "chat_tier": effective_chat_tier,
-                "content": FETAL_SEX_REFUSAL_MESSAGE,
-                "chart_insights": [],
-            }
-    except Exception as exc:
-        logger.warning("fetal sex gate skipped after error: %s", exc)
+    # Fetal / unborn sex determination: keep this gate for deeper chats, but never block fast speech/instant.
+    if instant_chat_active or speech_chat_requested:
+        log_ask_phase("safety_gates", message_id=assistant_message_id, fetal_gate_skipped=True)
+    else:
+        from ai.fetal_sex_query_classifier import FETAL_SEX_REFUSAL_MESSAGE, should_refuse_fetal_sex_determination
+        try:
+            if await should_refuse_fetal_sex_determination(
+                question=sanitize_text(question),
+                language=str(language or "english"),
+            ):
+                with get_conn() as conn:
+                    execute(
+                        conn,
+                        """
+                            UPDATE chat_messages
+                            SET content = %s, status = %s, message_type = %s, completed_at = %s
+                            WHERE message_id = %s
+                        """,
+                        (
+                            sanitize_text(FETAL_SEX_REFUSAL_MESSAGE),
+                            "completed",
+                            "answer",
+                            datetime.now(),
+                            assistant_message_id,
+                        ),
+                    )
+                    conn.commit()
+                return {
+                    "user_message_id": user_message_id,
+                    "message_id": assistant_message_id,
+                    "status": "completed",
+                    "message_type": "answer",
+                    "chat_tier": effective_chat_tier,
+                    "content": FETAL_SEX_REFUSAL_MESSAGE,
+                    "chart_insights": [],
+                }
+        except Exception as exc:
+            logger.warning("fetal sex gate skipped after error: %s", exc)
+        log_ask_phase("safety_gates", message_id=assistant_message_id, fetal_gate_skipped=False)
 
     chart_insights = []
     if effective_chat_tier != "instant" and not partnership_mode and isinstance(birth_details, dict):
@@ -1937,6 +2018,12 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                     conn.commit()
         except Exception as exc:
             logger.exception("failed to build early chart insights message_id=%s: %s", assistant_message_id, exc)
+    log_ask_phase(
+        "early_chart_insights",
+        message_id=assistant_message_id,
+        skipped=bool(effective_chat_tier == "instant" or partnership_mode),
+        chart_insight_count=len(chart_insights or []),
+    )
 
     worker_intent_metadata = {
         "query_context": request.get("query_context") or request.get("queryContext"),
@@ -1984,6 +2071,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         "using_free_question": using_free_question,
         "effective_cost": effective_cost,
         "chat_tier": effective_chat_tier,
+        "speech_chat_requested": speech_chat_requested,
         "speech_chat_billing": speech_chat_billing,
         "claim_id": str(uuid.uuid4()),
     }
@@ -1996,6 +2084,17 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             queued = enqueue_chat_processing_task(message_id=assistant_message_id, payload=task_payload)
         except Exception as exc:
             logger.exception("chat queue enqueue failed before fallback message_id=%s: %s", assistant_message_id, exc)
+
+    if speech_chat_billing or effective_chat_tier == "instant":
+        logger.info(
+            "SPEECH_DEBUG chat_task_dispatch message_id=%s session_id=%s chat_worker_active=%s queue_mode_enabled=%s queued=%s will_process_inline=%s",
+            assistant_message_id,
+            session_id,
+            bool(chat_worker_mode_active),
+            bool(queue_mode_enabled),
+            bool(queued),
+            bool(not queued and not (chat_worker_mode_active and queue_mode_enabled)),
+        )
 
     if queued:
         try:
@@ -2021,8 +2120,24 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         else:
             background_tasks.add_task(
                 process_gemini_response,
-                assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, worker_intent_metadata, user_message_id, using_free_question, effective_cost, effective_chat_tier, speech_chat_billing
+                assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, worker_intent_metadata, user_message_id, using_free_question, effective_cost, effective_chat_tier, speech_chat_billing, speech_chat_requested
             )
+    log_ask_phase(
+        "enqueue_or_background_dispatch",
+        message_id=assistant_message_id,
+        queued=bool(queued),
+        queue_mode_enabled=bool(queue_mode_enabled),
+        chat_worker_mode_active=bool(chat_worker_mode_active),
+    )
+    if speech_chat_billing or effective_chat_tier == "instant":
+        logger.info(
+            "SPEECH_PERF chat_ask_total user_id=%s message_id=%s session_id=%s duration_ms=%.1f queued=%s",
+            current_user.userid,
+            assistant_message_id,
+            session_id,
+            (time.time() - ask_started_at) * 1000,
+            bool(queued),
+        )
     
     return {
         "user_message_id": user_message_id,
@@ -2118,6 +2233,7 @@ async def process_chat_task(request: dict, x_chat_task_secret: Optional[str] = H
             effective_cost=optional_int(request.get("effective_cost")),
             chat_tier=request.get("chat_tier", "standard"),
             speech_chat_billing=bool(request.get("speech_chat_billing")),
+            speech_chat_requested=bool(request.get("speech_chat_requested") or request.get("speech_chat_billing")),
         )
         return {"ok": True, "state": "processed", "message_id": message_id}
     finally:
@@ -2169,6 +2285,17 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         # Verify message belongs to user
         if user_id != current_user.userid:
             raise HTTPException(status_code=403, detail="Access denied")
+
+        logger.info(
+            "SPEECH_DEBUG status_poll user_id=%s message_id=%s status=%s content_chars=%s error=%r claimed_until=%s enqueued_at=%s",
+            current_user.userid,
+            message_id,
+            status,
+            len(str(content or "")),
+            _debug_preview(error_message, 180),
+            task_claimed_until,
+            task_enqueued_at,
+        )
         
         response = {"status": status, "message_type": message_type or "answer"}
         wait_side_payload = None
@@ -2773,7 +2900,7 @@ async def _close_wait_side_conversation(message_id: int):
         logger.info("wait side conversation close skipped for message_id=%s: %s", message_id, str(exc)[:200])
 
 
-async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None, cached_intent: dict = None, user_message_id: int = None, using_free_question: bool = False, effective_cost: int = None, chat_tier: str = "standard", speech_chat_billing: bool = False):
+async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None, cached_intent: dict = None, user_message_id: int = None, using_free_question: bool = False, effective_cost: int = None, chat_tier: str = "standard", speech_chat_billing: bool = False, speech_chat_requested: bool = False):
     """Background task to process Gemini response. user_message_id: ID of the user message to update with category/canonical_question."""
     import sys
     import os
@@ -2805,6 +2932,27 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             partnership_mode=bool(partnership_mode and partner_birth_details),
             question_chars=len(question or ""),
         )
+        is_speech_chat = bool(speech_chat_requested or speech_chat_billing)
+        if is_instant_chat or is_speech_chat:
+            logger.info(
+                "SPEECH_DEBUG chat_worker_started user_id=%s message_id=%s session_id=%s chat_tier=%s speech_requested=%s speech_billing=%s question=%r",
+                user_id,
+                message_id,
+                session_id,
+                effective_chat_tier,
+                bool(is_speech_chat),
+                bool(speech_chat_billing),
+                _debug_preview(question),
+            )
+            try:
+                qc = (cached_intent or {}).get("query_context") if isinstance(cached_intent, dict) else None
+                logger.info(
+                    "SPEECH_DEBUG chat_worker_query_context message_id=%s query_context=%s",
+                    message_id,
+                    json.dumps(qc, ensure_ascii=False, default=str, sort_keys=True) if qc else "null",
+                )
+            except Exception:
+                pass
         death_analysis_unlocked = is_death_override_unlocked(question)
         # Refuse death-related questions without calling the model
         if is_death_related(question):
@@ -3434,7 +3582,15 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 intent=intent,
                 history=history,
                 language=language,
-                speech_mode=bool(speech_chat_billing),
+                speech_mode=bool(is_speech_chat),
+            )
+            logger.info(
+                "SPEECH_DEBUG instant_result message_id=%s success=%s response_chars=%s response_preview=%r followups=%r",
+                message_id,
+                bool(result.get("success")),
+                len(str(result.get("response") or "")),
+                _debug_preview(result.get("response"), 320),
+                [_debug_preview(item, 120) for item in (result.get("follow_up_questions") or [])[:3]],
             )
         else:
             llm_start = time.time()
@@ -3500,15 +3656,18 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 credit_service = CreditService()
                 answer_gate_metadata = None
                 first_purchase_bonus_payload = None
-                skip_instant_charge = bool(is_instant_chat and result.get("skip_instant_credit_charge"))
+                skip_instant_charge = bool(
+                    (is_instant_chat and result.get("skip_instant_credit_charge"))
+                    or (is_speech_chat and not speech_chat_billing)
+                )
                 if skip_instant_charge:
                     success = True
-                    logger.info("instant conversational ack; no credits charged user_id=%s message_id=%s", user_id, message_id)
+                    logger.info("instant/speech turn; no per-message credits charged user_id=%s message_id=%s speech=%s", user_id, message_id, bool(is_speech_chat))
                 elif using_free_question:
                     free_birth_hash = credit_service.create_free_question_birth_hash(birth_details)
                     credit_service.mark_free_chat_question_used(user_id, birth_hash=free_birth_hash)
                     if is_instant_chat:
-                        analysis_type = "Speech chat" if speech_chat_billing else "Instant Chat"
+                        analysis_type = "Speech chat" if is_speech_chat else "Instant Chat"
                     else:
                         analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
                     credit_service.record_zero_cost_feature_usage(
@@ -3539,8 +3698,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 else:
                     amount_to_deduct = effective_cost if effective_cost is not None else chat_cost
                     if is_instant_chat:
-                        analysis_type = "Speech chat" if speech_chat_billing else "Instant Chat"
-                        spend_feature = "speech_chat" if speech_chat_billing else "instant_chat"
+                        analysis_type = "Speech chat" if is_speech_chat else "Instant Chat"
+                        spend_feature = "speech_chat" if is_speech_chat else "instant_chat"
                     else:
                         analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
                         spend_feature = "chat_question"
@@ -3834,6 +3993,16 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             total_duration_ms=round((time.time() - processing_started_at) * 1000, 1),
             success=bool(result.get('success')),
         )
+        if is_instant_chat or is_speech_chat:
+            logger.info(
+                "SPEECH_PERF chat_worker_total user_id=%s message_id=%s session_id=%s speech_requested=%s total_ms=%.1f success=%s",
+                user_id,
+                message_id,
+                session_id,
+                bool(is_speech_chat),
+                (time.time() - processing_started_at) * 1000,
+                bool(result.get("success")),
+            )
         
     except Exception as e:
         # Handle any errors with user-friendly message and log to admin error list

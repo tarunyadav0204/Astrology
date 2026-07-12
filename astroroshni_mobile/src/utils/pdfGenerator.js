@@ -31,6 +31,23 @@ export async function getLogoDataUriForModule(assetModule) {
   }
 }
 
+export async function downloadPdfToLocalUri(pdfUrl, fileNamePrefix = 'report') {
+  if (!pdfUrl) {
+    throw new Error('Missing PDF URL');
+  }
+  const safePrefix = String(fileNamePrefix || 'report').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'report';
+  const cacheRoot = FileSystem.cacheDirectory || FileSystem.documentDirectory || '';
+  const folder = `${cacheRoot}reports/`;
+  try {
+    await FileSystem.makeDirectoryAsync(folder, { intermediates: true });
+  } catch (_) {
+    // directory may already exist
+  }
+  const localUri = `${folder}${safePrefix}-${Date.now()}.pdf`;
+  const result = await FileSystem.downloadAsync(pdfUrl, localUri);
+  return result?.uri || localUri;
+}
+
 export const generatePDF = async (message, options = {}) => {
   try {
     console.log('📄 [PDF] Starting generation...');
@@ -609,6 +626,7 @@ export const generateRelationshipReportPDF = async ({
   result,
   premiumReport,
   logoDataUri: optionLogoUri,
+  timeoutMs = 120000,
 } = {}) => {
   try {
     const sections = premiumReport?.sections || [];
@@ -693,7 +711,7 @@ export const generateRelationshipReportPDF = async ({
 
     const { uri } = await Promise.race([
       Print.printToFileAsync({ html, base64: false }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('PDF generation timeout')), 45000)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('PDF generation timeout')), timeoutMs)),
     ]);
     return uri;
   } catch (error) {

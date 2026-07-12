@@ -5,9 +5,10 @@ import os
 import json
 import re
 import hashlib
+import time
 
 import google.generativeai as genai
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -25,6 +26,29 @@ MAX_AUDIO_BYTES = 12 * 1024 * 1024
 DEFAULT_TRANSCRIPTION_MODEL = "models/gemini-2.5-flash"
 VOICE_GUIDE_MODEL_ENV = "GEMINI_SPEECH_GUIDE_MODEL"
 _VOICE_GUIDE_CACHE: dict[str, dict] = {}
+
+
+def _debug_preview(value: object, limit: int = 240) -> str:
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "…"
+
+
+def _save_debug_audio(data: bytes, suffix: str, *, user_id: int, reason: str) -> Optional[str]:
+    """Persist failed transcription audio in /tmp for local debugging."""
+    if not data:
+        return None
+    safe_suffix = suffix if suffix.startswith(".") else f".{suffix or 'm4a'}"
+    safe_reason = re.sub(r"[^a-zA-Z0-9_-]+", "_", reason or "debug").strip("_") or "debug"
+    path = f"/tmp/astroroshni_speech_{int(user_id)}_{int(time.time() * 1000)}_{safe_reason}{safe_suffix}"
+    try:
+        with open(path, "wb") as f:
+            f.write(data)
+        return path
+    except Exception:
+        logger.exception("SPEECH_DEBUG failed_to_save_audio path=%s", path)
+        return None
 
 
 def _response_text(response) -> str:
@@ -290,6 +314,13 @@ Context:
             normalized_lang,
             len(lines),
         )
+        logger.info(
+            "SPEECH_DEBUG guide_generated scene=%s lang=%s question=%r lines=%r",
+            normalized_scene,
+            normalized_lang,
+            _debug_preview(question),
+            [_debug_preview(line, 180) for line in lines],
+        )
         return result
     except Exception as exc:
         logger.exception("SPEECH guide generation failed scene=%s", normalized_scene)
@@ -481,8 +512,12 @@ async def _transcribe_with_gemini(
 
 @router.post("/transcribe")
 async def transcribe_speech(
+    request: Request,
     audio: UploadFile = File(...),
     language: str = Form("english"),
+    duration_ms: Optional[int] = Form(None),
+    metering_max: Optional[float] = Form(None),
+    metering_avg: Optional[float] = Form(None),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -502,12 +537,23 @@ async def transcribe_speech(
         raise HTTPException(status_code=413, detail="Audio is too large. Please ask a shorter question.")
 
     logger.info(
-        "SPEECH transcribe request user_id=%s bytes=%s filename=%s content_type=%s language=%s",
+        "SPEECH transcribe request user_id=%s bytes=%s duration_ms=%s filename=%s content_type=%s language=%s",
         current_user.userid,
         len(data),
+        duration_ms,
         (audio.filename or "").strip() or None,
         (audio.content_type or "").strip() or None,
         (language or "").strip() or "english",
+    )
+    logger.info(
+        "SPEECH_DEBUG transcribe_audio_metadata user_id=%s bytes=%s duration_ms=%s bytes_per_second=%s metering_max=%s metering_avg=%s content_type=%s",
+        current_user.userid,
+        len(data),
+        duration_ms,
+        round((len(data) * 1000 / duration_ms), 1) if duration_ms and duration_ms > 0 else None,
+        metering_max,
+        metering_avg,
+        (audio.content_type or "").strip() or None,
     )
 
     suffix = _audio_suffix(audio.filename, audio.content_type)
@@ -522,19 +568,49 @@ async def transcribe_speech(
 
         transcript = _clean_transcript(transcript)
         if not transcript or transcript.strip().lower() == "[no speech detected]" or _looks_like_instruction_following_failure(transcript):
+            debug_path = _save_debug_audio(
+                data,
+                suffix,
+                user_id=current_user.userid,
+                reason="no_speech_detected",
+            )
             logger.info(
-                "SPEECH transcribe empty_or_suspicious user_id=%s model=%s transcript=%r",
+                "SPEECH transcribe empty_or_suspicious user_id=%s model=%s transcript=%r debug_audio_path=%s",
                 current_user.userid,
                 model_name,
                 transcript,
+                debug_path,
             )
-            raise HTTPException(status_code=422, detail="Could not reliably understand the audio. Please try again.")
+            logger.info(
+                "SPEECH_DEBUG debug_audio_saved user_id=%s path=%s bytes=%s duration_ms=%s metering_max=%s metering_avg=%s",
+                current_user.userid,
+                debug_path,
+                len(data),
+                duration_ms,
+                metering_max,
+                metering_avg,
+            )
+            detail = "Could not reliably understand the audio. Please try again."
+            client_host = getattr(request.client, "host", "") if request.client else ""
+            include_debug_path = (
+                (os.getenv("SPEECH_DEBUG_AUDIO_PATH_IN_RESPONSE") or "").strip().lower() in {"1", "true", "yes"}
+                or client_host in {"127.0.0.1", "::1", "localhost"}
+            )
+            if debug_path and include_debug_path:
+                detail = f"{detail} Debug audio: {debug_path}"
+            raise HTTPException(status_code=422, detail=detail)
         logger.info(
             "SPEECH transcribe cleaned user_id=%s model=%s chars=%s transcript=%r",
             current_user.userid,
             model_name,
             len(transcript),
             transcript,
+        )
+        logger.info(
+            "SPEECH_DEBUG transcript_final user_id=%s model=%s transcript=%r",
+            current_user.userid,
+            model_name,
+            _debug_preview(transcript),
         )
         return {"transcript": transcript, "model": model_name}
     except HTTPException:
@@ -560,6 +636,15 @@ async def speech_guide_lines(
     if scene not in {"greeting", "processing", "closing"}:
         raise HTTPException(status_code=400, detail="Invalid speech guide scene")
 
+    logger.info(
+        "SPEECH_DEBUG guide_request user_id=%s scene=%s lang=%s question=%r follow_ups=%r",
+        current_user.userid,
+        scene,
+        request.language or "english",
+        _debug_preview(request.question),
+        [_debug_preview(item, 120) for item in (request.follow_ups or [])[:3]],
+    )
+
     result = await _generate_voice_guide_lines(
         scene=scene,
         language=request.language or "english",
@@ -568,5 +653,11 @@ async def speech_guide_lines(
         question=(request.question or "").strip(),
         follow_ups=request.follow_ups or [],
         hands_free=bool(request.hands_free),
+    )
+    logger.info(
+        "SPEECH_DEBUG guide_response user_id=%s scene=%s lines=%r",
+        current_user.userid,
+        scene,
+        [_debug_preview(line, 180) for line in (result.get("lines") or [])],
     )
     return result

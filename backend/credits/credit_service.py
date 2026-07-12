@@ -418,6 +418,7 @@ class CreditService:
                 ("chat_question_cost", 1, "Credits per chat question"),
                 ("instant_chat_cost", 1, "Credits per instant chat answer"),
                 ("speech_chat_cost", 1, "Credits per speech chat turn (Tara / voice-first)"),
+                ("speech_chat_per_minute_cost", 1, "Credits per minute for live speech chat"),
                 ("wealth_analysis_cost", 5, "Credits per wealth analysis"),
                 ("marriage_analysis_cost", 3, "Credits per marriage analysis"),
                 ("health_analysis_cost", 3, "Credits per health analysis"),
@@ -434,6 +435,11 @@ class CreditService:
                 ("business_opening_cost", 20, "Credits per business opening muhurat"),
                 ("event_timeline_cost", 100, "Credits per yearly event timeline analysis"),
                 ("partnership_analysis_cost", 2, "Credits per partnership compatibility analysis"),
+                ("partnership_report_cost", 9, "Credits per partnership PDF report"),
+                ("career_report_cost", 15, "Credits per career PDF report"),
+                ("wealth_report_cost", 9, "Credits per wealth PDF report"),
+                ("health_report_cost", 9, "Credits per health PDF report"),
+                ("progeny_report_cost", 15, "Credits per progeny PDF report"),
                 ("karma_analysis_cost", 25, "Credits per karma analysis"),
                 ("ashtakavarga_life_predictions_cost", 15, "Credits per Ashtakavarga life predictions (Dots of Destiny)"),
                 ("podcast_cost", 2, "Credits per podcast (listen to message as audio)"),
@@ -2098,6 +2104,10 @@ class CreditService:
 
     def is_free_standard_chat_question_available(self, userid: int) -> bool:
         """Unused one-time free standard chat AND notifications requirement met."""
+        from utils.admin_settings import is_free_question_enabled
+
+        if not is_free_question_enabled():
+            return False
         if self.get_free_chat_question_used(userid):
             return False
         return self.notification_opt_in_satisfied_for_free_question(userid)
@@ -2107,6 +2117,7 @@ class CreditService:
     ) -> bool:
         """
         Free question is available only when:
+        - admin free-question switch is ON,
         - user has not consumed their one-time free question,
         - notifications requirement is met,
         - and this birth hash has not consumed free question globally.
@@ -2123,6 +2134,10 @@ class CreditService:
 
     def free_question_pending_notification_opt_in(self, userid: int) -> bool:
         """True when the user still has their free question unused but has not met the notification requirement."""
+        from utils.admin_settings import is_free_question_enabled
+
+        if not is_free_question_enabled():
+            return False
         if self.get_free_chat_question_used(userid):
             return False
         return not self.notification_opt_in_satisfied_for_free_question(userid)
@@ -3139,9 +3154,10 @@ class CreditService:
         """Get all credit settings (value = original cost, discount = discounted cost when set)."""
         from db import get_conn, execute
         keys = (
-            'chat_question_cost', 'instant_chat_cost', 'speech_chat_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost',
+            'chat_question_cost', 'instant_chat_cost', 'speech_chat_cost', 'speech_chat_per_minute_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost',
             'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost',
-            'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
+            'progeny_analysis_cost', 'partnership_report_cost', 'career_report_cost', 'wealth_report_cost',
+            'health_report_cost', 'progeny_report_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
             'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost',
             'event_timeline_cost', 'karma_analysis_cost', 'ashtakavarga_life_predictions_cost', 'podcast_cost'
         )
@@ -3185,6 +3201,25 @@ class CreditService:
                     })
                 except Exception:
                     pass
+            # Ensure speech_chat_per_minute_cost exists so admin Feature Costs always shows it
+            if not any(s["key"] == "speech_chat_per_minute_cost" for s in settings):
+                try:
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO credit_settings (setting_key, setting_value, description)
+                        VALUES ('speech_chat_per_minute_cost', 1, 'Credits per minute for live speech chat')
+                        """,
+                    )
+                    conn.commit()
+                    settings.append({
+                        "key": "speech_chat_per_minute_cost",
+                        "value": 1,
+                        "description": "Credits per minute for live speech chat",
+                        "discount": None,
+                    })
+                except Exception:
+                    pass
             # Ensure podcast_cost exists so admin Feature Costs always shows it
             if not any(s["key"] == "podcast_cost" for s in settings):
                 try:
@@ -3200,6 +3235,34 @@ class CreditService:
                         "key": "podcast_cost",
                         "value": 2,
                         "description": "Credits per podcast (listen to message as audio)",
+                        "discount": None,
+                    })
+                except Exception:
+                    pass
+            report_defaults = [
+                ("partnership_report_cost", 9, "Credits per partnership PDF report"),
+                ("career_report_cost", 15, "Credits per career PDF report"),
+                ("wealth_report_cost", 9, "Credits per wealth PDF report"),
+                ("health_report_cost", 9, "Credits per health PDF report"),
+                ("progeny_report_cost", 15, "Credits per progeny PDF report"),
+            ]
+            for key, value, desc in report_defaults:
+                if any(s["key"] == key for s in settings):
+                    continue
+                try:
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO credit_settings (setting_key, setting_value, description)
+                        VALUES (?, ?, ?)
+                        """,
+                        (key, int(value), desc),
+                    )
+                    conn.commit()
+                    settings.append({
+                        "key": key,
+                        "value": int(value),
+                        "description": desc,
                         "discount": None,
                     })
                 except Exception:

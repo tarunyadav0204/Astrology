@@ -43,6 +43,7 @@ export default function ChartScreen({ navigation, route }) {
   useAnalytics('ChartScreen');
   const { theme, colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const embedded = !!route?.params?.embedded;
   const [birthData, setBirthData] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -195,12 +196,14 @@ export default function ChartScreen({ navigation, route }) {
         scrollToActiveTab(newIndex);
       } else if ((translationX > swipeThreshold || (velocityX > velocityThreshold && translationX > 10)) && idx === 0) {
         // At first chart, right-swipe acts as screen back gesture.
-        navigation.goBack();
+        if (!embedded) {
+          navigation.goBack();
+        }
       } else {
         resetChartTranslation();
       }
     }
-  }, [chartTypes.length, chartTranslateX, resetChartTranslation, scrollToActiveTab]);
+  }, [chartTypes.length, chartTranslateX, resetChartTranslation, scrollToActiveTab, embedded, navigation]);
   
   const changeChart = useCallback((newIndex) => {
     if (newIndex === currentChartIndex) return;
@@ -583,7 +586,7 @@ export default function ChartScreen({ navigation, route }) {
       const data = await storage.getBirthDetails();
       if (!data || !data.name) {
         setLoading(false);
-        navigation.replace('BirthProfileIntro', { returnTo: 'Chart' });
+        navigation.replace('BirthProfileIntro', { returnTo: embedded ? 'ChartsHub' : 'Chart' });
         return;
       }
       if (data && data.name) {
@@ -621,17 +624,21 @@ export default function ChartScreen({ navigation, route }) {
           style={StyleSheet.absoluteFill} 
         />
         
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <SafeAreaView style={styles.safeArea} edges={embedded ? [] : ['top']}>
           <View style={styles.compactHeader}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.closeButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}>
-              <Ionicons name="arrow-back" size={20} color={colors.text} />
-            </TouchableOpacity>
+            {embedded ? (
+              <View style={[styles.closeButton, { backgroundColor: 'transparent' }]} />
+            ) : (
+              <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.closeButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}>
+                <Ionicons name="arrow-back" size={20} color={colors.text} />
+              </TouchableOpacity>
+            )}
             <View style={styles.headerCenter}>
               <Text style={[styles.chartName, { color: colors.text }]}>{chartTypes[currentChartIndex]?.name}</Text>
               {birthData && (
                 <NativeSelectorChip 
                   birthData={birthData}
-                  onPress={() => navigation.navigate('SelectNative')}
+                  onPress={() => navigation.navigate('SelectNative', embedded ? { returnTo: 'ChartsHub' } : undefined)}
                   maxLength={15}
                   style={styles.nativeChip}
                   textStyle={styles.nativeChipText}

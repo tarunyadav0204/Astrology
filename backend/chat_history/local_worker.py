@@ -59,6 +59,17 @@ async def _run_task(task: dict) -> None:
             sort_keys=True,
         ),
     )
+    if payload.get("speech_chat_requested") or payload.get("speech_chat_billing") or str(payload.get("chat_tier") or "").strip().lower() == "instant":
+        logger.info(
+            "SPEECH_DEBUG local_worker_task task_id=%s message_id=%s user_id=%s chat_tier=%s speech_requested=%s speech_billing=%s question=%r",
+            task.get("id"),
+            task.get("message_id"),
+            payload.get("user_id"),
+            payload.get("chat_tier"),
+            bool(payload.get("speech_chat_requested")),
+            bool(payload.get("speech_chat_billing")),
+            " ".join(str(payload.get("question") or "").split())[:240],
+        )
     await process_chat_task(payload, x_chat_task_secret=chat_task_secret())
 
 

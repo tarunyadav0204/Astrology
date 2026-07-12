@@ -106,10 +106,13 @@ from whatsapp.routes import router as whatsapp_router
 from credits.razorpay_subscription_routes import router as razorpay_subscription_router
 from tts.routes import router as tts_router
 from speech.routes import router as speech_router
+from speech.ws_routes import router as speech_ws_router
 from credits.credit_request_routes import router as credit_request_router
 from blank_chart.routes import router as blank_chart_router
 from education.routes import router as education_router
 from marriage.marriage_routes import router as marriage_router
+from reports.routes import router as reports_router
+from reports.admin_routes import router as reports_admin_router
 from progeny.progeny_routes import router as progeny_router
 from routes.mundane_routes import router as mundane_router
 from routes.places_routes import router as places_router
@@ -921,10 +924,13 @@ app.include_router(whatsapp_router, prefix="/api")
 app.include_router(razorpay_subscription_router, prefix="/api/credits")
 app.include_router(tts_router, prefix="/api")
 app.include_router(speech_router, prefix="/api")
+app.include_router(speech_ws_router, prefix="/api")
 app.include_router(credit_request_router, prefix="/api")
 app.include_router(blank_chart_router, prefix="/api")
 app.include_router(education_router, prefix="/api")
 app.include_router(marriage_router, prefix="/api")
+app.include_router(reports_router, prefix="/api")
+app.include_router(reports_admin_router, prefix="/api")
 app.include_router(progeny_router, prefix="/api")
 app.include_router(trading_router, prefix="/api")
 app.include_router(yogini_dasha_router, prefix="/api")

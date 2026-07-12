@@ -46,7 +46,7 @@ const chartToPartnerData = (chart) => {
   };
 };
 
-const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
+const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl, submitLabel = 'Analyze Compatibility' }) => {
   const [boyData, setBoyData] = useState(() => mergePartnerState(emptyPartner(), initialBoy));
   const [girlData, setGirlData] = useState(() => mergePartnerState(emptyPartner(), initialGirl));
 
@@ -364,7 +364,7 @@ const PartnerForm = ({ onSubmit, user, onLogin, initialBoy, initialGirl }) => {
 
         <div className="form-actions">
           <button type="submit" className="btn-analyze" disabled={!isFormValid()}>
-            Analyze Compatibility
+            {submitLabel}
           </button>
         </div>
       </form>

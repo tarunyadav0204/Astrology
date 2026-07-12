@@ -159,9 +159,10 @@ const HOUSE_SIGNIFICATIONS = {
   }
 };
 
-export default function AshtakvargaOracle({ navigation }) {
+export default function AshtakvargaOracle({ navigation, route }) {
   const { theme, colors } = useTheme();
   const { credits, fetchBalance } = useCredits();
+  const embedded = !!route?.params?.embedded;
   const [activeTab, setActiveTab] = useState(0);
   const [birthData, setBirthData] = useState(null);
   const [oracleData, setOracleData] = useState(null);
@@ -211,7 +212,7 @@ export default function AshtakvargaOracle({ navigation }) {
           }
           if (cancelled) return;
           if (!data?.name) {
-            navigation.replace('BirthProfileIntro', { returnTo: 'AshtakvargaOracle' });
+            navigation.replace('BirthProfileIntro', { returnTo: embedded ? 'ChartsHub' : 'AshtakvargaOracle' });
             return;
           }
           const prev = birthDataRef.current;
@@ -229,7 +230,7 @@ export default function AshtakvargaOracle({ navigation }) {
       return () => {
         cancelled = true;
       };
-    }, [navigation])
+    }, [navigation, embedded])
   );
 
   useEffect(() => {
@@ -304,7 +305,7 @@ export default function AshtakvargaOracle({ navigation }) {
           setOracleData(null);
         }
       } else {
-        navigation.replace('BirthProfileIntro', { returnTo: 'AshtakvargaOracle' });
+        navigation.replace('BirthProfileIntro', { returnTo: embedded ? 'ChartsHub' : 'AshtakvargaOracle' });
         return;
       }
     } catch (error) {
@@ -1504,18 +1505,22 @@ export default function AshtakvargaOracle({ navigation }) {
     <View style={styles.container}>
       <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
       <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]} style={styles.gradient}>
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={embedded ? [] : undefined}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={colors.text} />
-            </TouchableOpacity>
+            {embedded ? (
+              <View style={[styles.backButton, { backgroundColor: 'transparent' }]} />
+            ) : (
+              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                <Ionicons name="arrow-back" size={24} color={colors.text} />
+              </TouchableOpacity>
+            )}
             <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
               Ashtakvarga
             </Text>
             {birthData ? (
               <NativeSelectorChip
                 birthData={birthData}
-                onPress={() => navigation.navigate('SelectNative', { returnTo: 'AshtakvargaOracle' })}
+                onPress={() => navigation.navigate('SelectNative', { returnTo: embedded ? 'ChartsHub' : 'AshtakvargaOracle' })}
                 maxLength={10}
                 showIcon={false}
               />

@@ -355,9 +355,9 @@ export const chatAPI = {
     feature: 'event_timeline', 
     description: 'Cosmic Timeline Analysis' 
   }, GLOBAL_ERROR_CONFIG),
-  tts: (text, lang = 'en', voiceName, includeTimepoints = false) =>
+  tts: (text, lang = 'en', voiceName, includeTimepoints = false, prepareSpoken = true) =>
     api.post(getEndpoint('/tts/synthesize'), null, {
-      params: { text, lang, voice_name: voiceName, include_timepoints: includeTimepoints },
+      params: { text, lang, voice_name: voiceName, include_timepoints: includeTimepoints, prepare_spoken: prepareSpoken },
     }),
   getTtsVoices: () =>
     api.get(getEndpoint('/tts/voices')),
@@ -395,9 +395,62 @@ export const mundaneAPI = {
 };
 
 export const speechAPI = {
-  transcribeAudio: (audioFile, language = 'english') => {
+  createConversationSocket: async ({ onOpen, onMessage, onError, onClose } = {}) => {
+    const rawToken = await AsyncStorage.getItem('authToken');
+    const token = rawToken && String(rawToken).trim();
+    const base = String(API_BASE_URL || '').replace(/\/$/, '');
+    const wsBase = base.replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:');
+    const url = `${wsBase}${getEndpoint('/speech/ws')}?token=${encodeURIComponent(token || '')}`;
+    const socket = new WebSocket(url);
+
+    socket.onopen = (event) => {
+      if (onOpen) onOpen(event);
+    };
+    socket.onmessage = (event) => {
+      let data = null;
+      try {
+        data = JSON.parse(event?.data || '{}');
+      } catch {
+        data = { type: 'error', error: 'bad_json', raw: event?.data };
+      }
+      if (onMessage) onMessage(data, event);
+    };
+    socket.onerror = (event) => {
+      if (onError) onError(event);
+    };
+    socket.onclose = (event) => {
+      if (onClose) onClose(event);
+    };
+
+    return {
+      socket,
+      send: (payload) => {
+        if (socket.readyState !== WebSocket.OPEN) return false;
+        socket.send(JSON.stringify(payload || {}));
+        return true;
+      },
+      close: () => {
+        try {
+          socket.close();
+        } catch {
+          // ignore close failures
+        }
+      },
+      isOpen: () => socket.readyState === WebSocket.OPEN,
+    };
+  },
+  transcribeAudio: (audioFile, language = 'english', metadata = {}) => {
     const form = new FormData();
     form.append('language', language || 'english');
+    if (metadata?.durationMs != null) {
+      form.append('duration_ms', String(Math.round(Number(metadata.durationMs) || 0)));
+    }
+    if (metadata?.meteringMax != null) {
+      form.append('metering_max', String(Number(metadata.meteringMax)));
+    }
+    if (metadata?.meteringAvg != null) {
+      form.append('metering_avg', String(Number(metadata.meteringAvg)));
+    }
     form.append('audio', audioFile);
     return api.post(getEndpoint('/speech/transcribe'), form, {
       headers: {
@@ -745,6 +798,11 @@ export const creditAPI = {
   getBalance: () => api.get(getEndpoint('/credits/balance')),
   getSubscriptionDetails: () => api.get(getEndpoint('/credits/subscription')),
   getHistory: () => api.get(getEndpoint('/credits/history')),
+  startSpeechSession: () => api.post(getEndpoint('/credits/speech-session/start'), {}, GLOBAL_ERROR_CONFIG),
+  endSpeechSession: (sessionId, reason = 'ended') =>
+    api.post(getEndpoint(`/credits/speech-session/${encodeURIComponent(sessionId)}/end`), { reason }, GLOBAL_ERROR_CONFIG),
+  getSpeechSessionStatus: (sessionId) =>
+    api.get(getEndpoint(`/credits/speech-session/${encodeURIComponent(sessionId)}/status`), GLOBAL_ERROR_CONFIG),
   redeemPromoCode: (code) => 
     api.post(getEndpoint('/credits/redeem'), { code: code.toString() }, {
       headers: { 'Content-Type': 'application/json' },
@@ -907,6 +965,67 @@ export const relationshipAPI = {
       language,
       force_regenerate: forceRegenerate,
     }),
+};
+
+export const reportAPI = {
+  listTypes: () => api.get(getEndpoint('/reports/types')),
+  getHistory: ({ reportType = null, status = null, limit = 30, offset = 0 } = {}) => {
+    const params = new URLSearchParams();
+    if (reportType) params.append('report_type', reportType);
+    if (status) params.append('status', status);
+    params.append('limit', String(limit));
+    params.append('offset', String(offset));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return api.get(getEndpoint(`/reports/history${suffix}`));
+  },
+  startPartnershipReport: (personA, personB, language = 'english', options = {}) =>
+    api.post(getEndpoint('/reports/partnership/start'), {
+      report_type: 'partnership',
+      boy_birth_data: personA,
+      girl_birth_data: personB,
+      language,
+      chart_style: options.chartStyle || 'both',
+      force_regenerate: Boolean(options.forceRegenerate),
+      include_images: options.includeImages !== false,
+    }),
+  lookupExistingPartnershipReport: (personA, personB, language = 'english', options = {}) =>
+    api.post(getEndpoint('/reports/partnership/existing'), {
+      report_type: 'partnership',
+      boy_birth_data: personA,
+      girl_birth_data: personB,
+      language,
+      chart_style: options.chartStyle || 'both',
+      force_regenerate: false,
+      include_images: options.includeImages !== false,
+    }),
+  getPartnershipReportStatus: (reportId) =>
+    api.get(getEndpoint(`/reports/partnership/status/${encodeURIComponent(reportId)}`)),
+  getPartnershipReport: (reportId) =>
+    api.get(getEndpoint(`/reports/partnership/${encodeURIComponent(reportId)}`)),
+  startWealthReport: (person, language = 'english', options = {}) =>
+    api.post(getEndpoint('/reports/wealth/start'), {
+      report_type: 'wealth',
+      birth_data: person,
+      language,
+      chart_style: options.chartStyle || 'both',
+      force_regenerate: Boolean(options.forceRegenerate),
+      include_images: options.includeImages !== false,
+    }),
+  lookupExistingWealthReport: (person, language = 'english', options = {}) =>
+    api.post(getEndpoint('/reports/wealth/existing'), {
+      report_type: 'wealth',
+      birth_data: person,
+      language,
+      chart_style: options.chartStyle || 'both',
+      force_regenerate: false,
+      include_images: options.includeImages !== false,
+    }),
+  getWealthReportStatus: (reportId) =>
+    api.get(getEndpoint(`/reports/wealth/status/${encodeURIComponent(reportId)}`)),
+  getWealthReport: (reportId) =>
+    api.get(getEndpoint(`/reports/wealth/${encodeURIComponent(reportId)}`)),
+  getReportPdfUrl: (reportId) =>
+    api.get(getEndpoint(`/reports/pdf/${encodeURIComponent(reportId)}`)),
 };
 
 export const pricingAPI = {

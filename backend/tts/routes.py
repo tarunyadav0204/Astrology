@@ -11,6 +11,7 @@ from google.cloud import texttospeech
 from google.cloud import texttospeech_v1beta1 as texttospeech_beta
 import logging
 import asyncio
+import time
 from functools import partial
 from pydantic import BaseModel
 from typing import Optional, Union
@@ -79,6 +80,29 @@ TTS_CREDENTIALS_ENV_ALT = "GOOGLE_SERVICE_ACCOUNT_KEY"
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tts", tags=["tts"])
 _SPOKEN_TTS_CACHE: dict[str, str] = {}
+_FAST_SPEECH_VOICE_EN = os.getenv("SPEECH_TTS_FAST_VOICE_EN", "en-IN-Neural2-A")
+_FAST_SPEECH_VOICE_HI = os.getenv("SPEECH_TTS_FAST_VOICE_HI", "hi-IN-Neural2-A")
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+  raw = os.getenv(name)
+  if raw is None:
+    return default
+  return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _resolve_live_speech_voice(lang: str, requested_voice_name: Optional[str] = None) -> str:
+  """
+  Live speech should honor the admin-selected brand voice by default. If we need
+  emergency speed mode, SPEECH_TTS_FAST_VOICE=true swaps Chirp to a faster voice.
+  """
+  resolved = requested_voice_name or get_speech_tts_voice(lang or "en")
+  if requested_voice_name or not _env_flag("SPEECH_TTS_FAST_VOICE", False):
+    return resolved
+  if "chirp" not in str(resolved or "").lower():
+    return resolved
+  normalized_lang = str(lang or "en").lower()
+  return _FAST_SPEECH_VOICE_HI if normalized_lang.startswith("hi") else _FAST_SPEECH_VOICE_EN
 
 
 def _build_voice_and_config(lang: str, voice_name: Optional[str] = None):
@@ -229,6 +253,33 @@ def _fallback_spoken_tts_text(text: str, lang: str) -> str:
   spoken = re.sub(r"([.?!।])\s+", r"\1 [PAUSE:medium] ", spoken)
   spoken = re.sub(r"\s{2,}", " ", spoken).strip()
   return spoken
+
+
+def _strip_spoken_control_cues_for_plain_tts(text: str) -> str:
+  """Remove pause/emphasis control cues before sending text to non-SSML TTS."""
+  cleaned = str(text or "")
+  cleaned = re.sub(
+    r"\[\s*PAUS[EC]\s*:\s*(?:short|medium|long)\s*\]",
+    ". ",
+    cleaned,
+    flags=re.IGNORECASE,
+  )
+  cleaned = re.sub(
+    r"\bPAUS[EC][\s:_-]+(?:short|medium|long)\b",
+    ". ",
+    cleaned,
+    flags=re.IGNORECASE,
+  )
+  cleaned = re.sub(
+    r"\[\s*(?:EMPHASIS|RISE|FALL|SLOW)\s*:\s*([^\]]+)\]",
+    r"\1",
+    cleaned,
+    flags=re.IGNORECASE,
+  )
+  cleaned = re.sub(r"\s+([,.?!।])", r"\1", cleaned)
+  cleaned = re.sub(r"([,.?!।]){2,}", r"\1", cleaned)
+  cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+  return cleaned
 
 
 def _prepare_spoken_tts_text(text: str, lang: str) -> str:
@@ -801,6 +852,7 @@ async def synthesize(
   lang: str = "en",
   voice_name: Optional[str] = None,
   include_timepoints: bool = Query(default=False),
+  prepare_spoken: bool = False,
 ):
   """
   Google Cloud Text-to-Speech with Indian voices.
@@ -819,25 +871,35 @@ async def synthesize(
     logger.exception("TTS: Error initializing TextToSpeechClient")
     raise HTTPException(status_code=503, detail=f"TTS client initialization failed: {e}")
 
-  resolved_voice_name = voice_name or get_speech_tts_voice(lang or "en")
+  resolved_voice_name = _resolve_live_speech_voice(lang or "en", voice_name)
   voice, audio_config = _build_voice_and_config(lang or "en", resolved_voice_name)
   try:
+    tts_total_started = time.perf_counter()
     timing_mode_used = False
     timing_disabled_reason: str | None = None
     timepoints_payload: list[dict] = []
     timeline_payload: list[dict] = []
-    spoken_text = _prepare_spoken_tts_text(text, lang or "en")
+    prep_started = time.perf_counter()
+    spoken_text = (
+      _prepare_spoken_tts_text(text, lang or "en")
+      if prepare_spoken
+      else _fallback_spoken_tts_text(text, lang or "en")
+    )
+    prep_ms = (time.perf_counter() - prep_started) * 1000.0
     allow_word_mark_timing = _voice_supports_word_mark_timepoints(resolved_voice_name)
     logger.info(
-      "TTS: synthesize request prepared spoken text (lang=%s, include_timepoints=%s, src_chars=%s, spoken_chars=%s, voice=%s, allow_word_mark_timing=%s)",
+      "TTS: synthesize request prepared spoken text (lang=%s, include_timepoints=%s, prepare_spoken=%s, prep_ms=%.1f, src_chars=%s, spoken_chars=%s, voice=%s, allow_word_mark_timing=%s)",
       lang,
       include_timepoints,
+      prepare_spoken,
+      prep_ms,
       len(str(text or "")),
       len(spoken_text),
       resolved_voice_name,
       allow_word_mark_timing,
     )
 
+    synth_started = time.perf_counter()
     if include_timepoints and allow_word_mark_timing:
       marked_chunks = _build_marked_ssml_chunks_and_timeline(spoken_text)
       if marked_chunks:
@@ -873,16 +935,24 @@ async def synthesize(
     else:
       if include_timepoints and not allow_word_mark_timing:
         timing_disabled_reason = "voice_family_prefers_smooth_audio"
-      marked_chunks = _build_marked_ssml_chunks_and_timeline(spoken_text)
-      if marked_chunks:
-        audio_parts = []
-        for chunk in marked_chunks:
-          audio_parts.append(
-            await _synthesize_ssml(client, voice, audio_config, _strip_mark_tags(chunk["ssml"]))
-          )
-        audio_bytes = b"".join(audio_parts)
-      else:
-        audio_bytes = await _chunk_and_synthesize(client, voice, audio_config, spoken_text)
+      audio_bytes = await _chunk_and_synthesize(
+        client,
+        voice,
+        audio_config,
+        _strip_spoken_control_cues_for_plain_tts(spoken_text),
+      )
+    synth_ms = (time.perf_counter() - synth_started) * 1000.0
+    total_ms = (time.perf_counter() - tts_total_started) * 1000.0
+    logger.info(
+      "TTS_PERF synthesize_complete lang=%s prepare_spoken=%s include_timepoints=%s prep_ms=%.1f synth_ms=%.1f total_ms=%.1f audio_bytes=%s",
+      lang,
+      prepare_spoken,
+      include_timepoints,
+      prep_ms,
+      synth_ms,
+      total_ms,
+      len(audio_bytes or b""),
+    )
   except Exception as e:
     logger.exception("TTS: synthesize_speech failed")
     raise HTTPException(status_code=500, detail=f"TTS synthesis failed: {e}")

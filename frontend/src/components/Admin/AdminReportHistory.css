@@ -1,0 +1,186 @@
+.admin-report-history {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-report-history__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.admin-report-history__header h2 {
+  color: #0f172a;
+  margin: 0 0 4px;
+}
+
+.admin-report-history__hint {
+  margin: 0;
+  max-width: 720px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.admin-report-history__filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.admin-report-history__filters input,
+.admin-report-history__filters select,
+.admin-report-history__filters button,
+.admin-report-history__refresh {
+  border: 1px solid #d0d7de;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #0f172a;
+}
+
+.admin-report-history__filters button,
+.admin-report-history__refresh {
+  cursor: pointer;
+  padding: 8px 12px;
+}
+
+.admin-report-history__error {
+  color: #b42318;
+  background: #fef3f2;
+  border: 1px solid #fecdca;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.admin-report-history__meta {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.admin-report-history__table-wrap {
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.admin-report-history__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1680px;
+}
+
+.admin-report-history__table th,
+.admin-report-history__table td {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 10px;
+  text-align: left;
+  vertical-align: top;
+  font-size: 13px;
+}
+
+.admin-report-history__table th {
+  background: #f8fafc;
+  font-weight: 700;
+  color: #0f172a !important;
+}
+
+.admin-report-history__sub {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.admin-report-history__model {
+  max-width: 220px;
+  overflow-wrap: anywhere;
+}
+
+.admin-report-history__version {
+  max-width: 180px;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.admin-report-history__empty {
+  text-align: center;
+  color: #64748b;
+}
+
+.admin-report-history__pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-report-history__pager button {
+  border: 1px solid #d0d7de;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.admin-report-history__pager button:disabled,
+.admin-report-history__refresh:disabled,
+.admin-report-history__filters button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.admin-report-history__pdf-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #c2410c;
+  background: #fff7ed;
+  color: #9a3412;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.admin-report-history__pdf-btn:hover:not(:disabled) {
+  background: #ffedd5;
+}
+
+.admin-report-history__pdf-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.admin-report-history__status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.admin-report-history__status--completed {
+  background: #ecfdf3;
+  color: #067647;
+}
+
+.admin-report-history__status--failed {
+  background: #fef3f2;
+  color: #b42318;
+}
+
+.admin-report-history__status--processing,
+.admin-report-history__status--pending {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.admin-report-history__error-cell {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #b42318;
+}

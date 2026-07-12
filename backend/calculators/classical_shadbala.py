@@ -873,7 +873,7 @@ def calculate_classical_shadbala(birth_data, chart_data: Dict) -> Dict:
             birth_dict = birth_data
         
         if not chart_data.get("divisions"):
-            _logger.warning(
+            _logger.debug(
                 "Shadbala: chart_data missing non-empty 'divisions'; Saptavargaja Bala will use "
                 "neutral defaults. Keys present: %s",
                 list(chart_data.keys()),

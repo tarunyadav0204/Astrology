@@ -78,6 +78,7 @@ function FullHamburgerMenuItems({
     </button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/ashtakavarga'); onClose(); }}>⊞ Ashtakavarga</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/kundli-matching', user ? undefined : { state: { openLogin: true } }); onClose(); }}>💕 Kundli matching</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/reports', user ? undefined : { state: { openLogin: true } }); onClose(); }}>📄 Reports Studio</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/#numerology'); onClose(); }}>🔢 Numerology</button>
 
     <div className="mobile-menu-section-label">Explore</div>
@@ -227,6 +228,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
               <button onClick={() => navigate('/festivals')}>Festivals</button>
               <button onClick={() => navigate('/nakshatras')}>Nakshatras</button>
               <button type="button" className="compact-menu__item compact-menu__item--wide" onClick={() => navigate('/kundli-matching', user ? undefined : { state: { openLogin: true } })}>Kundli matching</button>
+              <button type="button" className="compact-menu__item compact-menu__item--wide" onClick={() => navigate('/reports', user ? undefined : { state: { openLogin: true } })}>Reports Studio</button>
               {onAstrologyClick ? (
                 <button type="button" className="compact-menu__item compact-menu__item--optional" onClick={() => onAstrologyClick()}>Astrology</button>
               ) : (
@@ -469,6 +471,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
             <li><button onClick={() => navigate('/festivals')}>Festivals</button></li>
             <li><button onClick={() => navigate('/nakshatras')}>Nakshatras</button></li>
             <li><button type="button" onClick={() => navigate('/kundli-matching', user ? undefined : { state: { openLogin: true } })}>Kundli matching</button></li>
+            <li><button type="button" onClick={() => navigate('/reports', user ? undefined : { state: { openLogin: true } })}>Reports Studio</button></li>
             <li>
               {onAstrologyClick ? (
                 <button type="button" onClick={() => onAstrologyClick()}>Astrology</button>

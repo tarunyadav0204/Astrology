@@ -857,6 +857,11 @@ def chat_worker_mode_enabled_for_user(user_id: Optional[int]) -> bool:
         return False
 
 
+def is_free_question_enabled() -> bool:
+    """Master switch for the one-time free standard chat question. Default ON (current product behavior)."""
+    return _parse_bool_setting(get_setting("free_question_enabled"), default=True)
+
+
 def is_free_question_parashari_only_enabled() -> bool:
     """Global feature flag for answering free chat questions through a Parashari-only final lane."""
     return _parse_bool_setting(get_setting("free_question_parashari_only_enabled"), default=False)

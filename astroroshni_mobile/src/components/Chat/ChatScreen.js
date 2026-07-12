@@ -34,6 +34,7 @@ import HomeScreen from './HomeScreen';
 import CalibrationCard from './CalibrationCard';
 import PremiumAnalysisModal from './PremiumAnalysisModal';
 import NotificationEnableReminderModal from '../Notifications/NotificationEnableReminderModal';
+import NotificationEnableBanner from '../Notifications/NotificationEnableBanner';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import PodcastPromoModal from './PodcastPromoModal';
 import ChatRatingPromptModal from './ChatRatingPromptModal';
@@ -593,6 +594,8 @@ export default function ChatScreen({ navigation, route }) {
   const [showTopicIdeas, setShowTopicIdeas] = useState(false);
   /** Themed insufficient-credits popup when a suggestion card is tapped without enough balance. */
   const [showInsufficientCreditsAlert, setShowInsufficientCreditsAlert] = useState(false);
+  /** Soft push opt-in after a successful answer (Android; cadence in notificationReminder). */
+  const [showChatNotifBanner, setShowChatNotifBanner] = useState(false);
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -2670,6 +2673,8 @@ export default function ChatScreen({ navigation, route }) {
       openPartnershipModal(option.cost);
     } else if (option.action === 'relationshipMatch') {
       navigation.navigate('RelationshipMatch');
+    } else if (option.action === 'reports') {
+      navigation.navigate('ReportsStudio');
     } else if (option.action === 'mundane') {
       openMundaneModal(option.cost);
     } else if (option.action === 'periods') {
@@ -3440,6 +3445,7 @@ export default function ChatScreen({ navigation, route }) {
             const gatedNoCharge = status.message_type === 'native_gate' || status.message_type === 'clarification';
             if (!gatedNoCharge) {
               fetchBalance();
+              setShowChatNotifBanner(true);
             } else {
               freeUsedThisSendRef.current = false;
             }
@@ -5474,6 +5480,13 @@ export default function ChatScreen({ navigation, route }) {
                 )}
               </View>
             )}
+            {showChatNotifBanner && !showGreeting ? (
+              <NotificationEnableBanner
+                reason="chat_answer"
+                active={showChatNotifBanner}
+                style={{ marginHorizontal: 12, marginBottom: 8 }}
+              />
+            ) : null}
             <LinearGradient
                       colors={Platform.OS === 'android'
                         ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.15)', 'rgba(0, 0, 0, 0.05)'] : ['rgba(249, 115, 22, 0.04)', 'rgba(249, 115, 22, 0.02)'])
@@ -6435,6 +6448,31 @@ export default function ChatScreen({ navigation, route }) {
                         </LinearGradient>
                       </View>
                       <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.podcastHistory', 'Podcast History')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={getMenuOptionStyle()}
+                    onPress={() => {
+                      closeMenuDrawer(() => { navigation.navigate('ReportHistory'); });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#f97316', '#fb7185']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>📄</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('reports.reportHistoryMenu', 'Report History')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>

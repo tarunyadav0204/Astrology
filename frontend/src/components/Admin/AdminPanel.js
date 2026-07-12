@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { adminService, getAdminAuthHeaders, getDeviceId } from '../../services/adminService';
 import AdminChatHistory from './AdminChatHistory';
 import AdminEventTimelineHistory from './AdminEventTimelineHistory';
+import AdminReportHistory from './AdminReportHistory';
 import AdminCreditLedger from './AdminCreditLedger';
 import AdminDailyActivity from './AdminDailyActivity';
 import AdminActivity from './AdminActivity';
@@ -315,6 +316,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [chatWorkerModeEnabled, setChatWorkerModeEnabled] = useState(false);
   const [chatWorkerUserAllowlist, setChatWorkerUserAllowlist] = useState('');
   const [chatWorkerModeSaving, setChatWorkerModeSaving] = useState(false);
+  const [freeQuestionEnabled, setFreeQuestionEnabled] = useState(true);
+  const [freeQuestionEnabledSaving, setFreeQuestionEnabledSaving] = useState(false);
   const [freeQuestionParashariOnlyEnabled, setFreeQuestionParashariOnlyEnabled] = useState(false);
   const [freeQuestionParashariOnlySaving, setFreeQuestionParashariOnlySaving] = useState(false);
   const [firstPurchaseBonusEnabled, setFirstPurchaseBonusEnabled] = useState(false);
@@ -735,6 +738,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setChatSubjectGateUserAllowlist(data.chat_subject_gate_user_allowlist || '');
       setChatWorkerModeEnabled(Boolean(data.chat_worker_mode_enabled));
       setChatWorkerUserAllowlist(data.chat_worker_user_allowlist || '');
+      setFreeQuestionEnabled(data.free_question_enabled !== false);
       setFreeQuestionParashariOnlyEnabled(Boolean(data.free_question_parashari_only_enabled));
       const firstBonusConfig = data.first_purchase_bonus_config || {};
       setFirstPurchaseBonusEnabled(Boolean(data.first_purchase_bonus_enabled));
@@ -1293,6 +1297,36 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert('Failed to save chat worker settings.');
     } finally {
       setChatWorkerModeSaving(false);
+    }
+  };
+
+  const handleSaveFreeQuestionEnabledSettings = async () => {
+    setFreeQuestionEnabledSaving(true);
+    try {
+      const response = await fetch('/api/admin/settings/free_question_enabled', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAdminAuthHeaders(),
+        },
+        body: JSON.stringify({
+          key: 'free_question_enabled',
+          value: freeQuestionEnabled ? 'true' : 'false',
+          description: 'Master switch for the one-time free standard chat question. When off, users are charged normally and free-question UI is hidden.',
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        alert('Failed to save free-question setting: ' + (err.detail || 'check console'));
+        return;
+      }
+      alert(`Free first question ${freeQuestionEnabled ? 'enabled' : 'disabled'}. Balance and new chats pick this up within about a minute.`);
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving free-question setting:', error);
+      alert('Failed to save free-question setting.');
+    } finally {
+      setFreeQuestionEnabledSaving(false);
     }
   };
 
@@ -3174,6 +3208,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Event timeline
           </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'reports' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('reports')}
+          >
+            Reports
+          </button>
         </div>
       )}
 
@@ -3900,6 +3941,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'chat' && activeSubTab === 'eventTimeline' && (
           <AdminEventTimelineHistory />
+        )}
+        {activeTab === 'chat' && activeSubTab === 'reports' && (
+          <AdminReportHistory />
         )}
 
         {activeTab === 'ledger' && (
@@ -6144,6 +6188,37 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   disabled={chatWorkerModeSaving}
                 >
                   {chatWorkerModeSaving ? 'Saving…' : 'Save chat worker settings'}
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Free first question</h3>
+              <p className="settings-hint">
+                Master switch for the one-time free standard chat question. When off, eligible users are charged normally and free-question banners stay hidden. Already-used free questions are not reset.
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Enable free first question</strong>
+                  <p>Applies to standard chat only (not partnership, premium, or instant).</p>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={freeQuestionEnabled}
+                    onChange={(e) => setFreeQuestionEnabled(e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="create-btn"
+                  onClick={handleSaveFreeQuestionEnabledSettings}
+                  disabled={freeQuestionEnabledSaving}
+                >
+                  {freeQuestionEnabledSaving ? 'Saving…' : 'Save free first question'}
                 </button>
               </div>
             </div>

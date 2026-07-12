@@ -114,6 +114,17 @@ export default function AnalysisHubScreen({ navigation }) {
   const getAnalysisTypes = () => {
     const baseTypes = [
       {
+        id: 'reports',
+        title: Platform.OS === 'ios' ? 'Premium Report Studio' : 'Premium Reports',
+        subtitle: Platform.OS === 'ios' ? 'Choose charts, language, and generate a polished PDF' : 'Build a premium PDF with two-chart selection',
+        icon: '📄',
+        gradient: ['#fb7185', '#f97316'],
+        description: Platform.OS === 'ios'
+          ? 'A premium report flow that keeps the answer hidden until after generation, then gives you a polished PDF.'
+          : 'Start here when you want a premium PDF report instead of a generic summary.',
+        isFree: false,
+      },
+      {
         id: 'career',
         title: Platform.OS === 'ios' ? 'Chart Study' : 'Career Analysis',
         subtitle: Platform.OS === 'ios' ? 'Review your chart for work themes and direction' : 'Professional success & opportunities',
@@ -188,12 +199,20 @@ export default function AnalysisHubScreen({ navigation }) {
     
     return baseTypes.map(type => ({
       ...type,
-      cost: pricing[type.id] || 0,
-      originalCost: pricingOriginal[type.id],
+      cost: type.id === 'reports'
+        ? (pricing.partnership_report ?? pricing.partnership ?? 9)
+        : (pricing[type.id] || 0),
+      originalCost: type.id === 'reports'
+        ? (pricingOriginal.partnership_report ?? pricingOriginal.partnership ?? null)
+        : pricingOriginal[type.id],
     }));
   };
 
   const handleAnalysisSelect = (analysisType) => {
+    if (analysisType.id === 'reports') {
+      navigation.navigate('ReportsStudio');
+      return;
+    }
     if (analysisType.id === 'relationshipMatch') {
       navigation.navigate('RelationshipMatch');
       return;

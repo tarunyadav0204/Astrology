@@ -466,8 +466,12 @@ def _totals_from_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def _parallel_cache_ttl_s() -> int:
-    # This cache is explicitly deleted after each request; TTL is only a fallback.
-    return max(300, int(os.getenv("ASTRO_PARALLEL_CHAT_CACHE_TTL_S", "300") or 300))
+    from ai.gemini_context_cache import gemini_context_cache_ttl_s
+
+    return gemini_context_cache_ttl_s(
+        env_name="ASTRO_PARALLEL_CHAT_CACHE_TTL_S",
+        default=300,
+    )
 
 
 async def _create_gemini_parallel_cache(
@@ -483,54 +487,23 @@ async def _create_gemini_parallel_cache(
 
     Returns: (cache_resource, cached_model, setup_chars, setup_tokens)
     """
-    if llm_provider != "gemini" or not _env_bool(cache_enabled_env, default=True):
-        return None, None, 0, 0
-    try:
-        from google.generativeai import caching as genai_caching
-        import google.generativeai as genai
+    from ai.gemini_context_cache import create_gemini_context_cache
 
-        cache_text = f"{cache_label.upper()}_SHARED_CONTEXT_JSON:\n{_json_compact(cache_payload)}"
-        cache_setup_input_chars = len(cache_text)
-        cache_setup_input_tokens = max(1, int(round(cache_setup_input_chars / 4.0)))
-        ttl_s = _parallel_cache_ttl_s()
-        logger.info(
-            "%s_CACHE create model=%s ttl_s=%s context_chars=%s",
-            cache_label.upper(),
-            model_name,
-            ttl_s,
-            cache_setup_input_chars,
-        )
-        cache_resource = await asyncio.to_thread(
-            genai_caching.CachedContent.create,
-            model=model_name,
-            display_name=f"{cache_label}-{int(time.time())}",
-            system_instruction="Use cached shared context for all branch and merge reasoning.",
-            contents=[cache_text],
-            ttl=ttl_s,
-        )
-        cached_model = await asyncio.to_thread(
-            genai.GenerativeModel.from_cached_content,
-            cache_resource,
-        )
-        logger.info(
-            "%s_CACHE created name=%s",
-            cache_label.upper(),
-            getattr(cache_resource, "name", "unknown"),
-        )
-        return cache_resource, cached_model, cache_setup_input_chars, cache_setup_input_tokens
-    except Exception as e:
-        logger.warning("%s_CACHE failed; continuing without cache: %s", cache_label.upper(), e)
-        return None, None, 0, 0
+    return await create_gemini_context_cache(
+        llm_provider=llm_provider,
+        model_name=model_name,
+        cache_payload=cache_payload,
+        cache_label=cache_label,
+        cache_enabled_env=cache_enabled_env,
+        system_instruction="Use cached shared context for all branch and merge reasoning.",
+        ttl_env_name="ASTRO_PARALLEL_CHAT_CACHE_TTL_S",
+    )
 
 
 async def _delete_parallel_cache(cache_resource: Optional[Any], *, cache_label: str) -> None:
-    if cache_resource is None:
-        return
-    try:
-        await asyncio.to_thread(cache_resource.delete)
-        logger.info("%s_CACHE deleted", cache_label.upper())
-    except Exception as e:
-        logger.warning("%s_CACHE delete failed: %s", cache_label.upper(), e)
+    from ai.gemini_context_cache import delete_gemini_context_cache
+
+    await delete_gemini_context_cache(cache_resource, cache_label=cache_label)
 
 
 async def _run_branch_json(

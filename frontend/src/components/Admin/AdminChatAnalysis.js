@@ -98,57 +98,74 @@ export default function AdminChatAnalysis() {
 
   return (
     <div className="admin-chat-analysis">
-      <h2>Chat analysis</h2>
+      <header className="admin-chat-analysis-header">
+        <h2>Chat Analysis</h2>
+        <p className="admin-chat-analysis-lead">
+          Category mix and frequently asked questions from chat sessions.
+        </p>
+      </header>
 
       <div className="admin-chat-analysis-section">
-        <h3>By category</h3>
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Category</th>
-              <th>Count</th>
-            </tr>
-          </thead>
-          <tbody>
-            {byCategory.length === 0 ? (
-              <tr><td colSpan={2}>No categorized questions yet.</td></tr>
-            ) : (
-              byCategory.map((row) => (
-                <tr key={row.category}>
-                  <td>{row.category}</td>
-                  <td>{row.count}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="admin-chat-analysis-section">
-        <h3>By FAQ (frequently asked)</h3>
-        {faqLoading ? (
-          <div className="admin-chat-analysis-loading">Loading FAQ page…</div>
-        ) : (
+        <div className="admin-chat-analysis-section-head">
+          <h3>By category</h3>
+          <span className="admin-chat-analysis-meta">{byCategory.length} categories</span>
+        </div>
+        <div className="admin-chat-analysis-table-wrap">
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Canonical question</th>
-                <th>Count</th>
+                <th>Category</th>
+                <th className="admin-chat-analysis-num">Count</th>
               </tr>
             </thead>
             <tbody>
-              {byFaq.length === 0 ? (
-                <tr><td colSpan={2}>No FAQ data yet.</td></tr>
+              {byCategory.length === 0 ? (
+                <tr><td colSpan={2} className="admin-chat-analysis-empty">No categorized questions yet.</td></tr>
               ) : (
-                byFaq.map((row, i) => (
-                  <tr key={`${row.canonical_question || 'row'}-${i}`}>
-                    <td>{row.canonical_question}</td>
-                    <td>{row.count}</td>
+                byCategory.map((row) => (
+                  <tr key={row.category}>
+                    <td>{row.category}</td>
+                    <td className="admin-chat-analysis-num">{row.count}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="admin-chat-analysis-section">
+        <div className="admin-chat-analysis-section-head">
+          <h3>By FAQ</h3>
+          <span className="admin-chat-analysis-meta">
+            {faqTotal === 0 ? 'No rows' : `${faqRangeStart}–${faqRangeEnd} of ${faqTotal}`}
+          </span>
+        </div>
+        {faqLoading ? (
+          <div className="admin-chat-analysis-loading">Loading FAQ page…</div>
+        ) : (
+          <div className="admin-chat-analysis-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Canonical question</th>
+                  <th className="admin-chat-analysis-num">Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byFaq.length === 0 ? (
+                  <tr><td colSpan={2} className="admin-chat-analysis-empty">No FAQ data yet.</td></tr>
+                ) : (
+                  byFaq.map((row, i) => (
+                    <tr key={`${row.canonical_question || 'row'}-${i}`}>
+                      <td>{row.canonical_question}</td>
+                      <td className="admin-chat-analysis-num">{row.count}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {showFaqPagination && (
