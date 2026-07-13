@@ -1,6 +1,6 @@
 import React from 'react';
 
-const AuspiciousTimings = ({ choghadiyaData, horaData, muhurtaData, selectedDate }) => {
+const AuspiciousTimings = ({ choghadiyaData, horaData, muhurtaData, selectedDate, amritKalam }) => {
   if (!choghadiyaData || !horaData || !muhurtaData) {
     return (
       <div className="auspicious-timings">
@@ -63,9 +63,32 @@ const AuspiciousTimings = ({ choghadiyaData, horaData, muhurtaData, selectedDate
   const currentChoghadiya = getCurrentChoghadiya();
   const currentHora = getCurrentHora();
   const activeMuhurtas = getActiveMuhurtas();
+  const amritPeriods = Array.isArray(amritKalam) ? amritKalam : [];
 
   return (
     <div className="auspicious-timings">
+
+      {amritPeriods.length > 0 && (
+        <div className="timing-section">
+          <h4>💧 Amrit Kalam</h4>
+          <div className="hora-list">
+            {amritPeriods.map((period, index) => {
+              const isActive = isCurrentlyActive(period.start_time, period.end_time);
+              return (
+                <div key={`amrit-${index}`} className={`hora-item ${isActive ? 'active' : ''}`}>
+                  <div className="hora-header">
+                    <span className="hora-planet">Amrit</span>
+                    <span className="hora-time">
+                      {formatTime(period.start_time)} - {formatTime(period.end_time)}
+                    </span>
+                    {isActive && <span className="active-indicator">●</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       
       {/* Currently Active Auspicious Periods */}
       {(currentChoghadiya?.quality === 'Good' || currentChoghadiya?.quality === 'Best' || currentChoghadiya?.quality === 'Gain' || currentHora || activeMuhurtas.length > 0) && (

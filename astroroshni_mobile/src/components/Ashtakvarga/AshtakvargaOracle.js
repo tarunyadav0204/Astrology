@@ -159,7 +159,7 @@ const HOUSE_SIGNIFICATIONS = {
   }
 };
 
-export default function AshtakvargaOracle({ navigation, route }) {
+export default function AshtakvargaOracle({ navigation, route, onHeaderStateChange }) {
   const { theme, colors } = useTheme();
   const { credits, fetchBalance } = useCredits();
   const embedded = !!route?.params?.embedded;
@@ -1202,6 +1202,19 @@ export default function AshtakvargaOracle({ navigation, route }) {
   const [yearlyProgress, setYearlyProgress] = useState(0);
   const [showInfoModal, setShowInfoModal] = useState(false);
 
+  const openInfoModal = useCallback(() => {
+    setShowInfoModal(true);
+  }, []);
+
+  useEffect(() => {
+    if (!onHeaderStateChange || !embedded) return;
+    onHeaderStateChange({
+      title: 'Ashtakvarga',
+      birthData: birthData?.name ? birthData : null,
+      onOpenInfo: openInfoModal,
+    });
+  }, [onHeaderStateChange, embedded, birthData, openInfoModal]);
+
   const startLoadingAnimation = () => {
     setLoadingProgress(0);
     Animated.loop(
@@ -1506,21 +1519,18 @@ export default function AshtakvargaOracle({ navigation, route }) {
       <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
       <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]} style={styles.gradient}>
         <SafeAreaView style={styles.safeArea} edges={embedded ? [] : undefined}>
+          {!embedded ? (
           <View style={styles.header}>
-            {embedded ? (
-              <View style={[styles.backButton, { backgroundColor: 'transparent' }]} />
-            ) : (
-              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                <Ionicons name="arrow-back" size={24} color={colors.text} />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
               Ashtakvarga
             </Text>
             {birthData ? (
               <NativeSelectorChip
                 birthData={birthData}
-                onPress={() => navigation.navigate('SelectNative', { returnTo: embedded ? 'ChartsHub' : 'AshtakvargaOracle' })}
+                onPress={() => navigation.navigate('SelectNative', { returnTo: 'AshtakvargaOracle' })}
                 maxLength={10}
                 showIcon={false}
               />
@@ -1529,6 +1539,7 @@ export default function AshtakvargaOracle({ navigation, route }) {
               <Ionicons name="information-circle-outline" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
+          ) : null}
 
           <View style={styles.tabNavigation}>
             {ASHTAKVARGA_TABS.map((tab, index) => {

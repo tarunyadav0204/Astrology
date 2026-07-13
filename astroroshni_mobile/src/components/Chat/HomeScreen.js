@@ -18,7 +18,6 @@ import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import Icon from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Text as SvgText, Path, Line, Rect, Polygon } from 'react-native-svg';
 import { COLORS } from '../../utils/constants';
@@ -211,6 +210,92 @@ const formatDateOrdinal = (isoDate) => {
   return `${dayStr} ${month} ${y}`;
 };
 
+const formatPanchangClock = (value) => {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return typeof value === 'string' ? value : null;
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+};
+
+const getActivePanchangWindow = (panchangData) => {
+  if (!panchangData) return null;
+  const now = Date.now();
+  const windows = [];
+
+  const pushWindow = (key, labelKey, fallbackLabel, start, end, tone) => {
+    if (!start || !end) return;
+    const startMs = new Date(start).getTime();
+    const endMs = new Date(end).getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) return;
+    windows.push({ key, labelKey, fallbackLabel, start, end, startMs, endMs, tone });
+  };
+
+  pushWindow(
+    'brahma',
+    'home.panchang.brahmaMuhurta',
+    'Brahma Muhurta',
+    panchangData.brahma_muhurta_start,
+    panchangData.brahma_muhurta_end,
+    'good'
+  );
+  pushWindow(
+    'abhijit',
+    'home.panchang.abhijitMuhurta',
+    'Abhijit Muhurta',
+    panchangData.abhijit_muhurta_start,
+    panchangData.abhijit_muhurta_end,
+    'good'
+  );
+  (panchangData.inauspicious_times?.amrit_kalam || []).forEach((period, index) => {
+    pushWindow(
+      `amrit-${index}`,
+      'home.panchang.amritKalam',
+      'Amrit Kalam',
+      period?.start_time,
+      period?.end_time,
+      'good'
+    );
+  });
+  pushWindow(
+    'rahu',
+    'home.panchang.rahuKaal',
+    'Rahu Kaal',
+    panchangData.rahu_kaal?.rahu_kaal_start,
+    panchangData.rahu_kaal?.rahu_kaal_end,
+    'caution'
+  );
+  (panchangData.inauspicious_times?.dur_muhurta || []).forEach((period, index) => {
+    pushWindow(
+      `dur-${index}`,
+      'home.panchang.durMuhurta',
+      'Dur Muhurta',
+      period?.start_time,
+      period?.end_time,
+      'caution'
+    );
+  });
+  (panchangData.inauspicious_times?.varjyam || []).forEach((period, index) => {
+    pushWindow(
+      `varjyam-${index}`,
+      'home.panchang.varjyam',
+      'Varjyam',
+      period?.start_time,
+      period?.end_time,
+      'caution'
+    );
+  });
+
+  const active = windows.find((w) => now >= w.startMs && now <= w.endMs);
+  if (active) return { ...active, status: 'active' };
+
+  const upcoming = windows
+    .filter((w) => w.startMs > now)
+    .sort((a, b) => a.startMs - b.startMs)[0];
+  if (upcoming) return { ...upcoming, status: 'upcoming' };
+
+  return null;
+};
+
 // Scale animation for cards on scroll
 const getCardScale = (index) => 1;
 
@@ -239,6 +324,10 @@ export default function HomeScreen({
   const [showInfoOnlyModal, setShowInfoOnlyModal] = useState(false);
   const [infoOnlyModalContent, setInfoOnlyModalContent] = useState({ title: '', body: '' });
   const knowYourselfAnim = useRef(new Animated.Value(0)).current;
+  /** One promotional home prompt per Home focus visit (info modal counts as the visit slot). */
+  const homePromptShownThisVisitRef = useRef(false);
+  const isHomeFocusedRef = useRef(false);
+  const [homeFocusEpoch, setHomeFocusEpoch] = useState(0);
 
   const [dashData, setDashData] = useState(null);
   const [chartData, setChartData] = useState(null);
@@ -260,9 +349,7 @@ export default function HomeScreen({
     loading: true
   });
   const [latestBlogPosts, setLatestBlogPosts] = useState([]);
-  const [isFABCollapsed, setIsFABCollapsed] = useState(false);
   const lastScrollY = useRef(0);
-  const fabWidth = useRef(new Animated.Value(1)).current; // 1 for full, 0 for collapsed
   const lastHomeLoadKeyRef = useRef('');
   const lastHomeLoadAtRef = useRef(0);
   const lastPanchangCacheKeyRef = useRef('');
@@ -287,6 +374,12 @@ export default function HomeScreen({
 
   useEffect(() => {
     if (!infoModalPayload || !infoModalPayload.nonce) return;
+    // Info payload wins this visit — clear any promo prompt and reserve the slot.
+    homePromptShownThisVisitRef.current = true;
+    setShowFirstQuestionFreeModal(false);
+    setShowMonthlyWelcomeModal(false);
+    setShowMultiChartTipModal(false);
+    setShowKnowYourselfPrompt(false);
     setInfoOnlyModalContent({
       title: String(infoModalPayload.title || '').trim(),
       body: String(infoModalPayload.body || '').trim(),
@@ -295,42 +388,7 @@ export default function HomeScreen({
   }, [infoModalPayload]);
 
   const handleScroll = (event) => {
-    const currentScrollY = event.nativeEvent.contentOffset.y;
-    
-    // Determine scroll direction
-    const isScrollingDown = currentScrollY > lastScrollY.current;
-    const scrollThreshold = 20;
-
-    if (currentScrollY <= scrollThreshold) {
-      // Always expand at the top
-      if (isFABCollapsed) {
-        setIsFABCollapsed(false);
-        Animated.timing(fabWidth, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: false,
-        }).start();
-      }
-    } else {
-      // Toggle based on direction when not at the top
-      if (isScrollingDown && !isFABCollapsed) {
-        setIsFABCollapsed(true);
-        Animated.timing(fabWidth, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        }).start();
-      } else if (!isScrollingDown && isFABCollapsed) {
-        setIsFABCollapsed(false);
-        Animated.timing(fabWidth, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: false,
-        }).start();
-      }
-    }
-    
-    lastScrollY.current = currentScrollY;
+    lastScrollY.current = event.nativeEvent.contentOffset.y;
   };
 
 
@@ -414,14 +472,12 @@ export default function HomeScreen({
     }
   };
 
-  // Show first-question-free promo modal when user has free question (once per focus)
-  useFocusEffect(
-    React.useCallback(() => {
-      if (!freeQuestionAvailable) return;
-      const timer = setTimeout(() => setShowFirstQuestionFreeModal(true), 400);
-      return () => clearTimeout(timer);
-    }, [freeQuestionAvailable])
-  );
+  const clearHomePrompts = useCallback(() => {
+    setShowFirstQuestionFreeModal(false);
+    setShowMonthlyWelcomeModal(false);
+    setShowMultiChartTipModal(false);
+    setShowKnowYourselfPrompt(false);
+  }, []);
 
   // Target month for monthly modal: after 10th of current month we promote next month.
   const getMonthlyWelcomeTarget = useCallback(() => {
@@ -439,33 +495,98 @@ export default function HomeScreen({
     return t(`home.monthlyWelcome.months.${month}`);
   }, [getMonthlyWelcomeTarget, t]);
 
-  // Smart monthly predictions welcome modal – shown when user is on Home (greeting) view,
-  // once per native per (year, month) with a 7-day cooldown so it doesn’t show every time.
+  const pickHomePromptForVisit = useCallback(async () => {
+    // Priority: first-question free → monthly welcome → multi-chart tip → Know Yourself
+    if (freeQuestionAvailable) return 'first_question_free';
+
+    if (birthData?.id) {
+      try {
+        const { year, month } = getMonthlyWelcomeTarget();
+        const key = `monthly_welcome:${birthData.id}:${year}:${month}`;
+        const lastShown = await AsyncStorage.getItem(key);
+        if (!lastShown) return 'monthly_welcome';
+        const last = new Date(lastShown);
+        const diffDays = (new Date().getTime() - last.getTime()) / (1000 * 60 * 60 * 24);
+        if (diffDays >= 7) return 'monthly_welcome';
+      } catch (e) {
+        /* ignore and continue */
+      }
+
+      try {
+        const never = await AsyncStorage.getItem(MULTI_CHART_TIP_NEVER_KEY);
+        if (never !== '1') {
+          const snoozeUntil = await AsyncStorage.getItem(MULTI_CHART_TIP_SNOOZE_KEY);
+          let snoozed = false;
+          if (snoozeUntil) {
+            const until = new Date(snoozeUntil);
+            snoozed = !Number.isNaN(until.getTime()) && until > new Date();
+          }
+          if (!snoozed) {
+            const { storage } = require('../../services/storage');
+            const profiles = await storage.getBirthProfiles();
+            const count = Array.isArray(profiles) ? profiles.length : 0;
+            if (count === 1) return 'multi_chart_tip';
+          }
+        }
+      } catch (e) {
+        /* ignore and continue */
+      }
+
+      try {
+        const dismissedDate = await AsyncStorage.getItem(KNOW_YOURSELF_DISMISS_KEY);
+        if (dismissedDate !== todayDateKey()) return 'know_yourself';
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
+    return null;
+  }, [freeQuestionAvailable, birthData?.id, getMonthlyWelcomeTarget]);
+
+  // Focus boundary: reset the one-prompt-per-visit slot only on enter/leave.
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      const timer = setTimeout(async () => {
-        try {
-          if (!birthData?.id) return;
-          const { year, month } = getMonthlyWelcomeTarget();
-          const key = `monthly_welcome:${birthData.id}:${year}:${month}`;
-          const lastShown = await AsyncStorage.getItem(key);
-          if (lastShown) {
-            const last = new Date(lastShown);
-            const diffDays = (new Date().getTime() - last.getTime()) / (1000 * 60 * 60 * 24);
-            if (diffDays < 7) return;
-          }
-          if (!cancelled) setShowMonthlyWelcomeModal(true);
-        } catch (e) {
-          // fail silently
-        }
-      }, 600);
+      isHomeFocusedRef.current = true;
+      homePromptShownThisVisitRef.current = false;
+      clearHomePrompts();
+      setHomeFocusEpoch((n) => n + 1);
       return () => {
-        cancelled = true;
-        clearTimeout(timer);
+        isHomeFocusedRef.current = false;
+        clearHomePrompts();
       };
-    }, [birthData?.id, getMonthlyWelcomeTarget])
+    }, [clearHomePrompts])
   );
+
+  // Pick at most one eligible prompt while focused; never auto-chain another after dismiss.
+  useEffect(() => {
+    if (!homeFocusEpoch) return;
+    if (!isHomeFocusedRef.current) return;
+    if (homePromptShownThisVisitRef.current) return;
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        if (cancelled || !isHomeFocusedRef.current || homePromptShownThisVisitRef.current) return;
+        const prompt = await pickHomePromptForVisit();
+        if (cancelled || !isHomeFocusedRef.current || homePromptShownThisVisitRef.current) return;
+        if (!prompt) return;
+
+        homePromptShownThisVisitRef.current = true;
+        clearHomePrompts();
+        if (prompt === 'first_question_free') setShowFirstQuestionFreeModal(true);
+        else if (prompt === 'monthly_welcome') setShowMonthlyWelcomeModal(true);
+        else if (prompt === 'multi_chart_tip') setShowMultiChartTipModal(true);
+        else if (prompt === 'know_yourself') setShowKnowYourselfPrompt(true);
+      } catch (e) {
+        /* ignore */
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [homeFocusEpoch, pickHomePromptForVisit, clearHomePrompts]);
 
   // Whenever the modal is dismissed (any way), persist cooldown so it won't show again for 7 days.
   const closeMonthlyWelcomeModal = useCallback(async () => {
@@ -480,36 +601,6 @@ export default function HomeScreen({
     }
     setShowMonthlyWelcomeModal(false);
   }, [birthData?.id, getMonthlyWelcomeTarget]);
-
-  // Educate users with only one chart: they can add family/friends for predictions (long delay avoids stacking with other home modals).
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      const timer = setTimeout(async () => {
-        try {
-          if (!birthData?.id) return;
-          const never = await AsyncStorage.getItem(MULTI_CHART_TIP_NEVER_KEY);
-          if (never === '1') return;
-          const snoozeUntil = await AsyncStorage.getItem(MULTI_CHART_TIP_SNOOZE_KEY);
-          if (snoozeUntil) {
-            const until = new Date(snoozeUntil);
-            if (!Number.isNaN(until.getTime()) && until > new Date()) return;
-          }
-          const { storage } = require('../../services/storage');
-          const profiles = await storage.getBirthProfiles();
-          const count = Array.isArray(profiles) ? profiles.length : 0;
-          if (count !== 1) return;
-          if (!cancelled) setShowMultiChartTipModal(true);
-        } catch (e) {
-          // ignore
-        }
-      }, 7000);
-      return () => {
-        cancelled = true;
-        clearTimeout(timer);
-      };
-    }, [birthData?.id])
-  );
 
   const dismissMultiChartTipPermanent = useCallback(async () => {
     try {
@@ -557,26 +648,6 @@ export default function HomeScreen({
       chartData,
     });
   }, [navigation, currentNativeData, birthData, chartData]);
-
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      const timer = setTimeout(async () => {
-        try {
-          if (!birthData?.id) return;
-          const dismissedDate = await AsyncStorage.getItem(KNOW_YOURSELF_DISMISS_KEY);
-          if (dismissedDate === todayDateKey()) return;
-          if (!cancelled) setShowKnowYourselfPrompt(true);
-        } catch (e) {
-          /* ignore */
-        }
-      }, 900);
-      return () => {
-        cancelled = true;
-        clearTimeout(timer);
-      };
-    }, [birthData?.id])
-  );
 
   useEffect(() => {
     if (!showKnowYourselfPrompt) {
@@ -1160,15 +1231,6 @@ const loadHomeData = async (nativeData = null) => {
     }
   ] : [
     {
-      id: 'question',
-      icon: '💬',
-      title: t('home.options.question.title', 'Ask Any Question'),
-      description: t('home.options.question.description', 'Get insights about your personality, relationships, career, or any astrological topic'),
-      action: 'question',
-      cost: pricing.chat ?? 1,
-      originalCost: pricingOriginal.chat
-    },
-    {
       id: 'partnership',
       icon: '👥',
       title: t('home.options.partnership.title', 'Partnership Analysis'),
@@ -1215,6 +1277,16 @@ const loadHomeData = async (nativeData = null) => {
     { id: 'health', title: t('home.analysis.healthIosTitle', 'Wellness Study'), icon: '🏥', description: t('home.analysis.healthIosDescription', 'Review balance, recovery, and areas to support'), gradient: ['#15803D', '#22C55E'], cost: pricing.health ?? 3, originalCost: pricingOriginal.health },
     { id: 'education', title: t('home.analysis.educationIosTitle', 'Learning Path'), icon: '🎓', description: t('home.analysis.educationIosDescription', 'Study learning style, focus, and areas that support growth'), gradient: ['#1E40AF', '#3B82F6'], cost: pricing.education ?? 3, originalCost: pricingOriginal.education },
     { id: 'progeny', title: t('home.analysis.progenyIosTitle', 'Family Study'), icon: '👨‍👩‍👧‍👦', description: t('home.analysis.progenyIosDescription', 'Explore family themes, support, and expansion patterns'), gradient: ['#7C3AED', '#A855F7'], cost: pricing.progeny ?? 15, originalCost: pricingOriginal.progeny },
+    {
+      id: 'yearly',
+      title: t('home.analysis.yearlyIosTitle', 'Yearly & Monthly'),
+      icon: '📅',
+      description: t('home.analysis.yearlyIosDescription', 'Month-by-month timing notes for the year ahead'),
+      gradient: ['#C2410C', '#EA580C'],
+      cost: pricing.events ?? 100,
+      originalCost: pricingOriginal.events,
+      navigateAction: 'events',
+    },
     { id: 'trading', title: t('home.analysis.tradingIosTitle', 'Market Study'), icon: '📈', description: t('home.analysis.tradingIosDescription', 'Review market cycles and sector context for timing study'), gradient: ['#B45309', '#F97316'], cost: pricing.trading ?? 5, originalCost: pricingOriginal.trading },
     { id: 'financial', title: t('home.analysis.financialIosTitle', 'Market Context'), icon: '💹', description: t('home.analysis.financialIosDescription', 'Study sector rhythm and broader market context'), gradient: ['#047857', '#10B981'], cost: 0, originalCost: null },
     { id: 'childbirth', title: t('home.analysis.childbirthIosTitle', 'Family Timing'), icon: '🤱', description: t('home.analysis.childbirthIosDescription', 'Review supportive timing for family planning and delivery'), gradient: ['#BE185D', '#EC4899'], cost: pricing.childbirth ?? 8, originalCost: pricingOriginal.childbirth },
@@ -1235,6 +1307,16 @@ const loadHomeData = async (nativeData = null) => {
     { id: 'health', title: t('home.analysis.health.title', 'Health Analysis'), icon: '🏥', description: t('home.analysis.health.description', 'Wellness insights & precautions'), gradient: ['#32CD32', '#228B22'], cost: pricing.health ?? 3, originalCost: pricingOriginal.health },
     { id: 'education', title: t('home.analysis.education.title', 'Education Analysis'), icon: '🎓', description: t('home.analysis.education.description', 'Learning path & career guidance'), gradient: ['#4169E1', '#1E90FF'], cost: pricing.education ?? 3, originalCost: pricingOriginal.education },
     { id: 'progeny', title: t('home.analysis.progeny.title', 'Progeny Analysis'), icon: '👨‍👩‍👧‍👦', description: t('home.analysis.progeny.description', 'Fertility potential & family expansion'), gradient: ['#FF69B4', '#FF1493'], cost: pricing.progeny ?? 15, originalCost: pricingOriginal.progeny },
+    {
+      id: 'yearly',
+      title: t('home.analysis.yearly.title', 'Yearly & Monthly'),
+      icon: '📅',
+      description: t('home.analysis.yearly.description', 'What the year holds — month by month'),
+      gradient: ['#C2410C', '#EA580C'],
+      cost: pricing.events ?? 100,
+      originalCost: pricingOriginal.events,
+      navigateAction: 'events',
+    },
     { id: 'trading', title: t('home.analysis.trading.title', 'Trading Study'), icon: '📈', description: isIOS ? 'Market timing and sector context' : t('home.analysis.trading.description', 'Market timing and sector context'), gradient: ['#FFD700', '#FF8C00'], cost: pricing.trading ?? 5, originalCost: pricingOriginal.trading },
     { id: 'financial', title: t('home.analysis.financial.title', 'Market Astrology'), icon: '💹', description: isIOS ? 'Sector timing and market context' : t('home.analysis.financial.description', 'Sector forecasts & investment timing'), gradient: ['#10b981', '#059669'], cost: 0, originalCost: null },
     { id: 'childbirth', title: t('home.analysis.childbirth.title', 'Childbirth Planner'), icon: '🤱', description: t('home.analysis.childbirth.description', 'Auspicious dates for delivery'), gradient: ['#FF69B4', '#FF1493'], cost: pricing.childbirth ?? 8, originalCost: pricingOriginal.childbirth },
@@ -1467,10 +1549,10 @@ const loadHomeData = async (nativeData = null) => {
           <Text style={[styles.analysisTitle, { color: colors.text }]}>
             {isIOS
               ? t('home.sections.lifeStudy', 'Chart Study')
-              : t('home.sections.lifeAnalysis', '🧘 Life Analysis')}
+              : t('home.sections.lifeAnalysis', 'Life Analysis')}
           </Text>
           <View style={styles.lifeAnalysisGrid}>
-            {analysisOptions.slice(0, 7).map((option, index) => (
+            {analysisOptions.slice(0, 8).map((option, index) => (
               <LifeAnalysisCard
                 key={option.id}
                 option={option}
@@ -1496,7 +1578,7 @@ const loadHomeData = async (nativeData = null) => {
               scrollEventThrottle={16}
               contentContainerStyle={styles.ribbonScrollContent}
             >
-              {analysisOptions.slice(7).map((option, index) => (
+              {analysisOptions.slice(8).map((option, index) => (
                 <CosmicRibbonCard
                   key={option.id}
                   option={option}
@@ -1505,6 +1587,92 @@ const loadHomeData = async (nativeData = null) => {
                 />
               ))}
             </GHScrollView>
+          </View>
+        )}
+
+        {/* Today's Panchang — utility, below monetized paths */}
+        {panchangData && (
+          <View style={[styles.panchangCard, androidLightCardFixStyle, theme === 'light' && { backgroundColor: colors.cardBackground, borderColor: 'rgba(234, 88, 12, 0.12)', borderWidth: StyleSheet.hairlineWidth }]}>
+            <Text style={[styles.panchangTitle, { color: colors.text }]}>
+              {t('home.panchang.title', "Today's Panchang")}
+            </Text>
+            <View style={[styles.panchangTitleUnderline, theme === 'light' && { backgroundColor: colors.primary }]} />
+
+            <View style={styles.sunTimesRow}>
+              <View style={[styles.sunTimeItem, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
+                <Text style={styles.sunTimeEmoji}>🌅</Text>
+                <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.sunrise', 'Sunrise')}</Text>
+                <Text style={[styles.sunTimeValue, { color: colors.text }]}>
+                  {formatPanchangClock(panchangData.sunrise)
+                    || formatPanchangClock(panchangData.sunrise_sunset?.sunrise)
+                    || t('common.notAvailable', 'Not available')}
+                </Text>
+              </View>
+              <View style={[styles.sunTimeItem, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
+                <Text style={styles.sunTimeEmoji}>🌇</Text>
+                <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.sunset', 'Sunset')}</Text>
+                <Text style={[styles.sunTimeValue, { color: colors.text }]}>
+                  {formatPanchangClock(panchangData.sunset)
+                    || formatPanchangClock(panchangData.sunrise_sunset?.sunset)
+                    || t('common.notAvailable', 'Not available')}
+                </Text>
+              </View>
+            </View>
+
+            {(() => {
+              const window = getActivePanchangWindow(panchangData);
+              const toneColor = window?.tone === 'caution' ? '#EF4444' : '#10B981';
+              const range = window
+                ? `${formatPanchangClock(window.start) || '—'} – ${formatPanchangClock(window.end) || '—'}`
+                : null;
+              return (
+                <View
+                  style={[
+                    styles.panchangActiveWindow,
+                    theme === 'light' && {
+                      backgroundColor: window?.tone === 'caution'
+                        ? 'rgba(239, 68, 68, 0.08)'
+                        : 'rgba(16, 185, 129, 0.08)',
+                      borderColor: window?.tone === 'caution'
+                        ? 'rgba(239, 68, 68, 0.22)'
+                        : 'rgba(16, 185, 129, 0.22)',
+                    },
+                  ]}
+                >
+                  <View style={[styles.panchangActiveDot, { backgroundColor: window ? toneColor : colors.textTertiary }]} />
+                  <View style={styles.panchangActiveTextWrap}>
+                    <Text style={[styles.panchangActiveEyebrow, { color: colors.textSecondary }]}>
+                      {window?.status === 'active'
+                        ? t('home.panchang.activeNow', 'Active now')
+                        : window?.status === 'upcoming'
+                          ? t('home.panchang.upNext', 'Up next')
+                          : t('home.panchang.noActiveWindow', 'No special window right now')}
+                    </Text>
+                    <Text style={[styles.panchangActiveTitle, { color: colors.text }]} numberOfLines={1}>
+                      {window
+                        ? t(window.labelKey, window.fallbackLabel).replace(/:$/, '')
+                        : t('home.panchang.checkFull', 'See full day timings')}
+                    </Text>
+                    {range ? (
+                      <Text style={[styles.panchangActiveRange, { color: toneColor }]}>{range}</Text>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })()}
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => onOptionSelect?.({ action: 'panchang' })}
+              style={styles.panchangOpenLink}
+              accessibilityRole="button"
+              accessibilityLabel={t('home.panchang.openFull', 'Open full Panchang')}
+            >
+              <Text style={[styles.panchangOpenLinkText, { color: colors.textSecondary }]}>
+                {t('home.panchang.openFull', 'Open full Panchang')}
+              </Text>
+              <Icon name="chevron-forward" size={14} color={colors.textSecondary} />
+            </TouchableOpacity>
           </View>
         )}
 
@@ -2160,361 +2328,6 @@ const loadHomeData = async (nativeData = null) => {
             )}
           </View>
 
-          {/* Panchang Timeline */}
-          {panchangData && (
-            <View style={[styles.panchangCard, androidLightCardFixStyle, theme === 'light' && { backgroundColor: colors.cardBackground, borderColor: 'rgba(234, 88, 12, 0.18)', borderWidth: 1 }]}>
-              <Text style={[styles.panchangTitle, { color: colors.text }]}>
-                {t('home.panchang.title', '🌅 Today\'s Panchang')}
-              </Text>
-              <View style={[styles.panchangTitleUnderline, theme === 'light' && { backgroundColor: colors.primary }]} />
-              
-              <View style={styles.sunTimesRow}>
-                <View style={[styles.sunTimeItem, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
-                  <Text style={styles.sunTimeEmoji}>🌅</Text>
-                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.sunrise', 'Sunrise')}</Text>
-                  <Text style={[styles.sunTimeValue, { color: colors.text }]}>
-                    {panchangData.sunrise && !isNaN(new Date(panchangData.sunrise).getTime()) ? new Date(panchangData.sunrise).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : t('common.notAvailable', 'Not available')}
-                  </Text>
-                </View>
-                <View style={[styles.sunTimeItem, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
-                  <Text style={styles.sunTimeEmoji}>🌇</Text>
-                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.sunset', 'Sunset')}</Text>
-                  <Text style={[styles.sunTimeValue, { color: colors.text }]}>
-                    {panchangData.sunset && !isNaN(new Date(panchangData.sunset).getTime()) ? new Date(panchangData.sunset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : t('common.notAvailable', 'Not available')}
-                  </Text>
-                </View>
-              </View>
-              
-              <View style={styles.sunTimesRow}>
-                <View style={[styles.sunTimeItem, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
-                  <Text style={styles.sunTimeEmoji}>🌙</Text>
-                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.moonrise', 'Moonrise')}</Text>
-                  <Text style={[styles.sunTimeValue, { color: colors.text }]}>
-                    {panchangData.daily_panchang?.sunrise_sunset?.moonrise || panchangData.sunrise_sunset?.moonrise || t('common.notAvailable', 'Not available')}
-                  </Text>
-                </View>
-                <View style={[styles.sunTimeItem, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
-                  <Text style={styles.sunTimeEmoji}>🌚</Text>
-                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.moonset', 'Moonset')}</Text>
-                  <Text style={[styles.sunTimeValue, { color: colors.text }]}>
-                    {panchangData.daily_panchang?.sunrise_sunset?.moonset || panchangData.sunrise_sunset?.moonset || t('common.notAvailable', 'Not available')}
-                  </Text>
-                </View>
-              </View>
-              
-              {/* Day Progress */}
-              <View style={styles.dayProgressBar}>
-                <View style={[styles.progressTrack, theme === 'light' && { backgroundColor: 'rgba(0,0,0,0.1)' }]}>
-                  {(() => {
-                    const now = new Date();
-                    const sunrise = panchangData.sunrise ? new Date(panchangData.sunrise) : null;
-                    const sunset = panchangData.sunset ? new Date(panchangData.sunset) : null;
-                    
-                    if (!sunrise || !sunset || isNaN(sunrise.getTime()) || isNaN(sunset.getTime())) {
-                      return <View style={[styles.progressFill, { width: '0%' }]} />;
-                    }
-
-                    const totalDayTime = sunset.getTime() - sunrise.getTime();
-                    const elapsedTime = now.getTime() - sunrise.getTime();
-                    let progress = (elapsedTime / totalDayTime) * 100;
-                    
-                    if (isNaN(progress) || !isFinite(progress)) {
-                      progress = 0;
-                    }
-                    
-                    progress = Math.max(0, Math.min(100, progress));
-                    
-                    return (
-                      <>
-                        <View style={[styles.progressFill, { width: `${progress}%` }]} />
-                        <View style={[styles.currentTimeDot, { left: `${progress}%` }]}>
-                          <Icon name="sunny" size={12} color="#fff" />
-                        </View>
-                      </>
-                    );
-                  })()}
-                </View>
-                <Text style={[styles.progressLabel, { color: colors.textTertiary }]}>
-                  {t('home.panchang.dayProgress', 'Day Progress')}
-                </Text>
-              </View>
-
-              {/* Panchang Elements Section */}
-              {panchangData.daily_panchang && (
-                <View style={styles.panchangElementsSection}>
-                  <Text style={[styles.panchangElementsTitle, { color: colors.primary }]}>
-                    {t('home.panchang.elements', '🕉️ Panchang Elements')}
-                  </Text>
-                  
-                  <View style={styles.panchangElementGrid}>
-                    {/* Tithi */}
-                    {panchangData.daily_panchang.tithi && (
-                      <View style={[styles.panchangElement, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
-                        <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>
-                          {t('home.panchang.tithi', '🌙 Tithi')}
-                        </Text>
-                        <Text style={[styles.elementValue, { color: colors.text }]}>
-                          {panchangData.daily_panchang.tithi.name}
-                        </Text>
-                      </View>
-                    )}
-                    
-                    {/* Yoga */}
-                    {panchangData.daily_panchang.yoga && (
-                      <View style={[styles.panchangElement, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
-                        <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>
-                          {t('home.panchang.yoga', '🧘 Yoga')}
-                        </Text>
-                        <Text style={[styles.elementValue, { color: colors.text }]}>
-                          {panchangData.daily_panchang.yoga.name}
-                        </Text>
-                      </View>
-                    )}
-                    
-                    {/* Karana */}
-                    {panchangData.daily_panchang.karana && (
-                      <View style={[styles.panchangElement, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
-                        <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>
-                          {t('home.panchang.karana', '⚡ Karana')}
-                        </Text>
-                        <Text style={[styles.elementValue, { color: colors.text }]}>
-                          {panchangData.daily_panchang.karana.name}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              )}
-              
-
-              
-              {/* Moon SVG & Info Row */}
-              <View style={styles.moonSectionRow}>
-                <View style={styles.moonSvgContainer}>
-                  {/* Starlight Background */}
-                  <View style={styles.starlightContainer}>
-                    {[...Array(12)].map((_, i) => (
-                      <View 
-                        key={i} 
-                        style={[
-                          styles.star, 
-                          { 
-                            top: `${Math.random() * 100}%`, 
-                            left: `${Math.random() * 100}%`,
-                            opacity: Math.random() * 0.7 + 0.3,
-                            width: Math.random() * 2 + 1,
-                            height: Math.random() * 2 + 1,
-                            backgroundColor: '#fff'
-                          }
-                        ]} 
-                      />
-                    ))}
-                  </View>
-                  <Svg width="100" height="100" viewBox="0 0 100 100">
-                    <Circle cx="50" cy="50" r="45" fill="#1a1a1a" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
-                    {(() => {
-                      const illumination = parseFloat(panchangData.moon_illumination) || 98.5;
-                      const phase = panchangData.moon_phase || 'Full Moon';
-                      const r = 43;
-                      const cx = 50;
-                      const cy = 50;
-                      
-                      if (isNaN(illumination)) return <Circle cx="50" cy="50" r="43" fill="#f0f0f0" />;
-
-                      const normalizedPhase = phase.toLowerCase();
-                      const isWaning = normalizedPhase.includes('waning') || normalizedPhase.includes('last quarter') || normalizedPhase.includes('third quarter');
-                      const isFull = normalizedPhase.includes('full');
-                      const isNew = normalizedPhase.includes('new');
-                      const isWaxing = !isWaning && !isFull && !isNew;
-
-                      if (isNew || illumination <= 2) return null; 
-                      if (isFull || illumination >= 98) return <Circle cx="50" cy="50" r="43" fill="#f0f0f0" />;
-                      
-                      const ellipseRadiusX = r * Math.abs(1 - (2 * illumination / 100));
-                      if (isNaN(ellipseRadiusX)) return <Circle cx="50" cy="50" r="43" fill="#f0f0f0" />;
-
-                      let pathData = "";
-                      if (isWaxing) {
-                        pathData = `M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx} ${cy + r}`;
-                        if (illumination > 50) pathData += ` A ${ellipseRadiusX} ${r} 0 0 1 ${cx} ${cy - r} Z`;
-                        else pathData += ` A ${ellipseRadiusX} ${r} 0 0 0 ${cx} ${cy - r} Z`;
-                      } else {
-                        pathData = `M ${cx} ${cy - r} A ${r} ${r} 0 0 0 ${cx} ${cy + r}`;
-                        if (illumination > 50) pathData += ` A ${ellipseRadiusX} ${r} 0 0 0 ${cx} ${cy - r} Z`;
-                        else pathData += ` A ${ellipseRadiusX} ${r} 0 0 1 ${cx} ${cy - r} Z`;
-                      }
-                      return <Path d={pathData} fill="#f0f0f0" stroke="none" />;
-                    })()}
-                  </Svg>
-                </View>
-                
-                <View style={styles.moonInfoContainer}>
-                  <Text style={[styles.moonPhaseText, { color: colors.text }]}>
-                    {panchangData.moon_phase || t('home.panchang.fullMoon', 'Full Moon')}
-                  </Text>
-                  <Text style={[styles.moonIllumination, { color: colors.textSecondary }]}>
-                    {panchangData.moon_illumination ? `${panchangData.moon_illumination.toFixed(1)}% ${t('home.panchang.illuminated', 'Illuminated')}` : '98.5% Illuminated'}
-                  </Text>
-                  <View style={styles.moonElementRow}>
-                    <Icon name="moon-outline" size={14} color={colors.textTertiary} />
-                    <Text style={[styles.moonElementText, { color: colors.textSecondary }]}>
-                      {panchangData.daily_panchang?.nakshatra?.name || '...'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Visual Day Quality Timeline */}
-              <View style={styles.dayQualityContainer}>
-                <Text style={[styles.dayQualityTitle, { color: colors.text }]}>{t('home.panchang.dayQuality', 'Day Quality Timeline')}</Text>
-                <View style={styles.qualityTimelineWrapper}>
-                  <View style={[styles.qualityTimelineTrack, theme === 'light' && { backgroundColor: 'rgba(0,0,0,0.06)', borderColor: 'rgba(0,0,0,0.12)' }]}>
-                    {(() => {
-                      const now = new Date();
-                      const startOfDay = new Date(now);
-                      startOfDay.setHours(0, 0, 0, 0);
-                      const totalMs = 24 * 60 * 60 * 1000;
-                      
-                      const getPos = (timeStr) => {
-                        if (!timeStr) return null;
-                        const d = new Date(timeStr);
-                        if (isNaN(d.getTime())) return null;
-                        return ((d.getTime() - startOfDay.getTime()) / totalMs) * 100;
-                      };
-
-                      const blocks = [];
-                      
-                      // Brahma Muhurta (Green)
-                      if (panchangData.brahma_muhurta_start && panchangData.brahma_muhurta_end) {
-                        const start = getPos(panchangData.brahma_muhurta_start);
-                        const end = getPos(panchangData.brahma_muhurta_end);
-                        if (start !== null && end !== null) {
-                          blocks.push(<View key="brahma" style={[styles.qualityBlock, { left: `${start}%`, width: `${end - start}%`, backgroundColor: '#10B981' }]} />);
-                        }
-                      }
-
-                      // Abhijit Muhurta (Green)
-                      if (panchangData.abhijit_muhurta_start && panchangData.abhijit_muhurta_end) {
-                        const start = getPos(panchangData.abhijit_muhurta_start);
-                        const end = getPos(panchangData.abhijit_muhurta_end);
-                        if (start !== null && end !== null) {
-                          blocks.push(<View key="abhijit" style={[styles.qualityBlock, { left: `${start}%`, width: `${end - start}%`, backgroundColor: '#10B981' }]} />);
-                        }
-                      }
-
-                      // Rahu Kaal (Red)
-                      if (panchangData.rahu_kaal?.rahu_kaal_start && panchangData.rahu_kaal?.rahu_kaal_end) {
-                        const start = getPos(panchangData.rahu_kaal.rahu_kaal_start);
-                        const end = getPos(panchangData.rahu_kaal.rahu_kaal_end);
-                        if (start !== null && end !== null) {
-                          blocks.push(<View key="rahu" style={[styles.qualityBlock, { left: `${start}%`, width: `${end - start}%`, backgroundColor: '#EF4444' }]} />);
-                        }
-                      }
-
-                      // Dur Muhurta (Red)
-                      panchangData.inauspicious_times?.dur_muhurta?.forEach((period, i) => {
-                        const start = getPos(period.start_time);
-                        const end = getPos(period.end_time);
-                        if (start !== null && end !== null) {
-                          blocks.push(<View key={`dur-${i}`} style={[styles.qualityBlock, { left: `${start}%`, width: `${end - start}%`, backgroundColor: '#EF4444', opacity: 0.7 }]} />);
-                        }
-                      });
-
-                      // Varjyam (Red)
-                      panchangData.inauspicious_times?.varjyam?.forEach((period, i) => {
-                        const start = getPos(period.start_time);
-                        const end = getPos(period.end_time);
-                        if (start !== null && end !== null) {
-                          blocks.push(<View key={`varjyam-${i}`} style={[styles.qualityBlock, { left: `${start}%`, width: `${end - start}%`, backgroundColor: '#EF4444', opacity: 0.5 }]} />);
-                        }
-                      });
-
-                      // Current Time Indicator
-                      const currentPos = ((now.getTime() - startOfDay.getTime()) / totalMs) * 100;
-                      blocks.push(
-                        <View key="now" style={[styles.qualityNowIndicator, { left: `${currentPos}%` }]}>
-                          <View style={styles.qualityNowDot} />
-                          <View style={styles.qualityNowLine} />
-                        </View>
-                      );
-
-                      return blocks;
-                    })()}
-                  </View>
-                  <View style={styles.qualityLabels}>
-                    <Text style={[styles.qualityTimeLabel, { color: colors.textTertiary }]}>00:00</Text>
-                    <Text style={[styles.qualityTimeLabel, { color: colors.textTertiary }]}>06:00</Text>
-                    <Text style={[styles.qualityTimeLabel, { color: colors.textTertiary }]}>12:00</Text>
-                    <Text style={[styles.qualityTimeLabel, { color: colors.textTertiary }]}>18:00</Text>
-                    <Text style={[styles.qualityTimeLabel, { color: colors.textTertiary }]}>23:59</Text>
-                  </View>
-                </View>
-                <View style={styles.qualityLegend}>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
-                    <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('home.panchang.auspicious', 'Auspicious')}</Text>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
-                    <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('home.panchang.inauspicious', 'Inauspicious')}</Text>
-                  </View>
-                </View>
-
-                {/* Detailed Timings List */}
-                <View style={styles.detailedTimingsContainer}>
-                  {/* Auspicious */}
-                  <View style={[styles.timingGroup, theme === 'light' && { backgroundColor: 'rgba(16, 185, 129, 0.08)', borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.2)' }]}>
-                    <View style={styles.timingRow}>
-                      <Text style={[styles.timingLabel, { color: colors.textSecondary }]}>{t('home.panchang.brahmaMuhurta', 'Brahma Muhurta')}</Text>
-                      <Text style={[styles.timingValue, { color: '#10B981' }]}>
-                        {panchangData.brahma_muhurta_start && panchangData.brahma_muhurta_end && 
-                         !isNaN(new Date(panchangData.brahma_muhurta_start).getTime()) ? 
-                          `${new Date(panchangData.brahma_muhurta_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.brahma_muhurta_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
-                          t('common.notAvailable', 'Not available')
-                        }
-                      </Text>
-                    </View>
-                    <View style={styles.timingRow}>
-                      <Text style={[styles.timingLabel, { color: colors.textSecondary }]}>{t('home.panchang.abhijitMuhurta', 'Abhijit Muhurta')}</Text>
-                      <Text style={[styles.timingValue, { color: '#10B981' }]}>
-                        {panchangData.abhijit_muhurta_start && panchangData.abhijit_muhurta_end &&
-                         !isNaN(new Date(panchangData.abhijit_muhurta_start).getTime()) ? 
-                          `${new Date(panchangData.abhijit_muhurta_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.abhijit_muhurta_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
-                          t('common.notAvailable', 'Not available')
-                        }
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Inauspicious */}
-                  <View style={[styles.timingGroup, theme === 'light' && { backgroundColor: 'rgba(239, 68, 68, 0.08)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.2)' }]}>
-                    {panchangData.rahu_kaal && (
-                      <View style={styles.timingRow}>
-                        <Text style={[styles.timingLabel, { color: colors.textSecondary }]}>{t('home.panchang.rahuKaal', 'Rahu Kaal')}</Text>
-                        <Text style={[styles.timingValue, { color: '#EF4444' }]}>
-                          {panchangData.rahu_kaal.rahu_kaal_start && !isNaN(new Date(panchangData.rahu_kaal.rahu_kaal_start).getTime()) ? 
-                            `${new Date(panchangData.rahu_kaal.rahu_kaal_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.rahu_kaal.rahu_kaal_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
-                            t('common.notAvailable', 'Not available')
-                          }
-                        </Text>
-                      </View>
-                    )}
-                    {panchangData.inauspicious_times?.varjyam?.map((period, index) => (
-                      <View key={`varjyam-list-${index}`} style={styles.timingRow}>
-                        <Text style={[styles.timingLabel, { color: colors.textSecondary }]}>{t('home.panchang.varjyam', 'Varjyam')}</Text>
-                        <Text style={[styles.timingValue, { color: '#EF4444' }]}>
-                          {period.start_time && !isNaN(new Date(period.start_time).getTime()) ? 
-                            `${new Date(period.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(period.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
-                            t('common.notAvailable', 'Not available')
-                          }
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              </View>
-            </View>
-          )}
 
         </View>
       </GHScrollView>
@@ -2789,67 +2602,6 @@ const loadHomeData = async (nativeData = null) => {
         </Animated.View>
       ) : null}
 
-      {/* Floating Action Button (FAB) - Outside of ScrollView and Gradient to ensure absolute positioning */}
-      <Animated.View 
-        style={[
-          styles.fabContainer, 
-          androidLightCardFixStyle,
-          { 
-            bottom: 90 + insets.bottom,
-            width: fabWidth.interpolate({
-              inputRange: [0, 1],
-              outputRange: [56, 180], // Icon only vs full width
-            })
-          }
-        ]}
-      >
-        <TouchableOpacity
-          style={[styles.fabButton, androidLightCardFixStyle]}
-          onPress={() => onOptionSelect({ action: 'question' })}
-          activeOpacity={0.9}
-        >
-          <AnimatedLinearGradient
-            colors={['#FFD700', '#F59E0B']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[
-              styles.fabGradient, 
-              {
-                paddingHorizontal: fabWidth.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, 16],
-                }),
-                justifyContent: 'center'
-              }
-            ]}
-          >
-            <Icon name="chatbubbles" size={24} color="#854d0e" />
-            <Animated.Text 
-              style={[
-                styles.fabText, 
-                { 
-                  color: '#854d0e',
-                  opacity: fabWidth,
-                  width: fabWidth.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, 110], // Adjusted width for "Ask AstroRoshni"
-                  }),
-                  transform: [{
-                    translateX: fabWidth.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-20, 0],
-                    })
-                  }]
-                }
-              ]} 
-              numberOfLines={1}
-            >
-              {t('home.askFAB', 'Ask AstroRoshni')}
-            </Animated.Text>
-          </AnimatedLinearGradient>
-        </TouchableOpacity>
-      </Animated.View>
-
       {/* Bottom Tabs - reduced bottom padding on iPhone */}
       <View style={[
         styles.bottomTabs,
@@ -2903,7 +2655,9 @@ const loadHomeData = async (nativeData = null) => {
             />
           </View>
           <Text style={[styles.tabLabel, { color: activeTab === 'events' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'events' ? '800' : '600' }]}>
-            {t('home.tabs.events', 'Timing')}
+            {isIOS
+              ? t('home.tabs.events', 'Timing')
+              : t('home.tabs.eventsAndroid', 'Predictions')}
           </Text>
         </TouchableOpacity>
 
@@ -3052,89 +2806,84 @@ function OptionCard({ option, index, onOptionSelect }) {
 
 // Life Analysis Card - Bento Grid Layout
 function LifeAnalysisCard({ option, index, onOptionSelect }) {
-  const { colors, theme } = useTheme();
-  
-  const isLarge = option && (option.id === 'karma' || option.id === 'career' || option.id === 'wealth' || option.id === 'marriage');
-  const isWide = option && option.id === 'progeny';
-  
+  const { colors, theme, androidLightCardFixStyle } = useTheme();
+  const isDark = theme === 'dark';
+
   if (!option) return null;
 
+  const accent = option.gradient?.[0] || colors.primary;
   const isMarriage = option.id === 'marriage';
-  
+
+  // Prefer rgba accents — Android can mishandle 8-digit hex and leave opaque rectangles.
+  const accentFill = (() => {
+    const hex = String(accent).replace('#', '');
+    const full = hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex.slice(0, 6);
+    const n = parseInt(full, 16);
+    if (Number.isNaN(n)) return isDark ? 'rgba(249,115,22,0.18)' : 'rgba(249,115,22,0.12)';
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${isDark ? 0.22 : 0.12})`;
+  })();
+
   return (
-    <View 
+    <View
       testID={isMarriage ? 'life-analysis-marriage' : `life-analysis-${option.id}`}
       style={[
         styles.lifeAnalysisCard,
-        isLarge && styles.lifeAnalysisCardLarge,
-        isWide && styles.lifeAnalysisCardWide,
+        androidLightCardFixStyle,
+        {
+          backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : (colors.cardBackground || '#ffffff'),
+          borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(234, 88, 12, 0.14)',
+          elevation: 0,
+        },
       ]}
     >
       <TouchableOpacity
-        onPress={() => onOptionSelect({ action: 'analysis', type: option.id, cost: option.cost, originalCost: option.originalCost })}
-        activeOpacity={0.9}
+        onPress={() => {
+          if (option.navigateAction === 'events') {
+            onOptionSelect({
+              action: 'events',
+              cost: option.cost,
+              originalCost: option.originalCost,
+            });
+            return;
+          }
+          onOptionSelect({
+            action: 'analysis',
+            type: option.id,
+            cost: option.cost,
+            originalCost: option.originalCost,
+          });
+        }}
+        activeOpacity={0.85}
+        style={[styles.lifeAnalysisTouch, { backgroundColor: 'transparent' }]}
       >
-        <LinearGradient
-          colors={option.gradient}
-          style={[
-            styles.lifeAnalysisGradient,
-            !isLarge && !isWide && styles.lifeAnalysisGradientSmallFixed,
-            isLarge && styles.lifeAnalysisGradientLarge,
-            isWide && styles.lifeAnalysisGradientWide,
-          ]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          {/* Icon Glow Effect */}
-          <View style={styles.iconGlow} />
-          
-          {option.cost > 0 && (
-            <View style={styles.costBadge}>
-              <Icon name="flash" size={8} color="#854d0e" />
-              {option.originalCost != null && option.originalCost > option.cost ? (
-                <View style={styles.costWithDiscount}>
-                  <Text style={[styles.costText, styles.costOriginal]}>{option.originalCost}</Text>
-                  <Text style={styles.costText}>{option.cost}</Text>
-                </View>
-              ) : (
+        {option.cost > 0 && (
+          <View style={styles.lifeAnalysisCostBadge}>
+            <Icon name="flash" size={8} color="#854d0e" />
+            {option.originalCost != null && option.originalCost > option.cost ? (
+              <View style={styles.costWithDiscount}>
+                <Text style={[styles.costText, styles.costOriginal]}>{option.originalCost}</Text>
                 <Text style={styles.costText}>{option.cost}</Text>
-              )}
-            </View>
-          )}
-
-          <View style={[
-            styles.lifeAnalysisContent,
-            isWide && styles.lifeAnalysisContentWide
-          ]}>
-            <Text style={[
-              styles.lifeAnalysisEmoji,
-              isLarge && styles.lifeAnalysisEmojiLarge
-            ]}>
-              {option.icon}
-            </Text>
-            
-            <View style={isWide ? styles.lifeAnalysisTextWide : styles.lifeAnalysisTextNormal}>
-              <Text style={[
-                styles.lifeAnalysisTitle,
-                isLarge && styles.lifeAnalysisTitleLarge,
-                isWide && styles.lifeAnalysisTitleWide
-              ]}>
-                {option.title}
-              </Text>
-              
-              <Text 
-                style={[
-                  styles.lifeAnalysisDescription,
-                  isLarge && styles.lifeAnalysisDescriptionLarge,
-                  isWide && styles.lifeAnalysisDescriptionWide
-                ]} 
-                numberOfLines={isLarge ? 3 : 2}
-              >
-                {option.description}
-              </Text>
-            </View>
+              </View>
+            ) : (
+              <Text style={styles.costText}>{option.cost}</Text>
+            )}
           </View>
-        </LinearGradient>
+        )}
+
+        <View style={[styles.lifeAnalysisAccent, { backgroundColor: accentFill }]}>
+          <Text style={styles.lifeAnalysisEmoji}>{option.icon}</Text>
+        </View>
+
+        <Text style={[styles.lifeAnalysisTitle, { color: colors.text }]} numberOfLines={2}>
+          {option.title}
+        </Text>
+
+        <Text
+          style={[styles.lifeAnalysisDescription, { color: colors.textSecondary }]}
+          numberOfLines={1}
+        >
+          {option.description}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -3782,125 +3531,75 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     paddingHorizontal: 4,
+    gap: 0,
   },
   lifeAnalysisCard: {
     width: '48%',
     marginBottom: 12,
-    borderRadius: 24,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
+    elevation: 0,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
       },
       android: {
-        elevation: 4,
+        elevation: 0,
       },
     }),
   },
-  lifeAnalysisCardLarge: {
-    width: '48%',
-    height: 220,
+  lifeAnalysisTouch: {
+    paddingTop: 16,
+    paddingBottom: 14,
+    paddingHorizontal: 12,
+    minHeight: 128,
+    backgroundColor: 'transparent',
   },
-  lifeAnalysisCardWide: {
-    width: '100%',
-    height: 130,
-  },
-  lifeAnalysisGradient: {
-    padding: 16,
+  lifeAnalysisAccent: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  lifeAnalysisGradientSmallFixed: {
-    height: 160,
-  },
-  lifeAnalysisGradientLarge: {
-    height: 220,
-    justifyContent: 'flex-end',
-    alignItems: 'flex-start',
-    padding: 20,
-  },
-  lifeAnalysisGradientWide: {
-    height: 130,
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    padding: 20,
-  },
-  lifeAnalysisContent: {
-    alignItems: 'center',
-    width: '100%',
-    paddingTop: 4,
-  },
-  lifeAnalysisContentWide: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    paddingTop: 0,
-  },
-  lifeAnalysisTextNormal: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  lifeAnalysisTextWide: {
-    flex: 1,
-    marginLeft: 16,
-    alignItems: 'flex-start',
+    marginBottom: 10,
+    overflow: 'hidden',
   },
   lifeAnalysisEmoji: {
-    fontSize: 32,
-    marginBottom: 12,
+    fontSize: 20,
     textAlign: 'center',
     includeFontPadding: false,
-    textAlignVertical: 'center',
-    lineHeight: 40,
-  },
-  lifeAnalysisEmojiLarge: {
-    fontSize: 48,
-    marginBottom: 16,
-    textAlign: 'left',
-    lineHeight: 56,
+    lineHeight: 26,
   },
   lifeAnalysisTitle: {
     fontSize: 14,
-    fontWeight: '800',
-    marginBottom: 6,
-    textAlign: 'center',
-    lineHeight: 18,
-    color: '#ffffff',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  lifeAnalysisTitleLarge: {
-    fontSize: 18,
-    textAlign: 'left',
-  },
-  lifeAnalysisTitleWide: {
-    fontSize: 16,
-    textAlign: 'left',
+    fontWeight: '700',
     marginBottom: 4,
+    lineHeight: 18,
+    paddingRight: 28,
   },
   lifeAnalysisDescription: {
-    fontSize: 11,
-    textAlign: 'center',
-    lineHeight: 14,
-    paddingHorizontal: 4,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
-  },
-  lifeAnalysisDescriptionLarge: {
-    textAlign: 'left',
-    fontSize: 13,
-    lineHeight: 18,
-    paddingHorizontal: 0,
-  },
-  lifeAnalysisDescriptionWide: {
-    textAlign: 'left',
     fontSize: 12,
     lineHeight: 16,
-    paddingHorizontal: 0,
+    fontWeight: '500',
+  },
+  lifeAnalysisCostBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 2,
+    backgroundColor: 'rgba(255, 215, 0, 0.98)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(133, 77, 14, 0.25)',
+    elevation: 0,
   },
   costBadge: {
     position: 'absolute',
@@ -3946,14 +3645,6 @@ const styles = StyleSheet.create({
     textDecorationStyle: 'solid',
     textDecorationColor: '#000000',
     marginRight: 4,
-  },
-  iconGlow: {
-    position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    zIndex: -1,
   },
   // Dashboard Cards Styles
   dashboardContainer: {
@@ -4894,12 +4585,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#ff6b35',
     borderRadius: 2,
     alignSelf: 'flex-start',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   sunTimesRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 14,
     gap: 12,
   },
   sunTimeItem: {
@@ -4925,6 +4616,56 @@ const styles = StyleSheet.create({
   sunTimeValue: {
     fontSize: 13,
     fontWeight: '800',
+  },
+  panchangActiveWindow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+  },
+  panchangActiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 6,
+  },
+  panchangActiveTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  panchangActiveEyebrow: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  panchangActiveTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  panchangActiveRange: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 3,
+  },
+  panchangOpenLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 4,
+    paddingTop: 10,
+    paddingBottom: 2,
+  },
+  panchangOpenLinkText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   dayProgressBar: {
     alignItems: 'center',

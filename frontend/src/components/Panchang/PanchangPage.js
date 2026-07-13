@@ -355,6 +355,7 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
                 horaData={horaData}
                 muhurtaData={muhurtaData}
                 selectedDate={selectedDate}
+                amritKalam={inauspiciousData?.amrit_kalam || []}
               />
             </div>
           </div>

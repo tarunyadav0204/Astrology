@@ -57,6 +57,7 @@ const CascadingDashaBrowser = ({
   onRequireBirthData,
   selectNativeReturnTo = 'Home',
   embedded = false,
+  onHeaderStateChange,
 }) => {
   const { t } = useTranslation();
   const navigation = useNavigation();
@@ -129,12 +130,24 @@ const CascadingDashaBrowser = ({
   };
 
   const handleSelectNative = () => {
-    onClose?.();
+    if (!embedded) {
+      onClose?.();
+    }
     navigation.navigate('SelectNative', {
       returnTo: selectNativeReturnTo,
-      returnParams: { reopenDashaBrowser: true },
+      returnParams: embedded
+        ? { tab: 'dasha' }
+        : { reopenDashaBrowser: true },
     });
   };
+
+  useEffect(() => {
+    if (!onHeaderStateChange || !embedded) return;
+    onHeaderStateChange({
+      title: t('dasha.browserTitle'),
+      birthData: birthData?.name ? birthData : null,
+    });
+  }, [onHeaderStateChange, embedded, birthData, t]);
 
   const tSign = (sign) => {
     if (!sign) return '';
@@ -2195,19 +2208,18 @@ const CascadingDashaBrowser = ({
     );
   };
 
-  const renderBrowserHeader = (centerContent) => (
-    <View style={[styles.header, { backgroundColor: dashaColors.surface, borderBottomColor: dashaColors.border }]}>
-      {embedded ? (
-        <View style={styles.placeholder} />
-      ) : (
+  const renderBrowserHeader = (centerContent) => {
+    if (embedded) return null;
+    return (
+      <View style={[styles.header, { backgroundColor: dashaColors.surface, borderBottomColor: dashaColors.border }]}>
         <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: dashaColors.softControl }]}>
           <Icon name="arrow-back" size={22} color={colors.text} />
         </TouchableOpacity>
-      )}
-      {centerContent}
-      <View style={styles.placeholder} />
-    </View>
-  );
+        {centerContent}
+        <View style={styles.placeholder} />
+      </View>
+    );
+  };
 
   const renderShellBody = (headerCenter, body) => (
     <View

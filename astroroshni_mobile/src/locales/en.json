@@ -357,7 +357,10 @@
     "transit": "Transit",
     "dasha": "Dasha",
     "karakas": "Karakas",
-    "positions": "Positions"
+    "positions": "Positions",
+    "watchGuide": "Watch guide",
+    "watchGuideTitle": "How to read this chart",
+    "watchGuideDuration": "4 min"
   },
   "planets": {
     "Sun": "Su",
@@ -831,7 +834,7 @@
     "sections": {
       "choosePath": "Choose Your Path",
       "chooseStudy": "Choose what you want to study",
-      "lifeAnalysis": "🧘 Life Analysis",
+      "lifeAnalysis": "Life Analysis",
       "lifeStudy": "Chart Study",
       "timingPlanners": "⏰ Timing Planners",
       "cosmicDashboard": "✨ Your Chart Dashboard",
@@ -921,6 +924,12 @@
         "title": "Progeny Analysis",
         "description": "Fertility potential & family expansion"
       },
+      "yearly": {
+        "title": "Yearly & Monthly",
+        "description": "What the year holds — month by month"
+      },
+      "yearlyIosTitle": "Yearly & Monthly",
+      "yearlyIosDescription": "Month-by-month timing notes for the year ahead",
       "trading": {
         "title": "Trading Forecast",
         "description": "Stock market timing & context"
@@ -1040,29 +1049,35 @@
       "viewRing": "Ring"
     },
     "panchang": {
-      "title": "🌅 Today's Panchang",
+      "title": "Today's Panchang",
       "sunrise": "Sunrise",
       "sunset": "Sunset",
       "moonrise": "Moonrise",
       "moonset": "Moonset",
-      "elements": "🕉️ Panchang Elements",
-      "nakshatra": "⭐ Nakshatra:",
-      "tithi": "🌙 Tithi:",
-      "yoga": "🧘 Yoga:",
-      "karana": "⚡ Karana:",
+      "elements": "Panchang Elements",
+      "nakshatra": "Nakshatra:",
+      "tithi": "Tithi:",
+      "yoga": "Yoga:",
+      "karana": "Karana:",
       "fullMoon": "Full Moon",
       "dayProgress": "Day Progress",
-      "auspiciousTimes": "🕉️ Auspicious Times",
-      "brahmaMuhurta": "Brahma Muhurta:",
-      "abhijitMuhurta": "Abhijit Muhurta:",
-      "inauspiciousTimes": "⚠️ Inauspicious Times",
-      "rahuKaal": "Rahu Kaal:",
-      "durMuhurta": "Dur Muhurta:",
-      "varjyam": "Varjyam:",
+      "auspiciousTimes": "Auspicious Times",
+      "brahmaMuhurta": "Brahma Muhurta",
+      "abhijitMuhurta": "Abhijit Muhurta",
+      "inauspiciousTimes": "Inauspicious Times",
+      "rahuKaal": "Rahu Kaal",
+      "durMuhurta": "Dur Muhurta",
+      "varjyam": "Varjyam",
       "dayQuality": "Day Quality Timeline",
       "auspicious": "Auspicious",
       "inauspicious": "Inauspicious",
-      "illuminated": "Illuminated"
+      "illuminated": "Illuminated",
+      "activeNow": "Active now",
+      "upNext": "Up next",
+      "noActiveWindow": "No special window right now",
+      "checkFull": "See full day timings",
+      "openFull": "Open full Panchang",
+      "amritKalam": "Amrit Kalam"
     },
     "loading": {
       "transits": "Loading transits...",
@@ -1099,6 +1114,7 @@
       "ask": "Ask",
       "charts": "Charts",
       "events": "Timing",
+      "eventsAndroid": "Predictions",
       "reports": "Reports",
       "dashas": "Dashas",
       "you": "You"

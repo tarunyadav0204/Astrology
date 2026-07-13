@@ -25,7 +25,7 @@ import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, division, navigation, onHousePress }, ref) => {
+const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, onOpenChartGuide, division, navigation, onHousePress }, ref) => {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const isLight = theme === 'light';
@@ -452,6 +452,16 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
               >
                 <Ionicons name="shield-outline" size={18} color="#fff" />
               </TouchableOpacity>
+              {onOpenChartGuide ? (
+                <TouchableOpacity
+                  onPress={onOpenChartGuide}
+                  style={styles.floatingButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('chartScreen.watchGuide', 'Watch guide')}
+                >
+                  <Ionicons name="play-circle-outline" size={18} color="#fff" />
+                </TouchableOpacity>
+              ) : null}
             </View>
             <View style={styles.infoButtonContainer}>
               <TouchableOpacity onPress={() => setShowInfoModal(true)} style={styles.infoButton}>
@@ -539,6 +549,33 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 {t('chartScreen.infoTitle', 'About this chart')}
               </Text>
               <ScrollView style={styles.infoScroll} showsVerticalScrollIndicator={false}>
+                {onOpenChartGuide ? (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      setShowInfoModal(false);
+                      onOpenChartGuide();
+                    }}
+                    style={styles.infoGuideCard}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('chartScreen.watchGuideTitle', 'How to read this chart')}
+                  >
+                    <View style={styles.infoGuideIcon}>
+                      <Ionicons name="play" size={14} color="#fff" />
+                    </View>
+                    <View style={styles.infoGuideTextWrap}>
+                      <Text style={styles.infoGuideLabel}>
+                        {t('chartScreen.watchGuide', 'Watch guide')}
+                      </Text>
+                      <Text style={styles.infoGuideTitle}>
+                        {t('chartScreen.watchGuideTitle', 'How to read this chart')}
+                      </Text>
+                    </View>
+                    <Text style={styles.infoGuideMeta}>
+                      {t('chartScreen.watchGuideDuration', '4 min')}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
                 <Text style={styles.infoText}>
                   {getChartInfoIntro()}
                 </Text>
@@ -661,6 +698,42 @@ const styles = StyleSheet.create({
   infoSubTitle: { fontSize: 14, fontWeight: '700', color: '#cbd5f5', marginTop: 12, marginBottom: 4 },
   infoScroll: { maxHeight: 360, marginBottom: 16 },
   infoText: { fontSize: 13, color: '#e5e7eb', lineHeight: 20, marginBottom: 8 },
+  infoGuideCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(249, 115, 22, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(249, 115, 22, 0.35)',
+  },
+  infoGuideIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#f97316',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoGuideTextWrap: { flex: 1, minWidth: 0 },
+  infoGuideLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fdba74',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 1,
+  },
+  infoGuideTitle: { fontSize: 13, fontWeight: '700', color: '#f9fafb' },
+  infoGuideMeta: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#fdba74',
+    flexShrink: 0,
+  },
   infoCloseButton: { alignSelf: 'center', paddingHorizontal: 24, paddingVertical: 10, borderRadius: 999, backgroundColor: '#f97316' },
   infoCloseButtonText: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 0.3, textTransform: 'uppercase' },
 });

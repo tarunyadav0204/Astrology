@@ -39,6 +39,7 @@ import TradingDashboardScreen from './src/components/Trading/TradingDashboardScr
 import TradingCalendarScreen from './src/components/Trading/TradingCalendarScreen';
 import ChildbirthPlannerScreen from './src/components/ChildbirthPlannerScreen';
 import MuhuratHubScreen from './src/components/MuhuratHubScreen';
+import DailyPanchangScreen from './src/components/Panchang/DailyPanchangScreen';
 import UniversalMuhuratScreen from './src/components/UniversalMuhuratScreen';
 import EventScreen from './src/components/EventScreen';
 import MonthlyDeepScreen from './src/components/MonthlyDeepScreen';
@@ -750,6 +751,11 @@ export default function App() {
           <Stack.Screen 
             name="MuhuratHub" 
             component={MuhuratHubScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="DailyPanchang"
+            component={DailyPanchangScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 

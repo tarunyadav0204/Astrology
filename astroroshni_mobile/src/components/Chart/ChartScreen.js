@@ -38,7 +38,7 @@ import { getGrahaDrishtiToHouseSign } from '../../utils/grahaDrishti';
 import { calculateGandantaLocal, getGandantaHouseMatches } from '../../utils/gandanta';
 
 const { width, height } = Dimensions.get('window');
-export default function ChartScreen({ navigation, route }) {
+export default function ChartScreen({ navigation, route, onHeaderStateChange }) {
   const { t } = useTranslation();
   useAnalytics('ChartScreen');
   const { theme, colors } = useTheme();
@@ -528,7 +528,7 @@ export default function ChartScreen({ navigation, route }) {
     };
   }, [chartData]);
   
-  const handleShare = async () => {
+  const handleShare = useCallback(async () => {
     try {
       setIsSharing(true);
       // Wait for state update and potential re-renders
@@ -550,7 +550,26 @@ export default function ChartScreen({ navigation, route }) {
     } finally {
       setIsSharing(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!onHeaderStateChange) return;
+    onHeaderStateChange({
+      chartName: chartTypes[currentChartIndex]?.name || '',
+      positionLabel: `${currentChartIndex + 1}/${chartTypes.length}`,
+      onShare: handleShare,
+      isSharing,
+      birthData,
+    });
+  }, [
+    onHeaderStateChange,
+    currentChartIndex,
+    chartTypes[currentChartIndex]?.name,
+    chartTypes.length,
+    handleShare,
+    isSharing,
+    birthData,
+  ]);
   
   useEffect(() => {
     loadBirthData();
@@ -625,20 +644,17 @@ export default function ChartScreen({ navigation, route }) {
         />
         
         <SafeAreaView style={styles.safeArea} edges={embedded ? [] : ['top']}>
+          {!embedded ? (
           <View style={styles.compactHeader}>
-            {embedded ? (
-              <View style={[styles.closeButton, { backgroundColor: 'transparent' }]} />
-            ) : (
-              <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.closeButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}>
-                <Ionicons name="arrow-back" size={20} color={colors.text} />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.closeButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}>
+              <Ionicons name="arrow-back" size={20} color={colors.text} />
+            </TouchableOpacity>
             <View style={styles.headerCenter}>
               <Text style={[styles.chartName, { color: colors.text }]}>{chartTypes[currentChartIndex]?.name}</Text>
               {birthData && (
                 <NativeSelectorChip 
                   birthData={birthData}
-                  onPress={() => navigation.navigate('SelectNative', embedded ? { returnTo: 'ChartsHub' } : undefined)}
+                  onPress={() => navigation.navigate('SelectNative')}
                   maxLength={15}
                   style={styles.nativeChip}
                   textStyle={styles.nativeChipText}
@@ -657,6 +673,7 @@ export default function ChartScreen({ navigation, route }) {
               <Text style={[styles.positionText, { color: colors.text }]}>{currentChartIndex + 1}/{chartTypes.length}</Text>
             </View>
           </View>
+          ) : null}
 
           {loading ? (
             <View style={styles.loadingContainer}>
@@ -685,29 +702,6 @@ export default function ChartScreen({ navigation, route }) {
                       : { backgroundColor: '#fff5f0' }
                   ]}
                 >
-                  <TouchableOpacity
-                    activeOpacity={0.88}
-                    onPress={() => {
-                      setGuidePlayerStatus('loading');
-                      setShowGuidePlayer(true);
-                    }}
-                    style={[
-                      styles.guideStrip,
-                      {
-                        backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
-                        borderColor: theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.08)',
-                      },
-                    ]}
-                  >
-                    <View style={styles.guideStripText}>
-                      <Text style={[styles.guideStripLabel, { color: colors.textSecondary }]}>Watch guide</Text>
-                      <Text style={[styles.guideStripTitle, { color: colors.text }]}>How to read this chart</Text>
-                    </View>
-                    <View style={[styles.guideStripMeta, { borderColor: colors.primary + '25' }]}>
-                      <Text style={[styles.guideStripMetaText, { color: colors.primary }]}>4 min</Text>
-                    </View>
-                  </TouchableOpacity>
-
                   <View style={styles.chartAndNavContainer}>
                     <PanGestureHandler 
                       onGestureEvent={onGestureEvent}
@@ -748,6 +742,10 @@ export default function ChartScreen({ navigation, route }) {
                                   cosmicTheme={true}
                                   chartType={chartTypes[currentChartIndex].id}
                                   onOpenDasha={() => setShowDashaBrowser(true)}
+                                  onOpenChartGuide={() => {
+                                    setGuidePlayerStatus('loading');
+                                    setShowGuidePlayer(true);
+                                  }}
                                   onNavigateToTransit={() => {
                                     const transitIndex = chartTypes.findIndex(chart => chart.id === 'transit');
                                     if (transitIndex !== -1) changeChart(transitIndex);
@@ -1340,43 +1338,6 @@ const styles = StyleSheet.create({
   mainContent: {
     flex: 1,
     paddingHorizontal: 0,
-  },
-  guideStrip: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 4,
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  guideStripText: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  guideStripLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 2,
-  },
-  guideStripTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  guideStripMeta: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  guideStripMetaText: {
-    fontSize: 12,
-    fontWeight: '800',
   },
   chartAndNavContainer: {
     flex: 1,

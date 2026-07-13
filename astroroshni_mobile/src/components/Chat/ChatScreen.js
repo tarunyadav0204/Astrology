@@ -2685,6 +2685,8 @@ export default function ChatScreen({ navigation, route }) {
       navigation.navigate('AshtakvargaOracle');
     } else if (option.action === 'muhurat') {
       navigation.navigate('MuhuratHub');
+    } else if (option.action === 'panchang') {
+      navigation.navigate('DailyPanchang');
     } else if (option.action === 'numerology') {
       navigation.navigate('Numerology');
     } else if (option.action === 'analysis') {

@@ -45,14 +45,18 @@ class MonthlyPanchangCalculator:
         date_obj = datetime.strptime(date_str, '%Y-%m-%d')
         jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, 12.0)
         
-        # Basic panchang elements with timezone
-        basic_panchang = self.panchang_calc.calculate_panchang(date_str, latitude, longitude, timezone)
-        
+        # Basic panchang elements at local sunrise (Hindu day)
+        basic_panchang = self.panchang_calc.calculate_panchang(
+            date_str, latitude, longitude, timezone, reference="sunrise"
+        )
+
         # Calculate sunrise/sunset with timezone
         sunrise_sunset = self._calculate_sunrise_sunset(date_str, latitude, longitude, timezone)
-        
-        # Calculate special times with timezone
-        special_times = self._calculate_special_times(date_str, latitude, longitude, sunrise_sunset, timezone)
+
+        # Calculate special times with timezone (needs nakshatra window for Varjyam/Amrit)
+        special_times = self._calculate_special_times(
+            date_str, latitude, longitude, sunrise_sunset, timezone, basic_panchang=basic_panchang
+        )
         
         # Calculate samvats and calendar info
         calendar_info = self._calculate_calendar_info(date_obj, jd)
@@ -62,6 +66,9 @@ class MonthlyPanchangCalculator:
         
         # Calculate planetary positions for signs
         planetary_signs = self._calculate_planetary_signs(jd)
+
+        # Ritu / Ayana / Chandra Balam (day-level polish; Tara needs birth nakshatra)
+        day_context = self._calculate_day_context(jd, basic_panchang)
         
         return {
             'date': date_str,
@@ -74,124 +81,65 @@ class MonthlyPanchangCalculator:
             'calendar_info': calendar_info,
             'moon_info': moon_info,
             'planetary_signs': planetary_signs,
+            'day_context': day_context,
             'timezone': timezone
         }
     
     def _calculate_sunrise_sunset(self, date_str: str, latitude: float, longitude: float, timezone: str = None) -> Dict[str, Any]:
-        """Calculate sunrise, sunset, moonrise, moonset with proper timezone handling using pytz"""
-        timezone = timezone or "UTC+0"
-        
-        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-        jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, 0.0)
-        
-        geopos = [longitude, latitude, 0.0]
-        
-        # Parse timezone - support both IANA names and UTC offsets
-        if timezone.startswith('UTC'):
-            # Handle UTC offset format
-            tz_offset = self._parse_timezone(timezone)
-        else:
-            # Handle IANA timezone names with pytz
-            try:
-                local_tz = pytz.timezone(timezone)
-                # Get offset for this specific date (handles DST)
-                dt_naive = datetime(date_obj.year, date_obj.month, date_obj.day, 12, 0, 0)
-                dt_localized = local_tz.localize(dt_naive)
-                tz_offset = dt_localized.utcoffset().total_seconds() / 3600
-            except:
-                tz_offset = 0.0  # Fallback to UTC
-        
+        """Delegate sun/moon rise-set to shared Swiss Ephemeris calculator (Drik-aligned moon day)."""
+        from calculators.panchang_calculator import PanchangCalculator as RiseCalc
+
         try:
-            # Calculate sunrise/sunset
-            sunrise_result = swe.rise_trans(jd, swe.SUN, swe.CALC_RISE, geopos)
-            sunset_result = swe.rise_trans(jd, swe.SUN, swe.CALC_SET, geopos)
-            moonrise_result = swe.rise_trans(jd, swe.MOON, swe.CALC_RISE, geopos)
-            moonset_result = swe.rise_trans(jd, swe.MOON, swe.CALC_SET, geopos)
-            
-            sunrise_jd = sunrise_result[1][0] if sunrise_result[0] == 0 else None
-            sunset_jd = sunset_result[1][0] if sunset_result[0] == 0 else None
-            moonrise_jd = moonrise_result[1][0] if moonrise_result[0] == 0 else None
-            moonset_jd = moonset_result[1][0] if moonset_result[0] == 0 else None
-            
-            def jd_to_local_datetime(jd_val):
-                if not jd_val: return None
-                year, month, day, hour, minute, second = swe.jdut1_to_utc(jd_val, 1)
-                dt_utc = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-                
-                if timezone.startswith('UTC'):
-                    # Simple offset calculation
-                    dt_local = dt_utc + timedelta(hours=tz_offset)
-                else:
-                    # Use pytz for proper DST handling
-                    try:
-                        local_tz = pytz.timezone(timezone)
-                        dt_utc_aware = pytz.utc.localize(dt_utc)
-                        dt_local = dt_utc_aware.astimezone(local_tz)
-                    except:
-                        dt_local = dt_utc + timedelta(hours=tz_offset)
-                
-                return dt_local.replace(tzinfo=None)
+            raw = RiseCalc().get_local_sunrise_sunset(
+                date_str, latitude, longitude, timezone or "UTC+0"
+            )
 
-            sunrise_local = jd_to_local_datetime(sunrise_jd)
-            sunset_local = jd_to_local_datetime(sunset_jd)
-            moonrise_local = jd_to_local_datetime(moonrise_jd)
-            moonset_local = jd_to_local_datetime(moonset_jd)
+            def fmt_clock(iso_val):
+                if not iso_val:
+                    return None
+                return datetime.fromisoformat(str(iso_val)).strftime('%I:%M %p')
 
-            day_duration = None
-            if sunrise_local and sunset_local:
-                sunset_for_duration = sunset_local
-                if sunset_for_duration <= sunrise_local:
-                    sunset_for_duration += timedelta(days=1)
-                day_duration = (sunset_for_duration - sunrise_local).total_seconds() / 3600
-            
             return {
-                'sunrise': sunrise_local.strftime('%I:%M %p') if sunrise_local else None,
-                'sunset': sunset_local.strftime('%I:%M %p') if sunset_local else None,
-                'moonrise': moonrise_local.strftime('%I:%M %p') if moonrise_local else None,
-                'moonset': moonset_local.strftime('%I:%M %p') if moonset_local else None,
-                'day_duration': day_duration
+                'sunrise': fmt_clock(raw.get('sunrise')),
+                'sunset': fmt_clock(raw.get('sunset')),
+                'moonrise': fmt_clock(raw.get('moonrise')),
+                'moonset': fmt_clock(raw.get('moonset')),
+                'moonrise_iso': raw.get('moonrise'),
+                'moonset_iso': raw.get('moonset'),
+                'day_duration': raw.get('day_duration'),
             }
-            
         except Exception:
             return {
                 'sunrise': None,
                 'sunset': None,
                 'moonrise': None,
                 'moonset': None,
-                'day_duration': None
+                'day_duration': None,
             }
     
-    def _calculate_special_times(self, date_str: str, latitude: float, longitude: float, sunrise_sunset: Dict, timezone: str = None) -> Dict[str, Any]:
-        """Calculate Rahu Kaal, Gulikai Kalam, Yamaganda with dynamic muhurta windows"""
-        
+    def _calculate_special_times(self, date_str: str, latitude: float, longitude: float, sunrise_sunset: Dict, timezone: str = None, basic_panchang: Dict = None) -> Dict[str, Any]:
+        """Calculate Rahu Kaal, Gulikai, Yamaganda, Dur Muhurta, Varjyam, Amrit Kalam."""
+
         date_obj = datetime.strptime(date_str, '%Y-%m-%d')
         weekday = date_obj.weekday()  # 0=Monday, 6=Sunday
-        
-        if not sunrise_sunset['sunrise'] or not sunrise_sunset['sunset']:
+
+        if not sunrise_sunset.get('sunrise') or not sunrise_sunset.get('sunset'):
             return {}
-        
-        # Parse sunrise time
+
         sunrise_time = datetime.strptime(f"{date_str} {sunrise_sunset['sunrise']}", '%Y-%m-%d %I:%M %p')
-        day_duration = sunrise_sunset['day_duration']
-        
+        day_duration = sunrise_sunset.get('day_duration')
         if not day_duration:
             return {}
-        
-        # Dynamic muhurta calculation (1/15th of actual day duration)
-        muhurta_duration = day_duration / 15
-        
-        # Each Rahu Kaal period is 1/8 of day duration (Drik standard)
-        period_duration = day_duration / 8
-        
-        # Daylight is divided into 8 equal parts from local sunrise to local sunset.
-        # Values below are zero-based daylight segments, Sunday=0.
+
+        muhurta_duration = day_duration / 15.0
+        period_duration = day_duration / 8.0
+
+        # Daylight eighths from local sunrise; Sunday=0 maps.
         rahu_periods = {0: 7, 1: 1, 2: 6, 3: 4, 4: 5, 5: 3, 6: 2}
         gulikai_periods = {0: 6, 1: 5, 2: 4, 3: 3, 4: 2, 5: 1, 6: 0}
         yamaganda_periods = {0: 4, 1: 3, 2: 2, 3: 1, 4: 0, 5: 6, 6: 5}
-        
-        # Convert weekday (Monday=0) to (Sunday=0)
         sunday_weekday = (weekday + 1) % 7
-        
+
         def calculate_period_time(period_num):
             start_time = sunrise_time + timedelta(hours=period_num * period_duration)
             end_time = start_time + timedelta(hours=period_duration)
@@ -199,26 +147,149 @@ class MonthlyPanchangCalculator:
                 'start': start_time.strftime('%I:%M %p'),
                 'end': end_time.strftime('%I:%M %p')
             }
-        
-        # Calculate Abhijit Muhurta (8th muhurta - middle of day)
+
+        # Abhijit = 8th daytime muhurta (middle of day)
         abhijit_start = sunrise_time + timedelta(hours=7 * muhurta_duration)
         abhijit_end = abhijit_start + timedelta(hours=muhurta_duration)
-        
-        # Calculate Dur Muhurtam (inauspicious periods - 1/15th each)
-        dur_muhurta_1_start = sunrise_time + timedelta(hours=2 * muhurta_duration)
-        dur_muhurta_1_end = dur_muhurta_1_start + timedelta(hours=muhurta_duration)
-        
-        dur_muhurta_2_start = sunrise_time + timedelta(hours=13 * muhurta_duration)
-        dur_muhurta_2_end = dur_muhurta_2_start + timedelta(hours=muhurta_duration)
-        
-        # Calculate Amrit Kalam (auspicious periods - 1/15th each)
-        amrit_1_start = sunrise_time + timedelta(hours=4 * muhurta_duration)
-        amrit_1_end = amrit_1_start + timedelta(hours=muhurta_duration)
-        
-        # Calculate Varjyam (avoid specific activities - 1/15th)
-        varjyam_start = sunrise_time + timedelta(hours=11 * muhurta_duration)
-        varjyam_end = varjyam_start + timedelta(hours=muhurta_duration)
-        
+
+        # Classical Dur Muhurta by weekday (BV Raman / Muhurta Chintamani), 1-based muhurtas from sunrise.
+        # Sunday: 14; Monday: 8,12; Tuesday: 4,11; Wednesday: 8 (Abhijit); Thursday: 12,13; Friday: 4,8; Saturday: 1,2
+        # Drik / common practice: when muhurta 8 is listed but Abhijit is auspicious (not Wed),
+        # shift that Dur window to muhurta 9 (immediately after Abhijit).
+        dur_by_weekday_sun0 = {
+            0: [14],
+            1: [8, 12],
+            2: [4, 11],
+            3: [8],
+            4: [12, 13],
+            5: [4, 8],
+            6: [1, 2],
+        }
+        dur_nums = list(dur_by_weekday_sun0.get(sunday_weekday, []))
+        if 8 in dur_nums and sunday_weekday != 3:
+            dur_nums = [9 if n == 8 else n for n in dur_nums]
+        dur_muhurtam = []
+        for muhurta_num in dur_nums:
+            start = sunrise_time + timedelta(hours=(muhurta_num - 1) * muhurta_duration)
+            end = start + timedelta(hours=muhurta_duration)
+            dur_muhurtam.append({
+                'start': start.strftime('%I:%M %p'),
+                'end': end.strftime('%I:%M %p'),
+                'muhurta': muhurta_num,
+            })
+
+        # Classical Tyajya / Varjyam: 4 ghatis from nakshatra start (ghati table).
+        # Source: Muhurta texts (Ashwini=50 … Revati=30); duration = 4 ghatis.
+        varjyam_start_ghati = [
+            50, 4, 30, 40, 14, 21, 30, 20, 32, 30,
+            20, 1, 21, 20, 14, 14, 10, 14, 20, 20,
+            20, 10, 10, 18, 16, 30, 30,
+        ]
+        # Prashnamarga / common Amrita ghatika starts (4 ghatis).
+        amrit_start_ghati = [
+            42, 48, 54, 52, 38, 35, 54, 44, 56, 54,
+            44, 43, 45, 44, 38, 38, 34, 38, 40, 42,
+            42, 40, 40, 36, 38, 42, 42,
+        ]
+
+        hindu_day_end = sunrise_time + timedelta(hours=24)
+        sunset_time = datetime.strptime(f"{date_str} {sunrise_sunset['sunset']}", '%Y-%m-%d %I:%M %p')
+        if sunset_time <= sunrise_time:
+            sunset_time += timedelta(days=1)
+
+        def _parse_nak_window(nak: Dict) -> tuple:
+            nak_num = int(nak.get('number') or 0)
+            start_iso = nak.get('start_time')
+            end_iso = nak.get('end_time')
+            if not nak_num or not start_iso or not end_iso:
+                return None
+            try:
+                nak_start = datetime.fromisoformat(start_iso)
+                nak_end = datetime.fromisoformat(end_iso)
+            except ValueError:
+                return None
+            if nak_end <= nak_start:
+                nak_end += timedelta(days=1)
+            return nak_num, nak_start, nak_end
+
+        # Nakshatras active across the Hindu day (sunrise → next sunrise), not only sunrise star.
+        # Drik's daytime Amrit/Varjyam often belong to the post-sunrise nakshatra (e.g. Ardra).
+        nak_windows = []
+        first = _parse_nak_window((basic_panchang or {}).get('nakshatra') or {})
+        if first:
+            nak_windows.append(first)
+            cursor_end = first[2]
+            while cursor_end < hindu_day_end and len(nak_windows) < 3:
+                sample = cursor_end + timedelta(minutes=2)
+                sample_date = sample.strftime('%Y-%m-%d')
+                sample_time = sample.strftime('%H:%M:%S')
+                try:
+                    next_bp = self.panchang_calc.calculate_panchang(
+                        sample_date, latitude, longitude, timezone or "UTC+0", time_str=sample_time
+                    )
+                    nxt = _parse_nak_window((next_bp or {}).get('nakshatra') or {})
+                except Exception:
+                    nxt = None
+                if not nxt or nxt[0] == nak_windows[-1][0]:
+                    break
+                nak_windows.append(nxt)
+                cursor_end = nxt[2]
+
+        def periods_from_nakshatra_ghati(start_ghati_table):
+            periods = []
+            for nak_num, nak_start, nak_end in nak_windows:
+                duration = nak_end - nak_start
+                ghati = start_ghati_table[(nak_num - 1) % 27]
+                start = nak_start + duration * (ghati / 60.0)
+                end = start + duration * (4.0 / 60.0)
+                # Keep windows that fall on this Hindu day.
+                if end <= sunrise_time or start >= hindu_day_end:
+                    continue
+                periods.append({
+                    'start': start.strftime('%I:%M %p'),
+                    'end': end.strftime('%I:%M %p'),
+                    'start_dt': start,
+                    'end_dt': end,
+                    'nakshatra_number': nak_num,
+                })
+            return periods
+
+        def prefer_daytime(periods):
+            if not periods:
+                return []
+            daytime = [
+                p for p in periods
+                if p['start_dt'] < sunset_time and p['end_dt'] > sunrise_time
+            ]
+            chosen = daytime or periods
+            chosen = sorted(chosen, key=lambda p: p['start_dt'])
+            return [{k: v for k, v in p.items() if k not in ('start_dt', 'end_dt')} for p in chosen]
+
+        varjyam_periods = prefer_daytime(periods_from_nakshatra_ghati(varjyam_start_ghati))
+        amrit_periods = prefer_daytime(periods_from_nakshatra_ghati(amrit_start_ghati))
+
+        # Preserve prior response shape: varjyam as single object when one window.
+        if varjyam_periods:
+            varjyam = {k: v for k, v in varjyam_periods[0].items() if k != 'nakshatra_number'}
+        else:
+            # Fallback only if nakshatra timings missing
+            fallback_start = sunrise_time + timedelta(hours=10 * muhurta_duration)
+            varjyam = {
+                'start': fallback_start.strftime('%I:%M %p'),
+                'end': (fallback_start + timedelta(hours=muhurta_duration)).strftime('%I:%M %p'),
+            }
+
+        if not amrit_periods:
+            amrit_fallback = sunrise_time + timedelta(hours=6 * muhurta_duration)
+            amrit_periods = [{
+                'start': amrit_fallback.strftime('%I:%M %p'),
+                'end': (amrit_fallback + timedelta(hours=muhurta_duration)).strftime('%I:%M %p'),
+            }]
+        else:
+            amrit_periods = [
+                {k: v for k, v in p.items() if k != 'nakshatra_number'} for p in amrit_periods
+            ]
+
         return {
             'rahu_kalam': calculate_period_time(rahu_periods[sunday_weekday]),
             'gulikai_kalam': calculate_period_time(gulikai_periods[sunday_weekday]),
@@ -227,26 +298,9 @@ class MonthlyPanchangCalculator:
                 'start': abhijit_start.strftime('%I:%M %p'),
                 'end': abhijit_end.strftime('%I:%M %p')
             },
-            'dur_muhurtam': [
-                {
-                    'start': dur_muhurta_1_start.strftime('%I:%M %p'),
-                    'end': dur_muhurta_1_end.strftime('%I:%M %p')
-                },
-                {
-                    'start': dur_muhurta_2_start.strftime('%I:%M %p'),
-                    'end': dur_muhurta_2_end.strftime('%I:%M %p')
-                }
-            ],
-            'amrit_kalam': [
-                {
-                    'start': amrit_1_start.strftime('%I:%M %p'),
-                    'end': amrit_1_end.strftime('%I:%M %p')
-                }
-            ],
-            'varjyam': {
-                'start': varjyam_start.strftime('%I:%M %p'),
-                'end': varjyam_end.strftime('%I:%M %p')
-            },
+            'dur_muhurtam': dur_muhurtam,
+            'amrit_kalam': amrit_periods,
+            'varjyam': varjyam,
             'muhurta_duration_hours': muhurta_duration
         }
     
@@ -433,6 +487,45 @@ class MonthlyPanchangCalculator:
                     planetary_data[planet_name]['is_combust'] = angular_distance < 8
         
         return planetary_data
+
+    def _calculate_day_context(self, jd: float, basic_panchang: Dict) -> Dict[str, Any]:
+        """Ritu, Ayana, and day-level Chandra Balam (Tara Balam needs birth nakshatra)."""
+        sun_pos = swe.calc_ut(jd, swe.SUN, swe.FLG_SIDEREAL)[0][0]
+        moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
+        tithi_deg = (moon_pos - sun_pos) % 360
+
+        # Sidereal solar months → classical 6 ritus (approx by sun sign)
+        sun_sign = int(sun_pos / 30) % 12
+        ritu_by_sign = [
+            'Vasanta', 'Vasanta', 'Grishma', 'Grishma', 'Varsha', 'Varsha',
+            'Sharad', 'Sharad', 'Hemanta', 'Hemanta', 'Shishira', 'Shishira',
+        ]
+        # Ayana: Uttarayana when Sun in Capricorn–Gemini (signs 9–2), else Dakshinayana
+        ayana = 'Uttarayana' if sun_sign in (9, 10, 11, 0, 1, 2) else 'Dakshinayana'
+
+        # Chandra Balam proxy without birth chart: strong in Shukla, weak near Amavasya
+        if tithi_deg < 180:
+            chandra_balam = {'status': 'Strong', 'paksha': 'Shukla', 'note': 'Waxing Moon supports growth-oriented work'}
+        elif tithi_deg < 348:
+            chandra_balam = {'status': 'Moderate', 'paksha': 'Krishna', 'note': 'Waning Moon favors completion and release'}
+        else:
+            chandra_balam = {'status': 'Weak', 'paksha': 'Krishna', 'note': 'Near Amavasya — prefer quiet / remedial work'}
+
+        nak_num = int(((basic_panchang or {}).get('nakshatra') or {}).get('number') or 0)
+        # Tara Balam requires janma nakshatra; expose scaffold for clients that pass birth later.
+        tara_balam = {
+            'available': False,
+            'day_nakshatra_number': nak_num or None,
+            'note': 'Provide birth nakshatra to compute Tara Balam (1–9 count from janma star)',
+        }
+
+        return {
+            'ritu': ritu_by_sign[sun_sign],
+            'ayana': ayana,
+            'sun_sign_index': sun_sign,
+            'chandra_balam': chandra_balam,
+            'tara_balam': tara_balam,
+        }
     
     def _jd_to_time_string(self, jd: float, timezone: str = None) -> str:
         """Convert Julian Day to time string with proper timezone handling using pytz"""

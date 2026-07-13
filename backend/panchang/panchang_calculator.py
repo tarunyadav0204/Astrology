@@ -1,43 +1,76 @@
 import swisseph as swe
 from datetime import datetime, timedelta
 import math
+from utils.timezone_service import parse_timezone_offset
+
 
 class PanchangCalculator:
     def __init__(self):
         # Initialize Swiss Ephemeris with Lahiri Ayanamsa for accurate Vedic calculations
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-    
-    def calculate_panchang(self, date_str, latitude, longitude, timezone):
-        """Calculate complete Panchang for given date and location"""
+        self._tz_offset_hours = 0.0
+
+    def calculate_panchang(self, date_str, latitude, longitude, timezone, time_str=None, reference="sunrise"):
+        """
+        Calculate complete Panchang for given date and location.
+
+        reference:
+          - "sunrise" (default): Hindu day elements at local sunrise (daily panchang)
+          - "noon": civil noon local (legacy / approximate)
+          - explicit time_str "HH:MM[:SS]": evaluate at that local civil time
+        """
+        self._tz_offset_hours = parse_timezone_offset(timezone, latitude, longitude, for_date=date_str)
         date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-        jd = swe.julday(int(date_obj.year), int(date_obj.month), int(date_obj.day), 12.0)
-        
+
+        if time_str:
+            parts = str(time_str).split(':')
+            local_hour = int(parts[0]) + int(parts[1]) / 60.0
+            if len(parts) > 2:
+                local_hour += int(float(parts[2])) / 3600.0
+            utc_hour = local_hour - self._tz_offset_hours
+            jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, utc_hour)
+        elif reference == "noon":
+            utc_hour = 12.0 - self._tz_offset_hours
+            jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, utc_hour)
+        else:
+            # Default: evaluate at local sunrise (Hindu day start)
+            jd0 = swe.julday(date_obj.year, date_obj.month, date_obj.day, 0.0)
+            geopos = [float(longitude), float(latitude), 0.0]
+            rise = swe.rise_trans(jd0, swe.SUN, swe.CALC_RISE, geopos)
+            if rise[0] == 0:
+                jd = rise[1][0]
+            else:
+                utc_hour = 6.0 - self._tz_offset_hours
+                jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, utc_hour)
+
         # Calculate Sun and Moon positions
         sun_pos = swe.calc_ut(jd, swe.SUN, swe.FLG_SIDEREAL)[0][0]
         moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
-        
+
         # Calculate Tithi
         tithi_data = self._calculate_tithi(sun_pos, moon_pos, jd)
-        
-        # Calculate Vara (weekday)
+
+        # Calculate Vara (weekday) from local sunrise civil date when possible
         vara_data = self._calculate_vara(jd)
-        
+
         # Calculate Nakshatra
         nakshatra_data = self._calculate_nakshatra(moon_pos, jd)
-        
+
         # Calculate Yoga
         yoga_data = self._calculate_yoga(sun_pos, moon_pos, jd)
-        
+
         # Calculate Karana
         karana_data = self._calculate_karana(sun_pos, moon_pos, jd)
-        
+
         return {
             'tithi': tithi_data,
             'vara': vara_data,
             'nakshatra': nakshatra_data,
             'yoga': yoga_data,
             'karana': karana_data,
-            'ayanamsa': swe.get_ayanamsa_ut(jd)
+            'ayanamsa': swe.get_ayanamsa_ut(jd),
+            'reference_jd': jd,
+            'timezone_offset_hours': self._tz_offset_hours,
         }
     
     def _calculate_tithi(self, sun_pos, moon_pos, jd):
@@ -110,24 +143,23 @@ class PanchangCalculator:
         }
     
     def _calculate_nakshatra(self, moon_pos, jd):
-        """Calculate Nakshatra details"""
+        """Calculate Nakshatra details with precise angular transition times"""
+        nak_slice = 360.0 / 27.0
         nakshatra_deg = moon_pos % 360
-        nakshatra_num = int(nakshatra_deg / 13.333333) + 1
-        pada_deg = nakshatra_deg % 13.333333
-        pada_num = int(pada_deg / 3.333333) + 1
-        
-        # Nakshatra timing calculation
-        nakshatra_speed = 13.333333 / 27  # degrees per day for one nakshatra
-        elapsed_deg = nakshatra_deg % 13.333333
-        remaining_deg = 13.333333 - elapsed_deg
-        
-        base_time = datetime.fromtimestamp((jd - 2440587.5) * 86400)
-        hours_elapsed = (elapsed_deg / nakshatra_speed) * 24
-        hours_remaining = (remaining_deg / nakshatra_speed) * 24
-        
-        start_time = base_time - timedelta(hours=hours_elapsed)
-        end_time = base_time + timedelta(hours=hours_remaining)
-        
+        nakshatra_num = int(nakshatra_deg / nak_slice) + 1
+        pada_deg = nakshatra_deg % nak_slice
+        pada_num = int(pada_deg / (nak_slice / 4.0)) + 1
+
+        start_boundary = (nakshatra_num - 1) * nak_slice
+        end_boundary = nakshatra_num * nak_slice
+        if end_boundary >= 360:
+            end_boundary = 360.0
+
+        start_jd = self._find_longitude_moment(jd, swe.MOON, start_boundary, backwards=True)
+        end_jd = self._find_longitude_moment(jd, swe.MOON, end_boundary % 360 if end_boundary == 360 else end_boundary, backwards=False)
+        start_time = self._jd_to_local_time(start_jd)
+        end_time = self._jd_to_local_time(end_jd)
+
         nakshatra_names = [
             'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira',
             'Ardra', 'Punarvasu', 'Pushya', 'Ashlesha', 'Magha',
@@ -136,7 +168,7 @@ class PanchangCalculator:
             'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Purva Bhadrapada',
             'Uttara Bhadrapada', 'Revati'
         ]
-        
+
         nakshatra_lords = [
             'Ketu', 'Venus', 'Sun', 'Moon', 'Mars',
             'Rahu', 'Jupiter', 'Saturn', 'Mercury', 'Ketu',
@@ -145,7 +177,7 @@ class PanchangCalculator:
             'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter',
             'Saturn', 'Mercury'
         ]
-        
+
         nakshatra_deities = [
             'Ashwini Kumaras', 'Yama', 'Agni', 'Brahma', 'Soma',
             'Rudra', 'Aditi', 'Brihaspati', 'Nagas', 'Pitrs',
@@ -154,7 +186,7 @@ class PanchangCalculator:
             'Vishve Devas', 'Vishnu', 'Vasus', 'Varuna', 'Aja Ekapada',
             'Ahir Budhnya', 'Pushan'
         ]
-        
+
         career_focus = {
             1: 'Healing, Medicine', 2: 'Arts, Creativity', 3: 'Leadership, Fire-related',
             4: 'Agriculture, Beauty', 5: 'Research, Investigation', 6: 'Technology, Innovation',
@@ -166,7 +198,7 @@ class PanchangCalculator:
             22: 'Learning, Communication', 23: 'Music, Rhythm', 24: 'Healing, Medicine',
             25: 'Mysticism, Spirituality', 26: 'Compassion, Service', 27: 'Nourishment, Prosperity'
         }
-        
+
         return {
             'number': nakshatra_num,
             'name': nakshatra_names[nakshatra_num - 1],
@@ -179,24 +211,20 @@ class PanchangCalculator:
             'career_focus': career_focus.get(nakshatra_num, 'General'),
             'compatible_nakshatras': self._get_compatible_nakshatras(nakshatra_num)
         }
-    
+
     def _calculate_yoga(self, sun_pos, moon_pos, jd):
-        """Calculate Yoga details"""
+        """Calculate Yoga details with precise transition times"""
+        yoga_slice = 360.0 / 27.0
         yoga_deg = (sun_pos + moon_pos) % 360
-        yoga_num = int(yoga_deg / 13.333333) + 1
-        
-        # Yoga timing calculation
-        yoga_speed = 13.333333  # degrees per day
-        elapsed_deg = yoga_deg % 13.333333
-        remaining_deg = 13.333333 - elapsed_deg
-        
-        base_time = datetime.fromtimestamp((jd - 2440587.5) * 86400)
-        hours_elapsed = (elapsed_deg / yoga_speed) * 24
-        hours_remaining = (remaining_deg / yoga_speed) * 24
-        
-        start_time = base_time - timedelta(hours=hours_elapsed)
-        end_time = base_time + timedelta(hours=hours_remaining)
-        
+        yoga_num = int(yoga_deg / yoga_slice) + 1
+
+        start_boundary = (yoga_num - 1) * yoga_slice
+        end_boundary = yoga_num * yoga_slice
+        start_jd = self._find_sum_longitude_moment(jd, start_boundary, backwards=True)
+        end_jd = self._find_sum_longitude_moment(jd, end_boundary % 360 if end_boundary >= 360 else end_boundary, backwards=False)
+        start_time = self._jd_to_local_time(start_jd)
+        end_time = self._jd_to_local_time(end_jd)
+
         yoga_names = [
             'Vishkambha', 'Priti', 'Ayushman', 'Saubhagya', 'Shobhana',
             'Atiganda', 'Sukarma', 'Dhriti', 'Shula', 'Ganda',
@@ -205,7 +233,7 @@ class PanchangCalculator:
             'Siddha', 'Sadhya', 'Shubha', 'Shukla', 'Brahma',
             'Indra', 'Vaidhriti'
         ]
-        
+
         yoga_qualities = [
             'Inauspicious', 'Auspicious', 'Auspicious', 'Auspicious', 'Auspicious',
             'Inauspicious', 'Auspicious', 'Auspicious', 'Inauspicious', 'Inauspicious',
@@ -214,14 +242,14 @@ class PanchangCalculator:
             'Auspicious', 'Auspicious', 'Auspicious', 'Auspicious', 'Auspicious',
             'Auspicious', 'Inauspicious'
         ]
-        
+
         recommended_activities = {
             'Auspicious': ['New ventures', 'Ceremonies', 'Important meetings', 'Travel'],
             'Inauspicious': ['Routine work', 'Spiritual practices', 'Meditation', 'Rest']
         }
-        
+
         quality = yoga_qualities[yoga_num - 1]
-        
+
         return {
             'number': yoga_num,
             'name': yoga_names[yoga_num - 1],
@@ -232,37 +260,37 @@ class PanchangCalculator:
             'recommended_activities': recommended_activities[quality],
             'spiritual_practice': self._get_yoga_spiritual_practice(yoga_num)
         }
-    
+
     def _calculate_karana(self, sun_pos, moon_pos, jd):
-        """Calculate Karana details"""
+        """Calculate Karana using the classical 60 half-tithi sequence."""
         tithi_deg = (moon_pos - sun_pos) % 360
-        karana_deg = tithi_deg / 2
-        karana_num = int(karana_deg / 6) % 11 + 1
-        
-        karana_names = [
-            'Bava', 'Balava', 'Kaulava', 'Taitila', 'Gara',
-            'Vanija', 'Vishti', 'Shakuni', 'Chatushpada', 'Naga', 'Kimstughna'
-        ]
-        
-        karana_natures = [
-            'Movable', 'Movable', 'Movable', 'Movable', 'Movable',
-            'Movable', 'Movable', 'Fixed', 'Fixed', 'Fixed', 'Fixed'
-        ]
-        
+        k_num = int(tithi_deg / 6) + 1  # 1..60
+
+        movable = ['Bava', 'Balava', 'Kaulava', 'Taitila', 'Gara', 'Vanija', 'Vishti']
+        if k_num == 1:
+            karana_name = 'Kimstughna'
+            nature = 'Fixed'
+        elif k_num >= 58:
+            fixed_map = {58: 'Shakuni', 59: 'Chatushpada', 60: 'Naga'}
+            karana_name = fixed_map.get(k_num, 'Naga')
+            nature = 'Fixed'
+        else:
+            karana_name = movable[(k_num - 2) % 7]
+            nature = 'Movable'
+
         suitable_activities = {
             'Movable': ['Travel', 'Movement', 'Change', 'New beginnings'],
             'Fixed': ['Stable work', 'Meditation', 'Study', 'Planning']
         }
-        
-        business_suitable = karana_num not in [7, 8, 9, 10, 11]  # Avoid Vishti and fixed karanas for business
-        
+        business_suitable = karana_name not in ['Vishti', 'Shakuni', 'Chatushpada', 'Naga', 'Kimstughna']
+
         return {
-            'number': karana_num,
-            'name': karana_names[karana_num - 1],
-            'nature': karana_natures[karana_num - 1],
-            'duration': 6,  # hours (approximate)
-            'effect': self._get_karana_effect(karana_num),
-            'suitable_activities': suitable_activities[karana_natures[karana_num - 1]],
+            'number': k_num,
+            'name': karana_name,
+            'nature': nature,
+            'duration': 6,  # degrees of elongation (half-tithi)
+            'effect': self._get_karana_effect(((k_num - 1) % 11) + 1),
+            'suitable_activities': suitable_activities[nature],
             'business_suitable': business_suitable
         }
     
@@ -354,315 +382,62 @@ class PanchangCalculator:
         ]
         return effects[karana_num - 1]
     
-    def calculate_choghadiya(self, date_str: str, latitude: float, longitude: float) -> dict:
-        """Calculate Choghadiya periods for day and night"""
-        if not date_str or latitude is None or longitude is None:
-            raise ValueError("Date string, latitude, and longitude are required")
-            
-        try:
-            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-            julian_day = swe.julday(int(date_obj.year), int(date_obj.month), int(date_obj.day), 0.0)
-            
-            # Calculate sunrise and sunset for the given day
-            geopos = [float(longitude), float(latitude), 0.0]
-            sunrise_result = swe.rise_trans(julian_day, swe.SUN, swe.CALC_RISE, geopos)
-            sunset_result = swe.rise_trans(julian_day, swe.SUN, swe.CALC_SET, geopos)
-            
-            if sunrise_result[0] != 0 or sunset_result[0] != 0:
-                raise ValueError("Could not calculate sunrise/sunset for given location")
-                
-            sunrise_jd = sunrise_result[1][0]
-            sunset_jd = sunset_result[1][0]
-            
-            # Calculate next day sunrise
-            next_day_sunrise_result = swe.rise_trans(julian_day + 1, swe.SUN, swe.CALC_RISE, geopos)
-            
-            if next_day_sunrise_result[0] != 0:
-                raise ValueError("Could not calculate next day sunrise")
-                
-            next_sunrise_jd = next_day_sunrise_result[1][0]
-            
-            # Day duration and night duration
-            day_duration = (sunset_jd - sunrise_jd) * 24  # in hours
-            night_duration = (next_sunrise_jd - sunset_jd) * 24  # in hours
-            
-            # Each Choghadiya period is 1/8 of day/night
-            day_period_duration = day_duration / 8
-            night_period_duration = night_duration / 8
-            
-            # Weekday for determining starting sequence
-            weekday = date_obj.weekday()  # 0=Monday, 6=Sunday
-            weekday = (weekday + 1) % 7  # Convert to Sunday=0
-            
-            # Choghadiya names and qualities (correct sequence)
-            choghadiya_names = ['Udvega', 'Chara', 'Labha', 'Amrita', 'Kala', 'Shubha', 'Roga', 'Udvega']
-            choghadiya_qualities = ['Bad', 'Neutral', 'Gain', 'Best', 'Loss', 'Good', 'Evil', 'Bad']
-            
-            # Day Choghadiya starts with day lord (correct Vedic system)
-            # Sunday=0, Monday=1, etc. - each day starts with its own lord's choghadiya
-            day_start_index = weekday
-            
-            day_choghadiya = []
-            for i in range(8):
-                name_index = (day_start_index + i) % 8
-                name = choghadiya_names[name_index]
-                quality = choghadiya_qualities[name_index]
-                
-                # Map quality to nature for consistency
-                nature = 'Auspicious' if quality in ['Good', 'Best', 'Gain'] else 'Inauspicious'
-                
-                start_jd = sunrise_jd + (i * day_period_duration / 24)
-                end_jd = start_jd + (day_period_duration / 24)
-                
-                day_choghadiya.append({
-                    'period': i + 1,
-                    'name': name,
-                    'start_time': self._jd_to_iso(start_jd),
-                    'end_time': self._jd_to_iso(end_jd),
-                    'duration_minutes': int(day_period_duration * 60),
-                    'quality': quality,
-                    'nature': nature
-                })
-            
-            # Night Choghadiya follows specific sequence
-            night_choghadiya_names = ['Amrita', 'Chara', 'Roga', 'Kala', 'Labha', 'Udvega', 'Shubha', 'Amrita']
-            night_choghadiya_qualities = ['Best', 'Neutral', 'Evil', 'Loss', 'Gain', 'Bad', 'Good', 'Best']
-            
-            night_choghadiya = []
-            for i in range(8):
-                name = night_choghadiya_names[i]
-                quality = night_choghadiya_qualities[i]
-                
-                start_jd = sunset_jd + (i * night_period_duration / 24)
-                end_jd = start_jd + (night_period_duration / 24)
-                
-                night_choghadiya.append({
-                    'period': i + 1,
-                    'name': name,
-                    'start_time': self._jd_to_iso(start_jd),
-                    'end_time': self._jd_to_iso(end_jd),
-                    'duration_minutes': int(night_period_duration * 60),
-                    'quality': quality
-                })
-            
+    def calculate_choghadiya(self, date_str: str, latitude: float, longitude: float, timezone: str = None) -> dict:
+        """
+        Delegate to the shared calculators.PanchangCalculator (single source of truth).
+        Keeps ISO timestamps expected by trading + web clients.
+        """
+        from utils.timezone_service import get_timezone_from_coordinates
+        from calculators.panchang_calculator import PanchangCalculator as SharedPanchang
 
-            
-            return {
-                'date': date_str,
-                'location': {'latitude': latitude, 'longitude': longitude},
-                'day_choghadiya': day_choghadiya,
-                'night_choghadiya': night_choghadiya,
-                'day_duration_hours': day_duration,
-                'night_duration_hours': night_duration
-            }
-            
-        except Exception as e:
-            raise ValueError(f"Error calculating Choghadiya: {str(e)}")
-    
-    def calculate_hora(self, date_str: str, latitude: float, longitude: float) -> dict:
-        """Calculate Hora (planetary hours) for the day"""
-        if not date_str or latitude is None or longitude is None:
-            raise ValueError("Date string, latitude, and longitude are required")
-            
-        try:
-            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-            julian_day = swe.julday(int(date_obj.year), int(date_obj.month), int(date_obj.day), 0.0)
-            
-            # Calculate sunrise and sunset
-            geopos = [float(longitude), float(latitude), 0.0]
-            sunrise_result = swe.rise_trans(julian_day, swe.SUN, swe.CALC_RISE, geopos)
-            sunset_result = swe.rise_trans(julian_day, swe.SUN, swe.CALC_SET, geopos)
-            
-            if sunrise_result[0] != 0 or sunset_result[0] != 0:
-                raise ValueError("Could not calculate sunrise/sunset for given location")
-                
-            sunrise_jd = sunrise_result[1][0]
-            sunset_jd = sunset_result[1][0]
-            
-            # Calculate next day sunrise
-            next_day_sunrise_result = swe.rise_trans(julian_day + 1, swe.SUN, swe.CALC_RISE, geopos)
-            
-            if next_day_sunrise_result[0] != 0:
-                raise ValueError("Could not calculate next day sunrise")
-                
-            next_sunrise_jd = next_day_sunrise_result[1][0]
-            
-            # Day and night durations
-            day_duration = (sunset_jd - sunrise_jd) * 24  # in hours
-            night_duration = (next_sunrise_jd - sunset_jd) * 24  # in hours
-            
-            # Each hora is 1/7 of day/night
-            day_hora_duration = day_duration / 7
-            night_hora_duration = night_duration / 7
-            
-            # Weekday for determining starting planet
-            weekday = date_obj.weekday()  # 0=Monday, 6=Sunday
-            weekday = (weekday + 1) % 7  # Convert to Sunday=0
-            
-            # Planet sequence for Hora (correct Chaldean order)
-            planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
-            
-            # Swiss Ephemeris calculations are accurate
-            
-            # Day Hora starts with day lord
-            day_lord_index = weekday
-            
-            day_horas = []
-            for i in range(7):
-                planet_index = (day_lord_index + i) % 7
-                planet = planets[planet_index]
-                
-                start_jd = sunrise_jd + (i * day_hora_duration / 24)
-                end_jd = sunrise_jd + ((i + 1) * day_hora_duration / 24)
-                
-                # Ensure end time is after start time
-                if end_jd <= start_jd:
-                    end_jd = start_jd + (day_hora_duration / 24)
-                
-                day_horas.append({
-                    'hora': i + 1,
-                    'planet': planet,
-                    'start_time': self._jd_to_iso(start_jd),
-                    'end_time': self._jd_to_iso(end_jd),
-                    'duration_minutes': int(day_hora_duration * 60)
-                })
-            
-            # Night Hora continues the sequence from sunset
-            night_horas = []
-            for i in range(7):
-                # Continue the planetary sequence from where day ended
-                planet_index = (day_lord_index + 7 + i) % 7
-                planet = planets[planet_index]
-                
-                start_jd = sunset_jd + (i * night_hora_duration / 24)
-                end_jd = sunset_jd + ((i + 1) * night_hora_duration / 24)
-                
-                night_horas.append({
-                    'hora': i + 8,
-                    'planet': planet,
-                    'start_time': self._jd_to_iso(start_jd),
-                    'end_time': self._jd_to_iso(end_jd),
-                    'duration_minutes': int(night_hora_duration * 60)
-                })
-            
-            return {
-                'date': date_str,
-                'location': {'latitude': latitude, 'longitude': longitude},
-                'day_horas': day_horas,
-                'night_horas': night_horas,
-                'day_duration_hours': day_duration,
-                'night_duration_hours': night_duration
-            }
-            
-        except Exception as e:
-            raise ValueError(f"Error calculating Hora: {str(e)}")
-    
-    def calculate_special_muhurtas(self, date_str: str, latitude: float, longitude: float) -> dict:
-        """Calculate special muhurtas like Abhijit, Brahma Muhurta etc."""
-        if not date_str or latitude is None or longitude is None:
-            raise ValueError("Date string, latitude, and longitude are required")
-            
-        try:
-            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-            julian_day = swe.julday(int(date_obj.year), int(date_obj.month), int(date_obj.day), 0.0)
-            
-            # Calculate sunrise and sunset
-            geopos = [float(longitude), float(latitude), 0.0]
-            sunrise_result = swe.rise_trans(julian_day, swe.SUN, swe.CALC_RISE, geopos)
-            sunset_result = swe.rise_trans(julian_day, swe.SUN, swe.CALC_SET, geopos)
-            
-            if sunrise_result[0] != 0 or sunset_result[0] != 0:
-                raise ValueError("Could not calculate sunrise/sunset for given location")
-                
-            sunrise_jd = sunrise_result[1][0]
-            sunset_jd = sunset_result[1][0]
-            
-            # Calculate next day sunrise for night duration
-            next_day_sunrise_result = swe.rise_trans(julian_day + 1, swe.SUN, swe.CALC_RISE, geopos)
-            
-            if next_day_sunrise_result[0] != 0:
-                raise ValueError("Could not calculate next day sunrise")
-                
-            next_sunrise_jd = next_day_sunrise_result[1][0]
-            
-            # Day and night durations
-            day_duration = (sunset_jd - sunrise_jd) * 24  # in hours
-            night_duration = (next_sunrise_jd - sunset_jd) * 24  # in hours
-            
-            muhurtas = []
-            
-            # Brahma Muhurta (1.5 hours before sunrise)
-            brahma_muhurta_duration = 1.5  # Fixed 1.5 hours
-            brahma_muhurta_start_jd = sunrise_jd - (brahma_muhurta_duration / 24)
-            brahma_muhurta_end_jd = sunrise_jd
-            
-            muhurtas.append({
-                'name': 'Brahma Muhurta',
-                'start_time': self._jd_to_iso(brahma_muhurta_start_jd),
-                'end_time': self._jd_to_iso(brahma_muhurta_end_jd),
-                'duration_minutes': 90,  # Fixed 90 minutes
-                'significance': 'Most auspicious time for spiritual practices, meditation, and study',
-                'activities': ['Meditation', 'Prayer', 'Study', 'Yoga'],
-                'quality': 'Highly Auspicious'
-            })
-            
-            # Abhijit Muhurta (middle 1/15th of day, around noon)
-            # This is the 8th muhurta of the day (out of 15 muhurtas)
-            muhurta_duration_hours = day_duration / 15  # Each muhurta duration in hours
-            
-            abhijit_start_jd = sunrise_jd + (7 * muhurta_duration_hours / 24)  # 8th muhurta (0-indexed)
-            abhijit_end_jd = sunrise_jd + (8 * muhurta_duration_hours / 24)
-            
-            muhurtas.append({
-                'name': 'Abhijit Muhurta',
-                'start_time': self._jd_to_iso(abhijit_start_jd),
-                'end_time': self._jd_to_iso(abhijit_end_jd),
-                'duration_minutes': int(muhurta_duration_hours * 60),
-                'significance': 'Universal auspicious time, overcomes all doshas',
-                'activities': ['Important meetings', 'New ventures', 'Travel', 'Ceremonies'],
-                'quality': 'Universally Auspicious'
-            })
-            
-            # Godhuli Muhurta (cow dust time - around sunset)
-            godhuli_duration = 0.8  # 48 minutes total
-            godhuli_start_jd = sunset_jd - (0.4 / 24)  # 24 minutes before sunset
-            godhuli_end_jd = sunset_jd + (0.4 / 24)   # 24 minutes after sunset
-            
-            muhurtas.append({
-                'name': 'Godhuli Muhurta',
-                'start_time': self._jd_to_iso(godhuli_start_jd),
-                'end_time': self._jd_to_iso(godhuli_end_jd),
-                'duration_minutes': int(godhuli_duration * 60),
-                'significance': 'Evening auspicious time for prayers and spiritual activities',
-                'activities': ['Evening prayers', 'Spiritual practices', 'Charity'],
-                'quality': 'Auspicious'
-            })
-            
-            # Vijaya Muhurta (victory time - 2nd muhurta of the day)
-            vijaya_start_jd = sunrise_jd + (1 * muhurta_duration_hours / 24)  # 2nd muhurta
-            vijaya_end_jd = sunrise_jd + (2 * muhurta_duration_hours / 24)
-            
-            muhurtas.append({
-                'name': 'Vijaya Muhurta',
-                'start_time': self._jd_to_iso(vijaya_start_jd),
-                'end_time': self._jd_to_iso(vijaya_end_jd),
-                'duration_minutes': int(muhurta_duration_hours * 60),
-                'significance': 'Time for victory and success in endeavors',
-                'activities': ['Important tasks', 'Competitions', 'Business deals'],
-                'quality': 'Auspicious'
-            })
-            
-            return {
-                'date': date_str,
-                'location': {'latitude': latitude, 'longitude': longitude},
-                'muhurtas': muhurtas,
-                'day_duration_hours': day_duration,
-                'night_duration_hours': night_duration
-            }
-            
-        except Exception as e:
-            raise ValueError(f"Error calculating special muhurtas: {str(e)}")
-    
+        tz = timezone or get_timezone_from_coordinates(latitude, longitude, for_date=date_str)
+        self._tz_offset_hours = parse_timezone_offset(tz, latitude, longitude, for_date=date_str)
+        shared = SharedPanchang()
+        result = shared.calculate_choghadiya(date_str, latitude, longitude, tz)
+        return {
+            'date': date_str,
+            'location': {'latitude': latitude, 'longitude': longitude},
+            'timezone': tz,
+            'day_choghadiya': result.get('day_choghadiya', []),
+            'night_choghadiya': result.get('night_choghadiya', []),
+        }
+
+    def calculate_hora(self, date_str: str, latitude: float, longitude: float, timezone: str = None) -> dict:
+        """Delegate planetary hours to shared calculator."""
+        from utils.timezone_service import get_timezone_from_coordinates
+        from calculators.panchang_calculator import PanchangCalculator as SharedPanchang
+
+        tz = timezone or get_timezone_from_coordinates(latitude, longitude, for_date=date_str)
+        self._tz_offset_hours = parse_timezone_offset(tz, latitude, longitude, for_date=date_str)
+        shared = SharedPanchang()
+        result = shared.calculate_hora(date_str, latitude, longitude, tz)
+        if isinstance(result, dict) and 'error' in result:
+            raise ValueError(result['error'])
+        return {
+            'date': date_str,
+            'location': {'latitude': latitude, 'longitude': longitude},
+            'timezone': tz,
+            **result,
+        }
+
+    def calculate_special_muhurtas(self, date_str: str, latitude: float, longitude: float, timezone: str = None) -> dict:
+        """Delegate Brahma/Abhijit muhurtas to shared calculator."""
+        from utils.timezone_service import get_timezone_from_coordinates
+        from calculators.panchang_calculator import PanchangCalculator as SharedPanchang
+
+        tz = timezone or get_timezone_from_coordinates(latitude, longitude, for_date=date_str)
+        self._tz_offset_hours = parse_timezone_offset(tz, latitude, longitude, for_date=date_str)
+        shared = SharedPanchang()
+        result = shared.calculate_special_muhurtas(date_str, latitude, longitude, tz)
+        if isinstance(result, dict) and 'error' in result:
+            raise ValueError(result['error'])
+        return {
+            'date': date_str,
+            'location': {'latitude': latitude, 'longitude': longitude},
+            'timezone': tz,
+            **result,
+        }
+
     def _find_tithi_moment(self, jd, target_deg, backwards=False):
         """Find the exact moment when tithi degree is reached"""
         # Search range: 2 days before/after
@@ -700,15 +475,67 @@ class PanchangCalculator:
                     end_jd = mid_jd
                     
         return (start_jd + end_jd) / 2
-    
+
+    def _ang_diff(self, current, target):
+        """Signed shortest difference current-target on a circle."""
+        return (current - target + 180.0) % 360.0 - 180.0
+
+    def _find_longitude_moment(self, jd, body, target_deg, backwards=False):
+        """Binary-search when a body's sidereal longitude reaches target_deg."""
+        start_jd = jd - 2 if backwards else jd
+        end_jd = jd if backwards else jd + 2
+        target = target_deg % 360.0
+
+        for _ in range(40):
+            mid_jd = (start_jd + end_jd) / 2.0
+            current = swe.calc_ut(mid_jd, body, swe.FLG_SIDEREAL)[0][0] % 360.0
+            diff = self._ang_diff(current, target)
+            if abs(diff) < 0.0005:
+                return mid_jd
+            if backwards:
+                if diff > 0:
+                    end_jd = mid_jd
+                else:
+                    start_jd = mid_jd
+            else:
+                if diff < 0:
+                    start_jd = mid_jd
+                else:
+                    end_jd = mid_jd
+        return (start_jd + end_jd) / 2.0
+
+    def _find_sum_longitude_moment(self, jd, target_deg, backwards=False):
+        """Binary-search when (sun + moon) sidereal longitude reaches target_deg."""
+        start_jd = jd - 2 if backwards else jd
+        end_jd = jd if backwards else jd + 2
+        target = target_deg % 360.0
+
+        for _ in range(40):
+            mid_jd = (start_jd + end_jd) / 2.0
+            sun_pos = swe.calc_ut(mid_jd, swe.SUN, swe.FLG_SIDEREAL)[0][0]
+            moon_pos = swe.calc_ut(mid_jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
+            current = (sun_pos + moon_pos) % 360.0
+            diff = self._ang_diff(current, target)
+            if abs(diff) < 0.0005:
+                return mid_jd
+            if backwards:
+                if diff > 0:
+                    end_jd = mid_jd
+                else:
+                    start_jd = mid_jd
+            else:
+                if diff < 0:
+                    start_jd = mid_jd
+                else:
+                    end_jd = mid_jd
+        return (start_jd + end_jd) / 2.0
+
     def _jd_to_local_time(self, jd):
-        """Convert Julian Day to local datetime"""
+        """Convert Julian Day (UT) to local datetime using active timezone offset."""
         year, month, day, hour, minute, second = swe.jdut1_to_utc(jd, 1)
-        dt = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-        # Convert UTC to local time using timezone offset
-        dt_local = dt + timedelta(hours=0)  # Default UTC, should use timezone parameter
-        return dt_local
-    
+        dt_utc = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
+        return dt_utc + timedelta(hours=float(self._tz_offset_hours or 0.0))
+
     def _jd_to_iso(self, jd):
         """Convert Julian Day to local time ISO format datetime string"""
         return self._jd_to_local_time(jd).isoformat()

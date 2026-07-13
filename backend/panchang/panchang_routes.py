@@ -51,10 +51,10 @@ async def calculate_panchang(request: PanchangRequest):
         if latitude is None or longitude is None:
             raise HTTPException(status_code=422, detail="Missing latitude or longitude in birth_data")
         
-        # Auto-detect timezone if not provided
+        # Auto-detect timezone if not provided (DST-safe for transit date)
         if timezone is None:
             from utils.timezone_service import get_timezone_from_coordinates
-            timezone = get_timezone_from_coordinates(latitude, longitude)
+            timezone = get_timezone_from_coordinates(latitude, longitude, for_date=request.transit_date)
             print(f"[DEBUG] Auto-detected timezone: {timezone}")
         
         # Calculate basic panchang data
@@ -149,9 +149,9 @@ async def calculate_sunrise_sunset(request: SunriseSunsetRequest):
     try:
         print(f"[DEBUG] Sunrise/Sunset request: date={request.date}, lat={request.latitude}, lon={request.longitude}")
         
-        # Auto-detect timezone from coordinates
+        # Auto-detect timezone from coordinates for the requested date (DST-safe)
         from utils.timezone_service import get_timezone_from_coordinates
-        timezone = get_timezone_from_coordinates(request.latitude, request.longitude)
+        timezone = get_timezone_from_coordinates(request.latitude, request.longitude, for_date=request.date)
         print(f"[DEBUG] Auto-detected timezone: {timezone}")
         
         # Use professional PanchangCalculator with detected timezone
@@ -303,7 +303,7 @@ async def calculate_moon_phase(request: MoonPhaseRequest):
 async def calculate_inauspicious_times(request: InauspiciousTimesRequest):
     try:
         from utils.timezone_service import get_timezone_from_coordinates
-        timezone = get_timezone_from_coordinates(request.latitude, request.longitude)
+        timezone = get_timezone_from_coordinates(request.latitude, request.longitude, for_date=request.date)
 
         # Use local sunrise/sunset based MonthlyPanchangCalculator.
         daily_panchang = monthly_panchang_calc.calculate_daily_panchang(
@@ -349,6 +349,15 @@ async def calculate_inauspicious_times(request: InauspiciousTimesRequest):
                 'end_time': end_dt.isoformat(),
                 'specific_activities': ['Specific ceremonies', 'Religious activities', 'Auspicious events']
             })
+
+        amrit_kalam = []
+        for am in special_times.get('amrit_kalam', []) or []:
+            iso = period_to_iso(am)
+            if iso:
+                amrit_kalam.append({
+                    **iso,
+                    'description': 'Auspicious nectar period within the day nakshatra',
+                })
         
         return {
             'rahu_kaal': period_to_iso(special_times.get('rahu_kalam', {})),
@@ -356,6 +365,8 @@ async def calculate_inauspicious_times(request: InauspiciousTimesRequest):
             'gulika': period_to_iso(special_times.get('gulikai_kalam', {})),
             'dur_muhurta': dur_muhurta,
             'varjyam': varjyam,
+            'amrit_kalam': amrit_kalam,
+            'abhijit': period_to_iso(special_times.get('abhijit', {})),
             'sunrise_time': daily_panchang['sunrise_sunset']['sunrise'],
             'day_duration': daily_panchang['sunrise_sunset'].get('day_duration'),
             'timezone': timezone,
@@ -371,9 +382,9 @@ async def calculate_inauspicious_times(request: InauspiciousTimesRequest):
 @router.post("/calculate-rahu-kaal")
 async def calculate_rahu_kaal(request: SunriseSunsetRequest):
     try:
-        # Auto-detect timezone from coordinates
+        # Auto-detect timezone from coordinates for the requested date (DST-safe)
         from utils.timezone_service import get_timezone_from_coordinates
-        timezone = get_timezone_from_coordinates(request.latitude, request.longitude)
+        timezone = get_timezone_from_coordinates(request.latitude, request.longitude, for_date=request.date)
         print(f"[DEBUG] Rahu Kaal - Auto-detected timezone: {timezone}")
         
         # Use professional MonthlyPanchangCalculator
@@ -420,11 +431,34 @@ async def calculate_rahu_kaal(request: SunriseSunsetRequest):
 
 
 @router.get("/festivals/{date}")
-async def get_festivals(date: str):
+async def get_festivals(
+    date: str,
+    latitude: float = 28.6139,
+    longitude: float = 77.2090,
+    calendar_system: str = "amanta",
+    timezone: Optional[str] = None,
+):
+    """Festivals for a single date — used by web Panchang header."""
     try:
-        return []
-        
+        from festivals.festival_calculator import FestivalCalculator
+        from utils.timezone_service import get_timezone_from_coordinates, get_iana_timezone
+
+        year, month, _day = map(int, date.split("-")[:3])
+        tz = timezone
+        if not tz:
+            try:
+                tz = get_iana_timezone(float(latitude), float(longitude))
+            except Exception:
+                tz = get_timezone_from_coordinates(float(latitude), float(longitude), for_date=date)
+
+        calc = FestivalCalculator()
+        festivals = calc.find_festival_dates(
+            year, month, float(latitude), float(longitude), calendar_system, tz
+        )
+        # Match prior client expectation: array of festivals for the date
+        return [f for f in festivals if f.get("date") == date]
     except Exception as e:
+        print(f"[ERROR] Panchang festivals failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/choghadiya")
@@ -436,11 +470,10 @@ async def get_choghadiya(
     """Get Choghadiya periods using Swiss Ephemeris calculations"""
     try:
         print(f"[DEBUG] Choghadiya request: date={date}, lat={latitude}, lon={longitude}")
-        # Auto-detect timezone from coordinates
         from utils.timezone_service import get_timezone_from_coordinates
-        timezone = get_timezone_from_coordinates(latitude, longitude)
+        timezone = get_timezone_from_coordinates(latitude, longitude, for_date=date)
         print(f"[DEBUG] Auto-detected timezone: {timezone}")
-        
+
         result = panchang_calc.calculate_choghadiya(date, float(latitude), float(longitude), timezone)
         print(f"[DEBUG] Choghadiya result: {result}")
         return result
@@ -449,6 +482,13 @@ async def get_choghadiya(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/choghadiya")
+async def post_choghadiya(request: SunriseSunsetRequest):
+    """Mobile-compatible POST alias for Choghadiya."""
+    return await get_choghadiya(request.date, request.latitude, request.longitude)
+
 
 @router.get("/hora")
 async def get_hora(
@@ -459,11 +499,10 @@ async def get_hora(
     """Get Hora (planetary hours) using Swiss Ephemeris calculations"""
     try:
         print(f"[DEBUG] Hora request: date={date}, lat={latitude}, lon={longitude}")
-        # Auto-detect timezone from coordinates
         from utils.timezone_service import get_timezone_from_coordinates
-        timezone = get_timezone_from_coordinates(latitude, longitude)
+        timezone = get_timezone_from_coordinates(latitude, longitude, for_date=date)
         print(f"[DEBUG] Auto-detected timezone: {timezone}")
-        
+
         result = panchang_calc.calculate_hora(date, float(latitude), float(longitude), timezone)
         print(f"[DEBUG] Hora result keys: {list(result.keys()) if isinstance(result, dict) else type(result)}")
         if isinstance(result, dict) and 'error' in result:
@@ -475,6 +514,13 @@ async def get_hora(
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
+
+@router.post("/hora")
+async def post_hora(request: SunriseSunsetRequest):
+    """Mobile-compatible POST alias for Hora."""
+    return await get_hora(request.date, request.latitude, request.longitude)
+
+
 @router.get("/special-muhurtas")
 async def get_special_muhurtas(
     date: str,
@@ -484,14 +530,13 @@ async def get_special_muhurtas(
     """Get special muhurtas like Abhijit, Brahma Muhurta using Swiss Ephemeris calculations"""
     try:
         print(f"[DEBUG] Special muhurtas request: date={date}, lat={latitude}, lon={longitude}")
-        # Auto-detect timezone from coordinates
         from utils.timezone_service import get_timezone_from_coordinates
-        timezone = get_timezone_from_coordinates(latitude, longitude)
+        timezone = get_timezone_from_coordinates(latitude, longitude, for_date=date)
         print(f"[DEBUG] Auto-detected timezone: {timezone}")
-        
+
         result = panchang_calc.calculate_special_muhurtas(date, float(latitude), float(longitude), timezone)
         print(f"[DEBUG] Special muhurtas raw result: {result}")
-        
+
         # Format the result to match frontend expectations
         if 'error' not in result:
             muhurtas = []
@@ -509,17 +554,24 @@ async def get_special_muhurtas(
                     'end_time': result['abhijit_muhurta']['end_time'],
                     'purpose': result['abhijit_muhurta']['description']
                 })
-            
+
             formatted_result = {'muhurtas': muhurtas}
             print(f"[DEBUG] Special muhurtas formatted result: {formatted_result}")
             return formatted_result
-        
+
         return result
     except Exception as e:
         print(f"[ERROR] Special muhurtas calculation failed: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/special-muhurtas")
+async def post_special_muhurtas(request: SunriseSunsetRequest):
+    """Mobile-compatible POST alias for special muhurtas."""
+    return await get_special_muhurtas(request.date, request.latitude, request.longitude)
+
 
 @router.get("/monthly")
 async def get_monthly_panchang(
@@ -531,6 +583,11 @@ async def get_monthly_panchang(
 ):
     """Get complete monthly panchang with daily details"""
     try:
+        if timezone is None or timezone == '':
+            from utils.timezone_service import get_timezone_from_coordinates
+            # Use mid-month date for DST context
+            mid = f"{year}-{month:02d}-15"
+            timezone = get_timezone_from_coordinates(float(latitude), float(longitude), for_date=mid)
         result = monthly_panchang_calc.calculate_monthly_panchang(
             year, month, float(latitude), float(longitude), timezone
         )
@@ -547,10 +604,10 @@ async def get_daily_detailed_panchang(
 ):
     """Get detailed panchang for a single day with all elements and timezone support"""
     try:
-        # Auto-detect timezone if not provided
+        # Auto-detect timezone if not provided (DST-safe for requested date)
         if timezone is None or timezone == '':
             from utils.timezone_service import get_timezone_from_coordinates
-            timezone = get_timezone_from_coordinates(float(latitude), float(longitude))
+            timezone = get_timezone_from_coordinates(float(latitude), float(longitude), for_date=date)
             print(f"[DEBUG] Auto-detected timezone: {timezone}")
         
         result = monthly_panchang_calc.calculate_daily_panchang(

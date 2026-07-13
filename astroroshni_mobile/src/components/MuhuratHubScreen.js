@@ -106,6 +106,21 @@ export default function MuhuratHubScreen({ navigation }) {
 
           <Text style={styles.subHeader}>Select an event to plan</Text>
 
+          <TouchableOpacity
+            style={styles.panchangBanner}
+            onPress={() => navigation.navigate('DailyPanchang')}
+            activeOpacity={0.88}
+          >
+            <View style={styles.panchangBannerIcon}>
+              <Icon name="sunny" size={22} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.panchangBannerTitle}>Today's Panchang</Text>
+              <Text style={styles.panchangBannerSub}>Tithi, Choghadiya, Hora, Amrit & Rahu Kaal</Text>
+            </View>
+            <Icon name="chevron-forward" size={18} color="#FFD700" />
+          </TouchableOpacity>
+
           <ScrollView contentContainerStyle={styles.grid}>
             {MUHURAT_TYPES.map((item, index) => {
               const costKey = COST_KEYS[item.id];
@@ -153,7 +168,29 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center' },
   headerTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  subHeader: { color: '#aaa', marginLeft: 20, marginBottom: 20 },
+  subHeader: { color: '#aaa', marginLeft: 20, marginBottom: 12 },
+  panchangBanner: {
+    marginHorizontal: 20,
+    marginBottom: 18,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: 'rgba(249,115,22,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.35)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  panchangBannerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f97316',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  panchangBannerTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  panchangBannerSub: { color: '#cbd5e1', fontSize: 11, marginTop: 2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 15 },
   card: { 
     width: (width - 50) / 2, 

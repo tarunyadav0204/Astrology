@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import ChartScreen from './ChartScreen';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import AshtakvargaOracle from '../Ashtakvarga/AshtakvargaOracle';
+import NativeSelectorChip from '../Common/NativeSelectorChip';
 
 const TAB_KEYS = ['chart', 'dasha', 'ashtakvarga'];
 
@@ -28,6 +29,9 @@ export default function ChartsHubScreen({ navigation, route }) {
   const initialTab = TAB_KEYS.includes(route.params?.tab) ? route.params.tab : 'chart';
   const [activeTab, setActiveTab] = useState(initialTab);
   const [birthData, setBirthData] = useState(route.params?.birthData || null);
+  const [chartHeader, setChartHeader] = useState(null);
+  const [dashaHeader, setDashaHeader] = useState(null);
+  const [ashtakHeader, setAshtakHeader] = useState(null);
 
   const loadBirthData = useCallback(async () => {
     try {
@@ -54,6 +58,18 @@ export default function ChartsHubScreen({ navigation, route }) {
       loadBirthData();
     }, [loadBirthData])
   );
+
+  const onChartHeaderStateChange = useCallback((next) => {
+    setChartHeader(next);
+  }, []);
+
+  const onDashaHeaderStateChange = useCallback((next) => {
+    setDashaHeader(next);
+  }, []);
+
+  const onAshtakHeaderStateChange = useCallback((next) => {
+    setAshtakHeader(next);
+  }, []);
 
   const tabs = useMemo(
     () => [
@@ -85,6 +101,15 @@ export default function ChartsHubScreen({ navigation, route }) {
     []
   );
 
+  const showChartHeader = activeTab === 'chart' && !!chartHeader?.chartName;
+  const showDashaHeader = activeTab === 'dasha';
+  const showAshtakHeader = activeTab === 'ashtakvarga';
+  const actionBtnBg = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)';
+  const dashaTitle = dashaHeader?.title || t('dasha.browserTitle', 'Dasha Browser');
+  const dashaBirth = dashaHeader?.birthData || birthData;
+  const ashtakTitle = ashtakHeader?.title || t('chartsHub.tabs.ashtakvarga', 'Ashtakvarga');
+  const ashtakBirth = ashtakHeader?.birthData || birthData;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
@@ -92,16 +117,108 @@ export default function ChartsHubScreen({ navigation, route }) {
         <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}
+            style={[styles.backButton, { backgroundColor: actionBtnBg }]}
             accessibilityRole="button"
             accessibilityLabel={t('common.back', 'Back')}
           >
             <Ionicons name="arrow-back" size={20} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-            {t('chartsHub.title', 'Charts')}
-          </Text>
-          <View style={styles.headerSpacer} />
+
+          {showChartHeader ? (
+            <>
+              <View style={styles.headerCenter}>
+                <Text style={[styles.chartTitle, { color: colors.text }]} numberOfLines={1}>
+                  {chartHeader.chartName}
+                </Text>
+                {(chartHeader.birthData || birthData) ? (
+                  <NativeSelectorChip
+                    birthData={chartHeader.birthData || birthData}
+                    onPress={() => navigation.navigate('SelectNative', { returnTo: 'ChartsHub' })}
+                    maxLength={14}
+                    style={styles.nativeChip}
+                    textStyle={styles.nativeChipText}
+                    showIcon={false}
+                  />
+                ) : null}
+              </View>
+              <TouchableOpacity
+                onPress={chartHeader.onShare}
+                style={[styles.headerAction, { backgroundColor: actionBtnBg }]}
+                disabled={!!chartHeader.isSharing}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.share', 'Share')}
+              >
+                <Ionicons name="share-outline" size={18} color={colors.text} />
+              </TouchableOpacity>
+              <View style={[styles.positionBadge, { backgroundColor: actionBtnBg }]}>
+                <Text style={[styles.positionText, { color: colors.text }]}>
+                  {chartHeader.positionLabel}
+                </Text>
+              </View>
+            </>
+          ) : showDashaHeader ? (
+            <>
+              <View style={styles.headerCenter}>
+                <Text style={[styles.chartTitle, { color: colors.text }]} numberOfLines={1}>
+                  {dashaTitle}
+                </Text>
+                {dashaBirth?.name ? (
+                  <NativeSelectorChip
+                    birthData={dashaBirth}
+                    onPress={() =>
+                      navigation.navigate('SelectNative', {
+                        returnTo: 'ChartsHub',
+                        returnParams: { tab: 'dasha' },
+                      })
+                    }
+                    maxLength={14}
+                    style={styles.nativeChip}
+                    textStyle={styles.nativeChipText}
+                    showIcon={false}
+                  />
+                ) : null}
+              </View>
+              <View style={styles.headerSpacer} />
+            </>
+          ) : showAshtakHeader ? (
+            <>
+              <View style={styles.headerCenter}>
+                <Text style={[styles.chartTitle, { color: colors.text }]} numberOfLines={1}>
+                  {ashtakTitle}
+                </Text>
+                {ashtakBirth?.name ? (
+                  <NativeSelectorChip
+                    birthData={ashtakBirth}
+                    onPress={() =>
+                      navigation.navigate('SelectNative', {
+                        returnTo: 'ChartsHub',
+                        returnParams: { tab: 'ashtakvarga' },
+                      })
+                    }
+                    maxLength={14}
+                    style={styles.nativeChip}
+                    textStyle={styles.nativeChipText}
+                    showIcon={false}
+                  />
+                ) : null}
+              </View>
+              <TouchableOpacity
+                onPress={() => ashtakHeader?.onOpenInfo?.()}
+                style={[styles.headerAction, { backgroundColor: actionBtnBg }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.info', 'Info')}
+              >
+                <Ionicons name="information-circle-outline" size={20} color={colors.text} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+                {t('chartsHub.title', 'Charts')}
+              </Text>
+              <View style={styles.headerSpacer} />
+            </>
+          )}
         </View>
 
         <View style={[styles.tabRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(249,115,22,0.08)' }]}>
@@ -152,6 +269,7 @@ export default function ChartsHubScreen({ navigation, route }) {
             key={`chart-${birthData?.id || birthData?.name || 'none'}`}
             navigation={navigation}
             route={chartRoute}
+            onHeaderStateChange={onChartHeaderStateChange}
           />
         ) : null}
         {activeTab === 'dasha' ? (
@@ -165,6 +283,7 @@ export default function ChartsHubScreen({ navigation, route }) {
               navigation.navigate('BirthProfileIntro', { returnTo: 'ChartsHub' })
             }
             selectNativeReturnTo="ChartsHub"
+            onHeaderStateChange={onDashaHeaderStateChange}
           />
         ) : null}
         {activeTab === 'ashtakvarga' ? (
@@ -172,6 +291,7 @@ export default function ChartsHubScreen({ navigation, route }) {
             key={`ashtak-${birthData?.id || birthData?.name || 'none'}`}
             navigation={navigation}
             route={ashtakRoute}
+            onHeaderStateChange={onAshtakHeaderStateChange}
           />
         ) : null}
       </View>
@@ -192,6 +312,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 8,
   },
   backButton: {
     width: 36,
@@ -199,6 +320,43 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerCenter: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chartTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  nativeChip: {
+    marginTop: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  nativeChipText: {
+    fontSize: 10,
+  },
+  headerAction: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  positionBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 12,
+    minWidth: 40,
+    alignItems: 'center',
+  },
+  positionText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   headerTitle: {
     flex: 1,

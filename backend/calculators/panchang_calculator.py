@@ -1,7 +1,7 @@
 import swisseph as swe
 from datetime import datetime, timedelta
 from .base_calculator import BaseCalculator
-from utils.timezone_service import parse_timezone_offset
+from utils.timezone_service import parse_timezone_offset, format_utc_offset, get_utc_offset_hours
 
 class PanchangCalculator(BaseCalculator):
     """Extract panchang calculation logic"""
@@ -52,14 +52,13 @@ class PanchangCalculator(BaseCalculator):
         return offset
     
     def calculate_panchang(self, date_str, time_str="12:00:00", latitude=0.0, longitude=0.0, timezone=None):
-        # Auto-detect timezone if not provided using centralized service
+        # Auto-detect timezone if not provided using centralized service (DST for target date)
         if timezone is None and latitude != 0.0 and longitude != 0.0:
-            tz_offset = parse_timezone_offset('', latitude, longitude)
-            # Convert offset back to UTC format
-            if tz_offset >= 0:
-                timezone = f"UTC+{tz_offset}"
-            else:
-                timezone = f"UTC{tz_offset}"
+            try:
+                tz_offset = get_utc_offset_hours(latitude, longitude, for_date=date_str)
+                timezone = format_utc_offset(tz_offset)
+            except Exception:
+                timezone = "UTC+0"
         elif timezone is None:
             timezone = "UTC+0"  # Default fallback
         # Parse Date
@@ -145,61 +144,70 @@ class PanchangCalculator(BaseCalculator):
         """Calculate daily Choghadiya segments with dynamic timezone"""
         if 'T' in str(date_str): date_str = str(date_str).split('T')[0]
         year, month, day = map(int, str(date_str).split('-'))
-        
-        # Calculate Sunrise/Sunset (Geocentric, Noon UTC)
-        jd = swe.julday(year, month, day, 12.0)
-        
+
+        # Use 00:00 UT so rise_trans finds this civil day's sunrise (not previous/next).
+        jd = swe.julday(year, month, day, 0.0)
         geopos = (float(lon), float(lat), 0.0)
         rise = swe.rise_trans(jd, swe.SUN, swe.CALC_RISE, geopos)[1][0]
         setting = swe.rise_trans(jd, swe.SUN, swe.CALC_SET, geopos)[1][0]
-        
-        # Use dynamic timezone parsing
-        tz_offset = self._parse_timezone(timezone)
-        
-        rise_local = ((rise + 0.5 - int(rise + 0.5)) * 24.0 + tz_offset) % 24
-        set_local = ((setting + 0.5 - int(setting + 0.5)) * 24.0 + tz_offset) % 24
-        
-        day_duration = set_local - rise_local
-        if day_duration < 0: day_duration += 24
-        
-        night_duration = 24 - day_duration
-        day_chunk = day_duration / 8
-        night_chunk = night_duration / 8
-        
+
+        tz_offset = parse_timezone_offset(timezone, lat, lon, for_date=date_str)
+
+        def jd_to_local(jd_val):
+            y, m, d, hour, minute, second = swe.jdut1_to_utc(jd_val, 1)
+            return datetime(int(y), int(m), int(d), int(hour), int(minute), int(second)) + timedelta(hours=tz_offset)
+
+        def fmt_hm(dt):
+            return f"{dt.hour:02d}:{dt.minute:02d}"
+
+        sunrise_local = jd_to_local(rise)
+        sunset_local = jd_to_local(setting)
+        if sunset_local <= sunrise_local:
+            sunset_local += timedelta(days=1)
+
+        day_duration = (sunset_local - sunrise_local).total_seconds() / 3600.0
+        night_duration = 24.0 - day_duration
+        day_chunk = day_duration / 8.0
+        night_chunk = night_duration / 8.0
+
         CHOG_NAMES = ["Udvega", "Amrita", "Roga", "Labha", "Shubha", "Chara", "Kala"]
         CHOG_QUALITIES = ["Bad", "Good", "Bad", "Gain", "Good", "Movable", "Bad"]
-        weekday = int((jd + 1.5) % 7)  # 0=Sun
-        
-        # Day Slots
+        # Weekday of the Hindu day is based on sunrise local civil date.
+        weekday = sunrise_local.weekday()  # Mon=0..Sun=6
+        weekday_sun0 = (weekday + 1) % 7  # Sun=0
+
         day_slots = []
-        curr = rise_local
+        curr = sunrise_local
         for i in range(8):
-            end = curr + day_chunk
-            idx = (weekday + i) % 7
+            end = curr + timedelta(hours=day_chunk)
+            idx = (weekday_sun0 + i) % 7
             day_slots.append({
                 "name": CHOG_NAMES[idx],
                 "quality": CHOG_QUALITIES[idx],
-                "start_time": f"{int(curr):02d}:{int((curr%1)*60):02d}",
-                "end_time": f"{int(end):02d}:{int((end%1)*60):02d}"
+                "start_time": curr.isoformat(),
+                "end_time": end.isoformat(),
+                # Backward-compatible clock strings for older clients
+                "start_clock": fmt_hm(curr),
+                "end_clock": fmt_hm(end),
             })
             curr = end
-            
-        # Night Slots
+
         night_slots = []
-        night_start_idx = (weekday + 4) % 7
-        
-        curr = set_local
+        night_start_idx = (weekday_sun0 + 4) % 7
+        curr = sunset_local
         for i in range(8):
-            end = (curr + night_chunk) % 24
+            end = curr + timedelta(hours=night_chunk)
             idx = (night_start_idx + i) % 7
             night_slots.append({
                 "name": CHOG_NAMES[idx],
                 "quality": CHOG_QUALITIES[idx],
-                "start_time": f"{int(curr):02d}:{int((curr%1)*60):02d}",
-                "end_time": f"{int(end):02d}:{int((end%1)*60):02d}"
+                "start_time": curr.isoformat(),
+                "end_time": end.isoformat(),
+                "start_clock": fmt_hm(curr),
+                "end_clock": fmt_hm(end),
             })
             curr = end
-            
+
         return {"day_choghadiya": day_slots, "night_choghadiya": night_slots}
     
     def get_local_sunrise_sunset(self, date_str, latitude, longitude, timezone="UTC+0"):
@@ -213,25 +221,32 @@ class PanchangCalculator(BaseCalculator):
         # Use Swiss Ephemeris rise_trans for accurate calculations
         sunrise_result = swe.rise_trans(jd, swe.SUN, swe.CALC_RISE, geopos)
         sunset_result = swe.rise_trans(jd, swe.SUN, swe.CALC_SET, geopos)
-        moonrise_result = swe.rise_trans(jd, swe.MOON, swe.CALC_RISE, geopos)
-        moonset_result = swe.rise_trans(jd, swe.MOON, swe.CALC_SET, geopos)
-        
-        tz_offset = self._parse_timezone(timezone)
-        
+
+        tz_offset = parse_timezone_offset(timezone, latitude, longitude, for_date=date_str)
+
         def jd_to_local_time(jd_val):
-            if not jd_val: return None
-            # Swiss Ephemeris returns JD in UTC
-            # Convert JD directly to local time by adding timezone offset to JD
-            local_jd = jd_val + (tz_offset / 24.0)  # Convert hours to days
-            year, month, day, hour, minute, second = swe.jdut1_to_utc(local_jd, 1)
-            dt_local = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-            return dt_local
-        
+            if not jd_val:
+                return None
+            # Swiss Ephemeris returns JD in UT; convert to UTC wall time then apply offset.
+            y, m, d, hour, minute, second = swe.jdut1_to_utc(jd_val, 1)
+            dt_utc = datetime(int(y), int(m), int(d), int(hour), int(minute), int(second))
+            return dt_utc + timedelta(hours=tz_offset)
+
         sunrise_time = jd_to_local_time(sunrise_result[1][0]) if sunrise_result[0] == 0 else None
         sunset_time = jd_to_local_time(sunset_result[1][0]) if sunset_result[0] == 0 else None
+
+        # rise_trans from JD 0 UT can return the previous civil sunset for western longitudes.
+        if sunrise_time and sunset_time and sunset_time <= sunrise_time:
+            sunset_time = sunset_time + timedelta(days=1)
+
+        # Moon events from local sunrise (Drik day listing): if the moon is already up at
+        # sunrise, the next rise is tomorrow morning and set is this evening.
+        sunrise_jd_ut = sunrise_result[1][0] if sunrise_result[0] == 0 else jd
+        moonrise_result = swe.rise_trans(sunrise_jd_ut, swe.MOON, swe.CALC_RISE, geopos)
+        moonset_result = swe.rise_trans(sunrise_jd_ut, swe.MOON, swe.CALC_SET, geopos)
         moonrise_time = jd_to_local_time(moonrise_result[1][0]) if moonrise_result[0] == 0 else None
         moonset_time = jd_to_local_time(moonset_result[1][0]) if moonset_result[0] == 0 else None
-        
+ 
         # Calculate day duration using Swiss Ephemeris precision
         day_duration = (sunset_time - sunrise_time).total_seconds() / 3600 if sunrise_time and sunset_time else 12
         
@@ -247,8 +262,11 @@ class PanchangCalculator(BaseCalculator):
         astronomical_twilight_end = sunset_time + timedelta(hours=1.5) if sunset_time else None
         
         # Calculate special muhurtas
-        brahma_start = sunrise_time - timedelta(hours=1.5) if sunrise_time else None
-        brahma_end = sunrise_time - timedelta(minutes=48) if sunrise_time else None
+        # Brahma = last 2 night muhurtas before sunrise (Drik / classical).
+        night_duration = 24.0 - day_duration
+        night_muhurta = night_duration / 15.0
+        brahma_start = sunrise_time - timedelta(hours=2 * night_muhurta) if sunrise_time else None
+        brahma_end = sunrise_time - timedelta(hours=1 * night_muhurta) if sunrise_time else None
         
         abhijit_start = sunrise_time + timedelta(hours=day_duration/2 - muhurta_duration/2) if sunrise_time else None
         abhijit_end = abhijit_start + timedelta(hours=muhurta_duration) if abhijit_start else None
@@ -335,33 +353,38 @@ class PanchangCalculator(BaseCalculator):
         if sunrise_result[0] != 0 or sunset_result[0] != 0:
             return {"error": "Could not calculate sunrise/sunset"}
         
-        tz_offset = self._parse_timezone(timezone)
-        
+        tz_offset = parse_timezone_offset(timezone, latitude, longitude, for_date=date_str)
+
         def jd_to_local_time(jd_val):
-            year, month, day, hour, minute, second = swe.jdut1_to_utc(jd_val, 1)
-            dt_utc = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
+            y, m, d, hour, minute, second = swe.jdut1_to_utc(jd_val, 1)
+            dt_utc = datetime(int(y), int(m), int(d), int(hour), int(minute), int(second))
             return dt_utc + timedelta(hours=tz_offset)
-        
+
         sunrise_time = jd_to_local_time(sunrise_result[1][0])
         sunset_time = jd_to_local_time(sunset_result[1][0])
-        
+        if sunset_time <= sunrise_time:
+            sunset_time += timedelta(days=1)
+
         day_duration = (sunset_time - sunrise_time).total_seconds() / 3600
         night_duration = 24 - day_duration
         hora_duration_day = day_duration / 12
         hora_duration_night = night_duration / 12
-        
-        # Planetary sequence starting from day lord
+
+        # Planetary hour sequence (repeating). First daytime hora = weekday lord.
         planets = ['Sun', 'Venus', 'Mercury', 'Moon', 'Saturn', 'Jupiter', 'Mars']
-        weekday = int((jd + 1.5) % 7)
-        
+        day_lords = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']  # Sun=0
+        weekday = sunrise_time.weekday()  # Mon=0
+        weekday_sun0 = (weekday + 1) % 7  # Sun=0
+        start_index = planets.index(day_lords[weekday_sun0])
+
         # Day horas
         day_horas = []
         current_time = sunrise_time
-        
+
         for i in range(12):
-            planet_index = (weekday + i) % 7
+            planet_index = (start_index + i) % 7
             end_time = current_time + timedelta(hours=hora_duration_day)
-            
+
             day_horas.append({
                 'hora_number': i + 1,
                 'planet': planets[planet_index],
@@ -369,15 +392,15 @@ class PanchangCalculator(BaseCalculator):
                 'end_time': end_time.isoformat()
             })
             current_time = end_time
-        
-        # Night horas (start from sunset)
+
+        # Night horas (continue sequence from hour 13)
         night_horas = []
         current_time = sunset_time
-        
+
         for i in range(12):
-            planet_index = (weekday + 12 + i) % 7  # Continue sequence from day
+            planet_index = (start_index + 12 + i) % 7
             end_time = current_time + timedelta(hours=hora_duration_night)
-            
+
             night_horas.append({
                 'hora_number': i + 1,
                 'planet': planets[planet_index],
@@ -385,7 +408,7 @@ class PanchangCalculator(BaseCalculator):
                 'end_time': end_time.isoformat()
             })
             current_time = end_time
-        
+
         return {'day_horas': day_horas, 'night_horas': night_horas}
     
     def calculate_special_muhurtas(self, date_str, latitude, longitude, timezone="UTC+0"):
