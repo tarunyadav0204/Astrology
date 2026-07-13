@@ -195,6 +195,10 @@ class UpdatePromoCodeRequest(BaseModel):
     is_active: bool
 
 
+class UpdateCreditProductRequest(BaseModel):
+    is_active: bool
+
+
 class AdminRefundRequest(BaseModel):
     userid: int
     transaction_id: int
@@ -1047,6 +1051,9 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
     """List credit products from Google Play (active in-app products with id convention credits_N)."""
     try:
         products = _list_google_play_products(PACKAGE_NAME)
+        # Admin portal can disable packs without removing them from Play Console.
+        sellable_ids = credit_service.list_active_credit_product_ids()
+        products = [p for p in products if str(p.get("product_id") or "") in sellable_ids]
         first_purchase_base_status = credit_service._first_purchase_bonus_base_status(current_user.userid)
         purchase_discount_base_status = credit_service._purchase_discount_base_status(current_user.userid)
         for product in products:
@@ -1985,6 +1992,55 @@ async def end_speech_billing_session(
     }
 
 # Admin endpoints
+@router.get("/admin/credit-products")
+async def admin_list_credit_products(current_user: User = Depends(get_current_user)):
+    """List all credit packs (Google Play + Razorpay) with visibility flags.
+
+    First call creates `credit_product_catalog` and seeds the default packs if missing.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    try:
+        products = credit_service.list_credit_products(active_only=False)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load/initialize credit_product_catalog: {e}",
+        ) from e
+    return {"products": products}
+
+
+@router.post("/admin/credit-products/seed")
+async def admin_seed_credit_products(current_user: User = Depends(get_current_user)):
+    """Force-create + seed default credit packs (idempotent)."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    try:
+        credit_service._ensure_credit_product_catalog()
+        products = credit_service.list_credit_products(active_only=False)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to seed credit_product_catalog: {e}",
+        ) from e
+    return {"message": "Credit product catalog ready", "products": products}
+
+
+@router.put("/admin/credit-products/{product_id}")
+async def admin_update_credit_product(
+    product_id: str,
+    request: UpdateCreditProductRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Enable/disable a credit pack for both Google Play catalog and Razorpay."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    updated = credit_service.set_credit_product_active(product_id, request.is_active)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Credit product not found")
+    return {"message": "Credit product updated", "product": updated}
+
+
 @router.post("/admin/promo-codes")
 async def create_promo_code(request: CreatePromoCodeRequest, current_user: User = Depends(get_current_user)):
     if current_user.role != 'admin':

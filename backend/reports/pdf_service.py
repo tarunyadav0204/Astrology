@@ -969,10 +969,16 @@ def _render_page(page: Dict[str, Any], report_document: Dict[str, Any], styles: 
     tables = page.get("tables") or []
     for table_data in tables:
         rows = table_data.get("rows") or []
-        if rows:
-            story.append(Spacer(1, 3 * mm))
-            story.append(_p(table_data.get("title") or "Supporting reference", styles["ARSectionSubtitle"]))
-            story.append(_table_from_rows(rows, styles))
+        if not rows:
+            continue
+        headers = table_data.get("headers") or []
+        # List-rows often carry headers separately; dict-rows already expand keys as header.
+        render_rows: List[Any] = list(rows)
+        if headers and isinstance(rows[0], (list, tuple)):
+            render_rows = [list(headers)] + [list(r) for r in rows]
+        story.append(Spacer(1, 3 * mm))
+        story.append(_p(table_data.get("title") or "Supporting reference", styles["ARSectionSubtitle"]))
+        story.append(_table_from_rows(render_rows, styles))
 
     cta = page.get("cta")
     if cta:

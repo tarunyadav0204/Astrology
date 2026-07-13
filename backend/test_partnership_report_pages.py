@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 
-from reports.assembly.page_assembler import assemble_partnership_pages
+from reports.assembly.page_assembler import MASTER_PAGE_BLUEPRINT, assemble_partnership_pages
 from reports.pdf_service import render_report_pdf_bytes
 
 
@@ -93,6 +93,24 @@ def _engine_result():
         "ashtakoota": {
             "total_score": 27,
             "effective_total_score": 29,
+            "grade": "good",
+            "effective_grade": "good",
+            "rule_profile": "balanced_modern",
+            "koots": {
+                "varna": {"score": 1, "max_score": 1, "description": "Boy: Brahmin, Girl: Brahmin", "interpretation": "Supportive Varna match."},
+                "vashya": {"score": 2, "max_score": 2, "description": "Boy: Manava, Girl: Manava", "interpretation": "Easy mutual influence."},
+                "tara": {"score": 3, "max_score": 3, "description": "Boy Tara: 1, Girl Tara: 3", "interpretation": "Favorable Tara support."},
+                "yoni": {"score": 2, "max_score": 4, "description": "Friendly yoni", "interpretation": "Partial physical harmony."},
+                "graha_maitri": {"score": 4, "max_score": 5, "description": "Moon lords are friends", "interpretation": "Strong mental rapport."},
+                "gana": {"score": 6, "max_score": 6, "description": "Deva-Deva", "interpretation": "Temperament alignment is strong."},
+                "bhakoot": {"score": 0, "max_score": 7, "description": "6/8 Moon signs", "interpretation": "Classical Bhakoot caution."},
+                "nadi": {"score": 8, "max_score": 8, "description": "Boy: Adi, Girl: Madhya", "interpretation": "Different Nadis are favorable."},
+            },
+            "exceptions": {
+                "bhakoot": {"applied": True, "reasons": ["Moon sign rulers are mutual friends"], "score_adjustment": "+ partial recovery"},
+            },
+            "critical_issues": ["Bhakoot Dosha before exceptions"],
+            "effective_critical_issues": [],
             "breakdown": [
                 {"name": "Varna", "score": 1, "max_score": 1, "meaning": "Basic temperament support"},
                 {"name": "Nadi", "score": 8, "max_score": 8, "meaning": "Health and lineage compatibility"},
@@ -132,7 +150,7 @@ def _context():
 def test_partnership_report_assembles_dense_twenty_page_document():
     pages = assemble_partnership_pages(_context(), _premium_report(), _engine_result())
 
-    assert len(pages) == 24
+    assert len(pages) == len(MASTER_PAGE_BLUEPRINT)
     assert all(page["page_number"] == index for index, page in enumerate(pages, start=1))
     assert not any("Show North Indian" in " ".join(page.get("bullets", [])) for page in pages)
     assert all(
@@ -140,12 +158,25 @@ def test_partnership_report_assembles_dense_twenty_page_document():
         + len(page.get("notes", []))
         + len(page.get("tables", []))
         + len(page.get("metrics", []))
-        >= 4
-        for page in pages[:19]
+        >= 2
+        for page in pages
     )
-    assert pages[6]["chart_refs"] == ["boy_d1"]
-    assert pages[10]["chart_refs"] == ["boy_d9"]
-    assert pages[16]["chart_refs"] == ["boy_d7", "girl_d7"]
+    score_arch = next(p for p in pages if p["page_number"] == 3)
+    assert any("Ashtakoota" in (t.get("title") or "") for t in score_arch.get("tables") or [])
+    detail = next(t for t in score_arch["tables"] if "Detailed Ashtakoota" in (t.get("title") or ""))
+    assert len(detail.get("rows") or []) >= 8
+    # Full 8-koota breakdown should appear once (score architecture), not on every chapter.
+    detailed_titles = [
+        t.get("title")
+        for p in pages
+        for t in (p.get("tables") or [])
+        if "Detailed Ashtakoota" in (t.get("title") or "")
+    ]
+    assert detailed_titles == ["Detailed Ashtakoota (Guna Milan) breakdown"]
+    by_num = {p["page_number"]: p for p in pages}
+    assert by_num[9]["chart_refs"] == ["boy_d1"]
+    assert by_num[13]["chart_refs"] == ["boy_d9"]
+    assert by_num[19]["chart_refs"] == ["boy_d7", "girl_d7"]
 
 
 def test_partnership_report_pdf_renderer_handles_dense_pages():

@@ -126,6 +126,176 @@ def _quarter_table(months: List[Dict[str, Any]], start_idx: int) -> Dict[str, An
     }
 
 
+def _yoga_label(item: Any) -> str:
+    if isinstance(item, dict):
+        return _clean(item.get("name") or item.get("yoga") or item.get("title") or item.get("type"), "Yoga")
+    return _clean(item, "Yoga")
+
+
+def _yoga_note(item: Any) -> str:
+    if isinstance(item, dict):
+        return _clean(item.get("description") or item.get("summary") or item.get("effect") or item.get("interpretation"), "--")[:120]
+    return "--"
+
+
+def _wealth_score_breakdown_table(wealth: Dict[str, Any]) -> Dict[str, Any] | None:
+    breakdown = wealth.get("wealth_score_breakdown") or []
+    rows = []
+    for line in _as_list(breakdown)[:14]:
+        text = _clean(line)
+        if not text:
+            continue
+        if ":" in text:
+            left, right = text.split(":", 1)
+            rows.append([left.strip(), right.strip()])
+        else:
+            rows.append([text, ""])
+    if not rows:
+        return None
+    return {
+        "title": "Wealth score calculation",
+        "headers": ["Component", "Contribution"],
+        "rows": rows,
+    }
+
+
+def _wealth_houses_table(wealth: Dict[str, Any]) -> Dict[str, Any] | None:
+    house_analysis = wealth.get("house_analysis") or {}
+    if not isinstance(house_analysis, dict):
+        return None
+    rows = []
+    for house_num in (2, 11, 9, 5, 8, 4, 10, 1):
+        key = house_num if house_num in house_analysis else str(house_num)
+        row = house_analysis.get(key) or house_analysis.get(house_num)
+        if not isinstance(row, dict):
+            continue
+        rows.append([
+            f"{house_num}th",
+            _clean(row.get("wealth_significance"), "--")[:50],
+            _clean(row.get("wealth_interpretation"), "--")[:90],
+        ])
+    if not rows:
+        return None
+    return {
+        "title": "Wealth houses (D1)",
+        "headers": ["House", "Focus", "Reading"],
+        "rows": rows,
+    }
+
+
+def _wealth_yogas_table(wealth: Dict[str, Any]) -> Dict[str, Any] | None:
+    yoga = wealth.get("yoga_analysis") or {}
+    if not isinstance(yoga, dict):
+        return None
+    rows = []
+    for label, key in (
+        ("Dhana", "dhana_yogas"),
+        ("Lakshmi / Gaja-Kesari", "lakshmi_yogas"),
+        ("Raja", "raja_yogas"),
+        ("Viparita Raja", "viparita_yogas"),
+    ):
+        for item in _as_list(yoga.get(key))[:4]:
+            rows.append([label, _yoga_label(item), _yoga_note(item)])
+    if not rows:
+        total = yoga.get("total_beneficial")
+        if total is None:
+            return None
+        rows.append(["Beneficial yogas counted", str(total), "See narrative for named combinations."])
+    return {
+        "title": "Money yogas detected",
+        "headers": ["Family", "Yoga", "Note"],
+        "rows": rows[:12],
+    }
+
+
+def _income_sources_table(wealth: Dict[str, Any]) -> Dict[str, Any] | None:
+    sources = wealth.get("income_sources") or []
+    rows = []
+    for idx, item in enumerate(_as_list(sources)[:8], start=1):
+        rows.append([str(idx), _clean(item)[:140]])
+    if not rows:
+        return None
+    return {
+        "title": "Income source cues",
+        "headers": ["#", "Source"],
+        "rows": rows,
+    }
+
+
+def _planet_wealth_table(wealth: Dict[str, Any]) -> Dict[str, Any] | None:
+    planet_analysis = wealth.get("planet_analysis") or {}
+    if not isinstance(planet_analysis, dict):
+        return None
+    rows = []
+    for planet, row in planet_analysis.items():
+        if not isinstance(row, dict):
+            continue
+        impact = row.get("wealth_impact") or {}
+        if isinstance(impact, dict):
+            impact_type = _clean(impact.get("impact_type") or impact.get("level"), "--")
+            note = _clean(impact.get("summary") or impact.get("description"), "--")[:80]
+        else:
+            impact_type = _clean(impact, "--")
+            note = "--"
+        systems = row.get("wealth_systems") or []
+        rows.append([
+            _clean(planet),
+            impact_type,
+            ", ".join([_clean(s) for s in _as_list(systems)[:3]]) or "--",
+            note,
+        ])
+    if not rows:
+        return None
+    return {
+        "title": "Planet wealth impact",
+        "headers": ["Planet", "Impact", "Systems", "Cue"],
+        "rows": rows[:10],
+    }
+
+
+def _lords_nakshatra_table(lords: Dict[str, Any]) -> Dict[str, Any] | None:
+    rows = []
+    for key, label in (("second_lord", "2nd lord"), ("eleventh_lord", "11th lord")):
+        block = lords.get(key) or {}
+        nak = block.get("nakshatra") or {}
+        if isinstance(nak, dict):
+            nak_name = _clean(nak.get("nakshatra") or nak.get("nakshatra_name"), "--")
+            pada = _clean(nak.get("pada"), "--")
+            deity = _clean(nak.get("deity"), "--")
+        else:
+            nak_name, pada, deity = "--", "--", "--"
+        rows.append([
+            label,
+            _clean(block.get("planet"), "--"),
+            _clean(block.get("house"), "--"),
+            nak_name,
+            pada,
+            deity,
+        ])
+    if not any(r[1] != "--" for r in rows):
+        return None
+    return {
+        "title": "2nd & 11th lord nakshatra",
+        "headers": ["Role", "Planet", "House", "Nakshatra", "Pada", "Deity"],
+        "rows": rows,
+    }
+
+
+def _spouse_finance_table(hints: Dict[str, Any]) -> Dict[str, Any] | None:
+    if not isinstance(hints, dict) or not hints:
+        return None
+    rows = [
+        ["7th lord", _clean(hints.get("seventh_lord"), "--"), _clean(hints.get("seventh_lord_house"), "--")],
+        ["Venus house", "Venus", _clean(hints.get("venus_house"), "--")],
+        ["Jupiter house", "Jupiter", _clean(hints.get("jupiter_house"), "--")],
+    ]
+    return {
+        "title": "Spouse & joint-finance markers",
+        "headers": ["Point", "Planet", "House"],
+        "rows": rows,
+    }
+
+
 def build_wealth_chart_manifest(context: Dict[str, Any]) -> List[Dict[str, Any]]:
     style = context.get("chart_style") or "both"
     refs = ["native_d1", "native_d2", "native_d9", "native_d10"]
@@ -185,12 +355,83 @@ def assemble_wealth_pages(
                 _metric("Wealth score", score if score is not None else "--"),
                 _metric("Mode", px.get("mode") or "--"),
             ]
+            score_table = _wealth_score_breakdown_table(wealth)
+            if score_table:
+                tables.append(score_table)
+        elif key == "score_architecture":
+            score_table = _wealth_score_breakdown_table(wealth)
+            if score_table:
+                tables.append(score_table)
+            houses = _wealth_houses_table(wealth)
+            if houses:
+                tables.append(houses)
+            yogas = _wealth_yogas_table(wealth)
+            if yogas:
+                tables.append(yogas)
+        elif key == "d1_wealth_foundation":
+            houses = _wealth_houses_table(wealth)
+            if houses:
+                tables.append(houses)
+            planets = _planet_wealth_table(wealth)
+            if planets:
+                tables.append(planets)
+        elif key == "dhana_money_yogas":
+            yogas = _wealth_yogas_table(wealth)
+            if yogas:
+                tables.append(yogas)
+        elif key == "money_psychology":
+            planets = _planet_wealth_table(wealth)
+            if planets:
+                # Prefer Moon/Venus/Mercury rows when present
+                filtered = [r for r in (planets.get("rows") or []) if r and r[0] in {"Moon", "Venus", "Mercury", "Jupiter"}]
+                if filtered:
+                    tables.append({
+                        "title": "Earn–spend psychology planets",
+                        "headers": planets.get("headers"),
+                        "rows": filtered,
+                    })
+                else:
+                    tables.append(planets)
+        elif key == "income_engines":
+            planets = _planet_wealth_table(wealth)
+            if planets:
+                tables.append(planets)
+        elif key == "sources_of_wealth":
+            sources = _income_sources_table(wealth)
+            if sources:
+                tables.append(sources)
+        elif key == "assets_property_inheritance":
+            houses = _wealth_houses_table(wealth)
+            if houses:
+                focus = [r for r in (houses.get("rows") or []) if r and str(r[0]).startswith(("4", "8", "9"))]
+                if focus:
+                    tables.append({
+                        "title": "Assets / inheritance houses",
+                        "headers": houses.get("headers"),
+                        "rows": focus,
+                    })
+                else:
+                    tables.append(houses)
+        elif key == "debt_loss_sudden":
+            houses = _wealth_houses_table(wealth)
+            if houses:
+                focus = [r for r in (houses.get("rows") or []) if r and str(r[0]).startswith(("6", "8", "12", "5"))]
+                if focus:
+                    tables.append({
+                        "title": "Leakage & sudden-money houses",
+                        "headers": houses.get("headers"),
+                        "rows": focus,
+                    })
+                else:
+                    tables.append(houses)
         elif key == "current_dasha_theme":
             metrics = [
                 _metric("Mahadasha", (dashas.get("mahadasha") or {}).get("planet") or "--"),
                 _metric("Antardasha", (dashas.get("antardasha") or {}).get("planet") or "--"),
                 _metric("Pratyantardasha", (dashas.get("pratyantardasha") or {}).get("planet") or "--"),
             ]
+            if months[:3]:
+                tables.append(_quarter_table(months, 0))
         elif key == "twelve_month_overview":
             rows = [
                 [
@@ -220,12 +461,46 @@ def assemble_wealth_pages(
                 _metric("11th lord", eleventh.get("planet") or "--"),
                 _metric("11th nakshatra", (eleventh.get("nakshatra") or {}).get("nakshatra") or "--"),
             ]
+            lord_table = _lords_nakshatra_table(lords)
+            if lord_table:
+                tables.append(lord_table)
+        elif key == "spouse_joint_finances":
+            spouse = _spouse_finance_table(context.get("spouse_finance_hints") or {})
+            if spouse:
+                tables.append(spouse)
         elif key == "speculation_vs_investing":
             trading = context.get("trading_luck") or {}
             metrics = [
                 _metric("Trading tone", trading.get("recommendation") or trading.get("signal") or "--"),
                 _metric("Luck score", trading.get("final_score") or trading.get("score") or "--"),
             ]
+            trading_rows = []
+            for label, field in (
+                ("Signal", "signal"),
+                ("Recommendation", "recommendation"),
+                ("Score", "final_score"),
+                ("Risk note", "risk_note"),
+            ):
+                if field == "final_score":
+                    val = trading.get("final_score") or trading.get("score")
+                else:
+                    val = trading.get(field)
+                if val:
+                    trading_rows.append([label, _clean(val)[:100]])
+            if trading_rows:
+                tables.append({
+                    "title": "Speculation vs investing snapshot",
+                    "headers": ["Metric", "Value"],
+                    "rows": trading_rows,
+                })
+        elif key == "action_plan_remedies":
+            sources = _income_sources_table(wealth)
+            if sources:
+                tables.append(sources)
+        elif key == "wealth_roadmap_checklist":
+            score_table = _wealth_score_breakdown_table(wealth)
+            if score_table:
+                tables.append(score_table)
 
         pages.append(
             _page(

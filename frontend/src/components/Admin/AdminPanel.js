@@ -248,6 +248,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [loading, setLoading] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
+  const [creditProducts, setCreditProducts] = useState([]);
+  const [creditProductsLoading, setCreditProductsLoading] = useState(false);
+  const [creditProductsError, setCreditProductsError] = useState('');
+  const [seedingCreditProducts, setSeedingCreditProducts] = useState(false);
+  const [savingCreditProductId, setSavingCreditProductId] = useState(null);
   const [editingSubscription, setEditingSubscription] = useState(null);
   const [pendingSubscription, setPendingSubscription] = useState(null);
   /** Set when opening User profile from User Management (today’s date range + auto-load). Cleared when opening the tab manually. */
@@ -587,6 +592,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         fetchSubscriptionPlans();
       } else if (activeSubTab === 'subscriptionPlans') {
         fetchSubscriptionPlans();
+      } else if (activeSubTab === 'creditProducts') {
+        fetchCreditProducts();
       } else if (activeSubTab === 'requests') {
         fetchCreditRequests();
       }
@@ -1751,6 +1758,89 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setPlanBenefitsDraft(nextDraft);
     } catch (error) {
       console.error('Error fetching subscription plans:', error);
+    }
+  };
+
+  const fetchCreditProducts = async () => {
+    setCreditProductsLoading(true);
+    setCreditProductsError('');
+    try {
+      const response = await fetch('/api/credits/admin/credit-products', {
+        headers: getAdminAuthHeaders(),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        const detail = err.detail || `HTTP ${response.status}`;
+        throw new Error(detail);
+      }
+      const data = await response.json();
+      setCreditProducts(Array.isArray(data?.products) ? data.products : []);
+    } catch (error) {
+      console.error('Error fetching credit products:', error);
+      setCreditProducts([]);
+      setCreditProductsError(
+        error?.message ||
+          'Failed to load credit packs. Deploy/restart the backend that includes credit_product_catalog.'
+      );
+    } finally {
+      setCreditProductsLoading(false);
+    }
+  };
+
+  const handleSeedCreditProducts = async () => {
+    setSeedingCreditProducts(true);
+    setCreditProductsError('');
+    try {
+      const response = await fetch('/api/credits/admin/credit-products/seed', {
+        method: 'POST',
+        headers: getAdminAuthHeaders(),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      setCreditProducts(Array.isArray(data?.products) ? data.products : []);
+    } catch (error) {
+      console.error('Error seeding credit products:', error);
+      setCreditProductsError(error?.message || 'Failed to seed credit packs');
+    } finally {
+      setSeedingCreditProducts(false);
+    }
+  };
+
+  const handleToggleCreditProduct = async (product) => {
+    const productId = product?.product_id;
+    if (!productId) return;
+    const nextActive = !product.is_active;
+    setSavingCreditProductId(productId);
+    try {
+      const response = await fetch(`/api/credits/admin/credit-products/${encodeURIComponent(productId)}`, {
+        method: 'PUT',
+        headers: {
+          ...getAdminAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_active: nextActive }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to update credit product');
+      }
+      const data = await response.json();
+      const updated = data?.product;
+      setCreditProducts((prev) =>
+        (prev || []).map((p) =>
+          p.product_id === productId
+            ? { ...p, is_active: updated?.is_active ?? nextActive, updated_at: updated?.updated_at || p.updated_at }
+            : p
+        )
+      );
+    } catch (error) {
+      console.error('Error updating credit product:', error);
+      alert(error.message || 'Failed to update credit product');
+    } finally {
+      setSavingCreditProductId(null);
     }
   };
 
@@ -2957,6 +3047,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             onClick={() => setActiveSubTab('subscriptionPlans')}
           >
             Subscription Plans
+          </button>
+          <button
+            className={`subtab ${activeSubTab === 'creditProducts' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('creditProducts')}
+          >
+            Credit Packs
           </button>
           <button
             className={`subtab ${activeSubTab === 'subscriptionPurchases' ? 'active' : ''}`}
@@ -4271,6 +4367,73 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 <p className="credit-settings-hint">No subscription plans found.</p>
               )}
             </div>
+          </div>
+        )}
+
+        {activeTab === 'credits' && activeSubTab === 'creditProducts' && (
+          <div className="credits-management">
+            <h2>Credit Packs</h2>
+            <p className="credit-settings-hint">
+              Disable a pack to hide it from both Google Play (mobile) and Razorpay (web / User Choice) without removing it from Google Play Console.
+              Already-completed purchases for a disabled pack are still credited.
+            </p>
+            <p className="credit-settings-hint">
+              Opening this tab calls the API, which creates <code>credit_product_catalog</code> and seeds packs
+              (<code>credits_24</code> … <code>credits_999</code>) if they are missing. Restart the backend after deploying that code.
+            </p>
+            {creditProductsError && (
+              <p className="credit-settings-hint" style={{ color: '#b91c1c' }}>
+                {creditProductsError}
+              </p>
+            )}
+            {creditProductsLoading ? (
+              <p className="credit-settings-hint">Loading credit packs…</p>
+            ) : (
+              <div className="settings-form settings-form-table credit-product-table">
+                {(creditProducts || []).map((product) => {
+                  const productId = product.product_id;
+                  const isSaving = savingCreditProductId === productId;
+                  return (
+                    <div key={productId} className="setting-row credit-product-row">
+                      <label className="setting-row-label" title={productId}>
+                        {product.credits} credits
+                      </label>
+                      <div className="credit-product-meta">
+                        <code>{productId}</code>
+                        <span className={`credit-product-status ${product.is_active ? 'is-active' : 'is-hidden'}`}>
+                          {product.is_active ? 'Visible on Play + Razorpay' : 'Hidden from Play + Razorpay'}
+                        </span>
+                      </div>
+                      <div className="credit-product-actions">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleCreditProduct(product)}
+                          className={`save-btn credit-product-toggle-btn ${product.is_active ? 'is-disable' : 'is-enable'}`}
+                          disabled={isSaving}
+                        >
+                          {isSaving ? 'Saving…' : product.is_active ? 'Disable' : 'Enable'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {(!creditProducts || creditProducts.length === 0) && (
+                  <div>
+                    <p className="credit-settings-hint">
+                      No credit packs found. Deploy/restart the backend with the credit-product catalog code, then click Initialize.
+                    </p>
+                    <button
+                      type="button"
+                      className="save-btn credit-product-toggle-btn"
+                      onClick={handleSeedCreditProducts}
+                      disabled={seedingCreditProducts}
+                    >
+                      {seedingCreditProducts ? 'Initializing…' : 'Initialize credit packs'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

@@ -96,9 +96,13 @@ def _format_inr(paise: int) -> str:
 
 
 def get_razorpay_credit_packs() -> List[Dict[str, Any]]:
+    """Active packs only — respects admin credit_product_catalog.is_active."""
     packs: List[Dict[str, Any]] = []
+    active_amounts = set(credit_service.list_active_credit_amounts())
     for c in ALLOWED_CREDITS:
-        paise = _price_paise(c)
+        if c not in active_amounts:
+            continue
+        paise = _expected_paise_for_pack(c)
         packs.append(
             {
                 "credits": c,
@@ -122,6 +126,8 @@ def create_razorpay_credit_payment_link(
     """Create a Razorpay Payment Link for non-browser channels like WhatsApp."""
     if credits not in ALLOWED_CREDITS:
         raise ValueError("Invalid credits pack")
+    if not credit_service.is_credit_pack_sellable(credits=credits):
+        raise ValueError("This credits pack is currently unavailable")
 
     amount = _price_paise(credits)
     receipt = f"wa{int(userid)}c{credits}{secrets.token_hex(4)}"[:40]
@@ -444,6 +450,8 @@ async def razorpay_catalog(current_user: User = Depends(get_current_user)):
 async def razorpay_create_order(body: CreateOrderBody, current_user: User = Depends(get_current_user)):
     if body.credits not in ALLOWED_CREDITS:
         raise HTTPException(status_code=400, detail="credits must be one of: 24, 50, 100, 250, 500, 999")
+    if not credit_service.is_credit_pack_sellable(credits=body.credits):
+        raise HTTPException(status_code=400, detail="This credits pack is currently unavailable")
 
     amount = _price_paise(body.credits)
     auth = _auth()

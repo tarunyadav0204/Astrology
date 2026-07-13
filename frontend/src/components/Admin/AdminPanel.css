@@ -1168,6 +1168,69 @@ tr:hover {
   background: #da190b !important;
 }
 
+/* Credit packs admin table: label | meta | action (avoid subscription 4-col overlap) */
+.credit-product-table .credit-product-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 160px) minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.credit-product-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+  font-size: 13px;
+  color: #555;
+}
+
+.credit-product-meta code {
+  font-size: 12px;
+}
+
+.credit-product-status.is-active {
+  color: #2e7d32;
+}
+
+.credit-product-status.is-hidden {
+  color: #b45309;
+}
+
+.credit-product-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.credit-product-toggle-btn {
+  padding: 6px 14px !important;
+  min-width: 88px;
+  width: auto !important;
+  white-space: nowrap;
+  font-size: 13px !important;
+  line-height: 1.25 !important;
+  min-height: unset !important;
+  height: auto !important;
+}
+
+.credit-product-toggle-btn.is-enable {
+  background: #2e7d32 !important;
+  border-color: #2e7d32 !important;
+}
+
+@media (max-width: 700px) {
+  .credit-product-table .credit-product-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .credit-product-actions {
+    justify-content: flex-start;
+  }
+}
+
 /* Terms tab: search */
 .admin-terms .terms-search {
   display: flex;

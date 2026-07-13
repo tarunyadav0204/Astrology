@@ -33,6 +33,9 @@ import { useCredits } from '../../credits/CreditContext';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import PodcastPlayerModal from '../PodcastPlayerModal';
 
+/** Avoid replaying slide-in when a tall bubble remounts (Android clipping / recycle). */
+const messageBubbleEntryPlayedIds = new Set();
+
 function MessageBubble({
   message,
   language,
@@ -177,6 +180,15 @@ function MessageBubble({
   }, [message.isTyping, dot1Anim, dot2Anim, dot3Anim]);
 
   useEffect(() => {
+    const entryId = String(message?.messageId || message?.id || message?.clientRequestId || '');
+    if (entryId && messageBubbleEntryPlayedIds.has(entryId)) {
+      fadeAnim.setValue(1);
+      slideAnim.setValue(0);
+      return undefined;
+    }
+    if (entryId) {
+      messageBubbleEntryPlayedIds.add(entryId);
+    }
     const parallel = Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -197,7 +209,7 @@ function MessageBubble({
       stopAnimatedValue(fadeAnim, 1);
       stopAnimatedValue(slideAnim, 0);
     };
-  }, [fadeAnim, slideAnim]);
+  }, [fadeAnim, slideAnim, message?.messageId, message?.id, message?.clientRequestId]);
   const getCleanMessageText = () => {
     const raw = message.content;
     const s = typeof raw === 'string' ? raw : raw != null ? String(raw) : '';

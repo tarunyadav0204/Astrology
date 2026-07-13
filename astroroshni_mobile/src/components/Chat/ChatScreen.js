@@ -614,6 +614,9 @@ export default function ChatScreen({ navigation, route }) {
   const drawerAnimHandleRef = useRef(null);
   const menuLogoGlowLoopRef = useRef(null);
   const hasInstantTypingMessage = messages.some((msg) => msg?.isTyping && msg?.chatTier === 'instant');
+  /** When false, skip auto scroll-to-end so we don't fight the user's scroll position. */
+  const stickMessagesToBottomRef = useRef(true);
+  const lastAutoScrollAtRef = useRef(0);
 
   useEffect(() => {
     showMenuRef.current = showMenu;
@@ -713,11 +716,30 @@ export default function ChatScreen({ navigation, route }) {
     return () => clearInterval(interval);
   }, [hasInstantTypingMessage]);
 
+  // Instant loader grows every ~180ms. Scrolling on every word with animation causes continuous bounce.
+  // Scroll once when typing starts, then occasionally (non-animated) while still stuck to bottom.
   useEffect(() => {
     if (!hasInstantTypingMessage) return undefined;
+    if (!stickMessagesToBottomRef.current) return undefined;
     const timer = setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 80);
+      scrollViewRef.current?.scrollToEnd({ animated: false });
+      lastAutoScrollAtRef.current = Date.now();
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [hasInstantTypingMessage]);
+
+  useEffect(() => {
+    if (!hasInstantTypingMessage) return undefined;
+    if (!stickMessagesToBottomRef.current) return undefined;
+    // Follow content growth roughly every ~1.5s (≈8 words), never every single word.
+    if (instantLoaderWordCount > 1 && instantLoaderWordCount % 8 !== 0) return undefined;
+    const now = Date.now();
+    if (now - lastAutoScrollAtRef.current < 700) return undefined;
+    const timer = setTimeout(() => {
+      if (!stickMessagesToBottomRef.current) return;
+      scrollViewRef.current?.scrollToEnd({ animated: false });
+      lastAutoScrollAtRef.current = Date.now();
+    }, 40);
     return () => clearTimeout(timer);
   }, [hasInstantTypingMessage, instantLoaderWordCount]);
 
@@ -936,14 +958,29 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const scrollToBottomReliably = (animated = true) => {
+    stickMessagesToBottomRef.current = true;
     const run = () => scrollViewRef.current?.scrollToEnd({ animated });
     run();
     clearInstantScrollRetries();
+    // Avoid stacking multiple animated scrollToEnd calls — that looks like bounce.
+    if (!animated) {
+      instantScrollRetryRef.current = [
+        setTimeout(run, 40),
+        setTimeout(run, 120),
+      ];
+      return;
+    }
     instantScrollRetryRef.current = [
-      setTimeout(run, 40),
-      setTimeout(run, 120),
-      setTimeout(run, 260),
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 120),
     ];
+  };
+
+  const maybeScrollMessagesToEnd = (animated = false) => {
+    if (!stickMessagesToBottomRef.current) return;
+    const now = Date.now();
+    if (now - lastAutoScrollAtRef.current < 400) return;
+    lastAutoScrollAtRef.current = now;
+    scrollViewRef.current?.scrollToEnd({ animated });
   };
 
   const rememberMessageTier = (messageId, tier) => {
@@ -1957,6 +1994,10 @@ export default function ChatScreen({ navigation, route }) {
   const setMessagesWithStorage = (messagesOrUpdater) => {
     setMessages(prev => {
       const newMessagesRaw = typeof messagesOrUpdater === 'function' ? messagesOrUpdater(prev) : messagesOrUpdater;
+      // Polling often returns the same logical state; skip sort/storage/re-render when unchanged.
+      if (newMessagesRaw === prev) {
+        return prev;
+      }
       const newMessages = sortMessagesForDisplay(newMessagesRaw);
       // Get current person ID from birthData if currentPersonId is null
       const personId = currentPersonId || chatPersonStorageKey(birthData);
@@ -3240,6 +3281,24 @@ export default function ChatScreen({ navigation, route }) {
     };
   };
 
+  const waitConversationFingerprint = (waitConversation) => {
+    if (!waitConversation?.enabled) return '';
+    const msgs = Array.isArray(waitConversation.messages) ? waitConversation.messages : [];
+    return `${waitConversation.status || ''}|${msgs.map((m) => `${m?.id || ''}:${m?.content || ''}`).join('||')}`;
+  };
+
+  const engagementFingerprint = (updates) => {
+    if (!Array.isArray(updates) || updates.length === 0) return '';
+    return updates.map((u) => `${u?.id || ''}:${u?.text || ''}`).join('||');
+  };
+
+  const chartInsightsFingerprint = (insights) => {
+    if (!Array.isArray(insights) || insights.length === 0) return '';
+    return insights
+      .map((item) => `${item?.id || ''}:${item?.title || ''}:${item?.message || ''}`)
+      .join('||');
+  };
+
   const renderWaitConversation = (waitConversation) => {
     if (!waitConversation?.enabled || !Array.isArray(waitConversation.messages) || waitConversation.messages.length === 0) {
       return null;
@@ -3525,54 +3584,77 @@ export default function ChatScreen({ navigation, route }) {
           console.log(`🔄 [POLL PROCESSING] messageId: ${messageId}, pollCount: ${pollCount}, continuing...`);
           updateEffectiveStartedAt(status.started_at);
           const polledChartInsights = Array.isArray(status.chart_insights) ? status.chart_insights : [];
-          setMessagesWithStorage(prev => prev.map(msg =>
-            msg.messageId === messageId || msg.id === processingMessageId
-              ? {
-                  ...msg,
-                  messageId: msg.messageId || messageId,
-                  processingStartedAt: mergeProcessingStartedAt(
-                    msg.processingStartedAt || msg.timestamp,
-                    status.started_at
-                  ),
-                  chartInsights: polledChartInsights.length > 0 ? polledChartInsights : (Array.isArray(msg.chartInsights) ? msg.chartInsights : []),
-                }
-              : msg
-          ));
           const waitConversation = normalizeWaitConversation(status.wait_conversation);
-          if (waitConversation) {
-            setMessagesWithStorage(prev => prev.map(msg =>
-              msg.messageId === messageId || msg.id === processingMessageId
-                ? {
-                    ...msg,
-                    messageId: msg.messageId || messageId,
-                    processingStartedAt: mergeProcessingStartedAt(
-                      msg.processingStartedAt || msg.timestamp,
-                      status.started_at
-                    ),
-                    waitConversation,
-                  }
-                : msg
-            ));
+          const hasEngagementIncoming =
+            Array.isArray(status.engagement_updates) && status.engagement_updates.length > 0;
+          // Standard/premium wait path: do not rewrite + scrollToEnd on every 1.5s poll.
+          // That fights LoadingBubble height changes and looks like continuous bounce.
+          let shouldScrollForContentGrowth = false;
+          setMessagesWithStorage((prev) => {
+            let changed = false;
+            const next = prev.map((msg) => {
+              if (msg.messageId !== messageId && msg.id !== processingMessageId) return msg;
+
+              const nextMessageId = msg.messageId || messageId;
+              const nextStartedAt = mergeProcessingStartedAt(
+                msg.processingStartedAt || msg.timestamp,
+                status.started_at
+              );
+              const nextInsights =
+                polledChartInsights.length > 0
+                  ? polledChartInsights
+                  : (Array.isArray(msg.chartInsights) ? msg.chartInsights : []);
+              const nextWait = waitConversation || msg.waitConversation;
+              const nextEngagement = hasEngagementIncoming
+                ? mergeEngagementUpdates(msg.engagementUpdates, status.engagement_updates)
+                : msg.engagementUpdates;
+
+              const prevWaitFp = waitConversationFingerprint(msg.waitConversation);
+              const nextWaitFp = waitConversationFingerprint(nextWait);
+              const prevEngFp = engagementFingerprint(msg.engagementUpdates);
+              const nextEngFp = engagementFingerprint(nextEngagement);
+              const prevInsightsFp = chartInsightsFingerprint(msg.chartInsights);
+              const nextInsightsFp = chartInsightsFingerprint(nextInsights);
+
+              if (
+                nextMessageId === msg.messageId &&
+                nextStartedAt === msg.processingStartedAt &&
+                nextInsightsFp === prevInsightsFp &&
+                nextWaitFp === prevWaitFp &&
+                nextEngFp === prevEngFp
+              ) {
+                return msg;
+              }
+
+              const waitMsgCount = Array.isArray(nextWait?.messages) ? nextWait.messages.length : 0;
+              const prevWaitMsgCount = Array.isArray(msg.waitConversation?.messages)
+                ? msg.waitConversation.messages.length
+                : 0;
+              if (nextWaitFp !== prevWaitFp && waitMsgCount > prevWaitMsgCount) {
+                shouldScrollForContentGrowth = true;
+              }
+              if (nextEngFp !== prevEngFp && nextEngFp.length > prevEngFp.length) {
+                shouldScrollForContentGrowth = true;
+              }
+              if (!prevInsightsFp && nextInsightsFp) {
+                shouldScrollForContentGrowth = true;
+              }
+
+              changed = true;
+              return {
+                ...msg,
+                messageId: nextMessageId,
+                processingStartedAt: nextStartedAt,
+                chartInsights: nextInsights,
+                ...(waitConversation ? { waitConversation: nextWait } : {}),
+                ...(hasEngagementIncoming ? { engagementUpdates: nextEngagement } : {}),
+              };
+            });
+            return changed ? next : prev;
+          });
+          if (shouldScrollForContentGrowth) {
             setTimeout(() => {
-              scrollViewRef.current?.scrollToEnd({ animated: true });
-            }, 80);
-          }
-          if (Array.isArray(status.engagement_updates) && status.engagement_updates.length > 0) {
-            setMessagesWithStorage(prev => prev.map(msg =>
-              msg.messageId === messageId || msg.id === processingMessageId
-                ? {
-                    ...msg,
-                    messageId: msg.messageId || messageId,
-                    processingStartedAt: mergeProcessingStartedAt(
-                      msg.processingStartedAt || msg.timestamp,
-                      status.started_at
-                    ),
-                    engagementUpdates: mergeEngagementUpdates(msg.engagementUpdates, status.engagement_updates),
-                  }
-                : msg
-            ));
-            setTimeout(() => {
-              scrollViewRef.current?.scrollToEnd({ animated: true });
+              maybeScrollMessagesToEnd(false);
             }, 80);
           }
           
@@ -4232,7 +4314,7 @@ export default function ChatScreen({ navigation, route }) {
       };
     }));
     setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
+      maybeScrollMessagesToEnd(false);
     }, 80);
 
     try {
@@ -4258,7 +4340,7 @@ export default function ChatScreen({ navigation, route }) {
             : msg
         ));
         setTimeout(() => {
-          scrollViewRef.current?.scrollToEnd({ animated: true });
+          maybeScrollMessagesToEnd(false);
         }, 80);
       }
     } catch (error) {
@@ -4805,12 +4887,16 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const handleMessagesScroll = (e) => {
-    if (!ratingPromptStateLoaded) return;
-    if (ratingPromptVisible) return;
-    if (ratingPromptState.completed || ratingPromptState.neverAskAgain) return;
     const y = Number(e?.nativeEvent?.contentOffset?.y || 0);
     const h = Number(e?.nativeEvent?.layoutMeasurement?.height || 0);
     const ch = Number(e?.nativeEvent?.contentSize?.height || 0);
+    if (h > 0 && ch > 0) {
+      // Leave auto-follow only when the user scrolls meaningfully away from the bottom.
+      stickMessagesToBottomRef.current = y + h >= ch - 120;
+    }
+    if (!ratingPromptStateLoaded) return;
+    if (ratingPromptVisible) return;
+    if (ratingPromptState.completed || ratingPromptState.neverAskAgain) return;
     if (h <= 0 || ch <= 0) return;
     const nearBottom = y + h >= ch - 120;
     if (!nearBottom) return;
@@ -5091,13 +5177,16 @@ export default function ChatScreen({ navigation, route }) {
             }}
             showsVerticalScrollIndicator={false}
             onScroll={handleMessagesScroll}
-            scrollEventThrottle={120}
+            scrollEventThrottle={16}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="none"
-            removeClippedSubviews={Platform.OS === 'android'}
+            // Tall completed answers remount/jump with clipped subviews (seen as mid-answer bounce).
+            removeClippedSubviews={false}
+            bounces={false}
+            overScrollMode="never"
             initialNumToRender={12}
             maxToRenderPerBatch={8}
-            windowSize={10}
+            windowSize={21}
             updateCellsBatchingPeriod={50}
             {...(Platform.OS === 'ios'
               ? {
@@ -5152,18 +5241,19 @@ export default function ChatScreen({ navigation, route }) {
 
                       {dashaData && (
                         <Animated.View style={[styles.dashaSection, { opacity: fadeAnim }]}>
-                          <GHFlatList
+                          <ScrollView
                             horizontal
                             showsHorizontalScrollIndicator={false}
-                            data={[
+                            nestedScrollEnabled
+                            contentContainerStyle={styles.dashaFlatListContent}
+                          >
+                            {[
                               dashaData.maha_dashas?.find(d => d.current),
                               dashaData.antar_dashas?.find(d => d.current),
                               dashaData.pratyantar_dashas?.find(d => d.current),
                               dashaData.sookshma_dashas?.find(d => d.current),
                               dashaData.prana_dashas?.find(d => d.current)
-                            ].filter(Boolean)}
-                            keyExtractor={(dashaItem, dashaIndex) => dashaIndex.toString()}
-                            renderItem={({ item: dasha }) => {
+                            ].filter(Boolean).map((dasha, dashaIndex) => {
                               if (!dasha || !dasha.planet || !dasha.start || !dasha.end) return null;
                               const planetColor = getPlanetColor(dasha.planet);
                               const startDateObj = new Date(dasha.start);
@@ -5172,6 +5262,7 @@ export default function ChatScreen({ navigation, route }) {
                               const endDate = !isNaN(endDateObj.getTime()) ? endDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '...';
                               return (
                                 <TouchableOpacity
+                                  key={`dasha-chip-${dasha.planet}-${dashaIndex}`}
                                   style={[
                                     styles.dashaChip,
                                     {
@@ -5188,12 +5279,8 @@ export default function ChatScreen({ navigation, route }) {
                                   <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{endDate}</Text>
                                 </TouchableOpacity>
                               );
-                            }}
-                            contentContainerStyle={styles.dashaFlatListContent}
-                            snapToInterval={cardWidth + 8}
-                            decelerationRate="fast"
-                            pagingEnabled={false}
-                          />
+                            })}
+                          </ScrollView>
                         </Animated.View>
                       )}
                     </LinearGradient>
@@ -5280,10 +5367,9 @@ export default function ChatScreen({ navigation, route }) {
                 return (
                   <View ref={isLastMessage ? lastMessageRef : null}>
                     <LoadingBubble
-                      key={`loading-${item.messageId || item.id}`}
+                      key={`loading-${item.clientRequestId || item.id}`}
                       chartInsights={item.chartInsights}
                       chartData={chartData}
-                      scrollViewRef={scrollViewRef}
                       expectedWaitSeconds={item.expectedWaitSeconds}
                       startedAt={item.processingStartedAt || item.timestamp}
                     />

@@ -160,6 +160,84 @@ def _quarter_table(months: List[Dict[str, Any]], start_idx: int) -> Dict[str, An
     }
 
 
+def _health_layer_table(health: Dict[str, Any], constitution: str, dashas: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "title": "Health score architecture",
+        "headers": ["Layer", "Value", "Role"],
+        "rows": [
+            ["Overall health score", _clean(health.get("health_score"), "--"), "Blended vitality / vulnerability reading"],
+            ["Constitution", constitution, "Elemental / dosha leaning"],
+            ["Current MD", _clean((dashas.get("mahadasha") or {}).get("planet"), "--"), "Present-period wellness tone"],
+            ["Current AD", _clean((dashas.get("antardasha") or {}).get("planet"), "--"), "Near-term modifier"],
+        ],
+    }
+
+
+def _planet_systems_table(ranks: List[Dict[str, Any]], title: str = "Planet → body systems", limit: int = 10) -> Dict[str, Any] | None:
+    rows = []
+    for row in ranks[:limit]:
+        systems = row.get("systems") or []
+        rows.append([
+            _clean(row.get("planet"), "--"),
+            ", ".join([_clean(s) for s in systems[:3]]) or "--",
+            _clean(row.get("impact_summary"), "--")[:90],
+        ])
+    if not rows:
+        return None
+    return {"title": title, "headers": ["Planet", "Systems", "Cue"], "rows": rows}
+
+
+def _nakshatra_health_table(lords: Dict[str, Any]) -> Dict[str, Any] | None:
+    rows = []
+    for key, label in (
+        ("lagna_lord", "Lagna lord"),
+        ("sixth_lord", "6th lord"),
+        ("eighth_lord", "8th lord"),
+        ("moon", "Moon"),
+    ):
+        block = lords.get(key) or {}
+        nak = block.get("nakshatra") or {}
+        if isinstance(nak, dict):
+            nak_name = _clean(nak.get("nakshatra") or nak.get("nakshatra_name"), "--")
+            pada = _clean(nak.get("pada"), "--")
+        else:
+            nak_name, pada = "--", "--"
+        rows.append([
+            label,
+            _clean(block.get("planet"), "--"),
+            _clean(block.get("house"), "--"),
+            nak_name,
+            pada,
+        ])
+    if not any(r[1] != "--" for r in rows):
+        return None
+    return {
+        "title": "Health nakshatra markers",
+        "headers": ["Role", "Planet", "House", "Nakshatra", "Pada"],
+        "rows": rows,
+    }
+
+
+def _dict_metric_table(title: str, data: Any, limit: int = 8) -> Dict[str, Any] | None:
+    rows = []
+    if isinstance(data, dict):
+        for key, value in list(data.items())[:limit]:
+            if isinstance(value, (dict, list)):
+                continue
+            rows.append([_clean(key), _clean(value)[:120]])
+    elif isinstance(data, list):
+        for idx, item in enumerate(data[:limit], start=1):
+            if isinstance(item, dict):
+                label = _clean(item.get("name") or item.get("title") or item.get("type"), f"Item {idx}")
+                note = _clean(item.get("summary") or item.get("description") or item.get("note"), "--")[:120]
+                rows.append([label, note])
+            else:
+                rows.append([str(idx), _clean(item)[:120]])
+    if not rows:
+        return None
+    return {"title": title, "headers": ["Item", "Detail"], "rows": rows}
+
+
 def build_health_chart_manifest(context: Dict[str, Any]) -> List[Dict[str, Any]]:
     style = context.get("chart_style") or "both"
     refs = ["native_d1", "native_d9", "native_d30"]
@@ -223,7 +301,42 @@ def assemble_health_pages(
                 _metric("Health score", score if score is not None else "--"),
                 _metric("Constitution", constitution),
             ]
+            tables.append(_health_layer_table(health, constitution, dashas))
+            houses = context.get("attention_houses") or []
+            house_rows = []
+            for h in houses[:6]:
+                house_rows.append([
+                    _clean(h.get("house"), "--"),
+                    _clean(h.get("significance"), "--")[:50],
+                    ", ".join([_clean(p) for p in (h.get("residents") or [])[:4]]) or "--",
+                ])
+            if house_rows:
+                tables.append({
+                    "title": "Priority health houses",
+                    "headers": ["House", "Focus", "Residents"],
+                    "rows": house_rows,
+                })
             notes = notes + [disclaimer]
+        elif key == "score_architecture":
+            tables.append(_health_layer_table(health, constitution, dashas))
+            zone_map = context.get("body_zone_map") or {}
+            priority = zone_map.get("priority_zones") or []
+            zone_rows = []
+            for row in priority[:8]:
+                zone_rows.append([
+                    _clean(row.get("zone"), "--"),
+                    ", ".join([_clean(s) for s in (row.get("sources") or [])[:3]]) or "--",
+                    _clean((row.get("why") or [None])[0], "--")[:90],
+                ])
+            if zone_rows:
+                tables.append({
+                    "title": "Priority body zones",
+                    "headers": ["Zone", "Sources", "Why"],
+                    "rows": zone_rows,
+                })
+            planet_table = _planet_systems_table(context.get("planet_system_ranks") or [], limit=8)
+            if planet_table:
+                tables.append(planet_table)
         elif key == "constitution_dosha":
             metrics = [
                 _metric("Constitution", constitution),
@@ -233,19 +346,24 @@ def assemble_health_pages(
                 tables = [eb_table]
             else:
                 metrics.append(_metric("Element balance", "--"))
+            tables.append(_health_layer_table(health, constitution, dashas))
+        elif key == "vitality_immunity":
+            planet_table = _planet_systems_table(context.get("planet_system_ranks") or [], title="Vitality / immunity planet cues")
+            if planet_table:
+                tables.append(planet_table)
         elif key == "planet_body_systems":
             zone_map = context.get("body_zone_map") or {}
             priority = zone_map.get("priority_zones") or []
             patterns = zone_map.get("event_patterns") or []
             zone_rows = []
-            for row in priority[:6]:
+            for row in priority[:8]:
                 zone_rows.append([
                     _clean(row.get("zone"), "--"),
                     ", ".join([_clean(s) for s in (row.get("sources") or [])[:3]]) or "--",
                     _clean((row.get("why") or [None])[0], "--")[:90],
                 ])
             pattern_rows = []
-            for row in patterns[:5]:
+            for row in patterns[:6]:
                 pattern_rows.append([
                     _clean(row.get("title"), "--"),
                     ", ".join([_clean(z) for z in (row.get("zones") or [])[:3]]) or "--",
@@ -265,23 +383,15 @@ def assemble_health_pages(
                     "rows": pattern_rows,
                 })
             if not tables:
-                ranks = context.get("planet_system_ranks") or []
-                rows = []
-                for row in ranks[:9]:
-                    systems = row.get("systems") or []
-                    rows.append([
-                        _clean(row.get("planet"), "--"),
-                        ", ".join([_clean(s) for s in systems[:3]]) or "--",
-                        _clean(row.get("impact_summary"), "--")[:80],
-                    ])
-                if rows:
-                    tables = [{"title": "Planet → body systems", "headers": ["Planet", "Systems", "Cue"], "rows": rows}]
+                fallback = _planet_systems_table(context.get("planet_system_ranks") or [], limit=10)
+                if fallback:
+                    tables = [fallback]
             if zone_map.get("disclaimer"):
                 notes = notes + [_clean(zone_map.get("disclaimer"))]
         elif key == "health_houses_d1":
             houses = context.get("attention_houses") or []
             rows = []
-            for h in houses[:6]:
+            for h in houses[:8]:
                 fused = ""
                 zone_map = context.get("body_zone_map") or {}
                 for item in zone_map.get("house_map") or []:
@@ -292,15 +402,48 @@ def assemble_health_pages(
                     _clean(h.get("house"), "--"),
                     _clean(h.get("significance"), "--")[:40],
                     fused or "--",
+                    ", ".join([_clean(p) for p in (h.get("residents") or [])[:3]]) or "--",
                 ])
             if rows:
-                tables = [{"title": "Health houses × body flavour", "headers": ["House", "Focus", "Zones"], "rows": rows}]
+                tables = [{"title": "Health houses × body flavour", "headers": ["House", "Focus", "Zones", "Residents"], "rows": rows}]
+        elif key == "mental_emotional_health":
+            mental = _dict_metric_table("Mental / emotional cues", context.get("mental_health") or health.get("mental_health"))
+            if mental:
+                tables.append(mental)
+            planet_table = _planet_systems_table(context.get("planet_system_ranks") or [], title="Mind-related planet cues", limit=6)
+            if planet_table:
+                tables.append(planet_table)
+        elif key == "digestion_metabolism_recovery":
+            vitality = _dict_metric_table("Vitality / recovery cues", context.get("vitality_analysis"))
+            if vitality:
+                tables.append(vitality)
+        elif key == "acute_vs_chronic_pattern":
+            disease = _dict_metric_table("Pattern cues (not diagnoses)", context.get("disease_indicators"))
+            if disease:
+                tables.append(disease)
+        elif key == "health_yogas_afflictions":
+            planet_table = _planet_systems_table(context.get("planet_system_ranks") or [], title="Affliction / support planet board", limit=10)
+            if planet_table:
+                tables.append(planet_table)
+        elif key == "lifestyle_triggers":
+            lifestyle = _dict_metric_table("Lifestyle trigger cues", context.get("body_parts") or context.get("vitality_analysis"))
+            if lifestyle:
+                tables.append(lifestyle)
+        elif key == "badhaka_mrityu_bhaga":
+            badhaka = _dict_metric_table("Badhaka cues", context.get("badhaka_analysis"))
+            if badhaka:
+                tables.append(badhaka)
+            mrityu = _dict_metric_table("Mrityu Bhaga cues", context.get("mrityu_bhaga_analysis"))
+            if mrityu:
+                tables.append(mrityu)
         elif key == "current_dasha_health_theme":
             metrics = [
                 _metric("Mahadasha", (dashas.get("mahadasha") or {}).get("planet") or "--"),
                 _metric("Antardasha", (dashas.get("antardasha") or {}).get("planet") or "--"),
                 _metric("Pratyantardasha", (dashas.get("pratyantardasha") or {}).get("planet") or "--"),
             ]
+            if months[:3]:
+                tables.append(_quarter_table(months, 0))
         elif key == "twelve_month_overview":
             rows = [
                 [
@@ -329,13 +472,31 @@ def assemble_health_pages(
                 _metric("Lagna nakshatra", (lagna.get("nakshatra") or {}).get("nakshatra") or "--"),
                 _metric("Moon nakshatra", (moon.get("nakshatra") or {}).get("nakshatra") or "--"),
             ]
-        elif key in ("action_plan_remedies", "safety_and_next_steps"):
+            nak_table = _nakshatra_health_table(lords)
+            if nak_table:
+                tables.append(nak_table)
+        elif key in ("action_plan_remedies", "safety_and_next_steps", "ninety_day_checklist"):
             notes = notes + [disclaimer]
             if key == "safety_and_next_steps" and not bullets:
                 bullets = [
                     "Use this report for prevention, pacing, and self-care awareness.",
                     "Seek medical care for persistent symptoms, emergencies, or diagnosed conditions.",
                 ]
+            if key == "ninety_day_checklist":
+                zone_map = context.get("body_zone_map") or {}
+                priority = zone_map.get("priority_zones") or []
+                zone_rows = []
+                for row in priority[:6]:
+                    zone_rows.append([
+                        _clean(row.get("zone"), "--"),
+                        _clean((row.get("why") or [None])[0], "Monitor and support gently.")[:100],
+                    ])
+                if zone_rows:
+                    tables.append({
+                        "title": "90-day focus zones",
+                        "headers": ["Zone", "Focus"],
+                        "rows": zone_rows,
+                    })
 
         pages.append(
             _page(

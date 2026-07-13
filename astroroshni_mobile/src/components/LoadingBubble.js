@@ -9,7 +9,6 @@ import { stopAnimatedValue, stopAnimationLoop } from '../utils/safeAnimated';
 const LoadingBubble = ({
     chartInsights,
     chartData,
-    scrollViewRef,
     expectedWaitSeconds = 80,
     startedAt = null,
 }) => {
@@ -21,7 +20,6 @@ const LoadingBubble = ({
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const shimmerAnim = useRef(new Animated.Value(0)).current;
     const chartContainerRef = useRef(null);
-    const hasScrolled = useRef(false);
     const mountedRef = useRef(true);
     const insightFadeHandleRef = useRef(null);
     const mountMsRef = useRef(Date.now());
@@ -66,13 +64,13 @@ const LoadingBubble = ({
         setRemainingSeconds(Math.max(0, total - elapsedSeconds));
     }, [expectedWaitSeconds, startedAt]);
 
+    // Single interval for the whole wait — do not recreate on every remainingSeconds tick.
     useEffect(() => {
-        if (!remainingSeconds) return;
         const timer = setInterval(() => {
             setRemainingSeconds((prev) => (prev > 0 ? prev - 1 : 0));
         }, 1000);
         return () => clearInterval(timer);
-    }, [remainingSeconds]);
+    }, []);
 
     useEffect(() => {
         if (remainingSeconds > 0) return;
@@ -88,21 +86,6 @@ const LoadingBubble = ({
             mountedRef.current = false;
         };
     }, []);
-
-    useEffect(() => {
-        if (!hasChartInsights || hasScrolled.current || !chartContainerRef.current || !scrollViewRef?.current) {
-            return undefined;
-        }
-        const scrollTimer = setTimeout(() => {
-            if (!mountedRef.current) return;
-            const node = scrollViewRef.current;
-            if (node?.scrollToEnd) {
-                node.scrollToEnd({ animated: true });
-                hasScrolled.current = true;
-            }
-        }, 300);
-        return () => clearTimeout(scrollTimer);
-    }, [hasChartInsights, scrollViewRef]);
 
     useEffect(() => {
         const loops = [];

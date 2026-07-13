@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional
 
 from ..models import ReportMetric, ReportPage
 
@@ -226,6 +226,303 @@ def _ashtakoota_meaning_notes(ashtakoota: Dict[str, Any], limit: int = 6) -> Lis
     return notes[:limit]
 
 
+_ASHTAKOOTA_ORDER = (
+    "varna",
+    "vashya",
+    "tara",
+    "yoni",
+    "graha_maitri",
+    "gana",
+    "bhakoot",
+    "nadi",
+)
+
+_ASHTAKOOTA_LABELS = {
+    "varna": "Varna",
+    "vashya": "Vashya",
+    "tara": "Tara",
+    "yoni": "Yoni",
+    "graha_maitri": "Graha Maitri",
+    "gana": "Gana",
+    "bhakoot": "Bhakoot",
+    "nadi": "Nadi",
+}
+
+
+def _short_interpretation(text: Any, limit: int = 110) -> str:
+    raw = _clean(text)
+    if not raw:
+        return "--"
+    # Drop markdown section headers from calculator interpretations.
+    lines = []
+    for line in raw.replace("**", "").split("\n"):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.lower().startswith("what ") and "measures" in stripped.lower():
+            continue
+        if stripped.lower().startswith("how to read"):
+            continue
+        lines.append(stripped)
+    joined = " ".join(lines) if lines else raw
+    if len(joined) <= limit:
+        return joined
+    return joined[: limit - 1].rstrip() + "…"
+
+
+def _koota_status(score: Any, max_score: Any) -> str:
+    try:
+        s = float(score)
+        m = float(max_score) if max_score not in (None, "", "--") else 0.0
+    except (TypeError, ValueError):
+        return "--"
+    if m <= 0:
+        return "--"
+    if s >= m:
+        return "Full"
+    if s <= 0:
+        return "Nil"
+    return "Partial"
+
+
+def _ashtakoota_detail_rows(ashtakoota: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Full 8-koota scoring table from engine `koots` or legacy breakdown list."""
+    koots = ashtakoota.get("koots")
+    rows: List[Dict[str, Any]] = []
+    if isinstance(koots, dict) and koots:
+        for key in _ASHTAKOOTA_ORDER:
+            item = koots.get(key)
+            if not isinstance(item, dict):
+                continue
+            score = item.get("score")
+            max_score = item.get("max_score") or item.get("max") or "--"
+            rows.append({
+                "Koota": _ASHTAKOOTA_LABELS.get(key, _humanize_label(key)),
+                "Score": f"{_clean(score, '--')}/{_clean(max_score, '--')}",
+                "Status": _koota_status(score, max_score),
+                "Detail": _clean(item.get("description"), "--"),
+                "Reading": _short_interpretation(item.get("interpretation") or item.get("meaning")),
+            })
+        return rows
+
+    for item in _as_list(ashtakoota.get("kootas") or ashtakoota.get("breakdown")):
+        if not isinstance(item, dict):
+            continue
+        name = _clean(item.get("name") or item.get("koota"), "Koota")
+        score = item.get("score")
+        max_score = item.get("max_score") or item.get("max") or "--"
+        rows.append({
+            "Koota": name,
+            "Score": f"{_clean(score, '--')}/{_clean(max_score, '--')}",
+            "Status": _koota_status(score, max_score),
+            "Detail": _clean(item.get("description") or item.get("detail"), "--"),
+            "Reading": _short_interpretation(item.get("meaning") or item.get("interpretation")),
+        })
+    return rows
+
+
+def _ashtakoota_summary_table(ashtakoota: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "title": "Ashtakoota totals",
+        "rows": [
+            {
+                "Measure": "Raw total",
+                "Value": f"{_clean(ashtakoota.get('total_score'), '--')}/36",
+                "Grade": _clean(ashtakoota.get("grade"), "--"),
+            },
+            {
+                "Measure": "Effective total (after exceptions)",
+                "Value": f"{_clean(ashtakoota.get('effective_total_score'), '--')}/36",
+                "Grade": _clean(ashtakoota.get("effective_grade"), "--"),
+            },
+            {
+                "Measure": "Rule profile",
+                "Value": _humanize_label(ashtakoota.get("rule_profile"), "--"),
+                "Grade": _clean(ashtakoota.get("effective_compatibility_level") or ashtakoota.get("compatibility_level"), "--"),
+            },
+        ],
+    }
+
+
+def _ashtakoota_exceptions_table(ashtakoota: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    exceptions = ashtakoota.get("exceptions")
+    if not isinstance(exceptions, dict) or not exceptions:
+        return None
+    rows: List[Dict[str, Any]] = []
+    for key, entry in exceptions.items():
+        if not isinstance(entry, dict):
+            continue
+        applied = entry.get("applied")
+        if applied is False:
+            continue
+        reasons = [_clean(r) for r in _as_list(entry.get("reasons")) if _clean(r)]
+        if not reasons and applied is None and not entry.get("score_adjustment"):
+            continue
+        rows.append({
+            "Exception": _humanize_label(key),
+            "Applied": "Yes" if applied else ("Review" if applied is None else "No"),
+            "Effect": _clean(entry.get("score_adjustment") or entry.get("effect") or entry.get("status"), "--"),
+            "Reason": "; ".join(reasons[:2]) if reasons else _clean(entry.get("summary"), "--"),
+        })
+    if not rows:
+        return None
+    return {"title": "Exceptions softening classical doshas", "rows": rows}
+
+
+def _ashtakoota_tables(ashtakoota: Dict[str, Any], *, include_exceptions: bool = True) -> List[Dict[str, Any]]:
+    tables: List[Dict[str, Any]] = []
+    detail_rows = _ashtakoota_detail_rows(ashtakoota)
+    if detail_rows:
+        tables.append({"title": "Detailed Ashtakoota (Guna Milan) breakdown", "rows": detail_rows})
+    tables.append(_ashtakoota_summary_table(ashtakoota))
+    if include_exceptions:
+        exc = _ashtakoota_exceptions_table(ashtakoota)
+        if exc:
+            tables.append(exc)
+    return tables
+
+
+def _koota_subset_table(ashtakoota: Dict[str, Any], keys: Iterable[str], title: str) -> Optional[Dict[str, Any]]:
+    koots = ashtakoota.get("koots") if isinstance(ashtakoota.get("koots"), dict) else {}
+    rows: List[Dict[str, Any]] = []
+    wanted = {str(k).lower() for k in keys}
+    if koots:
+        for key in _ASHTAKOOTA_ORDER:
+            if key not in wanted:
+                continue
+            item = koots.get(key)
+            if not isinstance(item, dict):
+                continue
+            score = item.get("score")
+            max_score = item.get("max_score") or item.get("max")
+            rows.append({
+                "Koota": _ASHTAKOOTA_LABELS.get(key, _humanize_label(key)),
+                "Score": f"{_clean(score, '--')}/{_clean(max_score, '--')}",
+                "Status": _koota_status(score, max_score),
+                "Detail": _clean(item.get("description"), "--"),
+            })
+    else:
+        for item in _as_list(ashtakoota.get("breakdown") or ashtakoota.get("kootas")):
+            if not isinstance(item, dict):
+                continue
+            name = _clean(item.get("name") or item.get("koota"))
+            if name.lower().replace(" ", "_") not in wanted and name.lower() not in {
+                _ASHTAKOOTA_LABELS.get(k, "").lower() for k in wanted
+            }:
+                continue
+            score = item.get("score")
+            max_score = item.get("max_score") or item.get("max")
+            rows.append({
+                "Koota": name,
+                "Score": f"{_clean(score, '--')}/{_clean(max_score, '--')}",
+                "Status": _koota_status(score, max_score),
+                "Detail": _clean(item.get("description") or item.get("meaning"), "--"),
+            })
+    if not rows:
+        return None
+    return {"title": title, "rows": rows}
+
+
+def _cross_chart_table(cross: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    if not isinstance(cross, dict) or not cross:
+        return None
+    rows: List[Dict[str, Any]] = []
+    for key, label in (
+        ("moon_element_match", "Moon / emotional match"),
+        ("venus_to_mars", "Venus → Mars chemistry"),
+        ("mars_to_venus", "Mars → Venus chemistry"),
+        ("overall_relationship_quality", "Overall relationship quality"),
+        ("marriage_alignment", "Marriage alignment"),
+    ):
+        item = cross.get(key)
+        if not isinstance(item, dict):
+            continue
+        rows.append({
+            "Layer": label,
+            "Band / score": _clean(item.get("band") or item.get("score"), "--"),
+            "Note": _short_interpretation(item.get("reason") or item.get("description") or item.get("summary"), 90),
+        })
+    if not rows:
+        return None
+    return {"title": "Cross-chart chemistry scores", "rows": rows}
+
+
+def _evidence_factor_table(engine_result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    positive = _evidence(engine_result, "positive_factors", 5)
+    caution = _evidence(engine_result, "caution_factors", 5)
+    if not positive and not caution:
+        return None
+    rows: List[Dict[str, Any]] = []
+    for item in positive:
+        rows.append({"Type": "Support", "Factor": item})
+    for item in caution:
+        rows.append({"Type": "Caution", "Factor": item})
+    return {"title": "Evidence factors behind the verdict", "rows": rows}
+
+
+def _nakshatra_nature_table(
+    premium_report: Dict[str, Any],
+    boy_name: str,
+    girl_name: str,
+    key: str,
+) -> Optional[Dict[str, Any]]:
+    evidence = premium_report.get("relationship_nakshatra") or {}
+    if not evidence:
+        return None
+    person_a = evidence.get("person_a") or {}
+    person_b = evidence.get("person_b") or {}
+    rows: List[Dict[str, Any]] = []
+
+    def add_row(label: str, role: str, row: Dict[str, Any]) -> None:
+        if not isinstance(row, dict) or not row.get("nakshatra"):
+            return
+        chars = [_clean(c) for c in _as_list(row.get("characteristics")) if _clean(c)][:3]
+        rows.append({
+            "Person": label,
+            "Point": role,
+            "Nakshatra": _clean(row.get("nakshatra"), "--"),
+            "Pada": _clean(row.get("pada"), "--"),
+            "Nature": _clean(row.get("nature") or row.get("pada_nature"), "--"),
+            "Traits": ", ".join(chars) if chars else "--",
+        })
+
+    if key == "nakshatra_moon_nature":
+        for label, block in ((boy_name, person_a), (girl_name, person_b)):
+            add_row(label, "Moon", block.get("moon") or {})
+    else:
+        for label, block in ((boy_name, person_a), (girl_name, person_b)):
+            add_row(label, "Venus", block.get("venus") or {})
+            add_row(label, "7th lord", block.get("seventh_lord") or {})
+    if not rows:
+        return None
+    title = "Moon nakshatra nature" if key == "nakshatra_moon_nature" else "Venus & 7th-lord nakshatra nature"
+    return {"title": title, "rows": rows}
+
+
+def _profile_strength_table(engine_result: Dict[str, Any], boy_name: str, girl_name: str, *, only: str | None = None) -> Optional[Dict[str, Any]]:
+    profiles = engine_result.get("profiles", {}) or {}
+    rows: List[Dict[str, Any]] = []
+    people = []
+    if only in (None, "boy"):
+        people.append((boy_name, "boy"))
+    if only in (None, "girl"):
+        people.append((girl_name, "girl"))
+    for label, key in people:
+        profile = profiles.get(key, {}) or {}
+        seventh = profile.get("seventh_house", {}) or {}
+        navamsa = profile.get("navamsa_synthesis", {}) or {}
+        rows.append({
+            "Person": label,
+            "D1 7th band": _clean((seventh.get("d1_strength") or {}).get("band") or (seventh.get("d1_strength") or {}).get("score"), "--"),
+            "D9 band": _clean((seventh.get("d9_strength") or {}).get("band") or (seventh.get("d9_strength") or {}).get("score"), "--"),
+            "Navamsa overall": _clean(navamsa.get("band") or navamsa.get("score"), "--"),
+            "Root vs fruit": _clean(navamsa.get("root_vs_fruit"), "--"),
+        })
+    if not rows:
+        return None
+    return {"title": "Marriage foundation score bands", "rows": rows}
+
+
 def _profile_notes(engine_result: Dict[str, Any], boy_name: str, girl_name: str, *, only: str | None = None, limit: int = 8) -> List[str]:
     notes: List[str] = []
     profiles = engine_result.get("profiles", {}) or {}
@@ -375,42 +672,121 @@ def assemble_partnership_pages(context: Dict[str, Any], premium_report: Dict[str
                 _metric("Confidence", _confidence_label(score, recommendation)),
                 _metric("Timing climate", _humanize_label((shared.get("current_window") or {}).get("climate"), "See timing")),
             ]
+            evidence_table = _evidence_factor_table(engine_result)
+            if evidence_table:
+                tables.append(evidence_table)
+            # Compact totals only here — full 8-koota breakdown lives on score_architecture.
+            tables.append(_ashtakoota_summary_table(ashtakoota))
         elif key == "score_architecture":
             tables = [{"title": "What each compatibility layer means", "rows": _layer_meaning_rows(score, cross, ashtakoota, shared)}]
+            # Single home for the full Ashtakoota breakdown + exceptions.
+            tables.extend(_ashtakoota_tables(ashtakoota, include_exceptions=True))
+            cross_table = _cross_chart_table(cross)
+            if cross_table:
+                tables.append(cross_table)
             if not notes:
                 notes = [
                     "Guna Milan is the traditional first filter. Nakshatra nature, Moon rhythm, Venus-Mars chemistry, D1/D9 marriage promise, dosha cancellations, and dasha timing each answer a different question about married life.",
                     "A strong or weak number on one layer does not cancel the rest. Use the chapters that follow to understand how the couple may actually live together.",
                 ]
         elif key in {"nakshatra_moon_nature", "nakshatra_venus_seventh_lord"}:
+            nak_table = _nakshatra_nature_table(premium_report, boy_name, girl_name, key)
+            if nak_table:
+                tables.append(nak_table)
             if not notes:
                 notes = _nakshatra_nature_notes(premium_report, boy_name, girl_name, key)
             if not bullets:
                 bullets = _section_bullets(section, 5) or list((sections.get(key) or {}).get("facts") or [])[:4]
-        elif key in {"moon_emotional_rhythm", "communication_mental_rapport", "physical_chemistry_biology"}:
+        elif key == "moon_emotional_rhythm":
+            subset = _koota_subset_table(ashtakoota, ("gana", "tara", "bhakoot"), "Moon-related Ashtakoota scores")
+            if subset:
+                tables.append(subset)
+            moon_cross = _cross_chart_table({"moon_element_match": cross.get("moon_element_match") or {}})
+            if moon_cross:
+                tables.append(moon_cross)
+            if not notes:
+                notes = _ashtakoota_meaning_notes(ashtakoota, 5)
+        elif key == "communication_mental_rapport":
+            subset = _koota_subset_table(ashtakoota, ("varna", "graha_maitri", "gana"), "Communication Ashtakoota scores")
+            if subset:
+                tables.append(subset)
+            if not notes:
+                notes = _ashtakoota_meaning_notes(ashtakoota, 5)
+        elif key == "physical_chemistry_biology":
+            subset = _koota_subset_table(ashtakoota, ("yoni", "nadi", "vashya"), "Chemistry & biology Ashtakoota scores")
+            if subset:
+                tables.append(subset)
+            chem = {}
+            if cross.get("venus_to_mars"):
+                chem["venus_to_mars"] = cross.get("venus_to_mars")
+            if cross.get("mars_to_venus"):
+                chem["mars_to_venus"] = cross.get("mars_to_venus")
+            chem_table = _cross_chart_table(chem)
+            if chem_table:
+                tables.append(chem_table)
             if not notes:
                 notes = _ashtakoota_meaning_notes(ashtakoota, 5)
         elif key == "dosha_demystification":
+            # Do not repeat the full 8-koota table — only exceptions + dosha board.
+            exc = _ashtakoota_exceptions_table(ashtakoota)
+            if exc:
+                tables.append(exc)
             if not notes:
                 notes = _ashtakoota_meaning_notes(ashtakoota, 6)
             manglik = ((engine_result.get("manglik") or {}).get("compatibility") or {})
             manglik_note = _clean(manglik.get("description"))
             if manglik_note and manglik_note not in notes:
                 notes.insert(0, manglik_note)
+            manglik_rows = []
+            if manglik:
+                manglik_rows.append({
+                    "Dosha": "Manglik compatibility",
+                    "Status": _clean(manglik.get("status"), "--"),
+                    "Score": _clean(manglik.get("score"), "--"),
+                    "Note": _short_interpretation(manglik.get("description"), 100),
+                })
+            for issue in _as_list(ashtakoota.get("effective_critical_issues") or ashtakoota.get("critical_issues"))[:5]:
+                manglik_rows.append({
+                    "Dosha": "Ashtakoota caution",
+                    "Status": "Active",
+                    "Score": "--",
+                    "Note": _clean(issue),
+                })
+            if manglik_rows:
+                tables.append({"title": "Dosha status board", "rows": manglik_rows})
         elif key in {"person_a_d1_marriage_foundation", "person_a_d9_navamsa"}:
+            strength = _profile_strength_table(engine_result, boy_name, girl_name, only="boy")
+            if strength:
+                tables.append(strength)
             if not notes:
                 notes = _profile_notes(engine_result, boy_name, girl_name, only="boy")
         elif key in {"person_b_d1_marriage_foundation", "person_b_d9_navamsa"}:
+            strength = _profile_strength_table(engine_result, boy_name, girl_name, only="girl")
+            if strength:
+                tables.append(strength)
             if not notes:
                 notes = _profile_notes(engine_result, boy_name, girl_name, only="girl")
         elif key == "navamsa_pair_durability":
+            strength = _profile_strength_table(engine_result, boy_name, girl_name)
+            if strength:
+                tables.append(strength)
             if not notes:
                 notes = _profile_notes(engine_result, boy_name, girl_name)
         elif key in {"jaimini_upapada_environment", "darapada_a7_manifestation", "kp_event_materialization", "d60_karmic_layer"}:
             if not notes:
                 notes = _branch_notes(summaries, boy_name, girl_name)
+        elif key == "progeny_family_expansion":
+            subset = _koota_subset_table(ashtakoota, ("nadi", "bhakoot", "yoni"), "Progeny-related Ashtakoota scores")
+            if subset:
+                tables.append(subset)
+            tables.append(_ashtakoota_summary_table(ashtakoota))
         elif key == "dasha_transit_timing":
-            tables = [{"title": "Timing windows", "rows": _window_rows(shared)}]
+            window_rows = _window_rows(shared)
+            tables = [{"title": "Timing windows", "rows": window_rows}] if window_rows else []
+            metrics = [
+                _metric("Joint readiness", f"{_clean(shared.get('joint_readiness_score'), '--')}%"),
+                _metric("Current climate", _humanize_label((shared.get("current_window") or {}).get("climate"), "See narrative")),
+            ]
         elif key == "action_plan_remedies":
             bullets = bullets or [*priority_actions[:6], "Use gemstones only after a personal consultation confirms suitability."]
             tables = [{"title": "Practical next steps", "rows": [
@@ -420,14 +796,38 @@ def assemble_partnership_pages(context: Dict[str, Any], premium_report: Dict[str
             ]}]
             if "Gemstone suggestions must remain conditional unless a dedicated gemstone safety check is performed." not in notes:
                 notes.append("Gemstone suggestions must remain conditional unless a dedicated gemstone safety check is performed.")
+        elif key in {
+            "wealth_financial_synergy",
+            "d2_kp_wealth_manifestation",
+            "career_public_life",
+            "beliefs_intellect_dharma",
+            "d7_parenting_legacy",
+        }:
+            evidence_table = _evidence_factor_table(engine_result)
+            if evidence_table:
+                tables.append(evidence_table)
+            subset = _koota_subset_table(
+                ashtakoota,
+                ("bhakoot", "nadi", "graha_maitri", "gana"),
+                "Related Ashtakoota scores",
+            )
+            if subset:
+                tables.append(subset)
 
         # Deduplicate notes that repeat the opening summary.
         notes = [item for item in notes if item and item != summary]
+        # Drop empty tables so PDF pages stay dense with real content only.
+        tables = [t for t in tables if (t.get("rows") or [])]
         if not bullets:
             bullets = [item for item in (
                 _section_text(section, "practical_guidance"),
                 _section_text(section, "decision_guidance"),
             ) if item and item != summary][:3]
+        if not any([bullets, notes, tables, metrics]) and key != "cover":
+            notes = [
+                summary or f"This chapter studies {subtitle.lower()} for {boy_name} and {girl_name}.",
+                f"Keep the detailed Ashtakoota {_clean(ashtakoota.get('effective_total_score'), '--')}/36 and the score-architecture chapter in view while reading this layer.",
+            ]
 
         pages.append(_page(
             blueprint["num"],

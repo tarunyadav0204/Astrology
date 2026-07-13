@@ -91,32 +91,24 @@ class KarmaContextBuilder:
         Returns:
             (deity_name, nature, description)
         """
-        print(f"\n🔮 DEITY CALCULATION")
-        print(f"Input: degree_in_sign={degree_in_sign:.4f}°, sign_number={sign_number}")
         
         # Calculate index (0-59) based on degree
         index = int(degree_in_sign * 2)  # Each deity rules 0.5 degrees
-        print(f"Raw index calculation: int({degree_in_sign:.4f} × 2) = {index}")
         
         if index > 59:
-            print(f"Index {index} > 59, capping to 59")
             index = 59
         
         # Check if sign is odd or even
         is_odd_sign = sign_number % 2 == 1
-        print(f"Sign {sign_number} is {'ODD' if is_odd_sign else 'EVEN'}")
         
         if is_odd_sign:
             # Odd signs: Direct indexing (1st deity = index 0)
-            print(f"Using DIRECT indexing: deity_index = {index}")
             deity = KarmaContextBuilder.SHASHTIAMSA_DEITIES[index]
         else:
             # Even signs: Reverse indexing (1st deity = index 59, last = index 0)
             reversed_index = 59 - index
-            print(f"Using REVERSE indexing: deity_index = 59 - {index} = {reversed_index}")
             deity = KarmaContextBuilder.SHASHTIAMSA_DEITIES[reversed_index]
         
-        print(f"Result: {deity[0]} ({deity[1]}) - {deity[2]}")
         return deity
 
     @staticmethod
@@ -246,42 +238,29 @@ class KarmaContextBuilder:
     
     def _analyze_d60_essence(self) -> Dict:
         """D60 Shashtiamsa - Soul's essence from past karma"""
-        print(f"\n{'='*80}")
-        print(f"🔮 D60 ESSENCE ANALYSIS - LAGNA DEITY")
-        print(f"{'='*80}")
         
         d60_data = self.divisional_charts.get('d60_shashtiamsa', {})
         
         if not d60_data:
-            print("❌ D60 chart not available")
             return {"available": False, "message": "D60 chart not calculated"}
         
         # CRITICAL: Use D1 ascendant degree, NOT D60 ascendant degree (per BPHS)
         d1_asc_full = self.chart_data.get('ascendant', 0)
-        print(f"D1 Ascendant (full longitude): {d1_asc_full:.4f}°")
         
         d1_asc_sign = int(d1_asc_full / 30)
         d1_asc_degree = d1_asc_full % 30
-        print(f"D1 Ascendant sign: {d1_asc_sign} (0=Aries)")
-        print(f"D1 Ascendant degree in sign: {d1_asc_degree:.4f}°")
         
         # For reference, also show D60 position
         d60_asc_full = d60_data.get('ascendant', 0)
-        print(f"\n[Reference] D60 Ascendant: {d60_asc_full:.4f}° ({(d60_asc_full % 30):.4f}° in sign)")
         
         deity_info = self.get_shashtiamsa_deity_info(d1_asc_degree, d1_asc_sign + 1)
         deity_idx = deity_info["applied_index"]
         deity_name = deity_info["deity"]
         nature = deity_info["nature"]
         theme = deity_info["theme"]
-        print(f"\nDeity index calculation: raw={deity_info['raw_index']}, applied={deity_idx} ({deity_info['direction']})")
-        print(f"\n✅ LAGNA DEITY: {deity_name}")
-        print(f"   Nature: {nature}")
-        print(f"   Theme: {theme}")
         
         # Get deity benefic/malefic classification
         deity_classification = nature
-        print(f"   Classification: {deity_classification}")
         
         result = {
             "lagna_deity": deity_name,
@@ -297,19 +276,14 @@ class KarmaContextBuilder:
         }
         
         # Add Atmakaraka in D60 with nakshatra
-        print(f"\n{'='*80}")
-        print(f"🔮 D60 ESSENCE ANALYSIS - ATMAKARAKA DEITY")
-        print(f"{'='*80}")
         
         ak_data = self.chara_karaka_calc.get_atmakaraka()
         if ak_data:
             ak_planet = ak_data['planet']
-            print(f"Atmakaraka planet: {ak_planet}")
             
             if d60_data.get('planets'):
                 ak_d60 = d60_data['planets'].get(ak_planet, {})
                 ak_longitude = ak_d60.get('longitude', 0)
-                print(f"AK D60 longitude: {ak_longitude:.4f}°")
                 
                 if ak_longitude > 0:
                     # CRITICAL: Use D1 degree of AK, NOT D60 degree (per BPHS)
@@ -318,23 +292,14 @@ class KarmaContextBuilder:
                     ak_d1_sign = int(ak_d1_longitude / 30)
                     ak_d1_degree = ak_d1_longitude % 30
                     
-                    print(f"AK D1 longitude: {ak_d1_longitude:.4f}°")
-                    print(f"AK D1 sign: {ak_d1_sign} (0=Aries)")
-                    print(f"AK D1 degree in sign: {ak_d1_degree:.4f}°")
-                    print(f"\n[Reference] AK D60 longitude: {ak_longitude:.4f}° ({(ak_longitude % 30):.4f}° in sign)")
                     
                     ak_deity_info = self.get_shashtiamsa_deity_info(ak_d1_degree, ak_d1_sign + 1)
                     ak_deity_idx = ak_deity_info["applied_index"]
                     ak_deity_name = ak_deity_info["deity"]
                     ak_nature = ak_deity_info["nature"]
                     ak_theme = ak_deity_info["theme"]
-                    print(f"\nAK Deity index: raw={ak_deity_info['raw_index']}, applied={ak_deity_idx} ({ak_deity_info['direction']})")
-                    print(f"\n✅ ATMAKARAKA DEITY: {ak_deity_name}")
-                    print(f"   Nature: {ak_nature}")
-                    print(f"   Theme: {ak_theme}")
                     
                     ak_classification = ak_nature
-                    print(f"   Classification: {ak_classification}")
                     
                     # Calculate nakshatra from longitude
                     nakshatra_span = 360 / 27
@@ -345,7 +310,6 @@ class KarmaContextBuilder:
                                  'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha',
                                  'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati']
                     ak_d60_nakshatra = nakshatras[min(nakshatra_index, 26)]
-                    print(f"   D60 Nakshatra: {ak_d60_nakshatra}")
                     
                     result["atmakaraka_deity"] = ak_deity_name
                     result["atmakaraka_nature"] = ak_nature
@@ -359,17 +323,6 @@ class KarmaContextBuilder:
                     
                     karmic_balance = self._calculate_karmic_balance(deity_classification, ak_classification)
                     result["karmic_balance"] = karmic_balance
-                    print(f"\n📊 KARMIC BALANCE:")
-                    print(f"   Score: {karmic_balance.get('score')}")
-                    print(f"   Verdict: {karmic_balance.get('verdict')}")
-                else:
-                    print(f"⚠️ AK longitude is 0, skipping deity calculation")
-            else:
-                print(f"⚠️ No planets data in D60 chart")
-        else:
-            print(f"⚠️ No Atmakaraka data available")
-        
-        print(f"{'='*80}\n")
         
         return result
     
@@ -393,7 +346,6 @@ class KarmaContextBuilder:
         
         # Ganda Moola (Gandanta) calculation - CORRECTED
         # Only specific degrees at Fire-Water junctions, not entire nakshatras
-        print(f"\n🔮 GANDA MOOLA (GANDANTA) CHECK")
         
         # Get Moon longitude
         moon_data = self.chart_data.get('planets', {}).get('Moon', {})
@@ -401,30 +353,21 @@ class KarmaContextBuilder:
         moon_sign = int(moon_longitude / 30)
         moon_degree_in_sign = moon_longitude % 30
         
-        print(f"Moon: {moon_nakshatra} at {moon_sign} sign, {moon_degree_in_sign:.2f}° in sign")
         
         # Check Moon for Gandanta (last 3°20' or first 3°20' of junction nakshatras)
         moon_ganda = False
         if moon_nakshatra == 'Ashlesha' and moon_degree_in_sign >= 26.666667:  # Cancer 26°40' - 30°
             moon_ganda = True
-            print(f"✓ Moon in Gandanta: Last 3°20' of Ashlesha (Cancer-Leo junction)")
         elif moon_nakshatra == 'Magha' and moon_degree_in_sign <= 3.333333:  # Leo 0° - 3°20'
             moon_ganda = True
-            print(f"✓ Moon in Gandanta: First 3°20' of Magha (Cancer-Leo junction)")
         elif moon_nakshatra == 'Jyeshtha' and moon_degree_in_sign >= 26.666667:  # Scorpio 26°40' - 30°
             moon_ganda = True
-            print(f"✓ Moon in Gandanta: Last 3°20' of Jyeshtha (Scorpio-Sagittarius junction)")
         elif moon_nakshatra == 'Mula' and moon_degree_in_sign <= 3.333333:  # Sagittarius 0° - 3°20'
             moon_ganda = True
-            print(f"✓ Moon in Gandanta: First 3°20' of Mula (Scorpio-Sagittarius junction)")
         elif moon_nakshatra == 'Revati' and moon_degree_in_sign >= 26.666667:  # Pisces 26°40' - 30°
             moon_ganda = True
-            print(f"✓ Moon in Gandanta: Last 3°20' of Revati (Pisces-Aries junction)")
         elif moon_nakshatra == 'Ashwini' and moon_degree_in_sign <= 3.333333:  # Aries 0° - 3°20'
             moon_ganda = True
-            print(f"✓ Moon in Gandanta: First 3°20' of Ashwini (Pisces-Aries junction)")
-        else:
-            print(f"✗ Moon NOT in Gandanta")
         
         # Get Lagna longitude
         lagna_longitude = self.chart_data.get('ascendant', 0)
@@ -434,32 +377,21 @@ class KarmaContextBuilder:
         lagna_nak_info = self.nakshatra_calc.get_ascendant_nakshatra()
         lagna_nakshatra = lagna_nak_info.get('name')
         
-        print(f"Lagna: {lagna_nakshatra} at {lagna_sign} sign, {lagna_degree_in_sign:.2f}° in sign")
         
         # Check Lagna for Gandanta
         lagna_ganda = False
         if lagna_nakshatra == 'Ashlesha' and lagna_degree_in_sign >= 26.666667:
             lagna_ganda = True
-            print(f"✓ Lagna in Gandanta: Last 3°20' of Ashlesha (Cancer-Leo junction)")
         elif lagna_nakshatra == 'Magha' and lagna_degree_in_sign <= 3.333333:
             lagna_ganda = True
-            print(f"✓ Lagna in Gandanta: First 3°20' of Magha (Cancer-Leo junction)")
         elif lagna_nakshatra == 'Jyeshtha' and lagna_degree_in_sign >= 26.666667:
             lagna_ganda = True
-            print(f"✓ Lagna in Gandanta: Last 3°20' of Jyeshtha (Scorpio-Sagittarius junction)")
         elif lagna_nakshatra == 'Mula' and lagna_degree_in_sign <= 3.333333:
             lagna_ganda = True
-            print(f"✓ Lagna in Gandanta: First 3°20' of Mula (Scorpio-Sagittarius junction)")
         elif lagna_nakshatra == 'Revati' and lagna_degree_in_sign >= 26.666667:
             lagna_ganda = True
-            print(f"✓ Lagna in Gandanta: Last 3°20' of Revati (Pisces-Aries junction)")
         elif lagna_nakshatra == 'Ashwini' and lagna_degree_in_sign <= 3.333333:
             lagna_ganda = True
-            print(f"✓ Lagna in Gandanta: First 3°20' of Ashwini (Pisces-Aries junction)")
-        else:
-            print(f"✗ Lagna NOT in Gandanta")
-        
-        print(f"\n🎯 FINAL RESULT: Has Ganda Moola Dosha = {moon_ganda or lagna_ganda}\n")
         
         return {
             "atmakaraka_nakshatra": ak_nakshatra,
@@ -833,12 +765,6 @@ class KarmaContextBuilder:
             "significance": "5th house shows what you earned through past dharmic actions"
         }
         
-        print("\n=== 5TH HOUSE ANALYSIS (Poorva Punya) ===")
-        print(f"Planets: {result['planets']}")
-        print(f"Lord: {result['lord']}")
-        print(f"Past Life Merit: {result['past_life_merit']}")
-        print(f"This Life Blessings: {result['this_life_blessings']}")
-        print(f"Significance: {result['significance']}")
         
         return result
     
@@ -863,12 +789,6 @@ class KarmaContextBuilder:
             "significance": "8th house shows unavoidable karmic events - transformation you cannot escape"
         }
         
-        print("\n=== 8TH HOUSE ANALYSIS (Prarabdha) ===")
-        print(f"Planets: {result['planets']}")
-        print(f"Lord: {result['lord']}")
-        print(f"Karmic Debt: {result['karmic_debt']}")
-        print(f"Occult Potential: {result['occult_potential']}")
-        print(f"Significance: {result['significance']}")
         
         return result
     
@@ -896,12 +816,6 @@ class KarmaContextBuilder:
             "significance": "9th house shows blessings from past life dharma and righteousness"
         }
         
-        print("\n=== 9TH HOUSE ANALYSIS (Bhagya) ===")
-        print(f"Planets: {result['planets']}")
-        print(f"Lord: {result['lord']}")
-        print(f"Past Dharma: {result['past_dharma']}")
-        print(f"This Life Luck: {result['this_life_luck']}")
-        print(f"Significance: {result['significance']}")
         
         return result
     

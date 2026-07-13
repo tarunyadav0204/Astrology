@@ -413,6 +413,9 @@ class CreditService:
                 except Exception:
                     pass
 
+            # Credit packs sold via Google Play + Razorpay (admin can toggle is_active)
+            self._ensure_credit_product_catalog(conn)
+
             # Insert default credit costs
             defaults = [
                 ("chat_question_cost", 1, "Credits per chat question"),
@@ -3150,6 +3153,158 @@ class CreditService:
             conn.commit()
             return success
     
+    # Known one-time credit packs (must stay aligned with Play SKUs credits_N + Razorpay prices).
+    DEFAULT_CREDIT_PACKS: List[tuple] = [
+        (24, 1),
+        (50, 2),
+        (100, 3),
+        (250, 4),
+        (500, 5),
+        (999, 6),
+    ]
+
+    def _ensure_credit_product_catalog(self, conn=None) -> None:
+        """Create and seed credit_product_catalog if needed (idempotent)."""
+        from db import get_conn, execute
+
+        def _run(active_conn) -> None:
+            execute(
+                active_conn,
+                """
+                CREATE TABLE IF NOT EXISTS credit_product_catalog (
+                    product_id TEXT PRIMARY KEY,
+                    credits INTEGER NOT NULL UNIQUE,
+                    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+            )
+            for credits, sort_order in self.DEFAULT_CREDIT_PACKS:
+                product_id = f"credits_{credits}"
+                execute(
+                    active_conn,
+                    """
+                    INSERT INTO credit_product_catalog (product_id, credits, is_active, sort_order)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT (product_id) DO NOTHING
+                    """,
+                    (product_id, credits, True, sort_order),
+                )
+
+        if conn is not None:
+            _run(conn)
+            return
+
+        with get_conn() as owned:
+            _run(owned)
+            owned.commit()
+
+    def list_credit_products(self, *, active_only: bool = False) -> List[Dict[str, Any]]:
+        """List credit packs for admin/catalog. Creates table + seeds on first use."""
+        from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
+
+        self._ensure_credit_product_catalog()
+        with get_conn() as conn:
+            if active_only:
+                # Reuse the same boolean/int compatibility expression as subscription_plans.
+                cur = execute(
+                    conn,
+                    f"""
+                    SELECT product_id, credits, is_active, sort_order, updated_at
+                    FROM credit_product_catalog
+                    WHERE {SQL_SUBSCRIPTION_PLAN_ACTIVE}
+                    ORDER BY sort_order ASC, credits ASC
+                    """,
+                )
+            else:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT product_id, credits, is_active, sort_order, updated_at
+                    FROM credit_product_catalog
+                    ORDER BY sort_order ASC, credits ASC
+                    """,
+                )
+            rows = cur.fetchall() or []
+
+            # Table may exist empty (migration created it without seed). Re-seed once.
+            if not rows and not active_only:
+                self._ensure_credit_product_catalog(conn)
+                conn.commit()
+                cur = execute(
+                    conn,
+                    """
+                    SELECT product_id, credits, is_active, sort_order, updated_at
+                    FROM credit_product_catalog
+                    ORDER BY sort_order ASC, credits ASC
+                    """,
+                )
+                rows = cur.fetchall() or []
+
+        def _truthy(v: Any) -> bool:
+            if v is True or v == 1:
+                return True
+            if v is False or v == 0 or v is None:
+                return False
+            return str(v).strip().lower() in {"t", "true", "1", "yes"}
+
+        products: List[Dict[str, Any]] = []
+        for row in rows:
+            products.append({
+                "product_id": row[0],
+                "credits": int(row[1]),
+                "is_active": _truthy(row[2]),
+                "sort_order": int(row[3] or 0),
+                "updated_at": row[4],
+            })
+        return products
+
+    def list_active_credit_amounts(self) -> List[int]:
+        return [int(p["credits"]) for p in self.list_credit_products(active_only=True)]
+
+    def list_active_credit_product_ids(self) -> set:
+        return {str(p["product_id"]) for p in self.list_credit_products(active_only=True)}
+
+    def is_credit_pack_sellable(self, credits: Optional[int] = None, product_id: Optional[str] = None) -> bool:
+        """True when the pack exists and is_active (shown for Google Play + Razorpay)."""
+        pid = (product_id or "").strip()
+        if not pid and credits is not None:
+            try:
+                pid = f"credits_{int(credits)}"
+            except (TypeError, ValueError):
+                return False
+        if not pid:
+            return False
+        active_ids = self.list_active_credit_product_ids()
+        return pid in active_ids
+
+    def set_credit_product_active(self, product_id: str, is_active: bool) -> Optional[Dict[str, Any]]:
+        """Enable/disable a credit pack for both Play catalog and Razorpay. Returns updated row or None."""
+        from db import get_conn, execute
+
+        pid = (product_id or "").strip()
+        if not pid:
+            return None
+        self._ensure_credit_product_catalog()
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                UPDATE credit_product_catalog
+                SET is_active = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE product_id = ?
+                """,
+                (bool(is_active), pid),
+            )
+            if (cur.rowcount or 0) == 0:
+                return None
+            conn.commit()
+        for product in self.list_credit_products(active_only=False):
+            if product["product_id"] == pid:
+                return product
+        return None
+
     def get_all_credit_settings(self) -> List[Dict]:
         """Get all credit settings (value = original cost, discount = discounted cost when set)."""
         from db import get_conn, execute
