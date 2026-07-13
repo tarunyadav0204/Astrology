@@ -509,6 +509,32 @@ def is_instant_chat_enabled() -> bool:
     return _parse_bool_setting(get_setting("instant_chat_enabled"), default=False)
 
 
+DEFAULT_STANDARD_CHAT_COUNTDOWN_SECONDS = 110
+DEFAULT_PREMIUM_CHAT_COUNTDOWN_SECONDS = 210
+
+
+def _safe_countdown_seconds(value: Optional[str], fallback: int) -> int:
+    try:
+        parsed = int(str(value).strip())
+        return parsed if parsed > 0 else fallback
+    except Exception:
+        return fallback
+
+
+def get_chat_countdown_seconds(chat_tier: Optional[str] = "standard") -> int:
+    """Admin UI countdown for the chat loader (standard vs premium). Instant uses standard."""
+    tier = (chat_tier or "standard").strip().lower()
+    if tier == "premium":
+        return _safe_countdown_seconds(
+            get_setting("chat_countdown_premium_seconds"),
+            DEFAULT_PREMIUM_CHAT_COUNTDOWN_SECONDS,
+        )
+    return _safe_countdown_seconds(
+        get_setting("chat_countdown_standard_seconds"),
+        DEFAULT_STANDARD_CHAT_COUNTDOWN_SECONDS,
+    )
+
+
 def is_chat_subject_gate_enabled() -> bool:
     """Global feature flag for the pre-question subject/profile gate."""
     return _parse_bool_setting(get_setting("chat_subject_gate_enabled"), default=False)

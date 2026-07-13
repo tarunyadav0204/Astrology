@@ -17,7 +17,6 @@ from charts.house_insight_service import build_chart_preview_insights
 
 logger = logging.getLogger(__name__)
 _CHAT_SCHEMA_FLAGS: set[str] = set()
-CHAT_PROCESSING_EXPECTED_WAIT_SECONDS = 8 * 60
 
 
 def _schema_already_ready(flag: str) -> bool:
@@ -1443,6 +1442,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     from utils.admin_settings import (
         chat_worker_mode_enabled_for_user,
         chat_subject_gate_enabled_for_user,
+        get_chat_countdown_seconds,
         instant_chat_enabled_for_user,
         speech_chat_enabled_for_user,
     )
@@ -1877,7 +1877,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                     "status": "processing",
                     "message_type": "answer",
                     "chat_tier": effective_chat_tier,
-                    "expectedWaitSeconds": CHAT_PROCESSING_EXPECTED_WAIT_SECONDS,
+                    "expectedWaitSeconds": get_chat_countdown_seconds(effective_chat_tier),
                     "chart_insights": [],
                     "loading_messages": [],
                 }
@@ -2145,7 +2145,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         "status": "processing",
         "message": "Analyzing your chart...",
         "chat_tier": effective_chat_tier,
-        "expectedWaitSeconds": CHAT_PROCESSING_EXPECTED_WAIT_SECONDS,
+        "expectedWaitSeconds": get_chat_countdown_seconds(effective_chat_tier),
         "chart_insights": chart_insights,
     }
 
