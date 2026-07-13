@@ -255,6 +255,29 @@ Use this exact structure for the final user-facing answer:
 """
 
 
+def free_question_elaborate_instruction() -> str:
+    return """
+CRITICAL - FREE QUESTION DEPTH (PARASHARI-ONLY):
+Write a complete Parashari answer using only evidence in SPECIALIST_BRANCH_OUTPUTS_JSON.
+Do NOT invent KP, Nadi, Jaimini, Nakshatra-branch, Ashtakavarga, or Sudarshana sections or claims.
+Follow the Parashari-only response format below. Prefer clarity over multi-school synthesis.
+"""
+
+
+def scoped_lane_response_format(
+    *,
+    free_question_parashari_only: bool,
+    remedy_followup_requested: bool,
+    default_format: str,
+) -> str:
+    """Pick final response schema for single-lane finals (free Parashari / remedy)."""
+    if remedy_followup_requested:
+        return build_remedy_only_response_format()
+    if free_question_parashari_only:
+        return build_parashari_only_response_format()
+    return default_format
+
+
 def build_remedy_only_response_format() -> str:
     return """
 ### RESPONSE FORMAT (REMEDY-ONLY, MANDATORY)

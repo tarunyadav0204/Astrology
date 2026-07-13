@@ -81,7 +81,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     downloadTitle: isIosStudyMode ? 'Download Study PDF' : 'Download PDF',
     downloadBody: isIosStudyMode
       ? `Generate ${displayTitle} study for ${birthData?.name || 'this chart'}?`
-      : `Generate ${title} report for ${birthData.name}?`,
+      : `Generate ${title} report for ${birthData?.name || 'this chart'}?`,
     generateButton: isIosStudyMode ? 'Generate Study' : 'Generate',
     missingChildren: isIosStudyMode
       ? 'Please choose how many children you currently have.'

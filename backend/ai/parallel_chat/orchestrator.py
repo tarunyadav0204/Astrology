@@ -232,6 +232,8 @@ from ai.parallel_chat.prompt_blocks import (
     build_sudarshan_branch_static,
     build_sudarshan_branch_static_agent,
     build_remedy_only_response_format,
+    free_question_elaborate_instruction,
+    scoped_lane_response_format,
 )
 from ai.response_parser import ResponseParser
 from ai.term_matcher import find_terms_in_text
@@ -1039,8 +1041,15 @@ async def run_parallel_chat_pipeline(
         ) = _merge_instruction_blocks(
             user_question, ctx, language, response_style, user_context, premium_analysis, mode
         )
-        if remedy_followup_requested:
-            response_format_instruction = build_remedy_only_response_format()
+        # Free questions only run the Parashari branch — replace the full multi-school
+        # schema (KP/Nadi/Jaimini/Ashtakavarga) so the model cannot invent those sections.
+        response_format_instruction = scoped_lane_response_format(
+            free_question_parashari_only=free_question_parashari_only,
+            remedy_followup_requested=remedy_followup_requested,
+            default_format=response_format_instruction,
+        )
+        if free_question_parashari_only and not remedy_followup_requested:
+            elaborate_instruction = free_question_elaborate_instruction()
         current_date = datetime.now()
         ascendant_info = ctx.get("ascendant_info", {})
         ascendant_summary = (
@@ -1129,7 +1138,8 @@ async def run_parallel_chat_pipeline(
                 "enabled": False,
                 "selected_branches": ["parashari"],
                 "planner": None,
-                "free_question_parashari_only": True,
+                "free_question_parashari_only": bool(free_question_parashari_only),
+                "remedy_followup": bool(remedy_followup_requested),
             },
             "specialist_branch_outputs": parashari_branch_bundle,
         }

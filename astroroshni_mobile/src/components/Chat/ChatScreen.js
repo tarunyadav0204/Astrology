@@ -19,6 +19,7 @@ import {
   StatusBar,
   Linking,
   ActivityIndicator,
+  FlatList,
 } from 'react-native';
 import { ScrollView as GHScrollView, FlatList as GHFlatList } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -959,20 +960,16 @@ export default function ChatScreen({ navigation, route }) {
 
   const scrollToBottomReliably = (animated = true) => {
     stickMessagesToBottomRef.current = true;
-    const run = () => scrollViewRef.current?.scrollToEnd({ animated });
-    run();
     clearInstantScrollRetries();
-    // Avoid stacking multiple animated scrollToEnd calls — that looks like bounce.
-    if (!animated) {
-      instantScrollRetryRef.current = [
-        setTimeout(run, 40),
-        setTimeout(run, 120),
-      ];
-      return;
+    // One scroll only — stacked scrollToEnd retries fight tall cells and look like bounce.
+    const run = () => {
+      if (!stickMessagesToBottomRef.current) return;
+      scrollViewRef.current?.scrollToEnd({ animated: false });
+    };
+    run();
+    if (animated) {
+      instantScrollRetryRef.current = [setTimeout(run, 80)];
     }
-    instantScrollRetryRef.current = [
-      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 120),
-    ];
   };
 
   const maybeScrollMessagesToEnd = (animated = false) => {
@@ -3503,6 +3500,10 @@ export default function ChatScreen({ navigation, route }) {
             setLoading(false);
             setIsTyping(false);
             removePendingMessage(messageId);
+            // Stop auto-follow so post-answer UI (feedback, banners) does not yank scroll while reading.
+            if (!isInstantTierResponse) {
+              stickMessagesToBottomRef.current = false;
+            }
             const gatedNoCharge = status.message_type === 'native_gate' || status.message_type === 'clarification';
             if (!gatedNoCharge) {
               fetchBalance();
@@ -4891,18 +4892,22 @@ export default function ChatScreen({ navigation, route }) {
     const h = Number(e?.nativeEvent?.layoutMeasurement?.height || 0);
     const ch = Number(e?.nativeEvent?.contentSize?.height || 0);
     if (h > 0 && ch > 0) {
-      // Leave auto-follow only when the user scrolls meaningfully away from the bottom.
-      stickMessagesToBottomRef.current = y + h >= ch - 120;
+      // Tight threshold: reading mid/lower parts of a long last answer must not keep auto-follow on.
+      stickMessagesToBottomRef.current = y + h >= ch - 48;
     }
     if (!ratingPromptStateLoaded) return;
     if (ratingPromptVisible) return;
     if (ratingPromptState.completed || ratingPromptState.neverAskAgain) return;
     if (h <= 0 || ch <= 0) return;
-    const nearBottom = y + h >= ch - 120;
+    const nearBottom = y + h >= ch - 48;
     if (!nearBottom) return;
     const messageId = ratingEligibleMessageId;
     if (!messageId) return;
     triggerRatingPrompt(messageId, 'answer_scroll_bottom');
+  };
+
+  const handleMessagesScrollBeginDrag = () => {
+    stickMessagesToBottomRef.current = false;
   };
 
   const showOlderMessages = () => {
@@ -5163,7 +5168,7 @@ export default function ChatScreen({ navigation, route }) {
               </View>
             </View>
           )}
-          <GHFlatList
+          <FlatList
             ref={scrollViewRef}
             style={styles.messagesContainer}
             contentContainerStyle={styles.messagesContent}
@@ -5177,11 +5182,14 @@ export default function ChatScreen({ navigation, route }) {
             }}
             showsVerticalScrollIndicator={false}
             onScroll={handleMessagesScroll}
+            onScrollBeginDrag={handleMessagesScrollBeginDrag}
             scrollEventThrottle={16}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="none"
             // Tall completed answers remount/jump with clipped subviews (seen as mid-answer bounce).
             removeClippedSubviews={false}
+            // Short threads with one long answer: virtualization remounts the tall cell and jitters scroll.
+            disableVirtualization={visibleMessages.length <= 6}
             bounces={false}
             overScrollMode="never"
             initialNumToRender={12}

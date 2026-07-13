@@ -68,25 +68,27 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
   const { theme, colors } = useTheme();
   const [feedback, setFeedback] = useState({ rating: 0, comment: '', submitted: false });
   const [visible, setVisible] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const eligible =
+    message.role === 'assistant' &&
+    !message.isTyping &&
+    Boolean(message.messageId) &&
+    message.message_type === 'answer';
 
   useEffect(() => {
     // Show feedback only for 'answer' type messages from assistant
-    if (message.role === 'assistant' && 
-        !message.isTyping && 
-        message.messageId && 
-        message.message_type === 'answer') {
-      const timer = setTimeout(() => {
-        setVisible(true);
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }).start();
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [message.isTyping, message.message_type]);
+    if (!eligible || dismissed) return undefined;
+    const timer = setTimeout(() => {
+      setVisible(true);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [eligible, dismissed, fadeAnim]);
 
   const submitFeedback = async () => {
     try {
@@ -107,6 +109,7 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
           useNativeDriver: true,
         }).start(() => {
           setVisible(false);
+          setDismissed(true);
         });
       }, feedback.rating >= 4 ? 12000 : 2200);
     } catch (error) {
@@ -127,17 +130,27 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
       useNativeDriver: true,
     }).start(() => {
       setVisible(false);
+      setDismissed(true);
     });
   };
 
-  if (!visible) return null;
+  // Reserve space as soon as the answer is shown so the delayed reveal does not
+  // grow the FlatList row mid-read (that shifts scroll through long answers).
+  if (!eligible || dismissed) return null;
 
   return (
-    <Animated.View style={[styles.container, { 
-      opacity: fadeAnim,
-      backgroundColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.05)' : 'rgba(249, 115, 22, 0.1)',
-      borderColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.2)' : 'rgba(249, 115, 22, 0.3)'
-    }]}>
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          opacity: visible ? fadeAnim : 0,
+          minHeight: 72,
+          backgroundColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.05)' : 'rgba(249, 115, 22, 0.1)',
+          borderColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.2)' : 'rgba(249, 115, 22, 0.3)',
+        },
+      ]}
+      pointerEvents={visible ? 'auto' : 'none'}
+    >
       {feedback.submitted ? (
         <>
           <Text style={[styles.thanksText, { color: colors.primary }]}>Thanks for your feedback! 🙏</Text>

@@ -57,8 +57,13 @@ function MessageBubble({
   const { theme } = useTheme();
   const { podcastCost, credits } = useCredits();
   const navigation = useNavigation();
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
+  // Init from the played-ids set so FlatList remounts do not flash translateY:50 for one frame
+  // (that looked like the long answer bouncing between sections while reading).
+  const entryIdForAnim = String(message?.messageId || message?.id || message?.clientRequestId || '');
+  const entryAlreadyPlayed =
+    Boolean(entryIdForAnim) && messageBubbleEntryPlayedIds.has(entryIdForAnim);
+  const fadeAnim = useRef(new Animated.Value(entryAlreadyPlayed ? 1 : 0)).current;
+  const slideAnim = useRef(new Animated.Value(entryAlreadyPlayed ? 0 : 50)).current;
   const isPartnership = partnership || message.partnership_mode;
   const messageChatTier = String(message?.chatTier || message?.chat_tier || '').trim().toLowerCase();
   const isInstantChatMessage = messageChatTier === 'instant';
