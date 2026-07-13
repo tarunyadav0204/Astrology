@@ -4939,6 +4939,20 @@ async def get_all_daily_horoscopes(date: Optional[str] = None, period: str = "da
         raise HTTPException(status_code=500, detail=str(e))
 
 # Admin endpoints
+def _admin_users_signup_client_condition(signup_client: Optional[str]):
+    """Return (sql_fragment, params) for signup_client filter, or (None, []) if unused."""
+    if signup_client is None or not str(signup_client).strip():
+        return None, []
+    val = str(signup_client).strip().lower()
+    if val in ("all", "*"):
+        return None, []
+    if val in ("unknown", "none", "null", ""):
+        return "COALESCE(NULLIF(TRIM(u.signup_client), ''), '') = ''", []
+    if val in ("web", "mobile", "whatsapp"):
+        return "LOWER(COALESCE(u.signup_client, '')) = ?", [val]
+    return "LOWER(COALESCE(u.signup_client, '')) = ?", [val]
+
+
 @app.get("/api/admin/users")
 async def get_admin_users(
     current_user: User = Depends(get_current_user),
@@ -4946,6 +4960,10 @@ async def get_admin_users(
     name: Optional[str] = Query(None, description="Filter by name (partial match)"),
     role: Optional[str] = Query(None, description="Filter by role (user/admin)"),
     subscription: Optional[str] = Query(None, description="Filter by plan name, or 'none' for no subscription"),
+    signup_client: Optional[str] = Query(
+        None,
+        description="Filter by signup channel: web, mobile, whatsapp, or unknown",
+    ),
     created_from: Optional[str] = Query(None, description="Created on or after (YYYY-MM-DD)"),
     created_to: Optional[str] = Query(None, description="Created on or before (YYYY-MM-DD)"),
     page: int = Query(1, ge=1, description="Page number"),
@@ -4970,6 +4988,10 @@ async def get_admin_users(
         if role and role.strip():
             conditions.append("u.role = ?")
             params.append(role.strip())
+        sc_sql, sc_params = _admin_users_signup_client_condition(signup_client)
+        if sc_sql:
+            conditions.append(sc_sql)
+            params.extend(sc_params)
         if created_from and created_from.strip():
             conditions.append("DATE(u.created_at) >= ?")
             params.append(created_from.strip())
@@ -5103,6 +5125,12 @@ async def get_admin_users_summary(
     name: Optional[str] = Query(None, description="Filter by name/email (partial match)"),
     role: Optional[str] = Query(None, description="Filter by role (user/admin)"),
     subscription: Optional[str] = Query(None, description="Filter by plan name, or 'none' for no subscription"),
+    signup_client: Optional[str] = Query(
+        None,
+        description="Filter by signup channel: web, mobile, whatsapp, or unknown",
+    ),
+    created_from: Optional[str] = Query(None, description="Created on or after (YYYY-MM-DD)"),
+    created_to: Optional[str] = Query(None, description="Created on or before (YYYY-MM-DD)"),
 ):
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -5121,6 +5149,16 @@ async def get_admin_users_summary(
         if role and role.strip():
             conditions.append("u.role = ?")
             params.append(role.strip())
+        sc_sql, sc_params = _admin_users_signup_client_condition(signup_client)
+        if sc_sql:
+            conditions.append(sc_sql)
+            params.extend(sc_params)
+        if created_from and created_from.strip():
+            conditions.append("DATE(u.created_at) >= ?")
+            params.append(created_from.strip())
+        if created_to and created_to.strip():
+            conditions.append("DATE(u.created_at) <= ?")
+            params.append(created_to.strip())
 
         if subscription is not None and subscription.strip():
             sub_val = subscription.strip()
@@ -5142,17 +5180,24 @@ async def get_admin_users_summary(
         where_sql = " AND ".join(conditions) if conditions else "1=1"
 
         # Single scan: totals + "created today" slice (half the work vs two full queries).
+        # Channel counts always reflect the current filter set (signup / dates / etc.).
         summary_sql = f"""
             SELECT
                 COUNT(*)::bigint AS users_count,
                 SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'mobile' THEN 1 ELSE 0 END)::bigint AS mobile_users_count,
                 SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'web' THEN 1 ELSE 0 END)::bigint AS web_users_count,
+                SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'whatsapp' THEN 1 ELSE 0 END)::bigint AS whatsapp_users_count,
+                SUM(CASE WHEN COALESCE(NULLIF(TRIM(u.signup_client), ''), '') = '' THEN 1 ELSE 0 END)::bigint AS unknown_signup_count,
                 SUM(CASE WHEN dt.userid IS NOT NULL THEN 1 ELSE 0 END)::bigint AS push_enabled_count,
                 COUNT(*) FILTER (WHERE DATE(u.created_at) = CURRENT_DATE)::bigint AS today_users_count,
                 SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'mobile' THEN 1 ELSE 0 END)
                     FILTER (WHERE DATE(u.created_at) = CURRENT_DATE)::bigint AS today_mobile_users_count,
                 SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'web' THEN 1 ELSE 0 END)
                     FILTER (WHERE DATE(u.created_at) = CURRENT_DATE)::bigint AS today_web_users_count,
+                SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'whatsapp' THEN 1 ELSE 0 END)
+                    FILTER (WHERE DATE(u.created_at) = CURRENT_DATE)::bigint AS today_whatsapp_users_count,
+                SUM(CASE WHEN COALESCE(NULLIF(TRIM(u.signup_client), ''), '') = '' THEN 1 ELSE 0 END)
+                    FILTER (WHERE DATE(u.created_at) = CURRENT_DATE)::bigint AS today_unknown_signup_count,
                 SUM(CASE WHEN dt.userid IS NOT NULL THEN 1 ELSE 0 END)
                     FILTER (WHERE DATE(u.created_at) = CURRENT_DATE)::bigint AS today_push_enabled_count
             FROM users u
@@ -5163,19 +5208,21 @@ async def get_admin_users_summary(
         """
 
         cur = execute(conn, summary_sql, params)
-        row = cur.fetchone() or [0, 0, 0, 0, 0, 0, 0, 0]
+        row = cur.fetchone() or [0] * 12
 
         def _to_block(start):
             return {
                 "users_count": int(row[start] or 0),
                 "mobile_users_count": int(row[start + 1] or 0),
                 "web_users_count": int(row[start + 2] or 0),
-                "push_enabled_count": int(row[start + 3] or 0),
+                "whatsapp_users_count": int(row[start + 3] or 0),
+                "unknown_signup_count": int(row[start + 4] or 0),
+                "push_enabled_count": int(row[start + 5] or 0),
             }
 
         return {
             "total": _to_block(0),
-            "today": _to_block(4),
+            "today": _to_block(6),
         }
 
 

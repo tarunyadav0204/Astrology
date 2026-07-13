@@ -207,6 +207,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [usersSearchPhone, setUsersSearchPhone] = useState('');
   const [usersSearchName, setUsersSearchName] = useState('');
   const [usersSearchSubscription, setUsersSearchSubscription] = useState('all');
+  const [usersSearchSignupClient, setUsersSearchSignupClient] = useState('all');
   const [usersSearchCreatedStart, setUsersSearchCreatedStart] = useState('');
   const [usersSearchCreatedEnd, setUsersSearchCreatedEnd] = useState('');
   const [usersFiltersCollapsed, setUsersFiltersCollapsed] = useState(true);
@@ -216,8 +217,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [usersLimit] = useState(25);
   const [usersSummaryLoading, setUsersSummaryLoading] = useState(false);
   const [usersSummary, setUsersSummary] = useState({
-    today: { users_count: 0, mobile_users_count: 0, web_users_count: 0, push_enabled_count: 0 },
-    total: { users_count: 0, mobile_users_count: 0, web_users_count: 0, push_enabled_count: 0 },
+    today: { users_count: 0, mobile_users_count: 0, web_users_count: 0, whatsapp_users_count: 0, unknown_signup_count: 0, push_enabled_count: 0 },
+    total: { users_count: 0, mobile_users_count: 0, web_users_count: 0, whatsapp_users_count: 0, unknown_signup_count: 0, push_enabled_count: 0 },
   });
   const todayIso = new Date().toISOString().slice(0, 10);
   const [deletedBackups, setDeletedBackups] = useState([]);
@@ -1761,15 +1762,24 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       phone: usersSearchPhone.trim() || undefined,
       name: usersSearchName.trim() || undefined,
       subscription: usersSearchSubscription === 'all' ? undefined : usersSearchSubscription,
+      signup_client: usersSearchSignupClient === 'all' ? undefined : usersSearchSignupClient,
+      created_from: usersSearchCreatedStart.trim() || undefined,
+      created_to: usersSearchCreatedEnd.trim() || undefined,
     };
     setUsersSummaryLoading(true);
     try {
       const params = {
         ...summaryParams,
-        created_from: usersSearchCreatedStart.trim() || undefined,
-        created_to: usersSearchCreatedEnd.trim() || undefined,
         page,
         limit: usersLimit,
+      };
+      const emptySummaryBlock = {
+        users_count: 0,
+        mobile_users_count: 0,
+        web_users_count: 0,
+        whatsapp_users_count: 0,
+        unknown_signup_count: 0,
+        push_enabled_count: 0,
       };
       const [data, summary] = await Promise.all([
         adminService.getAllUsers(params),
@@ -1779,8 +1789,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setUsersTotal(data.total ?? 0);
       setUsersTotalPages(data.total_pages ?? 0);
       setUsersSummary({
-        today: summary?.today || { users_count: 0, mobile_users_count: 0, web_users_count: 0, push_enabled_count: 0 },
-        total: summary?.total || { users_count: 0, mobile_users_count: 0, web_users_count: 0, push_enabled_count: 0 },
+        today: summary?.today || emptySummaryBlock,
+        total: summary?.total || emptySummaryBlock,
       });
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -1788,8 +1798,22 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setUsersTotal(0);
       setUsersTotalPages(0);
       setUsersSummary({
-        today: { users_count: 0, mobile_users_count: 0, web_users_count: 0, push_enabled_count: 0 },
-        total: { users_count: 0, mobile_users_count: 0, web_users_count: 0, push_enabled_count: 0 },
+        today: {
+          users_count: 0,
+          mobile_users_count: 0,
+          web_users_count: 0,
+          whatsapp_users_count: 0,
+          unknown_signup_count: 0,
+          push_enabled_count: 0,
+        },
+        total: {
+          users_count: 0,
+          mobile_users_count: 0,
+          web_users_count: 0,
+          whatsapp_users_count: 0,
+          unknown_signup_count: 0,
+          push_enabled_count: 0,
+        },
       });
     } finally {
       setLoading(false);
@@ -3181,6 +3205,20 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                         </select>
                       </label>
                       <label>
+                        <span>Signup</span>
+                        <select
+                          value={usersSearchSignupClient}
+                          onChange={(e) => setUsersSearchSignupClient(e.target.value)}
+                          title="Filter by registration channel (signup_client)"
+                        >
+                          <option value="all">All channels</option>
+                          <option value="mobile">Mobile</option>
+                          <option value="web">Web</option>
+                          <option value="whatsapp">WhatsApp</option>
+                          <option value="unknown">Unknown</option>
+                        </select>
+                      </label>
+                      <label>
                         <span>Created from</span>
                         <input
                           type="date"
@@ -3206,15 +3244,19 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   <div className="users-summary-card">
                     <h4>Today</h4>
                     <p># Users: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.users_count ?? 0)}</strong></p>
-                    <p>Mobile Users: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.mobile_users_count ?? 0)}</strong></p>
-                    <p>Web Users: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.web_users_count ?? 0)}</strong></p>
+                    <p>Mobile: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.mobile_users_count ?? 0)}</strong></p>
+                    <p>Web: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.web_users_count ?? 0)}</strong></p>
+                    <p>WhatsApp: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.whatsapp_users_count ?? 0)}</strong></p>
+                    <p>Unknown signup: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.unknown_signup_count ?? 0)}</strong></p>
                     <p>Push Enabled: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.push_enabled_count ?? 0)}</strong></p>
                   </div>
                   <div className="users-summary-card">
                     <h4>Total</h4>
                     <p># Users: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.users_count ?? 0)}</strong></p>
-                    <p>Mobile Users: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.mobile_users_count ?? 0)}</strong></p>
-                    <p>Web Users: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.web_users_count ?? 0)}</strong></p>
+                    <p>Mobile: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.mobile_users_count ?? 0)}</strong></p>
+                    <p>Web: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.web_users_count ?? 0)}</strong></p>
+                    <p>WhatsApp: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.whatsapp_users_count ?? 0)}</strong></p>
+                    <p>Unknown signup: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.unknown_signup_count ?? 0)}</strong></p>
                     <p>Push Enabled: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.push_enabled_count ?? 0)}</strong></p>
                   </div>
                 </div>
@@ -3226,7 +3268,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       <th>Phone</th>
                       <th>Name</th>
                       <th>Email</th>
-                      <th title="Recorded at account creation from the registering app (web vs mobile).">
+                      <th title="Recorded at account creation: web, mobile, or whatsapp.">
                         Signup
                       </th>
                       <th>Gender</th>

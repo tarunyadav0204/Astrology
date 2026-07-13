@@ -49,6 +49,9 @@ export const adminService = {
     if (params.name != null && params.name !== '') sp.set('name', params.name);
     if (params.role != null && params.role !== '' && params.role !== 'all') sp.set('role', params.role);
     if (params.subscription != null && params.subscription !== '' && params.subscription !== 'all') sp.set('subscription', params.subscription);
+    if (params.signup_client != null && params.signup_client !== '' && params.signup_client !== 'all') {
+      sp.set('signup_client', params.signup_client);
+    }
     if (params.created_from != null && params.created_from !== '') sp.set('created_from', params.created_from);
     if (params.created_to != null && params.created_to !== '') sp.set('created_to', params.created_to);
     if (params.page != null) sp.set('page', String(params.page));
@@ -72,6 +75,11 @@ export const adminService = {
     if (params.name != null && params.name !== '') sp.set('name', params.name);
     if (params.role != null && params.role !== '' && params.role !== 'all') sp.set('role', params.role);
     if (params.subscription != null && params.subscription !== '' && params.subscription !== 'all') sp.set('subscription', params.subscription);
+    if (params.signup_client != null && params.signup_client !== '' && params.signup_client !== 'all') {
+      sp.set('signup_client', params.signup_client);
+    }
+    if (params.created_from != null && params.created_from !== '') sp.set('created_from', params.created_from);
+    if (params.created_to != null && params.created_to !== '') sp.set('created_to', params.created_to);
     const qs = sp.toString();
     const url = getAdminEndpoint('/admin/users/summary') + (qs ? `?${qs}` : '');
     const response = await fetch(url, {
