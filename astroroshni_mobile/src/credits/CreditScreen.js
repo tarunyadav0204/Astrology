@@ -606,6 +606,16 @@ const CreditScreen = ({ navigation }) => {
     fetchProducts();
   }, []);
 
+  // Warm Razorpay native module so alternative-billing open is faster after create-order.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    try {
+      require('react-native-razorpay');
+    } catch (_) {
+      /* optional until User Choice */
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -808,6 +818,10 @@ const CreditScreen = ({ navigation }) => {
 
             userChoiceIapLog('listener_user_confirmed', { creditSku, subSku });
 
+            // Keep pack/sub button in "processing" while create-order runs (often 1–3s).
+            if (creditSku) C.setPurchasingProductId?.(creditSku);
+            if (subSku) C.setPurchasingSubscriptionId?.(subSku);
+
             try {
               if (creditSku) {
                 const credits = creditsFromGooglePlayProductId(creditSku);
@@ -829,6 +843,7 @@ const CreditScreen = ({ navigation }) => {
                   externalTransactionToken,
                   description: desc,
                 });
+                C.setPurchasingProductId?.(null);
                 await C.fetchBalance();
                 await C.fetchHistory();
                 const creditsAdded = data.credits_added || 0;
@@ -879,6 +894,7 @@ const CreditScreen = ({ navigation }) => {
                   externalTransactionToken,
                   tierName: plan.tier_name,
                 });
+                C.setPurchasingSubscriptionId?.(null);
                 
                 await C.fetchBalance();
                 await C.fetchSubscriptionDetails();
@@ -921,6 +937,8 @@ const CreditScreen = ({ navigation }) => {
               console.error('IAP: Failed to match any known product ID in listener');
               Alert.alert(C.t('credits.page.alertError'), C.t('credits.page.userChoiceUnknownProducts'));
             } catch (e) {
+              C.setPurchasingProductId?.(null);
+              C.setPurchasingSubscriptionId?.(null);
               userChoiceIapLog('listener_flow_error', {
                 message: e?.message,
                 code: e?.code,

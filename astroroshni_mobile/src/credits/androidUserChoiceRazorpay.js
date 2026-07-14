@@ -135,15 +135,23 @@ export async function payCreditPackUserChoiceRazorpay({
   externalTransactionToken,
   description,
 }) {
+  const t0 = Date.now();
+  // Preload native module before network so open() is ready when order returns.
   const RazorpayCheckout = require('react-native-razorpay').default;
   userChoiceIapLog('credit_create_order', {
     credits,
     tokenLen: externalTransactionToken ? String(externalTransactionToken).length : 0,
   });
-  const { data } = await creditAPI.createRazorpayOrder(credits, {
-    google_play_external_transaction_token: externalTransactionToken,
+  const { data } = await creditAPI.createRazorpayOrder(
+    credits,
+    { google_play_external_transaction_token: externalTransactionToken },
+    { preferMainApi: true }
+  );
+  userChoiceIapLog('credit_create_order_ok', {
+    order_id: data?.order_id,
+    amount: data?.amount,
+    create_order_ms: Date.now() - t0,
   });
-  userChoiceIapLog('credit_create_order_ok', { order_id: data?.order_id, amount: data?.amount });
   const options = {
     key: data.key_id,
     amount: String(data.amount),
@@ -153,7 +161,12 @@ export async function payCreditPackUserChoiceRazorpay({
     description: description || `${data.credits} credits`,
     theme: { color: '#e91e63' },
   };
+  const openAt = Date.now();
   const rawCheckout = await RazorpayCheckout.open(options);
+  userChoiceIapLog('credit_checkout_opened_returned', {
+    open_to_return_ms: Date.now() - openAt,
+    total_ms: Date.now() - t0,
+  });
   userChoiceIapLog('credit_checkout_raw_keys', {
     keys: rawCheckout && typeof rawCheckout === 'object' ? Object.keys(rawCheckout) : [],
   });

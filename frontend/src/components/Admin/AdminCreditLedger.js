@@ -6,6 +6,7 @@ const isoToday = () => new Date().toISOString().slice(0, 10);
 
 const USER_LEDGER_LIMIT = 1500;
 const ACTION_MENU_WIDTH = 260;
+const PAGE_SIZE = 100;
 
 function computeActionMenuPosition(triggerRect) {
   const pad = 8;
@@ -13,10 +14,6 @@ function computeActionMenuPosition(triggerRect) {
   const left = Math.max(pad, Math.min(triggerRect.left, window.innerWidth - w - pad));
   const top = triggerRect.bottom + 4;
   return { top, left, width: w };
-}
-
-function isBuyTransaction(tx) {
-  return tx?.type === 'earned' || tx?.type === 'refund';
 }
 
 const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
@@ -40,6 +37,15 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
   const [buyOnly, setBuyOnly] = useState(false);
   /** Server-side filter: hides free / zero-credit ledger rows (no extra rows fetched). */
   const [excludeZeroAmount, setExcludeZeroAmount] = useState(false);
+  /** Server-side filter: hide admin_adjustment rows (bulk grants, manual adds/deducts). */
+  const [nonAdminOnly, setNonAdminOnly] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    page_size: PAGE_SIZE,
+    total: 0,
+    total_pages: 1,
+  });
 
   /** Row-specific ⋮ menu: which transaction row opened it (one dropdown at a time). */
   const [actionMenu, setActionMenu] = useState(null);
@@ -49,17 +55,16 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
   const menuDropdownRef = useRef(null);
   const ledgerContentRef = useRef(null);
 
-  const visibleSearchResults = useMemo(
-    () => (buyOnly ? searchResults.filter(isBuyTransaction) : searchResults),
-    [searchResults, buyOnly]
-  );
-  const loadTransactions = async (
-    fromDate = '',
-    toDate = '',
-    query = '',
+  const loadTransactions = async ({
+    fromDate = searchFromDate,
+    toDate = searchToDate,
+    query = searchQuery,
     excludeZero = excludeZeroAmount,
     cohort = cohortFilter,
-  ) => {
+    buy = buyOnly,
+    nonAdmin = nonAdminOnly,
+    pageNum = page,
+  } = {}) => {
     setSearchLoading(true);
     setSearchError(null);
     try {
@@ -68,7 +73,11 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
       if (toDate) params.append('to_date', toDate);
       if (query.trim()) params.append('query', query.trim());
       if (excludeZero) params.append('exclude_zero_amount', 'true');
+      if (buy) params.append('buy_only', 'true');
+      if (nonAdmin) params.append('non_admin_only', 'true');
       if (cohort) params.append('cohort_filter', cohort);
+      params.append('page', String(pageNum));
+      params.append('page_size', String(PAGE_SIZE));
       const response = await fetch(`/api/credits/admin/search?${params.toString()}`, {
         headers: getAdminAuthHeaders(),
       });
@@ -86,6 +95,14 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
       });
       setSearchRange({ from_date: data.from_date || null, to_date: data.to_date || null });
       setCohortFilter(data.cohort_filter || cohort || '');
+      const p = data.pagination || {};
+      setPagination({
+        page: Number(p.page) || pageNum,
+        page_size: Number(p.page_size) || PAGE_SIZE,
+        total: Number(p.total) || 0,
+        total_pages: Number(p.total_pages) || 1,
+      });
+      setPage(Number(p.page) || pageNum);
     } catch (err) {
       console.error('Error loading transactions:', err);
       setSearchError('Failed to load transactions. Please try again.');
@@ -99,6 +116,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
         free_questions_count: 0,
         new_users_bought_count: 0,
       });
+      setPagination({ page: 1, page_size: PAGE_SIZE, total: 0, total_pages: 1 });
     } finally {
       setSearchLoading(false);
     }
@@ -114,11 +132,41 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
     const q = hasJump ? String(ledgerJumpContext.query ?? '').trim() : '';
     setSearchQuery(q);
     setCohortFilter('');
-    loadTransactions(today, today, q, false);
+    setBuyOnly(false);
+    setExcludeZeroAmount(false);
+    setNonAdminOnly(false);
+    setPage(1);
+    loadTransactions({
+      fromDate: today,
+      toDate: today,
+      query: q,
+      excludeZero: false,
+      cohort: '',
+      buy: false,
+      nonAdmin: false,
+      pageNum: 1,
+    });
   }, [ledgerJumpNonce]);
 
   const handleSearch = () => {
-    loadTransactions(searchFromDate, searchToDate, searchQuery, excludeZeroAmount, cohortFilter);
+    setPage(1);
+    loadTransactions({
+      fromDate: searchFromDate,
+      toDate: searchToDate,
+      query: searchQuery,
+      excludeZero: excludeZeroAmount,
+      cohort: cohortFilter,
+      buy: buyOnly,
+      nonAdmin: nonAdminOnly,
+      pageNum: 1,
+    });
+  };
+
+  const goToPage = (nextPage) => {
+    const bounded = Math.max(1, Math.min(nextPage, pagination.total_pages || 1));
+    setPage(bounded);
+    loadTransactions({ pageNum: bounded });
+    ledgerContentRef.current?.scrollTo?.({ top: 0, behavior: 'smooth' });
   };
 
   const closeActionMenu = useCallback(() => setActionMenu(null), []);
@@ -171,9 +219,9 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
   useEffect(() => {
     const anchorId = actionMenu?.anchorTxId;
     if (anchorId == null) return undefined;
-    if (!visibleSearchResults.some((t) => t.id === anchorId)) closeActionMenu();
+    if (!searchResults.some((t) => t.id === anchorId)) closeActionMenu();
     return undefined;
-  }, [actionMenu?.anchorTxId, visibleSearchResults, closeActionMenu]);
+  }, [actionMenu?.anchorTxId, searchResults, closeActionMenu]);
 
   useEffect(() => {
     if (!userBreakdown) return undefined;
@@ -301,17 +349,17 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
   };
 
   const formatModalAmount = (row) => {
-    const t = row?.type;
-    const n = Number(row?.amount);
-    if (t === 'earned' || t === 'refund') return n > 0 ? `+${n}` : String(n);
-    return String(n);
+    const abs = Math.abs(Number(row?.amount) || 0);
+    const isCredit = row?.type === 'earned' || row?.type === 'refund';
+    if (abs === 0) return '0';
+    return isCredit ? `+${abs}` : `-${abs}`;
   };
 
   const menuContextTx = useMemo(() => {
     const anchorId = actionMenu?.anchorTxId;
     if (anchorId == null) return null;
-    return visibleSearchResults.find((t) => t.id === anchorId) ?? null;
-  }, [actionMenu?.anchorTxId, visibleSearchResults]);
+    return searchResults.find((t) => t.id === anchorId) ?? null;
+  }, [actionMenu?.anchorTxId, searchResults]);
 
   return (
     <div className="admin-credit-ledger">
@@ -352,13 +400,17 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
         </section>
 
         <section className="ledger-content" ref={ledgerContentRef}>
-          {searchLoading && (
+          {searchLoading && searchResults.length === 0 && (
             <div className="loading">Loading transactions…</div>
           )}
-          {!searchLoading && (
-            <div className="results-block">
+          {(searchResults.length > 0 || !searchLoading) && (
+            <div className={`results-block${searchLoading ? ' is-loading' : ''}`}>
               <h2 className="results-title">
-                Transactions ({visibleSearchResults.length}{buyOnly ? ` of ${searchResults.length}` : ''})
+                Transactions ({pagination.total.toLocaleString()}
+                {pagination.total_pages > 1
+                  ? ` · page ${pagination.page} of ${pagination.total_pages}`
+                  : ''}
+                )
                 {searchRange.from_date && searchRange.to_date && (
                   <span className="results-range">
                     {' '}· {formatDate(searchRange.from_date)} – {formatDate(searchRange.to_date)}
@@ -369,6 +421,12 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                 )}
                 {cohortFilter === 'new_users_bought_in_range' && (
                   <span className="results-filter"> · new users who bought in this range</span>
+                )}
+                {buyOnly && (
+                  <span className="results-filter"> · buy only</span>
+                )}
+                {nonAdminOnly && (
+                  <span className="results-filter"> · non-admin only</span>
                 )}
               </h2>
               <div className="ledger-summary">
@@ -393,7 +451,8 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                   onClick={() => {
                     const next = cohortFilter === 'new_users_bought_in_range' ? '' : 'new_users_bought_in_range';
                     setCohortFilter(next);
-                    loadTransactions(searchFromDate, searchToDate, searchQuery, excludeZeroAmount, next);
+                    setPage(1);
+                    loadTransactions({ cohort: next, pageNum: 1 });
                   }}
                 >
                   New users bought: {searchSummary.new_users_bought_count}
@@ -402,9 +461,27 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                   <input
                     type="checkbox"
                     checked={buyOnly}
-                    onChange={(e) => setBuyOnly(e.target.checked)}
+                    onChange={(e) => {
+                      const v = e.target.checked;
+                      setBuyOnly(v);
+                      setPage(1);
+                      loadTransactions({ buy: v, pageNum: 1 });
+                    }}
                   />
                   <span>Buy only transactions</span>
+                </label>
+                <label className="ledger-buy-only-toggle">
+                  <input
+                    type="checkbox"
+                    checked={nonAdminOnly}
+                    onChange={(e) => {
+                      const v = e.target.checked;
+                      setNonAdminOnly(v);
+                      setPage(1);
+                      loadTransactions({ nonAdmin: v, pageNum: 1 });
+                    }}
+                  />
+                  <span>Non-admin transactions</span>
                 </label>
                 <label className="ledger-buy-only-toggle">
                   <input
@@ -413,13 +490,14 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                     onChange={(e) => {
                       const v = e.target.checked;
                       setExcludeZeroAmount(v);
-                      loadTransactions(searchFromDate, searchToDate, searchQuery, v, cohortFilter);
+                      setPage(1);
+                      loadTransactions({ excludeZero: v, pageNum: 1 });
                     }}
                   />
                   <span>Hide zero-credit rows</span>
                 </label>
               </div>
-              {visibleSearchResults.length > 0 ? (
+              {searchResults.length > 0 ? (
               <div className="transactions-table wrap" ref={menuContainerRef}>
                 <table>
                   <thead>
@@ -435,7 +513,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleSearchResults.map((tx) => (
+                    {searchResults.map((tx) => (
                       <tr key={tx.id} className={tx.type}>
                         <td className="ledger-actions-cell">
                           {tx.userid != null && tx.id != null ? (
@@ -466,7 +544,12 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                           {tx.description || getFeatureName(tx.source, tx.reference_id)}
                         </td>
                         <td className={`amount-cell ${tx.type}`}>
-                          {tx.amount > 0 ? `+${tx.amount}` : tx.amount}
+                          {(() => {
+                            const abs = Math.abs(Number(tx.amount) || 0);
+                            const isCredit = tx.type === 'earned' || tx.type === 'refund';
+                            if (abs === 0) return '0';
+                            return isCredit ? `+${abs}` : `-${abs}`;
+                          })()}
                         </td>
                         <td className="balance-cell">{tx.balance_after}</td>
                       </tr>
@@ -478,10 +561,60 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                 <p className="no-results-msg">
                   {buyOnly
                     ? 'No buy transactions for this period. Turn off Buy only or adjust filters.'
-                    : excludeZeroAmount
-                      ? 'No non-zero credit transactions for this period. Turn off Hide zero-credit rows or adjust filters.'
-                      : 'No transactions for this period. Adjust dates or name/phone and click Search.'}
+                    : nonAdminOnly
+                      ? 'No non-admin transactions for this period. Turn off Non-admin transactions or adjust filters.'
+                      : excludeZeroAmount
+                        ? 'No non-zero credit transactions for this period. Turn off Hide zero-credit rows or adjust filters.'
+                        : 'No transactions for this period. Adjust dates or name/phone and click Search.'}
                 </p>
+              )}
+              {pagination.total > 0 && (
+                <div className="ledger-pagination" role="navigation" aria-label="Ledger pages">
+                  <span className="ledger-pagination-info">
+                    Showing{' '}
+                    {((pagination.page - 1) * pagination.page_size) + 1}
+                    –
+                    {Math.min(pagination.page * pagination.page_size, pagination.total)}
+                    {' '}of {pagination.total.toLocaleString()}
+                  </span>
+                  <div className="ledger-pagination-buttons">
+                    <button
+                      type="button"
+                      className="ledger-pagination-btn"
+                      disabled={searchLoading || pagination.page <= 1}
+                      onClick={() => goToPage(1)}
+                    >
+                      First
+                    </button>
+                    <button
+                      type="button"
+                      className="ledger-pagination-btn"
+                      disabled={searchLoading || pagination.page <= 1}
+                      onClick={() => goToPage(pagination.page - 1)}
+                    >
+                      Prev
+                    </button>
+                    <span className="ledger-pagination-page">
+                      Page {pagination.page} of {pagination.total_pages}
+                    </span>
+                    <button
+                      type="button"
+                      className="ledger-pagination-btn"
+                      disabled={searchLoading || pagination.page >= pagination.total_pages}
+                      onClick={() => goToPage(pagination.page + 1)}
+                    >
+                      Next
+                    </button>
+                    <button
+                      type="button"
+                      className="ledger-pagination-btn"
+                      disabled={searchLoading || pagination.page >= pagination.total_pages}
+                      onClick={() => goToPage(pagination.total_pages)}
+                    >
+                      Last
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           )}

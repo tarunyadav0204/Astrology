@@ -132,7 +132,14 @@ export default function AdminDailyActivity() {
                         {t.type === 'earned' || t.type === 'refund' ? '↑ Earned' : '↓ Spent'}
                       </span>
                     </td>
-                    <td className="amount-cell">{t.amount > 0 ? `+${t.amount}` : t.amount}</td>
+                    <td className={`amount-cell ${t.type}`}>
+                      {(() => {
+                        const abs = Math.abs(Number(t.amount) || 0);
+                        const isCredit = t.type === 'earned' || t.type === 'refund';
+                        if (abs === 0) return '0';
+                        return isCredit ? `+${abs}` : `-${abs}`;
+                      })()}
+                    </td>
                     <td className="balance-cell">{t.balance_after}</td>
                   </tr>
                 ))}

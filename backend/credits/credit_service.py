@@ -3617,31 +3617,41 @@ class CreditService:
         from_date: str,
         to_date: str,
         query: Optional[str] = None,
-        limit: int = 500,
+        limit: int = 100,
+        offset: int = 0,
         *,
         exclude_zero_amount: bool = False,
         cohort_filter: Optional[str] = None,
-    ) -> List[Dict]:
+        buy_only: bool = False,
+        non_admin_only: bool = False,
+    ) -> Dict[str, Any]:
         """
         Search credit transactions across all users for a date range, with optional
         wildcard search on user name or phone. Dates are YYYY-MM-DD inclusive.
+        Returns {"transactions": [...], "total": N} for pagination.
         """
         from db import get_conn, execute
 
+        limit = max(1, min(int(limit or 100), 500))
+        offset = max(0, int(offset or 0))
+
         zero_filter = " AND ct.amount <> 0" if exclude_zero_amount else ""
+        buy_filter = (
+            " AND ct.transaction_type IN ('earned', 'refund')" if buy_only else ""
+        )
+        non_admin_filter = (
+            " AND ct.source <> 'admin_adjustment'" if non_admin_only else ""
+        )
         cohort = (cohort_filter or "").strip().lower()
-        sql = f"""
-            SELECT ct.id, ct.userid, u.name, u.phone,
-                   ct.transaction_type, ct.amount, ct.balance_after,
-                   ct.source, ct.reference_id, ct.description, ct.created_at
+        where_sql = f"""
             FROM credit_transactions ct
             LEFT JOIN users u ON u.userid = ct.userid
-            WHERE date(ct.created_at) >= ? AND date(ct.created_at) <= ?{zero_filter}
+            WHERE date(ct.created_at) >= ? AND date(ct.created_at) <= ?{zero_filter}{buy_filter}{non_admin_filter}
         """
         params: List[Any] = [from_date, to_date]
 
         if cohort == "new_users_bought_in_range":
-            sql += """
+            where_sql += """
                 AND ct.userid IN (
                     SELECT DISTINCT ct2.userid
                     FROM credit_transactions ct2
@@ -3658,15 +3668,24 @@ class CreditService:
 
         if query and query.strip():
             like = f"%{query.strip()}%"
-            # ILIKE matches SQLite-style case-insensitive search better for names/phones
-            sql += " AND (u.name ILIKE ? OR u.phone ILIKE ?)"
+            where_sql += " AND (u.name ILIKE ? OR u.phone ILIKE ?)"
             params.extend([like, like])
 
-        sql += " ORDER BY ct.created_at DESC LIMIT ?"
-        params.append(limit)
+        count_sql = f"SELECT COUNT(*) {where_sql}"
+        list_sql = f"""
+            SELECT ct.id, ct.userid, u.name, u.phone,
+                   ct.transaction_type, ct.amount, ct.balance_after,
+                   ct.source, ct.reference_id, ct.description, ct.created_at
+            {where_sql}
+            ORDER BY ct.created_at DESC
+            LIMIT ? OFFSET ?
+        """
+        list_params = list(params) + [limit, offset]
 
         with get_conn() as conn:
-            cur = execute(conn, sql, params)
+            cur = execute(conn, count_sql, params)
+            total = int((cur.fetchone() or [0])[0] or 0)
+            cur = execute(conn, list_sql, list_params)
             rows = cur.fetchall()
 
         transactions = []
@@ -3684,7 +3703,7 @@ class CreditService:
                 "description": row[9],
                 "created_at": row[10],
             })
-        return transactions
+        return {"transactions": transactions, "total": total}
 
     def get_search_transaction_summary(
         self,

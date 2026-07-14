@@ -850,8 +850,13 @@ export const creditAPI = {
       '/razorpay/catalog',
       () => api.get(getEndpoint('/credits/razorpay/catalog'))
     ),
-  createRazorpayOrder: (credits, extra = {}) => {
+  createRazorpayOrder: (credits, extra = {}, options = {}) => {
     const body = { credits, ...extra };
+    // User Choice / alternative billing: skip Cloud Run payment service (cold starts add multi-second
+    // delay before Razorpay opens). Main API VMs stay warm and create the order with Razorpay directly.
+    if (options?.preferMainApi) {
+      return api.post(getEndpoint('/credits/razorpay/create-order'), body, GLOBAL_ERROR_CONFIG);
+    }
     return tryDirectPaymentThenFallback(
       '/razorpay/create-order',
       body,

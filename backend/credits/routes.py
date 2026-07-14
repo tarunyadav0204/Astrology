@@ -2952,12 +2952,16 @@ async def search_credit_transactions(
     to_date: Optional[str] = None,
     query: Optional[str] = None,
     exclude_zero_amount: bool = Query(False),
+    buy_only: bool = Query(False),
+    non_admin_only: bool = Query(False),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=500),
     cohort_filter: Optional[str] = None,
     current_user: User = Depends(get_current_user),
 ):
     """
     Search credit transactions across all users with optional date range (YYYY-MM-DD)
-    and wildcard search on user name or phone.
+    and wildcard search on user name or phone. Paginated.
     """
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -2979,6 +2983,7 @@ async def search_credit_transactions(
         fd = today - timedelta(days=30)
         td = today
 
+    offset = (page - 1) * page_size
     summary = credit_service.get_search_transaction_summary(
         fd.isoformat(),
         td.isoformat(),
@@ -2986,19 +2991,33 @@ async def search_credit_transactions(
         exclude_zero_amount=exclude_zero_amount,
         cohort_filter=cohort_filter,
     )
-    transactions = credit_service.search_transactions(
+    result = credit_service.search_transactions(
         fd.isoformat(),
         td.isoformat(),
         query,
+        limit=page_size,
+        offset=offset,
         exclude_zero_amount=exclude_zero_amount,
         cohort_filter=cohort_filter,
+        buy_only=buy_only,
+        non_admin_only=non_admin_only,
     )
+    total = int(result.get("total") or 0)
+    total_pages = max(1, (total + page_size - 1) // page_size) if total else 1
     return {
         "from_date": fd.isoformat(),
         "to_date": td.isoformat(),
         "cohort_filter": cohort_filter,
         "summary": summary,
-        "transactions": transactions,
+        "transactions": result.get("transactions") or [],
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "total_pages": total_pages,
+            "buy_only": buy_only,
+            "non_admin_only": non_admin_only,
+        },
     }
 
 
