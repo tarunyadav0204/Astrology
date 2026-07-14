@@ -984,6 +984,69 @@ def get_nakshatra_guide_videos() -> Dict[str, Any]:
     return {}
 
 
+DEFAULT_HOME_SCREEN_BANNER: Dict[str, Any] = {
+    "enabled": False,
+    "id": "",
+    "title": "",
+    "body": "",
+    "cta_label": "",
+    "cta_action": "dismiss",  # dismiss | credits | chat | url | none
+    "cta_url": "",
+    "frequency": "once",  # once | every_x_days
+    "interval_days": 7,
+    "platforms": ["android", "ios"],
+}
+
+
+def get_home_screen_banner_json() -> str:
+    """Raw JSON for the mobile home-screen announcement banner."""
+    return (get_setting("home_screen_banner_json") or "").strip()
+
+
+def get_home_screen_banner() -> Dict[str, Any]:
+    """
+    Parsed home-screen banner config for mobile.
+    Expected shape matches DEFAULT_HOME_SCREEN_BANNER.
+    """
+    raw = get_home_screen_banner_json()
+    out = dict(DEFAULT_HOME_SCREEN_BANNER)
+    if not raw:
+        return out
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        return out
+    if not isinstance(parsed, dict):
+        return out
+
+    out["enabled"] = bool(parsed.get("enabled"))
+    out["id"] = str(parsed.get("id") or "").strip()
+    out["title"] = str(parsed.get("title") or "").strip()
+    out["body"] = str(parsed.get("body") or "").strip()
+    out["cta_label"] = str(parsed.get("cta_label") or "").strip()
+    cta_action = str(parsed.get("cta_action") or "dismiss").strip().lower()
+    if cta_action not in ("dismiss", "credits", "chat", "url", "none"):
+        cta_action = "dismiss"
+    out["cta_action"] = cta_action
+    out["cta_url"] = str(parsed.get("cta_url") or "").strip()
+    frequency = str(parsed.get("frequency") or "once").strip().lower()
+    if frequency not in ("once", "every_x_days"):
+        frequency = "once"
+    out["frequency"] = frequency
+    try:
+        interval = int(parsed.get("interval_days") or 7)
+    except (TypeError, ValueError):
+        interval = 7
+    out["interval_days"] = max(1, min(interval, 3650))
+    platforms = parsed.get("platforms")
+    if isinstance(platforms, list) and platforms:
+        cleaned = [str(p).strip().lower() for p in platforms if str(p).strip()]
+        out["platforms"] = cleaned or ["android", "ios"]
+    else:
+        out["platforms"] = ["android", "ios"]
+    return out
+
+
 PODCAST_PROVIDER_TTS = "tts"
 PODCAST_PROVIDER_NOTEBOOK_LM = "notebook_lm"
 

@@ -43,6 +43,7 @@ export const CreditProvider = ({ children }) => {
   const [freeQuestionRequiresNotifications, setFreeQuestionRequiresNotifications] = useState(false);
   const [subscriptionTierName, setSubscriptionTierName] = useState(null);
   const [subscriptionDiscountPercent, setSubscriptionDiscountPercent] = useState(0);
+  const [isGuruMember, setIsGuruMember] = useState(false);
   const [pricing, setPricing] = useState({});
   const [pricingOriginal, setPricingOriginal] = useState({});
   const [pricingFeatures, setPricingFeatures] = useState({});
@@ -122,6 +123,7 @@ export const CreditProvider = ({ children }) => {
         setFreeQuestionRequiresNotifications(false);
         setSubscriptionTierName(null);
         setSubscriptionDiscountPercent(0);
+        setIsGuruMember(false);
         return 0;
       }
 
@@ -134,6 +136,7 @@ export const CreditProvider = ({ children }) => {
       setFreeQuestionRequiresNotifications(Boolean(data?.free_question_requires_notifications));
       setSubscriptionTierName(data?.subscription_tier_name ?? null);
       setSubscriptionDiscountPercent(Number(data?.subscription_discount_percent) || 0);
+      setIsGuruMember(Boolean(data?.is_guru_member));
       return balance;
     } catch (error) {
       console.error('❌ Error fetching credits:', {
@@ -152,6 +155,7 @@ export const CreditProvider = ({ children }) => {
         setFreeQuestionRequiresNotifications(false);
         setSubscriptionTierName(null);
         setSubscriptionDiscountPercent(0);
+        setIsGuruMember(false);
         return 0;
       }
       return null;
@@ -216,6 +220,7 @@ export const CreditProvider = ({ children }) => {
         freeQuestionRequiresNotifications,
         subscriptionTierName,
         subscriptionDiscountPercent,
+        isGuruMember,
         pricing,
         pricingOriginal,
         pricingFeatures,

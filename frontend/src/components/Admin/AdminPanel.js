@@ -118,7 +118,7 @@ const DEFAULT_PARALLEL_BRANCH_WORD_LIMITS = {
   merge: '1200',
 };
 
-const CREDIT_PACKS = [24, 50, 100, 250, 500, 999];
+const CREDIT_PACKS = [50, 100, 250, 999];
 const FIRST_PURCHASE_BONUS_PACKS = CREDIT_PACKS;
 
 function createDefaultPackOverrides() {
@@ -306,6 +306,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [androidMinVersion, setAndroidMinVersion] = useState('');
   const [iosMinVersion, setIosMinVersion] = useState('');
   const [appUpdateReleaseNotes, setAppUpdateReleaseNotes] = useState('');
+  const [homeBannerEnabled, setHomeBannerEnabled] = useState(false);
+  const [homeBannerId, setHomeBannerId] = useState('');
+  const [homeBannerTitle, setHomeBannerTitle] = useState('');
+  const [homeBannerBody, setHomeBannerBody] = useState('');
+  const [homeBannerCtaLabel, setHomeBannerCtaLabel] = useState('');
+  const [homeBannerCtaAction, setHomeBannerCtaAction] = useState('dismiss');
+  const [homeBannerCtaUrl, setHomeBannerCtaUrl] = useState('');
+  const [homeBannerFrequency, setHomeBannerFrequency] = useState('once');
+  const [homeBannerIntervalDays, setHomeBannerIntervalDays] = useState('7');
+  const [homeBannerSaving, setHomeBannerSaving] = useState(false);
   const [geminiModelOptions, setGeminiModelOptions] = useState([]);
   const [geminiChatModel, setGeminiChatModel] = useState('');
   const [geminiPremiumModel, setGeminiPremiumModel] = useState('');
@@ -724,6 +734,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setAndroidMinVersion(androidMin?.value ?? '');
       setIosMinVersion(iosMin?.value ?? '');
       setAppUpdateReleaseNotes(releaseNotes?.value ?? '');
+      const homeBanner = data.home_screen_banner || {};
+      setHomeBannerEnabled(Boolean(homeBanner.enabled));
+      setHomeBannerId(homeBanner.id || '');
+      setHomeBannerTitle(homeBanner.title || '');
+      setHomeBannerBody(homeBanner.body || '');
+      setHomeBannerCtaLabel(homeBanner.cta_label || '');
+      setHomeBannerCtaAction(homeBanner.cta_action || 'dismiss');
+      setHomeBannerCtaUrl(homeBanner.cta_url || '');
+      setHomeBannerFrequency(homeBanner.frequency === 'every_x_days' ? 'every_x_days' : 'once');
+      setHomeBannerIntervalDays(String(homeBanner.interval_days ?? '7'));
       setChatCountdownStandardSeconds((timerStandard?.value ?? '110').toString());
       setChatCountdownPremiumSeconds((timerPremium?.value ?? '210').toString());
       setChatStaticSuggestions(staticSuggestions?.value ?? '');
@@ -1738,6 +1758,65 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     } catch (error) {
       console.error('Error saving app version config:', error);
       alert('Failed to save app version config.');
+    }
+  };
+
+  const handleSaveHomeBanner = async () => {
+    const id = (homeBannerId || '').trim();
+    const title = (homeBannerTitle || '').trim();
+    const body = (homeBannerBody || '').trim();
+    if (homeBannerEnabled && !id) {
+      alert('Banner ID is required when the banner is enabled (used so dismiss state can reset when you change campaigns).');
+      return;
+    }
+    if (homeBannerEnabled && !title && !body) {
+      alert('Enter a title and/or body for the banner.');
+      return;
+    }
+    if (homeBannerCtaAction === 'url' && !(homeBannerCtaUrl || '').trim()) {
+      alert('Enter a CTA URL when action is “Open URL”.');
+      return;
+    }
+    let intervalDays = parseInt(homeBannerIntervalDays, 10);
+    if (!Number.isFinite(intervalDays) || intervalDays < 1) intervalDays = 7;
+    const payload = {
+      enabled: Boolean(homeBannerEnabled),
+      id,
+      title,
+      body,
+      cta_label: (homeBannerCtaLabel || '').trim(),
+      cta_action: homeBannerCtaAction || 'dismiss',
+      cta_url: (homeBannerCtaUrl || '').trim(),
+      frequency: homeBannerFrequency === 'every_x_days' ? 'every_x_days' : 'once',
+      interval_days: intervalDays,
+      platforms: ['android', 'ios'],
+    };
+    setHomeBannerSaving(true);
+    try {
+      const response = await fetch('/api/admin/settings/home_screen_banner_json', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAdminAuthHeaders(),
+        },
+        body: JSON.stringify({
+          key: 'home_screen_banner_json',
+          value: JSON.stringify(payload),
+          description: 'Mobile home screen announcement banner (enabled, copy, frequency, CTA)',
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        alert('Failed to save home banner: ' + (err.detail || 'unknown error'));
+        return;
+      }
+      alert(payload.enabled ? 'Home banner saved and enabled.' : 'Home banner saved (currently off).');
+      fetchAdminSettings();
+    } catch (e) {
+      console.error('Error saving home banner:', e);
+      alert('Failed to save home banner.');
+    } finally {
+      setHomeBannerSaving(false);
     }
   };
 
@@ -6919,6 +6998,143 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               <div className="form-buttons" style={{ marginTop: '12px' }}>
                 <button type="button" className="create-btn" onClick={handleSaveAppVersionConfig}>
                   Save App Version Config
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Home screen banner</h3>
+              <p className="settings-hint">
+                Shown on the mobile home screen when users open the app. Toggle on/off, edit copy, and choose whether it appears once or again every X days after dismiss.
+                Change the Banner ID to re-show a new campaign to users who already dismissed the previous one.
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Enabled</strong>
+                  <p>When off, the banner is hidden for everyone.</p>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={homeBannerEnabled}
+                    onChange={(e) => setHomeBannerEnabled(e.target.checked)}
+                  />
+                  {homeBannerEnabled ? 'On' : 'Off'}
+                </label>
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Banner ID</strong>
+                  <p>Stable id for this campaign (e.g. pack-relaunch-2026-07). Required when enabled.</p>
+                </div>
+                <input
+                  type="text"
+                  value={homeBannerId}
+                  onChange={(e) => setHomeBannerId(e.target.value)}
+                  placeholder="e.g. pack-relaunch-2026-07"
+                  style={{ width: '280px' }}
+                />
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Title</strong>
+                </div>
+                <input
+                  type="text"
+                  value={homeBannerTitle}
+                  onChange={(e) => setHomeBannerTitle(e.target.value)}
+                  placeholder="e.g. New packs are live"
+                  style={{ width: '320px' }}
+                />
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info" style={{ flex: '1 1 220px' }}>
+                  <strong>Body</strong>
+                  <p>Short supporting line under the title.</p>
+                </div>
+                <textarea
+                  value={homeBannerBody}
+                  onChange={(e) => setHomeBannerBody(e.target.value)}
+                  placeholder="e.g. From ₹99. Your existing credits stay with you."
+                  rows={3}
+                  style={{ width: '100%', maxWidth: '480px', minHeight: '72px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                />
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Frequency</strong>
+                  <p>Once = never again after dismiss (for this Banner ID). Every X days = show again after the interval.</p>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+                  <select
+                    value={homeBannerFrequency}
+                    onChange={(e) => setHomeBannerFrequency(e.target.value)}
+                    style={{ minWidth: '200px' }}
+                  >
+                    <option value="once">Show once (until dismiss)</option>
+                    <option value="every_x_days">Show every X days</option>
+                  </select>
+                  {homeBannerFrequency === 'every_x_days' ? (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      Days
+                      <input
+                        type="number"
+                        min={1}
+                        max={3650}
+                        value={homeBannerIntervalDays}
+                        onChange={(e) => setHomeBannerIntervalDays(e.target.value)}
+                        style={{ width: '80px' }}
+                      />
+                    </label>
+                  ) : null}
+                </div>
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>CTA button label</strong>
+                  <p>Optional. Leave blank for dismiss-only (X).</p>
+                </div>
+                <input
+                  type="text"
+                  value={homeBannerCtaLabel}
+                  onChange={(e) => setHomeBannerCtaLabel(e.target.value)}
+                  placeholder="e.g. View packs"
+                  style={{ width: '220px' }}
+                />
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>CTA action</strong>
+                </div>
+                <select
+                  value={homeBannerCtaAction}
+                  onChange={(e) => setHomeBannerCtaAction(e.target.value)}
+                  style={{ minWidth: '200px' }}
+                >
+                  <option value="dismiss">Dismiss only</option>
+                  <option value="credits">Open Credits</option>
+                  <option value="chat">Open Chat (Ask Tara)</option>
+                  <option value="url">Open URL</option>
+                  <option value="none">None (tap X only)</option>
+                </select>
+              </div>
+              {homeBannerCtaAction === 'url' ? (
+                <div className="setting-item">
+                  <div className="setting-info">
+                    <strong>CTA URL</strong>
+                  </div>
+                  <input
+                    type="url"
+                    value={homeBannerCtaUrl}
+                    onChange={(e) => setHomeBannerCtaUrl(e.target.value)}
+                    placeholder="https://..."
+                    style={{ width: '320px' }}
+                  />
+                </div>
+              ) : null}
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button type="button" className="create-btn" onClick={handleSaveHomeBanner} disabled={homeBannerSaving}>
+                  {homeBannerSaving ? 'Saving…' : 'Save Home Banner'}
                 </button>
               </div>
             </div>

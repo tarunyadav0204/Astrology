@@ -369,9 +369,33 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
                                     onClick={() => handleBuyPack(pack.credits)}
                                     disabled={purchasingCredits !== null}
                                 >
-                                    <span className="credits-modal-pack-credits">{pack.credits}</span>
-                                    <span className="credits-modal-pack-label">credits</span>
+                                    <span className="credits-modal-pack-name">
+                                        {pack.name || `${pack.credits} Credits`}
+                                        {pack.badge ? (
+                                            <span className="credits-modal-pack-badge">{pack.badge}</span>
+                                        ) : null}
+                                    </span>
                                     <span className="credits-modal-pack-price">{pack.amount_display}</span>
+                                    <span className="credits-modal-pack-credits">
+                                        {(pack.pack_bonus_credits > 0
+                                            ? pack.credits + pack.pack_bonus_credits
+                                            : pack.credits)} Credits
+                                    </span>
+                                    {pack.questions != null ? (
+                                        <span className="credits-modal-pack-questions">
+                                            {pack.credits >= 999
+                                                ? `${pack.questions} Questions with Tara`
+                                                : `${pack.questions} Questions`}
+                                        </span>
+                                    ) : null}
+                                    {pack.pack_bonus_credits > 0 ? (
+                                        <span className="credits-modal-pack-save">
+                                            {pack.credits} + {pack.pack_bonus_credits} bonus (5% extra)
+                                        </span>
+                                    ) : null}
+                                    {pack.save_percent > 0 ? (
+                                        <span className="credits-modal-pack-save">Save {pack.save_percent}%</span>
+                                    ) : null}
                                     {purchasingCredits === pack.credits && (
                                         <span className="credits-modal-pack-busy">Opening…</span>
                                     )}

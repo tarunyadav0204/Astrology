@@ -7,6 +7,7 @@ import swisseph as swe
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from typing import Dict, Any, List
+from math import ceil
 from utils.timezone_service import parse_timezone_offset
 
 class DashaCalculator:
@@ -27,7 +28,147 @@ class DashaCalculator:
         
         # Planet order for dasha sequence
         self.PLANET_ORDER = ['Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury']
-    
+        # Drik / AstroSage solar year — must match MD balance (365.25). Using 365.242199
+        # drifted Antar/Pratyantar ends by ~1 day over multi-year sub-periods.
+        self.YEAR_LEN = 365.25
+
+    @staticmethod
+    def _as_dt(value) -> datetime:
+        if isinstance(value, datetime):
+            return value
+        s = str(value).strip().replace('T', ' ').replace('Z', '')
+        if '.' in s:
+            s = s.split('.')[0]
+        date_part = s[:10]
+        if len(s) > 10:
+            time_part = s[11:19]
+            if len(time_part) == 5:
+                time_part = f'{time_part}:00'
+            return datetime.strptime(f'{date_part} {time_part}', '%Y-%m-%d %H:%M:%S')
+        return datetime.strptime(date_part, '%Y-%m-%d')
+
+    def _period_bounds(self, period: Dict) -> tuple:
+        start = period.get('_start_dt', period.get('start'))
+        end = period.get('_end_dt', period.get('end'))
+        return self._as_dt(start), self._as_dt(end)
+
+    def _serialize_period(self, planet: str, start: datetime, end: datetime, years: float, target_date: datetime = None) -> Dict[str, Any]:
+        """API-shaped period row; dates are calendar YYYY-MM-DD matching chat `_date_str`."""
+        is_current = False
+        if target_date is not None:
+            is_current = start <= target_date <= end
+        return {
+            'planet': planet,
+            'start': start.strftime('%Y-%m-%d'),
+            'end': end.strftime('%Y-%m-%d'),
+            'current': is_current,
+            'years': round(years, 4),
+            # Keep raw datetimes for internal chaining (stripped before HTTP response).
+            '_start_dt': start,
+            '_end_dt': end,
+        }
+
+    @staticmethod
+    def maha_end_date_str(maha_end: datetime) -> str:
+        """Maha ends are stored as transition-1s; return the transition calendar date."""
+        if not hasattr(maha_end, 'strftime'):
+            return str(maha_end)
+        return (maha_end + timedelta(seconds=1)).strftime('%Y-%m-%d')
+
+    def list_antardashas(self, maha_dasha: Dict, target_date: datetime = None) -> List[Dict[str, Any]]:
+        """All antardashas for a mahadasha — same math as `_calculate_antardasha`."""
+        maha_planet = maha_dasha['planet']
+        current, maha_end = self._period_bounds(maha_dasha)
+        start_index = self.PLANET_ORDER.index(maha_planet)
+        periods = []
+        for i in range(9):
+            planet = self.PLANET_ORDER[(start_index + i) % 9]
+            antar_years = (self.DASHA_PERIODS[maha_planet] * self.DASHA_PERIODS[planet]) / 120
+            end = current + timedelta(days=antar_years * self.YEAR_LEN)
+            periods.append(self._serialize_period(planet, current, end, antar_years, target_date))
+            current = end
+            if current >= maha_end:
+                break
+        return periods
+
+    def list_pratyantardashas(self, maha_dasha: Dict, antar_dasha: Dict, target_date: datetime = None) -> List[Dict[str, Any]]:
+        """All pratyantardashas — same math as `_calculate_pratyantardasha`."""
+        maha_planet = maha_dasha['planet']
+        antar_planet = antar_dasha['planet']
+        current, antar_end = self._period_bounds(antar_dasha)
+        start_index = self.PLANET_ORDER.index(antar_planet)
+        antar_years = (self.DASHA_PERIODS[maha_planet] * self.DASHA_PERIODS[antar_planet]) / 120
+        periods = []
+        for i in range(9):
+            planet = self.PLANET_ORDER[(start_index + i) % 9]
+            years = (antar_years * self.DASHA_PERIODS[planet]) / 120
+            end = current + timedelta(days=years * self.YEAR_LEN)
+            periods.append(self._serialize_period(planet, current, end, years, target_date))
+            current = end
+            if current >= antar_end:
+                break
+        return periods
+
+    def list_sookshmas(
+        self,
+        maha_dasha: Dict,
+        antar_dasha: Dict,
+        pratyantar_dasha: Dict,
+        target_date: datetime = None,
+    ) -> List[Dict[str, Any]]:
+        """All sookshma periods — same math as `_calculate_sookshma`."""
+        maha_planet = maha_dasha['planet']
+        antar_planet = antar_dasha['planet']
+        pratyantar_planet = pratyantar_dasha['planet']
+        current, parent_end = self._period_bounds(pratyantar_dasha)
+        start_index = self.PLANET_ORDER.index(pratyantar_planet)
+        antar_years = (self.DASHA_PERIODS[maha_planet] * self.DASHA_PERIODS[antar_planet]) / 120
+        pratyantar_years = (antar_years * self.DASHA_PERIODS[pratyantar_planet]) / 120
+        periods = []
+        for i in range(9):
+            planet = self.PLANET_ORDER[(start_index + i) % 9]
+            years = (pratyantar_years * self.DASHA_PERIODS[planet]) / 120
+            end = current + timedelta(days=years * self.YEAR_LEN)
+            periods.append(self._serialize_period(planet, current, end, years, target_date))
+            current = end
+            if current >= parent_end:
+                break
+        return periods
+
+    def list_pranas(
+        self,
+        maha_dasha: Dict,
+        antar_dasha: Dict,
+        pratyantar_dasha: Dict,
+        sookshma_dasha: Dict,
+        target_date: datetime = None,
+    ) -> List[Dict[str, Any]]:
+        """All prana periods — same math as `_calculate_prana`."""
+        maha_planet = maha_dasha['planet']
+        antar_planet = antar_dasha['planet']
+        pratyantar_planet = pratyantar_dasha['planet']
+        sookshma_planet = sookshma_dasha['planet']
+        current, parent_end = self._period_bounds(sookshma_dasha)
+        start_index = self.PLANET_ORDER.index(sookshma_planet)
+        antar_years = (self.DASHA_PERIODS[maha_planet] * self.DASHA_PERIODS[antar_planet]) / 120
+        pratyantar_years = (antar_years * self.DASHA_PERIODS[pratyantar_planet]) / 120
+        sookshma_years = (pratyantar_years * self.DASHA_PERIODS[sookshma_planet]) / 120
+        periods = []
+        for i in range(9):
+            planet = self.PLANET_ORDER[(start_index + i) % 9]
+            years = (sookshma_years * self.DASHA_PERIODS[planet]) / 120
+            end = current + timedelta(days=years * self.YEAR_LEN)
+            periods.append(self._serialize_period(planet, current, end, years, target_date))
+            current = end
+            if current >= parent_end:
+                break
+        return periods
+
+    @staticmethod
+    def strip_internal_period_fields(periods: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Remove non-JSON helper keys before returning from an API."""
+        return [{k: v for k, v in p.items() if not k.startswith('_')} for p in periods]
+
     def calculate_current_dashas(self, birth_data: Dict, current_date: datetime = None) -> Dict[str, Any]:
         """Calculate current dasha periods using accurate Vimshottari method.
 
@@ -111,8 +252,7 @@ class DashaCalculator:
             else:
                 birth_datetime = datetime.strptime(f"{birth_data['date']} {time_str}", "%Y-%m-%d %H:%M")
             
-            # Solar year length used by high-precision Panchangs
-            YEAR_LEN = 365.242199
+            # Solar year for sub-periods is self.YEAR_LEN (365.25).
             TOTAL_DASHA_CYCLE_YEARS = 120
             
             # Advance cycles if current_date is far in the future (e.g., for nations)
@@ -132,13 +272,17 @@ class DashaCalculator:
                 total_duration_years = self.DASHA_PERIODS[planet]
                 
                 if i == 0:
-                    # DRIK ALIGNMENT FINAL: Use 365.25 (Julian Year) for balance portion
-                    rem_y = int(total_duration_years * balance_fraction)
-                    rem_fractional_y = (total_duration_years * balance_fraction) - rem_y
-                    
-                    # Use 365.25 for balance to match Drik Panchang's traditional algorithm
-                    end_date = birth_datetime + relativedelta(years=rem_y) + timedelta(days=rem_fractional_y * 365.25)
+                    # Drik / AstroSage: balance as Julian days (365.25), not calendar
+                    # relativedelta(years=N)+fraction — that undercounts leap days and
+                    # drifts MD ends by ~1–2 days (e.g. Tarun Saturn 2030-11-02 vs 11-04).
                     actual_years = total_duration_years * balance_fraction
+                    balance_days = actual_years * 365.25
+                    # Whole-day balance, then snap to calendar midnight so AD/PD chains match
+                    # date-only panchangs (keeping birth clock made Mars AD end 17 Jun vs AstroSage 16 Jun).
+                    end_date = datetime.combine(
+                        (birth_datetime + timedelta(days=ceil(balance_days - 1e-9))).date(),
+                        datetime.min.time(),
+                    )
                 else:
                     # Use calendar years for subsequent dashas
                     end_date = current_maha_date + relativedelta(years=total_duration_years)
@@ -182,17 +326,24 @@ class DashaCalculator:
             current_prana = self._calculate_prana(current_maha, current_antar, current_pratyantar, current_sookshma, current_date)
             
             # Include start/end dates for current MD and AD so chat uses authoritative dates (no guessing)
-            def _date_str(dt):
-                return dt.strftime('%Y-%m-%d') if hasattr(dt, 'strftime') else str(dt)
+            def _date_str(dt, *, is_end=False):
+                if not hasattr(dt, 'strftime'):
+                    return str(dt)
+                # Maha ends are stored as transition-1s; at midnight that falls on the prior
+                # calendar day — report the transition date (matches AstroSage MD "to" dates).
+                if is_end:
+                    return (dt + timedelta(seconds=1)).strftime('%Y-%m-%d')
+                return dt.strftime('%Y-%m-%d')
             return {
                 'mahadasha': {
                     'planet': current_maha['planet'],
                     'start': _date_str(current_maha['start']),
-                    'end': _date_str(current_maha['end']),
+                    'end': _date_str(current_maha['end'], is_end=True),
                 },
                 'antardasha': {
                     'planet': current_antar['planet'],
                     'start': _date_str(current_antar['start']),
+                    # AD end is the true transition instant (not maha-style -1s).
                     'end': _date_str(current_antar['end']),
                 },
                 'pratyantardasha': {'planet': current_pratyantar['planet']},
@@ -230,7 +381,7 @@ class DashaCalculator:
         for i in range(9):
             antar_planet = self.PLANET_ORDER[(start_index + i) % 9]
             antar_period = (self.DASHA_PERIODS[maha_planet] * self.DASHA_PERIODS[antar_planet]) / 120
-            antar_days = antar_period * 365.242199
+            antar_days = antar_period * self.YEAR_LEN
             antar_end = current_antar_date + timedelta(days=antar_days)
             
             if current_antar_date <= current_date <= antar_end:
@@ -260,7 +411,7 @@ class DashaCalculator:
         for i in range(9):
             pratyantar_planet = self.PLANET_ORDER[(start_index + i) % 9]
             pratyantar_period = (antar_period * self.DASHA_PERIODS[pratyantar_planet]) / 120
-            pratyantar_days = pratyantar_period * 365.242199
+            pratyantar_days = pratyantar_period * self.YEAR_LEN
             pratyantar_end = current_pratyantar_date + timedelta(days=pratyantar_days)
             
             if current_pratyantar_date <= current_date <= pratyantar_end:
@@ -291,7 +442,7 @@ class DashaCalculator:
         for i in range(9):
             sookshma_planet = self.PLANET_ORDER[(start_index + i) % 9]
             sookshma_period = (pratyantar_period * self.DASHA_PERIODS[sookshma_planet]) / 120
-            sookshma_days = sookshma_period * 365.242199
+            sookshma_days = sookshma_period * self.YEAR_LEN
             sookshma_end = current_sookshma_date + timedelta(days=sookshma_days)
             
             if current_sookshma_date <= current_date <= sookshma_end:
@@ -324,7 +475,7 @@ class DashaCalculator:
         for i in range(9):
             prana_planet = self.PLANET_ORDER[(start_index + i) % 9]
             prana_period = (sookshma_period * self.DASHA_PERIODS[prana_planet]) / 120
-            prana_days = prana_period * 365.242199
+            prana_days = prana_period * self.YEAR_LEN
             prana_end = current_prana_date + timedelta(days=prana_days)
             
             if current_prana_date <= current_date <= prana_end:

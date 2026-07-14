@@ -16,7 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native';
 import Icon from '@expo/vector-icons/Ionicons';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
-import { parseCalendarDateInput } from '../../utils/birthDateUtils';
+import { parseCalendarDateInput, formatBirthDateForDisplay } from '../../utils/birthDateUtils';
 import { useTheme } from '../../context/ThemeContext';
 import { chartAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -175,6 +175,18 @@ const CascadingDashaBrowser = ({
       }
     }
   };
+
+  /** Calendar YYYY-MM-DD from API — never parse as UTC midnight. */
+  const formatDashaDate = (dateStr, options = { day: 'numeric', month: 'short', year: '2-digit' }) =>
+    formatBirthDateForDisplay(dateStr, options) || '';
+
+  const toLocalYmd = (d) => {
+    if (!(d instanceof Date) || isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
   const scrollRefs = {
     maha: React.useRef(null),
     antar: React.useRef(null),
@@ -285,7 +297,7 @@ const CascadingDashaBrowser = ({
       setLoading(true);
       setError(null);
       
-      const targetDate = transitDate.toISOString().split('T')[0];
+      const targetDate = toLocalYmd(transitDate);
       console.log('Transit Date:', transitDate);
       console.log('Target Date (formatted):', targetDate);
       
@@ -295,7 +307,10 @@ const CascadingDashaBrowser = ({
         time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
-        place: birthData.place || 'Unknown'
+        place: birthData.place || 'Unknown',
+        ...(birthData.timezone != null && birthData.timezone !== ''
+          ? { timezone: birthData.timezone }
+          : {}),
       };
       
       // DEBUG: Log birth data being used in mobile app
@@ -691,8 +706,8 @@ const CascadingDashaBrowser = ({
   };
   
   const calculateProgress = (startDate, endDate, currentDate = new Date()) => {
-    const start = new Date(startDate).getTime();
-    const end = new Date(endDate).getTime();
+    const start = (parseCalendarDateInput(startDate) || new Date(startDate)).getTime();
+    const end = (parseCalendarDateInput(endDate) || new Date(endDate)).getTime();
     const current = currentDate.getTime();
     
     if (current < start) return 0;
@@ -702,7 +717,7 @@ const CascadingDashaBrowser = ({
   };
   
   const getRemainingTime = (endDate) => {
-    const end = new Date(endDate);
+    const end = parseCalendarDateInput(endDate) || new Date(endDate);
     const now = new Date();
     const diffMs = end - now;
     
@@ -1033,7 +1048,7 @@ const CascadingDashaBrowser = ({
                     <>
                       <Text style={[styles.breadcrumbPeriod, vimTheme && { color: colors.text }]}>{formatPeriodDuration(item.details.years)}</Text>
                       <Text style={[styles.breadcrumbDates, vimTheme && { color: colors.textSecondary }]}>
-                        {new Date(item.details.start).toLocaleDateString('en-US', {month: 'short', year: '2-digit'})} - {new Date(item.details.end).toLocaleDateString('en-US', {month: 'short', year: '2-digit'})}
+                        {formatDashaDate(item.details.start, { month: 'short', year: '2-digit' })} - {formatDashaDate(item.details.end, { month: 'short', year: '2-digit' })}
                       </Text>
                     </>
                   )}
@@ -2149,8 +2164,8 @@ const CascadingDashaBrowser = ({
             options.map((dasha, index) => {
               const isSelected = selectedValue === dasha.planet;
               const currentDate = transitDate;
-              const startDate = new Date(dasha.start);
-              const endDate = new Date(dasha.end);
+              const startDate = parseCalendarDateInput(dasha.start) || new Date(dasha.start);
+              const endDate = parseCalendarDateInput(dasha.end) || new Date(dasha.end);
               const isActuallyCurrent = currentDate >= startDate && currentDate <= endDate;
 
               return (
@@ -2188,7 +2203,7 @@ const CascadingDashaBrowser = ({
                     isSelected && (vimTheme ? { color: '#fff' } : styles.selectedOptionDates),
                     isActuallyCurrent && !isSelected && (vimTheme ? { color: '#fff' } : styles.currentOptionDates)
                   ]}>
-                    {new Date(dasha.start).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})} - {new Date(dasha.end).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})}
+                    {formatDashaDate(dasha.start)} - {formatDashaDate(dasha.end)}
                   </Text>
                 </TouchableOpacity>
               );

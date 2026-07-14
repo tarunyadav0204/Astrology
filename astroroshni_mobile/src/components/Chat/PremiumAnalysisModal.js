@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { formatCreditsInr } from '../../credits/creditPackCatalog';
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -147,12 +148,14 @@ const PremiumAnalysisModal = ({ visible, onClose, premiumCost, standardCost }) =
                 <View style={styles.costRow}>
                   <View style={styles.costItem}>
                     <Text style={styles.costType}>Standard</Text>
-                    <Text style={styles.costValue}>{standardCost} credit</Text>
+                    <Text style={styles.costValue}>{formatCreditsInr(standardCost)}</Text>
+                    <Text style={styles.costCreditsHint}>~{standardCost} credits</Text>
                   </View>
                   <Text style={styles.costVs}>vs</Text>
                   <View style={[styles.costItem, styles.premiumCostItem]}>
                     <Text style={[styles.costType, styles.premiumCostType]}>Premium</Text>
-                    <Text style={[styles.costValue, styles.premiumCostValue]}>{premiumCost} credits</Text>
+                    <Text style={[styles.costValue, styles.premiumCostValue]}>{formatCreditsInr(premiumCost)}</Text>
+                    <Text style={[styles.costCreditsHint, styles.premiumCostValue]}>~{premiumCost} credits</Text>
                   </View>
                 </View>
               </View>
@@ -327,6 +330,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
+  },
+  costCreditsHint: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   premiumCostValue: {
     color: '#ff6b35',

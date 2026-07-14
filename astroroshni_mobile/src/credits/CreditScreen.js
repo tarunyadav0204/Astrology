@@ -33,9 +33,11 @@ import {
   userChoiceIapLog,
   describeUserChoiceRawProductsForLog,
 } from './androidUserChoiceRazorpay';
+import { getCreditPackMeta } from './creditPackCatalog';
 
 const { width } = Dimensions.get('window');
 const PENDING_GOOGLE_PLAY_CREDIT_PURCHASES_KEY = 'pendingGooglePlayCreditPurchasesV1';
+const PACK_RELAUNCH_BANNER_KEY = 'creditPackRelaunchBannerDismissedV1';
 
 
 /** Map react-native-iap v14 product shapes to fields used by this screen (legacy v12-style accessors). */
@@ -288,8 +290,18 @@ const CreditScreen = ({ navigation }) => {
   useAnalytics('CreditScreen');
   const { t, i18n } = useTranslation();
   const dateLocale = appLocaleForI18n(i18n.language);
-  const { theme, colors } = useTheme();
+  const { theme, colors, androidLightCardFixStyle } = useTheme();
   const isDark = theme === 'dark';
+  // Glass cards + Android elevation produce a white halo; flatten elevation on Android for all themes.
+  const androidGlassFixStyle = Platform.OS === 'android'
+    ? {
+        elevation: 0,
+        shadowColor: 'transparent',
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        shadowOffset: { width: 0, height: 0 },
+      }
+    : androidLightCardFixStyle;
   const { credits, loading, redeemCode, fetchBalance, subscriptionTierName, subscriptionDiscountPercent } = useCredits();
   const [promoCode, setPromoCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
@@ -308,6 +320,7 @@ const CreditScreen = ({ navigation }) => {
   const [vipPlansExpanded, setVipPlansExpanded] = useState(false);
   const [refreshSubscriptionStatusLoading, setRefreshSubscriptionStatusLoading] = useState(false);
   const [purchaseModal, setPurchaseModal] = useState({ visible: false, type: 'success', title: '', message: '', creditsAdded: 0 });
+  const [showPackRelaunchBanner, setShowPackRelaunchBanner] = useState(false);
   const purchaseListenerRef = useRef(null);
   const iapCallbacksRef = useRef({});
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -592,6 +605,30 @@ const CreditScreen = ({ navigation }) => {
     if (Platform.OS !== 'android') return;
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const dismissed = await AsyncStorage.getItem(PACK_RELAUNCH_BANNER_KEY);
+        if (!cancelled && dismissed !== '1') {
+          setShowPackRelaunchBanner(true);
+        }
+      } catch (_) {
+        if (!cancelled) setShowPackRelaunchBanner(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const dismissPackRelaunchBanner = async () => {
+    setShowPackRelaunchBanner(false);
+    try {
+      await AsyncStorage.setItem(PACK_RELAUNCH_BANNER_KEY, '1');
+    } catch (_) {}
+  };
 
   // Fetch subscription plans (Android only)
   useEffect(() => {
@@ -1451,7 +1488,7 @@ const CreditScreen = ({ navigation }) => {
             >
               <TouchableOpacity
                 onPress={() => navigation.goBack()}
-                style={[styles.backButton, { backgroundColor: backButtonBg }]}
+                style={[styles.backButton, androidGlassFixStyle, { backgroundColor: backButtonBg }]}
               >
                 <Ionicons name="arrow-back" size={24} color={colors.text} />
               </TouchableOpacity>
@@ -1477,6 +1514,7 @@ const CreditScreen = ({ navigation }) => {
             <Animated.View
               style={[
                 styles.balanceCard,
+                androidGlassFixStyle,
                 {
                   opacity: fadeAnim,
                   transform: [{ scale: pulseAnim }]
@@ -1504,7 +1542,18 @@ const CreditScreen = ({ navigation }) => {
             {/* Buy credits (Google Play) - Android only; products fetched from backend/Play */}
             {Platform.OS === 'android' && (
               <View style={styles.buySection}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('credits.page.buyCredits')}</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('credits.page.chooseYourPackWithTara')}</Text>
+                {showPackRelaunchBanner ? (
+                  <View style={[styles.packRelaunchBanner, { backgroundColor: isDark ? 'rgba(34,197,94,0.16)' : 'rgba(34,197,94,0.1)', borderColor: isDark ? 'rgba(34,197,94,0.45)' : 'rgba(22,163,74,0.35)' }]}>
+                    <Ionicons name="gift-outline" size={18} color="#16a34a" />
+                    <Text style={[styles.packRelaunchText, { color: colors.text }]}>
+                      {t('credits.page.packRelaunchBanner')}
+                    </Text>
+                    <TouchableOpacity onPress={dismissPackRelaunchBanner} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name="close" size={18} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
                 {productsLoading ? (
                   <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>{t('credits.page.loadingProducts')}</Text>
                 ) : googlePlayProducts.length === 0 ? (
@@ -1522,44 +1571,86 @@ const CreditScreen = ({ navigation }) => {
                         </View>
                       ) : null;
                     })()}
-                    <View style={styles.buyProductGrid}>
+                    <View style={styles.buyProductStack}>
                       {googlePlayProducts.map((product) => {
                         const bonus = getFirstPurchaseBonus(product);
+                        const meta = getCreditPackMeta(product.credits);
+                        // Prefer app/catalog names (Shuruaat/Guru) over Play Console titles ("999 Credits").
+                        const packName = meta.name || product.name || product.title;
+                        const badge = meta.badge ?? product.badge;
+                        const questions = meta.questions ?? product.questions;
+                        const savePercent = Number(meta.savePercent ?? product.save_percent) || 0;
+                        const packBonusCredits = Number(meta.bonusCredits ?? product.pack_bonus_credits) || 0;
+                        const displayPrice = getCreditPackDisplayPrice(product, iapProducts);
+                        const isPopular = Boolean(badge);
+                        const totalCredits =
+                          Number(product.total_credits) ||
+                          (bonus.eligible
+                            ? bonus.totalCredits
+                            : product.credits + packBonusCredits);
+                        const showPackBonus = packBonusCredits > 0 && !bonus.eligible;
                         return (
                           <TouchableOpacity
                             key={product.product_id}
                             style={[
-                              styles.creditPackCard,
+                              styles.creditPackCardWide,
+                              androidGlassFixStyle,
                               {
                                 backgroundColor: promoCardBg,
-                                borderColor: bonus.eligible ? colors.primary : colors.cardBorder,
+                                borderColor: isPopular || bonus.eligible ? colors.primary : colors.cardBorder,
+                                borderWidth: isPopular ? 2 : 1,
                               },
                             ]}
                             onPress={() => handleBuyCreditsPress(product)}
                             disabled={purchasingProductId === product.product_id}
                           >
-                            <View>
-                              <Text style={[styles.creditPackCredits, { color: colors.text }]}>
-                                {bonus.eligible
-                                  ? `${bonus.totalCredits} credits`
-                                  : t('credits.page.creditsCount', { count: product.credits })}
-                              </Text>
-                              {bonus.eligible ? (
-                                <Text style={[styles.creditPackBonus, { color: colors.primary }]}>
-                                  {product.credits} + {bonus.bonusCredits} bonus
+                            <View style={styles.creditPackWideTop}>
+                              <View style={{ flex: 1 }}>
+                                <View style={styles.creditPackNameRow}>
+                                  <Text style={[styles.creditPackName, { color: colors.text }]}>{packName}</Text>
+                                  {badge ? (
+                                    <View style={[styles.creditPackBadge, { backgroundColor: colors.primary }]}>
+                                      <Text style={styles.creditPackBadgeText}>{badge}</Text>
+                                    </View>
+                                  ) : null}
+                                </View>
+                                {displayPrice ? (
+                                  <Text style={[styles.creditPackPricePrimary, { color: colors.text }]}>{displayPrice}</Text>
+                                ) : null}
+                                <Text style={[styles.creditPackCreditsSecondary, { color: colors.textSecondary }]}>
+                                  {t('credits.page.creditsCountTitle', { count: totalCredits })}
                                 </Text>
-                              ) : null}
-                              {(() => {
-                                const displayPrice = getCreditPackDisplayPrice(product, iapProducts);
-                                return displayPrice ? (
-                                  <Text style={[styles.creditPackPrice, { color: colors.textSecondary }]}>{displayPrice}</Text>
-                                ) : null;
-                              })()}
-                            </View>
-                            <View style={[styles.creditPackButton, { backgroundColor: colors.primary }]}>
-                              <Text style={styles.creditPackButtonText}>
-                                {purchasingProductId === product.product_id ? t('credits.page.processing') : t('credits.page.buy')}
-                              </Text>
+                                {questions != null ? (
+                                  <Text style={[styles.creditPackQuestions, { color: colors.text }]}>
+                                    {product.credits >= 999
+                                      ? t('credits.page.questionsWithTara', { count: questions })
+                                      : t('credits.page.questionsCount', { count: questions })}
+                                  </Text>
+                                ) : null}
+                                {showPackBonus ? (
+                                  <Text style={[styles.creditPackBonus, { color: colors.primary }]}>
+                                    {t('credits.page.packBonusLine', {
+                                      base: product.credits,
+                                      bonus: packBonusCredits,
+                                    })}
+                                  </Text>
+                                ) : null}
+                                {bonus.eligible ? (
+                                  <Text style={[styles.creditPackBonus, { color: colors.primary }]}>
+                                    {product.credits} + {bonus.bonusCredits} bonus
+                                  </Text>
+                                ) : null}
+                                {savePercent > 0 ? (
+                                  <Text style={[styles.creditPackSave, { color: colors.primary }]}>
+                                    {t('credits.page.savePercent', { percent: savePercent })}
+                                  </Text>
+                                ) : null}
+                              </View>
+                              <View style={[styles.creditPackButton, { backgroundColor: colors.primary }]}>
+                                <Text style={styles.creditPackButtonText}>
+                                  {purchasingProductId === product.product_id ? t('credits.page.processing') : t('credits.page.buy')}
+                                </Text>
+                              </View>
                             </View>
                           </TouchableOpacity>
                         );
@@ -1573,7 +1664,7 @@ const CreditScreen = ({ navigation }) => {
             {/* VIP subscriptions are discounts, not credit packs. Keep them secondary to reduce purchase confusion. */}
             {Platform.OS === 'android' && (
               <View style={styles.buySection}>
-                <View style={[styles.vipDiscountPanel, { backgroundColor: promoCardBg, borderColor: colors.cardBorder }]}>
+                <View style={[styles.vipDiscountPanel, androidGlassFixStyle, { backgroundColor: promoCardBg, borderColor: colors.cardBorder }]}>
                   <View style={styles.vipDiscountHeader}>
                     <View style={[styles.vipDiscountIcon, { backgroundColor: isDark ? 'rgba(249,115,22,0.16)' : 'rgba(255,107,53,0.1)' }]}>
                       <Ionicons name="shield-checkmark-outline" size={22} color={colors.primary} />
@@ -1724,7 +1815,7 @@ const CreditScreen = ({ navigation }) => {
             {/* Promo Code Section */}
             <View style={styles.promoSection}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('credits.page.promoHeading')}</Text>
-              <View style={[styles.promoCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}>
+              <View style={[styles.promoCard, androidGlassFixStyle, { backgroundColor: promoCardBg, borderWidth: (isDark || Platform.OS === 'android') ? 1 : 0, borderColor: colors.cardBorder }]}>
                 <View style={[styles.promoInputContainer, { backgroundColor: promoInputBg, borderColor: colors.cardBorder }]}>
                   <Ionicons name="ticket" size={20} color={colors.primary} style={styles.promoIcon} />
                   <TextInput
@@ -1762,7 +1853,7 @@ const CreditScreen = ({ navigation }) => {
             <View style={styles.historySection}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('credits.page.transactionHistory')}</Text>
               {history.length > 0 ? (
-                <View style={[styles.historyCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}>
+                <View style={[styles.historyCard, androidGlassFixStyle, { backgroundColor: promoCardBg, borderWidth: (isDark || Platform.OS === 'android') ? 1 : 0, borderColor: colors.cardBorder }]}>
                   {history.map((item, index) => (
                     <View key={index}>
                       {renderTransaction({ item })}
@@ -1771,7 +1862,7 @@ const CreditScreen = ({ navigation }) => {
                   ))}
                 </View>
               ) : (
-                <View style={[styles.emptyState, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}>
+                <View style={[styles.emptyState, androidGlassFixStyle, { backgroundColor: promoCardBg, borderWidth: (isDark || Platform.OS === 'android') ? 1 : 0, borderColor: colors.cardBorder }]}>
                   <Ionicons name="receipt-outline" size={48} color={colors.textTertiary} />
                   <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>{t('credits.page.noTransactions')}</Text>
                   <Text style={[styles.emptyStateSubtext, { color: colors.textTertiary }]}>{t('credits.page.historyHint')}</Text>
@@ -1796,7 +1887,7 @@ const CreditScreen = ({ navigation }) => {
           onPress={closePurchaseModal}
         >
           <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={styles.modalContentWrap}>
-            <View style={[styles.purchaseModalCard, { backgroundColor: promoCardBg, borderColor: colors.cardBorder }]}>
+            <View style={[styles.purchaseModalCard, androidGlassFixStyle, { backgroundColor: promoCardBg, borderColor: colors.cardBorder }]}>
               <View style={[styles.purchaseModalIconWrap, { backgroundColor: purchaseModal.type === 'error' ? (isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.12)') : purchaseModal.type === 'already_credited' ? (isDark ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.12)') : (isDark ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.12)') }]}>
                 <Ionicons
                   name={purchaseModal.type === 'error' ? 'alert-circle' : purchaseModal.type === 'already_credited' ? 'information-circle' : 'checkmark-circle'}
@@ -1859,11 +1950,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: { elevation: 0 },
+    }),
   },
   headerContent: {
     alignItems: 'center',
@@ -1873,11 +1968,15 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     marginBottom: 16,
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#ff6b35',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
+      },
+      android: { elevation: 0 },
+    }),
   },
   orbGradient: {
     width: '100%',
@@ -1902,11 +2001,15 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 16,
+      },
+      android: { elevation: 0 },
+    }),
   },
   balanceGradient: {
     padding: 24,
@@ -2034,6 +2137,78 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: '700',
   },
+  packRelaunchBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  packRelaunchText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+  buyProductStack: {
+    gap: 12,
+  },
+  creditPackCardWide: {
+    width: '100%',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  creditPackWideTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  creditPackNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
+  },
+  creditPackName: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  creditPackBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  creditPackBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  creditPackPricePrimary: {
+    fontSize: 28,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  creditPackCreditsSecondary: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  creditPackQuestions: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  creditPackSave: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 2,
+  },
   creditPackCard: {
     width: (width - 52) / 2 - 6,
     borderRadius: 16,
@@ -2050,8 +2225,8 @@ const styles = StyleSheet.create({
   creditPackBonus: {
     fontSize: 12,
     fontWeight: '800',
-    marginTop: -2,
-    marginBottom: 6,
+    marginTop: 2,
+    marginBottom: 2,
   },
   creditPackPrice: {
     fontSize: 15,
@@ -2188,11 +2363,15 @@ const styles = StyleSheet.create({
   promoCard: {
     borderRadius: 16,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+      },
+      android: { elevation: 0 },
+    }),
   },
   promoInputContainer: {
     flexDirection: 'row',
@@ -2233,11 +2412,15 @@ const styles = StyleSheet.create({
   historyCard: {
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+      },
+      android: { elevation: 0 },
+    }),
   },
   transactionItem: {
     flexDirection: 'row',
@@ -2299,11 +2482,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 40,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+      },
+      android: { elevation: 0 },
+    }),
   },
   emptyStateText: {
     fontSize: 18,
@@ -2331,11 +2518,15 @@ const styles = StyleSheet.create({
     padding: 28,
     alignItems: 'center',
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    elevation: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.2,
+        shadowRadius: 24,
+      },
+      android: { elevation: 0 },
+    }),
   },
   purchaseModalIconWrap: {
     width: 80,

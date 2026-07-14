@@ -6,7 +6,7 @@ This doc describes how to enable in-app purchase of credits on Android via Googl
 
 - **Backend:** `GET /api/credits/google-play/products` fetches active in-app products from Google Play and returns credit products (product IDs following the `credits_N` convention). `POST /api/credits/google-play/verify` verifies a purchase with the Google Play Developer API and grants credits. Idempotent by `order_id` (same order is not credited twice).
 - **App:** Credit screen fetches products from the backend (which in turn lists them from Play), shows a “Buy credits” section on Android, and after a successful purchase sends `purchase_token`, `product_id`, and `order_id` to the verify endpoint.
-- **Products:** Create products in Play Console with **Product ID** format `credits_N` (e.g. `credits_50`, `credits_100`, `credits_250`, `credits_500`). The backend lists only active one-time products whose ID matches this pattern and grants N credits per purchase. You can add or change products in Play Console; the app will show whatever is returned by the API.
+- **Products:** Create products in Play Console with **Product ID** format `credits_N` (e.g. `credits_50`, `credits_100`, `credits_250`, `credits_999`). The backend lists only active one-time products whose ID matches this pattern and grants N credits per purchase. You can add or change products in Play Console; the app will show whatever is returned by the API.
 
 ---
 
@@ -15,11 +15,11 @@ This doc describes how to enable in-app purchase of credits on Android via Googl
 1. Open [Google Play Console](https://play.google.com/console) → your app (**com.astroroshni.mobile**).
 2. **Monetize** → **Products** → **In-app products** → Create product.
 3. Create four products with these **Product IDs** (exactly):
-   - `credits_50`
-   - `credits_100`
-   - `credits_250`
-   - `credits_500`
-4. For each: set name, description, and price. Save and activate.
+   - `credits_50` — Shuruaat Pack — ₹99
+   - `credits_100` — Aashirwad Pack — ₹199
+   - `credits_250` — Sadhak Pack — ₹499
+   - `credits_999` — Guru Pack — ₹1999
+4. For each: set name, description, and price. Save and activate. Deactivate retired SKUs (`credits_24`, `credits_500`) if present. Keep `credits_999` live as the Pro tier.
 5. Use **Consumable** so the same user can buy the same product again.
 
 ---

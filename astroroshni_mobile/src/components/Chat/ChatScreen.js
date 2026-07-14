@@ -53,6 +53,7 @@ import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import AppAlertModal from '../Common/AppAlertModal';
 import { useCredits } from '../../credits/CreditContext';
+import { formatCreditsInr } from '../../credits/creditPackCatalog';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
@@ -461,6 +462,7 @@ export default function ChatScreen({ navigation, route }) {
     pricingOriginal,
     pricingFeatures,
     chatCountdownSeconds,
+    isGuruMember,
   } = useCredits();
   const insets = useSafeAreaInsets();
   
@@ -5059,6 +5061,13 @@ export default function ChatScreen({ navigation, route }) {
             </View>
             
             <View style={styles.headerRight}>
+              {isGuruMember ? (
+                <View style={[styles.guruMemberBadge, { backgroundColor: theme === 'dark' ? 'rgba(255,107,53,0.2)' : 'rgba(255,107,53,0.12)', borderColor: colors.primary }]}>
+                  <Text style={[styles.guruMemberBadgeText, { color: colors.primary }]}>
+                    {t('credits.page.guruMemberBadge', 'Guru Member')}
+                  </Text>
+                </View>
+              ) : null}
               <TouchableOpacity
                 style={[styles.creditButton, isPremiumAnalysis && styles.creditButtonPremium]}
                 onPress={() => navigation.navigate('Credits')}
@@ -5608,16 +5617,13 @@ export default function ChatScreen({ navigation, route }) {
                       onPress={() => { setIsInstantAnalysis(true); setIsPremiumAnalysis(false); setShowModeSelector(false); }}
                     >
                       <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>{t('chat.modeInstant', 'Instant')}</Text>
-                      <View style={styles.modeSelectorCostRow}>
-                        {instantChatCostOriginal != null && instantChatCostOriginal > instantChatCost ? (
-                          <>
-                            <Text style={[styles.modeSelectorCostOriginal, { color: colors.textSecondary }]}>{instantChatCostOriginal}</Text>
-                            <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{instantChatCost}</Text>
-                          </>
-                        ) : (
-                          <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{instantChatCost}</Text>
-                        )}
-                        <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}> credit{instantChatCost !== 1 ? 's' : ''}</Text>
+                      <View style={styles.modeSelectorCostCol}>
+                        <Text style={[styles.modeSelectorPrice, { color: colors.text }]}>
+                          {formatCreditsInr(instantChatCost)}
+                        </Text>
+                        <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}>
+                          ~{instantChatCost} credit{instantChatCost !== 1 ? 's' : ''}
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   )}
@@ -5631,16 +5637,13 @@ export default function ChatScreen({ navigation, route }) {
                     onPress={() => { setIsInstantAnalysis(false); setIsPremiumAnalysis(false); setShowModeSelector(false); }}
                   >
                     <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>{t('chat.modeStandard', 'Standard')}</Text>
-                    <View style={styles.modeSelectorCostRow}>
-                      {chatCostOriginal != null && chatCostOriginal > chatCost ? (
-                        <>
-                          <Text style={[styles.modeSelectorCostOriginal, { color: colors.textSecondary }]}>{chatCostOriginal}</Text>
-                          <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{chatCost}</Text>
-                        </>
-                      ) : (
-                        <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{chatCost}</Text>
-                      )}
-                      <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}> credit{chatCost !== 1 ? 's' : ''}</Text>
+                    <View style={styles.modeSelectorCostCol}>
+                      <Text style={[styles.modeSelectorPrice, { color: colors.text }]}>
+                        {formatCreditsInr(chatCost)}
+                      </Text>
+                      <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}>
+                        ~{chatCost} credit{chatCost !== 1 ? 's' : ''}
+                      </Text>
                     </View>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -5653,16 +5656,13 @@ export default function ChatScreen({ navigation, route }) {
                     onPress={() => { setIsInstantAnalysis(false); setIsPremiumAnalysis(true); setShowModeSelector(false); }}
                   >
                     <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>{t('chat.modePremium', 'Premium')}</Text>
-                    <View style={styles.modeSelectorCostRow}>
-                      {premiumChatCostOriginal != null && premiumChatCostOriginal > premiumChatCost ? (
-                        <>
-                          <Text style={[styles.modeSelectorCostOriginal, { color: colors.textSecondary }]}>{premiumChatCostOriginal}</Text>
-                          <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{premiumChatCost}</Text>
-                        </>
-                      ) : (
-                        <Text style={[styles.modeSelectorCost, { color: colors.text }]}>{premiumChatCost}</Text>
-                      )}
-                      <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}> credit{premiumChatCost !== 1 ? 's' : ''}</Text>
+                    <View style={styles.modeSelectorCostCol}>
+                      <Text style={[styles.modeSelectorPrice, { color: colors.text }]}>
+                        {formatCreditsInr(premiumChatCost)}
+                      </Text>
+                      <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}>
+                        ~{premiumChatCost} credit{premiumChatCost !== 1 ? 's' : ''}
+                      </Text>
                     </View>
                   </TouchableOpacity>
                 </View>
@@ -7326,6 +7326,19 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     overflow: 'visible',
   },
+  guruMemberBadge: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    maxWidth: 88,
+  },
+  guruMemberBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
   creditButton: {
     backgroundColor: 'rgba(255, 107, 53, 0.2)',
     borderWidth: 1,
@@ -7895,6 +7908,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexWrap: 'wrap',
     justifyContent: 'center',
+  },
+  modeSelectorCostCol: {
+    alignItems: 'center',
+  },
+  modeSelectorPrice: {
+    fontSize: 13,
+    fontWeight: '800',
   },
   modeSelectorCost: {
     fontSize: 11,

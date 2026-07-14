@@ -2676,6 +2676,102 @@ class CreditService:
             return {"applied": False, **status, "eligible": False, "reason": "discount_write_failed"}
         return {"applied": True, **status}
 
+    def _pack_bonus_credits_for_product(
+        self,
+        *,
+        purchased_credits: int,
+        product_id: Optional[str] = None,
+    ) -> int:
+        """Fixed pack-level bonus (e.g. Guru 5% → +50). Independent of campaign bonuses."""
+        try:
+            from credits.razorpay_routes import CREDIT_PACK_META
+        except Exception:
+            CREDIT_PACK_META = {}
+        credits = int(purchased_credits or 0)
+        if credits <= 0 and product_id:
+            raw = str(product_id).strip()
+            if raw.startswith("credits_"):
+                try:
+                    credits = int(raw.split("_", 1)[1])
+                except ValueError:
+                    credits = 0
+        meta = CREDIT_PACK_META.get(credits) or {}
+        return max(0, int(meta.get("bonus_credits") or 0))
+
+    def maybe_apply_pack_bonus(
+        self,
+        *,
+        userid: int,
+        purchased_credits: int,
+        purchase_source: str,
+        purchase_reference_id: str,
+        product_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Award fixed pack bonus (Guru +50) idempotently per purchase reference."""
+        bonus = self._pack_bonus_credits_for_product(
+            purchased_credits=purchased_credits,
+            product_id=product_id,
+        )
+        if bonus <= 0:
+            return {"applied": False, "bonus_credits": 0, "eligible": False, "reason": "no_pack_bonus"}
+
+        reference_id = f"{purchase_source}:{purchase_reference_id}:pack_bonus"
+        if self.has_transaction_with_reference(userid, "pack_bonus", reference_id):
+            return {
+                "applied": False,
+                "bonus_credits": bonus,
+                "eligible": True,
+                "reason": "already_applied",
+            }
+
+        metadata = json.dumps(
+            {
+                "purchase_source": purchase_source,
+                "purchase_reference_id": purchase_reference_id,
+                "product_id": product_id,
+                "purchased_credits": int(purchased_credits),
+                "pack_bonus_credits": bonus,
+            }
+        )
+        ok = self.add_credits(
+            userid,
+            bonus,
+            "pack_bonus",
+            reference_id=reference_id,
+            description=f"Pack bonus: +{bonus} credits",
+            metadata=metadata,
+        )
+        if not ok:
+            return {"applied": False, "bonus_credits": bonus, "eligible": False, "reason": "bonus_write_failed"}
+        return {"applied": True, "bonus_credits": bonus, "eligible": True}
+
+    def user_is_guru_member(self, userid: int) -> bool:
+        """True if user purchased the Guru pack (credits_999) at least once."""
+        from db import get_conn, execute
+
+        try:
+            with get_conn() as conn:
+                cursor = execute(
+                    conn,
+                    """
+                    SELECT 1
+                    FROM credit_transactions
+                    WHERE userid = ?
+                      AND transaction_type = 'earned'
+                      AND (
+                        (source IN ('google_play', 'razorpay') AND amount = 999)
+                        OR (source = 'pack_bonus' AND COALESCE(metadata, '') LIKE '%credits_999%')
+                        OR COALESCE(description, '') LIKE '%credits_999%'
+                        OR COALESCE(metadata, '') LIKE '%credits_999%'
+                      )
+                    LIMIT 1
+                    """,
+                    (userid,),
+                )
+                return cursor.fetchone() is not None
+        except Exception:
+            return False
+
     def apply_purchase_extras(
         self,
         *,
@@ -2685,7 +2781,14 @@ class CreditService:
         purchase_reference_id: str,
         product_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Apply first-purchase bonus and open purchase discount for a verified purchase."""
+        """Apply pack bonus, first-purchase bonus, and open purchase discount for a verified purchase."""
+        pack_result = self.maybe_apply_pack_bonus(
+            userid=userid,
+            purchased_credits=purchased_credits,
+            purchase_source=purchase_source,
+            purchase_reference_id=purchase_reference_id,
+            product_id=product_id,
+        )
         first_result = self.maybe_apply_first_purchase_bonus(
             userid=userid,
             purchased_credits=purchased_credits,
@@ -2700,14 +2803,17 @@ class CreditService:
             purchase_reference_id=purchase_reference_id,
             product_id=product_id,
         )
+        pack_added = int(pack_result.get("bonus_credits") or 0) if pack_result.get("applied") else 0
         first_added = int(first_result.get("bonus_credits") or 0) if first_result.get("applied") else 0
         discount_added = int(discount_result.get("bonus_credits") or 0) if discount_result.get("applied") else 0
         return {
+            "pack_bonus": pack_result,
             "first_purchase_bonus": first_result,
             "purchase_discount": discount_result,
+            "pack_bonus_credits_added": pack_added,
             "first_purchase_bonus_credits_added": first_added,
             "discount_credits_added": discount_added,
-            "bonus_credits_added": first_added + discount_added,
+            "bonus_credits_added": pack_added + first_added + discount_added,
         }
 
     def add_credits(self, userid: int, amount: int, source: str, reference_id: str = None, description: str = None, metadata: str = None) -> bool:
@@ -3153,14 +3259,15 @@ class CreditService:
             conn.commit()
             return success
     
-    # Known one-time credit packs (must stay aligned with Play SKUs credits_N + Razorpay prices).
+    # Live sellable packs: Shuruaat 50 / Aashirwad 100 / Sadhak 250 / Guru 999.
+    # Keep retired SKUs seeded as inactive so admin history / old receipts still resolve.
     DEFAULT_CREDIT_PACKS: List[tuple] = [
-        (24, 1),
-        (50, 2),
-        (100, 3),
-        (250, 4),
-        (500, 5),
-        (999, 6),
+        (50, 1, True),
+        (100, 2, True),
+        (250, 3, True),
+        (999, 4, True),
+        (24, 10, False),
+        (500, 11, False),
     ]
 
     def _ensure_credit_product_catalog(self, conn=None) -> None:
@@ -3180,16 +3287,19 @@ class CreditService:
                 )
                 """,
             )
-            for credits, sort_order in self.DEFAULT_CREDIT_PACKS:
+            for credits, sort_order, is_active in self.DEFAULT_CREDIT_PACKS:
                 product_id = f"credits_{credits}"
                 execute(
                     active_conn,
                     """
                     INSERT INTO credit_product_catalog (product_id, credits, is_active, sort_order)
                     VALUES (?, ?, ?, ?)
-                    ON CONFLICT (product_id) DO NOTHING
+                    ON CONFLICT (product_id) DO UPDATE SET
+                        sort_order = EXCLUDED.sort_order,
+                        is_active = EXCLUDED.is_active,
+                        updated_at = CURRENT_TIMESTAMP
                     """,
-                    (product_id, credits, True, sort_order),
+                    (product_id, credits, is_active, sort_order),
                 )
 
         if conn is not None:

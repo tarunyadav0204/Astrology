@@ -13,6 +13,7 @@ import {
   Modal,
   Animated,
   Image,
+  Linking,
 } from 'react-native';
 import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { BlurView } from 'expo-blur';
@@ -20,7 +21,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Text as SvgText, Path, Line, Rect, Polygon } from 'react-native-svg';
-import { COLORS } from '../../utils/constants';
+import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
 import { chartAPI, panchangAPI } from '../../services/api';
 import { BiometricTeaserCard } from '../BiometricTeaserCard';
@@ -42,6 +43,8 @@ const BLOG_FETCH_TTL_MS = 15 * 60 * 1000;
 const MULTI_CHART_TIP_NEVER_KEY = 'home_multi_chart_tip_never';
 const MULTI_CHART_TIP_SNOOZE_KEY = 'home_multi_chart_tip_snooze_until';
 const KNOW_YOURSELF_DISMISS_KEY = 'home_know_yourself_dismissed_date';
+const HOME_BANNER_DISMISS_PREFIX = 'home_admin_banner_dismiss:';
+const homeBannerDismissKey = (bannerId) => `${HOME_BANNER_DISMISS_PREFIX}${bannerId}`;
 const todayDateKey = () => new Date().toISOString().slice(0, 10);
 const roundPanchangCoord = (value) => Math.round(parseFloat(value) * 100) / 100;
 
@@ -323,6 +326,7 @@ export default function HomeScreen({
   const [showKnowYourselfPrompt, setShowKnowYourselfPrompt] = useState(false);
   const [showInfoOnlyModal, setShowInfoOnlyModal] = useState(false);
   const [infoOnlyModalContent, setInfoOnlyModalContent] = useState({ title: '', body: '' });
+  const [homeBanner, setHomeBanner] = useState(null);
   const knowYourselfAnim = useRef(new Animated.Value(0)).current;
   /** One promotional home prompt per Home focus visit (info modal counts as the visit slot). */
   const homePromptShownThisVisitRef = useRef(false);
@@ -635,6 +639,85 @@ export default function HomeScreen({
       useNativeDriver: true,
     }).start(() => setShowKnowYourselfPrompt(false));
   }, [knowYourselfAnim]);
+
+  const shouldShowHomeBanner = useCallback(async (banner) => {
+    if (!banner?.enabled) return false;
+    const id = String(banner.id || '').trim();
+    const title = String(banner.title || '').trim();
+    const body = String(banner.body || '').trim();
+    if (!id || (!title && !body)) return false;
+    const platforms = Array.isArray(banner.platforms) ? banner.platforms.map((p) => String(p).toLowerCase()) : [];
+    if (platforms.length && !platforms.includes(Platform.OS)) return false;
+    try {
+      const raw = await AsyncStorage.getItem(homeBannerDismissKey(id));
+      if (!raw) return true;
+      if (raw === 'forever') return false;
+      const frequency = String(banner.frequency || 'once').toLowerCase();
+      if (frequency !== 'every_x_days') return false;
+      const dismissedAt = new Date(raw);
+      if (Number.isNaN(dismissedAt.getTime())) return true;
+      const intervalDays = Math.max(1, Number(banner.interval_days) || 7);
+      const diffDays = (Date.now() - dismissedAt.getTime()) / (1000 * 60 * 60 * 24);
+      return diffDays >= intervalDays;
+    } catch (_) {
+      return true;
+    }
+  }, []);
+
+  const loadHomeBanner = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}${getEndpoint('/app/config')}`);
+      if (!res.ok) {
+        setHomeBanner(null);
+        return;
+      }
+      const data = await res.json();
+      const banner = data?.home_banner;
+      if (banner && (await shouldShowHomeBanner(banner))) {
+        setHomeBanner(banner);
+      } else {
+        setHomeBanner(null);
+      }
+    } catch (_) {
+      setHomeBanner(null);
+    }
+  }, [shouldShowHomeBanner]);
+
+  const dismissHomeBanner = useCallback(async () => {
+    const id = String(homeBanner?.id || '').trim();
+    const frequency = String(homeBanner?.frequency || 'once').toLowerCase();
+    setHomeBanner(null);
+    if (!id) return;
+    try {
+      const value = frequency === 'every_x_days' ? new Date().toISOString() : 'forever';
+      await AsyncStorage.setItem(homeBannerDismissKey(id), value);
+    } catch (_) {
+      /* ignore */
+    }
+  }, [homeBanner]);
+
+  const handleHomeBannerCta = useCallback(async () => {
+    const action = String(homeBanner?.cta_action || 'dismiss').toLowerCase();
+    const url = String(homeBanner?.cta_url || '').trim();
+    await dismissHomeBanner();
+    if (action === 'credits') {
+      navigation.navigate('Credits');
+    } else if (action === 'chat') {
+      onOptionSelect?.({ action: 'question' });
+    } else if (action === 'url' && url) {
+      try {
+        await Linking.openURL(url);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  }, [homeBanner, dismissHomeBanner, navigation, onOptionSelect]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadHomeBanner();
+    }, [loadHomeBanner])
+  );
 
   const openKnowYourselfGuide = useCallback(async () => {
     try {
@@ -1450,6 +1533,39 @@ const loadHomeData = async (nativeData = null) => {
             </View>
           </LinearGradient>
         </View>
+
+        {homeBanner ? (
+          <View
+            style={[
+              styles.adminHomeBanner,
+              androidLightCardFixStyle,
+              {
+                backgroundColor: isDark ? 'rgba(34,197,94,0.16)' : 'rgba(34,197,94,0.1)',
+                borderColor: isDark ? 'rgba(34,197,94,0.45)' : 'rgba(22,163,74,0.35)',
+              },
+            ]}
+          >
+            <Icon name="megaphone-outline" size={18} color="#16a34a" style={{ marginTop: 2 }} />
+            <View style={styles.adminHomeBannerTextCol}>
+              {homeBanner.title ? (
+                <Text style={[styles.adminHomeBannerTitle, { color: colors.text }]}>{homeBanner.title}</Text>
+              ) : null}
+              {homeBanner.body ? (
+                <Text style={[styles.adminHomeBannerBody, { color: colors.textSecondary }]}>{homeBanner.body}</Text>
+              ) : null}
+              {homeBanner.cta_label && homeBanner.cta_action !== 'none' ? (
+                <TouchableOpacity onPress={handleHomeBannerCta} style={styles.adminHomeBannerCta}>
+                  <Text style={[styles.adminHomeBannerCtaText, { color: colors.primary }]}>
+                    {homeBanner.cta_label}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <TouchableOpacity onPress={dismissHomeBanner} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Icon name="close" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {/* At-a-Glance Ticker */}
         <View style={[styles.tickerContainer, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
@@ -3249,6 +3365,38 @@ const styles = StyleSheet.create({
     width: 1,
     height: 24,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  adminHomeBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 14,
+  },
+  adminHomeBannerTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  adminHomeBannerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  adminHomeBannerBody: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  adminHomeBannerCta: {
+    marginTop: 6,
+    alignSelf: 'flex-start',
+  },
+  adminHomeBannerCtaText: {
+    fontSize: 13,
+    fontWeight: '800',
   },
   
   container: {

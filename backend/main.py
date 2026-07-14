@@ -54,7 +54,7 @@ from app.kp.routes.kp_routes import router as kp_router
 from career_analysis.career_router import router as career_router
 from career_analysis.career_ai_router import router as career_ai_router
 from panchang.panchang_routes import router as panchang_router
-from utils.admin_settings import get_setting
+from utils.admin_settings import get_setting, get_home_screen_banner
 from panchang.muhurat_routes import router as muhurat_router
 from muhurat_routes import router as childbirth_router
 from health.health_routes import router as health_router
@@ -729,6 +729,7 @@ class AppConfigResponse(BaseModel):
     min_android_version_code: int
     min_ios_build_number: int
     app_update_release_notes: str = ""
+    home_banner: Optional[dict] = None
 
 
 @app.get("/api/app/config", response_model=AppConfigResponse)
@@ -741,6 +742,7 @@ async def get_app_config() -> AppConfigResponse:
       - admin_settings.min_android_version_code or MIN_ANDROID_VERSION_CODE
       - admin_settings.min_ios_build_number or MIN_IOS_BUILD_NUMBER
       - admin_settings.app_update_release_notes (optional; shown on forced update screen)
+      - admin_settings.home_screen_banner_json (optional home announcement banner)
 
     Set values to 0 (or leave unset) to disable forced updates.
     """
@@ -749,22 +751,24 @@ async def get_app_config() -> AppConfigResponse:
     ios_setting = get_setting("min_ios_build_number")
 
     try:
-      min_android = int(android_setting) if android_setting is not None else MIN_ANDROID_VERSION_CODE
+        min_android = int(android_setting) if android_setting is not None else MIN_ANDROID_VERSION_CODE
     except ValueError:
-      min_android = MIN_ANDROID_VERSION_CODE
+        min_android = MIN_ANDROID_VERSION_CODE
 
     try:
-      min_ios = int(ios_setting) if ios_setting is not None else MIN_IOS_BUILD_NUMBER
+        min_ios = int(ios_setting) if ios_setting is not None else MIN_IOS_BUILD_NUMBER
     except ValueError:
-      min_ios = MIN_IOS_BUILD_NUMBER
+        min_ios = MIN_IOS_BUILD_NUMBER
 
     notes_setting = get_setting("app_update_release_notes")
     release_notes = (notes_setting or "").strip()
+    home_banner = get_home_screen_banner()
 
     return AppConfigResponse(
         min_android_version_code=min_android,
         min_ios_build_number=min_ios,
         app_update_release_notes=release_notes,
+        home_banner=home_banner,
     )
 
 # Configure timeout for long-running requests (Gemini AI takes 30-60 seconds)
@@ -3704,7 +3708,7 @@ async def calculate_accurate_dasha(birth_data: BirthData):
             maha_dashas.append({
                 'planet': maha['planet'],
                 'start': maha['start'].strftime('%Y-%m-%d'),
-                'end': maha['end'].strftime('%Y-%m-%d'),
+                'end': DashaCalculator.maha_end_date_str(maha['end']),
                 'years': maha['years']
             })
         
@@ -3772,7 +3776,7 @@ async def calculate_cascading_dashas(request: dict):
         maha_dashas.append({
             'planet': maha['planet'],
             'start': maha['start'].strftime('%Y-%m-%d'),
-            'end': maha['end'].strftime('%Y-%m-%d'),
+            'end': DashaCalculator.maha_end_date_str(maha['end']),
             'current': maha['start'] <= target_date <= maha['end'],
             'years': maha['years']
         })
@@ -3794,79 +3798,33 @@ async def calculate_cascading_dashas(request: dict):
     }
     
     if current_maha:
-        # Calculate all antar dashas for current maha
-        antar_request = {
-            'birth_data': birth_dict,
-            'parent_dasha': {
-                'planet': current_maha['planet'],
-                'start': current_maha['start'].strftime('%Y-%m-%d'),
-                'end': current_maha['end'].strftime('%Y-%m-%d')
-            },
-            'dasha_type': 'antar',
-            'target_date': target_date.strftime('%Y-%m-%d')
-        }
-        antar_result = await calculate_sub_dashas(antar_request)
-        result['antar_dashas'] = antar_result['sub_dashas']
-        
-        # Find current antar
-        current_antar = None
-        for antar in result['antar_dashas']:
-            if antar['current']:
-                current_antar = antar
-                break
-        
+        # Use DashaCalculator list helpers (same YEAR_LEN math as chat) — not the old
+        # date-truncated proportional splitter that drifted ~1–2 days.
+        antar_raw = calculator.list_antardashas(current_maha, target_date)
+        result['antar_dashas'] = calculator.strip_internal_period_fields(antar_raw)
+
+        current_antar = next((a for a in antar_raw if a.get('current')), None)
         if current_antar:
-            # Calculate pratyantar dashas
-            pratyantar_request = {
-                'birth_data': birth_dict,
-                'parent_dasha': current_antar,
-                'dasha_type': 'pratyantar',
-                'target_date': target_date.strftime('%Y-%m-%d'),
-                'maha_lord': current_maha['planet']
-            }
-            pratyantar_result = await calculate_sub_dashas(pratyantar_request)
-            result['pratyantar_dashas'] = pratyantar_result['sub_dashas']
-            
-            # Find current pratyantar
-            current_pratyantar = None
-            for pratyantar in result['pratyantar_dashas']:
-                if pratyantar['current']:
-                    current_pratyantar = pratyantar
-                    break
-            
+            pratyantar_raw = calculator.list_pratyantardashas(current_maha, current_antar, target_date)
+            result['pratyantar_dashas'] = calculator.strip_internal_period_fields(pratyantar_raw)
+
+            current_pratyantar = next((p for p in pratyantar_raw if p.get('current')), None)
             if current_pratyantar:
-                # Calculate sookshma dashas
-                sookshma_request = {
-                    'birth_data': birth_dict,
-                    'parent_dasha': current_pratyantar,
-                    'dasha_type': 'sookshma',
-                    'target_date': target_date.strftime('%Y-%m-%d'),
-                    'maha_lord': current_maha['planet'],
-                    'antar_lord': current_antar['planet']
-                }
-                sookshma_result = await calculate_sub_dashas(sookshma_request)
-                result['sookshma_dashas'] = sookshma_result['sub_dashas']
-                
-                # Find current sookshma
-                current_sookshma = None
-                for sookshma in result['sookshma_dashas']:
-                    if sookshma['current']:
-                        current_sookshma = sookshma
-                        break
-                
+                sookshma_raw = calculator.list_sookshmas(
+                    current_maha, current_antar, current_pratyantar, target_date
+                )
+                result['sookshma_dashas'] = calculator.strip_internal_period_fields(sookshma_raw)
+
+                current_sookshma = next((s for s in sookshma_raw if s.get('current')), None)
                 if current_sookshma:
-                    # Calculate prana dashas
-                    prana_request = {
-                        'birth_data': birth_dict,
-                        'parent_dasha': current_sookshma,
-                        'dasha_type': 'prana',
-                        'target_date': target_date.strftime('%Y-%m-%d'),
-                        'maha_lord': current_maha['planet'],
-                        'antar_lord': current_antar['planet'],
-                        'pratyantar_lord': current_pratyantar['planet']
-                    }
-                    prana_result = await calculate_sub_dashas(prana_request)
-                    result['prana_dashas'] = prana_result['sub_dashas']
+                    prana_raw = calculator.list_pranas(
+                        current_maha,
+                        current_antar,
+                        current_pratyantar,
+                        current_sookshma,
+                        target_date,
+                    )
+                    result['prana_dashas'] = calculator.strip_internal_period_fields(prana_raw)
     log_lifecycle_event(
         "cascading_dashas_complete",
         level=logging.INFO,
@@ -3881,113 +3839,128 @@ async def calculate_cascading_dashas(request: dict):
 
 @app.post("/api/calculate-sub-dashas")
 async def calculate_sub_dashas(request: dict):
-    """Calculate sub-dashas (Antar, Pratyantar, Sookshma, Prana) for given parent dasha"""
-    try:
-        from event_prediction.config import DASHA_PERIODS, PLANET_ORDER
-    except ImportError:
-        DASHA_PERIODS = {
-            'Ketu': 7, 'Venus': 20, 'Sun': 6, 'Moon': 10, 'Mars': 7,
-            'Rahu': 18, 'Jupiter': 16, 'Saturn': 19, 'Mercury': 17
-        }
-        PLANET_ORDER = ['Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury']
-    
+    """Calculate sub-dashas (Antar, Pratyantar, Sookshma, Prana) for given parent dasha.
+
+    Resolves parent periods from DashaCalculator (full datetime precision) so dates
+    match chat / calculate-cascading-dashas. Does not use calendar-day proportional splits.
+    """
+    from shared.dasha_calculator import DashaCalculator
+
     birth_data = BirthData(**request['birth_data'])
     parent_dasha = request['parent_dasha']
     dasha_type = request['dasha_type']
-    target_date = datetime.strptime(request.get('target_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
-    
-    # Calculate sub-dashas using proper Vimshottari method
-    parent_start = datetime.strptime(parent_dasha['start'], '%Y-%m-%d')
-    parent_end = datetime.strptime(parent_dasha['end'], '%Y-%m-%d')
-    parent_planet = parent_dasha['planet']
-    
-    # Calculate parent period in days
-    parent_total_days = (parent_end - parent_start).days + 1  # Include end date
-    
-    # Get planet order starting from parent planet
-    start_index = PLANET_ORDER.index(parent_planet)
-    sub_dashas = []
-    current_date = parent_start
-    
-    # Calculate total period for proportional division
-    total_period = 0
-    for i in range(9):
-        planet = PLANET_ORDER[(start_index + i) % 9]
-        if dasha_type == 'antar':
-            period = (DASHA_PERIODS[parent_planet] * DASHA_PERIODS[planet]) / 120
-        elif dasha_type == 'pratyantar':
-            antar_period = (DASHA_PERIODS[request.get('maha_lord', parent_planet)] * DASHA_PERIODS[parent_planet]) / 120
-            period = (antar_period * DASHA_PERIODS[planet]) / 120
-        elif dasha_type == 'sookshma':
-            maha_lord = request.get('maha_lord', parent_planet)
-            antar_lord = request.get('antar_lord', parent_planet)
-            antar_period = (DASHA_PERIODS[maha_lord] * DASHA_PERIODS[antar_lord]) / 120
-            pratyantar_period = (antar_period * DASHA_PERIODS[parent_planet]) / 120
-            period = (pratyantar_period * DASHA_PERIODS[planet]) / 120
-        elif dasha_type == 'prana':
-            maha_lord = request.get('maha_lord', parent_planet)
-            antar_lord = request.get('antar_lord', parent_planet)
-            pratyantar_lord = request.get('pratyantar_lord', parent_planet)
-            antar_period = (DASHA_PERIODS[maha_lord] * DASHA_PERIODS[antar_lord]) / 120
-            pratyantar_period = (antar_period * DASHA_PERIODS[pratyantar_lord]) / 120
-            sookshma_period = (pratyantar_period * DASHA_PERIODS[parent_planet]) / 120
-            period = (sookshma_period * DASHA_PERIODS[planet]) / 120
-        else:
-            period = DASHA_PERIODS[planet]
-        
-        total_period += period
-    
-    # Calculate actual sub-dasha periods
-    for i in range(9):
-        planet = PLANET_ORDER[(start_index + i) % 9]
-        
-        if dasha_type == 'antar':
-            period = (DASHA_PERIODS[parent_planet] * DASHA_PERIODS[planet]) / 120
-        elif dasha_type == 'pratyantar':
-            antar_period = (DASHA_PERIODS[request.get('maha_lord', parent_planet)] * DASHA_PERIODS[parent_planet]) / 120
-            period = (antar_period * DASHA_PERIODS[planet]) / 120
-        elif dasha_type == 'sookshma':
-            maha_lord = request.get('maha_lord', parent_planet)
-            antar_lord = request.get('antar_lord', parent_planet)
-            antar_period = (DASHA_PERIODS[maha_lord] * DASHA_PERIODS[antar_lord]) / 120
-            pratyantar_period = (antar_period * DASHA_PERIODS[parent_planet]) / 120
-            period = (pratyantar_period * DASHA_PERIODS[planet]) / 120
-        elif dasha_type == 'prana':
-            maha_lord = request.get('maha_lord', parent_planet)
-            antar_lord = request.get('antar_lord', parent_planet)
-            pratyantar_lord = request.get('pratyantar_lord', parent_planet)
-            antar_period = (DASHA_PERIODS[maha_lord] * DASHA_PERIODS[antar_lord]) / 120
-            pratyantar_period = (antar_period * DASHA_PERIODS[pratyantar_lord]) / 120
-            sookshma_period = (pratyantar_period * DASHA_PERIODS[parent_planet]) / 120
-            period = (sookshma_period * DASHA_PERIODS[planet]) / 120
-        
-        # Calculate days for this sub-dasha
-        ratio = period / total_period
-        sub_days = parent_total_days * ratio
-        end_date = current_date + timedelta(days=sub_days)
-        
-        # Ensure we don't exceed parent end date
-        if end_date > parent_end:
-            end_date = parent_end
-        
-        # For display, make end date inclusive but not beyond parent end
-        display_end = min(end_date.date(), parent_end.date())
-        
-        is_current = current_date.date() <= target_date.date() <= display_end
-        
-        sub_dashas.append({
-            'planet': planet,
-            'start': current_date.strftime('%Y-%m-%d'),
-            'end': display_end.strftime('%Y-%m-%d'),
-            'current': is_current,
-            'years': round(period, 4)
-        })
-        
-        current_date = end_date
-        if current_date >= parent_end:
-            break
-    
-    return {'sub_dashas': sub_dashas}
+    target_date = datetime.strptime(
+        request.get('target_date', datetime.now().strftime('%Y-%m-%d')),
+        '%Y-%m-%d',
+    )
+
+    birth_dict = {
+        'name': birth_data.name,
+        'date': birth_data.date,
+        'time': birth_data.time,
+        'latitude': birth_data.latitude,
+        'longitude': birth_data.longitude,
+        'timezone': birth_data.timezone,
+    }
+
+    calculator = DashaCalculator()
+    current_dashas = await asyncio.to_thread(
+        calculator.calculate_current_dashas,
+        birth_dict,
+        target_date,
+    )
+    maha_dashas = current_dashas.get('maha_dashas') or []
+
+    def _find_maha(planet_name: str):
+        for m in maha_dashas:
+            if m.get('planet') == planet_name:
+                return m
+        return None
+
+    parent_planet = parent_dasha.get('planet')
+    sub_raw = []
+
+    if dasha_type == 'antar':
+        maha = _find_maha(parent_planet)
+        if not maha:
+            return {'sub_dashas': []}
+        sub_raw = calculator.list_antardashas(maha, target_date)
+
+    elif dasha_type == 'pratyantar':
+        maha = _find_maha(request.get('maha_lord') or parent_planet)
+        if not maha:
+            return {'sub_dashas': []}
+        antar = next(
+            (a for a in calculator.list_antardashas(maha, target_date) if a['planet'] == parent_planet),
+            None,
+        )
+        if not antar:
+            return {'sub_dashas': []}
+        sub_raw = calculator.list_pratyantardashas(maha, antar, target_date)
+
+    elif dasha_type == 'sookshma':
+        maha = _find_maha(request.get('maha_lord'))
+        if not maha:
+            return {'sub_dashas': []}
+        antar = next(
+            (
+                a
+                for a in calculator.list_antardashas(maha, target_date)
+                if a['planet'] == request.get('antar_lord')
+            ),
+            None,
+        )
+        if not antar:
+            return {'sub_dashas': []}
+        pratyantar = next(
+            (
+                p
+                for p in calculator.list_pratyantardashas(maha, antar, target_date)
+                if p['planet'] == parent_planet
+            ),
+            None,
+        )
+        if not pratyantar:
+            return {'sub_dashas': []}
+        sub_raw = calculator.list_sookshmas(maha, antar, pratyantar, target_date)
+
+    elif dasha_type == 'prana':
+        maha = _find_maha(request.get('maha_lord'))
+        if not maha:
+            return {'sub_dashas': []}
+        antar = next(
+            (
+                a
+                for a in calculator.list_antardashas(maha, target_date)
+                if a['planet'] == request.get('antar_lord')
+            ),
+            None,
+        )
+        if not antar:
+            return {'sub_dashas': []}
+        pratyantar = next(
+            (
+                p
+                for p in calculator.list_pratyantardashas(maha, antar, target_date)
+                if p['planet'] == request.get('pratyantar_lord')
+            ),
+            None,
+        )
+        if not pratyantar:
+            return {'sub_dashas': []}
+        sookshma = next(
+            (
+                s
+                for s in calculator.list_sookshmas(maha, antar, pratyantar, target_date)
+                if s['planet'] == parent_planet
+            ),
+            None,
+        )
+        if not sookshma:
+            return {'sub_dashas': []}
+        sub_raw = calculator.list_pranas(maha, antar, pratyantar, sookshma, target_date)
+
+    return {'sub_dashas': calculator.strip_internal_period_fields(sub_raw)}
 
 @app.post("/api/calculate-ashtakavarga")
 async def calculate_ashtakavarga(request: dict, current_user: User = Depends(get_current_user)):

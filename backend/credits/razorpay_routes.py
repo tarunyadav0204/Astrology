@@ -36,16 +36,52 @@ credit_service = CreditService()
 RAZORPAY_SOURCE = "razorpay"
 RAZORPAY_API_BASE = "https://api.razorpay.com/v1"
 
-ALLOWED_CREDITS: Tuple[int, ...] = (24, 50, 100, 250, 500, 999)
+# Live catalog: Shuruaat (50) / Aashirwad (100) / Sadhak (250) / Guru (999).
+# Retired: 24 and old ₹49 entry; 500 stays inactive.
+ALLOWED_CREDITS: Tuple[int, ...] = (50, 100, 250, 999)
+
+# Display names + marketing copy for recharge UI (Play listing titles may lag).
+CREDIT_PACK_META: Dict[int, Dict[str, Any]] = {
+    50: {
+        "name": "Shuruaat Pack",
+        "badge": None,
+        "questions": 2,
+        "save_percent": 0,
+        "value_prop": "New Users - 2 Questions",
+        "bonus_credits": 0,
+    },
+    100: {
+        "name": "Aashirwad Pack",
+        "badge": "Most Popular",
+        "questions": 4,
+        "save_percent": 10,
+        "value_prop": "Most Popular - 4 Questions",
+        "bonus_credits": 0,
+    },
+    250: {
+        "name": "Sadhak Pack",
+        "badge": "Best Value",
+        "questions": 11,
+        "save_percent": 25,
+        "value_prop": "Best Value - Save 25%",
+        "bonus_credits": 0,
+    },
+    999: {
+        "name": "Guru Pack",
+        "badge": "For Serious Seekers",
+        "questions": 45,
+        "save_percent": 0,
+        "value_prop": "45 Questions with Tara",
+        # 5% extra → 999 + 50 = 1049 credits on purchase
+        "bonus_credits": 50,
+    },
+}
 
 _DEFAULT_PRICE_PAISE: Dict[int, int] = {
-    24: 2400,
-    50: 4900,
-    100: 9900,
-    250: 22900,
-    500: 44900,
-    # Override with RAZORPAY_PRICE_PAISE_999 to match Play Console (paise).
-    999: 84900,
+    50: 9900,      # ₹99 Shuruaat Pack
+    100: 19900,    # ₹199 Aashirwad Pack
+    250: 49900,    # ₹499 Sadhak Pack
+    999: 199900,   # ₹1999 Guru Pack
 }
 
 
@@ -103,6 +139,7 @@ def get_razorpay_credit_packs() -> List[Dict[str, Any]]:
         if c not in active_amounts:
             continue
         paise = _expected_paise_for_pack(c)
+        meta = CREDIT_PACK_META.get(c) or {}
         packs.append(
             {
                 "credits": c,
@@ -110,6 +147,12 @@ def get_razorpay_credit_packs() -> List[Dict[str, Any]]:
                 "amount_paise": paise,
                 "amount_display": _format_inr(paise),
                 "currency": "INR",
+                "name": meta.get("name") or f"{c} Credits",
+                "badge": meta.get("badge"),
+                "questions": meta.get("questions"),
+                "save_percent": meta.get("save_percent") or 0,
+                "value_prop": meta.get("value_prop"),
+                "pack_bonus_credits": int(meta.get("bonus_credits") or 0),
             }
         )
     return packs

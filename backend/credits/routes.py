@@ -1056,9 +1056,21 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
         products = [p for p in products if str(p.get("product_id") or "") in sellable_ids]
         first_purchase_base_status = credit_service._first_purchase_bonus_base_status(current_user.userid)
         purchase_discount_base_status = credit_service._purchase_discount_base_status(current_user.userid)
+        try:
+            from credits.razorpay_routes import CREDIT_PACK_META
+        except Exception:
+            CREDIT_PACK_META = {}
         for product in products:
             try:
                 credits = int(product.get("credits") or 0)
+                meta = CREDIT_PACK_META.get(credits) or {}
+                if meta:
+                    product["name"] = meta.get("name") or product.get("title")
+                    product["badge"] = meta.get("badge")
+                    product["questions"] = meta.get("questions")
+                    product["save_percent"] = meta.get("save_percent") or 0
+                    product["value_prop"] = meta.get("value_prop")
+                    product["pack_bonus_credits"] = int(meta.get("bonus_credits") or 0)
                 product_id = str(product.get("product_id") or "").strip() or None
                 status = credit_service._compose_bonus_status(
                     first_purchase_base_status,
@@ -1072,7 +1084,8 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
                     product_id=product_id,
                 )
                 product["purchase_discount"] = discount_status
-                bonus_total = 0
+                pack_bonus = int(product.get("pack_bonus_credits") or 0)
+                bonus_total = pack_bonus
                 if status.get("eligible") and int(status.get("bonus_credits") or 0) > 0:
                     bonus_total += int(status.get("bonus_credits") or 0)
                 if discount_status.get("eligible") and int(discount_status.get("bonus_credits") or 0) > 0:
@@ -1087,6 +1100,8 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
                     product.get("product_id"),
                     product,
                 )
+        # Shuruaat → Aashirwad → Sadhak → Guru order
+        products.sort(key=lambda p: int(p.get("credits") or 0))
         return {"products": products}
     except HTTPException as e:
         # When Play is not configured (e.g. local dev without GOOGLE_PLAY_SERVICE_ACCOUNT_JSON), return empty list so app still works
@@ -1717,6 +1732,10 @@ async def get_credit_balance(current_user: User = Depends(get_current_user)):
         "free_question_available": free_ok,
         "free_question_requires_notifications": pending_notif,
     }
+    try:
+        result["is_guru_member"] = credit_service.user_is_guru_member(current_user.userid)
+    except Exception:
+        result["is_guru_member"] = False
     try:
         result["first_purchase_bonus"] = credit_service.get_first_purchase_bonus_status(current_user.userid)
     except Exception:

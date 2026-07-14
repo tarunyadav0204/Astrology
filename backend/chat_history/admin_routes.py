@@ -2535,6 +2535,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_play_payment_service_base_url,
             get_chart_guide_video_url,
             get_nakshatra_guide_videos_json,
+            get_home_screen_banner,
             is_chat_worker_mode_enabled,
             get_chat_worker_user_allowlist,
             is_free_question_enabled,
@@ -2633,6 +2634,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "play_payment_service_base_url": get_play_payment_service_base_url() or "",
             "chart_guide_video_url": get_chart_guide_video_url(),
             "nakshatra_guide_videos_json": get_nakshatra_guide_videos_json(),
+            "home_screen_banner": get_home_screen_banner(),
             "chat_worker_mode_enabled": is_chat_worker_mode_enabled(),
             "chat_worker_user_allowlist": ",".join(
                 str(uid) for uid in sorted(get_chat_worker_user_allowlist())

@@ -379,12 +379,57 @@
   cursor: wait;
 }
 
-.credits-modal-pack-credits {
-  font-size: 26px;
+.credits-modal-pack-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 14px;
   font-weight: 800;
-  color: #be185d;
+  color: #111827;
+}
+
+.credits-modal-pack-badge {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #f97316;
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.credits-modal-pack-price {
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 800;
+  color: #111827;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+}
+
+.credits-modal-pack-credits {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  line-height: 1.2;
+}
+
+.credits-modal-pack-questions {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #be185d;
+}
+
+.credits-modal-pack-save {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #ea580c;
 }
 
 .credits-modal-pack-label {
@@ -393,13 +438,6 @@
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: #9ca3af;
-}
-
-.credits-modal-pack-price {
-  margin-top: 6px;
-  font-size: 15px;
-  font-weight: 800;
-  color: #374151;
 }
 
 .credits-modal-pack-busy {
