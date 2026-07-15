@@ -345,6 +345,11 @@
   color: #c62828;
 }
 
+.inr-amount-cell {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .balance-cell {
   color: #333;
   font-weight: 600;

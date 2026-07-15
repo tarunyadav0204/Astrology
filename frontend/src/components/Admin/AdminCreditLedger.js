@@ -8,6 +8,47 @@ const USER_LEDGER_LIMIT = 1500;
 const ACTION_MENU_WIDTH = 260;
 const PAGE_SIZE = 100;
 
+/** 1 credit = ₹1 until 2026-07-14; ₹2 per credit from 2026-07-15 (IST calendar date). */
+const CREDIT_INR_RATE_CUTOVER_IST = '2026-07-15';
+
+function istCalendarDate(value) {
+  if (!value) return null;
+  try {
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) {
+      const raw = String(value).slice(0, 10);
+      return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+    }
+    return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  } catch (_) {
+    return null;
+  }
+}
+
+function inrPerCredit(createdAt) {
+  const day = istCalendarDate(createdAt);
+  if (!day) return 1;
+  return day >= CREDIT_INR_RATE_CUTOVER_IST ? 2 : 1;
+}
+
+function isLedgerCreditType(type) {
+  return type === 'earned' || type === 'refund';
+}
+
+function formatCreditsCell(row) {
+  const abs = Math.abs(Number(row?.amount) || 0);
+  if (abs === 0) return '0';
+  return isLedgerCreditType(row?.type) ? `+${abs}` : `-${abs}`;
+}
+
+function formatInrAmountCell(row) {
+  const absCredits = Math.abs(Number(row?.amount) || 0);
+  const inr = absCredits * inrPerCredit(row?.created_at || row?.date);
+  if (inr === 0) return '₹0';
+  const formatted = `₹${inr.toLocaleString('en-IN')}`;
+  return isLedgerCreditType(row?.type) ? `+${formatted}` : `-${formatted}`;
+}
+
 function computeActionMenuPosition(triggerRect) {
   const pad = 8;
   const w = Math.min(ACTION_MENU_WIDTH, window.innerWidth - 2 * pad);
@@ -348,12 +389,8 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
     });
   };
 
-  const formatModalAmount = (row) => {
-    const abs = Math.abs(Number(row?.amount) || 0);
-    const isCredit = row?.type === 'earned' || row?.type === 'refund';
-    if (abs === 0) return '0';
-    return isCredit ? `+${abs}` : `-${abs}`;
-  };
+  const formatModalCredits = (row) => formatCreditsCell(row);
+  const formatModalInr = (row) => formatInrAmountCell(row);
 
   const menuContextTx = useMemo(() => {
     const anchorId = actionMenu?.anchorTxId;
@@ -508,6 +545,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                       <th>Phone</th>
                       <th>Type</th>
                       <th>Feature</th>
+                      <th>Credits</th>
                       <th>Amount</th>
                       <th>Balance</th>
                     </tr>
@@ -543,14 +581,8 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                         <td className="feature-cell">
                           {tx.description || getFeatureName(tx.source, tx.reference_id)}
                         </td>
-                        <td className={`amount-cell ${tx.type}`}>
-                          {(() => {
-                            const abs = Math.abs(Number(tx.amount) || 0);
-                            const isCredit = tx.type === 'earned' || tx.type === 'refund';
-                            if (abs === 0) return '0';
-                            return isCredit ? `+${abs}` : `-${abs}`;
-                          })()}
-                        </td>
+                        <td className={`amount-cell ${tx.type}`}>{formatCreditsCell(tx)}</td>
+                        <td className={`amount-cell inr-amount-cell ${tx.type}`}>{formatInrAmountCell(tx)}</td>
                         <td className="balance-cell">{tx.balance_after}</td>
                       </tr>
                     ))}
@@ -708,6 +740,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                       <th>Date</th>
                       <th>Type</th>
                       <th>Feature</th>
+                      <th>Credits</th>
                       <th>Amount</th>
                       <th>Balance</th>
                     </tr>
@@ -728,7 +761,8 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                         <td className="feature-cell">
                           {row.description || getFeatureName(row.source, row.reference_id)}
                         </td>
-                        <td className={`amount-cell ${row.type}`}>{formatModalAmount(row)}</td>
+                        <td className={`amount-cell ${row.type}`}>{formatModalCredits(row)}</td>
+                        <td className={`amount-cell inr-amount-cell ${row.type}`}>{formatModalInr(row)}</td>
                         <td className="balance-cell">{row.balance_after}</td>
                       </tr>
                     ))}
