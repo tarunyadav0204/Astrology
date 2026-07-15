@@ -420,6 +420,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [notifChatSuggestMode, setNotifChatSuggestMode] = useState(false);
   const [notifGenerateFromChatLoading, setNotifGenerateFromChatLoading] = useState(false);
   const [selectedNotifUserIds, setSelectedNotifUserIds] = useState([]); // multi-select
+  const [notifPasteUserIds, setNotifPasteUserIds] = useState(''); // comma/space/newline separated bulk IDs
   const [notifBulkAudience, setNotifBulkAudience] = useState('selected'); // 'selected' | 'all_matching'
   const [notifBulkRequireToken, setNotifBulkRequireToken] = useState(true);
   const [notifBulkJob, setNotifBulkJob] = useState(null);
@@ -2529,13 +2530,29 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setDeleteConfirmation(null);
   };
 
+  const parseNotifUserIdsText = (text) => {
+    const ids = String(text || '')
+      .split(/[\s,;]+/)
+      .map((part) => parseInt(String(part).trim(), 10))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    return [...new Set(ids)];
+  };
+
+  const getSelectedCustomNotifUserIds = () => {
+    const fromList = selectedNotifUserIds
+      .map((id) => parseInt(id, 10))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    const fromPaste = parseNotifUserIdsText(notifPasteUserIds);
+    return [...new Set([...fromList, ...fromPaste])];
+  };
+
   const handleSendNotification = async () => {
-    const userIds = selectedNotifUserIds.map((id) => parseInt(id, 10)).filter(Boolean);
+    const userIds = getSelectedCustomNotifUserIds();
     const isAllMatching = notifBulkAudience === 'all_matching';
     if ((!isAllMatching && !userIds.length) || !notifTitle.trim() || !notifBody.trim()) {
       const msg = isAllMatching
         ? 'Please enter both title and body.'
-        : 'Please select at least one user and enter both title and body.';
+        : 'Please select or paste at least one user id, and enter both title and body.';
       setNotifResult({ ok: false, message: msg });
       console.warn('[Admin Notifications] Validation failed:', msg);
       return;
@@ -2547,7 +2564,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setNotifSending(true);
     setNotifResult(null);
     setNotifBulkJob(null);
-    console.log('[Admin Notifications] Sending audience=', notifBulkAudience, 'user_ids=', userIds, 'title=', notifTitle.trim().slice(0, 50));
+    console.log('[Admin Notifications] Sending audience=', notifBulkAudience, 'user_ids_count=', userIds.length, 'title=', notifTitle.trim().slice(0, 50));
     try {
       if (notifNativeId && userIds.length === 1) {
         const userId = userIds[0];
@@ -2619,6 +2636,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setNotifLandingScreen('chat');
       if (!isAllMatching) {
         setSelectedNotifUserIds([]);
+        setNotifPasteUserIds('');
       }
     } catch (err) {
       console.error('[Admin Notifications] Request error:', err);
@@ -4788,6 +4806,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                           onChange={() => {
                             setNotifBulkAudience('all_matching');
                             setSelectedNotifUserIds([]);
+                            setNotifPasteUserIds('');
                           }}
                           disabled={notifChatSuggestMode}
                         />
@@ -4806,6 +4825,25 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                         </label>
                       )}
                     </div>
+                    {notifBulkAudience === 'selected' && !notifChatSuggestMode && (
+                      <div className="notif-paste-ids">
+                        <label htmlFor="notif-paste-user-ids">Paste user IDs</label>
+                        <textarea
+                          id="notif-paste-user-ids"
+                          className="notif-paste-ids-input"
+                          rows={4}
+                          placeholder="e.g. 12, 56, 102 or one ID per line — paste hundreds at once"
+                          value={notifPasteUserIds}
+                          onChange={(e) => setNotifPasteUserIds(e.target.value)}
+                        />
+                        <small className="form-hint">
+                          Comma, space, or newline separated. Merged with any users checked in the list below.
+                          {parseNotifUserIdsText(notifPasteUserIds).length > 0
+                            ? ` Parsed ${parseNotifUserIdsText(notifPasteUserIds).length} unique ID(s).`
+                            : ''}
+                        </small>
+                      </div>
+                    )}
                     <div className="notif-search-row">
                       <input
                         type="text"
@@ -4911,7 +4949,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     <div className="notif-user-summary">
                       {notifBulkAudience === 'all_matching'
                         ? `All matching users${notifSearchName.trim() ? ` for "${notifSearchName.trim()}"` : ''} will be sent in the background.`
-                        : `${selectedNotifUserIds.length} selected`}
+                        : `${getSelectedCustomNotifUserIds().length} recipient(s) (${selectedNotifUserIds.length} from list · ${parseNotifUserIdsText(notifPasteUserIds).length} from pasted IDs)`}
                     </div>
                     <small className="form-hint">
                       Only users with registered device tokens will actually receive a push notification.
@@ -4974,11 +5012,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     <select
                       value={notifNativeId}
                       onChange={(e) => setNotifNativeId(e.target.value)}
-                      disabled={loading || notifBulkAudience === 'all_matching' || selectedNotifUserIds.length !== 1}
+                      disabled={
+                        loading ||
+                        notifBulkAudience === 'all_matching' ||
+                        getSelectedCustomNotifUserIds().length !== 1
+                      }
                     >
                       <option value="">Any — use user&apos;s current selection</option>
                       {(charts || [])
-                        .filter((c) => Number(c.userid) === Number(selectedNotifUserIds[0]))
+                        .filter((c) => Number(c.userid) === Number(getSelectedCustomNotifUserIds()[0]))
                         .map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.name || 'Unnamed'} (id: {c.id})
@@ -4993,7 +5035,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       onClick={handleSendNotification}
                       disabled={
                         notifSending ||
-                        (notifBulkAudience === 'selected' && selectedNotifUserIds.length === 0) ||
+                        (notifBulkAudience === 'selected' && getSelectedCustomNotifUserIds().length === 0) ||
                         !notifTitle.trim() ||
                         !notifBody.trim()
                       }

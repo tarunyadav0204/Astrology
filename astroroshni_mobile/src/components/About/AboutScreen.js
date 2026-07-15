@@ -88,7 +88,7 @@ export default function AboutScreen({ navigation }) {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('about.legalHeading', 'Legal & Policies')}</Text>
           <TouchableOpacity
             style={styles.rowItem}
-            onPress={() => handleOpenUrl('https://astroroshni.com/privacy')}
+            onPress={() => handleOpenUrl('https://astroroshni.com/policy')}
           >
             <Text style={[styles.rowText, { color: colors.text }]}>{t('about.privacyPolicy', 'Privacy Policy')}</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />

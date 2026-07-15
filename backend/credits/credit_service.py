@@ -2145,6 +2145,139 @@ class CreditService:
             return False
         return not self.notification_opt_in_satisfied_for_free_question(userid)
 
+    def try_reserve_free_chat_question(self, userid: int, birth_hash: Optional[str]) -> bool:
+        """
+        Atomically claim the one-time free standard question at /ask time.
+
+        Only one concurrent caller can win. Clarification / native_gate / failure
+        paths must call release_free_chat_question_reservation so the user is not
+        charged for a non-answer. Successful answers keep the reservation and
+        record the zero-cost ledger row.
+        """
+        from utils.admin_settings import is_free_question_enabled
+
+        if not is_free_question_enabled():
+            return False
+        if not birth_hash:
+            return False
+        if not self.notification_opt_in_satisfied_for_free_question(userid):
+            return False
+        if self.prior_paid_chat_usage_exists_for_birth_hash(birth_hash):
+            return False
+
+        from db import get_conn, execute
+
+        try:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    "SELECT 1 FROM free_chat_birth_hash_usage WHERE birth_hash = ? LIMIT 1",
+                    (birth_hash,),
+                )
+                if cur.fetchone():
+                    return False
+
+                cur = execute(
+                    conn,
+                    "SELECT COALESCE(free_chat_question_used, 0), COALESCE(credits, 0) FROM user_credits WHERE userid = ?",
+                    (userid,),
+                )
+                row = cur.fetchone()
+                if row and int(row[0] or 0) == 1:
+                    return False
+                if not row:
+                    self._upsert_user_credits(conn, userid, 0, free_used=0)
+
+                cur = execute(
+                    conn,
+                    """
+                    UPDATE user_credits
+                    SET free_chat_question_used = 1, updated_at = CURRENT_TIMESTAMP
+                    WHERE userid = ? AND COALESCE(free_chat_question_used, 0) = 0
+                    """,
+                    (userid,),
+                )
+                if (cur.rowcount or 0) == 0:
+                    conn.rollback()
+                    return False
+
+                try:
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO free_chat_birth_hash_usage (birth_hash, first_userid, created_at)
+                        VALUES (?, ?, CURRENT_TIMESTAMP)
+                        """,
+                        (birth_hash, userid),
+                    )
+                except Exception:
+                    conn.rollback()
+                    return False
+
+                conn.commit()
+                return True
+        except Exception:
+            logger.exception(
+                "try_reserve_free_chat_question failed userid=%s birth_hash=%s",
+                userid,
+                (birth_hash or "")[:16],
+            )
+            return False
+
+    def release_free_chat_question_reservation(
+        self, userid: int, birth_hash: Optional[str] = None
+    ) -> None:
+        """
+        Undo a free-question reservation after clarification / failure / aborted ask.
+
+        Safe to call when nothing was reserved. Does not clear the flag if a
+        zero-cost free ledger row already exists for this user (answer completed).
+        """
+        from db import get_conn, execute
+
+        try:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT 1 FROM credit_transactions
+                    WHERE userid = ?
+                      AND source = 'feature_usage'
+                      AND amount = 0
+                      AND description LIKE '%(Free)%'
+                    LIMIT 1
+                    """,
+                    (userid,),
+                )
+                if cur.fetchone():
+                    return
+
+                execute(
+                    conn,
+                    """
+                    UPDATE user_credits
+                    SET free_chat_question_used = 0, updated_at = CURRENT_TIMESTAMP
+                    WHERE userid = ? AND COALESCE(free_chat_question_used, 0) = 1
+                    """,
+                    (userid,),
+                )
+                if birth_hash:
+                    execute(
+                        conn,
+                        """
+                        DELETE FROM free_chat_birth_hash_usage
+                        WHERE birth_hash = ? AND first_userid = ?
+                        """,
+                        (birth_hash, userid),
+                    )
+                conn.commit()
+        except Exception:
+            logger.exception(
+                "release_free_chat_question_reservation failed userid=%s birth_hash=%s",
+                userid,
+                (birth_hash or "")[:16],
+            )
+
     def mark_free_chat_question_used(self, userid: int, birth_hash: Optional[str] = None) -> None:
         """Mark free question used for user and optionally for global birth-hash gate. Idempotent."""
         from db import get_conn, execute

@@ -2,7 +2,7 @@ import React from 'react';
 import { Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const TERMS_URL = 'https://astroroshni.com/terms';
-const PRIVACY_URL = 'https://astroroshni.com/privacy';
+const PRIVACY_URL = 'https://astroroshni.com/policy';
 
 function openUrl(url) {
   try {

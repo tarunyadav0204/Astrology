@@ -245,20 +245,26 @@ export default function ReportsStudioScreen({ navigation, route }) {
       seen.add(key);
       const fallback = fallbackByKey.get(key) || {};
       const merged = reportTypeMap.get(key) || fallback;
+      const englishTitle = merged.title || fallback.title || key;
+      const englishSubtitle = merged.subtitle || fallback.subtitle || '';
+      const englishDescription = merged.description || merged.summary || fallback.description || '';
+      const englishShort = String(englishTitle).replace(/\s+Report$/i, '');
       list.push({
         ...fallback,
         ...merged,
         key,
         icon: merged.icon || fallback.icon || '📄',
         gradient: merged.gradient || fallback.gradient || ['#fb7185', '#f97316'],
-        title: merged.title || fallback.title || key,
-        subtitle: merged.subtitle || fallback.subtitle || '',
-        description: merged.description || merged.summary || fallback.description || '',
+        // Prefer locale strings over API/fallback English copy.
+        title: t(`reports.types.${key}.title`, englishTitle),
+        shortTitle: t(`reports.types.${key}.shortTitle`, englishShort),
+        subtitle: t(`reports.types.${key}.subtitle`, englishSubtitle),
+        description: t(`reports.types.${key}.description`, englishDescription),
         enabled: merged.enabled !== undefined ? merged.enabled : fallback.enabled !== false,
       });
       return list;
     }, []);
-  }, [reportTypeMap, reportTypes]);
+  }, [reportTypeMap, reportTypes, t, i18n.language]);
 
   const reportCost = useMemo(() => {
     const key = `${selectedReportType}_report`;
@@ -279,7 +285,9 @@ export default function ReportsStudioScreen({ navigation, route }) {
   }, [pricingOriginal, selectedReportType]);
 
   const selectedTypeMeta = reportTypeMap.get(selectedReportType) || REPORT_TYPE_FALLBACKS[0];
+  const selectedTypeDisplay = displayReportTypes.find((item) => item.key === selectedReportType) || selectedTypeMeta;
   const selectedTypeEnabled = selectedTypeMeta?.enabled !== false;
+  const creditsWord = t('reports.creditsWord', 'credits');
   const step1Ready = !!selectedReportType && selectedTypeEnabled;
   const step2Ready = selectedReportType === 'partnership'
     ? (!!selectedPersonA && !!selectedPersonB)
@@ -1295,7 +1303,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                               {item.description}
                             </Text>
                             <Text style={[styles.reportTypeCostInline, { color: colors.text }]}>
-                              {formatCreditsLabel(itemCost, itemOriginal, 'credits')}
+                              {formatCreditsLabel(itemCost, itemOriginal, creditsWord)}
                             </Text>
                           </View>
                         </TouchableOpacity>
@@ -1321,7 +1329,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                           >
                             <Text style={styles.upcomingChipEmoji}>{item.icon || '📄'}</Text>
                             <Text style={[styles.upcomingChipText, { color: colors.textSecondary }]} numberOfLines={1}>
-                              {item.title.replace(/ Report$/i, '')}
+                              {item.shortTitle || item.title}
                             </Text>
                           </View>
                         ))}
@@ -1488,7 +1496,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                         {t('reports.reviewType', 'Type')}
                       </Text>
                       <Text style={[styles.reviewValue, { color: colors.text }]} numberOfLines={1}>
-                        {selectedTypeMeta?.title || 'Partnership'}
+                        {selectedTypeDisplay?.title || t('reports.types.partnership.title', 'Partnership Report')}
                       </Text>
                     </View>
                     <View style={styles.reviewRow}>
@@ -1498,7 +1506,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                       <Text style={[styles.reviewValue, { color: colors.text }]}>
                         {canRegenerateCurrentPair
                           ? t('reports.reviewAlreadyPaid', 'Already generated')
-                          : formatCreditsLabel(reportCost, reportOriginalCost, 'credits')}
+                          : formatCreditsLabel(reportCost, reportOriginalCost, creditsWord)}
                       </Text>
                     </View>
                   </View>

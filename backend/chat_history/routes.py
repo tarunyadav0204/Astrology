@@ -581,6 +581,29 @@ def _mark_chat_processing_failed(message_id: int, error_message: str) -> None:
         conn.commit()
 
 
+def _release_free_question_if_reserved(
+    using_free_question: bool,
+    user_id: int,
+    birth_details: dict = None,
+) -> None:
+    """Release an /ask-time free reservation when the turn did not produce a billable answer."""
+    if not using_free_question:
+        return
+    try:
+        from credits.credit_service import CreditService
+
+        credit_service = CreditService()
+        free_birth_hash = credit_service.create_free_question_birth_hash(birth_details)
+        credit_service.release_free_chat_question_reservation(
+            user_id, birth_hash=free_birth_hash
+        )
+    except Exception:
+        logger.exception(
+            "failed to release free-question reservation user_id=%s",
+            user_id,
+        )
+
+
 def _claim_chat_processing_message(message_id: int, claim_id: str, *, claim_minutes: int = 35) -> str:
     """
     Atomically claim a processing message for one queue worker.
@@ -1766,11 +1789,16 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     user_balance = credit_service.get_user_credits(current_user.userid)
     is_standard_chat = not partnership_mode and not premium_analysis and not instant_chat_active
     free_birth_hash = credit_service.create_free_question_birth_hash(birth_details)
-    free_available = credit_service.is_free_standard_chat_question_available_for_birth_hash(
-        current_user.userid,
-        free_birth_hash,
+    # Eligibility only here — atomic reserve happens after death/fetal gates so refusals
+    # never consume free. Race losers re-check paid cost just before enqueue.
+    free_eligible = bool(
+        is_standard_chat
+        and credit_service.is_free_standard_chat_question_available_for_birth_hash(
+            current_user.userid,
+            free_birth_hash,
+        )
     )
-    using_free_question = is_standard_chat and free_available
+    using_free_question = False
     chat_key = (
         'partnership_analysis_cost'
         if partnership_mode
@@ -1784,13 +1812,14 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             )
         )
     )
-    effective_cost = 0 if using_free_question else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
+    effective_cost = 0 if free_eligible else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
     log_ask_phase(
         "credits",
         chat_key=chat_key,
         effective_cost=effective_cost,
         balance=user_balance,
-        using_free_question=bool(using_free_question),
+        free_eligible=bool(free_eligible),
+        using_free_question=False,
     )
 
     if user_balance < effective_cost:
@@ -1998,6 +2027,41 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             logger.warning("fetal sex gate skipped after error: %s", exc)
         log_ask_phase("safety_gates", message_id=assistant_message_id, fetal_gate_skipped=False)
 
+    # Atomic free claim only after safety gates that return without an answer.
+    if free_eligible:
+        using_free_question = bool(
+            credit_service.try_reserve_free_chat_question(current_user.userid, free_birth_hash)
+        )
+        if using_free_question:
+            effective_cost = 0
+        else:
+            effective_cost = credit_service.get_effective_cost(
+                current_user.userid, chat_cost, chat_key
+            )
+            user_balance = credit_service.get_user_credits(current_user.userid)
+            if user_balance < effective_cost:
+                _mark_chat_processing_failed(
+                    assistant_message_id,
+                    (
+                        f"Insufficient credits for Standard Analysis. "
+                        f"You need {effective_cost} credits but have {user_balance}."
+                    ),
+                )
+                raise HTTPException(
+                    status_code=402,
+                    detail=(
+                        f"Insufficient credits for Standard Analysis. "
+                        f"You need {effective_cost} credits but have {user_balance}."
+                    ),
+                )
+    log_ask_phase(
+        "free_question_reserve",
+        message_id=assistant_message_id,
+        free_eligible=bool(free_eligible),
+        using_free_question=bool(using_free_question),
+        effective_cost=effective_cost,
+    )
+
     chart_insights = []
     if effective_chat_tier != "instant" and not partnership_mode and isinstance(birth_details, dict):
         try:
@@ -2117,6 +2181,9 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 current_user.userid,
             )
             _mark_chat_processing_failed(assistant_message_id, CHAT_QUEUE_UNAVAILABLE_MESSAGE)
+            _release_free_question_if_reserved(
+                using_free_question, current_user.userid, birth_details
+            )
         else:
             background_tasks.add_task(
                 process_gemini_response,
@@ -2967,6 +3034,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     (sanitize_text(REFUSAL_MESSAGE), "completed", "answer", datetime.now(), message_id),
                 )
                 conn.commit()
+            _release_free_question_if_reserved(using_free_question, user_id, birth_details)
             return
         
         session_lookup_start = time.time()
@@ -3247,6 +3315,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         (session_id, 1, json.dumps(intent.get('extracted_context', {}))),
                     )
                     conn.commit()
+                _release_free_question_if_reserved(using_free_question, user_id, birth_details)
                 return  # Exit early, no chart calculation needed
             elif intent.get('status') == 'READY':
                 # Reset clarification count when ready to answer
@@ -3921,6 +3990,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         """,
                         ("failed", "Credit deduction failed. Please try again.", datetime.now(), message_id),
                     )
+                    _release_free_question_if_reserved(using_free_question, user_id, birth_details)
             else:
                 # Prefer user-facing text from analyzer; never persist raw provider errors to clients.
                 error_msg = result.get('response') or result.get(
@@ -3943,6 +4013,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     """,
                     ("failed", error_msg, datetime.now(), message_id),
                 )
+                _release_free_question_if_reserved(using_free_question, user_id, birth_details)
             
             conn.commit()
         _chat_log_event(
@@ -4031,6 +4102,34 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     message_id,
                     str(e)[:240],
                 )
+                # Only keep free consumed if a real answer already wrote the free ledger.
+                # Otherwise this was a non-answer completion that still reserved free.
+                try:
+                    from credits.credit_service import CreditService
+
+                    cs = CreditService()
+                    with get_conn() as ledger_conn:
+                        cur = execute(
+                            ledger_conn,
+                            """
+                            SELECT 1 FROM credit_transactions
+                            WHERE userid = %s
+                              AND source = 'feature_usage'
+                              AND amount = 0
+                              AND description LIKE '%%(Free)%%'
+                            LIMIT 1
+                            """,
+                            (user_id,),
+                        )
+                        has_free_ledger = cur.fetchone() is not None
+                    if using_free_question and not has_free_ledger:
+                        _release_free_question_if_reserved(using_free_question, user_id, birth_details)
+                except Exception:
+                    logger.exception(
+                        "free release check failed after preserve message_id=%s user_id=%s",
+                        message_id,
+                        user_id,
+                    )
                 return
             execute(
                 conn,
@@ -4043,6 +4142,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             )
             conn.commit()
         logger.exception("chat message processing failed message_id=%s user_id=%s", message_id, user_id)
+        _release_free_question_if_reserved(using_free_question, user_id, birth_details)
         _chat_log_event(
             "chat_processing_failed",
             level=logging.ERROR,

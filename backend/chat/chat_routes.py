@@ -132,7 +132,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
     else:
         chat_cost = credit_service.get_credit_setting('chat_question_cost')
     user_balance = credit_service.get_user_credits(current_user.userid)
-    # First question free: standard chat only (not partnership, not premium); requires notification opt-in
+    # First question free: eligibility now; atomic reserve only after safety/clarification gates.
     is_standard_chat = not request.partnership_mode and not request.premium_analysis
     free_birth_hash = credit_service.create_free_question_birth_hash({
         "date": request.date,
@@ -140,23 +140,47 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
         "latitude": request.latitude,
         "longitude": request.longitude,
     })
-    free_available = credit_service.is_free_standard_chat_question_available_for_birth_hash(
-        current_user.userid,
-        free_birth_hash,
+    free_eligible = bool(
+        is_standard_chat
+        and credit_service.is_free_standard_chat_question_available_for_birth_hash(
+            current_user.userid,
+            free_birth_hash,
+        )
     )
-    using_free_question = is_standard_chat and free_available
+    using_free_question = False
     chat_key = (
         'partnership_analysis_cost'
         if request.partnership_mode
         else ('premium_chat_cost' if request.premium_analysis else 'chat_question_cost')
     )
-    effective_cost = 0 if using_free_question else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
+    effective_cost = 0 if free_eligible else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
     
+    def _release_free_if_needed():
+        if using_free_question:
+            credit_service.release_free_chat_question_reservation(
+                current_user.userid, birth_hash=free_birth_hash
+            )
+
+    def _reserve_free_or_require_credits() -> bool:
+        """Claim free after gates; on race loss require paid credits. Returns False if blocked."""
+        nonlocal using_free_question, effective_cost, user_balance
+        if not free_eligible:
+            return True
+        using_free_question = bool(
+            credit_service.try_reserve_free_chat_question(current_user.userid, free_birth_hash)
+        )
+        if using_free_question:
+            effective_cost = 0
+            return True
+        effective_cost = credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
+        user_balance = credit_service.get_user_credits(current_user.userid)
+        return user_balance >= effective_cost
+
     print(f"💳 CREDIT CHECK DEBUG:")
     print(f"   User ID: {current_user.userid}")
     print(f"   Partnership Mode: {request.partnership_mode}")
     print(f"   Premium Analysis: {request.premium_analysis}")
-    print(f"   Chat cost: {chat_cost} credits, effective: {effective_cost} (free_question: {using_free_question})")
+    print(f"   Chat cost: {chat_cost} credits, effective: {effective_cost} (free_eligible: {free_eligible})")
     print(f"   User balance: {user_balance} credits")
     print(f"   Has sufficient credits: {user_balance >= effective_cost}")
     
@@ -258,6 +282,10 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                 return
             elif intent_result.get('status') == 'READY':
                 session_manager.reset_clarification_count(birth_hash)
+
+            if not _reserve_free_or_require_credits():
+                yield f"data: {json.dumps({'status': 'error', 'error': f'Insufficient credits. You need {effective_cost} credits but have {user_balance}.'})}\n\n"
+                return
             
             # Set selected period if provided
             if request.selected_period:
@@ -379,6 +407,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                 print(f"❌ CONTEXT BUILDING ERROR: {context_error}")
                 import traceback
                 traceback.print_exc()
+                _release_free_if_needed()
                 yield f"data: {json.dumps({'status': 'error', 'error': f'Chart calculation failed: {str(context_error)}'})}\n\n"
                 return
             
@@ -661,6 +690,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                     
                     # Don't deduct credits if AI fails
                     print(f"⚠️ NOT DEDUCTING CREDITS due to AI failure")
+                    _release_free_if_needed()
                     
                     yield f"data: {json.dumps({'status': 'error', 'error': user_error})}\n\n"
                     
@@ -682,6 +712,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                 elif "rate limit" in str(e).lower() or "quota" in str(e).lower():
                     error_message = "I'm receiving too many requests right now. Please wait a moment and try again."
                 
+                _release_free_if_needed()
                 yield f"data: {json.dumps({'status': 'error', 'error': error_message})}\n\n"
                 
         except Exception as e:
@@ -692,6 +723,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
             pass
             
             # User-friendly error for outer exceptions
+            _release_free_if_needed()
             user_error = "Something went wrong while processing your request. Please try again."
             yield f"data: {json.dumps({'status': 'error', 'error': user_error})}\n\n"
     

@@ -1928,7 +1928,7 @@ input:checked + .toggle-slider:before {
 }
 
 .notifications-form {
-  max-width: 500px;
+  max-width: 640px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -2225,6 +2225,31 @@ input:checked + .toggle-slider:before {
 .notif-audience-suboption {
   margin-left: 22px;
   color: #6b7280;
+}
+
+.notif-paste-ids {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.notif-paste-ids label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.notif-paste-ids-input {
+  width: 100%;
+  min-height: 96px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  resize: vertical;
 }
 
 .notif-result {
