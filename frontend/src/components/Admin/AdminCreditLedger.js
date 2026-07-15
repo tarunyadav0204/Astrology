@@ -64,6 +64,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [searchSummary, setSearchSummary] = useState({
     purchased_credits: 0,
+    purchased_amount_inr: 0,
     user_spend_credits: 0,
     admin_added_credits: 0,
     admin_deducted_credits: 0,
@@ -127,6 +128,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
       setSearchResults(data.transactions || []);
       setSearchSummary(data.summary || {
         purchased_credits: 0,
+        purchased_amount_inr: 0,
         user_spend_credits: 0,
         admin_added_credits: 0,
         admin_deducted_credits: 0,
@@ -150,6 +152,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
       setSearchResults([]);
       setSearchSummary({
         purchased_credits: 0,
+        purchased_amount_inr: 0,
         user_spend_credits: 0,
         admin_added_credits: 0,
         admin_deducted_credits: 0,
@@ -468,7 +471,9 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
               </h2>
               <div className="ledger-summary">
                 <span className="ledger-summary-chip ledger-summary-chip--bought">
-                  Purchased Credits: {searchSummary.purchased_credits}
+                  Purchased Credits: {Number(searchSummary.purchased_credits || 0).toLocaleString('en-IN')}
+                  {' · '}
+                  Purchase amount: ₹{Number(searchSummary.purchased_amount_inr || 0).toLocaleString('en-IN')}
                 </span>
                 <span className="ledger-summary-chip ledger-summary-chip--spent">
                   User Spend: {searchSummary.user_spend_credits}

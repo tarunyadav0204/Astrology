@@ -3888,6 +3888,14 @@ class CreditService:
                      AND ct.transaction_type IN ('earned', 'refund')
                     THEN ABS(ct.amount) ELSE 0 END), 0) AS purchased_credits,
                 COALESCE(SUM(CASE
+                    WHEN ct.source IN ('google_play', 'razorpay')
+                     AND ct.transaction_type IN ('earned', 'refund')
+                    THEN ABS(ct.amount) * CASE
+                        WHEN date(ct.created_at) >= DATE '2026-07-15' THEN 2
+                        ELSE 1
+                    END
+                    ELSE 0 END), 0) AS purchased_amount_inr,
+                COALESCE(SUM(CASE
                     WHEN ct.transaction_type = 'spent'
                      AND ct.source NOT IN ('admin_adjustment', 'google_play_refund', 'razorpay_refund', 'refund')
                     THEN ABS(ct.amount) ELSE 0 END), 0) AS user_spend_credits,
@@ -3926,16 +3934,17 @@ class CreditService:
 
         with get_conn() as conn:
             cur = execute(conn, sql, params)
-            row = cur.fetchone() or (0, 0, 0, 0, 0, 0, 0)
+            row = cur.fetchone() or (0, 0, 0, 0, 0, 0, 0, 0)
 
         return {
             "purchased_credits": int(row[0] or 0),
-            "user_spend_credits": int(row[1] or 0),
-            "admin_added_credits": int(row[2] or 0),
-            "admin_deducted_credits": int(row[3] or 0),
-            "refund_reversal_credits": int(row[4] or 0),
-            "free_questions_count": int(row[5] or 0),
-            "new_users_bought_count": int(row[6] or 0),
+            "purchased_amount_inr": int(row[1] or 0),
+            "user_spend_credits": int(row[2] or 0),
+            "admin_added_credits": int(row[3] or 0),
+            "admin_deducted_credits": int(row[4] or 0),
+            "refund_reversal_credits": int(row[5] or 0),
+            "free_questions_count": int(row[6] or 0),
+            "new_users_bought_count": int(row[7] or 0),
         }
 
     def get_google_play_transactions(
