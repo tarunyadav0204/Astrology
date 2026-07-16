@@ -46,9 +46,10 @@ WINDOW1_PATTERNS = (
 PREDICTION_ANCHOR_META_INSTRUCTION = """
 CRITICAL - PREDICTION ANCHOR METADATA (do not include this line in the main answer the user sees):
 When this turn sets or updates a lifespan/event timing forecast (especially career/job/marriage/children/property), after NEXT_ACTION_META and before FAQ_META, output exactly one line:
-PREDICTION_ANCHOR_META: {"topic_key":"<career|marriage|children|property|education|health|wealth|general>","confidence":"<high|medium|low>","window_1_label":"<ranked #1 window dates>","window_1_start":"<YYYY-MM-DD or empty>","window_1_end":"<YYYY-MM-DD or empty>","window_1_layer":"<activation|offer|joining|promise|execution>","window_1_dasha":"<MD-AD-PD if known>","window_1_strength":"<high|medium|low>","activation_window":"<career: more calls/effort band or empty>","offer_window":"<career: offer-likely band or empty>","joining_window":"<career: joining/settle band or empty>","score_fingerprint":"<short hash of ranking reason or empty>"}
-- topic_key must be lowercase from the list above.
-- For career/job answers, window_1_layer and the three career layer fields are mandatory. Never use one PD start date for all three layers.
+PREDICTION_ANCHOR_META: {"topic_key":"<career|career_first_job|career_promotion|marriage|children|property|education|health|wealth|general>","confidence":"<high|medium|low>","window_1_label":"<ranked #1 window dates>","window_1_start":"<YYYY-MM-DD or empty>","window_1_end":"<YYYY-MM-DD or empty>","window_1_layer":"<activation|offer|joining|visibility|formalization|settle|promise|execution>","window_1_dasha":"<MD-AD-PD if known>","window_1_strength":"<high|medium|low>","activation_window":"<job: effort band OR promotion: visibility band>","offer_window":"<job: offer band OR promotion: formalization band>","joining_window":"<job: joining band OR promotion: settle band>","score_fingerprint":"<short hash of ranking reason or empty>"}
+- topic_key must be lowercase from the list above (use career_promotion for promotion/raise).
+- For first-job answers, window_1_layer and Activation/Offer/Joining fields are mandatory. Never use one PD start date for all three layers.
+- For promotion answers, use Visibility/Formalization/Settle (map into activation_window/offer_window/joining_window fields). Do NOT use first-job Activation/Offer/Joining wording in the user-facing answer.
 - If this is a follow-up and TIMING_CONTRACT_LOCK is present, keep window_1_* identical unless the lock explicitly allows a re-rank.
 """
 
@@ -69,7 +70,8 @@ def infer_topic_family(
         cat = "marriage"
     if cat in {"child", "childbirth", "progeny"}:
         cat = "children"
-    if cat in TOPIC_FAMILIES:
+    # Weak router categories must not block question cues (lifespan often lands on timing/general).
+    if cat in TOPIC_FAMILIES and cat not in {"general"}:
         return cat
 
     q = str(question or "").lower()
@@ -86,7 +88,7 @@ def infer_topic_family(
         "work",
         "profession",
     )
-    marriage_cues = ("marriage", "wedding", "spouse", "husband", "wife", "engage")
+    marriage_cues = ("marriage", "married", "wedding", "spouse", "husband", "wife", "engage")
     children_cues = ("child", "pregnancy", "conceive", "baby", "progeny")
     property_cues = ("house", "property", "flat", "home purchase", "relocation")
     education_cues = ("exam", "admission", "education", "degree", "college")
@@ -561,9 +563,28 @@ def format_timing_contract_lock_block(
     ]
     if w1.get("dasha_chain"):
         lines.append(f"- Locked dasha chain for Window 1: {w1.get('dasha_chain')}")
+    fp = anchor.get("verdict_fingerprint") or {}
+    if fp.get("double_transit"):
+        lines.append(
+            f"- Locked Double Transit status for Window 1 evidence: {fp.get('double_transit')} "
+            "(do not silently upgrade none→full)."
+        )
+    if fp.get("confidence_ceiling"):
+        lines.append(f"- Locked confidence ceiling: {fp.get('confidence_ceiling')}")
     if w1.get("layer"):
         lines.append(f"- Locked Window 1 claim layer: {w1.get('layer')} (do not promote it to a different outcome layer)")
-    if family == "career":
+    topic_key = str(anchor.get("topic_key") or "")
+    if "promotion" in topic_key:
+        lines.append(
+            "- Promotion layers (keep separate; NOT Activation/Offer/Joining): "
+            f"Visibility={layers.get('visibility') or layers.get('activation') or w1.get('label') or 'n/a'}; "
+            f"Formalization={layers.get('formalization') or layers.get('offer') or 'not yet specified'}; "
+            f"Settle={layers.get('settle') or layers.get('joining') or 'not yet specified'}."
+        )
+        lines.append(
+            "- Emphasize 10th/11th status+gains and D10. Do not reframe as first-job Activation/Offer/Joining."
+        )
+    elif family == "career":
         lines.append(
             "- Career layers (keep separate): "
             f"Activation={layers.get('activation') or w1.get('label') or 'n/a'}; "
@@ -581,10 +602,15 @@ def format_timing_contract_lock_block(
             "You may update Window 1, but you MUST explicitly state what changed and why."
         )
     else:
+        layer_hint = (
+            "Visibility vs Formalization vs Settle"
+            if "promotion" in topic_key
+            else "Activation vs Offer vs Joining"
+        )
         lines.append(
             "- RE-RANK FORBIDDEN: keep the same Window 1 dates/rank. "
             "Do not silently demote it to a near-miss or promote a secondary window to #1. "
-            "If nuance is needed, refine Activation vs Offer vs Joining language without changing Window 1 rank."
+            f"If nuance is needed, refine {layer_hint} language without changing Window 1 rank."
         )
         lines.append(
             "- Ban flipping the same period's house signification (e.g. 7th/contracts → 8th/rejection) "
@@ -600,14 +626,168 @@ def format_timing_contract_lock_block(
 
 def career_layer_prompt_rules() -> str:
     return (
-        "CAREER TIMING LAYERS (MANDATORY for job/career event timing):\n"
+        "CAREER TIMING LAYERS (MANDATORY for job/career event timing — NOT for promotion):\n"
         "1) Activation = more calls, effort, interviews, visibility (environment shift).\n"
         "2) Conversion / Offer = offer letter becomes likely.\n"
         "3) Joining / Stability = start date / settle-in.\n"
         "Never let one dasha/PD start date mean all three. "
         "A PD change is an environment shift; call it offer/joining only if the ranked execution window "
-        "and score support that layer. Executive summary must name Activation vs Offer vs Joining separately."
+        "supports that layer. Executive summary must name Activation vs Offer vs Joining separately. "
+        "Each ranked window gets exactly one career layer (never 'Offer & Joining' on one window). "
+        "Add a chronological Event arc line (Activation → Offer → Joining) so earlier activation "
+        "is not read as a worse rival to Window 1."
     )
+
+
+def promotion_layer_prompt_rules() -> str:
+    return (
+        "PROMOTION TIMING LAYERS (MANDATORY — do NOT use first-job Activation/Offer/Joining):\n"
+        "1) Visibility = more responsibility, review, recognition, promotion discussions.\n"
+        "2) Formalization = title / band / compensation step-up confirmed.\n"
+        "3) Settle = operating stably in the elevated role.\n"
+        "Primary houses are 10th (status) and 11th (gains); 6th is service support only. "
+        "Cite D10 when present. Executive summary must name Visibility vs Formalization vs Settle. "
+        "Each ranked window gets exactly one promotion layer. "
+        "Event arc: Visibility → Formalization → Settle. "
+        "Only fall back to Activation/Offer/Joining if the native is clearly job-seeking/unemployed."
+    )
+
+
+def career_timing_prompt_for_topic(
+    topic_key: str = "",
+    *,
+    category: Optional[str] = None,
+    question: str = "",
+) -> str:
+    """Return job layers or promotion layers; never both."""
+    key = str(topic_key or infer_topic_key(question, category=category)).lower()
+    cat = str(category or "").lower()
+    if (
+        key in {"career_promotion", "promotion"}
+        or key.endswith("_promotion")
+        or cat == "promotion"
+        or ("promotion" in str(question or "").lower() and "first job" not in str(question or "").lower())
+    ):
+        return promotion_layer_prompt_rules()
+    return career_layer_prompt_rules()
+
+
+def build_anchor_from_lifespan_evidence(
+    pack: Dict[str, Any],
+    *,
+    question: str = "",
+    message_id: Optional[int] = None,
+) -> Optional[Dict[str, Any]]:
+    """Build / fingerprint an anchor from deterministic lifespan_timing_evidence pack."""
+    if not isinstance(pack, dict) or not pack:
+        return None
+    cands = pack.get("candidate_windows") if isinstance(pack.get("candidate_windows"), list) else []
+    if not cands:
+        return None
+    top = cands[0] if isinstance(cands[0], dict) else None
+    if not top or not top.get("label"):
+        return None
+    topic = pack.get("topic") if isinstance(pack.get("topic"), dict) else {}
+    topic_key = str(topic.get("topic_key") or infer_topic_key(question)).strip().lower()
+    family = str(topic.get("family") or infer_topic_family(question, category=topic_key.split("_")[0]))
+    dt = pack.get("double_transit") or {}
+    near_dt = (dt.get("near_band") or {}) if isinstance(dt, dict) else {}
+    top_dt = dt.get("top_window") if isinstance(dt, dict) else None
+    dt_status = ""
+    if isinstance(top_dt, dict):
+        dt_status = str(top_dt.get("status") or "")
+    elif isinstance(near_dt, dict):
+        dt_status = str(near_dt.get("status") or "")
+    if not dt_status:
+        dt_status = str(top.get("double_transit") or "")
+    ceiling = str(pack.get("confidence_ceiling") or top.get("confidence_ceiling") or "medium").lower()
+    window_1 = {
+        "rank": 1,
+        "label": str(top.get("label") or "").strip(),
+        "start": top.get("start"),
+        "end": top.get("end"),
+        "strength": ceiling,
+        "layer": (
+            "formalization"
+            if "promotion" in topic_key
+            else ("activation" if family == "career" else "execution")
+        ),
+        "dasha_chain": str(top.get("dasha_chain") or "").strip(),
+        "score": top.get("score"),
+        "significations": list(top.get("why") or [])[:6],
+    }
+    layers = {}
+    if "promotion" in topic_key:
+        layers = {
+            "visibility": window_1["label"],
+            "formalization": "",
+            "settle": "",
+        }
+    elif family == "career":
+        layers = {
+            "activation": window_1["label"],
+            "offer": "",
+            "joining": "",
+        }
+    return {
+        "topic_key": topic_key if topic_key.startswith("career") else family,
+        "topic_family": family,
+        "question_preview": str(question or "")[:240],
+        "created_at": _now_iso(),
+        "updated_at": _now_iso(),
+        "message_id": message_id,
+        "confidence": ceiling,
+        "window_1": window_1,
+        "windows": [window_1],
+        "layers": layers,
+        "verdict_fingerprint": {
+            "source": "lifespan_timing_evidence",
+            "dasha_chain": window_1["dasha_chain"],
+            "window_1_start": window_1.get("start"),
+            "window_1_end": window_1.get("end"),
+            "double_transit": dt_status,
+            "confidence_ceiling": ceiling,
+            "score_fingerprint": (
+                f"{window_1['dasha_chain']}|dt:{dt_status}|ceil:{ceiling}|{window_1.get('start')}"
+            ),
+        },
+        "source": "lifespan_timing_evidence",
+    }
+
+
+def enrich_anchor_fingerprint_from_pack(
+    anchor: Dict[str, Any],
+    pack: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Merge pack Window-1 + DT into an existing anchor's verdict_fingerprint."""
+    if not isinstance(anchor, dict):
+        return anchor
+    if not isinstance(pack, dict) or not pack:
+        return anchor
+    from_pack = build_anchor_from_lifespan_evidence(pack, question=str(anchor.get("question_preview") or ""))
+    if not from_pack:
+        return anchor
+    out = dict(anchor)
+    prior_fp = dict(out.get("verdict_fingerprint") or {})
+    pack_fp = dict(from_pack.get("verdict_fingerprint") or {})
+    out["verdict_fingerprint"] = {**prior_fp, **pack_fp}
+    # Prefer pack dasha_chain when meta left it empty / invented.
+    w1 = dict(out.get("window_1") or {})
+    pack_w1 = from_pack.get("window_1") or {}
+    if pack_w1.get("dasha_chain") and not w1.get("dasha_chain"):
+        w1["dasha_chain"] = pack_w1["dasha_chain"]
+    if pack_w1.get("start") and not w1.get("start"):
+        w1["start"] = pack_w1.get("start")
+        w1["end"] = pack_w1.get("end")
+    out["window_1"] = w1
+    if from_pack.get("confidence") and str(out.get("confidence") or "").lower() == "high":
+        # Do not let LLM meta overclaim above pack ceiling.
+        ceil = str((pack.get("confidence_ceiling") or from_pack.get("confidence") or "")).lower()
+        if ceil in {"medium", "low"}:
+            out["confidence"] = ceil
+            w1["strength"] = ceil
+            out["window_1"] = w1
+    return out
 
 
 def merge_anchor_candidates(
@@ -620,14 +800,16 @@ def merge_anchor_candidates(
     prediction_anchor_meta: Optional[Dict[str, Any]],
     event_timing_verdict: Optional[Dict[str, Any]],
     message_id: Optional[int] = None,
+    lifespan_timing_evidence: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     if not should_apply_timing_contract(
         mode=mode, category=category, question=question, faq_category=faq_category
     ):
         # Still allow meta-driven career timing anchors even if mode drifted.
-        if not prediction_anchor_meta and not event_timing_verdict:
+        if not prediction_anchor_meta and not event_timing_verdict and not lifespan_timing_evidence:
             return None
     topic_key = infer_topic_key(question, category=category, faq_category=faq_category)
+    pack = lifespan_timing_evidence if isinstance(lifespan_timing_evidence, dict) else None
     if prediction_anchor_meta:
         from_meta = build_anchor_from_meta(
             prediction_anchor_meta,
@@ -636,7 +818,13 @@ def merge_anchor_candidates(
             fallback_answer=answer_text,
         )
         if from_meta:
-            return from_meta
+            return enrich_anchor_fingerprint_from_pack(from_meta, pack)
+    if pack:
+        from_pack = build_anchor_from_lifespan_evidence(
+            pack, question=question, message_id=message_id
+        )
+        if from_pack:
+            return from_pack
     if isinstance(event_timing_verdict, dict) and event_timing_verdict:
         from_verdict = build_anchor_from_event_timing_verdict(
             event_timing_verdict,
@@ -645,11 +833,14 @@ def merge_anchor_candidates(
             message_id=message_id,
         )
         if from_verdict:
-            return from_verdict
-    return build_anchor_from_answer_heuristic(
+            return enrich_anchor_fingerprint_from_pack(from_verdict, pack)
+    heuristic = build_anchor_from_answer_heuristic(
         answer_text,
         question=question,
         category=category,
         faq_category=faq_category,
         message_id=message_id,
     )
+    if heuristic:
+        return enrich_anchor_fingerprint_from_pack(heuristic, pack)
+    return heuristic

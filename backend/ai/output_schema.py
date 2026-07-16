@@ -297,33 +297,34 @@ TEMPLATE_LIFESPAN_TIMELINE = """
 ### 🕰️ LIFESPAN EVENT TIMELINE (MANDATORY)
 Your response must be a chronological analysis of the specific event requested across the native's lifespan.
 
-1. <div class="quick-answer-card">**Executive Summary**: [Direct answer naming the most likely window AND, when justified, the best month or 2-3 month execution band. For career/job questions, explicitly separate **Activation** (calls/effort/interviews), **Offer** (offer letter likely), and **Joining** (start/settle). Never collapse all three into one PD start date.]</div>
+1. <div class="quick-answer-card">**Executive Summary**: [Direct answer naming the strongest window AND, when justified, the best month or 2-3 month execution band. For **first-job/job-seeking**: separate **Activation** / **Offer** / **Joining**. For **promotion/raise**: separate **Visibility** / **Formalization** / **Settle** — never use Activation/Offer/Joining. Never collapse all three into one PD start date.]</div>
 
-2. ### 🗓️ Ranked Potential Windows
-[List 3-5 specific time windows in ranked order, strongest first. Ranking MUST follow scored clusters / event_timing_verdict when present. Do not silently re-rank Window 1 on follow-ups.]
-- **Window [1/2/3]**: [Year/Period]
-  - **Ripe / Promise Window**: [Broader year/range when the event is ripe — not natal chart promise / not KP CSL]
+2. **Event arc** (career REQUIRED; other events when phases apply): One short chronological line in time order. Job-seeking: `Activation → Offer → Joining`. Promotion: `Visibility → Formalization → Settle`.
+
+3. ### 🗓️ Ranked Potential Windows
+[List 3–5 windows ranked by strength (Window 1 = strongest claim), NOT by calendar order. Ranking MUST follow scored clusters / event_timing_verdict when present; otherwise cite dasha+transit+divisional confluence — do not invent numeric scores. Do not silently re-rank Window 1 on follow-ups.]
+- **Window [1/2/3]**: [Year/Period] — tag **Same arc** (phase of the primary story) or **Alternate path** (backup / later / different outcome path)
+  - **Ripe Window**: [Broader year/range when the event is ripe — not natal chart promise / not KP CSL]
   - **Execution Window**: [Best month or narrow month-band]
-  - **Career layer (job questions only)**: [Activation | Offer | Joining — pick the correct claim layer for this window]
+  - **Career/Promotion layer**: Job-seeking: exactly one of Activation | Offer | Joining. Promotion: exactly one of Visibility | Formalization | Settle. Never combine two layers on one window.
   - **Astrological Strength**: [High/Medium/Low]
-  - **Key Triggers**: [Briefly mention the Dasha, divisional support, and transit alignment]
+  - **Key Triggers**: [Brief dasha + one transit/divisional hook]
   - **What Helps**: [Why this window is strong]
-  - **What Weakens It**: [Why it is not ranked even higher / what could obstruct]
+  - **What Weakens It**: [Why it is not ranked higher / obstruction]
   - **Manifestation**: [How the event is likely to occur in this period]
-  - 🚨 PD / micro-dasha start = environment shift (Activation), not an offer/joining SLA unless execution score supports that layer.
+  - 🚨 PD / micro-dasha start = environment shift (Activation), not an offer/joining SLA unless the ranked execution window supports that layer.
 
-3. ### 🔍 Technical Deep Dive
-- **Primary Dasha Promise**: [Analysis of the Mahadasha/Antardasha lords responsible]
-- **Candidate Ranking Logic**: [Why Window 1 outranks Window 2 and Window 3 — cite score/cluster evidence]
-- **Ashtakavarga (SAV & BAV)**: [MANDATORY: Cite SAV for relevant houses and BAV for key planets for the windows discussed; apply BAV override where BAV < 3]
-- **KP Cusp Confirmation**: [Check the relevant Cusp Sub-Lord (CSL) and its significations for the event]
-- **Transit Confirmations**: [Analysis of Jupiter/Saturn/Rahu transits for the key windows and month-level execution points]
-- **Divisional Confirmation**: [Brief mention of D9/D10/D7 support]
+4. ### 🔍 Technical Deep Dive (KEEP SLIM — 3 beats only)
+Do NOT dump a full school-by-school report. Cap this section to:
+- **Why Window 1**: Primary dasha stack + the 1–2 strongest confirming factors (pick from transit / divisional / KP CSL / SAV-BAV — only what actually decides the rank)
+- **Main risk**: The single biggest weakeners for Window 1 or the next-best alternate
+- **Optional one-liner**: Extra school detail only if the user asked for technical depth or remedies
+Do not add long KP Sign→Star→Sub stacks, Kota essays, or remedy lists unless requested. Candidate ranking must explain Window 1 vs 2 vs 3 in plain confluence language (or scores when present).
 
-4. ### 💡 Guidance & Preparation
-[Actionable advice for the upcoming windows or reflection for past windows]
+5. ### 💡 Guidance & Preparation
+[2–4 short actionable points for the upcoming windows — not a second technical essay]
 
-<div class="final-thoughts-card">**Final Verdict**: [Summary of the strongest window with confidence High/Medium/Low. No guarantee / copper-bottomed / mathematical-certainty language.]</div>
+<div class="final-thoughts-card">**Final Verdict**: [Confidence High/Medium/Low for Window 1 + what would demote it. Do not restate the full executive summary. No guarantee / copper-bottomed / mathematical-certainty language.]</div>
 """
 
 # Template D2: Restricted Life Termination Research
@@ -836,7 +837,7 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
     try:
         from ai.prediction_anchor import (
             PREDICTION_ANCHOR_META_INSTRUCTION,
-            career_layer_prompt_rules,
+            career_timing_prompt_for_topic,
             compare_verdict_to_anchor,
             format_timing_contract_lock_block,
             get_locked_anchor,
@@ -851,7 +852,11 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
             if locked:
                 prompt_parts.append(format_timing_contract_lock_block(locked, rerank=compare_verdict_to_anchor(locked, None)))
             elif str(intent_category or "").lower() in {"career", "job", "promotion", "business"} or str(topic_key).startswith("career"):
-                prompt_parts.append(career_layer_prompt_rules())
+                prompt_parts.append(
+                    career_timing_prompt_for_topic(
+                        topic_key, category=intent_category, question=user_question
+                    )
+                )
             prompt_parts.append(PREDICTION_ANCHOR_META_INSTRUCTION.strip())
     except Exception:
         pass

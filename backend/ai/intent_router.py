@@ -273,16 +273,20 @@ def _normalize_chart_focus_payload(focus: Dict[str, Any] | None) -> Dict[str, An
     }
 
 
-def merge_divisional_charts_with_category_defaults(result: Dict) -> None:
+def merge_divisional_charts_with_category_defaults(
+    result: Dict,
+    user_question: str = "",
+) -> None:
     """
     After the model returns divisional_charts, ensure the list includes every chart required for
     `category` (additive merge — extra charts from the model are kept). Fixes omissions like D24 for education.
+    Also forces topic divisionals for lifespan timing when category is weak (timing/general).
     """
     required = get_default_divisional_charts_for_category(str(result.get("category") or "general"))
     raw = result.get("divisional_charts")
     if not isinstance(raw, list):
         result["divisional_charts"] = list(required)
-        return
+        raw = result["divisional_charts"]
     seen: set[str] = set()
     out: list[str] = []
     for c in raw:
@@ -297,6 +301,17 @@ def merge_divisional_charts_with_category_defaults(result: Dict) -> None:
             out.append(cr)
             seen.add(cr)
     result["divisional_charts"] = out
+    try:
+        from chat.lifespan_timing_evidence import force_divisional_codes_for_lifespan
+
+        result["divisional_charts"] = force_divisional_codes_for_lifespan(
+            mode=result.get("mode"),
+            category=result.get("category"),
+            question=str(user_question or ""),
+            existing=result.get("divisional_charts"),
+        )
+    except Exception:
+        pass
 
 
 def _build_usage_stage(
@@ -972,7 +987,7 @@ class IntentRouter:
             )
         if 'divisional_charts' not in result or not isinstance(result.get('divisional_charts'), list):
             result['divisional_charts'] = self._get_default_divisional_charts(result.get('category', 'general'))
-        merge_divisional_charts_with_category_defaults(result)
+        merge_divisional_charts_with_category_defaults(result, user_question=user_question)
         apply_chart_focus_guards(result, user_question)
 
         if include_chart_insights:
@@ -1059,7 +1074,7 @@ class IntentRouter:
             }
             _refine_life_event_category(user_question, result)
             result["divisional_charts"] = self._get_default_divisional_charts(result.get("category", "general"))
-            merge_divisional_charts_with_category_defaults(result)
+            merge_divisional_charts_with_category_defaults(result, user_question=user_question)
             if normalized_query_context:
                 result["query_context"] = normalized_query_context
             result["evidence_plan"] = normalize_evidence_plan(None, question=user_question)

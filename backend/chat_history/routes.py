@@ -3993,6 +3993,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             answer_text=str(result.get("response") or ""),
                             prediction_anchor_meta=result.get("prediction_anchor_meta"),
                             event_timing_verdict=result.get("event_timing_verdict"),
+                            lifespan_timing_evidence=result.get("lifespan_timing_evidence"),
                             message_id=int(message_id) if message_id is not None else None,
                         )
                         if anchor:

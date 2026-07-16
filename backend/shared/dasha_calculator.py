@@ -492,56 +492,186 @@ class DashaCalculator:
     def calculate_dashas_for_date(self, target_date: datetime, birth_data: Dict) -> Dict[str, Any]:
         """Calculate dashas for a specific date"""
         return self.calculate_current_dashas(birth_data, target_date)
-    
-    def get_dasha_periods_for_range(self, birth_data: Dict, start_date: datetime, end_date: datetime) -> List[Dict]:
-        """Get all dasha period changes within a date range"""
-        # print(f"           Getting dasha periods from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
-        
-        periods = []
-        current_date = start_date
-        
-        while current_date <= end_date:
-            dashas = self.calculate_current_dashas(birth_data, current_date)
-            # print(f"           {current_date.strftime('%Y-%m-%d')}: {dashas['mahadasha']['planet']}-{dashas['antardasha']['planet']}-{dashas['pratyantardasha']['planet']}")
-            
-            # Find when current pratyantardasha ends
-            next_change = self._find_next_dasha_change(birth_data, current_date)
-            period_end = min(next_change, end_date)
-            
-            # print(f"           Period: {current_date.strftime('%Y-%m-%d')} to {period_end.strftime('%Y-%m-%d')}")
-            
-            periods.append({
-                'start_date': current_date.strftime('%Y-%m-%d'),
-                'end_date': period_end.strftime('%Y-%m-%d'),
-                'mahadasha': dashas['mahadasha']['planet'],
-                'antardasha': dashas['antardasha']['planet'],
-                'pratyantardasha': dashas['pratyantardasha']['planet'],
-                'sookshma': dashas['sookshma']['planet'],
-                'prana': dashas['prana']['planet']
-            })
-            
-            current_date = period_end + timedelta(days=1)
-            
-            # Prevent infinite loop
-            if len(periods) > 100:
-                # print(f"           WARNING: Breaking loop after 100 periods to prevent infinite loop")
+
+    def _resolve_levels_at(self, birth_data: Dict, current_date: datetime) -> Dict[str, Any]:
+        """Resolve MD/AD/PD (with real start/end datetimes) at current_date."""
+        dashas = self.calculate_current_dashas(birth_data, current_date)
+        maha_list = dashas.get("maha_dashas") or []
+        current_maha = None
+        for maha in maha_list:
+            if maha["start"] <= current_date <= maha["end"]:
+                current_maha = maha
                 break
-        
-        # print(f"           Total dasha periods found: {len(periods)}")
+        if not current_maha and maha_list:
+            current_maha = maha_list[0]
+        if not current_maha:
+            return {
+                "mahadasha": dashas.get("mahadasha") or {},
+                "antardasha": dashas.get("antardasha") or {},
+                "pratyantardasha": dashas.get("pratyantardasha") or {},
+                "sookshma": dashas.get("sookshma") or {},
+                "prana": dashas.get("prana") or {},
+            }
+        current_antar = self._calculate_antardasha(current_maha, current_date)
+        current_pd = self._calculate_pratyantardasha(current_maha, current_antar, current_date)
+        current_sk = self._calculate_sookshma(current_maha, current_antar, current_pd, current_date)
+        current_pr = self._calculate_prana(
+            current_maha, current_antar, current_pd, current_sk, current_date
+        )
+        return {
+            "mahadasha": current_maha,
+            "antardasha": current_antar,
+            "pratyantardasha": current_pd,
+            "sookshma": current_sk,
+            "prana": current_pr,
+        }
+
+    @staticmethod
+    def _advance_past_end(period_end: datetime, range_end: datetime) -> datetime:
+        """Move just past a period end so the next loop picks the following period."""
+        nxt = period_end + timedelta(seconds=1)
+        # Date-level consumers often use calendar days; ensure forward progress of ≥1 day.
+        if nxt.date() <= period_end.date():
+            nxt = datetime.combine(period_end.date() + timedelta(days=1), datetime.min.time())
+        if nxt > range_end + timedelta(days=1):
+            return range_end + timedelta(days=1)
+        return nxt
+
+    def get_dasha_periods_for_range(
+        self,
+        birth_data: Dict,
+        start_date: datetime,
+        end_date: datetime,
+        *,
+        max_periods: int = 2000,
+    ) -> List[Dict]:
+        """Get all PD-level dasha changes in [start_date, end_date] using real PD ends.
+
+        Advances by actual pratyantardasha.end (not a 30-day probe). Caps at max_periods
+        as a safety valve; for multi-decade scans prefer iter_ad_periods + a near PD band.
+        """
+        periods: List[Dict] = []
+        current_date = start_date
+        truncated = False
+
+        while current_date <= end_date:
+            levels = self._resolve_levels_at(birth_data, current_date)
+            pd = levels["pratyantardasha"]
+            ad = levels["antardasha"]
+            md = levels["mahadasha"]
+            sk = levels["sookshma"]
+            pr = levels["prana"]
+            pd_end = pd.get("end")
+            if not isinstance(pd_end, datetime):
+                # Fallback: one day step if internals failed
+                pd_end = current_date + timedelta(days=1)
+            period_end = min(pd_end, end_date)
+            row_start = max(current_date, pd.get("start") or current_date)
+            if isinstance(row_start, datetime) and row_start < start_date:
+                row_start = start_date
+            periods.append(
+                {
+                    "start_date": row_start.strftime("%Y-%m-%d")
+                    if isinstance(row_start, datetime)
+                    else current_date.strftime("%Y-%m-%d"),
+                    "end_date": period_end.strftime("%Y-%m-%d")
+                    if isinstance(period_end, datetime)
+                    else str(period_end)[:10],
+                    "mahadasha": md.get("planet", ""),
+                    "antardasha": ad.get("planet", ""),
+                    "pratyantardasha": pd.get("planet", ""),
+                    "sookshma": sk.get("planet", ""),
+                    "prana": pr.get("planet", ""),
+                }
+            )
+            if len(periods) >= max_periods:
+                truncated = True
+                break
+            current_date = self._advance_past_end(pd_end, end_date)
+
+        if truncated and periods:
+            periods[-1]["_truncated"] = True
         return periods
-    
+
+    def iter_ad_periods(
+        self,
+        birth_data: Dict,
+        start_date: datetime,
+        end_date: datetime,
+        *,
+        max_periods: int = 500,
+    ) -> List[Dict[str, Any]]:
+        """Compact MD/AD spine covering [start_date, end_date] with real AD boundaries."""
+        dashas = self.calculate_current_dashas(birth_data, start_date)
+        maha_list = dashas.get("maha_dashas") or []
+        if not maha_list:
+            return []
+
+        # Extend maha list if end_date is beyond the first 9-MD block by re-querying near end.
+        end_dashas = self.calculate_current_dashas(birth_data, end_date)
+        end_mahas = end_dashas.get("maha_dashas") or []
+        seen = {(m["planet"], m["start"]) for m in maha_list}
+        for m in end_mahas:
+            key = (m["planet"], m["start"])
+            if key not in seen:
+                maha_list.append(m)
+                seen.add(key)
+        maha_list.sort(key=lambda m: m["start"])
+
+        rows: List[Dict[str, Any]] = []
+        for maha in maha_list:
+            m_start, m_end = self._period_bounds(maha)
+            if m_end < start_date or m_start > end_date:
+                continue
+            for ad in self.list_antardashas(maha):
+                a_start, a_end = self._period_bounds(ad)
+                if a_end < start_date or a_start > end_date:
+                    continue
+                clip_start = max(a_start, start_date)
+                clip_end = min(a_end, end_date)
+                rows.append(
+                    {
+                        "start_date": clip_start.strftime("%Y-%m-%d"),
+                        "end_date": clip_end.strftime("%Y-%m-%d"),
+                        "mahadasha": maha["planet"],
+                        "antardasha": ad["planet"],
+                        "ad_start": a_start.strftime("%Y-%m-%d"),
+                        "ad_end": a_end.strftime("%Y-%m-%d"),
+                    }
+                )
+                if len(rows) >= max_periods:
+                    return rows
+        return rows
+
+    def iter_pd_periods(
+        self,
+        birth_data: Dict,
+        start_date: datetime,
+        end_date: datetime,
+        *,
+        max_periods: int = 2000,
+    ) -> List[Dict[str, Any]]:
+        """PD spine for a near band; same rows as get_dasha_periods_for_range without sookshma/prana noise."""
+        raw = self.get_dasha_periods_for_range(
+            birth_data, start_date, end_date, max_periods=max_periods
+        )
+        out: List[Dict[str, Any]] = []
+        for row in raw:
+            out.append(
+                {
+                    "start_date": row.get("start_date"),
+                    "end_date": row.get("end_date"),
+                    "mahadasha": row.get("mahadasha"),
+                    "antardasha": row.get("antardasha"),
+                    "pratyantardasha": row.get("pratyantardasha"),
+                }
+            )
+        return out
+
     def _find_next_dasha_change(self, birth_data: Dict, current_date: datetime) -> datetime:
-        """Find the next dasha change date"""
-        # Check every day for the next 30 days to find change
-        current_dashas = self.calculate_current_dashas(birth_data, current_date)
-        current_pratyantar = current_dashas['pratyantardasha']['planet']
-        
-        for days_ahead in range(1, 31):
-            test_date = current_date + timedelta(days=days_ahead)
-            test_dashas = self.calculate_current_dashas(birth_data, test_date)
-            
-            if test_dashas['pratyantardasha']['planet'] != current_pratyantar:
-                return test_date
-        
-        # Default to 30 days ahead if no change found
-        return current_date + timedelta(days=30)
+        """Find the next PD change using real pratyantardasha.end (kept for callers)."""
+        levels = self._resolve_levels_at(birth_data, current_date)
+        pd_end = levels.get("pratyantardasha", {}).get("end")
+        if isinstance(pd_end, datetime):
+            return pd_end
+        return current_date + timedelta(days=1)

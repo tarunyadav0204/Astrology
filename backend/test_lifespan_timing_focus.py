@@ -82,6 +82,22 @@ def test_job_alias_gets_career_sutras():
 def test_merge_includes_lean_lifespan_rule():
     merge = build_merge_synthesis_instruction(mode="LIFESPAN_EVENT_TIMING")
     assert "MERGE-LIFESPAN" in merge
+    assert "MERGE-LIFESPAN-OUTLINE" in merge
+    assert "Event arc" in merge
+    assert "one career layer" in merge.lower() or "exactly one" in merge.lower()
+    assert "Slim Technical Deep Dive" in merge or "slim" in merge.lower()
     assert LIFESPAN_MERGE_TIMING_RULE.strip()[:20] in merge
     default_merge = build_merge_synthesis_instruction(mode="DEFAULT")
     assert "MERGE-LIFESPAN" not in default_merge
+
+
+def test_lifespan_template_has_arc_layer_and_slim_dive():
+    from ai.output_schema import TEMPLATE_LIFESPAN_TIMELINE
+
+    t = TEMPLATE_LIFESPAN_TIMELINE
+    assert "Event arc" in t
+    assert "exactly one" in t.lower()
+    assert "Same arc" in t and "Alternate path" in t
+    assert "KEEP SLIM" in t or "3 beats" in t
+    assert "Ripe Window" in t
+    assert "Offer & Joining" in t  # forbidden example in the rule text

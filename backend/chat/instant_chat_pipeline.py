@@ -5914,7 +5914,7 @@ Keep it short and valid JSON.
     timing_lock_block = ""
     try:
         from ai.prediction_anchor import (
-            career_layer_prompt_rules,
+            career_timing_prompt_for_topic,
             compare_verdict_to_anchor,
             format_timing_contract_lock_block,
             get_locked_anchor,
@@ -5939,7 +5939,9 @@ Keep it short and valid JSON.
                 rerank = compare_verdict_to_anchor(locked, verdict)
                 timing_lock_block = "\n\n" + format_timing_contract_lock_block(locked, rerank=rerank)
             elif str(category or "").lower() in {"career", "job", "promotion", "business"} or topic_key.startswith("career"):
-                timing_lock_block = "\n\n" + career_layer_prompt_rules()
+                timing_lock_block = "\n\n" + career_timing_prompt_for_topic(
+                    topic_key, category=category, question=question
+                )
     except Exception:
         logger.exception("instant_timing_contract_lock_inject_failed")
         timing_lock_block = ""

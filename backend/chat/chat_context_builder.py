@@ -361,6 +361,20 @@ class ChatContextBuilder:
             except Exception as e:
                 logger.warning("classical rule matcher failed: %s", e)
         
+        # Lifespan: force topic divisionals even if category fell through as timing/general
+        if intent_result:
+            try:
+                from chat.lifespan_timing_evidence import force_divisional_codes_for_lifespan
+
+                intent_result["divisional_charts"] = force_divisional_codes_for_lifespan(
+                    mode=intent_result.get("mode"),
+                    category=intent_result.get("category"),
+                    question=user_question or "",
+                    existing=intent_result.get("divisional_charts"),
+                )
+            except Exception:
+                logger.exception("lifespan_force_divisionals_failed")
+
         # Filter divisional charts based on intent router recommendations
         if intent_result and intent_result.get('divisional_charts'):
             requested_chart_codes = intent_result['divisional_charts']
@@ -422,6 +436,21 @@ class ChatContextBuilder:
                 "divisional_chart_filtering_skipped",
                 chart_count=len(full_context.get('divisional_charts', {})),
             )
+
+        # Deterministic lifespan timing evidence (cite-only pack for Standard/Premium)
+        try:
+            from chat.lifespan_timing_evidence import build_lifespan_timing_evidence
+
+            pack = build_lifespan_timing_evidence(
+                full_context,
+                birth_data=birth_data,
+                user_question=user_question or "",
+                intent_result=intent_result,
+            )
+            if pack:
+                full_context["lifespan_timing_evidence"] = pack
+        except Exception:
+            logger.exception("lifespan_timing_evidence_build_failed")
         
         # Apply minification before returning
         return self._minify_data(full_context)
@@ -1440,6 +1469,10 @@ class ChatContextBuilder:
                 # print(f"   Optimization: Skipped fast movers (Sun, Moon, Mercury, Venus) to reduce compute load")
                 
                 transit_activations = []
+                dasha_levels = self._get_required_dasha_levels(intent_result, year_range)
+                dasha_periods: List[Dict] = []
+                chara_periods_for_range: List[Dict] = []
+                yogini_periods_for_range: List[Dict] = []
                 
                 for i, aspect in enumerate(aspects):
                     # print(f"   Processing aspect {i+1}/{len(aspects)}: {aspect['transit_planet']} -> {aspect['natal_planet']}")
@@ -1654,16 +1687,39 @@ class ChatContextBuilder:
                 if len(transit_activations) > 3:
                     print(f"     ... and {len(transit_activations) - 3} more")
                 
-                # Build unified dasha timeline (sent once at top level)
-                context['unified_dasha_timeline'] = {
-                    'vimshottari_periods': [
-                        self._filter_dasha_levels(d, dasha_levels) for d in dasha_periods
-                    ],
-                    'chara_periods': chara_periods_for_range,
-                    'yogini_periods': yogini_periods_for_range,
-                    'dasha_levels_included': dasha_levels,
-                    'note': 'Reference this timeline for all transit activations'
-                }
+                # Build unified dasha timeline (sent once at top level).
+                # Prefer lifespan AD/PD spines from requested_dasha_summary when present.
+                rds = context.get("requested_dasha_summary") or {}
+                if rds.get("ad_spine") is not None and (
+                    (context.get("timing_focus") or {}).get("open_ended_lifespan")
+                    or str((intent_result or {}).get("mode") or "").upper()
+                    in {"LIFESPAN_EVENT_TIMING", "PREDICT_EVENT_TIMING"}
+                    or year_range >= 10
+                ):
+                    context["unified_dasha_timeline"] = {
+                        "vimshottari_periods": rds.get("vimshottari_sequence") or [],
+                        "ad_spine": rds.get("ad_spine") or [],
+                        "pd_near_band": rds.get("pd_near_band") or {},
+                        "period_coverage_actual": rds.get("period_coverage_actual"),
+                        "truncated": bool(rds.get("truncated")),
+                        "chara_periods": chara_periods_for_range,
+                        "yogini_periods": yogini_periods_for_range,
+                        "dasha_levels_included": dasha_levels,
+                        "note": rds.get("note")
+                        or "Lifespan AD spine + near PD band; cite dates only from these lists.",
+                    }
+                else:
+                    context['unified_dasha_timeline'] = {
+                        'vimshottari_periods': [
+                            self._filter_dasha_levels(d, dasha_levels) for d in dasha_periods
+                        ],
+                        'chara_periods': chara_periods_for_range,
+                        'yogini_periods': yogini_periods_for_range,
+                        'dasha_levels_included': dasha_levels,
+                        'period_coverage_actual': rds.get("period_coverage_actual"),
+                        'truncated': bool(rds.get("truncated")),
+                        'note': 'Reference this timeline for all transit activations'
+                    }
                 # Add comprehensive transit analysis instructions
                 context['comprehensive_transit_analysis'] = {
                     "mandatory_approach": "For each transit activation, analyze ALL connected houses and predict MULTIPLE specific life events by combining house meanings",
@@ -2678,12 +2734,60 @@ class ChatContextBuilder:
         end_date = datetime(end_year, 12, 31)
         
         dasha_calc = DashaCalculator()
-        
-        # Get all Vimshottari periods for the range
-        vimshottari_periods = dasha_calc.get_dasha_periods_for_range(birth_data, start_date, end_date)
-        
-        # Determine required dasha levels
         dasha_levels = self._get_required_dasha_levels(intent_result, year_range)
+
+        timing_focus = context.get("timing_focus") or {}
+        mode = str(
+            (intent_result or {}).get("mode")
+            or timing_focus.get("mode")
+            or ""
+        ).upper()
+        open_ended = bool(timing_focus.get("open_ended_lifespan"))
+        lifespan_mode = mode in {"LIFESPAN_EVENT_TIMING", "PREDICT_EVENT_TIMING"} or open_ended or year_range >= 10
+
+        judgment_year = int(timing_focus.get("judgment_year") or datetime.now().year)
+        near_start = datetime(max(start_year, judgment_year - 1), 1, 1)
+        near_end = datetime(min(end_year, judgment_year + 3), 12, 31)
+        if near_end < near_start:
+            near_start, near_end = start_date, min(end_date, start_date + timedelta(days=365 * 4))
+
+        if lifespan_mode:
+            # Full-scan AD spine + near-band PD (avoids dumping decades of PD into the prompt).
+            ad_spine = dasha_calc.iter_ad_periods(birth_data, start_date, end_date)
+            pd_near = dasha_calc.iter_pd_periods(birth_data, near_start, near_end)
+            vimshottari_periods = [
+                {
+                    "start_date": r.get("start_date"),
+                    "end_date": r.get("end_date"),
+                    "mahadasha": r.get("mahadasha"),
+                    "antardasha": r.get("antardasha"),
+                    "pratyantardasha": r.get("pratyantardasha", ""),
+                }
+                for r in pd_near
+            ]
+            actual_start = (ad_spine[0]["start_date"] if ad_spine else start_date.strftime("%Y-%m-%d"))
+            actual_end = (ad_spine[-1]["end_date"] if ad_spine else end_date.strftime("%Y-%m-%d"))
+            truncated = False
+        else:
+            ad_spine = []
+            pd_near = []
+            vimshottari_periods = dasha_calc.get_dasha_periods_for_range(
+                birth_data, start_date, end_date
+            )
+            actual_start = (
+                vimshottari_periods[0]["start_date"]
+                if vimshottari_periods
+                else start_date.strftime("%Y-%m-%d")
+            )
+            actual_end = (
+                vimshottari_periods[-1]["end_date"]
+                if vimshottari_periods
+                else end_date.strftime("%Y-%m-%d")
+            )
+            truncated = bool(
+                vimshottari_periods
+                and vimshottari_periods[-1].get("_truncated")
+            )
         
         # Get house lordships for enriched data
         ascendant_sign = int(chart_data.get('ascendant', 0) / 30)
@@ -2708,9 +2812,20 @@ class ChatContextBuilder:
                 })
         except Exception as e:
             print(f"DEBUG: Yogini summary calculation error: {e}")
+
+        # Enrich near-band / short-range PD rows for Parashari (cap size).
+        enrich_source = vimshottari_periods[:120]
         
         return {
             'period_coverage': f"{start_year}-{end_year}",
+            'period_coverage_actual': f"{actual_start}→{actual_end}",
+            'truncated': truncated,
+            'ad_spine': ad_spine,
+            'pd_near_band': {
+                'start': near_start.strftime("%Y-%m-%d") if lifespan_mode else None,
+                'end': near_end.strftime("%Y-%m-%d") if lifespan_mode else None,
+                'periods': pd_near if lifespan_mode else [],
+            },
             'vimshottari_sequence': [
                 self._filter_dasha_levels(d, dasha_levels) for d in vimshottari_periods
             ],
@@ -2748,12 +2863,18 @@ class ChatContextBuilder:
                         'lordships': house_lordships.get(d.get('prana', ''), []),
                         'transit_house': self._get_planet_transit_house(d.get('prana', ''), start_date, birth_data)
                     }
-                } for d in vimshottari_periods
+                } for d in enrich_source
             ],
             'chara_sequence': chara_periods,
             'yogini_sequence': yogini_periods,
             'dasha_levels_included': dasha_levels,
-            'note': f'Dasha coverage with {len(dasha_levels)} levels for {year_range}-year period. Use all_five_levels_sequence for complete Parashari analysis.'
+            'note': (
+                f"Lifespan dasha pack: AD spine for {start_year}-{end_year}; "
+                f"PD near-band {near_start.date()}→{near_end.date()}. "
+                "Cite MD/AD/PD dates only from ad_spine / pd_near_band / vimshottari_sequence."
+                if lifespan_mode
+                else f'Dasha coverage with {len(dasha_levels)} levels for {year_range}-year period. Use all_five_levels_sequence for complete Parashari analysis.'
+            ),
         }
     
     def _validate_transit_data(self, transit_activations: List[Dict]) -> None:

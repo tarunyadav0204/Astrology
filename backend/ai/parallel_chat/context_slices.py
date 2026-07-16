@@ -56,6 +56,8 @@ _PARASHARI_KEYS: Set[str] = {
     "extracted_context",
     "current_date_info",
     "response_format",
+    "timing_focus",
+    "lifespan_timing_evidence",
     "bhavat_bhavam",
 }
 
@@ -109,6 +111,8 @@ _SHARED_KERNEL_KEYS: Set[str] = {
     "period_dasha_activations",
     "unified_dasha_timeline",
     "bhavat_bhavam",
+    "timing_focus",
+    "lifespan_timing_evidence",
 }
 
 
@@ -131,6 +135,8 @@ _PARALLEL_KERNEL_LITE_KEYS: Set[str] = {
     "current_dashas",
     "requested_dasha_summary",
     "bhavat_bhavam",
+    "timing_focus",
+    "lifespan_timing_evidence",
 }
 
 

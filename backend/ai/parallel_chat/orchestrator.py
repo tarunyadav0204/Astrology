@@ -1323,10 +1323,11 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
     )
     timing_contract_block = ""
     prediction_anchor_meta_tail = ""
+    lifespan_evidence_block = ""
     try:
         from ai.prediction_anchor import (
             PREDICTION_ANCHOR_META_INSTRUCTION,
-            career_layer_prompt_rules,
+            career_timing_prompt_for_topic,
             compare_verdict_to_anchor,
             format_timing_contract_lock_block,
             get_locked_anchor,
@@ -1342,13 +1343,32 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
                     locked, rerank=compare_verdict_to_anchor(locked, None)
                 ) + "\n"
             elif str(category or "").lower() in {"career", "job", "promotion", "business"} or str(topic_key).startswith("career"):
-                timing_contract_block = career_layer_prompt_rules() + "\n"
+                timing_contract_block = (
+                    career_timing_prompt_for_topic(
+                        topic_key, category=category, question=user_question
+                    )
+                    + "\n"
+                )
             prediction_anchor_meta_tail = "\n" + PREDICTION_ANCHOR_META_INSTRUCTION.strip()
     except Exception:
         logger.exception("parallel_timing_contract_inject_failed")
+    try:
+        from chat.lifespan_timing_evidence import compact_lifespan_timing_evidence_for_prompt
+
+        pack = ctx.get("lifespan_timing_evidence")
+        compact = compact_lifespan_timing_evidence_for_prompt(pack if isinstance(pack, dict) else None)
+        if compact:
+            lifespan_evidence_block = (
+                "LIFESPAN_TIMING_EVIDENCE_JSON (cite-only authority for MD/AD/PD dates, "
+                "Double Transit, topic divisionals, Window ranking, confidence ceiling):\n"
+                f"{_json_compact(compact)}\n"
+            )
+    except Exception:
+        logger.exception("parallel_lifespan_evidence_inject_failed")
     merge_user = (
         f"{time_context}\n\n"
         f"{merge_cached_note}"
+        f"{lifespan_evidence_block}"
         f"SPECIALIST_BRANCH_OUTPUTS_JSON:\n"
         f"{_json_compact(branch_bundle)}\n"
         f"{'' if _runtime_for('merge')['cached_model'] else hist_text + chr(10)}"
@@ -1559,6 +1579,16 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
     for cache_key, cache_resource in cache_resources_by_key.items():
         await _delete_parallel_cache(cache_resource, cache_label=f"parallel_chat_{cache_key[0]}_{cache_key[1]}")
 
+    lifespan_pack_out = None
+    try:
+        from chat.lifespan_timing_evidence import compact_lifespan_timing_evidence_for_prompt
+
+        lifespan_pack_out = compact_lifespan_timing_evidence_for_prompt(
+            ctx.get("lifespan_timing_evidence") if isinstance(ctx.get("lifespan_timing_evidence"), dict) else None
+        )
+    except Exception:
+        lifespan_pack_out = None
+
     return {
         "success": True,
         "response": parsed_response["content"],
@@ -1569,6 +1599,7 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
             "analysis_steps": parsed_response.get("analysis_steps", []),
             "faq_metadata": faq_metadata,
             "prediction_anchor_meta": prediction_anchor_meta,
+            "lifespan_timing_evidence": lifespan_pack_out,
             "next_action": next_action,
             "raw_response": response_text,
         "has_transit_request": "transitRequest" in response_text and '"requestType"' in response_text,
