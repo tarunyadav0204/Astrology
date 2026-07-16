@@ -80,6 +80,81 @@ def _year_from_mapping(data: Optional[Dict[str, Any]], camel_key: str, snake_key
     return _safe_year(value, fallback)
 
 
+def resolve_timing_focus(
+    intent_result: Optional[Dict[str, Any]],
+    *,
+    target_date: Optional[datetime] = None,
+    requested_period: Optional[Dict[str, Any]] = None,
+    now: Optional[datetime] = None,
+) -> Dict[str, Any]:
+    """Split scan window (candidate search) from judgment epoch (current/Varshphal/Sudarshana).
+
+    Open-ended LIFESPAN keeps a wide Chara/transit *scan* (e.g. age 18 → now+25) but
+    anchors is_current / single-year clocks to **now** (or an explicitly asked year).
+    """
+    now_dt = now or datetime.now()
+    intent = intent_result if isinstance(intent_result, dict) else {}
+    mode = str(intent.get("mode") or "").upper()
+    req = intent.get("transit_request") if isinstance(intent.get("transit_request"), dict) else {}
+    extracted = intent.get("extracted_context") if isinstance(intent.get("extracted_context"), dict) else {}
+
+    scan_start = _year_from_mapping(req, "startYear", "start_year", now_dt.year) if req else None
+    scan_end = _year_from_mapping(req, "endYear", "end_year", now_dt.year) if req else None
+    if scan_start is not None and scan_end is not None and scan_end < scan_start:
+        scan_start, scan_end = scan_end, scan_start
+
+    asked_year = None
+    for key in ("specific_year", "target_year", "asked_year"):
+        raw = extracted.get(key)
+        if raw not in (None, ""):
+            asked_year = _safe_year(raw, now_dt.year)
+            break
+    if asked_year is None and extracted.get("specific_date"):
+        try:
+            asked_year = datetime.strptime(str(extracted.get("specific_date"))[:10], "%Y-%m-%d").year
+        except ValueError:
+            asked_year = None
+
+    span = (int(scan_end) - int(scan_start)) if (scan_start is not None and scan_end is not None) else 0
+    open_ended_lifespan = mode in {"LIFESPAN_EVENT_TIMING", "PREDICT_EVENT_TIMING"} and span >= 10 and asked_year is None
+
+    focus_date = now_dt
+    focus_source = "now"
+    if asked_year is not None:
+        focus_date = datetime(int(asked_year), 1, 1)
+        focus_source = "extracted_asked_year"
+    elif target_date is not None:
+        focus_date = target_date
+        focus_source = "target_date"
+    elif requested_period and (requested_period.get("startYear") or requested_period.get("start_year")):
+        focus_date = datetime(
+            _year_from_mapping(requested_period, "startYear", "start_year", now_dt.year),
+            1,
+            1,
+        )
+        focus_source = "requested_period"
+    elif open_ended_lifespan:
+        focus_date = now_dt
+        focus_source = "lifespan_open_ended_now"
+    elif scan_start is not None and scan_end is not None and span < 10:
+        # Narrow transit band / single-year ask: use start of that band.
+        focus_date = datetime(int(scan_start), 1, 1)
+        focus_source = "narrow_transit_window"
+    elif scan_start is not None and not req.get("endYear") and not req.get("end_year"):
+        focus_date = datetime(int(scan_start), 1, 1)
+        focus_source = "transit_start_only"
+
+    return {
+        "focus_date": focus_date,
+        "judgment_year": int(focus_date.year),
+        "focus_source": focus_source,
+        "scan_start_year": int(scan_start) if scan_start is not None else None,
+        "scan_end_year": int(scan_end) if scan_end is not None else None,
+        "open_ended_lifespan": bool(open_ended_lifespan),
+        "mode": mode or None,
+    }
+
+
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
 
@@ -873,87 +948,74 @@ class ChatContextBuilder:
             'gandanta_analysis': gandanta_calc.calculate_gandanta_analysis()
         }
         
-        # Add Sudarshana Dasha (Annual Clock with precision triggers)
+        timing_focus = resolve_timing_focus(
+            intent_result,
+            target_date=target_date,
+            requested_period=requested_period,
+        )
+        context["timing_focus"] = {
+            "judgment_year": timing_focus["judgment_year"],
+            "focus_source": timing_focus["focus_source"],
+            "scan_start_year": timing_focus["scan_start_year"],
+            "scan_end_year": timing_focus["scan_end_year"],
+            "open_ended_lifespan": timing_focus["open_ended_lifespan"],
+            "note": (
+                "judgment_year anchors Varshphal/Sudarshana/is_current; "
+                "scan_* is the candidate search window (keep full Chara sequence for that span)."
+            ),
+        }
+        focus_date = timing_focus["focus_date"]
+        judgment_year = int(timing_focus["judgment_year"])
+
+        # Add Sudarshana Dasha (Annual Clock) for judgment year — not scan start (age-18).
         if intent_result and intent_result.get('needs_transits'):
             try:
-                from datetime import datetime
                 birth_hash = self._create_birth_hash(birth_data)
                 chart_data = self.static_cache[birth_hash]['d1_chart']
-                
-                # Determine target year from intent
-                target_year = datetime.now().year
-                if intent_result.get('transit_request'):
-                    target_year = intent_result['transit_request'].get('startYear', target_year)
-                
                 sudarshana_dasha_calc = SudarshanaDashaCalculator(chart_data, birth_data)
-                context['sudarshana_dasha'] = sudarshana_dasha_calc.calculate_precision_triggers(target_year)
+                context['sudarshana_dasha'] = sudarshana_dasha_calc.calculate_precision_triggers(judgment_year)
             except Exception as e:
-                logger.warning("sudarshana dasha calculation failed for target_year=%s: %s", target_year, e)
+                logger.warning("sudarshana dasha calculation failed for target_year=%s: %s", judgment_year, e)
         
-        # Add Varshphal if question is about a specific year
-        if intent_result and intent_result.get('transit_request'):
-            req = intent_result['transit_request']
-            year = req.get('startYear') or req.get('start_year')
-            if year:
-                try:
-                    chart_calc = ChartCalculator({})
-                    vp_calc = VarshphalCalculator(chart_calc)
-                    varshphal_data = vp_calc.calculate_varshphal(birth_data, int(year))
-                    
-                    # Extract muntha lord from sign
-                    muntha_sign = varshphal_data['muntha']['sign']
-                    sign_lords = {
-                        1: 'Mars', 2: 'Venus', 3: 'Mercury', 4: 'Moon', 5: 'Sun', 6: 'Mercury',
-                        7: 'Venus', 8: 'Mars', 9: 'Jupiter', 10: 'Saturn', 11: 'Saturn', 12: 'Jupiter'
-                    }
-                    muntha_lord = sign_lords.get(muntha_sign, 'Unknown')
-                    
-                    context['varshphal'] = {
-                        'muntha_house': varshphal_data['muntha']['house'],
-                        'muntha_sign': muntha_sign,
-                        'muntha_lord': muntha_lord,
-                        'mudda_dasha': varshphal_data['mudda_dasha'],
-                        'year_lord': varshphal_data['year_lord'],
-                        'year': year
-                    }
-                    # print(f"✅ Varshphal calculated for year {year}")
-                except Exception as e:
-                    logger.warning("varshphal calculation failed for year=%s: %s", year, e)
+        # Varshphal for judgment year (now / asked year). Skip misleading age-18 annual chart on open lifespan.
+        if intent_result and (intent_result.get('transit_request') or intent_result.get('needs_transits')):
+            year = judgment_year
+            try:
+                chart_calc = ChartCalculator({})
+                vp_calc = VarshphalCalculator(chart_calc)
+                varshphal_data = vp_calc.calculate_varshphal(birth_data, int(year))
+                
+                # Extract muntha lord from sign
+                muntha_sign = varshphal_data['muntha']['sign']
+                sign_lords = {
+                    1: 'Mars', 2: 'Venus', 3: 'Mercury', 4: 'Moon', 5: 'Sun', 6: 'Mercury',
+                    7: 'Venus', 8: 'Mars', 9: 'Jupiter', 10: 'Saturn', 11: 'Saturn', 12: 'Jupiter'
+                }
+                muntha_lord = sign_lords.get(muntha_sign, 'Unknown')
+                
+                context['varshphal'] = {
+                    'muntha_house': varshphal_data['muntha']['house'],
+                    'muntha_sign': muntha_sign,
+                    'muntha_lord': muntha_lord,
+                    'mudda_dasha': varshphal_data['mudda_dasha'],
+                    'year_lord': varshphal_data['year_lord'],
+                    'year': year,
+                    'focus_source': timing_focus.get('focus_source'),
+                }
+            except Exception as e:
+                logger.warning("varshphal calculation failed for year=%s: %s", year, e)
         
-        # Add Chara Dasha (Jaimini) with DYNAMIC TARGETING
+        # Chara: full sequence filtered to scan window; is_current uses judgment focus (now / asked year).
         try:
-            from datetime import datetime
             birth_hash = self._create_birth_hash(birth_data)
             chart_data = self.static_cache[birth_hash]['d1_chart']
             chara_calc = CharaDashaCalculator(chart_data)
             dob_dt = datetime.strptime(birth_data['date'], '%Y-%m-%d')
-            
-            # Calculate full sequence
-            # Determine focus date (PRIORITY ORDER)
-            focus_date = datetime.now()
-            
-            # PRIORITY 1: Intent Router (User's explicit question: "How is 2028?")
-            if intent_result and intent_result.get('transit_request'):
-                req = intent_result['transit_request']
-                year = req.get('startYear') or req.get('start_year')
-                if year:
-                    focus_date = datetime(int(year), 1, 1)
-            
-            # PRIORITY 2: Explicit Target Date (Backend override/Annual mode)
-            elif target_date:
-                focus_date = target_date
-            
-            # PRIORITY 3: Gemini Requested Period (Tool call/Drill-down)
-            elif requested_period:
-                year = requested_period.get('startYear') or requested_period.get('start_year')
-                if year:
-                    focus_date = datetime(int(year), 1, 1)
 
-            # Calculate full sequence aligned to the actual analysis date so both
-            # MD and AD "current" flags are correct for the user's asked timeframe.
+            # Calculate full sequence aligned to judgment epoch for correct MD/AD current flags.
             full_chara_data = chara_calc.calculate_dasha(dob_dt, focus_date=focus_date)
             
-            # Filter periods to only relevant ones for the transit period
+            # Filter periods to only relevant ones for the transit / lifespan scan window
             filtered_periods = []
             if intent_result and intent_result.get('transit_request'):
                 req = intent_result['transit_request']
@@ -970,10 +1032,10 @@ class ChatContextBuilder:
                         
                         # Include period if it overlaps with transit period
                         if p_start <= period_end and p_end >= period_start:
-                            # Update is_current flag based on focus date
+                            # Update is_current flag based on judgment focus (not scan start)
                             period['is_current'] = p_start <= focus_date < p_end
                             if period['is_current']:
-                                period['note'] = "ACTIVE PERIOD for User Question"
+                                period['note'] = "ACTIVE PERIOD at judgment focus (now/asked year)"
                             filtered_periods.append(period)
                 else:
                     # Fallback to current period only
@@ -982,7 +1044,7 @@ class ChatContextBuilder:
                         p_end = datetime.strptime(period['end_date'], "%Y-%m-%d")
                         period['is_current'] = p_start <= focus_date < p_end
                         if period['is_current']:
-                            period['note'] = "ACTIVE PERIOD for User Question"
+                            period['note'] = "ACTIVE PERIOD at judgment focus (now/asked year)"
                             filtered_periods.append(period)
                             break
             else:
@@ -992,7 +1054,7 @@ class ChatContextBuilder:
                     p_end = datetime.strptime(period['end_date'], "%Y-%m-%d")
                     period['is_current'] = p_start <= focus_date < p_end
                     if period['is_current']:
-                        period['note'] = "ACTIVE PERIOD for User Question"
+                        period['note'] = "ACTIVE PERIOD at judgment focus (now/asked year)"
                         filtered_periods.append(period)
                         break
             
@@ -1000,7 +1062,14 @@ class ChatContextBuilder:
             context['chara_dasha'] = {
                 'calculation_method': full_chara_data.get('calculation_method', 'Standard'),
                 'periods': filtered_periods,
-                'note': f'Filtered to {len(filtered_periods)} relevant periods for transit analysis'
+                'judgment_year': judgment_year,
+                'focus_source': timing_focus.get('focus_source'),
+                'scan_start_year': timing_focus.get('scan_start_year'),
+                'scan_end_year': timing_focus.get('scan_end_year'),
+                'note': (
+                    f'Filtered to {len(filtered_periods)} periods in the scan window; '
+                    f'is_current uses judgment_year={judgment_year} ({timing_focus.get("focus_source")}).'
+                ),
             }
             
             # Update Jaimini Full Analysis with the correct chara_dasha
@@ -1013,7 +1082,6 @@ class ChatContextBuilder:
                 # Recalculate Jaimini analyzer with the focus_date chara_dasha
                 jaimini_analyzer = JaiminiFullAnalyzer(chart_data, karaka_data, jaimini_points, full_chara_data)
                 context['jaimini_full_analysis'] = jaimini_analyzer.get_jaimini_report()
-                # print(f"✅ Jaimini Full Analysis updated with focus_date Chara Dasha")
             except Exception as e:
                 logger.warning("jaimini analyzer update failed: %s", e)
         except Exception as e:
@@ -1031,24 +1099,31 @@ class ChatContextBuilder:
         
 
         
-        # Add 5-year macro transit timeline for slow-moving planets
+        # Macro slow-planet timeline: default 5y; for lifespan extend now → scan_end (weekly if long).
         try:
             real_calc = RealTransitCalculator()
-            macro_transits = real_calc.get_slow_planet_transits(birth_data, years=5)
+            macro_start = datetime.now()
+            macro_end = macro_start + timedelta(days=365 * 5)
+            scan_end_y = timing_focus.get("scan_end_year")
+            if timing_focus.get("open_ended_lifespan") and scan_end_y:
+                macro_end = datetime(int(scan_end_y), 12, 31)
+                if macro_end < macro_start:
+                    macro_end = macro_start + timedelta(days=365 * 5)
+            elif timing_focus.get("scan_end_year") and timing_focus.get("scan_start_year"):
+                span = int(timing_focus["scan_end_year"]) - int(timing_focus["scan_start_year"])
+                if span >= 10:
+                    macro_end = datetime(int(timing_focus["scan_end_year"]), 12, 31)
+            macro_transits = real_calc.get_slow_planet_transits(
+                birth_data,
+                start_date=macro_start,
+                end_date=macro_end,
+            )
             context['macro_transits_timeline'] = macro_transits
-            
-            total_periods = sum(len(periods) for periods in macro_transits.values())
-            # print(f"✅ Macro transits timeline: {total_periods} periods for 5 years")
-            
-            # Print detailed breakdown
-            # print(f"\n📊 MACRO TRANSITS TIMELINE (5 YEARS):")
-            for planet, periods in macro_transits.items():
-                # print(f"\n{planet.upper()} ({len(periods)} periods):")
-                for i, period in enumerate(periods[:3], 1):  # Show first 3 periods
-                    retro_flag = " [RETROGRADE RETURN]" if period.get('retrograde_return') else ""
-                    # print(f"  {i}. {period['start_date']} to {period['end_date']}")
-                    # print(f"     Sign: {period['sign']} | House: {period['house']} | Segment: {period['segment']}{retro_flag}")
-            # print()
+            context['macro_transits_meta'] = {
+                "start": macro_start.strftime("%Y-%m-%d"),
+                "end": macro_end.strftime("%Y-%m-%d"),
+                "note": "Future slow-planet sign changes for Double Transit confirmation; past scan uses transit_activations.",
+            }
             
         except Exception as e:
             # print(f"❌ Macro transits calculation failed: {e}")

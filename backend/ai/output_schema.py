@@ -297,22 +297,24 @@ TEMPLATE_LIFESPAN_TIMELINE = """
 ### 🕰️ LIFESPAN EVENT TIMELINE (MANDATORY)
 Your response must be a chronological analysis of the specific event requested across the native's lifespan.
 
-1. <div class="quick-answer-card">**Executive Summary**: [Direct answer naming the most likely window AND, when justified, the best month or 2-3 month execution band]</div>
+1. <div class="quick-answer-card">**Executive Summary**: [Direct answer naming the most likely window AND, when justified, the best month or 2-3 month execution band. For career/job questions, explicitly separate **Activation** (calls/effort/interviews), **Offer** (offer letter likely), and **Joining** (start/settle). Never collapse all three into one PD start date.]</div>
 
 2. ### 🗓️ Ranked Potential Windows
-[List 3-5 specific time windows in ranked order, strongest first]
+[List 3-5 specific time windows in ranked order, strongest first. Ranking MUST follow scored clusters / event_timing_verdict when present. Do not silently re-rank Window 1 on follow-ups.]
 - **Window [1/2/3]**: [Year/Period]
-  - **Promise Window**: [Broader year/range]
+  - **Ripe / Promise Window**: [Broader year/range when the event is ripe — not natal chart promise / not KP CSL]
   - **Execution Window**: [Best month or narrow month-band]
+  - **Career layer (job questions only)**: [Activation | Offer | Joining — pick the correct claim layer for this window]
   - **Astrological Strength**: [High/Medium/Low]
   - **Key Triggers**: [Briefly mention the Dasha, divisional support, and transit alignment]
   - **What Helps**: [Why this window is strong]
   - **What Weakens It**: [Why it is not ranked even higher / what could obstruct]
   - **Manifestation**: [How the event is likely to occur in this period]
+  - 🚨 PD / micro-dasha start = environment shift (Activation), not an offer/joining SLA unless execution score supports that layer.
 
 3. ### 🔍 Technical Deep Dive
 - **Primary Dasha Promise**: [Analysis of the Mahadasha/Antardasha lords responsible]
-- **Candidate Ranking Logic**: [Why Window 1 outranks Window 2 and Window 3]
+- **Candidate Ranking Logic**: [Why Window 1 outranks Window 2 and Window 3 — cite score/cluster evidence]
 - **Ashtakavarga (SAV & BAV)**: [MANDATORY: Cite SAV for relevant houses and BAV for key planets for the windows discussed; apply BAV override where BAV < 3]
 - **KP Cusp Confirmation**: [Check the relevant Cusp Sub-Lord (CSL) and its significations for the event]
 - **Transit Confirmations**: [Analysis of Jupiter/Saturn/Rahu transits for the key windows and month-level execution points]
@@ -321,7 +323,7 @@ Your response must be a chronological analysis of the specific event requested a
 4. ### 💡 Guidance & Preparation
 [Actionable advice for the upcoming windows or reflection for past windows]
 
-<div class="final-thoughts-card">**Final Verdict**: [Summary of the most certain period and why]</div>
+<div class="final-thoughts-card">**Final Verdict**: [Summary of the strongest window with confidence High/Medium/Low. No guarantee / copper-bottomed / mathematical-certainty language.]</div>
 """
 
 # Template D2: Restricted Life Termination Research
@@ -831,6 +833,28 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
     )
     
     prompt_parts.append(build_multi_question_focus_instruction(_lang))
+    try:
+        from ai.prediction_anchor import (
+            PREDICTION_ANCHOR_META_INSTRUCTION,
+            career_layer_prompt_rules,
+            compare_verdict_to_anchor,
+            format_timing_contract_lock_block,
+            get_locked_anchor,
+            infer_topic_key,
+            should_apply_timing_contract,
+        )
+
+        intent_category = context.get("intent", {}).get("category", "general") if isinstance(context.get("intent"), dict) else "general"
+        if should_apply_timing_contract(mode=intent_mode, category=intent_category, question=user_question):
+            topic_key = infer_topic_key(user_question, category=intent_category)
+            locked = get_locked_anchor(context.get("extracted_context"), topic_key)
+            if locked:
+                prompt_parts.append(format_timing_contract_lock_block(locked, rerank=compare_verdict_to_anchor(locked, None)))
+            elif str(intent_category or "").lower() in {"career", "job", "promotion", "business"} or str(topic_key).startswith("career"):
+                prompt_parts.append(career_layer_prompt_rules())
+            prompt_parts.append(PREDICTION_ANCHOR_META_INSTRUCTION.strip())
+    except Exception:
+        pass
     prompt_parts.append(f"{history_text}\nCURRENT QUESTION: {user_question}")
     prompt_parts.append(final_check)
     prompt_parts.append(NEXT_ACTION_META_INSTRUCTION.strip())

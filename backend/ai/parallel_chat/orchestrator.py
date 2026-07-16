@@ -1173,6 +1173,8 @@ async def run_parallel_chat_pipeline(
             if native_name and native_name != "the native":
                 cleaned_text = analyzer._fix_pronoun_usage(cleaned_text, native_name)
         cleaned_text, faq_metadata = ResponseParser.parse_faq_metadata(cleaned_text)
+        cleaned_text, next_action = ResponseParser.parse_next_action_metadata(cleaned_text)
+        cleaned_text, prediction_anchor_meta = ResponseParser.parse_prediction_anchor_metadata(cleaned_text)
         if len(cleaned_text) < 50:
             _log_parallel_llm_summary(_parallel_usage_rows)
             for cache_key, cache_resource in cache_resources_by_key.items():
@@ -1195,7 +1197,6 @@ async def run_parallel_chat_pipeline(
                 "PARALLEL_MERGE_RAW_RESPONSE_START\n%s\nPARALLEL_MERGE_RAW_RESPONSE_END",
                 cleaned_text,
             )
-        cleaned_text, next_action = ResponseParser.parse_next_action_metadata(cleaned_text)
         if _parallel_log_merge_body_enabled():
             logger.info(
                 "PARALLEL_MERGE_PARSED_NEXT_ACTION %s",
@@ -1234,6 +1235,7 @@ async def run_parallel_chat_pipeline(
             "follow_up_questions": parsed_response.get("follow_up_questions", []),
             "analysis_steps": parsed_response.get("analysis_steps", []),
             "faq_metadata": faq_metadata,
+            "prediction_anchor_meta": prediction_anchor_meta,
             "next_action": next_action,
             "raw_response": response_text,
             "has_transit_request": "transitRequest" in response_text and '"requestType"' in response_text,
@@ -1319,6 +1321,31 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
         if _runtime_for("merge")["cached_model"]
         else ""
     )
+    timing_contract_block = ""
+    prediction_anchor_meta_tail = ""
+    try:
+        from ai.prediction_anchor import (
+            PREDICTION_ANCHOR_META_INSTRUCTION,
+            career_layer_prompt_rules,
+            compare_verdict_to_anchor,
+            format_timing_contract_lock_block,
+            get_locked_anchor,
+            infer_topic_key,
+            should_apply_timing_contract,
+        )
+
+        if should_apply_timing_contract(mode=intent_mode, category=category, question=user_question):
+            topic_key = infer_topic_key(user_question, category=category)
+            locked = get_locked_anchor(ctx.get("extracted_context"), topic_key)
+            if locked:
+                timing_contract_block = format_timing_contract_lock_block(
+                    locked, rerank=compare_verdict_to_anchor(locked, None)
+                ) + "\n"
+            elif str(category or "").lower() in {"career", "job", "promotion", "business"} or str(topic_key).startswith("career"):
+                timing_contract_block = career_layer_prompt_rules() + "\n"
+            prediction_anchor_meta_tail = "\n" + PREDICTION_ANCHOR_META_INSTRUCTION.strip()
+    except Exception:
+        logger.exception("parallel_timing_contract_inject_failed")
     merge_user = (
         f"{time_context}\n\n"
         f"{merge_cached_note}"
@@ -1326,9 +1353,11 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
         f"{_json_compact(branch_bundle)}\n"
         f"{'' if _runtime_for('merge')['cached_model'] else hist_text + chr(10)}"
         f"{mq_focus}\n"
+        f"{timing_contract_block}"
         f"{'' if _runtime_for('merge')['cached_model'] else f'CURRENT QUESTION: {user_question}' + chr(10)}"
         f"{final_check}\n{FAQ_META_INSTRUCTION.strip()}"
         f"\n{NEXT_ACTION_META_INSTRUCTION.strip()}"
+        f"{prediction_anchor_meta_tail}"
     )
     merge_static = "\n\n".join(
         [
@@ -1463,6 +1492,8 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
             cleaned_text = analyzer._fix_pronoun_usage(cleaned_text, native_name)
 
     cleaned_text, faq_metadata = ResponseParser.parse_faq_metadata(cleaned_text)
+    cleaned_text, next_action = ResponseParser.parse_next_action_metadata(cleaned_text)
+    cleaned_text, prediction_anchor_meta = ResponseParser.parse_prediction_anchor_metadata(cleaned_text)
     if len(cleaned_text) < 50:
         _log_parallel_llm_summary(_parallel_usage_rows)
         for cache_key, cache_resource in cache_resources_by_key.items():
@@ -1486,7 +1517,6 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
             "PARALLEL_MERGE_RAW_RESPONSE_START\n%s\nPARALLEL_MERGE_RAW_RESPONSE_END",
             cleaned_text,
         )
-    cleaned_text, next_action = ResponseParser.parse_next_action_metadata(cleaned_text)
     if _parallel_log_merge_body_enabled():
         logger.info(
             "PARALLEL_MERGE_PARSED_NEXT_ACTION %s",
@@ -1538,6 +1568,7 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
         "follow_up_questions": parsed_response.get("follow_up_questions", []),
             "analysis_steps": parsed_response.get("analysis_steps", []),
             "faq_metadata": faq_metadata,
+            "prediction_anchor_meta": prediction_anchor_meta,
             "next_action": next_action,
             "raw_response": response_text,
         "has_transit_request": "transitRequest" in response_text and '"requestType"' in response_text,

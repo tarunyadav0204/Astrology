@@ -3318,8 +3318,18 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 _release_free_question_if_reserved(using_free_question, user_id, birth_details)
                 return  # Exit early, no chart calculation needed
             elif intent.get('status') == 'READY':
-                # Reset clarification count when ready to answer
+                # Reset clarification count when ready to answer; preserve prediction_anchors.
                 with get_conn() as conn:
+                    ready_ctx = dict(intent.get("extracted_context") or {})
+                    prior_anchors = None
+                    if isinstance(extracted_context, dict):
+                        prior_anchors = extracted_context.get("prediction_anchors")
+                        # Keep non-conflicting prior keys (anchors + prior clarifications).
+                        merged_ready = dict(extracted_context)
+                        merged_ready.update(ready_ctx)
+                        if prior_anchors and "prediction_anchors" not in ready_ctx:
+                            merged_ready["prediction_anchors"] = prior_anchors
+                        ready_ctx = merged_ready
                     execute(
                         conn,
                         """
@@ -3330,7 +3340,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                                 extracted_context = EXCLUDED.extracted_context,
                                 last_updated = CURRENT_TIMESTAMP
                         """,
-                        (session_id, 0, json.dumps(intent.get('extracted_context', {}))),
+                        (session_id, 0, json.dumps(ready_ctx)),
                     )
                     conn.commit()
             
@@ -3552,9 +3562,20 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         if death_analysis_unlocked:
             context['death_analysis_unlocked'] = True
         
-        # Inject extracted context from clarifications
-        if intent.get('extracted_context') and not is_instant_chat:
-            context['extracted_context'] = intent['extracted_context']
+        # Inject session extracted_context (clarifications + prediction_anchors) for continuity.
+        session_extracted = dict(extracted_context or {})
+        if isinstance(intent.get("extracted_context"), dict):
+            # Intent clarifications win on overlapping keys, but keep prediction_anchors from session.
+            intent_extracted = dict(intent.get("extracted_context") or {})
+            anchors = session_extracted.get("prediction_anchors")
+            session_extracted.update(intent_extracted)
+            if anchors and "prediction_anchors" not in intent_extracted:
+                session_extracted["prediction_anchors"] = anchors
+        if not is_instant_chat:
+            context["extracted_context"] = session_extracted
+        else:
+            # Instant lane reads anchors from intent._session_extracted_context.
+            intent["_session_extracted_context"] = session_extracted
         
         # Override intent mode for @All_Events to force event prediction
         is_all_events_question = question.startswith('@All_Events')
@@ -3957,6 +3978,70 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             message_id,
                         ),
                     )
+                    try:
+                        from ai.prediction_anchor import (
+                            merge_anchor_candidates,
+                            upsert_anchor_into_extracted_context,
+                        )
+
+                        faq_meta = result.get("faq_metadata") if isinstance(result.get("faq_metadata"), dict) else {}
+                        anchor = merge_anchor_candidates(
+                            question=combined_question or question,
+                            mode=intent.get("mode"),
+                            category=intent.get("category"),
+                            faq_category=faq_meta.get("category"),
+                            answer_text=str(result.get("response") or ""),
+                            prediction_anchor_meta=result.get("prediction_anchor_meta"),
+                            event_timing_verdict=result.get("event_timing_verdict"),
+                            message_id=int(message_id) if message_id is not None else None,
+                        )
+                        if anchor:
+                            cur = execute(
+                                conn,
+                                "SELECT clarification_count, extracted_context FROM conversation_state WHERE session_id = %s",
+                                (session_id,),
+                            )
+                            state_row = cur.fetchone()
+                            prior_ctx = {}
+                            if state_row and state_row[1]:
+                                try:
+                                    prior_ctx = json.loads(state_row[1]) if isinstance(state_row[1], str) else dict(state_row[1] or {})
+                                except Exception:
+                                    prior_ctx = {}
+                            if not isinstance(prior_ctx, dict):
+                                prior_ctx = {}
+                            # First lock wins Window 1; later turns enrich layers only.
+                            replace_window1 = not bool((prior_ctx.get("prediction_anchors") or {}).get(anchor.get("topic_key")))
+                            updated_ctx = upsert_anchor_into_extracted_context(
+                                prior_ctx,
+                                anchor,
+                                replace_window1=replace_window1,
+                            )
+                            clarification_count_persist = int(state_row[0] or 0) if state_row else 0
+                            execute(
+                                conn,
+                                """
+                                INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
+                                VALUES (%s, %s, %s)
+                                ON CONFLICT (session_id) DO UPDATE SET
+                                    extracted_context = EXCLUDED.extracted_context,
+                                    last_updated = CURRENT_TIMESTAMP
+                                """,
+                                (session_id, clarification_count_persist, json.dumps(updated_ctx, ensure_ascii=False, default=str)),
+                            )
+                            logger.info(
+                                "prediction_anchor_persisted session_id=%s topic_key=%s source=%s replace_window1=%s",
+                                session_id,
+                                anchor.get("topic_key"),
+                                anchor.get("source"),
+                                replace_window1,
+                            )
+                    except Exception:
+                        logger.exception(
+                            "prediction_anchor_persist_failed session_id=%s message_id=%s",
+                            session_id,
+                            message_id,
+                        )
                     timing = result.get("timing") or {}
                     llm_prov = timing.get("chat_llm_provider")
                     llm_mod = (result.get("chat_llm_model") or timing.get("chat_llm_model") or "").strip()

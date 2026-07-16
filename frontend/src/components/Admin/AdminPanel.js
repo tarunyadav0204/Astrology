@@ -3140,28 +3140,26 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             Daily
           </button>
           <button
-            className={`subtab ${activeSubTab === 'subscriptionPlans' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('subscriptionPlans')}
+            className={`subtab ${
+              activeSubTab === 'subscriptionPlans' ||
+              activeSubTab === 'creditProducts' ||
+              activeSubTab === 'subscriptionPurchases' ||
+              activeSubTab === 'subscriptionEvents'
+                ? 'active'
+                : ''
+            }`}
+            onClick={() => {
+              if (
+                activeSubTab !== 'subscriptionPlans' &&
+                activeSubTab !== 'creditProducts' &&
+                activeSubTab !== 'subscriptionPurchases' &&
+                activeSubTab !== 'subscriptionEvents'
+              ) {
+                setActiveSubTab('subscriptionPlans');
+              }
+            }}
           >
-            Subscription Plans
-          </button>
-          <button
-            className={`subtab ${activeSubTab === 'creditProducts' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('creditProducts')}
-          >
-            Credit Packs
-          </button>
-          <button
-            className={`subtab ${activeSubTab === 'subscriptionPurchases' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('subscriptionPurchases')}
-          >
-            Subscription purchases
-          </button>
-          <button
-            className={`subtab ${activeSubTab === 'subscriptionEvents' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('subscriptionEvents')}
-          >
-            Subscription events
+            Plans & Subscriptions
           </button>
           <button
             className={`subtab ${activeSubTab === 'questionCost' ? 'active' : ''}`}
@@ -3186,6 +3184,43 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             onClick={() => setActiveSubTab('razorpayRefund')}
           >
             Razorpay credit return
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'credits' &&
+        (activeSubTab === 'subscriptionPlans' ||
+          activeSubTab === 'creditProducts' ||
+          activeSubTab === 'subscriptionPurchases' ||
+          activeSubTab === 'subscriptionEvents') && (
+        <div className="admin-subtabs admin-subtabs--nested">
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'subscriptionPlans' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('subscriptionPlans')}
+          >
+            Subscription Plans
+          </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'creditProducts' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('creditProducts')}
+          >
+            Credit Packs
+          </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'subscriptionPurchases' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('subscriptionPurchases')}
+          >
+            Subscription purchases
+          </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'subscriptionEvents' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('subscriptionEvents')}
+          >
+            Subscription events
           </button>
         </div>
       )}

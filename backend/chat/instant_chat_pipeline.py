@@ -951,7 +951,24 @@ def _build_event_timing_verdict(
             "Do not invent an exact event date beyond the provided windows.",
             "Do not say a planet rules/supports/activates a named domain house unless that exact house is present in that window's activated_focus_houses or why text.",
             "Do not translate 'rules focus house(s) [N]' into 'rules the event house' unless N is the primary event house explicitly active in the same window.",
+            "Do not re-rank Window 1 away from the scored best cluster unless score_delta / comparison materially flips.",
+            "Do not flip the same period from supportive house significations (e.g. 7th/contracts) to hostile ones (e.g. 8th/rejection) without new activated_focus_houses evidence.",
+            "Do not treat a PD / micro-dasha start date as an offer or joining SLA; PD starts are activation/environment shifts unless the ranked execution window supports offer/joining.",
+            "Do not use guarantee / copper-bottomed / mathematical conclusion / perfectly accurate / absolute truth / non-negotiable / will get phrasing.",
         ],
+        "career_layer_contract": (
+            {
+                "activation": "more calls, effort, interviews, visibility",
+                "offer": "offer letter likely",
+                "joining": "start date / settle-in",
+                "rule": (
+                    "For career/job questions, executive summary must separate Activation vs Offer vs Joining. "
+                    "Never let one dasha date mean all three."
+                ),
+            }
+            if _normalize_event_category(category) == "career"
+            else None
+        ),
     }
 
 
@@ -4551,8 +4568,11 @@ def _instant_parashari_instruction_block(
                 "CRITICAL: Score confidence higher when active dasha lords are transiting on or aspecting their natal houses (already encoded in segment scoring and reasons).",
                 "CRITICAL: Your response will be marked failed if you mention only the current MD/AD when `forward_event_dasha_scan` or `horizon_dasha_segments` show stronger later AD/PD windows inside the next 3 years.",
                 "CRITICAL: Use `normalized_evidence.event_timing_verdict` as the final comparison contract. Its `comparison`, `score_delta`, `answer_rule`, `required_answer_points`, and `forbidden_answer_moves` override your own interpretation of raw scores.",
+                "CRITICAL: Window order must match scored clusters in event_timing_verdict. Do not promote a secondary window to #1 on a follow-up unless scores flip; if they flip, say what changed and why.",
                 "CRITICAL: Use `normalized_evidence.event_timing_verdict.answer_event_label` to name the asked event plainly in the opening sentence. For example: 'For having a child...' or 'For promotion...'. Do not hide the topic behind vague wording like 'this event' unless the label itself is general.",
                 "CRITICAL: If event_timing_verdict says the future is only slightly cleaner/stronger, do not call it clearly superior or overwhelmingly better. If it says current_window exists, acknowledge current activation.",
+                "CRITICAL: For career/job timing, separate Activation (calls/effort) vs Offer vs Joining. PD/micro-dasha starts are environment shifts, not delivery SLAs.",
+                "CRITICAL: If TIMING_CONTRACT_LOCK is present in the prompt, obey it over narrative improvisation.",
                 "CRITICAL: When AD or PD changes across the horizon materially change the event support, mention that shift explicitly instead of smoothing all years into one generic trend.",
                 "CRITICAL: If a ranked horizon row is marked `current window`, describe it as already active now or ongoing now. Do not phrase that row as if the same MD/AD/PD combination will start in the future.",
                 "CRITICAL: If the current broader MD/AD pair continues into a later stronger sub-phase, say it is the same ongoing MD/AD period with a later shift in PD or support level. Do not describe that later strengthening as if the MD/AD pair itself begins only then.",
@@ -5392,6 +5412,10 @@ def _build_instant_context(
         prompt_instant_parashari.pop("dominant_houses", None)
         prompt_instant_parashari.pop("top_supports", None)
 
+    session_extracted = (intent or {}).get("_session_extracted_context")
+    if not isinstance(session_extracted, dict):
+        session_extracted = (intent or {}).get("extracted_context") if isinstance((intent or {}).get("extracted_context"), dict) else {}
+
     return {
         "birth_summary": evidence_birth_summary if is_non_self_target else birth_summary,
         "intent_summary": {
@@ -5405,6 +5429,7 @@ def _build_instant_context(
             "extracted_context": (intent or {}).get("extracted_context") or {},
             "target_subject": target_subject or {"key": "self", "label": "self", "base_house": 1},
         },
+        "session_extracted_context": session_extracted if isinstance(session_extracted, dict) else {},
         "evidence_plan": evidence_plan,
         "natal_snapshot": evidence_natal_snapshot if is_non_self_target else natal_snapshot,
         "target_chart_context": target_chart_context,
@@ -5886,15 +5911,49 @@ NEXT_ACTION_META: {"type":"<remedy|diagnosis|timing|clarification|comparison|cha
 Always include this line. If no follow-up is needed, set type to "none" and follow_up_questions to an empty array.
 Keep it short and valid JSON.
 """
+    timing_lock_block = ""
+    try:
+        from ai.prediction_anchor import (
+            career_layer_prompt_rules,
+            compare_verdict_to_anchor,
+            format_timing_contract_lock_block,
+            get_locked_anchor,
+            infer_topic_key,
+            should_apply_timing_contract,
+        )
+
+        session_ctx = (
+            instant_context.get("session_extracted_context")
+            if isinstance(instant_context.get("session_extracted_context"), dict)
+            else {}
+        )
+        if should_apply_timing_contract(mode=mode, category=category, question=question) or answer_mode == "event_prediction":
+            topic_key = infer_topic_key(question, category=category)
+            locked = get_locked_anchor(session_ctx, topic_key)
+            verdict = (
+                normalized_evidence.get("event_timing_verdict")
+                if isinstance(normalized_evidence.get("event_timing_verdict"), dict)
+                else {}
+            )
+            if locked:
+                rerank = compare_verdict_to_anchor(locked, verdict)
+                timing_lock_block = "\n\n" + format_timing_contract_lock_block(locked, rerank=rerank)
+            elif str(category or "").lower() in {"career", "job", "promotion", "business"} or topic_key.startswith("career"):
+                timing_lock_block = "\n\n" + career_layer_prompt_rules()
+    except Exception:
+        logger.exception("instant_timing_contract_lock_inject_failed")
+        timing_lock_block = ""
     return f"""
 {identity_block}
 
 Astrological method:
 {analysis_block}
+{timing_lock_block}
 
 Style rules:
 - Language: {language_label}
 {length_rule}
+- Natal chart facts (dignity, avastha including Mrit, Mrityu Bhaga, natal combustion) are birth properties — say "in the natal chart" / "by birth", never "currently Mrit/debilitated" unless you mean a transit planet's sky position.
 - If the user is only deferring or declining to ask (for example: "nothing for now", "no thanks", "not yet", "I'm good"), reply in one or two warm sentences. Do not analyze the chart, dashas, houses, or transits, and do not say you will look something up in the chart — there is no question to answer yet.
 - Lead with the direct answer in the first 1 to 2 sentences when there is a real astrological question.
 - If `named_dasha_lookup.matches` is present, use its `authoritative_fact` for the requested planet dasha start/end date. Do not infer a different date from transits, event windows, or current dasha summaries.
@@ -6050,6 +6109,7 @@ async def generate_instant_chat_response(
         speech_followups = []
     parsed_response = ResponseParser.parse_images_in_chat_response(response_text)
     response_content = parsed_response.get("content") or response_text
+    response_content, prediction_anchor_meta = ResponseParser.parse_prediction_anchor_metadata(response_content)
     if speech_mode:
         response_content = _strip_speech_answer_greeting(response_content)
         response_content = _polish_speech_event_answer(response_content, prompt_context)
@@ -6066,9 +6126,18 @@ async def generate_instant_chat_response(
         len(combined_followups),
         bool(speech_mode),
     )
+    event_timing_verdict = None
+    try:
+        ne = (prompt_context or {}).get("normalized_evidence") or {}
+        if isinstance(ne.get("event_timing_verdict"), dict):
+            event_timing_verdict = ne.get("event_timing_verdict")
+    except Exception:
+        event_timing_verdict = None
     return {
         "success": True,
         "response": response_content,
+        "prediction_anchor_meta": prediction_anchor_meta,
+        "event_timing_verdict": event_timing_verdict,
         "error": None,
         "chat_llm_model": llm_result.get("chat_llm_model") or model_name,
         "timing": {

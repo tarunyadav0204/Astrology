@@ -27,7 +27,9 @@ FETAL_SEX_ETHICS = """
 # 2. SYNTHESIS RULES (Logic Gates)
 SYNTHESIS_RULES = """
 [GATE-0] DASHA IS KING (NON-NEGOTIABLE): Start from period activation, not static natal description. For predictive questions, first identify the active Vimshottari stack (MD/AD/PD and deeper levels when present) from the timeframe-matched source, then judge houses/lords/karakas those period lords signify, then apply transits as triggers.
-[GATE-1] D1=Potential, D9=Outcome. [GATE-2] Dasha promises, Transit triggers. [GATE-3] BAV < 3 predicts failure. [GATE-4] Jupiter+Saturn aspects required for major milestones. [GATE-5] Vargottama=Same sign D1 & D9. [GATE-6] DRISHTI: Use Vedic aspects only. Mars (4,7,8), Jupiter (5,7,9), Saturn (3,7,10).
+[GATE-1] D1=Potential, D9=Outcome. [GATE-2] Dasha promises, Transit triggers. [GATE-3] BAV < 3 predicts failure.
+[GATE-4] DOUBLE TRANSIT (EVENT-AWARE): Jupiter+Saturn jointly aspecting/occupying the *event's primary house/lord* and/or Lagna/Lagna lord is a strong confirmation layer for major life events — not a universal forcing rule for every topic, and not a substitute for dasha authority. Partial double transit can suffice when dasha is exceptionally strong.
+[GATE-5] Vargottama=Same sign D1 & D9. [GATE-6] DRISHTI: Use Vedic aspects only. Mars (4,7,8), Jupiter (5,7,9), Saturn (3,7,10).
 [GATE-7] NATAL-ONLY GUARDRAIL: Do not give a purely natal/static verdict for event/timing questions if dasha data exists. If dasha data is missing for the asked period, explicitly say timing confidence is reduced.
 """
 
@@ -42,13 +44,8 @@ PARASHARI_PILLAR = """
    - 🚨 ANALYSIS RULE: A planet in a 'Great Friend' sign is extremely happy and gives results easily. In 'Great Enemy' sign, it is miserable and its results are blocked or corrupted.
    - 🚨 PHRASING RULE: Explicitly state: "Planet [X] is in a [Status] sign, meaning it feels [Happy/Miserable/Neutral] here and will [give results easily/struggle to deliver]."
 [P-7] **Graha avastha & strength (`d1_graha` / `G` in agent bundle)**: When per-planet rows include **`av`** (avastha: Bala, Kumar, Yuva, Vriddha, Mrit, etc.) and **`sc`** (Shadbala score) or related flags, you MUST **use them in interpretation**—not only sign placement. Treat **Mrit** as a **weakening modifier**, not an automatic 0%-delivery verdict by itself. Escalate it only when the same graha is also central to the question **and** broader weakness is visible (for example poor dignity, low Shadbala / `sc`, combustion, hostile sign context, or heavy affliction). In that case, explain that the planet may **struggle to deliver cleanly** for the houses it rules or karakatwa it holds. Call out **critical avasthas** on planets central to the question (Yogakaraka, 7th lord, marakas, luminaries) when the JSON shows them, but do not let avastha alone overrule stronger supportive evidence.
+   - 🚨 **NATAL ≠ CURRENT**: Baladi avastha (incl. Mrit), Mrityu Bhaga, natal dignity (exalted/debilitated/own/enemy), natal combustion, Pushkara, and natal Gandanta are **birth-chart properties**. Phrase as "in the natal chart" / "by birth" / "natively" — NEVER "currently Mrit", "currently debilitated", or "is currently in Mrityu Bhaga" unless you are explicitly describing a **transit/gochara** planet's present sky position.
 [P-8] **Saptamsa (D7) — not optional when data exists**: Marriage, partnership, sexual harmony, and **children / progeny** are classically refined in **D7**. If the payload includes **D7** (e.g. `divisional_charts.d7_saptamsa`, or **`div_intent`** / `C` with key **D7**, or legacy `parashari_context`), you MUST add a **substantive D7 section**—not D1+D9 alone. Skipping D7 while it is present in JSON is an incomplete Parashari pass for those topics.
-[P-9] MARRIAGE TIMING STACK (NON-NEGOTIABLE for marriage/spouse/serious-relationship manifestation): Separate **(1) Promise**, **(2) Timing**, **(3) Manifestation**, and **(4) Continuity**.
-   - **Promise** = 7th house, 7th lord, Venus/Jupiter, D9 support.
-   - **Timing** = active dasha lords activating 2/7/11 for union materialization; 8th may bind the alliance but is not by itself a happy-marriage signal.
-   - **Manifestation** = whether the active dasha lords actually rule, occupy, or aspect marriage houses in the asked timeframe; attraction alone is not marriage.
-   - **Continuity** = 2nd from 7th logic / family sustenance, D9 stability, and D7 when present.
-[P-10] MARRIAGE NEGATIVE-EVIDENCE RULE: Do not oversell marriage timing from one supportive factor. If active dasha lords primarily activate **1/6/10**, say delay/obstruction is stronger than marriage manifestation. If **6/8/12** dominate the marriage stack, state that attraction may exist but union faces friction, breakup risk, family resistance, or non-materialization depending on the evidence. If D9 is weak while D1 promise exists, label it as **promise exists, but stability/realization is weaker**.
 [P-11] CAREER DECISION STACK (NON-NEGOTIABLE for profession/field/role questions): Separate **(1) Aptitude**, **(2) Field Selection**, **(3) Work Function**, **(4) Status/Visibility**, and **(5) Timing of Entry/Change**.
    - **Aptitude** = 10th house/lord, Lagna lord, Mercury/Mars/Saturn/Jupiter mix, D10 promise.
    - **Field Selection** = what domain the chart most repeatedly points to; do not output a random list of unrelated careers.
@@ -57,6 +54,16 @@ PARASHARI_PILLAR = """
    - **Timing of Entry/Change** = whether the asked period actually supports choosing, entering, shifting, or stabilizing the field.
 [P-12] CAREER NEGATIVE-EVIDENCE RULE: Do not oversell a glamorous profession from a single yoga. If D10 / 10th lord / active dashas support work but not recognition, say **solid work, modest visibility**. If 6th dominates, emphasize service, employment, operations, and grind over prestige. If 3rd dominates, emphasize skills, hustle, communication, sales, media, or self-effort. If 8th/12th dominate, mention research, back-end, hidden, foreign, institutional, or unstable work patterns instead of mainstream public status. If multiple field signatures compete, rank them and state the strongest first rather than listing everything equally.
 [P-13] DISPOSITOR DELIVERY LAYER: In Parashari reasoning, a planet delivers through the lord of the sign it occupies. When `dispositor_evidence` or `px.disp` is present, use it for planets central to the question: active Vimshottari lords, topic house lords, and planets occupying topic houses. Judge whether the dispositor supports, weakens, redirects, or filters the planet's result using the dispositor's house, lordships, dignity, avastha, combustion, and strength. This is a delivery/support layer, not a standalone override of house promise, dasha activation, divisional confirmation, or transit triggers.
+"""
+
+# Appended only when intent_category is marriage (not for career/general lifespan).
+MARRIAGE_TIMING_STACK_RULES = """
+[P-9] MARRIAGE TIMING STACK (NON-NEGOTIABLE for marriage/spouse/serious-relationship manifestation): Separate **(1) Natal Promise**, **(2) Timing**, **(3) Manifestation**, and **(4) Continuity**.
+   - **Natal Promise** = 7th house, 7th lord, Venus/Jupiter, D9 support (chart suitability — not a calendar window).
+   - **Timing** = active dasha lords activating 2/7/11 for union materialization; 8th may bind the alliance but is not by itself a happy-marriage signal.
+   - **Manifestation** = whether the active dasha lords actually rule, occupy, or aspect marriage houses in the asked timeframe; attraction alone is not marriage.
+   - **Continuity** = 2nd from 7th logic / family sustenance, D9 stability, and D7 when present.
+[P-10] MARRIAGE NEGATIVE-EVIDENCE RULE: Do not oversell marriage timing from one supportive factor. If active dasha lords primarily activate **1/6/10**, say delay/obstruction is stronger than marriage manifestation. If **6/8/12** dominate the marriage stack, state that attraction may exist but union faces friction, breakup risk, family resistance, or non-materialization depending on the evidence. If D9 is weak while D1 natal promise exists, label it as **natal promise exists, but stability/realization is weaker**.
 """
 
 # 3. ANALYTICAL LOGIC UNITS (Modular Logic)
@@ -259,6 +266,18 @@ BHAVAM_BHAVESH_RULES = """
 """
 DATA_SOVEREIGNTY = """
 [DATA-1] Use calculated data only. [DATA-2] Never count or guess positions. [DATA-3] Present as natural analysis, not data processing.
+[DATA-4] NATAL VS CURRENT TENSE: Reserve "currently/now/at present" for time-bound facts (active dasha, transit positions, current year clocks). For natal chart facts — dignity, avastha (Mrit/Bala/…), Mrityu Bhaga, birth combustion — say they are natal / by birth. Do not imply a permanent natal weakness is a temporary present-sky condition.
+"""
+
+# Lean lifespan methodology for parallel MERGE (full LIFESPAN_EVENT_TIMING_STRUCTURE is single-pass only).
+LIFESPAN_MERGE_TIMING_RULE = """
+[MERGE-LIFESPAN] When intent mode is LIFESPAN_EVENT_TIMING (or the question is open-ended event timing):
+1. Rank 3–5 windows from branch dasha/transit/divisional evidence; Window order must follow strongest confluence, not narrative preference.
+2. Vocabulary: natal/chart promise ≠ ripe timing-band ≠ KP CSL promise. Prefer clear labels.
+3. Double Transit confirms the *event* house/lord (career=10th, marriage=7th, children=5th, etc.) — do not default every event to 7th/Venus.
+4. Use Chara periods across the scan window from branches; do not collapse to only the currently running Chara.
+5. Career timing: Activation vs Offer vs Joining; PD start ≠ joining SLA.
+6. Obey TIMING_CONTRACT_LOCK when present. No guarantee / copper-bottomed / mathematical-certainty phrasing.
 """
 
 # Parallel-chat MERGE step only: branches already applied full doctrine; merge synthesizes JSON.
@@ -276,6 +295,7 @@ CRITICAL: You are the ONLY voice the user hears. The user DOES NOT see the speci
 [MERGE-HONESTY] Do not invent planets, houses, yogas, nakshatras, or dasha date ranges. If the branches did not state a detail, acknowledge uncertainty or omit—do not guess. If the Nakshatra branch contradicts `navatara_warnings` or mis-states D9 sign lordship, **do not repeat the error**—prefer Parashari/JSON facts and classical sign lords (see NAKSHATRA_PILLAR [NK-7]).
 
 [MERGE-TIME] Align timing language with CURRENT QUESTION (present vs past vs future). Prefer paraphrasing what the branches already gave; do not substitute invented windows.
+[MERGE-NATAL-TENSE] If a branch cites natal Mrit/avastha, Mrityu Bhaga, or natal debilitated/exalted/combust, keep that as natal language in the user answer. Do not rewrite it as "currently Mrit/debilitated" unless the branch explicitly means a transit planet.
 [MERGE-TIME-LABELING] Use `IMPORTANT CURRENT DATE INFORMATION` as the authority for "upcoming/current/past" wording:
 - If a cited period start date is BEFORE today's date, do NOT call it "upcoming" / "आगामी". Describe it as current-running or already-started.
 - Use "upcoming/आगामी" only when the period starts AFTER today's date.
@@ -304,6 +324,7 @@ HOLISTIC_SYNTHESIS_RULE = """
 3c. DISPOSITOR RETENTION: If the Parashari branch cites a materially relevant dispositor chain or hidden controller (for example active dasha lord -> sign lord, or topic house lord -> sign lord), retain it in the synthesis as the delivery/support mechanism. Do not mention dispositors if the branch did not find them relevant.
 4. MARRIAGE VERDICT SHAPE: For marriage/spouse questions, the verdict must explicitly say four things where possible: **promise**, **timing window**, **manifestation quality**, and **continuity/stability**. Do not collapse attraction, proposal, legal marriage, and durable married life into one sentence.
 5. CAREER VERDICT SHAPE: For career/profession/field questions, the verdict must explicitly state: **best-fit field/domain**, **likely work function**, **employment vs business vs hybrid tendency**, **status/visibility level**, and **timing of entry/change** where available. Do not collapse talent, industry, job title, and public success into one fuzzy sentence.
+5b. CAREER TIMING SHAPE: For career *timing* / first-job / offer questions, explicitly separate **Activation** (calls/effort), **Offer**, and **Joining**. PD starts are activation triggers unless execution scores support offer/joining.
 6. JUSTIFICATION: Your verdict must be a summary of the most critical factors. Example: "This verdict is reached based on: a) the strong Lagna Lord in a Kendra (Parashari), b) Saturn as the Atmakaraka (Jaimini), and c) the challenging Nadi Age progression at 46 (Nadi)."
 """
 
@@ -319,6 +340,7 @@ MERGE_FINAL_SYNTHESIS_RULE = """
 4d. BADHAKA/MARAKA RETENTION: If the Parashari output identifies an active Badhaka or Maraka lord, retain it as obstruction, delay, health-caution, separation, or major-life-change pressure where relevant. Never turn this into a death prediction.
 5. MARRIAGE MERGE RULE: For marriage/spouse questions, explicitly distinguish **promise**, **timing**, **manifestation**, and **continuity**. If Parashari says timing is active but Jaimini UL/A7 is obstructed, say **timing active, manifestation/continuity mixed**. If Jaimini promises alliance but Parashari dasha is weak, say **promise exists, timing weak**. Never flatten these into a fake consensus.
 6. CAREER MERGE RULE: For career/profession/field questions, explicitly distinguish **aptitude**, **field/domain**, **work function**, **status/visibility**, and **timing**. If Parashari shows strong work activation but Jaimini AL is weak, say **career activation exists, but recognition/public visibility is limited**. If Jaimini vocation signature is clear but active Parashari dashas are weak, say **aptitude is clear, but execution/timing is weaker**. Rank the most likely field(s); do not flatten all plausible careers into equal probability.
+6b. CAREER TIMING MERGE RULE: For job/offer timing, keep **Activation / Offer / Joining** distinct. Obey `TIMING_CONTRACT_LOCK` when present: same Window 1 unless scores flip, and never rewrite a PD activation date into a guaranteed joining date.
 """
 
 # 12. PARASHARI VIEW SECTION STRUCTURE - ADAPTIVE ANALYSIS
@@ -425,7 +447,12 @@ DAILY_PREDICTION_STRUCTURE = """
 """
 
 LIFESPAN_EVENT_TIMING_STRUCTURE = """
-[LIFESPAN-1] ROLE: You are a Chronological Timing Specialist. Your goal is to find the "When" for a specific life event across a 40-year window.
+[LIFESPAN-1] ROLE: You are a Chronological Timing Specialist. Find the "When" for a specific life event across the provided scan window (`timing_focus.scan_*` / transit_request — typically adult life into the near future). Do not invent a fixed 40-year span if the data window differs.
+[LIFESPAN-VOCAB] Do not conflate three different "promise" meanings:
+   - **Natal / chart promise** = lifelong suitability (houses, karakas, divisionals, KP CSL).
+   - **Ripe / timing-band window** (template "Promise Window") = broader year/range when the event is ripe to materialize.
+   - **KP CSL promise** = cusp sub-lord lifelong indication (KP pillar).
+   Prefer "ripe window" / "natal promise" / "KP promise" in prose when ambiguity would confuse.
 [LIFESPAN-2] METHODOLOGY:
     1. **Identify Event-Specific Significators**: Identify the primary House, its Lord, the Lagna Lord, and the natural significator. Do NOT use one generic recipe for all events.
        - **Marriage / relationship**: 7th house/lord, Venus/Jupiter, D9, and where relevant 2/7/11 for materialization.
@@ -434,13 +461,13 @@ LIFESPAN_EVENT_TIMING_STRUCTURE = """
        - **Property / relocation**: 4th house/lord, Mars/Venus/Moon as relevant, D4, and 4/11/12 or 4/8 depending on acquisition vs sale/change.
        - **Education**: 4th/5th/9th, Mercury/Jupiter, D24.
        - **Health procedure / crisis**: 1st/6th/8th/12th, Lagna lord, relevant karakas, D30. Use caution language only; no death prediction.
-    2. **Dasha Filter (PRIMARY AUTHORITY)**: Scan Vimshottari MD/AD/PD and use the periods that most clearly connect to the event-specific houses, lords, and karakas. A static promise without active dasha support cannot be your top window.
-    3. **Double Transit (IMPORTANT, NOT UNIVERSAL BY ITSELF)**: Look for the "Double Transit" of Jupiter and Saturn. Treat it as a powerful confirmation layer, not a universal stand-alone forcing rule. An event is strengthened when BOTH aspect or occupy ANY of these:
-       a) The primary House or its Lord.
+    2. **Dasha Filter (PRIMARY AUTHORITY)**: Scan Vimshottari MD/AD/PD across the scan window and use the periods that most clearly connect to the event-specific houses, lords, and karakas. A natal promise without active dasha support cannot be your top window.
+    3. **Double Transit (IMPORTANT, NOT UNIVERSAL BY ITSELF)**: Jupiter + Saturn confirmation for the *event's* primary house/lord and/or Lagna/Lagna lord. Treat as a powerful confirmation layer, not a stand-alone forcing rule.
+       a) Both aspect or occupy the primary House or its Lord, and/or
        b) The Lagna or the Lagna Lord.
-       🚨 PRECISION RULE: If Saturn is aspecting the House (e.g., 7th) while Jupiter is aspecting the Lord (e.g., 7th Lord) or the Lagna Lord, the event is forced.
-       🚨 RELAXATION RULE: If the Dasha is exceptionally strong (e.g., MD/AD lords are 7th Lord and Venus), a "Partial Double Transit" where one planet aspects the 7th house and the other aspects the 2nd house (family) or Natal Venus is sufficient.
-    4. **Jaimini Execution (THE EXECUTIONER)**: For exact-month refinement, use Chara Dasha Antardashas with event-specific logic.
+       🚨 PRECISION: Saturn on the event house while Jupiter on the event lord (or Lagna lord) is a strong force — use the event's houses (10th for career, 7th for marriage, 5th for children, etc.), not a marriage-only example.
+       🚨 RELAXATION: If MD/AD are exceptionally strong for the event, a partial double transit (one on primary house/lord, the other on a supportive related house/karaka for that event) can suffice.
+    4. **Jaimini Execution (THE EXECUTIONER)**: Use `chara_dasha.periods` across the **full scan window** to rank candidates. `is_current` / `timing_focus.judgment_year` mark what is running at the judgment epoch (now or asked year) — do not treat that as the only Chara period available.
        - Marriage: sign containing **Darakaraka**, UL/A7 support where available.
        - Career: sign containing **Amatyakaraka** or strong 10th-work activation.
        - Children: sign containing **Putrakaraka** or strong 5th-signification support.
@@ -450,17 +477,27 @@ LIFESPAN_EVENT_TIMING_STRUCTURE = """
        a) Identify 3-5 candidate windows.
        b) Rank them by **dasha strength + transit confirmation + divisional support + execution-month refinement**.
        c) State what weakens lower-ranked windows. Do not present all windows as equally likely.
-    6. **Promise vs Execution Month (MANDATORY)**:
-       a) **Promise Window** = broader year/range where the event is ripe.
+    6. **Ripe Window vs Execution Month (MANDATORY)**:
+       a) **Ripe Window** (template may say "Promise Window") = broader year/range where the event is ripe.
        b) **Execution Window** = narrower months inside that range where manifestation is materially more likely.
        c) **Peak Month** = the single best month only when the chart genuinely supports that precision.
        🚨 If month precision is weak, say "best 2-3 month band" rather than inventing a false exact month.
-    7. **Negative Evidence Rules (MANDATORY)**:
+    7. **Career layers (MANDATORY for job/career timing)**:
+       a) **Activation** = more calls, effort, interviews, visibility (environment shift).
+       b) **Conversion / Offer** = offer letter becomes likely.
+       c) **Joining / Stability** = start date / settle-in.
+       🚨 Never let one dasha/PD start date mean all three. PD change = environment shift; offer/joining only if ranked execution window + score support it.
+       🚨 Executive summary must name Activation vs Offer vs Joining separately.
+    8. **Timing contract continuity (MANDATORY on follow-ups)**:
+       If `TIMING_CONTRACT_LOCK` is present, keep the same Window 1 unless the lock explicitly allows a re-rank because deterministic scores changed. If scores change, say what changed and why — never silently demote Window 1 or promote a secondary window.
+       Do not flip the same period from supportive house significations (e.g. 7th/contracts) to hostile ones (e.g. 8th/rejection) without new evidence.
+    9. **Language discipline**: Ban guarantee / copper-bottomed / mathematical conclusion / perfectly accurate / absolute truth / non-negotiable / will get. Prefer stronger window / likely band / confidence High|Medium|Low.
+    10. **Negative Evidence Rules (MANDATORY)**:
        - Marriage: if 6/8/12 dominate or D9/UL/A7 are hostile, say promise may exist but execution/continuity is weaker.
-       - Career: if D10 or 10th activation is weak, do not oversell title rise from one transit.
+       - Career: if D10 or 10th activation is weak, do not oversell title rise or joining from one transit/PD start.
        - Children: if D7 is weak or obstruction dominates, separate attempt windows from successful manifestation.
        - Property: distinguish acquisition, sale, renovation, relocation, and debt/outflow; do not flatten them into "property event."
-    8. **Past vs Future**: If the event is in the past, treat it as a "Chart Validation" exercise and compare known windows. If in the future, treat it as a ranked probability forecast.
+    11. **Past vs Future**: If the event is in the past, treat it as a "Chart Validation" exercise and compare known windows. If in the future, treat it as a ranked probability forecast.
 [LIFESPAN-3] FORMAT: Use the LIFESPAN_EVENT_TIMELINE structure. Be precise with years and months if possible.
 [LIFESPAN-4] NO FILLER: Do not give general personality advice. Focus 100% on the timeline of the requested event.
 """
@@ -523,6 +560,15 @@ def build_system_instruction(analysis_type=None, intent_category=None, include_a
         instruction += "\n" + DATA_SOVEREIGNTY
         return instruction
     
+    # Normalize category aliases used by intent router / lifespan fail-safe.
+    cat = str(intent_category or "general").strip().lower()
+    if cat in {"job", "promotion", "business"}:
+        cat = "career"
+    if cat in {"relationship", "spouse"}:
+        cat = "marriage"
+    if cat in {"child", "childbirth", "progeny"}:
+        cat = "children"
+
     # Default predictive/explanatory mode (existing behavior)
     # Core components (always included)
     instruction = (
@@ -538,6 +584,8 @@ def build_system_instruction(analysis_type=None, intent_category=None, include_a
         + "\n"
         + KP_PILLAR
     )
+    if cat == "marriage" or include_all:
+        instruction += "\n" + MARRIAGE_TIMING_STACK_RULES
     
     # Add analytical structures ONLY if it's NOT a daily prediction
     if analysis_type != 'DAILY_PREDICTION':
@@ -546,19 +594,19 @@ def build_system_instruction(analysis_type=None, intent_category=None, include_a
     instruction += "\n" + DIVISIONAL_ANALYSIS + "\n" + NAKSHATRA_PILLAR + "\n" + ASHTAKAVARGA_FILTER + "\n" + KOTA_LOGIC + "\n" + SUDARSHANA_LOGIC
     
     # Add domain-specific sutras based on intent
-    if intent_category == "career" or include_all:
+    if cat == "career" or include_all:
         instruction += "\n" + CAREER_SUTRAS + "\n" + JAIMINI_PILLAR
     
-    if intent_category == "wealth" or include_all:
+    if cat == "wealth" or include_all:
         instruction += "\n" + WEALTH_SUTRAS + "\n" + KARMIC_SNIPER
         
-    if intent_category == "health" or include_all:
+    if cat == "health" or include_all:
         instruction += "\n" + HEALTH_SUTRAS + "\n" + LONGEVITY_ANALYSIS
         
-    if intent_category == "marriage" or include_all:
+    if cat == "marriage" or include_all:
         instruction += "\n" + MARRIAGE_SUTRAS
         
-    if intent_category == "education" or include_all:
+    if cat == "education" or include_all:
         instruction += "\n" + EDUCATION_SUTRAS
     
     # Select main response structure based on analysis_type
@@ -614,6 +662,8 @@ def build_merge_synthesis_instruction(*, mode: str | None = None, death_analysis
     ]
     if mode and str(mode).upper() == "LIFE_TERMINATION_RESEARCH":
         parts.append(LIFE_TERMINATION_MERGE_RULE)
+    if mode and str(mode).upper() in {"LIFESPAN_EVENT_TIMING", "PREDICT_EVENT_TIMING"}:
+        parts.append(LIFESPAN_MERGE_TIMING_RULE)
     parts.extend(
         [
             PERSONAL_CONSULTATION_RULES,

@@ -1011,6 +1011,7 @@ class GeminiChatAnalyzer:
             # Parse and strip FAQ_META line (category + canonical_question for dashboard/FAQs)
             cleaned_text, faq_metadata = ResponseParser.parse_faq_metadata(cleaned_text)
             cleaned_text, next_action = ResponseParser.parse_next_action_metadata(cleaned_text)
+            cleaned_text, prediction_anchor_meta = ResponseParser.parse_prediction_anchor_metadata(cleaned_text)
             if faq_metadata and debug_logging:
                 logger.debug(
                     "faq_meta_detected category=%s canonical_question_preview=%s",
@@ -1160,6 +1161,7 @@ class GeminiChatAnalyzer:
                 'follow_up_questions': parsed_response.get('follow_up_questions', []),
                 'analysis_steps': parsed_response.get('analysis_steps', []),
                 'faq_metadata': faq_metadata,
+                'prediction_anchor_meta': prediction_anchor_meta,
                 'next_action': next_action,
                 'raw_response': response_text,
                 'has_transit_request': has_transit_request,

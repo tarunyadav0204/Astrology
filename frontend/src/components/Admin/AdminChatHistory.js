@@ -369,6 +369,15 @@ const AdminChatHistory = () => {
     messageId: null,
     payload: null,
   });
+  const [qaModal, setQaModal] = useState({
+    open: false,
+    loading: false,
+    phase: null, // 'load' | 'run' | null
+    error: '',
+    messageId: null,
+    adminNotes: '',
+    result: null,
+  });
   const [pdfMessageId, setPdfMessageId] = useState(null);
 
   useEffect(() => {
@@ -551,6 +560,138 @@ const AdminChatHistory = () => {
         payload: null,
       });
     }
+  };
+
+  const closeQaModal = () => {
+    setQaModal({
+      open: false,
+      loading: false,
+      phase: null,
+      error: '',
+      messageId: null,
+      adminNotes: '',
+      result: null,
+    });
+  };
+
+  const openResponseQa = async (messageId) => {
+    if (!messageId) return;
+    setQaModal({
+      open: true,
+      loading: true,
+      phase: 'load',
+      error: '',
+      messageId,
+      adminNotes: '',
+      result: null,
+    });
+    try {
+      const response = await fetch(`/api/admin/chat/response-qa/${messageId}`, {
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) {
+        const t = await response.text().catch(() => '');
+        throw new Error(t || `Failed (${response.status})`);
+      }
+      const data = await response.json();
+      if (data?.found && data?.report) {
+        setQaModal({
+          open: true,
+          loading: false,
+          phase: null,
+          error: '',
+          messageId,
+          adminNotes: data.admin_notes || '',
+          result: data,
+        });
+        return;
+      }
+      setQaModal({
+        open: true,
+        loading: false,
+        phase: null,
+        error: '',
+        messageId,
+        adminNotes: '',
+        result: null,
+      });
+    } catch (e) {
+      setQaModal({
+        open: true,
+        loading: false,
+        phase: null,
+        error: '',
+        messageId,
+        adminNotes: '',
+        result: null,
+      });
+      console.error('Failed loading stored Astrology QA:', e);
+    }
+  };
+
+  const runResponseQa = async () => {
+    const messageId = qaModal.messageId;
+    if (!messageId) return;
+    setQaModal((prev) => ({
+      ...prev,
+      loading: true,
+      phase: 'run',
+      error: '',
+      result: null,
+    }));
+    try {
+      const response = await fetch(`/api/admin/chat/response-qa/${messageId}`, {
+        method: 'POST',
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_notes: qaModal.adminNotes || '',
+          include_prior_turns: 8,
+        }),
+      });
+      if (!response.ok) {
+        const t = await response.text().catch(() => '');
+        let detail = t || `Failed (${response.status})`;
+        try {
+          const parsed = JSON.parse(t);
+          if (parsed?.detail) detail = typeof parsed.detail === 'string' ? parsed.detail : JSON.stringify(parsed.detail);
+        } catch (_) {
+          /* keep raw */
+        }
+        throw new Error(detail);
+      }
+      const data = await response.json();
+      setQaModal((prev) => ({
+        ...prev,
+        loading: false,
+        phase: null,
+        error: '',
+        result: data,
+        adminNotes: data?.admin_notes || prev.adminNotes || '',
+      }));
+    } catch (e) {
+      setQaModal((prev) => ({
+        ...prev,
+        loading: false,
+        phase: null,
+        error: String(e?.message || 'Failed to run astrology QA'),
+        result: null,
+      }));
+    }
+  };
+
+  const severityClass = (sev) => {
+    const s = String(sev || '').toLowerCase();
+    if (s === 'critical') return 'admin-qa-sev--critical';
+    if (s === 'high') return 'admin-qa-sev--high';
+    if (s === 'medium') return 'admin-qa-sev--medium';
+    return 'admin-qa-sev--low';
+  };
+
+  const gradeClass = (grade) => {
+    const g = String(grade || '').toUpperCase();
+    if (g === 'A' || g === 'B') return 'admin-qa-grade--good';
+    if (g === 'C') return 'admin-qa-grade--mid';
+    return 'admin-qa-grade--bad';
   };
 
   const IST = 'Asia/Kolkata';
@@ -2034,6 +2175,16 @@ const AdminChatHistory = () => {
                       dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }}
                     />
                     <div className="message-meta">
+                      {role === 'assistant' && Number.isFinite(Number(message.message_id)) && (
+                        <button
+                          type="button"
+                          className="message-branch-btn message-qa-btn"
+                          onClick={() => openResponseQa(message.message_id)}
+                          title="Run senior jyotishi exam on this answer"
+                        >
+                          Astrology QA
+                        </button>
+                      )}
                       {role === 'assistant' && Number.isFinite(Number(message.message_id)) && !isInstantUsage && (
                         <button
                           type="button"
@@ -2460,6 +2611,241 @@ const AdminChatHistory = () => {
                     </details>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+    {qaModal.open && (
+      <div className="admin-branch-modal-overlay" onClick={closeQaModal}>
+        <div className="admin-branch-modal admin-qa-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="admin-branch-modal-header">
+            <h3>Astrology QA exam • Msg #{qaModal.messageId}</h3>
+            <button type="button" className="admin-branch-modal-close" onClick={closeQaModal}>
+              ×
+            </button>
+          </div>
+          <div className="admin-branch-modal-body">
+            <p className="admin-qa-intro">
+              Senior jyotishi exam on Gemini Pro with rebuilt generation context (chart/dasha/divisional spine),
+              prior turns, and branch outputs. Checks technical claims against that context — not just narrative polish.
+            </p>
+            <label className="admin-qa-notes-label" htmlFor={`admin-qa-notes-${qaModal.messageId}`}>
+              Examiner notes (optional)
+            </label>
+            <textarea
+              id={`admin-qa-notes-${qaModal.messageId}`}
+              className="admin-qa-notes"
+              rows={3}
+              value={qaModal.adminNotes}
+              disabled={qaModal.loading}
+              placeholder="e.g. User says July window was promised as offer; check drift vs Aug 28 rewrite"
+              onChange={(e) =>
+                setQaModal((prev) => ({
+                  ...prev,
+                  adminNotes: e.target.value,
+                }))
+              }
+            />
+            <div className="admin-qa-actions">
+              <button
+                type="button"
+                className="message-branch-btn message-qa-btn"
+                onClick={runResponseQa}
+                disabled={qaModal.loading}
+              >
+                {qaModal.loading ? 'Examining…' : qaModal.result ? 'Re-run exam' : 'Run exam'}
+              </button>
+            </div>
+            {qaModal.loading && (
+              <p className="admin-qa-loading">
+                {qaModal.phase === 'run'
+                  ? 'Rebuilding generation context + running deterministic precheck + Gemini Pro examiner…'
+                  : 'Loading saved exam…'}
+              </p>
+            )}
+            {!qaModal.loading && qaModal.error && (
+              <p className="admin-branch-modal-error">{qaModal.error}</p>
+            )}
+            {!qaModal.loading && !qaModal.error && !qaModal.result?.report && (
+              <p className="admin-qa-intro" style={{ marginTop: 4 }}>
+                No saved exam for this message yet. Click <strong>Run exam</strong> to generate one.
+              </p>
+            )}
+            {!qaModal.loading && qaModal.result?.report && (
+              <div className="admin-qa-report">
+                {(() => {
+                  const report = qaModal.result.report;
+                  const findings = Array.isArray(report.findings) ? report.findings : [];
+                  const layers = report.layers && typeof report.layers === 'object' ? report.layers : {};
+                  const timing = report.timing_contract && typeof report.timing_contract === 'object'
+                    ? report.timing_contract
+                    : {};
+                  const proposals = Array.isArray(report.prompt_rule_proposals)
+                    ? report.prompt_rule_proposals
+                    : [];
+                  const preFlags = Array.isArray(report.deterministic_precheck?.flags)
+                    ? report.deterministic_precheck.flags
+                    : [];
+                  return (
+                    <>
+                      <div className="admin-qa-score-row">
+                        <span className={`admin-qa-grade ${gradeClass(report.overall_grade)}`}>
+                          Grade {report.overall_grade || '—'}
+                        </span>
+                        <span className={`admin-qa-sev ${severityClass(report.trust_risk)}`}>
+                          Trust risk: {report.trust_risk || '—'}
+                        </span>
+                        <span className="admin-qa-meta-chip">
+                          Branches {qaModal.result.branch_analysis_found ? 'found' : 'missing'}
+                        </span>
+                        <span className="admin-qa-meta-chip">
+                          Prior turns {qaModal.result.prior_turn_count ?? 0}
+                        </span>
+                        <span className="admin-qa-meta-chip">
+                          Gen context{' '}
+                          {qaModal.result.generation_context?.ok ||
+                          report.evidence_available?.has_generation_context
+                            ? `yes (${Math.round(
+                                (qaModal.result.generation_context?.char_count ||
+                                  report.evidence_available?.generation_context_chars ||
+                                  0) / 1000,
+                              )}k)`
+                            : 'missing'}
+                        </span>
+                        {report.auditor_meta?.forced_pro && (
+                          <span className="admin-qa-meta-chip">
+                            Pro {report.auditor_meta?.requested_model || report.auditor_meta?.model || 'gemini'}
+                          </span>
+                        )}
+                        {qaModal.result.stored && (
+                          <span className="admin-qa-meta-chip" title={qaModal.result.stored_at || ''}>
+                            Saved{qaModal.result.stored_at ? ` · ${formatDate(qaModal.result.stored_at)}` : ''}
+                          </span>
+                        )}
+                      </div>
+                      {qaModal.result.generation_context?.error && !qaModal.result.generation_context?.ok && (
+                        <p className="admin-branch-modal-error">
+                          Generation context rebuild failed: {qaModal.result.generation_context.error}
+                        </p>
+                      )}
+                      {report.executive_summary && (
+                        <div className="admin-qa-block">
+                          <h4>Exam summary</h4>
+                          <p>{report.executive_summary}</p>
+                        </div>
+                      )}
+                      {report.corrected_executive_summary && (
+                        <div className="admin-qa-block admin-qa-block--fix">
+                          <h4>Corrected executive summary</h4>
+                          <p>{report.corrected_executive_summary}</p>
+                        </div>
+                      )}
+                      <div className="admin-qa-block">
+                        <h4>Layer scores</h4>
+                        <div className="admin-qa-layers">
+                          {Object.entries(layers).map(([key, val]) => (
+                            <div key={key} className="admin-qa-layer">
+                              <div className="admin-qa-layer-title">
+                                <strong>{key.replace(/_/g, ' ')}</strong>
+                                <span className={`admin-qa-sev ${severityClass(val?.status === 'fail' ? 'high' : val?.status === 'warn' ? 'medium' : 'low')}`}>
+                                  {val?.status || '—'}
+                                </span>
+                              </div>
+                              {val?.notes ? <p>{val.notes}</p> : null}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {(timing.primary_window || timing.activation_window || timing.result_window || timing.consistency_with_prior) && (
+                        <div className="admin-qa-block">
+                          <h4>Timing contract</h4>
+                          <ul className="admin-qa-list">
+                            {timing.activation_window ? <li><strong>Activation:</strong> {timing.activation_window}</li> : null}
+                            {timing.result_window ? <li><strong>Result:</strong> {timing.result_window}</li> : null}
+                            {timing.primary_window ? <li><strong>Primary claimed:</strong> {timing.primary_window}</li> : null}
+                            {timing.consistency_with_prior ? (
+                              <li><strong>Vs prior:</strong> {timing.consistency_with_prior}</li>
+                            ) : null}
+                          </ul>
+                        </div>
+                      )}
+                      {preFlags.length > 0 && (
+                        <div className="admin-qa-block">
+                          <h4>Deterministic precheck flags</h4>
+                          <ul className="admin-qa-list">
+                            {preFlags.map((f, i) => (
+                              <li key={`pre-${i}`}>
+                                <span className={`admin-qa-sev ${severityClass(f.severity)}`}>{f.severity}</span>{' '}
+                                <strong>{f.category}</strong> — {f.note}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <div className="admin-qa-block">
+                        <h4>Findings ({findings.length})</h4>
+                        {findings.length === 0 ? (
+                          <p>No findings returned.</p>
+                        ) : (
+                          <div className="admin-qa-findings">
+                            {findings.map((f, i) => (
+                              <details key={f.id || `f-${i}`} className="admin-qa-finding" open={i < 3}>
+                                <summary>
+                                  <span className={`admin-qa-sev ${severityClass(f.severity)}`}>{f.severity || '—'}</span>
+                                  <strong>{f.category || 'finding'}</strong>
+                                  {f.claim_in_answer ? ` — ${String(f.claim_in_answer).slice(0, 120)}` : ''}
+                                </summary>
+                                <div className="admin-qa-finding-body">
+                                  {f.evidence_problem ? (
+                                    <p><strong>Problem:</strong> {f.evidence_problem}</p>
+                                  ) : null}
+                                  {f.classical_correction ? (
+                                    <p><strong>Classical correction:</strong> {f.classical_correction}</p>
+                                  ) : null}
+                                  {f.product_fix ? (
+                                    <p><strong>Product fix:</strong> {f.product_fix}</p>
+                                  ) : null}
+                                </div>
+                              </details>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {proposals.length > 0 && (
+                        <div className="admin-qa-block">
+                          <h4>Prompt / rule proposals</h4>
+                          <ul className="admin-qa-list">
+                            {proposals.map((p, i) => (
+                              <li key={`prop-${i}`}>{p}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {report.knowledge_test_notes && (
+                        <div className="admin-qa-block">
+                          <h4>Knowledge-test notes</h4>
+                          <p>{report.knowledge_test_notes}</p>
+                        </div>
+                      )}
+                      {qaModal.result.question && (
+                        <details className="admin-qa-block">
+                          <summary>Question under exam</summary>
+                          <p className="admin-qa-mono">{qaModal.result.question}</p>
+                        </details>
+                      )}
+                      {report.auditor_meta && (
+                        <p className="admin-qa-footer-meta">
+                          Examiner {report.auditor_meta.provider || '—'} / {report.auditor_meta.model || '—'}
+                          {report.auditor_meta.elapsed_total_s != null
+                            ? ` · ${report.auditor_meta.elapsed_total_s}s`
+                            : ''}
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             )}
           </div>

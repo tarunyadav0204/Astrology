@@ -373,8 +373,20 @@ class RealTransitCalculator:
         
         return False
     
-    def get_slow_planet_transits(self, birth_data: Dict, years: int = 5) -> Dict[str, List[Dict]]:
-        """Generate 5-year transit timeline for slow-moving planets with retrograde awareness"""
+    def get_slow_planet_transits(
+        self,
+        birth_data: Dict,
+        years: int = 5,
+        *,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        step_days: Optional[int] = None,
+    ) -> Dict[str, List[Dict]]:
+        """Generate slow-planet sign timeline (Jupiter/Saturn/Rahu/Ketu).
+
+        Default: from now for `years`. Optional start/end override the window.
+        For long spans, step_days defaults to weekly sampling to keep runtime sane.
+        """
         natal_positions = self._calculate_natal_positions(birth_data)
         if not natal_positions:
             return {}
@@ -382,8 +394,18 @@ class RealTransitCalculator:
         ascendant_longitude = natal_positions.get('ascendant_longitude', 0)
         slow_planets = ['Jupiter', 'Saturn', 'Rahu', 'Ketu']
         
-        start_date = datetime.now()
-        end_date = start_date + timedelta(days=365 * years)
+        if start_date is None:
+            start_date = datetime.now()
+        if end_date is None:
+            end_date = start_date + timedelta(days=365 * max(1, int(years or 5)))
+        if end_date < start_date:
+            start_date, end_date = end_date, start_date
+
+        span_days = max(1, (end_date - start_date).days)
+        if step_days is None:
+            # Daily for short windows; weekly beyond ~8y to avoid day-scan blowups on lifespan.
+            step_days = 7 if span_days > (365 * 8) else 1
+        step_days = max(1, int(step_days))
         
         sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
                       'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
@@ -400,7 +422,7 @@ class RealTransitCalculator:
             while current_date <= end_date:
                 longitude = self.get_planet_position(current_date, planet)
                 if longitude is None:
-                    current_date += timedelta(days=1)
+                    current_date += timedelta(days=step_days)
                     continue
                 
                 current_sign = int(longitude / 30)
@@ -436,7 +458,7 @@ class RealTransitCalculator:
                     period_start = current_date
                     segment_count[current_sign] = segment_count.get(current_sign, 0) + 1
                 
-                current_date += timedelta(days=1)
+                current_date += timedelta(days=step_days)
             
             # Add final period
             if prev_sign is not None and period_start is not None:

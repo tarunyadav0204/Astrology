@@ -64,6 +64,11 @@ class AdminCpuSnapshotRequest(BaseModel):
     cpu_threshold_percent: int = 120
 
 
+class ResponseQaRequest(BaseModel):
+    admin_notes: Optional[str] = None
+    include_prior_turns: int = 8
+
+
 def require_admin(current_user: dict = Depends(get_current_user)):
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -2393,6 +2398,420 @@ async def get_branch_analysis_for_message(
     except Exception as e:
         logger.exception("Error fetching branch analysis for message_id=%s", message_id)
         raise HTTPException(status_code=500, detail=f"Error fetching branch analysis: {str(e)}")
+
+
+def _ensure_response_qa_table(conn) -> None:
+    execute(
+        conn,
+        """
+        CREATE TABLE IF NOT EXISTS admin_response_qa_reports (
+            message_id BIGINT PRIMARY KEY,
+            session_id TEXT,
+            user_id INTEGER,
+            admin_user_id INTEGER,
+            admin_notes TEXT,
+            payload JSONB NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """,
+    )
+    execute(
+        conn,
+        """
+        CREATE INDEX IF NOT EXISTS idx_admin_response_qa_reports_updated
+        ON admin_response_qa_reports (updated_at DESC)
+        """,
+    )
+
+
+def _save_response_qa_report(
+    *,
+    message_id: int,
+    session_id: Any,
+    user_id: Any,
+    admin_user_id: Any,
+    admin_notes: Optional[str],
+    payload: Dict[str, Any],
+) -> None:
+    with get_conn() as conn:
+        _ensure_response_qa_table(conn)
+        execute(
+            conn,
+            """
+            INSERT INTO admin_response_qa_reports (
+                message_id, session_id, user_id, admin_user_id, admin_notes, payload, created_at, updated_at
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s::jsonb, NOW(), NOW()
+            )
+            ON CONFLICT (message_id) DO UPDATE SET
+                session_id = EXCLUDED.session_id,
+                user_id = EXCLUDED.user_id,
+                admin_user_id = EXCLUDED.admin_user_id,
+                admin_notes = EXCLUDED.admin_notes,
+                payload = EXCLUDED.payload,
+                updated_at = NOW()
+            """,
+            (
+                int(message_id),
+                str(session_id) if session_id is not None else None,
+                int(user_id) if user_id is not None else None,
+                int(admin_user_id) if admin_user_id is not None else None,
+                (admin_notes or "").strip() or None,
+                json.dumps(payload, ensure_ascii=False, default=str),
+            ),
+        )
+        conn.commit()
+
+
+def _load_response_qa_report(message_id: int) -> Optional[Dict[str, Any]]:
+    with get_conn() as conn:
+        _ensure_response_qa_table(conn)
+        cur = execute(
+            conn,
+            """
+            SELECT payload, admin_notes, created_at, updated_at, admin_user_id
+            FROM admin_response_qa_reports
+            WHERE message_id = %s
+            LIMIT 1
+            """,
+            (int(message_id),),
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+        payload_raw, admin_notes, created_at, updated_at, admin_user_id = row
+        payload = payload_raw
+        if isinstance(payload_raw, str):
+            try:
+                payload = json.loads(payload_raw)
+            except Exception:
+                payload = None
+        if not isinstance(payload, dict):
+            return None
+        out = dict(payload)
+        out["stored"] = True
+        out["admin_notes"] = admin_notes
+        out["stored_at"] = str(updated_at or created_at) if (updated_at or created_at) is not None else None
+        out["stored_by_admin_user_id"] = admin_user_id
+        return out
+
+
+async def _fetch_branch_outputs_for_message(message_id: int) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+    """Return (found, payload, created_at) from BigQuery branch outputs table."""
+    table = _get_branch_outputs_bigquery_table()
+    if not table:
+        return False, None, None
+    try:
+        from google.cloud import bigquery
+        from google.oauth2 import service_account
+        from utils.env_json import parse_json_from_env
+
+        project = (os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT_ID") or "").strip()
+        key = (
+            os.getenv("GOOGLE_SERVICE_ACCOUNT_KEY")
+            or os.getenv("GOOGLE_TTS_SERVICE_ACCOUNT_JSON")
+            or os.getenv("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
+            or ""
+        )
+        creds = None
+        if key and str(key).strip():
+            raw = str(key).strip()
+            info = parse_json_from_env(raw)
+            if info and isinstance(info, dict):
+                creds = service_account.Credentials.from_service_account_info(info)
+            elif os.path.isfile(raw):
+                creds = service_account.Credentials.from_service_account_file(raw)
+        client = bigquery.Client(project=project, credentials=creds) if creds else bigquery.Client(project=project)
+
+        query = f"""
+            SELECT created_at, specialist_branch_outputs
+            FROM {table}
+            WHERE message_id = @message_id
+            ORDER BY created_at DESC
+            LIMIT 1
+        """
+        params = [bigquery.ScalarQueryParameter("message_id", "INT64", int(message_id))]
+        job = client.query(query, job_config=bigquery.QueryJobConfig(query_parameters=params))
+        rows = list(job)
+        if not rows:
+            return False, None, None
+        row = rows[0]
+        raw_payload = row.get("specialist_branch_outputs")
+        parsed = None
+        if isinstance(raw_payload, str) and raw_payload.strip():
+            try:
+                parsed = json.loads(raw_payload)
+            except Exception:
+                parsed = None
+        elif isinstance(raw_payload, dict):
+            parsed = raw_payload
+        created_at = str(row.get("created_at")) if row.get("created_at") is not None else None
+        return bool(parsed), parsed if isinstance(parsed, dict) else None, created_at
+    except Exception:
+        logger.exception("Failed loading branch outputs for QA message_id=%s", message_id)
+        return False, None, None
+
+
+@router.post("/admin/chat/response-qa/{message_id}")
+async def audit_chat_response_qa(
+    message_id: int,
+    body: Optional[ResponseQaRequest] = None,
+    current_user: dict = Depends(require_admin),
+):
+    """
+    Run a senior-jyotishi style QA exam on an assistant chat answer.
+    Uses prior turns + specialist branch outputs when available.
+    """
+    from encryption_utils import EncryptionManager
+    from ai.response_qa_auditor import audit_astrology_response, rebuild_generation_context_for_qa
+    from chat_history.routes import coerce_chat_birth_details
+
+    req = body or ResponseQaRequest()
+    prior_limit = max(0, min(16, int(req.include_prior_turns or 8)))
+
+    def _load_birth_details_for_qa(conn, userid: int, chart_id: int) -> Optional[Dict[str, Any]]:
+        cur = execute(
+            conn,
+            """
+            SELECT id, userid, name, date, time, latitude, longitude, place, gender
+            FROM birth_charts
+            WHERE id = %s AND userid = %s
+            """,
+            (chart_id, userid),
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+
+        def dec(val: Any) -> str:
+            if val is None:
+                return ""
+            s = str(val)
+            try:
+                return enc.decrypt(s)
+            except Exception:
+                return s
+
+        try:
+            lat = float(str(dec(row[5])).strip())
+            lon = float(str(dec(row[6])).strip())
+        except (TypeError, ValueError):
+            return None
+        return coerce_chat_birth_details(
+            {
+                "id": int(row[0]),
+                "name": dec(row[2]),
+                "date": dec(row[3]),
+                "time": dec(row[4]),
+                "latitude": lat,
+                "longitude": lon,
+                "place": dec(row[7]) or "",
+                "gender": dec(row[8]) or "",
+            }
+        )
+
+    try:
+        enc = EncryptionManager()
+        birth_chart_id = None
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT
+                    cm.message_id,
+                    cm.session_id,
+                    cm.sender,
+                    cm.content,
+                    cm.timestamp,
+                    bc.name AS native_name_raw,
+                    cs.user_id,
+                    cs.birth_chart_id
+                FROM chat_messages cm
+                INNER JOIN chat_sessions cs ON cm.session_id = cs.session_id
+                LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
+                WHERE cm.message_id = %s
+                LIMIT 1
+                """,
+                (int(message_id),),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Message not found")
+
+            msg_id, session_id, sender, content_raw, ts, native_name_raw, user_id, birth_chart_id = row
+            if str(sender or "").lower() != "assistant":
+                raise HTTPException(status_code=400, detail="Response QA only applies to assistant messages")
+
+            def _maybe_decrypt(value: Any) -> str:
+                if value is None:
+                    return ""
+                raw = value if isinstance(value, str) else str(value)
+                try:
+                    out = enc.decrypt(raw)
+                    return out if out is not None else raw
+                except Exception:
+                    return raw
+
+            answer_text = _maybe_decrypt(content_raw)
+
+            native_name = None
+            if native_name_raw:
+                native_name = _maybe_decrypt(native_name_raw) or str(native_name_raw)
+
+            # Prior turns in the same session (chronological), ending at this message.
+            cur = execute(
+                conn,
+                """
+                SELECT message_id, sender, content, timestamp
+                FROM chat_messages
+                WHERE session_id = %s
+                  AND timestamp <= %s
+                  AND message_id <> %s
+                ORDER BY timestamp DESC, message_id DESC
+                LIMIT %s
+                """,
+                (session_id, ts, int(message_id), max(prior_limit * 2, 12)),
+            )
+            prior_rows = list(cur.fetchall() or [])
+            prior_rows.reverse()
+
+            prior_turns: List[Dict[str, str]] = []
+            question_text = ""
+            for prow in prior_rows:
+                _pmid, psender, pcontent, _pts = prow
+                ptext = _maybe_decrypt(pcontent)
+                role = "assistant" if str(psender or "").lower() == "assistant" else "user"
+                prior_turns.append({"role": role, "text": ptext})
+                if role == "user":
+                    question_text = ptext
+
+            # Nearest preceding user question if not found above
+            if not question_text:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT content
+                    FROM chat_messages
+                    WHERE session_id = %s
+                      AND sender = 'user'
+                      AND timestamp <= %s
+                    ORDER BY timestamp DESC, message_id DESC
+                    LIMIT 1
+                    """,
+                    (session_id, ts),
+                )
+                qrow = cur.fetchone()
+                if qrow and qrow[0]:
+                    question_text = _maybe_decrypt(qrow[0])
+
+            # Keep only the last N prior turns for the packet
+            if len(prior_turns) > prior_limit:
+                prior_turns = prior_turns[-prior_limit:]
+
+            birth_details = None
+            if birth_chart_id and user_id:
+                try:
+                    birth_details = _load_birth_details_for_qa(conn, int(user_id), int(birth_chart_id))
+                except Exception:
+                    logger.exception(
+                        "Failed loading birth details for QA message_id=%s chart_id=%s",
+                        message_id,
+                        birth_chart_id,
+                    )
+                    birth_details = None
+
+        branch_found, branch_payload, branch_created_at = await _fetch_branch_outputs_for_message(int(message_id))
+
+        generation_context = None
+        generation_context_meta: Dict[str, Any] = {
+            "ok": False,
+            "char_count": 0,
+            "error": "birth chart unavailable",
+            "intent": None,
+            "birth_chart_id": birth_chart_id,
+        }
+        if birth_details:
+            rebuilt = rebuild_generation_context_for_qa(
+                birth_details=birth_details,
+                question=question_text or "",
+            )
+            generation_context = rebuilt.get("context_compact")
+            generation_context_meta = {
+                "ok": bool(rebuilt.get("ok")),
+                "char_count": int(rebuilt.get("char_count") or 0),
+                "error": rebuilt.get("error"),
+                "intent": rebuilt.get("intent"),
+                "birth_chart_id": birth_chart_id,
+            }
+
+        report = await audit_astrology_response(
+            question=question_text or "",
+            answer=answer_text or "",
+            prior_turns=prior_turns,
+            branch_outputs=branch_payload,
+            generation_context=generation_context,
+            generation_context_meta=generation_context_meta,
+            native_name=native_name,
+            admin_notes=req.admin_notes,
+        )
+
+        result_payload = {
+            "message_id": int(message_id),
+            "session_id": session_id,
+            "user_id": user_id,
+            "native_name": native_name,
+            "question": question_text or "",
+            "branch_analysis_found": branch_found,
+            "branch_analysis_created_at": branch_created_at,
+            "prior_turn_count": len(prior_turns),
+            "generation_context": generation_context_meta,
+            "report": report,
+            "stored": True,
+        }
+
+        try:
+            admin_user_id = getattr(current_user, "userid", None) or getattr(current_user, "id", None)
+            if isinstance(current_user, dict):
+                admin_user_id = current_user.get("userid") or current_user.get("id")
+            _save_response_qa_report(
+                message_id=int(message_id),
+                session_id=session_id,
+                user_id=user_id,
+                admin_user_id=admin_user_id,
+                admin_notes=req.admin_notes,
+                payload=result_payload,
+            )
+        except Exception:
+            logger.exception("Failed persisting response QA report for message_id=%s", message_id)
+            result_payload["stored"] = False
+
+        return result_payload
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error running response QA for message_id=%s", message_id)
+        raise HTTPException(status_code=500, detail=f"Error running response QA: {str(e)}")
+
+
+@router.get("/admin/chat/response-qa/{message_id}")
+async def get_stored_chat_response_qa(
+    message_id: int,
+    current_user: dict = Depends(require_admin),
+):
+    """Fetch the latest stored Astrology QA exam for an assistant message."""
+    try:
+        stored = _load_response_qa_report(int(message_id))
+        if not stored:
+            return {"found": False, "message_id": int(message_id)}
+        return {
+            "found": True,
+            "message_id": int(message_id),
+            **stored,
+        }
+    except Exception as e:
+        logger.exception("Error loading stored response QA for message_id=%s", message_id)
+        raise HTTPException(status_code=500, detail=f"Error loading stored response QA: {str(e)}")
 
 
 @router.get("/admin/chat/analysis-stats")

@@ -149,6 +149,14 @@ class ResponseParser:
             return text, None
 
     @staticmethod
+    def parse_prediction_anchor_metadata(text: str) -> Tuple[str, Optional[Dict[str, object]]]:
+        """Find PREDICTION_ANCHOR_META: {...}, parse JSON, strip from text."""
+        from ai.prediction_anchor import parse_prediction_anchor_meta
+
+        cleaned, meta = parse_prediction_anchor_meta(text)
+        return cleaned, meta
+
+    @staticmethod
     def _strip_analysis_steps_section(content: str) -> str:
         """Remove Analysis Steps blocks (###/##/plain heading, * or • bullets)."""
         stripped = content
