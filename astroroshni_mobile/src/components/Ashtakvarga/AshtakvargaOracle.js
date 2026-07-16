@@ -28,6 +28,7 @@ import DateNavigator from '../Common/DateNavigator';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useTheme } from '../../context/ThemeContext';
 import { useCredits } from '../../credits/CreditContext';
+import { useAuthGate } from '../../auth/AuthGateContext';
 import { pricingAPI } from '../../services/api';
 import CreditModal from '../CreditModal';
 
@@ -162,6 +163,7 @@ const HOUSE_SIGNIFICATIONS = {
 export default function AshtakvargaOracle({ navigation, route, onHeaderStateChange }) {
   const { theme, colors } = useTheme();
   const { credits, fetchBalance } = useCredits();
+  const { requireAuthForPaid } = useAuthGate();
   const embedded = !!route?.params?.embedded;
   const [activeTab, setActiveTab] = useState(0);
   const [birthData, setBirthData] = useState(null);
@@ -542,7 +544,13 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
     probeAshtakavargaAnalysis('');
   };
 
-  const onConfirmAnalysisCreditModal = () => {
+  const onConfirmAnalysisCreditModal = async () => {
+    const authOk = await requireAuthForPaid({
+      feature: 'Ashtakavarga analysis',
+      message: 'Sign in to run Ashtakavarga AI analysis. Saved replays stay free.',
+      resume: { resumeRoute: 'AshtakvargaOracle', resumeParams: {} },
+    });
+    if (!authOk) return;
     setAnalysisCreditModalVisible(false);
     const nextQuestion = pendingAnalysisQuestion ?? '';
     setPendingAnalysisQuestion(null);
@@ -1417,7 +1425,13 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
     }
   };
 
-  const onConfirmLifePredictionsCreditModal = () => {
+  const onConfirmLifePredictionsCreditModal = async () => {
+    const authOk = await requireAuthForPaid({
+      feature: 'Ashtakavarga life predictions',
+      message: 'Sign in to generate an Ashtakavarga life study. Saved studies reopen free.',
+      resume: { resumeRoute: 'AshtakvargaOracle', resumeParams: {} },
+    });
+    if (!authOk) return;
     const mode = lifePredictionsCreditModalMode;
     setLifePredictionsCreditModalMode(null);
     generateLifePredictions(mode === 'regenerate');

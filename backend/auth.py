@@ -90,6 +90,20 @@ def get_current_user(
     return User(userid=user[0], name=user[1], phone=user[2], role=user[3], signup_client=sc)
 
 
+def get_optional_user(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Optional[User]:
+    """Return the current user when a valid JWT is present; otherwise None (guest)."""
+    token = _extract_bearer_token(request, credentials)
+    if not token:
+        return None
+    try:
+        return get_current_user(request, credentials)
+    except HTTPException:
+        return None
+
+
 def create_access_token_for_phone(phone: str, expire_minutes: int = 180) -> str:
     """
     Mint a JWT with `sub` = user phone (same shape as login) for server-side callers

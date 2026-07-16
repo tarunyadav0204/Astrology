@@ -25,6 +25,7 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import NotificationEnableBanner from '../Notifications/NotificationEnableBanner';
+import { useAuthGate } from '../../auth/AuthGateContext';
 
 const REPORT_TYPE_FALLBACKS = [
   {
@@ -198,6 +199,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
   const { pricing, pricingOriginal, credits, fetchBalance } = useCredits();
+  const { requireAuthForPaid } = useAuthGate();
 
   const [birthData, setBirthData] = useState(null);
   const [selectedReportType, setSelectedReportType] = useState('partnership');
@@ -932,7 +934,13 @@ export default function ReportsStudioScreen({ navigation, route }) {
     }
   };
 
-  const openCreditsConfirmModal = ({ forceRegenerate = false } = {}) => {
+  const openCreditsConfirmModal = async ({ forceRegenerate = false } = {}) => {
+    const authOk = await requireAuthForPaid({
+      feature: 'PDF report',
+      message: 'Sign in to generate a premium PDF report. Reopening a saved report stays free.',
+      resume: { resumeRoute: 'ReportsStudio', resumeParams: {} },
+    });
+    if (!authOk) return;
     setPendingForceRegenerate(Boolean(forceRegenerate));
     setShowCreditsModal(true);
   };

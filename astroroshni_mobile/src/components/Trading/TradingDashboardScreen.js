@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCredits } from '../../credits/CreditContext';
+import { useAuthGate } from '../../auth/AuthGateContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../../utils/constants';
 import { useAnalytics } from '../../hooks/useAnalytics';
@@ -102,6 +103,7 @@ export default function TradingDashboardScreen({ navigation }) {
   const [premiumCost, setPremiumCost] = useState(50);
   const [isPremium, setIsPremium] = useState(false);
   const { credits, fetchBalance } = useCredits();
+  const { requireAuthForPaid } = useAuthGate();
 
   useEffect(() => {
     let mounted = true;
@@ -310,7 +312,13 @@ export default function TradingDashboardScreen({ navigation }) {
     }
   };
 
-  const confirmAndRunAnalysis = () => {
+  const confirmAndRunAnalysis = async () => {
+    const authOk = await requireAuthForPaid({
+      feature: 'trading forecast',
+      message: 'Sign in to run trading forecasts.',
+      resume: { resumeRoute: 'TradingDashboard', resumeParams: {} },
+    });
+    if (!authOk) return;
     const cost = isPremium ? premiumCost : dailyCost;
     if (credits < cost) {
       const analysisType = isPremium ? "premium trading analysis" : "daily forecast";

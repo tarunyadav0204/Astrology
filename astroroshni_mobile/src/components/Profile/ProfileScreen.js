@@ -22,6 +22,7 @@ import { COLORS, LANGUAGES } from '../../utils/constants';
 import { parseCalendarDateInput, formatBirthDateForDisplay } from '../../utils/birthDateUtils';
 import { storage } from '../../services/storage';
 import { useCredits } from '../../credits/CreditContext';
+import { useAuthGate } from '../../auth/AuthGateContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
@@ -71,6 +72,7 @@ export default function ProfileScreen({ navigation, route }) {
   useAnalytics('ProfileScreen');
   const { theme, toggleTheme, colors } = useTheme();
   const { credits } = useCredits();
+  const { requireAuthForPaid, isGuest } = useAuthGate();
   const [userData, setUserData] = useState(null);
   const [birthData, setBirthData] = useState(null);
   const [stats, setStats] = useState({ totalChats: 0, chartsViewed: 0, podcastsCount: 0 });
@@ -159,6 +161,18 @@ export default function ProfileScreen({ navigation, route }) {
     try {
       const user = await storage.getUserData();
       setUserData(user);
+      const token = await storage.getAuthToken();
+
+      if (!token) {
+        const localBirth = await storage.getBirthDetails();
+        setBirthData(localBirth);
+        if (localBirth) {
+          loadChartData(localBirth);
+          loadDashaData(localBirth);
+        }
+        setStats({ totalChats: 0, chartsViewed: 0, podcastsCount: 0 });
+        return;
+      }
       
       // Fetch user's self birth chart from API
       const { authAPI, chatAPI } = require('../../services/api');
@@ -174,7 +188,12 @@ export default function ProfileScreen({ navigation, route }) {
         loadChartData(birthDataWithId);
         loadDashaData(birthDataWithId);
       } else {
-        setBirthData(null);
+        const localBirth = await storage.getBirthDetails();
+        setBirthData(localBirth);
+        if (localBirth) {
+          loadChartData(localBirth);
+          loadDashaData(localBirth);
+        }
       }
       // Load real profile stats (chats, charts, days)
       const statsRes = await authAPI.getUserStats();
@@ -450,6 +469,31 @@ export default function ProfileScreen({ navigation, route }) {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
+            {isGuest ? (
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => navigation.navigate('Login')}
+                style={{
+                  marginHorizontal: 16,
+                  marginBottom: 12,
+                  borderRadius: 14,
+                  padding: 14,
+                  backgroundColor: 'rgba(255, 107, 53, 0.16)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(255, 107, 53, 0.35)',
+                }}
+              >
+                <Text style={{ color: colors.text, fontWeight: '800', fontSize: 15 }}>
+                  {t('profile.guestSignInTitle', 'Exploring as guest')}
+                </Text>
+                <Text style={{ color: colors.textSecondary, marginTop: 4, fontSize: 13 }}>
+                  {t(
+                    'profile.guestSignInBody',
+                    'Sign in to save charts to your account, buy credits, and unlock paid insights.',
+                  )}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
             <Animated.View style={[styles.profileHeader, { opacity: fadeAnim }]}>
               <View style={styles.avatarContainer}>
                 <Animated.View style={[styles.zodiacRing, { transform: [{ rotate: spin }] }]}>
@@ -520,7 +564,15 @@ export default function ProfileScreen({ navigation, route }) {
                   </View>
                   <TouchableOpacity 
                     style={styles.addCreditsButton}
-                    onPress={() => navigation.navigate('Credits')}
+                    onPress={async () => {
+                      const authOk = await requireAuthForPaid({
+                        feature: 'credits',
+                        message: 'Sign in to buy credits and unlock paid insights.',
+                        resume: { resumeRoute: 'Credits', resumeParams: {} },
+                      });
+                      if (!authOk) return;
+                      navigation.navigate('Credits');
+                    }}
                   >
                     <Text style={styles.addCreditsText}>{t('profile.add', '+ Add')}</Text>
                   </TouchableOpacity>

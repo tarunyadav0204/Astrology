@@ -37,6 +37,7 @@ const normalizePricingPayload = (raw) => {
 export const CreditProvider = ({ children }) => {
   const [credits, setCredits] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [isGuest, setIsGuest] = useState(true);
   const [partnershipCost, setPartnershipCost] = useState(2);
   const [podcastCost, setPodcastCost] = useState(2);
   const [freeQuestionAvailable, setFreeQuestionAvailable] = useState(false);
@@ -89,10 +90,10 @@ export const CreditProvider = ({ children }) => {
     const run = (async () => {
       try {
         const token = await AsyncStorage.getItem('authToken');
-        if (!token) {
-          return applyPricingPayload({});
-        }
-        const response = await pricingAPI.getPricing();
+        // Guests: public analysis-pricing so Home can still show costs.
+        const response = token
+          ? await pricingAPI.getPricing()
+          : await pricingAPI.getAnalysisPricing();
         pricingFetchedAtRef.current = Date.now();
         return applyPricingPayload(response);
       } catch (error) {
@@ -118,6 +119,7 @@ export const CreditProvider = ({ children }) => {
     try {
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
+        setIsGuest(true);
         setCredits(0);
         setFreeQuestionAvailable(false);
         setFreeQuestionRequiresNotifications(false);
@@ -127,6 +129,7 @@ export const CreditProvider = ({ children }) => {
         return 0;
       }
 
+      setIsGuest(false);
       setLoading(true);
       const response = await creditAPI.getBalance();
       const data = response?.data;
@@ -150,6 +153,7 @@ export const CreditProvider = ({ children }) => {
         },
       });
       if (error.response?.status === 401) {
+        setIsGuest(true);
         setCredits(0);
         setFreeQuestionAvailable(false);
         setFreeQuestionRequiresNotifications(false);
@@ -214,6 +218,7 @@ export const CreditProvider = ({ children }) => {
       value={{
         credits,
         loading,
+        isGuest,
         partnershipCost,
         podcastCost,
         freeQuestionAvailable,

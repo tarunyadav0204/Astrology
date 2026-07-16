@@ -20,6 +20,13 @@ import { useCredits } from '../../../credits/CreditContext';
 import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
 import AuthKeyboardScreen from './AuthKeyboardScreen';
 import AuthLegalNotice from '../AuthLegalNotice';
+import {
+  clearPendingPaidAction,
+  getPendingPaidAction,
+  mergeGuestProfilesAfterLogin,
+} from '../../../auth/guestAuth';
+import { useAuthGate } from '../../../auth/AuthGateContext';
+import { trackGA4EventOnly } from '../../../utils/analytics';
 
 export default function PasswordScreen({ 
   formData, 
@@ -30,6 +37,7 @@ export default function PasswordScreen({
   navigation 
 }) {
   const { refreshCredits } = useCredits();
+  const { refreshAuthState } = useAuthGate();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isValid, setIsValid] = useState(false);
@@ -173,6 +181,9 @@ export default function PasswordScreen({
         trackAcquisitionFunnelEvent('login_completed', {}, { status: 'success', screenName: 'PasswordScreen' }).catch(() => {});
         trackAstrologyEvent.userLoggedIn();
         await refreshCredits();
+        try {
+          await refreshAuthState?.();
+        } catch (_) {}
         if (Platform.OS !== 'ios') {
           try {
             const { syncPushTokenIfPermissionGranted } = require('../../../services/pushNotifications');
@@ -180,12 +191,29 @@ export default function PasswordScreen({
           } catch (_) {}
         }
 
-        const resetTo = (routeName) => {
+        const resetTo = (routeName, params) => {
           navigation.reset({
             index: 0,
-            routes: [{ name: routeName }],
+            routes: [{ name: routeName, params }],
           });
         };
+
+        // Merge any guest-local charts onto the account before routing.
+        try {
+          await mergeGuestProfilesAfterLogin({ chartAPI });
+        } catch (_) {
+          /* non-fatal */
+        }
+
+        const pending = await getPendingPaidAction();
+        if (pending?.resumeRoute) {
+          await clearPendingPaidAction();
+          trackGA4EventOnly('auth_gate_completed', {
+            feature: pending.feature || 'paid_feature',
+          }).catch(() => {});
+          resetTo(pending.resumeRoute, pending.resumeParams || {});
+          return;
+        }
 
         // Route by chart COUNT (not only self chart):
         // - If user has >=1 chart, pick one and land Home.
@@ -196,24 +224,27 @@ export default function PasswordScreen({
           try {
             const chartsRes = await chartAPI.getExistingCharts('', 10, 0);
             const charts = Array.isArray(chartsRes?.data?.charts) ? chartsRes.data.charts : [];
-            if (charts.length > 0) {
-              const selfChart = charts.find(
-                (c) => String(c?.relation || '').trim().toLowerCase() === 'self'
-              );
-              const selected = selfChart || charts[0];
-              const birthDetails = {
-                id: selected.id ?? selected._id,
-                name: selected.name,
-                date: selected.date,
-                time: selected.time,
-                place: selected.place,
-                latitude: selected.latitude,
-                longitude: selected.longitude,
-                gender: selected.gender,
-                relation: selected.relation,
-                isSelf: String(selected?.relation || '').trim().toLowerCase() === 'self',
-              };
-              await storage.setBirthDetails(birthDetails);
+            const localActive = await storage.getBirthDetails();
+            if (charts.length > 0 || localActive) {
+              if (!localActive && charts.length > 0) {
+                const selfChart = charts.find(
+                  (c) => String(c?.relation || '').trim().toLowerCase() === 'self'
+                );
+                const selected = selfChart || charts[0];
+                const birthDetails = {
+                  id: selected.id ?? selected._id,
+                  name: selected.name,
+                  date: selected.date,
+                  time: selected.time,
+                  place: selected.place,
+                  latitude: selected.latitude,
+                  longitude: selected.longitude,
+                  gender: selected.gender,
+                  relation: selected.relation,
+                  isSelf: String(selected?.relation || '').trim().toLowerCase() === 'self',
+                };
+                await storage.setBirthDetails(birthDetails);
+              }
               resetTo('Home');
             } else {
               resetTo('BirthProfileIntro');
@@ -256,6 +287,15 @@ export default function PasswordScreen({
           ).catch(() => {});
           trackAstrologyEvent.userRegistered('mobile');
           await refreshCredits();
+          try {
+            await refreshAuthState?.();
+          } catch (_) {}
+          try {
+            await mergeGuestProfilesAfterLogin({ chartAPI });
+          } catch (_) {
+            /* non-fatal */
+          }
+          trackGA4EventOnly('auth_gate_completed', { feature: 'registration' }).catch(() => {});
           
           // Language selection, then welcome (same preference as Profile → language)
           navigateToScreen('chooseLanguage');

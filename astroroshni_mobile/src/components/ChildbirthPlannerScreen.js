@@ -9,11 +9,13 @@ import { storage } from '../services/storage';
 import { API_BASE_URL, getEndpoint, COLORS } from '../utils/constants';
 import LocationPicker from './LocationPicker';
 import { useCredits } from '../credits/CreditContext';
+import { useAuthGate } from '../auth/AuthGateContext';
 import { pricingAPI } from '../services/api';
 
 
 export default function ChildbirthPlannerScreen({ navigation }) {
   const { credits, fetchBalance } = useCredits();
+  const { requireAuthForPaid } = useAuthGate();
   const [loading, setLoading] = useState(false);
   const [motherProfile, setMotherProfile] = useState(null);
   
@@ -106,6 +108,13 @@ export default function ChildbirthPlannerScreen({ navigation }) {
       Alert.alert("Missing Information", "Please select delivery location.");
       return;
     }
+
+    const authOk = await requireAuthForPaid({
+      feature: 'childbirth planner',
+      message: 'Sign in to run the childbirth muhurat planner.',
+      resume: { resumeRoute: 'ChildbirthPlanner', resumeParams: {} },
+    });
+    if (!authOk) return;
 
     const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
     if (daysDiff > 30) {

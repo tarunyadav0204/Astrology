@@ -30,6 +30,7 @@ import { chatAPI } from '../../services/api';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 import { useCredits } from '../../credits/CreditContext';
+import { useAuthGate } from '../../auth/AuthGateContext';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import PodcastPlayerModal from '../PodcastPlayerModal';
 
@@ -56,6 +57,7 @@ function MessageBubble({
   const { t } = useTranslation();
   const { theme } = useTheme();
   const { podcastCost, credits } = useCredits();
+  const { requireAuthForPaid } = useAuthGate();
   const navigation = useNavigation();
   // Init from the played-ids set so FlatList remounts do not flash translateY:50 for one frame
   // (that looked like the long answer bouncing between sections while reading).
@@ -368,7 +370,13 @@ function MessageBubble({
     setShowPodcastCreditsModal(true);
   };
 
-  const confirmPodcastCredits = () => {
+  const confirmPodcastCredits = async () => {
+    const authOk = await requireAuthForPaid({
+      feature: 'podcast',
+      message: 'Sign in to generate a podcast from this answer.',
+      resume: { resumeRoute: 'Home', resumeParams: {} },
+    });
+    if (!authOk) return;
     setShowPodcastCreditsModal(false);
     setPodcastPlayerMode('generating');
     setShowPodcastPlayerModal(true);

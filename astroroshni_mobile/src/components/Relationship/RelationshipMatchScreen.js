@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 import { useCredits } from '../../credits/CreditContext';
 import { chartAPI, pricingAPI, relationshipAPI } from '../../services/api';
+import { useAuthGate } from '../../auth/AuthGateContext';
 import { storage } from '../../services/storage';
 import { generateRelationshipReportPDF, getLogoDataUriForModule, sharePDFOnWhatsApp } from '../../utils/pdfGenerator';
 
@@ -126,6 +127,7 @@ export default function RelationshipMatchScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { theme, colors, androidLightCardFixStyle } = useTheme();
   const { credits } = useCredits();
+  const { requireAuthForPaid } = useAuthGate();
   const isDark = theme === 'dark';
 
   const [savedProfiles, setSavedProfiles] = useState([]);
@@ -255,6 +257,13 @@ export default function RelationshipMatchScreen({ navigation, route }) {
       return;
     }
 
+    const authOk = await requireAuthForPaid({
+      feature: 'kundli matching',
+      message: 'Sign in to run kundli matching. Basic compare is free after you sign in.',
+      resume: { resumeRoute: 'RelationshipMatch', resumeParams: {} },
+    });
+    if (!authOk) return;
+
     try {
       setLoadingResult(true);
       setPremiumReport(null);
@@ -278,6 +287,12 @@ export default function RelationshipMatchScreen({ navigation, route }) {
 
   const unlockPremiumReport = async (forceRegenerate = false) => {
     if (!result || !personOne || !personTwo) return;
+    const authOk = await requireAuthForPaid({
+      feature: 'premium matching report',
+      message: 'Sign in to unlock the premium compatibility report.',
+      resume: { resumeRoute: 'RelationshipMatch', resumeParams: {} },
+    });
+    if (!authOk) return;
     if (premiumReportCost > 0 && credits < premiumReportCost && (!premiumReport || forceRegenerate)) {
       navigation.navigate('Credits');
       return;

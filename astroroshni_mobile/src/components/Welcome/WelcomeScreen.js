@@ -302,22 +302,24 @@ const WelcomeScreen = ({ navigation }) => {
                 <Text style={styles.buttonIcon}>✦</Text>
               </LinearGradient>
             </TouchableOpacity>
-            
-            {/* <TouchableOpacity 
-              onPress={() => navigation.navigate('AnalysisHub')} 
-              activeOpacity={0.8}
+
+            <TouchableOpacity
+              onPress={() => navigation.replace('Home')}
+              activeOpacity={0.88}
               style={styles.secondaryButton}
             >
               <LinearGradient
-                colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                colors={['rgba(255, 255, 255, 0.16)', 'rgba(255, 255, 255, 0.06)']}
                 style={styles.secondaryButtonGradient}
               >
-                <Text style={styles.secondaryButtonText}>🔮 Explore Life Analysis</Text>
+                <Text style={styles.secondaryButtonText}>
+                  {isIOS ? 'Continue without signing in' : 'Explore without signing in'}
+                </Text>
               </LinearGradient>
-            </TouchableOpacity> */}
+            </TouchableOpacity>
             
             <View style={styles.ctaSubtext}>
-              <Text style={styles.ctaSubtextSub}>Free to start • No credit card required</Text>
+              <Text style={styles.ctaSubtextSub}>Free charts & panchang • Sign in only for paid insights</Text>
             </View>
           </Animated.View>
         </View>

@@ -28,6 +28,7 @@ import { useCredits } from '../../credits/CreditContext';
 import { pricingAPI } from '../../services/api';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { trackAstrologyEvent, trackEvent } from '../../utils/analytics';
+import { useAuthGate } from '../../auth/AuthGateContext';
 
 /** Map AI/backend section heading to karmaAnalysis.sectionTitles.<slug> */
 function karmaSectionTitleSlug(title) {
@@ -53,6 +54,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   const isDark = theme === 'dark';
   const { chartId } = route.params || {};
   const { credits, fetchBalance } = useCredits();
+  const { requireAuthForPaid } = useAuthGate();
 
   const screenGradient = isDark
     ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd]
@@ -255,7 +257,13 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleStartAnalysis = () => {
+  const handleStartAnalysis = async () => {
+    const authOk = await requireAuthForPaid({
+      feature: 'karma analysis',
+      message: 'Sign in to run karma analysis. Credits are charged only after you confirm.',
+      resume: { resumeRoute: 'KarmaAnalysis', resumeParams: { chartId: selectedChartId } },
+    });
+    if (!authOk) return;
     if (credits < karmaCost) {
       Alert.alert(
         t('karmaAnalysis.insufficientCreditsTitle'),

@@ -70,6 +70,7 @@ import AboutScreen from './src/components/About/AboutScreen';
 import SupportScreen from './src/components/Support/SupportScreen';
 import MembershipComparisonScreen from './src/components/Support/MembershipComparisonScreen';
 import { CreditProvider } from './src/credits/CreditContext';
+import { AuthGateProvider } from './src/auth/AuthGateContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { ErrorProvider } from './src/context/ErrorContext';
 import { storage } from './src/services/storage';
@@ -347,17 +348,21 @@ export default function App() {
             } catch (clearErr) {
               console.log('Clear storage on bootstrap auth fail:', clearErr);
             }
-            setInitialRoute('Welcome');
+            // Expired session: still allow guest Home (free tools) instead of hard Welcome wall.
+            setInitialRoute('Home');
+            trackGA4EventOnly('guest_home_opened', { source: 'expired_session' }).catch(() => {});
           } else {
             setInitialRoute('Home');
           }
         }
       } else {
-        setInitialRoute('Welcome');
+        // Guests can explore free chart tools without registering.
+        setInitialRoute('Home');
+        trackGA4EventOnly('guest_home_opened', { source: 'cold_start' }).catch(() => {});
       }
     } catch (error) {
       console.log('Bootstrap error:', error);
-      setInitialRoute('Welcome');
+      setInitialRoute('Home');
     } finally {
       try {
         const { linkAcquisitionInstallationToUser } = require('./src/services/acquisitionTracking');
@@ -593,6 +598,7 @@ export default function App() {
                 }}
               >
               <GlobalErrorHandler />
+              <AuthGateProvider>
               <StatusBar barStyle="dark-content" backgroundColor="#ff6b35" />
         <Stack.Navigator
           initialRouteName={initialRoute}
@@ -885,6 +891,7 @@ export default function App() {
           />
         </Stack.Navigator>
         <ErrorOverlay />
+        </AuthGateProvider>
         </NavigationContainer>
         </ErrorBoundary>
       </CreditProvider>
