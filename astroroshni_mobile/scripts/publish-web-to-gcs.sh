@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Publish Expo Web assets into the CRA site bucket without wiping CRA files.
 # Expects dist-web already built + post-processed (expo-index.html present).
+#
+# Public entry: https://astroroshni.com/mobile/  (CRA stays on / for all devices)
 set -euo pipefail
 
 BUCKET="${1:-${GCP_FRONTEND_SITE_BUCKET:-}}"
@@ -19,22 +21,27 @@ TARGET="gs://${BUCKET}"
 
 echo "Publishing Expo Web assets to ${TARGET} (non-destructive)"
 
-# HTML entry for mobile UA edge
-gsutil -h "Cache-Control:no-cache" cp "$DIST/expo-index.html" "${TARGET}/expo-index.html"
+# Canonical Expo entry under /mobile/ (phones on / keep CRA)
+gsutil -h "Cache-Control:no-cache" -h "Content-Type:text/html; charset=utf-8" \
+  cp "$DIST/expo-index.html" "${TARGET}/mobile/index.html"
 
-# Hashed Expo bundles
+# Keep root copy for debugging / health checks
+gsutil -h "Cache-Control:no-cache" -h "Content-Type:text/html; charset=utf-8" \
+  cp "$DIST/expo-index.html" "${TARGET}/expo-index.html"
+
+# Hashed Expo bundles (absolute /_expo/... URLs in the HTML)
 if [[ -d "$DIST/_expo" ]]; then
   gsutil -m rsync -r "$DIST/_expo" "${TARGET}/_expo"
   gsutil -m setmeta -h "Cache-Control:public, max-age=31536000, immutable" "${TARGET}/_expo/**" || true
 fi
 
-# Other root assets from the export (favicon, fonts copied beside index, manifest)
+# Other root assets from the export (favicon, fonts, manifest)
 # Do NOT use rsync -d here — that would delete CRA files.
 shopt -s nullglob
 for f in "$DIST"/*; do
   base="$(basename "$f")"
   case "$base" in
-    index.html|expo-index.html|_expo|metadata.json) continue ;;
+    index.html|expo-index.html|_expo|metadata.json|mobile) continue ;;
   esac
   if [[ -f "$f" ]]; then
     gsutil -h "Cache-Control:public, max-age=3600" cp "$f" "${TARGET}/${base}"
@@ -44,3 +51,4 @@ for f in "$DIST"/*; do
 done
 
 echo "Done publishing Expo Web to ${TARGET}"
+echo "  Entry: ${TARGET}/mobile/index.html  →  https://astroroshni.com/mobile/"

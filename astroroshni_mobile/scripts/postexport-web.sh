@@ -49,7 +49,7 @@ cat > "$DIST/expo-manifest.webmanifest" <<'EOF'
   "name": "AstroRoshni",
   "short_name": "AstroRoshni",
   "description": "Vedic astrology chat, charts, and timing tools",
-  "start_url": "/",
+  "start_url": "/mobile/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#1a0033",

@@ -17,7 +17,8 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'User-Agent': 'AstroRoshni-Mobile/1.0',
+    // Browsers forbid setting User-Agent from JS; only set on native.
+    ...(Platform.OS !== 'web' ? { 'User-Agent': 'AstroRoshni-Mobile/1.0' } : {}),
   }
 });
 
@@ -845,16 +846,20 @@ export const creditAPI = {
       order_id: orderId,
     }, GLOBAL_ERROR_CONFIG),
   /** INR credit packs via Razorpay (same packs as web/backend, including 24-credit starter pack). Requires checkout UI (e.g. WebView or react-native-razorpay). */
-  getRazorpayCatalog: () =>
-    tryDirectPaymentGetThenFallback(
+  getRazorpayCatalog: (options = {}) => {
+    // Expo Web / browsers: hit main API only (CORS-safe, matches frontend CreditsModal).
+    if (options?.preferMainApi || Platform.OS === 'web') {
+      return api.get(getEndpoint('/credits/razorpay/catalog'));
+    }
+    return tryDirectPaymentGetThenFallback(
       '/razorpay/catalog',
       () => api.get(getEndpoint('/credits/razorpay/catalog'))
-    ),
+    );
+  },
   createRazorpayOrder: (credits, extra = {}, options = {}) => {
     const body = { credits, ...extra };
-    // User Choice / alternative billing: skip Cloud Run payment service (cold starts add multi-second
-    // delay before Razorpay opens). Main API VMs stay warm and create the order with Razorpay directly.
-    if (options?.preferMainApi) {
+    // User Choice / Expo Web: skip Cloud Run payment service (cold starts / CORS). Main API stays warm.
+    if (options?.preferMainApi || Platform.OS === 'web') {
       return api.post(getEndpoint('/credits/razorpay/create-order'), body, GLOBAL_ERROR_CONFIG);
     }
     return tryDirectPaymentThenFallback(
@@ -863,12 +868,15 @@ export const creditAPI = {
       () => api.post(getEndpoint('/credits/razorpay/create-order'), body, GLOBAL_ERROR_CONFIG),
     );
   },
-  verifyRazorpayPayment: ({
-    razorpay_order_id,
-    razorpay_payment_id,
-    razorpay_signature,
-    google_play_external_transaction_token,
-  }) => {
+  verifyRazorpayPayment: (
+    {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      google_play_external_transaction_token,
+    },
+    options = {}
+  ) => {
     const body = {
       razorpay_order_id,
       razorpay_payment_id,
@@ -877,6 +885,9 @@ export const creditAPI = {
         ? { google_play_external_transaction_token }
         : {}),
     };
+    if (options?.preferMainApi || Platform.OS === 'web') {
+      return api.post(getEndpoint('/credits/razorpay/verify'), body, GLOBAL_ERROR_CONFIG);
+    }
     return tryDirectPaymentThenFallback(
       '/razorpay/verify',
       body,

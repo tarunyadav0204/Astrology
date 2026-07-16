@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/Ionicons';
@@ -20,7 +20,9 @@ export default function LocationPicker({ onLocationSelect, onClose }) {
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`,
-        { headers: { 'User-Agent': 'AstrologyApp/1.0' } }
+        Platform.OS !== 'web'
+          ? { headers: { 'User-Agent': 'AstrologyApp/1.0' } }
+          : undefined
       );
       const data = await response.json();
       const places = data.map(item => {

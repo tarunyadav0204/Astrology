@@ -379,7 +379,8 @@ const CreditScreen = ({ navigation }) => {
     if (!silent) setRazorpayCatalogLoading(true);
     setRazorpayCatalogError('');
     try {
-      const { data } = await creditAPI.getRazorpayCatalog();
+      // Web: main API only (same as frontend CreditsModal) — never Google Play / payment-service IAP.
+      const { data } = await creditAPI.getRazorpayCatalog({ preferMainApi: true });
       setRazorpayCatalog(data || null);
     } catch (e) {
       setRazorpayCatalog(null);
@@ -388,6 +389,25 @@ const CreditScreen = ({ navigation }) => {
       if (!silent) setRazorpayCatalogLoading(false);
     }
   };
+
+  const productIds = useMemo(
+    () => googlePlayProducts.map((p) => p.product_id).filter(Boolean),
+    [googlePlayProducts]
+  );
+  const subscriptionProductIds = useMemo(
+    () => subscriptionPlans.map((p) => p.google_play_product_id).filter(Boolean),
+    [subscriptionPlans]
+  );
+  // Only show plans that actually exist in Google Play (returned by getSubscriptions)
+  const subscriptionPlansFromPlay = useMemo(
+    () =>
+      subscriptionPlans.filter((plan) =>
+        plan.google_play_product_id &&
+        iapSubscriptions.some((s) => (s.productId || s.product_id) === plan.google_play_product_id)
+      ),
+    [subscriptionPlans, iapSubscriptions]
+  );
+  const hasAnyIapProducts = productIds.length > 0 || subscriptionProductIds.length > 0;
 
   const loadPendingGooglePlayCreditPurchases = async () => {
     try {
@@ -595,9 +615,15 @@ const CreditScreen = ({ navigation }) => {
     pulseLoop.start();
     
     // Refresh credits + history when screen comes into focus.
-    // On Android, sync one-time purchases/subscriptions with Google Play first so missed callbacks recover.
+    // Android: sync with Google Play. Web: Razorpay catalog only (never Play IAP).
     const unsubscribe = navigation.addListener('focus', () => {
       fetchBalance();
+      if (Platform.OS === 'web') {
+        fetchRazorpayCatalog({ silent: true });
+        fetchHistory();
+        fetchSubscriptionDetails();
+        return;
+      }
       if (Platform.OS === 'android') {
         fetchProducts({ silent: true });
         fetchPlans({ silent: true });
@@ -636,13 +662,15 @@ const CreditScreen = ({ navigation }) => {
     }
   }, []);
 
-  // Web: load Razorpay INR catalog (same packs as the website Checkout.js flow).
+  // Web: load Razorpay INR catalog (same packs as the website CreditsModal flow).
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     fetchRazorpayCatalog();
   }, []);
 
   useEffect(() => {
+    // Pack relaunch banner is Android Play catalog messaging — skip on web.
+    if (Platform.OS !== 'android') return undefined;
     let cancelled = false;
     (async () => {
       try {
@@ -671,26 +699,6 @@ const CreditScreen = ({ navigation }) => {
     if (Platform.OS !== 'android') return;
     fetchPlans();
   }, []);
-
-  const productIds = useMemo(
-    () => googlePlayProducts.map((p) => p.product_id).filter(Boolean),
-    [googlePlayProducts]
-  );
-  const subscriptionProductIds = useMemo(
-    () => subscriptionPlans.map((p) => p.google_play_product_id).filter(Boolean),
-    [subscriptionPlans]
-  );
-  // Only show plans that actually exist in Google Play (returned by getSubscriptions)
-  const subscriptionPlansFromPlay = useMemo(
-    () =>
-      subscriptionPlans.filter((plan) =>
-        plan.google_play_product_id &&
-        iapSubscriptions.some((s) => (s.productId || s.product_id) === plan.google_play_product_id)
-      ),
-    [subscriptionPlans, iapSubscriptions]
-  );
-  const hasAnyIapProducts = productIds.length > 0 || subscriptionProductIds.length > 0;
-
 
   useLayoutEffect(() => {
     iapCallbacksRef.current = {
@@ -1344,14 +1352,21 @@ const CreditScreen = ({ navigation }) => {
     if (!Number.isFinite(creditsAmount) || creditsAmount <= 0) return;
     setPurchasingRazorpayCredits(creditsAmount);
     try {
-      const { data: orderData } = await creditAPI.createRazorpayOrder(creditsAmount);
+      // Same path as frontend: main API create-order → Checkout.js → verify (no Play / Cloud Run hop).
+      const { data: orderData } = await creditAPI.createRazorpayOrder(
+        creditsAmount,
+        {},
+        { preferMainApi: true }
+      );
       const verifyPayload = await openRazorpayCheckout({
         orderData,
         description: pack?.name || `${creditsAmount} credits`,
         themeColor: colors.primary || '#f97316',
         onDismiss: () => setPurchasingRazorpayCredits(null),
         verifyPayment: async (payment) => {
-          const { data } = await creditAPI.verifyRazorpayPayment(payment);
+          const { data } = await creditAPI.verifyRazorpayPayment(payment, {
+            preferMainApi: true,
+          });
           return data;
         },
       });

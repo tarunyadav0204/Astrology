@@ -5119,7 +5119,12 @@ export default function ChatScreen({ navigation, route }) {
         </View>
 
         {showGreeting ? (
-          <View style={{ flex: 1 }}>
+          <View
+            style={{
+              flex: 1,
+              ...(Platform.OS === 'web' ? { minHeight: 0, overflow: 'hidden' } : null),
+            }}
+          >
             <HomeScreen 
               birthData={birthData}
               onOptionSelect={handleGreetingOptionSelect}
@@ -7193,18 +7198,23 @@ export default function ChatScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    ...(Platform.OS === 'web' ? { minHeight: 0, height: '100%', overflow: 'hidden' } : null),
   },
   gradientBg: {
     flex: 1,
+    ...(Platform.OS === 'web' ? { minHeight: 0 } : null),
   },
   safeArea: {
     flex: 1,
+    ...(Platform.OS === 'web' ? { minHeight: 0 } : null),
   },
   safeAreaInner: {
     flex: 1,
+    ...(Platform.OS === 'web' ? { minHeight: 0, overflow: 'hidden' } : null),
   },
   keyboardAvoidingView: {
     flex: 1,
+    ...(Platform.OS === 'web' ? { minHeight: 0 } : null),
   },
   headerContainer: {
     paddingHorizontal: 12,

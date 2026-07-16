@@ -195,10 +195,12 @@ const styles = StyleSheet.create({
   bodyScroll: {
     flex: 1,
     minHeight: 0,
+    ...(Platform.OS === 'web' ? { overflow: 'auto' } : null),
   },
   bodyContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    // On web, vertical centering + flexGrow can clip tall content; keep top-aligned.
+    justifyContent: Platform.OS === 'web' ? 'flex-start' : 'center',
     paddingTop: 10,
     paddingBottom: 14,
   },

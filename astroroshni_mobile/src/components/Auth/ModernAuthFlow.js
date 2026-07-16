@@ -275,14 +275,18 @@ export default function ModernAuthFlow({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    ...(Platform.OS === 'web' ? { minHeight: 0, height: '100%' } : null),
   },
   gradient: {
     flex: 1,
+    ...(Platform.OS === 'web' ? { minHeight: 0 } : null),
   },
   safeArea: {
     flex: 1,
+    ...(Platform.OS === 'web' ? { minHeight: 0 } : null),
   },
   screenContainer: {
     flex: 1,
+    ...(Platform.OS === 'web' ? { minHeight: 0 } : null),
   },
 });

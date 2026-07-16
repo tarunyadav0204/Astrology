@@ -87,14 +87,27 @@ import { trackGA4EventOnly } from './src/utils/analytics';
 // Push notifications: imported lazily in useEffect to avoid touching native module at launch (reduces iOS device crash risk).
 
 const Stack = createStackNavigator();
+
+/** Production Expo Web lives at /mobile; local `expo start --web` stays at /. */
+function getWebLinkingPrefixes() {
+  if (typeof window === 'undefined' || !window.location?.origin) {
+    return [];
+  }
+  const origin = window.location.origin;
+  const underMobile =
+    Platform.OS === 'web' &&
+    /^\/mobile(\/|$)/.test(String(window.location.pathname || ''));
+  return underMobile ? [`${origin}/mobile`, origin] : [origin, `${origin}/mobile`];
+}
+
 const linking = {
   prefixes: [
+    'https://astroroshni.com/mobile',
+    'https://www.astroroshni.com/mobile',
     'https://astroroshni.com',
     'https://www.astroroshni.com',
     'astroroshni://',
-    ...(typeof window !== 'undefined' && window.location?.origin
-      ? [window.location.origin]
-      : []),
+    ...getWebLinkingPrefixes(),
   ],
   config: {
     screens: {
@@ -119,8 +132,11 @@ const linking = {
     },
   },
   getStateFromPath(path, options) {
-    const normalizedPath = `/${String(path || '').split('?')[0].replace(/^\/+|\/+$/g, '')}`;
-    // Let App bootstrap choose Welcome vs Home for the site root.
+    let raw = String(path || '').split('?')[0];
+    // Tolerate /mobile prefix if the matched linking prefix did not strip it.
+    raw = raw.replace(/^\/?mobile\/?/, '/');
+    const normalizedPath = `/${raw.replace(/^\/+|\/+$/g, '')}`;
+    // Let App bootstrap choose Welcome vs Home for the site root (/ or /mobile).
     if (normalizedPath === '/') {
       return undefined;
     }
@@ -132,7 +148,7 @@ const linking = {
       '/marriage-analysis': '/kundli-matching',
       '/policy': '/about',
     };
-    return getStateFromPath(pathAliases[normalizedPath] || path, options);
+    return getStateFromPath(pathAliases[normalizedPath] || raw, options);
   },
 };
 const APP_CONFIG_FETCH_TIMEOUT_MS = 6000;
@@ -594,10 +610,28 @@ export default function App() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
+    <GestureHandlerRootView
+      style={{
+        flex: 1,
+        // Web: fixed shell so Home tabs stay pinned; inner screens scroll.
+        ...(Platform.OS === 'web' ? { minHeight: 0, height: '100%', overflow: 'hidden' } : null),
+      }}
+    >
+      <SafeAreaProvider
+        style={
+          Platform.OS === 'web'
+            ? { flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }
+            : undefined
+        }
+      >
         <ThemeProvider initialTheme={initialTheme}>
-        <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <Animated.View
+          style={{
+            flex: 1,
+            opacity: fadeAnim,
+            ...(Platform.OS === 'web' ? { minHeight: 0, height: '100%', overflow: 'hidden' } : null),
+          }}
+        >
           <ErrorProvider>
             <CreditProvider>
               <ErrorBoundary>
@@ -626,8 +660,20 @@ export default function App() {
             headerTitleStyle: {
               fontWeight: 'bold',
             },
-            gestureEnabled: true,
+            // Web: no edge-swipe stack gestures (they steal touch from page scroll in device mode).
+            gestureEnabled: Platform.OS !== 'web',
             gestureDirection: 'horizontal',
+            ...(Platform.OS === 'web'
+              ? {
+                  cardStyle: {
+                    flex: 1,
+                    minHeight: 0,
+                    height: '100%',
+                    overflow: 'hidden',
+                    backgroundColor: 'transparent',
+                  },
+                }
+              : null),
           }}
         >
           <Stack.Screen 

@@ -1,18 +1,17 @@
 /**
- * UA edge router for astroroshni.com
+ * Path-based shell router for astroroshni.com
  *
- * Serves CRA (desktop + crawlers) or Expo Web (mobile browsers) HTML entry
- * from the same GCS site bucket, while proxying static assets from that bucket.
+ * - `/` and normal site paths → CRA (`index.html`) for everyone (desktop + phones)
+ * - `/mobile` and `/mobile/*` → Expo Web (`/mobile/index.html`)
+ * - `/api/*` is not served here (LB should send API to backend)
  *
  * Escape hatches:
- *   ?force_web=1 / Cookie force_web=1  → CRA
- *   ?force_app=1 / Cookie force_app=1  → Expo Web
+ *   ?force_web=1  → CRA (even under /mobile)
+ *   ?force_app=1  → redirect to /mobile/ (Expo entry)
  *
  * Env:
  *   SITE_BUCKET_BASE_URL  e.g. https://storage.googleapis.com/tradebest-465307-frontend-site
- *     or the public CDN origin that already fronts the bucket
  *   PORT                  default 8080
- *   CACHE_HTML_SECONDS    default 0
  */
 const http = require('http');
 const https = require('https');
@@ -22,12 +21,6 @@ const PORT = Number(process.env.PORT || 8080);
 const SITE_BASE = String(
   process.env.SITE_BUCKET_BASE_URL || 'https://storage.googleapis.com/tradebest-465307-frontend-site'
 ).replace(/\/+$/, '');
-
-const BOT_RE =
-  /googlebot|bingbot|slurp|duckduckbot|baiduspider|yandexbot|sogou|exabot|facebot|ia_archiver|semrushbot|ahrefsbot|dotbot|petalbot|applebot|twitterbot|linkedinbot|embedly|quora link preview|showyoubot|outbrain|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|preview/i;
-
-const MOBILE_RE =
-  /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS|FxiOS/i;
 
 function parseCookies(header) {
   const out = {};
@@ -46,7 +39,6 @@ function parseCookies(header) {
 function wantsHtml(req, pathname) {
   const accept = String(req.headers.accept || '');
   if (pathname.includes('.')) {
-    // Explicit asset extensions are never HTML SPA fallbacks
     if (/\.(js|css|map|png|jpe?g|gif|webp|svg|ico|woff2?|ttf|json|txt|xml|webmanifest)$/i.test(pathname)) {
       return false;
     }
@@ -56,19 +48,8 @@ function wantsHtml(req, pathname) {
   return false;
 }
 
-function resolveShell(req, url) {
-  const cookies = parseCookies(req.headers.cookie);
-  const forceWeb =
-    url.searchParams.get('force_web') === '1' || cookies.force_web === '1';
-  const forceApp =
-    url.searchParams.get('force_app') === '1' || cookies.force_app === '1';
-  const ua = String(req.headers['user-agent'] || '');
-
-  if (forceWeb) return 'cra';
-  if (forceApp) return 'expo';
-  if (BOT_RE.test(ua)) return 'cra';
-  if (MOBILE_RE.test(ua)) return 'expo';
-  return 'cra';
+function isExpoMobilePath(pathname) {
+  return pathname === '/mobile' || pathname.startsWith('/mobile/');
 }
 
 function fetchUpstream(pathname, redirectsLeft = 3) {
@@ -134,42 +115,72 @@ const server = http.createServer(async (req, res) => {
       pathname = pathname.slice(0, -1);
     }
 
-    // Never proxy API through this edge — LB should route /api to backend.
     if (pathname === '/api' || pathname.startsWith('/api/')) {
       res.writeHead(404, { 'content-type': 'text/plain' });
       res.end('Not found');
       return;
     }
 
+    const cookies = parseCookies(req.headers.cookie);
+    const forceWeb =
+      url.searchParams.get('force_web') === '1' || cookies.force_web === '1';
+    const forceApp =
+      url.searchParams.get('force_app') === '1' || cookies.force_app === '1';
+
+    // Bookmark / old escape hatch → canonical Expo entry
+    if (forceApp && !isExpoMobilePath(pathname) && !forceWeb) {
+      res.writeHead(302, {
+        location: '/mobile/',
+        'set-cookie': [
+          'force_app=; Path=/; Max-Age=0; SameSite=Lax',
+          'force_web=; Path=/; Max-Age=0; SameSite=Lax',
+        ],
+        'cache-control': 'no-cache',
+      });
+      res.end();
+      return;
+    }
+
     const html = wantsHtml(req, pathname);
     let upstreamPath = pathname;
     let isHtmlShell = false;
+    let shell = 'cra';
     const setCookies = [];
 
     if (html) {
-      const shell = resolveShell(req, url);
       isHtmlShell = true;
-      upstreamPath = shell === 'expo' ? '/expo-index.html' : '/index.html';
+      const wantExpo = isExpoMobilePath(pathname) && !forceWeb;
+      shell = wantExpo ? 'expo' : 'cra';
+      upstreamPath = wantExpo ? '/mobile/index.html' : '/index.html';
 
       if (url.searchParams.get('force_web') === '1') {
         setCookies.push('force_web=1; Path=/; Max-Age=86400; SameSite=Lax');
         setCookies.push('force_app=; Path=/; Max-Age=0; SameSite=Lax');
       }
-      if (url.searchParams.get('force_app') === '1') {
-        setCookies.push('force_app=1; Path=/; Max-Age=86400; SameSite=Lax');
-        setCookies.push('force_web=; Path=/; Max-Age=0; SameSite=Lax');
-      }
     }
 
     const upstream = await fetchUpstream(upstreamPath);
-    // SPA fallback: missing deep-link asset → appropriate index
-    if (html && upstream.statusCode === 404) {
-      const shell = resolveShell(req, url);
-      const fallback = await fetchUpstream(shell === 'expo' ? '/expo-index.html' : '/index.html');
+    // SPA fallback for Expo deep links: /mobile/credits → mobile/index.html
+    if (html && upstream.statusCode === 404 && shell === 'expo') {
+      const fallback = await fetchUpstream('/mobile/index.html');
       const headers = {
         'content-type': 'text/html; charset=utf-8',
         'cache-control': 'no-cache',
-        'x-ar-shell': shell,
+        'x-ar-shell': 'expo',
+      };
+      if (setCookies.length) headers['set-cookie'] = setCookies;
+      res.writeHead(fallback.statusCode === 200 ? 200 : fallback.statusCode, headers);
+      res.end(fallback.body);
+      return;
+    }
+
+    // CRA SPA fallback for unknown HTML paths (not under /mobile)
+    if (html && upstream.statusCode === 404 && shell === 'cra') {
+      const fallback = await fetchUpstream('/index.html');
+      const headers = {
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'no-cache',
+        'x-ar-shell': 'cra',
       };
       if (setCookies.length) headers['set-cookie'] = setCookies;
       res.writeHead(fallback.statusCode === 200 ? 200 : fallback.statusCode, headers);
@@ -184,7 +195,7 @@ const server = http.createServer(async (req, res) => {
         : upstream.headers['cache-control'] || 'public, max-age=31536000, immutable',
     };
     if (isHtmlShell) {
-      headers['x-ar-shell'] = resolveShell(req, url);
+      headers['x-ar-shell'] = shell;
     }
     if (setCookies.length) headers['set-cookie'] = setCookies;
 

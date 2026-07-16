@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   Dimensions,
   Alert,
   FlatList,
@@ -15,7 +14,7 @@ import {
   Image,
   Linking,
 } from 'react-native';
-import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
+import AppScrollView, { VerticalPageScroll } from '../../platform/AppScrollView';
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -1138,7 +1137,7 @@ const loadHomeData = async (nativeData = null) => {
             : [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientAccent || '#fde68a']}
           style={styles.gradient}
         >
-          <GHScrollView
+          <VerticalPageScroll
             style={[styles.scrollView, { zIndex: 1 }]}
             contentContainerStyle={[styles.content, styles.emptyStateContent]}
             showsVerticalScrollIndicator={false}
@@ -1181,7 +1180,7 @@ const loadHomeData = async (nativeData = null) => {
                 </Text>
               </View>
             )}
-          </GHScrollView>
+          </VerticalPageScroll>
         </LinearGradient>
       </View>
     );
@@ -1432,7 +1431,7 @@ const loadHomeData = async (nativeData = null) => {
         style={styles.gradient}
       >
         
-      <GHScrollView 
+      <VerticalPageScroll 
         style={[styles.scrollView, { zIndex: 1 }]} 
         contentContainerStyle={styles.content} 
         showsVerticalScrollIndicator={false}
@@ -1569,7 +1568,7 @@ const loadHomeData = async (nativeData = null) => {
 
         {/* At-a-Glance Ticker */}
         <View style={[styles.tickerContainer, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-          <GHScrollView 
+          <AppScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.tickerContent}
@@ -1622,7 +1621,7 @@ const loadHomeData = async (nativeData = null) => {
                 </TouchableOpacity>
               </>
             )}
-          </GHScrollView>
+          </AppScrollView>
         </View>
 
         <ReportStudioCard
@@ -1685,7 +1684,7 @@ const loadHomeData = async (nativeData = null) => {
             <Text style={[styles.analysisTitle, { color: colors.text, paddingHorizontal: 20 }]}>
               {t('home.sections.timingPlanners', '⏰ Timing Planners')}
             </Text>
-            <GHScrollView
+            <AppScrollView
               horizontal
               nestedScrollEnabled
               showsHorizontalScrollIndicator={false}
@@ -1702,7 +1701,7 @@ const loadHomeData = async (nativeData = null) => {
                   onOptionSelect={onOptionSelect}
                 />
               ))}
-            </GHScrollView>
+            </AppScrollView>
           </View>
         )}
 
@@ -1803,7 +1802,7 @@ const loadHomeData = async (nativeData = null) => {
                 <Text style={{ color: '#ff6b35', fontWeight: '700', fontSize: 13 }}>{t('blog.seeAll')}</Text>
               </TouchableOpacity>
             </View>
-            <GHScrollView
+            <AppScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }}
@@ -1830,7 +1829,7 @@ const loadHomeData = async (nativeData = null) => {
                   </View>
                 </TouchableOpacity>
               ))}
-            </GHScrollView>
+            </AppScrollView>
           </View>
         )}
 
@@ -2058,7 +2057,7 @@ const loadHomeData = async (nativeData = null) => {
           {/* Astrology Tools Section */}
           <View style={styles.toolsSection}>
             <Text style={[styles.toolsSectionTitle, { color: colors.text }]}>{t('home.sections.astrologyTools', '🔧 Astrology Tools')}</Text>
-            <GHScrollView 
+            <AppScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.toolsScrollContent}
@@ -2254,7 +2253,7 @@ const loadHomeData = async (nativeData = null) => {
                   <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.cosmicRing', 'Cosmic\nRing')}</Text>
                 </View>
               </TouchableOpacity>
-            </GHScrollView>
+            </AppScrollView>
           </View>
 
           {/* Cosmic Weather - Transits & Mini Zodiac */}
@@ -2390,7 +2389,7 @@ const loadHomeData = async (nativeData = null) => {
                   </View>
 
                 {/* Horizontal Transit Strip */}
-                <GHScrollView 
+                <AppScrollView 
                   horizontal 
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.transitScrollContent}
@@ -2439,14 +2438,14 @@ const loadHomeData = async (nativeData = null) => {
                             </View>
                           );
                   })}
-                </GHScrollView>
+                </AppScrollView>
               </View>
             )}
           </View>
 
 
         </View>
-      </GHScrollView>
+      </VerticalPageScroll>
       
       {/* Monthly Predictions Welcome Modal */}
       <Modal
@@ -3401,17 +3400,25 @@ const styles = StyleSheet.create({
   
   container: {
     flex: 1,
+    ...(Platform.OS === 'web'
+      ? { minHeight: 0, height: '100%', overflow: 'hidden', position: 'relative' }
+      : null),
   },
   gradient: {
     flex: 1,
+    ...(Platform.OS === 'web' ? { minHeight: 0, overflow: 'hidden' } : null),
   },
   scrollView: {
     flex: 1,
+    ...(Platform.OS === 'web'
+      ? { minHeight: 0, overflow: 'auto', touchAction: 'pan-y' }
+      : null),
   },
   content: {
     padding: 20,
     paddingTop: 10,
-    paddingBottom: 40,
+    // Leave room under absolute/fixed bottom tabs on web.
+    paddingBottom: Platform.OS === 'web' ? 100 : 40,
   },
   emptyStateContent: {
     paddingTop: 40,
@@ -5593,6 +5600,12 @@ const styles = StyleSheet.create({
         paddingBottom: 0,
       },
       android: {
+        height: 70,
+        paddingTop: 0,
+        paddingBottom: 0,
+      },
+      // Web: same absolute pin; parent shell is viewport-height locked (webShell.css).
+      web: {
         height: 70,
         paddingTop: 0,
         paddingBottom: 0,

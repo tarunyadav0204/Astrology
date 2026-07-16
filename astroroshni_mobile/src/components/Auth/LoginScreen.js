@@ -429,7 +429,9 @@ export default function LoginScreen({ navigation }) {
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`,
-        { headers: { 'User-Agent': 'AstrologyApp/1.0' } }
+        Platform.OS !== 'web'
+          ? { headers: { 'User-Agent': 'AstrologyApp/1.0' } }
+          : undefined
       );
       const data = await response.json();
       return data.map(item => ({

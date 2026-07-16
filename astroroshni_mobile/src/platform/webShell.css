@@ -1,33 +1,54 @@
-/* Expo Web phone-shell defaults — applied only when Platform.OS === 'web'. */
+/* Expo Web phone-shell — loaded only when Platform.OS === 'web' (index.js). Never on Play/iOS. */
+
+/*
+ * Fixed app shell: viewport is locked; screens scroll internally.
+ * Required so Home bottom tabs stay pinned (position:absolute) while feed scrolls.
+ */
 html,
-body,
-#root {
+body {
   height: 100%;
+  height: 100dvh;
+  height: -webkit-fill-available;
   margin: 0;
   padding: 0;
-  background-color: #1a0033;
+  overflow: hidden;
   overscroll-behavior: none;
+  background-color: #1a0033;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  -webkit-tap-highlight-color: transparent;
-  -webkit-text-size-adjust: 100%;
-  /* iOS Safari: keep the chat composer above the home indicator / keyboard chrome */
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
     env(safe-area-inset-left);
   box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
 }
 
 #root {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
-  min-height: 100dvh;
-  min-height: -webkit-fill-available;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  height: -webkit-fill-available;
+  overflow: hidden;
+  background-color: #1a0033;
 }
 
-/* Keep the app feeling phone-first on larger viewports (tablet/desktop force_app). */
+/* Outer RN Web wrappers must fill the shell and pass height down. */
+#root > div {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100% !important;
+  max-height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Phone column on wide desktop (not device-mode). */
 @media (min-width: 768px) {
   #root {
     max-width: 480px;
@@ -36,9 +57,27 @@ body {
   }
 }
 
-/* Inputs: prevent iOS zoom on focus */
 input,
 textarea,
 select {
   font-size: 16px;
+}
+
+/* Vertical scrollports (Home feed, chat list, etc.). */
+#root div[style*='overflow: auto'],
+#root div[style*='overflow:auto'],
+#root div[style*='overflow-y: auto'],
+#root div[style*='overflow-y:auto'],
+#root div[style*='overflowY'] {
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* Horizontal carousels still need sideways pan. */
+#root div[style*='overflow-x: auto'],
+#root div[style*='overflow-x:auto'],
+#root div[style*='overflowX'] {
+  touch-action: pan-x pinch-zoom !important;
+  -webkit-overflow-scrolling: touch;
 }

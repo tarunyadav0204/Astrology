@@ -8,6 +8,7 @@ import {
   Dimensions,
   ScrollView,
   Image,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -191,6 +192,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    ...(Platform.OS === 'web' ? { minHeight: 0 } : null),
   },
   scrollContent: {
     flexGrow: 1,
@@ -199,7 +201,8 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   content: {
-    flex: 1,
+    // flex:1 inside ScrollView traps height on web and blocks trackpad scrolling.
+    ...(Platform.OS === 'web' ? null : { flex: 1 }),
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,

@@ -52,8 +52,6 @@ const PROD_API_URL = 'https://astroroshni.com';
 export const PAYMENT_SERVICE_BASE_URL = 'https://astroroshni-play-payment-service-800681558445.asia-south2.run.app';
 
 const getApiUrl = () => {
-  if (ENV_API_BASE_URL) return ENV_API_BASE_URL;
-
   // Same-origin when the Expo Web shell is served from astroroshni.com
   if (
     Platform.OS === 'web' &&
@@ -62,6 +60,15 @@ const getApiUrl = () => {
     /astroroshni\.com$/i.test(window.location.hostname)
   ) {
     return window.location.origin;
+  }
+
+  if (ENV_API_BASE_URL) {
+    // 10.0.2.2 is the Android emulator → host bridge; browsers cannot reach it.
+    // Keep .env as-is for Play/emulator; remap only for Expo Web.
+    if (Platform.OS === 'web' && /10\.0\.2\.2/.test(ENV_API_BASE_URL)) {
+      return ENV_API_BASE_URL.replace(/10\.0\.2\.2/g, 'localhost');
+    }
+    return ENV_API_BASE_URL;
   }
 
   if (__DEV__ && USE_DEV_API) {

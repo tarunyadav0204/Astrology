@@ -790,8 +790,9 @@ jobs:
           set -euo pipefail
           curl -fsS --max-time 20 "https://astroroshni.com/api/health" >/dev/null
           curl -fsS --max-time 20 "https://astroroshni.com/" >/dev/null
-          # Expo shell artifact should exist after mobile_web deploys (ignore if not yet cut over)
-          curl -fsS --max-time 20 -o /dev/null -w "%{http_code}\n" "https://astroroshni.com/expo-index.html" || true
+          # Expo Web entry at /mobile (CRA remains on / for all devices, including phones)
+          curl -fsS --max-time 20 -o /dev/null -w "%{http_code}\n" "https://astroroshni.com/mobile/" || true
+          curl -fsS --max-time 20 -o /dev/null -w "%{http_code}\n" "https://astroroshni.com/mobile/index.html" || true
 
   replace_vms:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'replace_vms' }}
