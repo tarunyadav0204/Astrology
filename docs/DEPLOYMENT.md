@@ -55,6 +55,7 @@ bash deploy.sh
   - after CDN/backend-bucket cutover is verified, switch `SERVE_FRONTEND_LOCALLY=false`
   - from that point, prod VMs become backend-only and `deploy.sh` skips all local frontend build/serve work
   - use the cutover runbook at [docs/OPTION_B_STATIC_FRONTEND_CUTOVER.md](/Users/tarunydv/Desktop/Code/AstrologyApp/docs/OPTION_B_STATIC_FRONTEND_CUTOVER.md)
+- **Expo Web (mobile UA)**: phone browsers can be served the Expo export of `astroroshni_mobile` via the UA edge router. See [docs/EXPO_WEB_MOBILE_UA.md](EXPO_WEB_MOBILE_UA.md). CI publishes `mobile-web-build-*.tgz` and `expo-index.html` / `/_expo/**` into the site bucket.
 
 ## Services
 

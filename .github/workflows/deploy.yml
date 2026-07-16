@@ -68,6 +68,7 @@ jobs:
       payment_required: ${{ steps.detect.outputs.payment_required }}
       nudge_required: ${{ steps.detect.outputs.nudge_required }}
       frontend_required: ${{ steps.detect.outputs.frontend_required }}
+      mobile_web_required: ${{ steps.detect.outputs.mobile_web_required }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -102,12 +103,14 @@ jobs:
           payment_required=false
           nudge_required=false
           frontend_required=false
+          mobile_web_required=false
 
           if [[ "${FORCE_FULL_DEPLOY}" == "true" ]]; then
             backend_required=true
             payment_required=true
             nudge_required=true
             frontend_required=true
+            mobile_web_required=true
           else
             if [[ "${FORCE_BACKEND_PIP}" == "true" ]]; then
               backend_required=true
@@ -115,6 +118,7 @@ jobs:
 
             if [[ "${FORCE_FRONTEND_DEPLOY}" == "true" ]]; then
               frontend_required=true
+              mobile_web_required=true
             fi
 
             # Prefix patterns must not use a trailing `$` after `backend/` / `play_payment_service/`
@@ -137,12 +141,18 @@ jobs:
             if printf '%s\n' "${changed_files}" | grep -E -q '^frontend/|^frontend-next/'; then
               frontend_required=true
             fi
+
+            if printf '%s\n' "${changed_files}" | grep -E -q \
+              '^astroroshni_mobile/|^infra/ua-edge-router/'; then
+              mobile_web_required=true
+            fi
           fi
 
           echo "backend_required=${backend_required}" >> "${GITHUB_OUTPUT}"
           echo "payment_required=${payment_required}" >> "${GITHUB_OUTPUT}"
           echo "nudge_required=${nudge_required}" >> "${GITHUB_OUTPUT}"
           echo "frontend_required=${frontend_required}" >> "${GITHUB_OUTPUT}"
+          echo "mobile_web_required=${mobile_web_required}" >> "${GITHUB_OUTPUT}"
 
   backend_and_chat:
     if: ${{ (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') && needs.detect_changes.outputs.backend_required == 'true' }}
@@ -694,6 +704,75 @@ jobs:
           gsutil -m setmeta -h "Cache-Control:public, max-age=3600" "gs://${GCP_FRONTEND_SITE_BUCKET}/robots.txt" || true
           gsutil -m setmeta -h "Cache-Control:public, max-age=3600" "gs://${GCP_FRONTEND_SITE_BUCKET}/sitemap.xml" || true
 
+  mobile_web:
+    if: ${{ (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') && needs.detect_changes.outputs.mobile_web_required == 'true' }}
+    needs: [detect_changes]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: astroroshni_mobile/package-lock.json
+
+      - name: Build Expo Web export
+        working-directory: astroroshni_mobile
+        shell: bash
+        env:
+          CI: 'true'
+          EXPO_NO_TELEMETRY: '1'
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run web:export
+          bash scripts/postexport-web.sh dist-web
+          tar -czf "${RUNNER_TEMP}/mobile-web-build-${GITHUB_SHA}.tgz" -C dist-web .
+
+      - name: Publish mobile-web artifact to GCS
+        shell: bash
+        env:
+          GCP_FRONTEND_ARTIFACT_BUCKET: ${{ vars.GCP_FRONTEND_ARTIFACT_BUCKET }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${GCP_FRONTEND_ARTIFACT_BUCKET}" ]]; then
+            echo "❌ GCP_FRONTEND_ARTIFACT_BUCKET GitHub variable is required to publish mobile-web artifacts"
+            exit 1
+          fi
+          gcloud config set project "${GCP_PROJECT_ID}"
+          VERSIONED_URI="gs://${GCP_FRONTEND_ARTIFACT_BUCKET}/prod/mobile-web-build-${GITHUB_SHA}.tgz"
+          LATEST_URI="gs://${GCP_FRONTEND_ARTIFACT_BUCKET}/prod/mobile-web-build-latest.tgz"
+          gcloud storage cp "${RUNNER_TEMP}/mobile-web-build-${GITHUB_SHA}.tgz" "${VERSIONED_URI}"
+          gcloud storage cp "${RUNNER_TEMP}/mobile-web-build-${GITHUB_SHA}.tgz" "${LATEST_URI}"
+
+      - name: Publish Expo Web assets into site bucket
+        if: ${{ vars.GCP_FRONTEND_SITE_BUCKET != '' }}
+        working-directory: astroroshni_mobile
+        shell: bash
+        env:
+          GCP_FRONTEND_SITE_BUCKET: ${{ vars.GCP_FRONTEND_SITE_BUCKET }}
+        run: |
+          set -euo pipefail
+          gcloud config set project "${GCP_PROJECT_ID}"
+          bash scripts/publish-web-to-gcs.sh "${GCP_FRONTEND_SITE_BUCKET}" dist-web
+
   finalize_app_deploy:
     if: ${{ always() && (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') }}
     needs:
@@ -702,6 +781,7 @@ jobs:
       - payment_service
       - nudge_services
       - frontend
+      - mobile_web
     runs-on: ubuntu-latest
     steps:
       - name: Final public site health check
@@ -710,6 +790,8 @@ jobs:
           set -euo pipefail
           curl -fsS --max-time 20 "https://astroroshni.com/api/health" >/dev/null
           curl -fsS --max-time 20 "https://astroroshni.com/" >/dev/null
+          # Expo shell artifact should exist after mobile_web deploys (ignore if not yet cut over)
+          curl -fsS --max-time 20 -o /dev/null -w "%{http_code}\n" "https://astroroshni.com/expo-index.html" || true
 
   replace_vms:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'replace_vms' }}

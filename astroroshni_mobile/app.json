@@ -135,7 +135,17 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "name": "AstroRoshni",
+      "shortName": "AstroRoshni",
+      "lang": "en",
+      "themeColor": "#f97316",
+      "backgroundColor": "#1a0033",
+      "display": "standalone",
+      "orientation": "portrait",
+      "description": "AstroRoshni — Vedic astrology chat, charts, and timing tools"
     },
     "extra": {
       "eas": {

@@ -54,10 +54,21 @@ export const PAYMENT_SERVICE_BASE_URL = 'https://astroroshni-play-payment-servic
 const getApiUrl = () => {
   if (ENV_API_BASE_URL) return ENV_API_BASE_URL;
 
+  // Same-origin when the Expo Web shell is served from astroroshni.com
+  if (
+    Platform.OS === 'web' &&
+    typeof window !== 'undefined' &&
+    window.location?.origin &&
+    /astroroshni\.com$/i.test(window.location.hostname)
+  ) {
+    return window.location.origin;
+  }
+
   if (__DEV__ && USE_DEV_API) {
     if (DEV_API_HOST) return DEV_API_HOST;
     if (Platform.OS === 'ios') return 'http://localhost:8001';
     if (Platform.OS === 'android') return 'http://10.0.2.2:8001';
+    if (Platform.OS === 'web') return 'http://localhost:8001';
   }
 
   // Uncomment exactly one of these for non-dev builds / manual switching:

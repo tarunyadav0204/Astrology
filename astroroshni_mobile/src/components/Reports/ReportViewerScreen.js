@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { WebView } from 'react-native-webview';
+import WebView from '../../platform/AppWebView';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';

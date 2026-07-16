@@ -88,7 +88,14 @@ import { trackGA4EventOnly } from './src/utils/analytics';
 
 const Stack = createStackNavigator();
 const linking = {
-  prefixes: ['https://astroroshni.com', 'https://www.astroroshni.com', 'astroroshni://'],
+  prefixes: [
+    'https://astroroshni.com',
+    'https://www.astroroshni.com',
+    'astroroshni://',
+    ...(typeof window !== 'undefined' && window.location?.origin
+      ? [window.location.origin]
+      : []),
+  ],
   config: {
     screens: {
       Home: '',
@@ -113,6 +120,10 @@ const linking = {
   },
   getStateFromPath(path, options) {
     const normalizedPath = `/${String(path || '').split('?')[0].replace(/^\/+|\/+$/g, '')}`;
+    // Let App bootstrap choose Welcome vs Home for the site root.
+    if (normalizedPath === '/') {
+      return undefined;
+    }
     const pathAliases = {
       '/panchang': '/muhurat',
       '/monthly-panchang': '/muhurat',
@@ -223,7 +234,7 @@ export default function App() {
     }
   };
 
-  const SPLASH_MIN_MS = 3000;
+  const SPLASH_MIN_MS = Platform.OS === 'web' ? 800 : 3000;
 
   const checkForceUpdate = async () => {
     let timeoutId = null;
@@ -296,8 +307,15 @@ export default function App() {
       }
 
       try {
-        const { sendAcquisitionFirstOpenOnce } = require('./src/services/acquisitionTracking');
-        await sendAcquisitionFirstOpenOnce().catch(() => {});
+        // Avoid noisy CORS failures when developing Expo Web off astroroshni.com.
+        const sameOriginWeb =
+          Platform.OS !== 'web' ||
+          (typeof window !== 'undefined' &&
+            /astroroshni\.com$/i.test(window.location?.hostname || ''));
+        if (sameOriginWeb) {
+          const { sendAcquisitionFirstOpenOnce } = require('./src/services/acquisitionTracking');
+          await sendAcquisitionFirstOpenOnce().catch(() => {});
+        }
       } catch (_) {
         /* optional */
       }
@@ -457,7 +475,11 @@ export default function App() {
   };
 
   if (isLoading) {
-    return <SplashScreen />;
+    return (
+      <SafeAreaProvider>
+        <SplashScreen />
+      </SafeAreaProvider>
+    );
   }
 
   if (fatalRuntimeError) {

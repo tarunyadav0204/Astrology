@@ -34,6 +34,7 @@ import {
   describeUserChoiceRawProductsForLog,
 } from './androidUserChoiceRazorpay';
 import { getCreditPackMeta } from './creditPackCatalog';
+import { openRazorpayCheckout } from '../platform/payments';
 
 const { width } = Dimensions.get('window');
 const PENDING_GOOGLE_PLAY_CREDIT_PURCHASES_KEY = 'pendingGooglePlayCreditPurchasesV1';
@@ -321,6 +322,10 @@ const CreditScreen = ({ navigation }) => {
   const [refreshSubscriptionStatusLoading, setRefreshSubscriptionStatusLoading] = useState(false);
   const [purchaseModal, setPurchaseModal] = useState({ visible: false, type: 'success', title: '', message: '', creditsAdded: 0 });
   const [showPackRelaunchBanner, setShowPackRelaunchBanner] = useState(false);
+  const [razorpayCatalog, setRazorpayCatalog] = useState(null);
+  const [razorpayCatalogLoading, setRazorpayCatalogLoading] = useState(false);
+  const [razorpayCatalogError, setRazorpayCatalogError] = useState('');
+  const [purchasingRazorpayCredits, setPurchasingRazorpayCredits] = useState(null);
   const purchaseListenerRef = useRef(null);
   const iapCallbacksRef = useRef({});
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -366,6 +371,21 @@ const CreditScreen = ({ navigation }) => {
       console.warn('Failed to load subscription plans:', e?.message);
     } finally {
       if (!silent) setSubscriptionPlansLoading(false);
+    }
+  };
+
+  const fetchRazorpayCatalog = async ({ silent = false } = {}) => {
+    if (Platform.OS !== 'web') return;
+    if (!silent) setRazorpayCatalogLoading(true);
+    setRazorpayCatalogError('');
+    try {
+      const { data } = await creditAPI.getRazorpayCatalog();
+      setRazorpayCatalog(data || null);
+    } catch (e) {
+      setRazorpayCatalog(null);
+      setRazorpayCatalogError(e?.message || 'Could not load payment options');
+    } finally {
+      if (!silent) setRazorpayCatalogLoading(false);
     }
   };
 
@@ -614,6 +634,12 @@ const CreditScreen = ({ navigation }) => {
     } catch (_) {
       /* optional until User Choice */
     }
+  }, []);
+
+  // Web: load Razorpay INR catalog (same packs as the website Checkout.js flow).
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    fetchRazorpayCatalog();
   }, []);
 
   useEffect(() => {
@@ -1297,6 +1323,9 @@ const CreditScreen = ({ navigation }) => {
         fetchPlans({ silent: true }),
       ]);
     }
+    if (Platform.OS === 'web') {
+      await fetchRazorpayCatalog({ silent: true });
+    }
     if (Platform.OS === 'android' && iapReady && productIds.length > 0 && RNIap) {
       await syncOneTimePurchasesWithPlay();
     }
@@ -1307,6 +1336,52 @@ const CreditScreen = ({ navigation }) => {
     }
     await fetchSubscriptionDetails();
     setRefreshing(false);
+  };
+
+  const handleBuyRazorpayPack = async (pack) => {
+    if (Platform.OS !== 'web') return;
+    const creditsAmount = Number(pack?.credits);
+    if (!Number.isFinite(creditsAmount) || creditsAmount <= 0) return;
+    setPurchasingRazorpayCredits(creditsAmount);
+    try {
+      const { data: orderData } = await creditAPI.createRazorpayOrder(creditsAmount);
+      const verifyPayload = await openRazorpayCheckout({
+        orderData,
+        description: pack?.name || `${creditsAmount} credits`,
+        themeColor: colors.primary || '#f97316',
+        onDismiss: () => setPurchasingRazorpayCredits(null),
+        verifyPayment: async (payment) => {
+          const { data } = await creditAPI.verifyRazorpayPayment(payment);
+          return data;
+        },
+      });
+      const added = Number(verifyPayload?.credits_added) || 0;
+      setPurchaseModal({
+        visible: true,
+        type: 'success',
+        title: t('credits.page.purchaseSuccessTitle', { defaultValue: 'Purchase successful' }),
+        message:
+          added > 0
+            ? t('credits.page.purchaseCreditsAddedSuffix', {
+                count: added,
+                defaultValue: `Added ${added} credits`,
+              })
+            : verifyPayload?.message || t('credits.page.purchaseCreditsAddedDefault', { defaultValue: 'Your balance is up to date.' }),
+        creditsAdded: added,
+      });
+      await fetchBalance();
+      await fetchHistory();
+    } catch (e) {
+      if (e?.code === 'USER_CANCELLED') {
+        return;
+      }
+      Alert.alert(
+        t('credits.page.purchaseFailed', { defaultValue: 'Purchase failed' }),
+        e?.message || t('credits.page.couldNotStartPurchase', { defaultValue: 'Could not start payment' })
+      );
+    } finally {
+      setPurchasingRazorpayCredits(null);
+    }
   };
 
   const handleBuyCreditsPress = async (product) => {
@@ -1675,6 +1750,105 @@ const CreditScreen = ({ navigation }) => {
                       })}
                     </View>
                   </>
+                )}
+              </View>
+            )}
+
+            {/* Buy credits (Razorpay Checkout.js) — Expo Web / mobile browsers */}
+            {Platform.OS === 'web' && (
+              <View style={styles.buySection}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  {t('credits.page.chooseYourPackWithTara')}
+                </Text>
+                <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary, marginBottom: 12 }]}>
+                  Secure checkout (UPI, cards, netbanking) — same packs as the website.
+                </Text>
+                {razorpayCatalogLoading ? (
+                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>
+                    {t('credits.page.loadingProducts')}
+                  </Text>
+                ) : razorpayCatalogError ? (
+                  <Text style={[styles.buyProductPlaceholder, { color: colors.error || '#dc2626' }]}>
+                    {razorpayCatalogError}
+                  </Text>
+                ) : !(razorpayCatalog?.packs?.length) ? (
+                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>
+                    {t('credits.page.noProducts')}
+                  </Text>
+                ) : (
+                  <View style={styles.buyProductStack}>
+                    {razorpayCatalog.packs.map((pack) => {
+                      const meta = getCreditPackMeta(pack.credits);
+                      const packName = pack.name || meta.name || `${pack.credits} Credits`;
+                      const badge = pack.badge || meta.badge;
+                      const questions = pack.questions ?? meta.questions;
+                      const packBonusCredits =
+                        Number(pack.pack_bonus_credits ?? meta.bonusCredits) || 0;
+                      const totalCredits =
+                        Number(pack.total_credits) || pack.credits + packBonusCredits;
+                      const isPopular = Boolean(badge);
+                      return (
+                        <TouchableOpacity
+                          key={`rzp-${pack.credits}`}
+                          style={[
+                            styles.creditPackCardWide,
+                            {
+                              backgroundColor: promoCardBg,
+                              borderColor: isPopular ? colors.primary : colors.cardBorder,
+                              borderWidth: isPopular ? 2 : 1,
+                            },
+                          ]}
+                          onPress={() => handleBuyRazorpayPack(pack)}
+                          disabled={purchasingRazorpayCredits !== null}
+                        >
+                          <View style={styles.creditPackWideTop}>
+                            <View style={{ flex: 1 }}>
+                              <View style={styles.creditPackNameRow}>
+                                <Text style={[styles.creditPackName, { color: colors.text }]}>
+                                  {packName}
+                                </Text>
+                                {badge ? (
+                                  <View style={[styles.creditPackBadge, { backgroundColor: colors.primary }]}>
+                                    <Text style={styles.creditPackBadgeText}>{badge}</Text>
+                                  </View>
+                                ) : null}
+                              </View>
+                              {pack.amount_display ? (
+                                <Text style={[styles.creditPackPricePrimary, { color: colors.text }]}>
+                                  {pack.amount_display}
+                                </Text>
+                              ) : null}
+                              <Text style={[styles.creditPackCreditsSecondary, { color: colors.textSecondary }]}>
+                                {t('credits.page.creditsCountTitle', { count: totalCredits })}
+                              </Text>
+                              {questions != null ? (
+                                <Text style={[styles.creditPackQuestions, { color: colors.text }]}>
+                                  {pack.credits >= 999
+                                    ? t('credits.page.questionsWithTara', { count: questions })
+                                    : t('credits.page.questionsCount', { count: questions })}
+                                </Text>
+                              ) : null}
+                              {packBonusCredits > 0 ? (
+                                <Text style={[styles.creditPackBonus, { color: colors.primary }]}>
+                                  {t('credits.page.packBonusLine', {
+                                    base: pack.credits,
+                                    bonus: packBonusCredits,
+                                  })}
+                                </Text>
+                              ) : null}
+                            </View>
+                            <View style={[styles.creditPackButton, { backgroundColor: colors.primary }]}>
+                              <Text style={styles.creditPackButtonText}>
+                                {purchasingRazorpayCredits === pack.credits
+                                  ? t('credits.page.processing')
+                                  : t('credits.page.buy')}
+                              </Text>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 )}
               </View>
             )}

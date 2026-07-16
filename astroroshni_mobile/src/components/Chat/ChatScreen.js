@@ -1091,6 +1091,9 @@ export default function ChatScreen({ navigation, route }) {
     return restoreChatModeFromMessages(messageList);
   };
 
+  // Partnership mode state (declared before effects that read partnershipMode)
+  const [partnershipMode, setPartnershipMode] = useState(false);
+
   useEffect(() => {
     if (partnershipMode || isMundane || !birthData || !chatModeHydratedRef.current) return;
     const modeKey = getSelectedChatModeKey();
@@ -1108,8 +1111,7 @@ export default function ChatScreen({ navigation, route }) {
   // Calibration state
   const [calibrationEvent, setCalibrationEvent] = useState(null);
   
-  // Partnership mode state
-  const [partnershipMode, setPartnershipMode] = useState(false);
+  // Partnership mode step state
   const [partnershipStep, setPartnershipStep] = useState(0); // 0: select first, 1: select second, 2: describe relation, 3: done
   const [partnershipSubStep, setPartnershipSubStep] = useState(0);
   const [partnershipRelation, setPartnershipRelation] = useState('');

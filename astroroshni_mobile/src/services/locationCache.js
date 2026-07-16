@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import majorCities from '../../assets/data/major_cities.json';
+import majorCities from '../data/majorCities';
 
 const CACHE_KEY = 'location_search_cache';
 const CACHE_EXPIRY_DAYS = 30;

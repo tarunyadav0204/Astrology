@@ -15,7 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
+import WebView from '../../platform/AppWebView';
 import { useTranslation } from 'react-i18next';
 import { blogAPI } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
