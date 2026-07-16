@@ -87,6 +87,17 @@ Without the edge router, `/mobile/` and `/mobile/index.html` still work from the
    - `https://astroroshni.com/mobile/` → Expo shell (`data-ar-shell="expo-web"` in HTML)
 4. (Optional) Deploy / re-point UA edge router so `/mobile/credits` etc. SPA-fallback correctly.
 
+## Add to Home Screen / PWA
+
+| Platform | How users save it | What we ship |
+|----------|-------------------|--------------|
+| **iOS Safari** | Share → **Add to Home Screen** (no one-tap API) | `apple-mobile-web-app-*` meta, `apple-touch-icon`, in-app guide modal |
+| **Android Chrome** | Browser **Install app** / our Install button when `beforeinstallprompt` fires | Web manifest (192/512 icons, `display: standalone`, `start_url`/`scope` `/mobile/`) + minimal `/mobile/sw.js` |
+
+Both open full-screen from the home icon. CRA on `/` is unchanged. Play/native builds never load this UI.
+
+**Test after deploy:** open `https://astroroshni.com/mobile/` on a real phone (HTTPS required for Chrome install).
+
 ## Platform shims
 
 Native-only modules are stubbed on web via Metro (`astroroshni_mobile/metro.config.js`) and `.web.js` files:

@@ -314,6 +314,9 @@ export default function HomeScreen({
 }) {
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
+  // iOS native: keep a tight fixed inset. Web/Android: use real home-indicator inset so the
+  // tab bar background can extend edge-to-edge without a dead strip under the bar.
+  const tabSafeBottom = Platform.OS === 'ios' ? 10 : Math.max(0, insets.bottom || 0);
   useAnalytics('HomeScreen');
   const { theme, colors, androidLightCardFixStyle } = useTheme();
   const isDark = theme === 'dark';
@@ -2717,13 +2720,13 @@ const loadHomeData = async (nativeData = null) => {
         </Animated.View>
       ) : null}
 
-      {/* Bottom Tabs - reduced bottom padding on iPhone */}
+      {/* Bottom Tabs — bar paints to the physical bottom; icons clear the home indicator via padding. */}
       <View style={[
         styles.bottomTabs,
         {
           bottom: 0,
-          height: (Platform.OS === 'ios' ? 80 : 70) + (Platform.OS === 'ios' ? 10 : insets.bottom),
-          paddingBottom: Platform.OS === 'ios' ? 10 : insets.bottom,
+          height: (Platform.OS === 'ios' ? 80 : 70) + tabSafeBottom,
+          paddingBottom: tabSafeBottom,
         },
       ]}>
         <LinearGradient

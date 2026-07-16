@@ -84,6 +84,7 @@ import { API_BASE_URL, getEndpoint } from './src/utils/constants';
 import { initFacebookAnalytics } from './src/services/facebookAnalytics';
 import { trackNavigationRoute } from './src/services/navigationAnalytics';
 import { trackGA4EventOnly } from './src/utils/analytics';
+import AddToHomeScreenPrompt from './src/platform/AddToHomeScreenPrompt';
 // Push notifications: imported lazily in useEffect to avoid touching native module at launch (reduces iOS device crash risk).
 
 const Stack = createStackNavigator();
@@ -953,6 +954,7 @@ export default function App() {
           />
         </Stack.Navigator>
         <ErrorOverlay />
+        {Platform.OS === 'web' ? <AddToHomeScreenPrompt /> : null}
         </NavigationContainer>
         </ErrorBoundary>
       </CreditProvider>

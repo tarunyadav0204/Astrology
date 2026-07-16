@@ -107,6 +107,18 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
     Animated.spring(chartTranslateX, { toValue: 0, friction: 8, tension: 80, useNativeDriver: true }).start();
   }, [chartTranslateX]);
 
+  // Must be declared before handleSwipe/changeChart — those hooks read it in their dep arrays.
+  const scrollToActiveTab = useCallback((index) => {
+    if (!bottomNavScrollRef.current) return;
+    const pillWidth = 100;
+    const maxIndex = Math.max(0, chartTypes.length - 1);
+    const safeIndex = Math.max(0, Math.min(index, maxIndex));
+    const x = Math.max(0, safeIndex * pillWidth - (width / 2) + (pillWidth / 2));
+    try {
+      bottomNavScrollRef.current.scrollTo({ x, animated: true });
+    } catch (_) {}
+  }, [chartTypes.length]);
+
   useEffect(() => {
     let cancelled = false;
     const loadGuideVideoUrl = async () => {
@@ -210,18 +222,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
     // Simplified for performance
     setCurrentChartIndex(newIndex);
     scrollToActiveTab(newIndex);
-  }, [currentChartIndex]);
-
-  const scrollToActiveTab = useCallback((index) => {
-    if (!bottomNavScrollRef.current) return;
-    const pillWidth = 100;
-    const maxIndex = Math.max(0, chartTypes.length - 1);
-    const safeIndex = Math.max(0, Math.min(index, maxIndex));
-    const x = Math.max(0, safeIndex * pillWidth - (width / 2) + (pillWidth / 2));
-    try {
-      bottomNavScrollRef.current.scrollTo({ x, animated: true });
-    } catch (_) {}
-  }, [chartTypes.length]);
+  }, [currentChartIndex, scrollToActiveTab]);
   
   const getChartDataForType = useCallback((chartType) => {
     if (!birthData) return null;

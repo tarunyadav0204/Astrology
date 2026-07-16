@@ -21,9 +21,17 @@ TARGET="gs://${BUCKET}"
 
 echo "Publishing Expo Web assets to ${TARGET} (non-destructive)"
 
-# Canonical Expo entry under /mobile/ (phones on / keep CRA)
+# Canonical Expo entry + PWA bits under /mobile/ (phones on / keep CRA)
 gsutil -h "Cache-Control:no-cache" -h "Content-Type:text/html; charset=utf-8" \
   cp "$DIST/expo-index.html" "${TARGET}/mobile/index.html"
+if [[ -f "$DIST/mobile/sw.js" ]]; then
+  gsutil -h "Cache-Control:no-cache" -h "Content-Type:application/javascript; charset=utf-8" \
+    cp "$DIST/mobile/sw.js" "${TARGET}/mobile/sw.js"
+fi
+if [[ -f "$DIST/mobile/manifest.webmanifest" ]]; then
+  gsutil -h "Cache-Control:no-cache" -h "Content-Type:application/manifest+json" \
+    cp "$DIST/mobile/manifest.webmanifest" "${TARGET}/mobile/manifest.webmanifest"
+fi
 
 # Keep root copy for debugging / health checks
 gsutil -h "Cache-Control:no-cache" -h "Content-Type:text/html; charset=utf-8" \
