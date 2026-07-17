@@ -681,20 +681,27 @@ If **`intent_result`** omits transits, the agent merges a **default window**: cu
 | `Y` | `{ "sy", "ey" }` resolved year span. |
 | `n` | Count of raw activations before capping. |
 | `A` | Up to **`CONTEXT_AGENT_TRANSIT_MAX`** (default **32**) rows: `tp` transit graha, `np` natal graha, `an` aspect number, `sd`/`ed` ISO dates, `th`/`nh` whole-sign houses, `at` aspect label, optional `pk` (dasha ref peak), optional `sg` (short significance string). |
+| `M` | Compact **`macro_transits_timeline`** for Jupiter/Saturn/Rahu/Ketu: per planet a list of `{ sg, h, sd, ed, rr? }` sign/house occupancy periods overlapping `Y` (±1 year). **Authority for ingress years** — do not invent these from memory. |
 | `d` | Optional Vimshottari anchor: `{ "m": MD lord, "a": AD lord }` from `current_dashas`. |
 | `p` | Optional slim **`period_dasha_activations.dasha_activations`** (≤12 rows, short keys only when present in source). |
 
-**Not included:** `unified_dasha_timeline`, `macro_transits_timeline`, `transit_data_availability` prose, full per-period dasha trees, **ashtakavarga** — use chat context or future agents if needed.
+**Not included:** `unified_dasha_timeline`, full `macro_transits_timeline` blob (use compact `M` instead), `transit_data_availability` prose, full per-period dasha trees, **ashtakavarga** — use chat context or future agents if needed.
 
 ```json
 {
   "a": "transit_win",
-  "v": 2,
+  "v": 4,
   "Y": { "sy": 2026, "ey": 2028 },
   "n": 14,
   "A": [
     { "tp": "Jupiter", "np": "Venus", "an": 5, "sd": "2026-03-01", "ed": "2026-08-20", "th": 4, "nh": 7, "at": "5th_house", "pk": "2026-03-01" }
   ],
+  "M": {
+    "Jupiter": [
+      { "sg": "Cancer", "h": 7, "sd": "2026-06-02", "ed": "2026-10-30" },
+      { "sg": "Cancer", "h": 7, "sd": "2027-01-25", "ed": "2027-06-25", "rr": true }
+    ]
+  },
   "d": { "m": "Saturn", "a": "Mercury" },
   "p": [{ "planet": "Jupiter", "dasha_level": "mahadasha", "probability": "high" }]
 }

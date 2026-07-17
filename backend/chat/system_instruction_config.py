@@ -232,7 +232,7 @@ USER_MEMORY = """
 
 # 9. COMPLIANCE AND VERIFICATION RULES
 COMPLIANCE_RULES = """
-[COMP-1] PD_CHECK: Mention Pratyantardasha lord. [COMP-2] VARGOTTAMA_VERIFY: D1_sign==D9_sign. [COMP-3] ASPECT_VERIFY: Use sign_aspects mapping only. [COMP-4] VARSHPHAL_CHECK: Mention Muntha & Mudda Dasha. [COMP-5] SUBSECTION_HEADERS: Use ####. [COMP-6] PARASHARI_ADAPTIVE: Adapt dasha depth to time period. [COMP-7] PERIOD_PRIORITY: Prioritize period_dasha_activations for short-term. [COMP-8] TRANSIT_REFERENCE: Use transit_activations data.
+[COMP-1] PD_CHECK: Mention Pratyantardasha lord. [COMP-2] VARGOTTAMA_VERIFY: D1_sign==D9_sign. [COMP-3] ASPECT_VERIFY: Use sign_aspects mapping only. [COMP-4] VARSHPHAL_CHECK: Mention Muntha & Mudda Dasha. [COMP-5] SUBSECTION_HEADERS: Use ####. [COMP-6] PARASHARI_ADAPTIVE: Adapt dasha depth to time period. [COMP-7] PERIOD_PRIORITY: Prioritize period_dasha_activations for short-term. [COMP-8] TRANSIT_REFERENCE: Use transit_activations / transit_win.A / px.TR for aspect windows; use macro_transits_timeline / transit_win.M / px.TR.MT / AUTHORITATIVE_SLOW_TRANSITS_JSON for Jupiter/Saturn/Rahu/Ketu sign-entry years and house occupancy dates.
 """
 
 # 9b. DASHA DATES – MATCH TIMEFRAME, THEN USE ONLY PROVIDED DATES
@@ -248,6 +248,20 @@ DASHA_DATES_SOVEREIGNTY = """
    - If start < today, NEVER say "starting [start]", "will start [start]", "transitioning into [period]", "entering [period]", "upcoming", or "आगामी" for that period.
    - Use "upcoming", "will start", "transitioning into", or "entering" ONLY when the start date is after today.
    - If end < today, say "past/completed" and never use it as a future trigger.
+"""
+
+# 9c. SLOW-PLANET TRANSIT INGRESS DATES – NEVER ESTIMATE FROM MEMORY
+TRANSIT_DATES_SOVEREIGNTY = """
+[TRANSIT-DATES] CRITICAL – Slow-planet sign/house changes are ephemeris-sovereign:
+1) For Jupiter, Saturn, Rahu, or Ketu entering a zodiac sign or natal house, cite ONLY dates from:
+   macro_transits_timeline, transit_win.M, px.TR.MT, or AUTHORITATIVE_SLOW_TRANSITS_JSON
+   (fields: sg/sign, h/house, sd/start_date, ed/end_date; rr=true means retrograde return).
+2) NEVER invent or estimate ingress years from memory, training data, or "typical" 12-year Jupiter cycles.
+   If the required planet/sign row is missing, say the exact ingress date is unavailable — do not guess a year.
+3) transit_activations / px.TR.dp are aspect-activation windows, NOT sign-ingress tables. Do not derive
+   "Jupiter enters Cancer in YEAR" from an aspect row alone.
+4) When both a forward ingress and a retrograde_return (rr) segment exist for the same sign, state both
+   with their provided dates; do not collapse them into a wrong single year.
 """
 
 # 11. HOUSE SIGNIFICATIONS REFERENCE
@@ -644,7 +658,7 @@ def build_system_instruction(analysis_type=None, intent_category=None, include_a
         instruction += "\n" + CHART_ANALYSIS_STRUCTURE
 
     # Always add citations, memory, compliance, and data rules
-    instruction += "\n" + CLASSICAL_CITATIONS + "\n" + USER_MEMORY + "\n" + COMPLIANCE_RULES + "\n" + DASHA_DATES_SOVEREIGNTY + "\n" + HOUSE_SIGNIFICATIONS + "\n" + BHAVAM_BHAVESH_RULES + "\n" + DATA_SOVEREIGNTY + "\n" + PERSONAL_CONSULTATION_RULES + "\n" + HOLISTIC_SYNTHESIS_RULE
+    instruction += "\n" + CLASSICAL_CITATIONS + "\n" + USER_MEMORY + "\n" + COMPLIANCE_RULES + "\n" + DASHA_DATES_SOVEREIGNTY + "\n" + TRANSIT_DATES_SOVEREIGNTY + "\n" + HOUSE_SIGNIFICATIONS + "\n" + BHAVAM_BHAVESH_RULES + "\n" + DATA_SOVEREIGNTY + "\n" + PERSONAL_CONSULTATION_RULES + "\n" + HOLISTIC_SYNTHESIS_RULE
     
     return instruction
 

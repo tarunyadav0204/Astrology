@@ -274,13 +274,21 @@ def compact_generation_context(full_context: Dict[str, Any], *, max_chars: int =
     for heavy in (
         "unified_dasha_timeline",
         "period_dasha_activations",
-        "macro_transits_timeline",
         "transit_activations",
         "yogas",
         "advanced_analysis",
         "d1_chart",  # already in shared_kernel
     ):
         parashari.pop(heavy, None)
+    # Keep a capped slow-planet ingress table so QA can grade transit-year fidelity.
+    from context_agents.macro_transits_compact import compact_macro_transits_timeline
+
+    macro_src = parashari.pop("macro_transits_timeline", None)
+    if macro_src is None and isinstance(full_context, dict):
+        macro_src = full_context.get("macro_transits_timeline")
+    compact_macro = compact_macro_transits_timeline(macro_src)
+    if compact_macro:
+        parashari["macro_transits_timeline"] = compact_macro
     if isinstance(parashari.get("divisional_charts"), dict):
         # Keep topic divisionals but cap each.
         capped_divs = {}

@@ -48,12 +48,16 @@ def test_transit_win_shape(context_agent_cached):
         ),
     )
     assert out["a"] == "transit_win"
-    assert out["v"] == 3
+    assert out["v"] == 4
     assert set(out.keys()) >= {"a", "v", "sc", "Y", "n", "A"}
     assert out["Y"]["sy"] == cy
     assert out["Y"]["ey"] == cy
     assert isinstance(out["n"], int)
     assert isinstance(out["A"], list)
+    # Macro ingress table is required when dynamic has macro_transits_timeline
+    if dynamic.get("macro_transits_timeline"):
+        assert isinstance(out.get("M"), dict)
+        assert out["M"]
     for row in out["A"][:3]:
         assert "tp" in row and "np" in row and "sd" in row and "ed" in row
         assert "all_aspects_cast" not in row

@@ -7,8 +7,10 @@ Uses the same pipeline as chat: `ChatContextBuilder` static cache +
 
 Strips heavy fields (`all_aspects_cast`, `comprehensive_dashas`, long nested
 blobs) from each activation; omits `ashtakavarga_filter` (deliver AV via a
-separate agent). Does not modify the intent router — callers pass
-`AgentContext.intent_result` (or rely on the built-in default window).
+separate agent). Also emits compact `M` from `macro_transits_timeline`
+(Jupiter/Saturn/Rahu/Ketu sign ingress dates). Does not modify the intent
+router — callers pass `AgentContext.intent_result` (or rely on the built-in
+default window).
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from typing import Any, Dict, List, Optional
 
 from chat.chat_context_builder import ChatContextBuilder
 from context_agents.base import AgentContext, ContextAgent
+from context_agents.macro_transits_compact import compact_macro_transits_timeline
 from context_agents.scope import effective_time_scope, intent_for_transit_build
 
 _MAX_ACTIVATIONS = int(os.environ.get("CONTEXT_AGENT_TRANSIT_MAX", "32"))
@@ -81,7 +84,7 @@ def _vim_anchor(cd: Any) -> Optional[Dict[str, str]]:
 
 class TransitWinAgent(ContextAgent):
     agent_id = "transit_win"
-    schema_version = 3
+    schema_version = 4
 
     def build(self, ctx: AgentContext) -> Dict[str, Any]:
         birth = ctx.birth_data or {}
@@ -123,6 +126,16 @@ class TransitWinAgent(ContextAgent):
             "n": len(raw_acts) if isinstance(raw_acts, list) else 0,
             "A": acts,
         }
+
+        # Slow-planet sign ingress table (ephemeris authority for "Jupiter enters Cancer").
+        # Expand the filter window by 1 year on each side so boundary ingresses are visible.
+        macro = compact_macro_transits_timeline(
+            dynamic.get("macro_transits_timeline"),
+            start_year=sy - 1,
+            end_year=ey + 1,
+        )
+        if macro:
+            out["M"] = macro
 
         anchor = _vim_anchor(dynamic.get("current_dashas"))
         if anchor:

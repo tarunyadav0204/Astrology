@@ -850,6 +850,10 @@ def _transit_summary(target_houses: List[int], levels: Dict[str, Dict[str, Any]]
         out["dp"] = dp[:10]
     if isinstance(transit_win.get("p"), list) and transit_win.get("p"):
         out["pd"] = list(transit_win["p"][:8])
+    # Authoritative Ju/Sa/Ra/Ke sign-change rows from transit_win.M (macro timeline).
+    macro = transit_win.get("M")
+    if isinstance(macro, dict) and macro:
+        out["MT"] = macro
     return out
 
 

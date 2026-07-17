@@ -1084,9 +1084,19 @@ async def run_parallel_chat_pipeline(
                 "classical_rule_matches": copy.deepcopy(classical_rule_matches) if isinstance(classical_rule_matches, dict) else None,
             },
         }
+        slow_transits_block = ""
+        if free_question_parashari_only and not remedy_followup_requested:
+            from context_agents.macro_transits_compact import authoritative_slow_transits_packet
+
+            slow_packet = authoritative_slow_transits_packet(ctx if isinstance(ctx, dict) else {})
+            if slow_packet.get("planets"):
+                slow_transits_block = (
+                    f"AUTHORITATIVE_SLOW_TRANSITS_JSON:\n{_json_compact(slow_packet)}\n\n"
+                )
         final_user = (
             f"{time_context}\n\n"
             f"{hist_text}"
+            f"{slow_transits_block}"
             f"SPECIALIST_BRANCH_OUTPUTS_JSON:\n{_json_compact(parashari_branch_bundle)}\n"
             f"CURRENT QUESTION: {user_question}\n"
             f"{final_check}\n{FAQ_META_INSTRUCTION.strip()}"

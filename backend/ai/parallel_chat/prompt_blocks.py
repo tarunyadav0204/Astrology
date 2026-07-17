@@ -36,6 +36,7 @@ from chat.system_instruction_config import (
     PERSONAL_CONSULTATION_RULES,
     SUDARSHANA_LOGIC,
     SYNTHESIS_RULES,
+    TRANSIT_DATES_SOVEREIGNTY,
     USER_MEMORY,
     WEALTH_SUTRAS,
     death_ethics_block,
@@ -165,6 +166,7 @@ def build_parashari_branch_static(intent_category: str, death_analysis_unlocked:
         USER_MEMORY,
         COMPLIANCE_RULES,
         DASHA_DATES_SOVEREIGNTY,
+        TRANSIT_DATES_SOVEREIGNTY,
         HOUSE_SIGNIFICATIONS,
         BHAVAM_BHAVESH_RULES,
         CLASSICAL_RULE_MATCH_INSTRUCTION,
@@ -203,6 +205,7 @@ def build_parashari_final_answer_static(intent_category: str, death_analysis_unl
         USER_MEMORY,
         COMPLIANCE_RULES,
         DASHA_DATES_SOVEREIGNTY,
+        TRANSIT_DATES_SOVEREIGNTY,
         HOUSE_SIGNIFICATIONS,
         BHAVAM_BHAVESH_RULES,
         CLASSICAL_RULE_MATCH_INSTRUCTION,
@@ -258,8 +261,14 @@ Use this exact structure for the final user-facing answer:
 def free_question_elaborate_instruction() -> str:
     return """
 CRITICAL - FREE QUESTION DEPTH (PARASHARI-ONLY):
-Write a complete Parashari answer using only evidence in SPECIALIST_BRANCH_OUTPUTS_JSON.
+Write a complete Parashari answer using only evidence in SPECIALIST_BRANCH_OUTPUTS_JSON
+and AUTHORITATIVE_SLOW_TRANSITS_JSON when present.
 Do NOT invent KP, Nadi, Jaimini, Nakshatra-branch, Ashtakavarga, or Sudarshana sections or claims.
+For Jupiter/Saturn/Rahu/Ketu sign or house changes, cite ONLY dates from AUTHORITATIVE_SLOW_TRANSITS_JSON
+(or transit_win.M / px.TR.MT inside the branch payload). Never estimate ingress years from memory.
+For major relationship outcomes, require confluence of Mahadasha/Antardasha support plus matching
+slow-planet transits; do not promise reconciliation from a favorable Pratyantardasha alone when MD/AD
+lords are obstructive (e.g. 6th/8th/12th).
 Follow the Parashari-only response format below. Prefer clarity over multi-school synthesis.
 """
 
@@ -470,6 +479,7 @@ def build_parashari_branch_static_agent(intent_category: str, death_analysis_unl
         USER_MEMORY,
         COMPLIANCE_RULES,
         DASHA_DATES_SOVEREIGNTY,
+        TRANSIT_DATES_SOVEREIGNTY,
         HOUSE_SIGNIFICATIONS,
         BHAVAM_BHAVESH_RULES,
         CLASSICAL_RULE_MATCH_INSTRUCTION,
@@ -493,6 +503,7 @@ def build_parashari_branch_static_agent(intent_category: str, death_analysis_unl
         "Use `px.dx` whenever divisional charts are relevant: `px.dx.rf` = D1-vs-D9 root/fruit confirmation for relevant lords/karakas; `px.dx.topic.charts` = topic-specific divisional house rows with lord placement, occupants, and support band; `px.dx.current` = whether current MD/AD/PD lords are actually linking into those divisional houses right now; `px.dx.career` / `relationship` / `education` / `health` = ready divisional support blocks. If a required divisional chart is missing, say that explicitly from `px.dx.*.avail` instead of implying certainty.",
         "For current or predictive questions, do not stop at static divisional promise. Also cite `px.dx.current.topic` or the relevant `px.dx.current.<life_area>` block to say whether the active periods are presently activating that divisional chart or not.",
         "Use `px.TR` as a compact transit filter: near-term answers should say whether transit hits are landing on the topic houses directly (`th`/`nh`) and whether active dasha planets are involved (`dp`).",
+        "For Jupiter/Saturn/Rahu/Ketu **sign or house entry years**, use `transit_win.M` and/or `px.TR.MT` only (`sg`/`h`/`sd`/`ed`, optional `rr`). Never invent those ingress years from memory.",
         "For marriage/spouse questions, explicitly separate **Promise -> Timing -> Manifestation -> Continuity**. Use `px.relationship` first: `mat` = materialization pressure, `fr` = friction pressure, `ct` = continuity emphasis, `mode` = supportive/mixed/obstructed, `dom` = dominant houses. Then refine with `px.hs`, `px.HI`, and raw graha detail. Do not equate generic relationship activation with legal or durable marriage.",
         "For career/profession/field questions, explicitly separate **Aptitude -> Field Selection -> Work Function -> Status/Visibility -> Timing of Entry/Change**. Use `px.career` first: `mode` = service/business/hybrid tendency, `work` = house-pattern scores, `fn` = ranked function tags, `vis` = visibility level, `dom` = dominant houses. Then refine with `px.hs`, `px.HI`, and raw graha detail. Rank the likely field signatures instead of listing many unrelated jobs equally.",
         health_prompt_line,
