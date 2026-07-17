@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, Easing, Platform } from 'react-native';
 import Svg, { Rect, Text as SvgText, G, Line, ClipPath, Defs } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -198,7 +198,13 @@ const SouthIndianChart = ({
 
   return (
     <View style={styles.container}>
-      <Svg viewBox="0 0 340 340" style={styles.svg}>
+      <Svg
+        viewBox="0 0 340 340"
+        width="100%"
+        height="100%"
+        preserveAspectRatio="xMidYMid meet"
+        style={styles.svg}
+      >
         <Defs>
           <ClipPath id="southChartClip">
             <Rect 
@@ -416,7 +422,11 @@ const SouthIndianChart = ({
         </TouchableOpacity>
       </Modal>
       
-      <Text style={[styles.instructionText, cosmicTheme && styles.instructionTextCosmic]}>
+      <Text style={[
+        styles.instructionText,
+        cosmicTheme && styles.instructionTextCosmic,
+        Platform.OS === 'web' && styles.instructionTextWeb,
+      ]}>
         Touch any sign to make it ascendant
       </Text>
     </View>
@@ -424,15 +434,37 @@ const SouthIndianChart = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    width: '100%',
-    aspectRatio: 1,
-  },
-  svg: {
-    width: '100%',
-    height: '100%',
-    aspectRatio: 1,
+  container: Platform.select({
+    web: {
+      width: '100%',
+      height: '100%',
+      alignSelf: 'stretch',
+      position: 'relative',
+    },
+    default: {
+      flex: 1,
+      width: '100%',
+      aspectRatio: 1,
+    },
+  }),
+  svg: Platform.select({
+    web: {
+      width: '100%',
+      height: '100%',
+      display: 'block',
+    },
+    default: {
+      width: '100%',
+      height: '100%',
+      aspectRatio: 1,
+    },
+  }),
+  instructionTextWeb: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 8,
+    marginTop: 0,
   },
   modalOverlay: {
     flex: 1,

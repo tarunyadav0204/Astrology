@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Animated, Easing } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Animated, Easing, Platform } from 'react-native';
 import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Stop, Circle, Path, ClipPath } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
@@ -260,7 +260,13 @@ const NorthIndianChart = ({
 
   return (
     <View style={styles.container}>
-      <Svg viewBox="0 0 400 400" style={styles.svg}>
+      <Svg
+        viewBox="0 0 400 400"
+        width="100%"
+        height="100%"
+        preserveAspectRatio="xMidYMid meet"
+        style={styles.svg}
+      >
         <Defs>
           <ClipPath id="chartClip">
             <Rect 
@@ -559,7 +565,11 @@ const NorthIndianChart = ({
       )}
       
       {!hideInstructions && (
-        <Text style={[styles.instructionText, { color: theme === 'dark' ? (cosmicTheme ? 'rgba(255, 255, 255, 0.7)' : '#666') : (cosmicTheme ? 'rgba(0, 0, 0, 0.6)' : '#666') }]}>
+        <Text style={[
+          styles.instructionText,
+          Platform.OS === 'web' && styles.instructionTextWeb,
+          { color: theme === 'dark' ? (cosmicTheme ? 'rgba(255, 255, 255, 0.7)' : '#666') : (cosmicTheme ? 'rgba(0, 0, 0, 0.6)' : '#666') },
+        ]}>
           Touch any house for deep insights
         </Text>
       )}
@@ -568,11 +578,18 @@ const NorthIndianChart = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, width: '100%', aspectRatio: 1 },
-  svg: { width: '100%', height: '100%', aspectRatio: 1 },
+  container: Platform.select({
+    web: { width: '100%', height: '100%', alignSelf: 'stretch', position: 'relative' },
+    default: { flex: 1, width: '100%', aspectRatio: 1 },
+  }),
+  svg: Platform.select({
+    web: { width: '100%', height: '100%', display: 'block' },
+    default: { width: '100%', height: '100%', aspectRatio: 1 },
+  }),
   tooltip: { position: 'absolute', top: 20, left: 20, right: 20, padding: 12, borderRadius: 12, alignItems: 'center', zIndex: 100 },
   tooltipText: { color: 'white', fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
   instructionText: { textAlign: 'center', fontSize: 12, fontStyle: 'italic', marginTop: 12, marginBottom: 18 },
+  instructionTextWeb: { position: 'absolute', left: 0, right: 0, bottom: 8, marginTop: 0, marginBottom: 0 },
 });
 
 export default NorthIndianChart;

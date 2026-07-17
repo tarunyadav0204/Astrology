@@ -1246,9 +1246,43 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 1,
   },
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  actionButton: { width: (width - 52) / 2, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
-  actionGradient: { padding: 12, justifyContent: 'center' },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    ...Platform.select({
+      // PWA/web: percentage widths so 2 columns fit despite padding/gap rounding.
+      // Native keeps the existing fixed-width layout (already correct on device).
+      web: {
+        justifyContent: 'space-between',
+        rowGap: 12,
+      },
+      default: {
+        gap: 12,
+      },
+    }),
+  },
+  actionButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+    ...Platform.select({
+      web: {
+        width: '48%',
+        maxWidth: '48%',
+        flexGrow: 0,
+        flexShrink: 0,
+        boxSizing: 'border-box',
+      },
+      default: {
+        width: (width - 52) / 2,
+      },
+    }),
+  },
+  actionGradient: { padding: 12, borderContent: 'center' },
   actionContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   actionLabel: { color: COLORS.white, fontSize: 13, fontWeight: '600' },
   settingsCard: { borderRadius: 16, padding: 4 },
