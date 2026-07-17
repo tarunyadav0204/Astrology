@@ -701,9 +701,10 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
             style={[
               styles.chartWrapper,
               webIntrinsic,
-              // Keep a square slot on web so %/flex collapse cannot hide the chart.
+              // Web: do not force the whole ChartWidget (toolbar + chart) into a square —
+              // that made floating icons overlap the enlarged chart.
               Platform.OS === 'web'
-                ? { width: '100%', aspectRatio: 1, minHeight: 280 }
+                ? { width: '100%', alignSelf: 'stretch' }
                 : null,
             ]}
           >

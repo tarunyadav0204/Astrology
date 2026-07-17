@@ -449,6 +449,53 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           <TouchableOpacity onPress={handleResetRotation} style={styles.resetButton}><Text style={styles.resetButtonText}>Reset</Text></TouchableOpacity>
         </View>
       )}
+
+      {cosmicTheme && isWeb ? (
+        <View style={styles.webToolbar}>
+          <View style={styles.webToolbarLeft}>
+            <TouchableOpacity
+              onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
+              style={[styles.floatingButton, showDegreeNakshatra && styles.floatingButtonActive]}
+            >
+              <Ionicons name={showDegreeNakshatra ? "eye" : "eye-off"} size={18} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={toggleStyle} style={styles.floatingButton}>
+              <Text style={styles.floatingButtonText}>{chartStyle === 'north' ? 'S' : 'N'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation?.navigate('AshtakvargaOracle')}
+              style={styles.floatingButton}
+            >
+              <Ionicons name="grid-outline" size={18} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation?.navigate('KPSystem', { birthDetails: birthData })}
+              style={styles.floatingButton}
+            >
+              <Ionicons name="compass-outline" size={18} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation?.navigate('KotaChakra', { birthChartId: birthData?.id })}
+              style={styles.floatingButton}
+            >
+              <Ionicons name="shield-outline" size={18} color="#fff" />
+            </TouchableOpacity>
+            {onOpenChartGuide ? (
+              <TouchableOpacity
+                onPress={onOpenChartGuide}
+                style={styles.floatingButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('chartScreen.watchGuide', 'Watch guide')}
+              >
+                <Ionicons name="play-circle-outline" size={18} color="#fff" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <TouchableOpacity onPress={() => setShowInfoModal(true)} style={styles.infoButton}>
+            <Ionicons name="information-circle-outline" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      ) : null}
       
       <View
         onLayout={onWebChartLayout}
@@ -466,9 +513,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             : null,
         ]}
       >
-        {cosmicTheme && (
+        {cosmicTheme && !isWeb && (
           <>
-            <View style={[styles.floatingControls, isWeb && styles.floatingControlsWeb, currentChartType === 'transit' && styles.floatingControlsTransit]}>
+            <View style={[styles.floatingControls, currentChartType === 'transit' && styles.floatingControlsTransit]}>
               <TouchableOpacity
                 onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
                 style={[styles.floatingButton, showDegreeNakshatra && styles.floatingButtonActive]}
@@ -507,7 +554,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 </TouchableOpacity>
               ) : null}
             </View>
-            <View style={[styles.infoButtonContainer, isWeb && styles.infoButtonContainerWeb]}>
+            <View style={styles.infoButtonContainer}>
               <TouchableOpacity onPress={() => setShowInfoModal(true)} style={styles.infoButton}>
                 <Ionicons name="information-circle-outline" size={20} color="#fff" />
               </TouchableOpacity>
@@ -705,14 +752,29 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: 16, color: COLORS.textSecondary },
   floatingControls: { position: 'absolute', top: 10, left: 30, flexDirection: 'row', gap: 8, zIndex: 10 },
-  floatingControlsWeb: { left: 8 },
   floatingControlsTransit: { top: 10 },
+  webToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+    zIndex: 2,
+  },
+  webToolbarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    flex: 1,
+    paddingRight: 8,
+  },
   chartContainerTransit: { marginTop: 20 },
   floatingButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
   floatingButtonActive: { backgroundColor: 'rgba(255, 107, 53, 0.8)', borderColor: 'rgba(255, 107, 53, 1)' },
   floatingButtonText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   infoButtonContainer: { position: 'absolute', top: 10, right: 30, zIndex: 10 },
-  infoButtonContainerWeb: { right: 8 },
   infoButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
   quickActionsGrid: { marginTop: 24, paddingHorizontal: 36, gap: 12 },
   quickActionsRow: { flexDirection: 'row', gap: 12 },
