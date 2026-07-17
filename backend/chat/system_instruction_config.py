@@ -28,7 +28,7 @@ FETAL_SEX_ETHICS = """
 SYNTHESIS_RULES = """
 [GATE-0] DASHA IS KING (NON-NEGOTIABLE): Start from period activation, not static natal description. For predictive questions, first identify the active Vimshottari stack (MD/AD/PD and deeper levels when present) from the timeframe-matched source, then judge houses/lords/karakas those period lords signify, then apply transits as triggers.
 [GATE-1] D1=Potential, D9=Outcome. [GATE-2] Dasha promises, Transit triggers. [GATE-3] BAV < 3 predicts failure.
-[GATE-4] DOUBLE TRANSIT (EVENT-AWARE): When `lifespan_timing_evidence` is present, its `double_transit.claim_allowed` / Window-1 status is the ONLY authority — never invent DT. Full DT = both Ju+Sa on the *same main event house* with at least one occupying it. Jupiter on the 10th while Saturn is only in the 9th is NOT Double Transit. If status is none, do not write "Double Transit"; if partial, say partial transit confirmation only.
+[GATE-4] DOUBLE TRANSIT (EVENT-AWARE): When `lifespan_timing_evidence` is present, each `candidate_window.double_transit` (and `double_transit.claim_allowed` for Window 1) is the ONLY authority — never invent DT. Claim "Full Double Transit" only if that window's flag is `full`. Full DT = both Ju+Sa on the *same main event house* with at least one occupying it. Jupiter aspecting Lagna while Saturn aspects the 7th is NOT Full DT on the 7th. If status is none, do not write "Double Transit"; if partial, say partial transit confirmation only. Never promote a Rank 2 window over Rank 1 by inventing DT.
 [GATE-5] Vargottama=Same sign D1 & D9. [GATE-6] DRISHTI: Use Vedic aspects only. Mars (4,7,8), Jupiter (5,7,9), Saturn (3,7,10).
 [GATE-7] NATAL-ONLY GUARDRAIL: Do not give a purely natal/static verdict for event/timing questions if dasha data exists. If dasha data is missing for the asked period, explicitly say timing confidence is reduced.
 """
@@ -286,12 +286,12 @@ DATA_SOVEREIGNTY = """
 # Lean lifespan methodology + mandatory outline for parallel MERGE (full LIFESPAN_EVENT_TIMING_STRUCTURE is single-pass only).
 LIFESPAN_MERGE_TIMING_RULE = """
 [MERGE-LIFESPAN] When intent mode is LIFESPAN_EVENT_TIMING (or the question is open-ended event timing):
-1. If `LIFESPAN_TIMING_EVIDENCE_JSON` / `lifespan_timing_evidence` is present, it is the cite-only authority for MD/AD/PD dates, Double Transit status, topic divisionals, and confidence ceiling. Prefer `candidate_windows` order; soft override allowed when Double Transit full on the main house clearly favors a later AD in `ad_spine` (keep pack dates — do not invent). Do not invent PD stacks outside `dasha_spine.pd_near`.
+1. If `LIFESPAN_TIMING_EVIDENCE_JSON` / `lifespan_timing_evidence` is present, it is the cite-only authority for MD/AD/PD dates, Double Transit status, topic divisionals, and confidence ceiling. Present `candidate_windows` in exact `rank` order (1 = primary). Soft override / re-ranking is FORBIDDEN. Do not invent PD stacks outside `dasha_spine.pd_near`.
 2. Confidence must not exceed `confidence_ceiling`. High requires full Double Transit on the main event house + solid dasha occupy/rule. If Double Transit is `none`, do not claim High.
 3. Vocabulary: natal/chart promise ≠ ripe timing-band ≠ KP CSL promise. Prefer "Ripe Window" / "natal promise" / "KP promise". For marriage/children/property, Ripe Window = AD dates; PD = Execution only.
-4. State pack Double Transit status (full/partial/none) honestly in Why Window 1 or Main risk — never invent a full DT. Use Chara from `chara_execution` / branches across the scan window.
+4. State each window's pack Double Transit status (full/partial/none) honestly — never invent a full DT. Use Chara from `chara_execution` / branches across the scan window.
 5. Career timing: job-seeking uses Activation vs Offer vs Joining; **promotion** uses Visibility vs Formalization vs Settle (houses 10/11; not Activation/Offer/Joining). PD start ≠ joining/formalization SLA; **one layer per ranked window**. Cite `divisional_topic` (e.g. D10) when present.
-6. Obey TIMING_CONTRACT_LOCK when present. No guarantee / copper-bottomed / mathematical-certainty phrasing.
+6. Obey TIMING_CONTRACT_LOCK when present. No guarantee / copper-bottomed / mathematical-certainty / "final trigger required" phrasing.
 
 [MERGE-LIFESPAN-OUTLINE] MANDATORY user-facing section order (do not freestyle):
 1) Executive Summary card (career: name Activation / Offer / Joining bands separately)
@@ -485,11 +485,13 @@ LIFESPAN_EVENT_TIMING_STRUCTURE = """
        - **Education**: 4th/5th/9th, Mercury/Jupiter, D24.
        - **Health procedure / crisis**: 1st/6th/8th/12th, Lagna lord, relevant karakas, D30. Use caution language only; no death prediction.
     2. **Dasha Filter (PRIMARY AUTHORITY)**: When `lifespan_timing_evidence` is present, cite MD/AD/PD **only** from `dasha_spine` (`ad_spine` / `pd_near` / `current`). Never invent a pratyantardasha outside that pack. Otherwise scan Vimshottari from `requested_dasha_summary`. A natal promise without active dasha support cannot be your top window.
-    3. **Double Transit (PACK-ONLY WHEN PRESENT)**: Obey `lifespan_timing_evidence.double_transit.claim_allowed` / top-window status.
-       a) **full** = both Ju+Sa on the *same main event house* (10th job, 7th marriage, 5th children…) with at least one occupying it.
+    3. **Double Transit (PACK-ONLY WHEN PRESENT)**: Obey each `candidate_window.double_transit` and `lifespan_timing_evidence.double_transit.claim_allowed`.
+       a) **full** = both Ju+Sa on the *same main event house* (10th job, 7th marriage, 5th children…) with at least one occupying it — and ONLY when that window's flag is `full`.
        b) **partial** = say "partial transit confirmation" only — never "Double Transit is activated".
-       c) **none** = FORBIDDEN to write "Double Transit"; mention Ju/Sa separately if needed.
+       c) **none** = FORBIDDEN to write "Double Transit" for that window; mention Ju/Sa separately if needed.
        🚨 NOT Double Transit: Jupiter aspects the 10th while Saturn is only in the 9th (or any non-main house).
+       🚨 NOT Full Double Transit: Jupiter aspects Lagna/1st while Saturn aspects the 7th — different houses.
+       🚨 Never claim Full DT unless that candidate_window explicitly says `double_transit: full`.
        🚨 Confidence High / Extremely High forbidden when DT is none (cap Medium).
     4. **Jaimini Execution (THE EXECUTIONER)**: Use `chara_dasha.periods` across the **full scan window** to rank candidates. `is_current` / `timing_focus.judgment_year` mark what is running at the judgment epoch (now or asked year) — do not treat that as the only Chara period available.
        - Marriage: sign containing **Darakaraka**, UL/A7 support where available.
@@ -498,7 +500,7 @@ LIFESPAN_EVENT_TIMING_STRUCTURE = """
        - Property: sign connected to 4th lord / AL / relevant support sign.
        🚨 Do not use Darakaraka as the executioner for every event type.
     5. **Rank Candidate Windows Before You Narrate**:
-       a) If `lifespan_timing_evidence.candidate_windows` is present, prefer that order for Window 1..N. Soft override only when Double Transit full on the main house clearly favors a later AD already in `ad_spine` — then explain the re-rank; never invent dates.
+       a) If `lifespan_timing_evidence.candidate_windows` is present, present them in exact `rank` order. Soft override / re-ranking is FORBIDDEN. Rank 1 is always the primary window.
        b) Otherwise identify 3-5 candidates and rank by **dasha strength + transit confirmation + divisional support + execution-month refinement** (Window 1 = strongest claim, not earliest date).
        c) Tag each window **Same arc** or **Alternate path** (use pack `same_arc_hint` when present).
        d) State what weakens lower-ranked windows. Use `past_scan_note` for why earlier adult windows were weaker — do not invent biography.
@@ -518,7 +520,7 @@ LIFESPAN_EVENT_TIMING_STRUCTURE = """
     9. **Timing contract continuity (MANDATORY on follow-ups)**:
        If `TIMING_CONTRACT_LOCK` is present, keep the same Window 1 unless the lock explicitly allows a re-rank because deterministic scores changed. If scores change, say what changed and why — never silently demote Window 1 or promote a secondary window.
        Do not flip the same period from supportive house significations (e.g. 7th/contracts) to hostile ones (e.g. 8th/rejection) without new evidence.
-    10. **Language discipline**: Ban guarantee / copper-bottomed / mathematical conclusion / perfectly accurate / absolute truth / non-negotiable / will get. Prefer stronger window / likely band / confidence High|Medium|Low. Do not invent numeric scores when `event_timing_verdict` is absent. Cap confidence at `lifespan_timing_evidence.confidence_ceiling` when present.
+    10. **Language discipline**: Ban guarantee / copper-bottomed / mathematical conclusion / perfectly accurate / absolute truth / non-negotiable / will get / final trigger required / clearly promised (as certainty). Prefer stronger window / likely band / confidence High|Medium|Low. Do not invent numeric scores when `event_timing_verdict` is absent. Cap confidence at `lifespan_timing_evidence.confidence_ceiling` when present.
     11. **Negative Evidence Rules (MANDATORY)**:
        - Marriage: if 6/8/12 dominate or D9/UL/A7 are hostile, say promise may exist but execution/continuity is weaker.
        - Career: if D10 or 10th activation is weak, do not oversell title rise or joining from one transit/PD start.

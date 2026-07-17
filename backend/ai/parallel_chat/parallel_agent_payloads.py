@@ -251,6 +251,18 @@ def build_parashari_agent_payload(
         bb = merged_chart_context.get("bhavat_bhavam")
         if isinstance(bb, dict) and bb:
             out["bhavat_bhavam"] = copy.deepcopy(bb)
+        try:
+            from chat.lifespan_timing_evidence import compact_lifespan_timing_evidence_for_prompt
+
+            compact_lte = compact_lifespan_timing_evidence_for_prompt(
+                merged_chart_context.get("lifespan_timing_evidence")
+                if isinstance(merged_chart_context.get("lifespan_timing_evidence"), dict)
+                else None
+            )
+            if compact_lte:
+                out["lifespan_timing_evidence"] = compact_lte
+        except Exception:
+            logger.exception("parashari_agent_payload_lifespan_attach_failed")
     return out
 
 

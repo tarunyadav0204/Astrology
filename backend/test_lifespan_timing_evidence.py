@@ -5,8 +5,10 @@ from datetime import datetime
 from shared.dasha_calculator import DashaCalculator
 from chat.lifespan_timing_evidence import (
     _build_candidate_windows,
+    _double_transit_cite_instruction,
     _double_transit_status,
     build_lifespan_timing_evidence,
+    compact_lifespan_timing_evidence_for_prompt,
     force_divisional_codes_for_lifespan,
     is_promotion_topic,
     topic_spec_for_family,
@@ -269,6 +271,11 @@ def test_pack_dt_none_caps_confidence(monkeypatch=None):
     # Afflictions should surface debilitated Saturn and/or Bal Mercury/Venus
     planets = {a["planet"] for a in pack["afflictions"]}
     assert "Saturn" in planets or "Mercury" in planets or "Venus" in planets
+    rules = " ".join(pack.get("cite_rules") or [])
+    assert "HARD RANK ORDER" in rules
+    assert "Soft override is FORBIDDEN" in rules
+    assert "Full Double Transit" in rules
+    assert "final trigger required" in rules
 
 
 def test_anchor_fingerprint_from_pack():
@@ -581,3 +588,81 @@ def test_high_ceiling_forbidden_without_full_dt():
     assert ranked
     assert ranked[0]["confidence_ceiling"] != "high"
     assert ranked[0]["double_transit"] == "none"
+
+
+def test_cite_rules_forbid_soft_override_and_invented_full_dt():
+    none_line = _double_transit_cite_instruction("none", main_house=7)
+    assert "NONE" in none_line
+    assert "Never synthesize Full Double Transit" in none_line
+    assert "different houses" in none_line
+
+    pack = {
+        "topic": {"family": "marriage", "topic_key": "marriage", "primary_houses": [7]},
+        "timing_focus": {},
+        "dasha_spine": {"current": {}, "pd_near": [], "ad_spine": []},
+        "double_transit": {
+            "near_band": {"status": "none", "main_house": 7},
+            "top_window": {"status": "full", "main_house": 7},
+            "claim_allowed": "full",
+            "cite_line": _double_transit_cite_instruction("full", main_house=7),
+        },
+        "candidate_windows": [
+            {
+                "rank": 1,
+                "label": "2028-08 – 2031-08",
+                "start": "2028-08-01",
+                "end": "2031-08-01",
+                "dasha_chain": "Rahu-Venus",
+                "double_transit": "full",
+                "score": 19,
+                "confidence_ceiling": "high",
+                "same_arc_hint": "same_arc",
+                "why": ["Full DT on 7th"],
+            },
+            {
+                "rank": 2,
+                "label": "2024 – 2027",
+                "start": "2024-01-01",
+                "end": "2027-07-01",
+                "dasha_chain": "Rahu-Mercury",
+                "double_transit": "none",
+                "score": 11,
+                "confidence_ceiling": "medium",
+                "same_arc_hint": "alternate_path",
+                "why": ["Nearer but weaker"],
+            },
+        ],
+        "confidence_ceiling": "high",
+        "cite_rules": [
+            "HARD RANK ORDER: Present candidate_windows strictly by their `rank` field",
+            "Soft override is FORBIDDEN.",
+            "Never claim 'Full Double Transit' / 'Double Transit activated' for a window "
+            "unless that exact candidate_window.double_transit == 'full'.",
+            "final trigger required",
+        ],
+    }
+    compact = compact_lifespan_timing_evidence_for_prompt(pack)
+    assert compact is not None
+    assert compact["candidate_windows"][0]["rank"] == 1
+    assert compact["candidate_windows"][0]["score"] == 19
+    assert compact["candidate_windows"][0]["double_transit"] == "full"
+    assert compact["candidate_windows"][1]["double_transit"] == "none"
+    assert compact["candidate_windows"][1]["score"] == 11
+    rules = " ".join(compact["cite_rules"] or [])
+    assert "Soft override is FORBIDDEN" in rules
+    assert "double_transit == 'full'" in rules or 'double_transit == "full"' in rules or "double_transit == 'full'" in rules
+
+
+def test_pack_cite_rules_include_hard_rank_when_built():
+    full = _double_transit_cite_instruction("full", main_house=7)
+    assert "candidate_window" in full
+    assert "SAME main event house" in full
+    from ai.parallel_chat.prompt_blocks import free_question_elaborate_instruction
+    from chat.system_instruction_config import LIFESPAN_MERGE_TIMING_RULE, SYNTHESIS_RULES
+
+    assert "Soft override / re-ranking is FORBIDDEN" in LIFESPAN_MERGE_TIMING_RULE or "Soft override" in LIFESPAN_MERGE_TIMING_RULE
+    assert "FORBIDDEN" in LIFESPAN_MERGE_TIMING_RULE
+    assert "candidate_window.double_transit" in SYNTHESIS_RULES or "each `candidate_window.double_transit`" in SYNTHESIS_RULES
+    elab = free_question_elaborate_instruction()
+    assert "exact rank order" in elab
+    assert "final trigger required" in elab

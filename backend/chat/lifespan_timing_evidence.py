@@ -1053,13 +1053,20 @@ def build_lifespan_timing_evidence(
     cite_rules = [
         "Cite MD/AD/PD planet names and date ranges ONLY from dasha_spine (ad_spine / pd_near / current).",
         "Do not invent pratyantardasha stacks outside pd_near.",
-        "Prefer candidate_windows order for Window 1..N. Soft override allowed when Double Transit "
-        "full on the main house clearly favors a later AD in ad_spine — then rank that AD Window 1 "
-        "and keep the pack's prior #1 as Same arc / Alternate path. Do not invent dates outside the spine.",
+        "HARD RANK ORDER: Present candidate_windows strictly by their `rank` field (1, then 2, then 3…). "
+        "Window 1 = primary / most potent. Do NOT promote a Rank 2+ window over Rank 1. "
+        "Do NOT re-rank using your own Double Transit synthesis. Soft override is FORBIDDEN.",
+        "DOUBLE TRANSIT PER WINDOW: Never claim 'Full Double Transit' / 'Double Transit activated' for a window "
+        "unless that exact candidate_window.double_transit == 'full'. If it is 'none' or 'partial', say so. "
+        "Do NOT invent Full DT by combining Jupiter on house A with Saturn on house B "
+        "(e.g. Ju aspecting Lagna + Sa aspecting 7th is NOT Full Double Transit on the 7th).",
         "For marriage/children/property, Ripe Window = AD dates; PD is Execution only (not Window label).",
         f"Confidence must not exceed confidence_ceiling ({overall_ceiling}). Never say Extremely High. "
         "High requires full Double Transit on the main event house plus solid dasha occupy/rule.",
         dt_cite,
+        "LANGUAGE: Do not use mechanical absolutes such as 'final trigger required', 'guaranteed', "
+        "'mathematical conclusion', or 'clearly promised' for marriage/event timing. "
+        "Prefer 'highly supportive', 'strong catalyst', 'primary window'.",
         "For career/marriage/children/property, mention divisional_topic when present.",
         "Natal avastha/combust/Mrityu Bhaga from afflictions are natal facts — not 'currently' sky conditions.",
         "Do not claim degree-exact Jupiter over a natal planet unless longitude evidence is in the pack.",
@@ -1134,6 +1141,7 @@ def compact_lifespan_timing_evidence_for_prompt(pack: Optional[Dict[str, Any]]) 
                 "execution_end": c.get("execution_end"),
                 "dasha_chain": c.get("dasha_chain"),
                 "double_transit": c.get("double_transit"),
+                "score": c.get("score"),
                 "confidence_ceiling": c.get("confidence_ceiling"),
                 "same_arc_hint": c.get("same_arc_hint"),
                 "ranking_mode": c.get("ranking_mode"),
@@ -1195,13 +1203,18 @@ def compact_lifespan_timing_evidence_for_prompt(pack: Optional[Dict[str, Any]]) 
 
 
 def _double_transit_cite_instruction(status: str, *, main_house: int) -> str:
-    """Prompt-only DT wording rules (language-agnostic machine status → model instruction)."""
+    """Prompt-only DT wording rules (language-agnostic machine status -> model instruction)."""
     st = str(status or "none").lower()
+    common = (
+        "You may say full Double Transit ONLY when the specific candidate_window you are describing "
+        "has double_transit: full (or claim_allowed/top_window is full for Window 1). "
+        "Never synthesize Full Double Transit from individual Jupiter/Saturn hits on different houses. "
+        f"Full DT = both Jupiter and Saturn hit the SAME main event house ({main_house}) "
+        "with at least one occupying it. Do not relocate Saturn/Jupiter to other houses."
+    )
     if st == "full":
         return (
-            f"Double Transit status for Window 1 is FULL on house {main_house}. "
-            "You may say full Double Transit only if both Jupiter and Saturn hit that same main house "
-            "(at least one by occupation). Do not relocate Saturn/Jupiter to other houses. "
+            f"Double Transit status for Window 1 is FULL on house {main_house}. {common} "
             "Phrase this in the user's language."
         )
     if st == "partial":
@@ -1209,11 +1222,13 @@ def _double_transit_cite_instruction(status: str, *, main_house: int) -> str:
             f"Double Transit status for Window 1 is PARTIAL on house {main_house}. "
             "Describe partial transit confirmation only — never claim full/activated Double Transit. "
             "Jupiter on the main house while Saturn is only in a non-main house (e.g. 9th) is NOT Double Transit. "
-            "Phrase this in the user's language."
+            f"{common} Phrase this in the user's language."
         )
     return (
         f"Double Transit status for Window 1 is NONE on house {main_house}. "
-        "Do not claim Double Transit / Ju+Sa joint activation of the event. "
+        "Do not claim Double Transit / Ju+Sa joint activation of the event for Window 1. "
         "You may mention individual Jupiter or Saturn transits factually. "
-        "Phrase this in the user's language."
+        "If a LOWER-ranked window has double_transit: full, you may say Full DT only for THAT window — "
+        "do not use a Full DT claim to promote a none/partial window above Rank 1. "
+        f"{common} Phrase this in the user's language."
     )

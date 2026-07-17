@@ -222,6 +222,7 @@ def build_parashari_final_answer_static(intent_category: str, death_analysis_unl
         health_prompt_line,
         "When `special_points` is present, use `gandanta_analysis` if flagged. If `special_points.yogi_points` is present, include a distinct subsection titled exactly `#### Yogi & Avayogi Karma` and explicitly cover **Yogi**, **Avayogi**, **Dagdha Rashi**, and **Tithi Shunya Rashi** in relation to the user's question. If `special_points.yogi_points.avayogi_tithi_shunya_overlap.is_active=true`, state that this modifies the obstruction and can give good results.",
         "Be strictly technical and evidence-based. Do not use motivational filler. If dasha period labels or windows are present, explicitly cite them.",
+        "When LIFESPAN_TIMING_EVIDENCE_JSON is present in the user packet: follow its candidate_windows rank order exactly; claim Full Double Transit only when that window's double_transit is full; never invent Full DT; never use 'final trigger required' / guarantee language.",
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -261,11 +262,15 @@ Use this exact structure for the final user-facing answer:
 def free_question_elaborate_instruction() -> str:
     return """
 CRITICAL - FREE QUESTION DEPTH (PARASHARI-ONLY):
-Write a complete Parashari answer using only evidence in SPECIALIST_BRANCH_OUTPUTS_JSON
-and AUTHORITATIVE_SLOW_TRANSITS_JSON when present.
+Write a complete Parashari answer using only evidence in SPECIALIST_BRANCH_OUTPUTS_JSON,
+AUTHORITATIVE_SLOW_TRANSITS_JSON, and LIFESPAN_TIMING_EVIDENCE_JSON when present.
 Do NOT invent KP, Nadi, Jaimini, Nakshatra-branch, Ashtakavarga, or Sudarshana sections or claims.
 For Jupiter/Saturn/Rahu/Ketu sign or house changes, cite ONLY dates from AUTHORITATIVE_SLOW_TRANSITS_JSON
 (or transit_win.M / px.TR.MT inside the branch payload). Never estimate ingress years from memory.
+When LIFESPAN_TIMING_EVIDENCE_JSON is present: present candidate_windows in exact rank order
+(Rank 1 = primary). Never claim Full Double Transit unless that window's double_transit is full.
+Do not invent Full DT from Ju/Sa on different houses. Soft override / re-ranking is forbidden.
+Do not use absolute phrasing like "final trigger required", "guaranteed", or "clearly promised".
 For major relationship outcomes, require confluence of Mahadasha/Antardasha support plus matching
 slow-planet transits; do not promise reconciliation from a favorable Pratyantardasha alone when MD/AD
 lords are obstructive (e.g. 6th/8th/12th).
@@ -504,6 +509,7 @@ def build_parashari_branch_static_agent(intent_category: str, death_analysis_unl
         "For current or predictive questions, do not stop at static divisional promise. Also cite `px.dx.current.topic` or the relevant `px.dx.current.<life_area>` block to say whether the active periods are presently activating that divisional chart or not.",
         "Use `px.TR` as a compact transit filter: near-term answers should say whether transit hits are landing on the topic houses directly (`th`/`nh`) and whether active dasha planets are involved (`dp`).",
         "For Jupiter/Saturn/Rahu/Ketu **sign or house entry years**, use `transit_win.M` and/or `px.TR.MT` only (`sg`/`h`/`sd`/`ed`, optional `rr`). Never invent those ingress years from memory.",
+        "When `lifespan_timing_evidence` is present: treat `candidate_windows` as deterministic ranking. Present them in exact `rank` order (1 = primary). Soft override is forbidden. Claim Full Double Transit only if that window's `double_transit` is `full` — never invent Full DT by combining Ju/Sa on different houses.",
         "For marriage/spouse questions, explicitly separate **Promise -> Timing -> Manifestation -> Continuity**. Use `px.relationship` first: `mat` = materialization pressure, `fr` = friction pressure, `ct` = continuity emphasis, `mode` = supportive/mixed/obstructed, `dom` = dominant houses. Then refine with `px.hs`, `px.HI`, and raw graha detail. Do not equate generic relationship activation with legal or durable marriage.",
         "For career/profession/field questions, explicitly separate **Aptitude -> Field Selection -> Work Function -> Status/Visibility -> Timing of Entry/Change**. Use `px.career` first: `mode` = service/business/hybrid tendency, `work` = house-pattern scores, `fn` = ranked function tags, `vis` = visibility level, `dom` = dominant houses. Then refine with `px.hs`, `px.HI`, and raw graha detail. Rank the likely field signatures instead of listing many unrelated jobs equally.",
         health_prompt_line,

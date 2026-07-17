@@ -1085,6 +1085,7 @@ async def run_parallel_chat_pipeline(
             },
         }
         slow_transits_block = ""
+        lifespan_evidence_block = ""
         if free_question_parashari_only and not remedy_followup_requested:
             from context_agents.macro_transits_compact import authoritative_slow_transits_packet
 
@@ -1093,9 +1094,25 @@ async def run_parallel_chat_pipeline(
                 slow_transits_block = (
                     f"AUTHORITATIVE_SLOW_TRANSITS_JSON:\n{_json_compact(slow_packet)}\n\n"
                 )
+            try:
+                from chat.lifespan_timing_evidence import compact_lifespan_timing_evidence_for_prompt
+
+                compact = compact_lifespan_timing_evidence_for_prompt(
+                    ctx.get("lifespan_timing_evidence") if isinstance(ctx, dict) else None
+                )
+                if compact:
+                    lifespan_evidence_block = (
+                        "LIFESPAN_TIMING_EVIDENCE_JSON (cite-only authority for MD/AD/PD dates, "
+                        "Double Transit per window, Window ranking, confidence ceiling — "
+                        "present windows in exact rank order; never invent Full Double Transit):\n"
+                        f"{_json_compact(compact)}\n\n"
+                    )
+            except Exception:
+                logger.exception("free_question_lifespan_evidence_inject_failed")
         final_user = (
             f"{time_context}\n\n"
             f"{hist_text}"
+            f"{lifespan_evidence_block}"
             f"{slow_transits_block}"
             f"SPECIALIST_BRANCH_OUTPUTS_JSON:\n{_json_compact(parashari_branch_bundle)}\n"
             f"CURRENT QUESTION: {user_question}\n"
