@@ -99,7 +99,7 @@ const PARALLEL_BRANCH_MODEL_CONFIG = [
   { key: 'kp', label: 'KP', fallbackLabel: 'Standard chat model' },
   { key: 'ashtakavarga', label: 'Ashtakavarga', fallbackLabel: 'Standard chat model' },
   { key: 'sudarshan', label: 'Sudarshan', fallbackLabel: 'Standard chat model' },
-  { key: 'merge', label: 'Merge synthesis', fallbackLabel: 'Premium chat model' },
+  { key: 'merge', label: 'Merge synthesis', fallbackLabel: 'Standard chat (non-premium) / Premium chat (premium)' },
 ];
 
 const DEFAULT_PARALLEL_BRANCH_MODELS = PARALLEL_BRANCH_MODEL_CONFIG.reduce((acc, branch) => {

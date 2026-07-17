@@ -774,6 +774,19 @@ async def run_parallel_chat_pipeline(
     premium_gemini_model_name = (
         get_gemini_premium_model() if premium_analysis else standard_gemini_model_name
     )
+    # Non-premium (incl. free questions): merge/final must use the Standard chat model
+    # (admin gemini_chat_model), not a separate parallel-merge override or premium fallback.
+    if premium_analysis:
+        merge_provider = premium_provider
+        merge_model_name = (
+            get_parallel_branch_gemini_model("merge", premium_gemini_model_name)
+            if premium_provider == "gemini"
+            else premium_gemini_model_name
+        )
+    else:
+        merge_provider = standard_provider
+        merge_model_name = standard_gemini_model_name
+
     branch_runtime = {
         "parashari": {
             "provider": premium_provider,
@@ -804,8 +817,8 @@ async def run_parallel_chat_pipeline(
             "model_name": get_parallel_branch_gemini_model("sudarshan", standard_gemini_model_name) if standard_provider == "gemini" else standard_gemini_model_name,
         },
         "merge": {
-            "provider": premium_provider,
-            "model_name": get_parallel_branch_gemini_model("merge", premium_gemini_model_name) if premium_provider == "gemini" else premium_gemini_model_name,
+            "provider": merge_provider,
+            "model_name": merge_model_name,
         },
     }
 
@@ -1128,10 +1141,14 @@ async def run_parallel_chat_pipeline(
             )
         final_prompt = f"{final_static}\n\n{final_user}"
         t_final = time.time()
-        final_runtime = _runtime_for("parashari")
+        # Free / remedy single-lane final is the merge writer — use Standard chat model
+        # for non-premium (same admin setting as Gemini standard chat).
+        final_runtime = _runtime_for("merge")
         syn = await analyzer.generate_text_from_prompt(
             final_prompt,
             premium_analysis=premium_analysis,
+            model_override=final_runtime["cached_model"],
+            model_name_override=final_runtime["model_name"],
             llm_log_tag="parallel_parashari_final",
         )
         synthesis_ms = round((time.time() - t_final) * 1000, 1)
@@ -1440,9 +1457,7 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
         merge_prompt,
         premium_analysis=premium_analysis,
         model_override=merge_runtime["cached_model"],
-        model_name_override=(
-            merge_runtime["model_name"] if merge_runtime["cached_model"] else None
-        ),
+        model_name_override=merge_runtime["model_name"],
         llm_log_tag="parallel_merge",
     )
     synthesis_ms = round((time.time() - t_syn) * 1000, 1)

@@ -463,7 +463,16 @@ class GeminiChatAnalyzer:
                     (str(model_name_override).strip() if model_name_override else "")
                     or (get_gemini_premium_model() if premium_analysis else get_gemini_chat_model())
                 )
-                selected_model = model_override or self._get_model(premium_analysis)
+                # Honor model_name_override even when no cached GenerativeModel is supplied.
+                # Previously override was only logged while _get_model(premium) actually ran.
+                if model_override is not None:
+                    selected_model = model_override
+                elif model_name_override:
+                    selected_model = self.get_named_gemini_model(
+                        model_name, premium_analysis=premium_analysis
+                    )
+                else:
+                    selected_model = self._get_model(premium_analysis)
                 req_to = int(timeout_s) if timeout_s >= 1 else 1
                 response = await asyncio.wait_for(
                     selected_model.generate_content_async(
