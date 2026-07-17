@@ -34,6 +34,12 @@ if [[ -f "$DIST/mobile/manifest.webmanifest" ]]; then
   gsutil -h "Cache-Control:no-cache" -h "Content-Type:application/manifest+json" \
     cp "$DIST/mobile/manifest.webmanifest" "${TARGET}/mobile/manifest.webmanifest"
 fi
+if [[ -f "$DIST/mobile/version.json" ]]; then
+  # iOS/Android home-screen apps poll this on focus to auto-reload after deploys.
+  gsutil -h "Cache-Control:no-cache, no-store, must-revalidate" \
+    -h "Content-Type:application/json; charset=utf-8" \
+    cp "$DIST/mobile/version.json" "${TARGET}/mobile/version.json"
+fi
 # PWA icons must resolve under /mobile/ (manifest prefers these paths)
 for icon in pwa-icon-192.png pwa-icon-512.png apple-touch-icon.png; do
   if [[ -f "$DIST/mobile/$icon" ]]; then

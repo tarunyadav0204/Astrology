@@ -96,12 +96,15 @@ Without the edge router, `/mobile/` and `/mobile/index.html` still work from the
 
 Both open full-screen from the home icon. CRA on `/` is unchanged. Play/native builds never load this UI.
 
+**Updates after deploy (no reinstall)**  
+Each export writes `/mobile/version.json` + stamps `window.__AR_WEB_BUILD__`. On open/focus, the home-screen app fetches `version.json` with `cache: no-store` and **reloads itself** when the build id changes. Users should **not** need to delete the iOS home-screen icon for normal deploys—just reopen the app (or switch back to it).
+
 **Android tips if Install is missing**
 1. Open exactly `https://astroroshni.com/mobile/` (trailing slash) in **Chrome**, not an in-app browser.
 2. If the Play Store app is already installed, Chrome often hides **Install app** — use **Add to Home screen** instead.
 3. Wait a few seconds after load so the service worker can register, then check **⋮** again.
 
-**Test after deploy:** open `https://astroroshni.com/mobile/` on a real phone (HTTPS required for Chrome install).
+**Test after deploy:** open `https://astroroshni.com/mobile/` on a real phone (HTTPS required for Chrome install). Confirm `/mobile/version.json` shows the new build id.
 
 ## Platform shims
 

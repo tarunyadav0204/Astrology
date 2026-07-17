@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+import { Platform, StatusBar } from 'react-native';
 
 const ThemeContext = createContext();
 
@@ -56,6 +56,51 @@ export const THEMES = {
   },
 };
 
+/** PWA / Expo Web: browser & installed-app chrome (Android status bar) follows theme. */
+function syncWebChromeTheme(themeName) {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  const palette = THEMES[themeName] || THEMES.dark;
+  const bg = palette.background;
+  let meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute('name', 'theme-color');
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', bg);
+  // media-specific tags (Expo sometimes emits light/dark variants)
+  document.querySelectorAll('meta[name="theme-color"][media]').forEach((el) => {
+    el.setAttribute('content', bg);
+  });
+  let appleBar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+  if (!appleBar) {
+    appleBar = document.createElement('meta');
+    appleBar.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
+    document.head.appendChild(appleBar);
+  }
+  // dark: blend into purple shell; light: default so icons stay dark on cream
+  appleBar.setAttribute('content', themeName === 'dark' ? 'black-translucent' : 'default');
+  document.documentElement.style.backgroundColor = bg;
+  document.documentElement.style.colorScheme = themeName === 'dark' ? 'dark' : 'light';
+  if (document.body) {
+    document.body.style.backgroundColor = bg;
+  }
+  const root = document.getElementById('root');
+  if (root) root.style.backgroundColor = bg;
+}
+
+/** Global StatusBar that matches active theme (fixes hardcoded orange in App.js). */
+export function ThemedStatusBar() {
+  const { colors } = useTheme();
+  return (
+    <StatusBar
+      barStyle={colors.statusBarStyle}
+      backgroundColor={colors.background}
+      translucent={false}
+    />
+  );
+}
+
 export const ThemeProvider = ({ children, initialTheme }) => {
   const [theme, setTheme] = useState(initialTheme === 'light' || initialTheme === 'dark' ? initialTheme : 'dark');
   const [isLoading, setIsLoading] = useState(false);
@@ -66,6 +111,10 @@ export const ThemeProvider = ({ children, initialTheme }) => {
     }
     loadTheme();
   }, []);
+
+  useEffect(() => {
+    syncWebChromeTheme(theme);
+  }, [theme]);
 
   const loadTheme = async () => {
     try {
@@ -104,7 +153,7 @@ export const ThemeProvider = ({ children, initialTheme }) => {
     : baseColors;
 
   // Spread this onto any card View to remove elevation and shadow on Android light (fixes white inner shadow)
-  const androidLightCardFixStyle = useMemo(() => 
+  const androidLightCardFixStyle = useMemo(() =>
     isAndroidLight
       ? {
           elevation: 0,

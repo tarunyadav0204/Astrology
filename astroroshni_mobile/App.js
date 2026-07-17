@@ -70,7 +70,7 @@ import AboutScreen from './src/components/About/AboutScreen';
 import SupportScreen from './src/components/Support/SupportScreen';
 import MembershipComparisonScreen from './src/components/Support/MembershipComparisonScreen';
 import { CreditProvider } from './src/credits/CreditContext';
-import { ThemeProvider } from './src/context/ThemeContext';
+import { ThemeProvider, ThemedStatusBar } from './src/context/ThemeContext';
 import { ErrorProvider } from './src/context/ErrorContext';
 import { storage } from './src/services/storage';
 import SplashScreen from './src/components/SplashScreen';
@@ -650,7 +650,7 @@ export default function App() {
                 }}
               >
               <GlobalErrorHandler />
-              <StatusBar barStyle="dark-content" backgroundColor="#ff6b35" />
+              <ThemedStatusBar />
         <Stack.Navigator
           initialRouteName={initialRoute}
           screenOptions={{
