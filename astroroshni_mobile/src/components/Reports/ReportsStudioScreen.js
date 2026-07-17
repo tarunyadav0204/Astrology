@@ -28,6 +28,7 @@ import { useTranslation } from 'react-i18next';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import NotificationEnableBanner from '../Notifications/NotificationEnableBanner';
 import { useAuthGate } from '../../auth/AuthGateContext';
+import { goBackOrHome } from '../../navigation/navHelpers';
 
 const REPORT_TYPE_FALLBACKS = [
   {
@@ -1234,7 +1235,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
             <View style={styles.headerTopRow}>
               <TouchableOpacity
                 style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]}
-                onPress={() => navigation.goBack()}
+                onPress={() => goBackOrHome(navigation)}
                 accessibilityRole="button"
                 accessibilityLabel={t('common.back', 'Back')}
               >

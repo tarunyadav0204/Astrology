@@ -31,6 +31,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCredits } from '../../credits/CreditContext';
+import { useAuthGate } from '../../auth/AuthGateContext';
 
 const { width, height: windowHeight } = Dimensions.get('window');
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -322,6 +323,7 @@ export default function HomeScreen({
   const isDark = theme === 'dark';
   const isIOS = Platform.OS === 'ios';
   const { freeQuestionAvailable, pricing, pricingOriginal, fetchPricing } = useCredits();
+  const { requireAuthForPaid } = useAuthGate();
   const [showFirstQuestionFreeModal, setShowFirstQuestionFreeModal] = useState(false);
   const [showMonthlyWelcomeModal, setShowMonthlyWelcomeModal] = useState(false);
   const [showMultiChartTipModal, setShowMultiChartTipModal] = useState(false);
@@ -703,6 +705,12 @@ export default function HomeScreen({
     const url = String(homeBanner?.cta_url || '').trim();
     await dismissHomeBanner();
     if (action === 'credits') {
+      const ok = await requireAuthForPaid({
+        feature: t('authGate.featureCredits'),
+        message: t('authGate.messageCredits'),
+        resume: { resumeRoute: 'Credits', resumeParams: {} },
+      });
+      if (!ok) return;
       navigation.navigate('Credits');
     } else if (action === 'chat') {
       onOptionSelect?.({ action: 'question' });
@@ -713,7 +721,19 @@ export default function HomeScreen({
         /* ignore */
       }
     }
-  }, [homeBanner, dismissHomeBanner, navigation, onOptionSelect]);
+  }, [homeBanner, dismissHomeBanner, navigation, onOptionSelect, requireAuthForPaid]);
+
+  const requireBirthChart = useCallback(
+    (thenNavigate) => {
+      const data = currentNativeData || birthData;
+      if (data) {
+        thenNavigate(data);
+        return;
+      }
+      navigation.navigate('BirthForm', { returnTo: 'Home' });
+    },
+    [currentNativeData, birthData, navigation],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -1130,66 +1150,8 @@ const loadHomeData = async (nativeData = null) => {
     return null;
   }
 
-  // Empty state when no native: show CTA to add birth profile (→ BirthProfileIntro)
-  if (!displayData) {
-    return (
-      <View style={styles.container}>
-        <LinearGradient
-          colors={theme === 'dark'
-            ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary]
-            : [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientAccent || '#fde68a']}
-          style={styles.gradient}
-        >
-          <VerticalPageScroll
-            style={[styles.scrollView, { zIndex: 1 }]}
-            contentContainerStyle={[styles.content, styles.emptyStateContent]}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={[styles.emptyStateCard, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <View style={styles.emptyStateIconWrap}>
-                <Icon name="planet-outline" size={48} color={colors.accent || '#FFD700'} />
-              </View>
-              <Text style={[styles.emptyStateTitle, { color: colors.text }]}>
-                {t('birthProfileIntro.emptyStateTitle', 'Add your birth profile')}
-              </Text>
-              <Text style={[styles.emptyStateBody, { color: colors.textSecondary }]}>
-                {t('birthProfileIntro.emptyStateBody', 'Your date, time and place of birth unlock your Vedic chart, personalized chart insights, and analysis tools. You can add or change this anytime.')}
-              </Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('BirthForm', { returnTo: 'Home' })}
-                activeOpacity={0.85}
-                style={styles.emptyStateCtaWrap}
-              >
-                <LinearGradient
-                  colors={['#FF6B35', '#F7931E', '#FFD700']}
-                  style={styles.emptyStateCta}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
-                  <Text style={styles.emptyStateCtaText}>
-                    {t('birthProfileIntro.emptyStateCta', 'Add birth profile')}
-                  </Text>
-                  <Text style={styles.emptyStateCtaIcon}>✨</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-            {panchangData?.sunrise_sunset && (
-              <View style={[styles.emptyStatePanchang, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-                <Text style={[styles.emptyStatePanchangTitle, { color: colors.text }]}>
-                  {t('home.panchang.title', 'Today’s Panchang')}
-                </Text>
-                <Text style={[styles.emptyStatePanchangSub, { color: colors.textSecondary }]}>
-                  {`${t('common.sunrise', 'Sunrise')}: ${panchangData.sunrise_sunset.sunrise || '—'} • ${t('common.sunset', 'Sunset')}: ${panchangData.sunrise_sunset.sunset || '—'}`}
-                </Text>
-              </View>
-            )}
-          </VerticalPageScroll>
-        </LinearGradient>
-      </View>
-    );
-  }
-
-  const place = displayData?.place || `${displayData?.latitude}, ${displayData?.longitude}`;
+  // Guest / empty chart: still show full Home (tiles + tabs). Nudge chart creation without a birth-form-only wall.
+  const place = displayData?.place || (displayData ? `${displayData?.latitude}, ${displayData?.longitude}` : '');
   const time = displayData?.time || 'Unknown time';
 
   const handlePhysicalScan = async () => {
@@ -1456,12 +1418,18 @@ const loadHomeData = async (nativeData = null) => {
                   {t('home.greeting.hello', 'Hello')},
                 </Text>
                 <Text style={[styles.headerName, { color: colors.text }]} numberOfLines={1}>
-                  {displayData?.name}
+                  {displayData?.name || t('home.greeting.guestName', 'Explorer')}
                 </Text>
               </View>
               <NativeSelectorChip 
                 birthData={displayData}
-                onPress={() => navigation.navigate('SelectNative', { returnTo: 'Home', returnParams: { stayOnGreeting: true } })}
+                onPress={() => {
+                  if (!displayData) {
+                    navigation.navigate('BirthForm', { returnTo: 'Home' });
+                    return;
+                  }
+                  navigation.navigate('SelectNative', { returnTo: 'Home', returnParams: { stayOnGreeting: true } });
+                }}
                 maxLength={10}
                 showIcon={false}
                 style={styles.headerNativeChip}
@@ -1536,6 +1504,42 @@ const loadHomeData = async (nativeData = null) => {
           </LinearGradient>
         </View>
 
+        {!displayData ? (
+          <View
+            style={[
+              styles.emptyStateCard,
+              { marginHorizontal: 16, marginBottom: 12 },
+              theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder },
+            ]}
+          >
+            <Text style={[styles.emptyStateTitle, { color: colors.text, fontSize: 18 }]}>
+              {t('home.guestNudge.title', 'Create your free birth chart')}
+            </Text>
+            <Text style={[styles.emptyStateBody, { color: colors.textSecondary, marginBottom: 12 }]}>
+              {t(
+                'home.guestNudge.body',
+                'Charts and dashas are free — no account needed. Sign in when you want chat, analysis, or credits.',
+              )}
+            </Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('BirthForm', { returnTo: 'Home' })}
+              activeOpacity={0.85}
+              style={styles.emptyStateCtaWrap}
+            >
+              <LinearGradient
+                colors={['#FF6B35', '#F7931E', '#FFD700']}
+                style={styles.emptyStateCta}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.emptyStateCtaText}>
+                  {t('home.guestNudge.cta', 'Add birth details')}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {homeBanner ? (
           <View
             style={[
@@ -1585,7 +1589,9 @@ const loadHomeData = async (nativeData = null) => {
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => {
-                    if (displayData) navigation.navigate('ChartsHub', { birthData: displayData, tab: 'dasha' });
+                    requireBirthChart((data) =>
+                      navigation.navigate('ChartsHub', { birthData: data, tab: 'dasha' }),
+                    );
                   }}
                 >
                   <TickerItem 
@@ -1599,7 +1605,11 @@ const loadHomeData = async (nativeData = null) => {
                 <View style={[styles.tickerSeparator, theme === 'light' && { backgroundColor: colors.cardBorder }]} />
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => navigation.navigate('NakshatraCalendar', { birthData: displayData })}
+                  onPress={() =>
+                    requireBirthChart((data) =>
+                      navigation.navigate('NakshatraCalendar', { birthData: data }),
+                    )
+                  }
                 >
                   <TickerItem 
                     icon="star-outline" 
@@ -1612,7 +1622,9 @@ const loadHomeData = async (nativeData = null) => {
                 <View style={[styles.tickerSeparator, theme === 'light' && { backgroundColor: colors.cardBorder }]} />
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => displayData && navigation.navigate('SadeSati', { birthData: displayData })}
+                  onPress={() =>
+                    requireBirthChart((data) => navigation.navigate('SadeSati', { birthData: data }))
+                  }
                 >
                   <TickerItem 
                     icon="shield-checkmark-outline" 
@@ -1634,6 +1646,7 @@ const loadHomeData = async (nativeData = null) => {
           cost={pricing.partnership_report ?? pricing.partnership ?? 9}
           originalCost={pricingOriginal.partnership_report ?? pricingOriginal.partnership}
           t={t}
+          requireAuthForPaid={requireAuthForPaid}
         />
 
 
@@ -1995,7 +2008,11 @@ const loadHomeData = async (nativeData = null) => {
           {dashData && (
             <TouchableOpacity
               style={[styles.dashaTimelineContainer, androidLightCardFixStyle, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-              onPress={() => navigation.navigate('ChartsHub', { birthData, tab: 'dasha' })}
+              onPress={() =>
+                requireBirthChart((data) =>
+                  navigation.navigate('ChartsHub', { birthData: data, tab: 'dasha' }),
+                )
+              }
               activeOpacity={0.85}
             >
               <Text style={[styles.dashaSectionTitle, { color: colors.text }]}>{t('home.sections.currentDasha', '⏰ Current Dasha Periods')}</Text>
@@ -2069,7 +2086,11 @@ const loadHomeData = async (nativeData = null) => {
             >
               <TouchableOpacity 
                 style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => navigation.navigate('ChartsHub', { birthData, tab: 'chart' })}
+                onPress={() =>
+                  requireBirthChart((data) =>
+                    navigation.navigate('ChartsHub', { birthData: data, tab: 'chart' }),
+                  )
+                }
                 activeOpacity={0.8}
               >
                 <View style={[
@@ -2095,7 +2116,11 @@ const loadHomeData = async (nativeData = null) => {
               
               <TouchableOpacity 
                 style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => navigation.navigate('ChartsHub', { birthData, tab: 'dasha' })}
+                onPress={() =>
+                  requireBirthChart((data) =>
+                    navigation.navigate('ChartsHub', { birthData: data, tab: 'dasha' }),
+                  )
+                }
                 activeOpacity={0.8}
               >
                 <View style={[
@@ -2121,7 +2146,11 @@ const loadHomeData = async (nativeData = null) => {
 
               <TouchableOpacity 
                 style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => navigation.navigate('KPSystem', { birthDetails: birthData })}
+                onPress={() =>
+                  requireBirthChart((data) =>
+                    navigation.navigate('KPSystem', { birthDetails: data }),
+                  )
+                }
                 activeOpacity={0.8}
               >
                 <View style={[
@@ -2145,7 +2174,11 @@ const loadHomeData = async (nativeData = null) => {
 
               <TouchableOpacity 
                 style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => navigation.navigate('KotaChakra', { birthChartId: birthData?.id })}
+                onPress={() =>
+                  requireBirthChart((data) =>
+                    navigation.navigate('KotaChakra', { birthChartId: data?.id }),
+                  )
+                }
                 activeOpacity={0.8}
               >
                 <View style={[
@@ -2169,7 +2202,7 @@ const loadHomeData = async (nativeData = null) => {
 
               <TouchableOpacity 
                 style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => navigation.navigate('Yogas')}
+                onPress={() => requireBirthChart(() => navigation.navigate('Yogas'))}
                 activeOpacity={0.8}
               >
                 <View style={[
@@ -2193,7 +2226,11 @@ const loadHomeData = async (nativeData = null) => {
               
               <TouchableOpacity 
                 style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => navigation.navigate('ChartsHub', { birthData, tab: 'ashtakvarga' })}
+                onPress={() =>
+                  requireBirthChart((data) =>
+                    navigation.navigate('ChartsHub', { birthData: data, tab: 'ashtakvarga' }),
+                  )
+                }
                 activeOpacity={0.8}
               >
                 <View style={[
@@ -2215,8 +2252,10 @@ const loadHomeData = async (nativeData = null) => {
               <TouchableOpacity 
                 style={[styles.toolCard, androidLightCardFixStyle]}
                 onPress={() =>
-                  chartData?.planets &&
-                  navigation.navigate('PlanetaryPositions', { chartData, birthData: displayData })
+                  requireBirthChart((data) => {
+                    if (!chartData?.planets) return;
+                    navigation.navigate('PlanetaryPositions', { chartData, birthData: data });
+                  })
                 }
                 activeOpacity={0.8}
               >
@@ -2238,7 +2277,7 @@ const loadHomeData = async (nativeData = null) => {
 
               <TouchableOpacity 
                 style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => navigation.navigate('CosmicRing')}
+                onPress={() => requireBirthChart(() => navigation.navigate('CosmicRing'))}
                 activeOpacity={0.8}
               >
                 <View style={[
@@ -2266,7 +2305,7 @@ const loadHomeData = async (nativeData = null) => {
               <View style={styles.planetaryHeaderRight}>
                 <TouchableOpacity
                   style={[styles.cosmicRingChip, theme === 'dark' ? styles.cosmicRingChipDark : styles.cosmicRingChipLight]}
-                  onPress={() => navigation.navigate('CosmicRing')}
+                  onPress={() => requireBirthChart(() => navigation.navigate('CosmicRing'))}
                   activeOpacity={0.8}
                 >
                   <Icon name="ellipse-outline" size={16} color={colors.primary} />
@@ -2781,7 +2820,15 @@ const loadHomeData = async (nativeData = null) => {
 
         <TouchableOpacity 
           style={styles.tabItem} 
-          onPress={() => navigation.navigate('ReportsStudio')}
+          onPress={async () => {
+            const ok = await requireAuthForPaid({
+              feature: t('authGate.featureReports'),
+              message: t('authGate.messageReports'),
+              resume: { resumeRoute: 'ReportsStudio', resumeParams: {} },
+            });
+            if (!ok) return;
+            navigation.navigate('ReportsStudio');
+          }}
           activeOpacity={0.7}
         >
           <View style={styles.tabIconContainer}>
@@ -2798,7 +2845,9 @@ const loadHomeData = async (nativeData = null) => {
 
         <TouchableOpacity 
           style={styles.tabItem} 
-          onPress={() => navigation.navigate('ChartsHub', { birthData })}
+          onPress={() =>
+            requireBirthChart((data) => navigation.navigate('ChartsHub', { birthData: data }))
+          }
           activeOpacity={0.7}
         >
           <View style={styles.tabIconContainer}>
@@ -3071,7 +3120,7 @@ function CosmicRibbonCard({ option, index, onOptionSelect }) {
   );
 }
 
-function ReportStudioCard({ navigation, isDark, colors, cost, originalCost, t }) {
+function ReportStudioCard({ navigation, isDark, colors, cost, originalCost, t, requireAuthForPaid }) {
   const creditsLabel = originalCost != null && originalCost > cost
     ? `${originalCost} → ${cost}`
     : `${cost}`;
@@ -3079,7 +3128,17 @@ function ReportStudioCard({ navigation, isDark, colors, cost, originalCost, t })
   return (
     <TouchableOpacity
       activeOpacity={0.92}
-      onPress={() => navigation.navigate('ReportsStudio')}
+      onPress={async () => {
+        if (requireAuthForPaid) {
+          const ok = await requireAuthForPaid({
+            feature: t('authGate.featureReports'),
+            message: t('authGate.messageReports'),
+            resume: { resumeRoute: 'ReportsStudio', resumeParams: {} },
+          });
+          if (!ok) return;
+        }
+        navigation.navigate('ReportsStudio');
+      }}
       style={styles.reportStudioCardWrap}
       accessibilityRole="button"
       accessibilityLabel={t('reports.homeA11y', 'Open Reports Studio for the deepest premium chart analysis')}

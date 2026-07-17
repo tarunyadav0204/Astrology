@@ -313,8 +313,8 @@ const CreditScreen = ({ navigation }) => {
       let cancelled = false;
       (async () => {
         const ok = await requireAuthForPaid({
-          feature: 'credits',
-          message: 'Sign in to buy credits and unlock paid insights.',
+          feature: t('authGate.featureCredits'),
+          message: t('authGate.messageCredits'),
           resume: { resumeRoute: 'Credits', resumeParams: {} },
         });
         if (!cancelled && !ok) {

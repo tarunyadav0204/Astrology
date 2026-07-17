@@ -36,14 +36,27 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const [showKarakas, setShowKarakas] = useState(false);
   const [karakas, setKarakas] = useState(null);
   const [showInfoModal, setShowInfoModal] = useState(false);
-  // PWA/web: aspectRatio + paddingTop shrinks nested SVGs; use an explicit full-width square.
-  const [webChartSize, setWebChartSize] = useState(() => (isWeb ? Math.floor(Dimensions.get('window').width) : null));
+  // PWA/web: % SVG height often collapses to 0. Measure parent and pass pixel size.
+  const [webChartSize, setWebChartSize] = useState(() => {
+    if (!isWeb) return null;
+    const w = Math.floor(Dimensions.get('window').width);
+    return w > 0 ? w : 320;
+  });
+
+  const onWebChartLayout = useCallback((event) => {
+    if (!isWeb) return;
+    const nextWidth = Math.floor(event?.nativeEvent?.layout?.width || 0);
+    if (nextWidth < 80) return;
+    setWebChartSize((prev) => (prev === nextWidth ? prev : nextWidth));
+  }, []);
 
   useEffect(() => {
     if (!isWeb) return undefined;
     const syncSize = ({ window: nextWindow } = {}) => {
       const nextWidth = Math.floor((nextWindow || Dimensions.get('window')).width);
-      setWebChartSize((prev) => (prev === nextWidth ? prev : nextWidth));
+      if (nextWidth < 80) return;
+      // Only seed from window before onLayout; don't fight a tighter parent measure.
+      setWebChartSize((prev) => (prev && prev <= nextWidth ? prev : nextWidth));
     };
     syncSize();
     const subscription = Dimensions.addEventListener('change', syncSize);
@@ -352,6 +365,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   
   const renderChart = useCallback((type, data) => {
     if (!type || !data) return <View style={styles.loadingContainer}><Text style={styles.loadingText}>Loading...</Text></View>;
+    const sizeProp = isWeb && webChartSize ? { size: webChartSize } : {};
     return chartStyle === 'north' ? (
       <NorthIndianChart 
         chartData={data}
@@ -364,6 +378,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         showKarakas={showKarakas}
         karakas={karakas}
         onHousePress={onHousePress}
+        {...sizeProp}
       />
     ) : (
       <SouthIndianChart 
@@ -376,9 +391,10 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         onRotate={handleRotate}
         showKarakas={showKarakas}
         karakas={karakas}
+        {...sizeProp}
       />
     );
-  }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress]);
+  }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize]);
 
   const QuickActionButton = ({ icon, label, onPress, active, primary }) => {
     const iconColor = primary ? '#fff' : (isLight ? '#1e293b' : '#fff');
@@ -435,16 +451,17 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       )}
       
       <View
+        onLayout={onWebChartLayout}
         style={[
           styles.chartContainer,
           cosmicTheme && styles.cosmicChartContainer,
           currentChartType === 'transit' && cosmicTheme && styles.chartContainerTransit,
           isWeb && webChartSize
             ? {
-                width: webChartSize,
+                width: '100%',
                 height: webChartSize,
                 maxWidth: '100%',
-                alignSelf: 'center',
+                alignSelf: 'stretch',
               }
             : null,
         ]}
@@ -503,6 +520,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           style={[
             styles.swipeArea,
             isWeb && styles.swipeAreaWeb,
+            isWeb && webChartSize ? { width: webChartSize, height: webChartSize } : null,
             { transform: [{ translateX: slideAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: [-20, 0, 20], extrapolate: 'clamp' }) }] },
           ]}
         >
@@ -650,6 +668,8 @@ const styles = StyleSheet.create({
   chartContainer: Platform.select({
     web: {
       width: '100%',
+      // Fallback before onLayout; % SVG height alone collapses to 0 on RN Web.
+      aspectRatio: 1,
       position: 'relative',
       alignItems: 'center',
       justifyContent: 'center',
@@ -668,6 +688,7 @@ const styles = StyleSheet.create({
   cosmicChartContainer: Platform.select({
     web: {
       width: '100%',
+      aspectRatio: 1,
       padding: 0,
       marginBottom: 12,
     },
@@ -680,7 +701,7 @@ const styles = StyleSheet.create({
     },
   }),
   swipeArea: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
-  swipeAreaWeb: { flex: 0, width: '100%', height: '100%', alignSelf: 'stretch' },
+  swipeAreaWeb: { flex: 0, alignSelf: 'center' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: 16, color: COLORS.textSecondary },
   floatingControls: { position: 'absolute', top: 10, left: 30, flexDirection: 'row', gap: 8, zIndex: 10 },

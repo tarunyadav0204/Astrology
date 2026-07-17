@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Animated,
   Alert,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -289,6 +290,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     letterSpacing: 3,
+    ...(Platform.OS === 'web'
+      ? { outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none' }
+      : null),
   },
   resendContainer: {
     alignItems: 'center',

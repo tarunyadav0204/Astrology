@@ -465,7 +465,7 @@ export default function ChatScreen({ navigation, route }) {
     chatCountdownSeconds,
     isGuruMember,
   } = useCredits();
-  const { requireAuthForPaid, isGuest } = useAuthGate();
+  const { requireAuthForPaid, isGuest, refreshAuthState } = useAuthGate();
   const insets = useSafeAreaInsets();
   
   // Mundane mode state
@@ -599,6 +599,7 @@ export default function ChatScreen({ navigation, route }) {
   const [showTopicIdeas, setShowTopicIdeas] = useState(false);
   /** Themed insufficient-credits popup when a suggestion card is tapped without enough balance. */
   const [showInsufficientCreditsAlert, setShowInsufficientCreditsAlert] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   /** Soft push opt-in after a successful answer (Android; cadence in notificationReminder). */
   const [showChatNotifBanner, setShowChatNotifBanner] = useState(false);
 
@@ -650,11 +651,12 @@ export default function ChatScreen({ navigation, route }) {
       useNativeDriver: true,
     });
     drawerAnimHandleRef.current = anim;
-    anim.start(({ finished }) => {
+    anim.start(() => {
       if (!mountedRef.current) return;
       menuJustClosedAt.current = Date.now();
       setShowMenu(false);
-      if (finished && onClosed) onClosed();
+      // Always run the follow-up (web animations may report unfinished).
+      if (onClosed) onClosed();
     });
   };
 
@@ -2712,17 +2714,34 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const handleGreetingOptionSelect = async (option) => {
-    // Chat / partnership / mundane immediately need an account (credit or free-question).
-    // Other screens may open for browsing; their generate/spend paths gate separately.
-    const needsAuthNow = new Set(['question', 'partnership', 'mundane']);
+    // Chat / analysis / predictions / partnership / mundane need an account.
+    // Chart & dasha tools stay open for guests.
+    const needsAuthNow = new Set(['question', 'partnership', 'mundane', 'analysis', 'events']);
     if (needsAuthNow.has(option.action)) {
+      const resumeRoute =
+        option.action === 'events'
+          ? 'EventScreen'
+          : 'Home';
+      const featureLabel =
+        option.action === 'question'
+          ? t('authGate.featureChat')
+          : option.action === 'analysis'
+            ? t('authGate.featureAnalysis')
+            : option.action === 'events'
+              ? t('authGate.featureEvents')
+              : option.action;
+      const message =
+        option.action === 'question'
+          ? t('authGate.messageChat')
+          : option.action === 'analysis'
+            ? t('authGate.messageAnalysis')
+            : option.action === 'events'
+              ? t('authGate.messageEvents')
+              : t('authGate.messageGeneric', { feature: featureLabel });
       const ok = await requireAuthForPaid({
-        feature: option.action === 'question' ? 'AI chat' : option.action,
-        message:
-          option.action === 'question'
-            ? 'Sign in to ask AstroRoshni — your first standard question can be free.'
-            : `Sign in to use ${option.action}. Free chart tools stay available without an account.`,
-        resume: { resumeRoute: 'Home', resumeParams: {} },
+        feature: featureLabel,
+        message,
+        resume: { resumeRoute, resumeParams: {} },
       });
       if (!ok) return;
     }
@@ -4404,8 +4423,8 @@ export default function ChatScreen({ navigation, route }) {
       hasBirthData: Boolean(birthData),
     });
     const authOk = await requireAuthForPaid({
-      feature: 'AI chat',
-      message: 'Sign in to ask AstroRoshni — your first standard question can be free.',
+      feature: t('authGate.featureChat'),
+      message: t('authGate.messageChat'),
       resume: { resumeRoute: 'Home', resumeParams: {} },
     });
     if (!authOk) return;
@@ -4836,23 +4855,23 @@ export default function ChatScreen({ navigation, route }) {
 
   const clearChat = confirmStartNewChat;
 
-  const logout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await storage.clearAll();
-            const { replaceWithLogin } = require('../../navigation/replaceWithLogin');
-            replaceWithLogin(navigation);
-          },
-        },
-      ]
-    );
+  // RN Web Alert.alert is a no-op — use AppAlertModal for logout confirm.
+  const logout = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const performLogout = async () => {
+    setShowLogoutConfirm(false);
+    try {
+      await storage.clearAll();
+    } catch (_) {
+      /* still leave the session */
+    }
+    try {
+      await refreshAuthState?.();
+    } catch (_) {}
+    // Guest mode: land on Home as guest (not a hard Login wall).
+    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   };
 
   const handleDeleteMessage = async (messageIdOrLocalId) => {
@@ -6717,6 +6736,10 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={[getMenuOptionStyle(), styles.menuOptionLast]}
                     onPress={() => {
+                      if (isGuest) {
+                        closeMenuDrawer(() => { navigation.navigate('Login'); });
+                        return;
+                      }
                       closeMenuDrawer(() => { logout(); });
                     }}
                   >
@@ -6726,14 +6749,16 @@ export default function ChatScreen({ navigation, route }) {
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff3b30', '#ff6b60']}
+                          colors={isGuest ? ['#ff7b45', '#FF6B35'] : ['#ff3b30', '#ff6b60']}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>🚪</Text>
+                          <Text style={styles.menuEmoji}>{isGuest ? '🔑' : '🚪'}</Text>
                         </LinearGradient>
                       </View>
                       <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#dc2626' }]}>
-                        {t('menu.logout')}
+                        {isGuest
+                          ? t('menu.signIn', 'Sign in / Register')
+                          : t('menu.logout')}
                       </Text>
                       <Ionicons
                         name="chevron-forward"
@@ -7112,6 +7137,19 @@ export default function ChatScreen({ navigation, route }) {
         }}
         onSecondaryPress={() => setShowInsufficientCreditsAlert(false)}
         onRequestClose={() => setShowInsufficientCreditsAlert(false)}
+      />
+
+      <AppAlertModal
+        visible={showLogoutConfirm}
+        variant="warning"
+        icon="log-out-outline"
+        title={t('menu.logout', 'Logout')}
+        message={t('menu.logoutConfirm', 'Are you sure you want to logout? You can keep exploring free chart tools as a guest.')}
+        primaryText={t('menu.logout', 'Logout')}
+        secondaryText={t('common.cancel', 'Cancel')}
+        onPrimaryPress={performLogout}
+        onSecondaryPress={() => setShowLogoutConfirm(false)}
+        onRequestClose={() => setShowLogoutConfirm(false)}
       />
 
       <PodcastPromoModal

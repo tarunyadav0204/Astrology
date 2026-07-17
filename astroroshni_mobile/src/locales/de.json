@@ -7,7 +7,9 @@
     "skipSubtext": "Erkunde die App und füge dein Profil später hinzu",
     "emptyStateTitle": "Geburtsprofil hinzufügen",
     "emptyStateBody": "Dein Geburtsdatum, deine Geburtszeit und dein Geburtsort schalten dein vedisches Horoskop, personalisierte Einblicke und kosmische Führung frei. Du kannst dies jederzeit hinzufügen oder ändern.",
-    "emptyStateCta": "Geburtsprofil hinzufügen"
+    "emptyStateCta": "Geburtsprofil hinzufügen",
+    "chartRequiredTitle": "Geburtshoroskop erforderlich",
+    "chartRequiredBody": "Ihr Konto hat noch kein Geburtshoroskop. Fügen Sie Geburtsdaten hinzu, um Charts, Dashas und personalisierte Funktionen freizuschalten."
   },
   "menu": {
     "title": "Kosmisches Menü",
@@ -260,7 +262,10 @@
     "deleteAccountFailed": "Konto konnte nicht gelöscht werden. Bitte erneut versuchen.",
     "deleteAccountUnexpectedError": "Beim Löschen des Kontos ist ein Fehler aufgetreten. Bitte erneut versuchen.",
     "deleteAccountAndData": "Konto und Daten löschen",
-    "logout": "Abmelden"
+    "logout": "Abmelden",
+    "signUnavailable": "—",
+    "guestSignInTitle": "Als Gast unterwegs",
+    "guestSignInBody": "Melden Sie sich an, um Charts zu speichern, Credits zu kaufen und kostenpflichtige Einblicke freizuschalten."
   },
   "accountSecurity": {
     "title": "Konto und Sicherheit",
@@ -337,7 +342,8 @@
     "featureAi": "KI-gestützte Vorhersagen",
     "featureDaily": "Tägliche kosmische Führung",
     "createBirthChart": "Mein Geburtshoroskop erstellen",
-    "skipForNow": "Jetzt überspringen"
+    "skipForNow": "Jetzt überspringen",
+    "chartRequiredSubtitle": "Für chartbasierte Funktionen ist ein Geburtshoroskop erforderlich. Fügen Sie Ihre Geburtsdaten hinzu, um fortzufahren."
   },
   "chat": {
     "chartEssence": "{{name}}s Horoskop-Kern",
@@ -361,7 +367,9 @@
   "home": {
     "greeting": {
       "subtitle": "Dein kosmischer Bauplan wartet. Wähle deinen Pfad zur Erkenntnis.",
-      "lifePath": "{{name}}s Lebensweg"
+      "lifePath": "{{name}}s Lebensweg",
+      "hello": "Hallo",
+      "guestName": "Entdecker"
     },
     "firstQuestionFree": {
       "title": "Deine erste Frage ist kostenlos!",
@@ -635,6 +643,11 @@
       "watchHint": "Tippe auf Play, um ein kurzes Video zu deinem Mond-Nakshatra zu öffnen.",
       "watchHintMissing": "Dein Guide-Video erscheint hier, sobald dein Chart bereit ist.",
       "openVideo": "Video öffnen"
+    },
+    "guestNudge": {
+      "title": "Erstellen Sie Ihr kostenloses Geburtshoroskop",
+      "body": "Charts und Dashas sind kostenlos — kein Konto nötig. Melden Sie sich an für Chat, Analyse oder Credits.",
+      "cta": "Geburtsdaten hinzufügen"
     }
   },
   "reports": {
@@ -1216,5 +1229,23 @@
       "timing_of_events": "Zeitpunkt der Ereignisse",
       "remedial_measures": "Heilende Maßnahmen"
     }
+  },
+  "authGate": {
+    "title": "Zum Fortfahren anmelden",
+    "defaultMessage": "Erstellen Sie ein kostenloses Konto, um fortzufahren. Ihre Charts auf diesem Gerät werden in Ihrem Konto gespeichert.",
+    "messageGeneric": "Melden Sie sich an, um {{feature}} zu nutzen. Kostenlose Chart-Tools bleiben ohne Konto verfügbar.",
+    "messageChat": "Melden Sie sich an, um AstroRoshni zu fragen — Ihre erste Standardfrage kann kostenlos sein.",
+    "messageAnalysis": "Melden Sie sich an, um Lebensanalysen zu starten. Kostenlose Chart- und Dasha-Tools bleiben ohne Konto verfügbar.",
+    "messageEvents": "Melden Sie sich an, um Vorhersagen (jährlich & monatlich) zu öffnen. Kostenlose Chart- und Dasha-Tools bleiben ohne Konto verfügbar.",
+    "messageCredits": "Melden Sie sich an, um Credits zu kaufen und kostenpflichtige Funktionen freizuschalten.",
+    "messageReports": "Melden Sie sich an, um Reports Studio zu öffnen. Kostenlose Chart-Tools bleiben ohne Konto verfügbar.",
+    "cta": "Anmelden / Registrieren",
+    "dismiss": "Kostenlose Tools weiter erkunden",
+    "featureChat": "KI-Chat",
+    "featureAnalysis": "Lebensanalyse",
+    "featureEvents": "Vorhersagen",
+    "featureCredits": "Credits",
+    "featureReports": "Reports Studio",
+    "messageSpeech": "Melden Sie sich an, um den Sprachchat zu nutzen. Sprechzeit verbraucht Credits."
   }
 }

@@ -386,6 +386,10 @@ export default function App() {
             // Expired session: still allow guest Home (free tools) instead of hard Welcome wall.
             setInitialRoute('Home');
             trackGA4EventOnly('guest_home_opened', { source: 'expired_session' }).catch(() => {});
+            try {
+              const { trackGuestActivity } = require('./src/services/acquisitionTracking');
+              trackGuestActivity('guest_open').catch(() => {});
+            } catch (_) {}
           } else {
             setInitialRoute('Home');
           }
@@ -394,6 +398,10 @@ export default function App() {
         // Guests can explore free chart tools without registering.
         setInitialRoute('Home');
         trackGA4EventOnly('guest_home_opened', { source: 'cold_start' }).catch(() => {});
+        try {
+          const { trackGuestActivity } = require('./src/services/acquisitionTracking');
+          trackGuestActivity('guest_open').catch(() => {});
+        } catch (_) {}
       }
     } catch (error) {
       console.log('Bootstrap error:', error);

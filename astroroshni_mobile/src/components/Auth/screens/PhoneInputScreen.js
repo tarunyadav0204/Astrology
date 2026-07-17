@@ -9,6 +9,7 @@ import {
   Alert,
   Modal,
   FlatList,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -484,6 +485,9 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     paddingVertical: 16,
     fontWeight: '500',
+    ...(Platform.OS === 'web'
+      ? { outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none' }
+      : null),
   },
   inlineErrorRow: {
     flexDirection: 'row',

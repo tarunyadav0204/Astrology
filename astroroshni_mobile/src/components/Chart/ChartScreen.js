@@ -697,7 +697,16 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
         ]}
       >
         <View style={[styles.chartArea, webIntrinsic]}>
-          <View style={[styles.chartWrapper, webIntrinsic]}>
+          <View
+            style={[
+              styles.chartWrapper,
+              webIntrinsic,
+              // Keep a square slot on web so %/flex collapse cannot hide the chart.
+              Platform.OS === 'web'
+                ? { width: '100%', aspectRatio: 1, minHeight: 280 }
+                : null,
+            ]}
+          >
             <ChartWidget
               ref={chartWidgetRef}
               chartData={getChartDataForType(chartTypes[currentChartIndex].id)}

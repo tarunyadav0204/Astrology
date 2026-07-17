@@ -424,8 +424,8 @@ export default function SpeechChatScreen({ navigation, route }) {
   const startSpeechBillingSession = async () => {
     if (billingSessionRef.current?.session_id) return true;
     const authOk = await requireAuthForPaid({
-      feature: 'speech chat',
-      message: 'Sign in to use speech chat. Talk time uses credits.',
+      feature: t('speechChat.title', 'speech chat'),
+      message: t('authGate.messageSpeech'),
       resume: { resumeRoute: 'SpeechChat', resumeParams: route?.params || {} },
     });
     if (!authOk) return false;

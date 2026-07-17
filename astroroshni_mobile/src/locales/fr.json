@@ -7,7 +7,9 @@
     "skipSubtext": "Explorez l'application et ajoutez votre profil plus tard",
     "emptyStateTitle": "Ajoutez votre profil de naissance",
     "emptyStateBody": "Votre date, heure et lieu de naissance débloquent votre thème védique, des analyses personnalisées et des conseils cosmiques. Vous pouvez modifier cela à tout moment.",
-    "emptyStateCta": "Ajouter un profil de naissance"
+    "emptyStateCta": "Ajouter un profil de naissance",
+    "chartRequiredTitle": "Thème natal requis",
+    "chartRequiredBody": "Votre compte n’a pas encore de thème natal. Ajoutez vos détails de naissance pour débloquer les thèmes, dashas et fonctionnalités personnalisées."
   },
   "menu": {
     "title": "Menu Cosmique",
@@ -260,7 +262,10 @@
     "deleteAccountFailed": "Échec de la suppression du compte. Veuillez réessayer.",
     "deleteAccountUnexpectedError": "Une erreur s'est produite lors de la suppression du compte. Veuillez réessayer.",
     "deleteAccountAndData": "Supprimer le compte et les données",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "signUnavailable": "—",
+    "guestSignInTitle": "Exploration en invité",
+    "guestSignInBody": "Connectez-vous pour enregistrer les thèmes, acheter des crédits et débloquer les insights payants."
   },
   "accountSecurity": {
     "title": "Compte et sécurité",
@@ -337,7 +342,8 @@
     "featureAi": "Prédictions assistées par IA",
     "featureDaily": "Guidance cosmique quotidienne",
     "createBirthChart": "Créer mon thème natal",
-    "skipForNow": "Passer pour l'instant"
+    "skipForNow": "Passer pour l'instant",
+    "chartRequiredSubtitle": "Un thème natal est requis pour les fonctions basées sur le thème. Ajoutez vos détails de naissance pour continuer."
   },
   "chat": {
     "chartEssence": "Essence du thème de {{name}}",
@@ -361,7 +367,9 @@
   "home": {
     "greeting": {
       "subtitle": "Votre plan cosmique vous attend. Choisissez votre chemin vers l'éveil.",
-      "lifePath": "Chemin de vie de {{name}}"
+      "lifePath": "Chemin de vie de {{name}}",
+      "hello": "Bonjour",
+      "guestName": "Explorateur"
     },
     "firstQuestionFree": {
       "title": "Votre première question est gratuite !",
@@ -635,6 +643,11 @@
       "watchHint": "Appuyez sur lecture pour ouvrir une courte vidéo sur votre Nakshatra lunaire.",
       "watchHintMissing": "Votre vidéo-guide apparaîtra ici une fois votre thème prêt.",
       "openVideo": "Ouvrir la vidéo"
+    },
+    "guestNudge": {
+      "title": "Créez votre thème natal gratuit",
+      "body": "Thèmes et dashas sont gratuits — aucun compte requis. Connectez-vous pour le chat, l’analyse ou les crédits.",
+      "cta": "Ajouter les détails de naissance"
     }
   },
   "reports": {
@@ -1216,5 +1229,23 @@
       "timing_of_events": "Moment des événements",
       "remedial_measures": "Mesures correctives"
     }
+  },
+  "authGate": {
+    "title": "Connectez-vous pour continuer",
+    "defaultMessage": "Créez un compte gratuit pour continuer. Vos thèmes sur cet appareil seront enregistrés dans votre compte.",
+    "messageGeneric": "Connectez-vous pour utiliser {{feature}}. Les outils de thème gratuits restent disponibles sans compte.",
+    "messageChat": "Connectez-vous pour interroger AstroRoshni — votre première question standard peut être gratuite.",
+    "messageAnalysis": "Connectez-vous pour lancer l’analyse de vie. Les outils de thème et dasha gratuits restent disponibles sans compte.",
+    "messageEvents": "Connectez-vous pour ouvrir les Prédictions (annuelles et mensuelles). Les outils de thème et dasha gratuits restent disponibles sans compte.",
+    "messageCredits": "Connectez-vous pour acheter des crédits et débloquer les fonctions payantes.",
+    "messageReports": "Connectez-vous pour ouvrir Reports Studio. Les outils de thème gratuits restent disponibles sans compte.",
+    "cta": "Connexion / Inscription",
+    "dismiss": "Continuer à explorer les outils gratuits",
+    "featureChat": "Chat IA",
+    "featureAnalysis": "Analyse de vie",
+    "featureEvents": "Prédictions",
+    "featureCredits": "crédits",
+    "featureReports": "Reports Studio",
+    "messageSpeech": "Connectez-vous pour utiliser le chat vocal. Le temps de parole utilise des crédits."
   }
 }

@@ -7,7 +7,9 @@
     "skipSubtext": "先探索应用，稍后再添加个人资料",
     "emptyStateTitle": "添加您的出生资料",
     "emptyStateBody": "您的出生日期、时间和地点将解锁您的吠陀星盘、个性化见解和宇宙指引。您可以随时添加或更改。",
-    "emptyStateCta": "添加出生资料"
+    "emptyStateCta": "添加出生资料",
+    "chartRequiredTitle": "需要出生盘",
+    "chartRequiredBody": "您的账户还没有出生盘。添加出生信息以解锁星盘、行星周期和个性化功能。"
   },
   "menu": {
     "title": "宇宙菜单",
@@ -260,7 +262,10 @@
     "deleteAccountFailed": "删除账户失败，请重试。",
     "deleteAccountUnexpectedError": "删除账户时出错，请重试。",
     "deleteAccountAndData": "删除账户与数据",
-    "logout": "退出登录"
+    "logout": "退出登录",
+    "signUnavailable": "—",
+    "guestSignInTitle": "以访客身份探索",
+    "guestSignInBody": "登录以将星盘保存到账户、购买积分并解锁付费洞察。"
   },
   "accountSecurity": {
     "title": "账户与安全",
@@ -337,7 +342,8 @@
     "featureAi": "AI 驱动的预测",
     "featureDaily": "每日宇宙指引",
     "createBirthChart": "创建我的出生星盘",
-    "skipForNow": "暂时跳过"
+    "skipForNow": "暂时跳过",
+    "chartRequiredSubtitle": "基于星盘的功能需要出生盘。添加出生信息以继续。"
   },
   "chat": {
     "chartEssence": "{{name}} 的星盘核心",
@@ -361,7 +367,9 @@
   "home": {
     "greeting": {
       "subtitle": "您的宇宙蓝图已准备就绪。选择您的启迪之路。",
-      "lifePath": "{{name}} 的人生道路"
+      "lifePath": "{{name}} 的人生道路",
+      "hello": "你好",
+      "guestName": "探索者"
     },
     "firstQuestionFree": {
       "title": "您的第一个问题免费！",
@@ -635,6 +643,11 @@
       "watchHint": "点击播放，打开关于你月亮星宿的简短视频。",
       "watchHintMissing": "当你的星盘准备好后，指南视频会出现在这里。",
       "openVideo": "打开视频"
+    },
+    "guestNudge": {
+      "title": "创建您的免费出生盘",
+      "body": "星盘和周期免费——无需账户。聊天、分析或积分时请登录。",
+      "cta": "添加出生信息"
     }
   },
   "reports": {
@@ -1216,5 +1229,23 @@
       "timing_of_events": "事件发生时机",
       "remedial_measures": "化解建议"
     }
+  },
+  "authGate": {
+    "title": "登录以继续",
+    "defaultMessage": "创建免费账户以继续。此设备上的星盘将保存到您的账户。",
+    "messageGeneric": "登录以使用{{feature}}。免费星盘工具无需账户即可使用。",
+    "messageChat": "登录以向 AstroRoshni 提问——您的第一个标准问题可能免费。",
+    "messageAnalysis": "登录以进行人生分析。免费星盘和周期工具无需账户即可使用。",
+    "messageEvents": "登录以打开预测（年度与月度）。免费星盘和周期工具无需账户即可使用。",
+    "messageCredits": "登录以购买积分并解锁付费功能。",
+    "messageReports": "登录以打开 Reports Studio。免费星盘工具无需账户即可使用。",
+    "cta": "登录 / 注册",
+    "dismiss": "继续探索免费工具",
+    "featureChat": "AI 聊天",
+    "featureAnalysis": "人生分析",
+    "featureEvents": "预测",
+    "featureCredits": "积分",
+    "featureReports": "Reports Studio",
+    "messageSpeech": "登录以使用语音聊天。通话时间会消耗积分。"
   }
 }

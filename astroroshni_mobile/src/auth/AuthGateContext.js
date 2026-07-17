@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   clearPendingPaidAction,
@@ -24,6 +25,9 @@ import {
   setPendingPaidAction,
 } from './guestAuth';
 import { trackGA4EventOnly } from '../utils/analytics';
+import { trackGuestActivity } from '../services/acquisitionTracking';
+import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 const AuthGateContext = createContext({
   isGuest: true,
@@ -35,10 +39,14 @@ const AuthGateContext = createContext({
 
 export function AuthGateProvider({ children }) {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const { theme, colors } = useTheme();
+  const { t } = useTranslation();
+  const isDark = theme === 'dark';
   const [isGuest, setIsGuest] = useState(true);
   const [visible, setVisible] = useState(false);
   const [gateMeta, setGateMeta] = useState({
-    feature: 'this feature',
+    feature: '',
     message: '',
   });
 
@@ -58,16 +66,15 @@ export function AuthGateProvider({ children }) {
 
   const openAuthGate = useCallback((meta = {}) => {
     setGateMeta({
-      feature: meta.feature || 'this feature',
-      message:
-        meta.message ||
-        'Create a free account to continue. Your charts on this device will be saved to your account.',
+      feature: meta.feature || t('authGate.featureCredits', 'this feature'),
+      message: meta.message || t('authGate.defaultMessage'),
     });
     setVisible(true);
     trackGA4EventOnly('auth_gate_shown', {
       feature: meta.feature || 'unknown',
     }).catch(() => {});
-  }, []);
+    trackGuestActivity('auth_gate_shown').catch(() => {});
+  }, [t]);
 
   const requireAuthForPaid = useCallback(
     async ({ feature, message, resume } = {}) => {
@@ -113,46 +120,72 @@ export function AuthGateProvider({ children }) {
     [isGuest, refreshAuthState, requireAuthForPaid, openAuthGate, closeAuthGate],
   );
 
+  const sheetBg = isDark ? colors.backgroundSecondary : colors.cardBackground;
+  const sheetBorder = colors.cardBorder;
+  const iconBg = isDark ? 'rgba(249, 115, 22, 0.18)' : 'rgba(234, 88, 12, 0.12)';
+  const ctaColors = isDark
+    ? ['#f97316', '#ea580c', '#c2410c']
+    : ['#fb923c', '#ea580c', '#c2410c'];
+
   return (
     <AuthGateContext.Provider value={value}>
       {children}
       <Modal
         visible={visible}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={dismissGate}
       >
-        <TouchableOpacity
-          style={styles.backdrop}
-          activeOpacity={1}
-          onPress={dismissGate}
-        >
-          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={styles.sheetWrap}>
-            <View style={styles.sheet}>
-              <View style={styles.iconWrap}>
-                <Ionicons name="lock-closed" size={22} color="#B45309" />
-              </View>
-              <Text style={styles.title}>Sign in to continue</Text>
-              <Text style={styles.body}>
-                {gateMeta.message ||
-                  `Sign in to use ${gateMeta.feature}. Free chart tools stay available without an account.`}
-              </Text>
-              <TouchableOpacity onPress={goToLogin} activeOpacity={0.9}>
-                <LinearGradient
-                  colors={['#ff7b45', '#FF6B35', '#e85a2a']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.primaryBtn}
-                >
-                  <Text style={styles.primaryText}>Sign in / Register</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={dismissGate} style={styles.secondaryBtn}>
-                <Text style={styles.secondaryText}>Keep exploring free tools</Text>
-              </TouchableOpacity>
+        <View style={styles.backdrop}>
+          <TouchableOpacity
+            style={styles.backdropTap}
+            activeOpacity={1}
+            onPress={dismissGate}
+            accessibilityLabel={t('authGate.dismiss')}
+          />
+          <View
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: sheetBg,
+                borderColor: sheetBorder,
+                paddingBottom: Math.max(insets.bottom, 16) + 8,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.handle,
+                { backgroundColor: isDark ? 'rgba(255,255,255,0.28)' : 'rgba(28,25,23,0.2)' },
+              ]}
+            />
+            <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
+              <Ionicons name="lock-closed" size={22} color={colors.primary} />
             </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
+            <Text style={[styles.title, { color: colors.text }]}>
+              {t('authGate.title')}
+            </Text>
+            <Text style={[styles.body, { color: colors.textSecondary }]}>
+              {gateMeta.message ||
+                t('authGate.messageGeneric', { feature: gateMeta.feature || t('authGate.featureCredits') })}
+            </Text>
+            <TouchableOpacity onPress={goToLogin} activeOpacity={0.9}>
+              <LinearGradient
+                colors={ctaColors}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.primaryBtn}
+              >
+                <Text style={styles.primaryText}>{t('authGate.cta')}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={dismissGate} style={styles.secondaryBtn} activeOpacity={0.7}>
+              <Text style={[styles.secondaryText, { color: colors.textTertiary }]}>
+                {t('authGate.dismiss')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </AuthGateContext.Provider>
   );
@@ -163,27 +196,43 @@ export const useAuthGate = () => useContext(AuthGateContext);
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    backgroundColor: 'rgba(10, 5, 20, 0.55)',
     justifyContent: 'flex-end',
   },
-  sheetWrap: {
-    width: '100%',
+  backdropTap: {
+    flex: 1,
   },
   sheet: {
-    backgroundColor: '#fffbeb',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
     paddingHorizontal: 22,
-    paddingTop: 22,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 22,
+    paddingTop: 10,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.28)',
+    borderBottomWidth: 0,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -6 },
+        shadowOpacity: 0.18,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 16,
+      },
+      default: {},
+    }),
+  },
+  handle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 16,
   },
   iconWrap: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(245, 158, 11, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -191,18 +240,16 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#1c1917',
     marginBottom: 8,
   },
   body: {
     fontSize: 14,
-    lineHeight: 20,
-    color: '#57534e',
-    marginBottom: 18,
+    lineHeight: 21,
+    marginBottom: 20,
   },
   primaryBtn: {
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingVertical: 15,
     alignItems: 'center',
   },
   primaryText: {
@@ -211,12 +258,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   secondaryBtn: {
-    marginTop: 12,
-    paddingVertical: 10,
+    marginTop: 10,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   secondaryText: {
-    color: '#78716c',
     fontSize: 14,
     fontWeight: '600',
   },

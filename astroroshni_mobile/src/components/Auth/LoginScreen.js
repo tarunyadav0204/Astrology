@@ -17,12 +17,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { authAPI } from '../../services/api';
 import { storage } from '../../services/storage';
-import { trackAstrologyEvent } from '../../utils/analytics';
+import { trackAstrologyEvent, trackGA4EventOnly } from '../../utils/analytics';
 import { COLORS } from '../../utils/constants';
 import { apiErrorMessage } from '../../utils/apiErrorMessage';
 import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { trackAcquisitionFunnelEvent, updateAcquisitionLeadContact } from '../../services/acquisitionTracking';
+import {
+  clearPendingPaidAction,
+  getPendingPaidAction,
+  mergeGuestProfilesAfterLogin,
+} from '../../auth/guestAuth';
+import { resetToRoute } from '../../navigation/navHelpers';
 
 const { width, height } = Dimensions.get('window');
 
@@ -144,26 +150,64 @@ export default function LoginScreen({ navigation }) {
         trackAstrologyEvent.userLoggedIn();
         // Refresh credits after successful login
         await refreshCredits();
+
+        try {
+          const { chartAPI } = require('../../services/api');
+          await mergeGuestProfilesAfterLogin({ chartAPI });
+        } catch (_) {
+          /* non-fatal */
+        }
+
+        const resetTo = (routeName, params) => {
+          resetToRoute(navigation, routeName, params);
+        };
+
+        const pending = await getPendingPaidAction();
+        if (pending?.resumeRoute) {
+          await clearPendingPaidAction();
+          trackGA4EventOnly('auth_gate_completed', {
+            feature: pending.feature || 'paid_feature',
+          }).catch(() => {});
+          resetTo(pending.resumeRoute, pending.resumeParams || {});
+          return;
+        }
         
         // Check if user has self birth chart from login response
         if (response.data.self_birth_chart) {
-          // User has self birth chart, go directly to main app
-          navigation.navigate('SelectNative');
+          resetTo('Home');
         } else {
           // Check if user has existing charts
           try {
             const { chartAPI } = require('../../services/api');
             const chartResponse = await chartAPI.getExistingCharts();
-            const hasCharts = chartResponse.data.charts && chartResponse.data.charts.length > 0;
+            const charts = chartResponse.data?.charts || [];
+            const localActive = await storage.getBirthDetails();
             
-            if (hasCharts) {
-              navigation.navigate('SelectNative');
+            if (charts.length > 0 || localActive) {
+              if (!localActive && charts.length > 0) {
+                const selfChart = charts.find(
+                  (c) => String(c?.relation || '').trim().toLowerCase() === 'self'
+                );
+                const selected = selfChart || charts[0];
+                await storage.setBirthDetails({
+                  id: selected.id ?? selected._id,
+                  name: selected.name,
+                  date: selected.date,
+                  time: selected.time,
+                  place: selected.place,
+                  latitude: selected.latitude,
+                  longitude: selected.longitude,
+                  gender: selected.gender,
+                  relation: selected.relation,
+                  isSelf: String(selected?.relation || '').trim().toLowerCase() === 'self',
+                });
+              }
+              resetTo('Home');
             } else {
-              navigation.navigate('BirthForm');
+              resetTo('BirthProfileIntro', { chartRequired: true });
             }
           } catch (error) {
-            // If API fails, go to birth form
-            navigation.navigate('BirthForm');
+            resetTo('BirthProfileIntro', { chartRequired: true });
           }
         }
       } else {

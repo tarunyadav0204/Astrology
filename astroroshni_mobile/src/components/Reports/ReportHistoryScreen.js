@@ -19,6 +19,7 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 import { reportAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import { downloadPdfToLocalUri, sharePDFOnWhatsApp } from '../../utils/pdfGenerator';
+import { goBackOrHome } from '../../navigation/navHelpers';
 
 const STATUS_META = {
   completed: { icon: 'checkmark-circle', tint: '#22c55e' },
@@ -241,7 +242,7 @@ export default function ReportHistoryScreen({ navigation }) {
           <View style={styles.header}>
             <View style={styles.headerTopRow}>
               <TouchableOpacity
-                onPress={() => navigation.goBack()}
+                onPress={() => goBackOrHome(navigation)}
                 style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]}
               >
                 <Ionicons name="arrow-back" size={22} color={colors.text} />

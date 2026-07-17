@@ -1,15 +1,24 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../../../utils/constants';
+import { chartAPI } from '../../../services/api';
+import storage from '../../../services/storage';
+import {
+  clearPendingPaidAction,
+  getPendingPaidAction,
+} from '../../../auth/guestAuth';
+import { trackGA4EventOnly } from '../../../utils/analytics';
+import { resetToRoute } from '../../../navigation/navHelpers';
 
 export default function WelcomeAfterRegistrationScreen({ 
   formData, 
@@ -19,6 +28,7 @@ export default function WelcomeAfterRegistrationScreen({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const [routing, setRouting] = useState(true);
 
   useEffect(() => {
     Animated.parallel([
@@ -42,13 +52,80 @@ export default function WelcomeAfterRegistrationScreen({
     ]).start();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const pending = await getPendingPaidAction();
+        const localActive = await storage.getBirthDetails();
+        let charts = [];
+        try {
+          const chartsRes = await chartAPI.getExistingCharts('', 10, 0);
+          charts = Array.isArray(chartsRes?.data?.charts) ? chartsRes.data.charts : [];
+        } catch (_) {
+          /* offline / guest merge already ran */
+        }
+
+        if (cancelled) return;
+
+        if (charts.length > 0 || localActive) {
+          if (!localActive && charts.length > 0) {
+            const selfChart = charts.find(
+              (c) => String(c?.relation || '').trim().toLowerCase() === 'self'
+            );
+            const selected = selfChart || charts[0];
+            await storage.setBirthDetails({
+              id: selected.id ?? selected._id,
+              name: selected.name,
+              date: selected.date,
+              time: selected.time,
+              place: selected.place,
+              latitude: selected.latitude,
+              longitude: selected.longitude,
+              gender: selected.gender,
+              relation: selected.relation,
+              isSelf: String(selected?.relation || '').trim().toLowerCase() === 'self',
+            });
+          }
+          if (pending?.resumeRoute) {
+            await clearPendingPaidAction();
+            trackGA4EventOnly('auth_gate_completed', {
+              feature: pending.feature || 'paid_feature',
+            }).catch(() => {});
+            resetToRoute(navigation, pending.resumeRoute, pending.resumeParams || {});
+            return;
+          }
+          navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+          return;
+        }
+
+        // Zero charts after register: birth chart required.
+        setRouting(false);
+      } catch (_) {
+        if (!cancelled) setRouting(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [navigation]);
+
   const handleCreateBirthChart = () => {
     navigation.replace('BirthForm', { 
       prefillData: { 
         name: formData.name 
-      } 
+      },
+      chartRequired: true,
     });
   };
+
+  if (routing) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#ffd700" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -65,7 +142,6 @@ export default function WelcomeAfterRegistrationScreen({
             },
           ]}
         >
-          {/* Success Icon */}
           <View style={styles.iconContainer}>
             <LinearGradient
               colors={['#ff6b35', '#ffd700', '#ff6b35']}
@@ -75,16 +151,17 @@ export default function WelcomeAfterRegistrationScreen({
             </LinearGradient>
           </View>
 
-          {/* Welcome Message */}
           <Text style={styles.welcomeTitle}>
             {t('authOnboarding.welcomeTitle', { name: formData.name || '' })}
           </Text>
           
           <Text style={styles.welcomeSubtitle}>
-            {t('authOnboarding.welcomeSubtitle')}
+            {t(
+              'authOnboarding.chartRequiredSubtitle',
+              'A birth chart is required to use chart-based features. Add your birth details to continue.',
+            )}
           </Text>
 
-          {/* Features List */}
           <View style={styles.featuresList}>
             <View style={styles.featureItem}>
               <Text style={styles.featureIcon}>📊</Text>
@@ -100,7 +177,6 @@ export default function WelcomeAfterRegistrationScreen({
             </View>
           </View>
 
-          {/* Create Birth Chart Button */}
           <TouchableOpacity
             style={styles.createChartButton}
             onPress={handleCreateBirthChart}
@@ -112,14 +188,6 @@ export default function WelcomeAfterRegistrationScreen({
               <Text style={styles.buttonText}>{t('authOnboarding.createBirthChart')}</Text>
               <Ionicons name="arrow-forward" size={20} color="#ffffff" />
             </LinearGradient>
-          </TouchableOpacity>
-
-          {/* Skip Option */}
-          <TouchableOpacity
-            style={styles.skipButton}
-            onPress={() => navigation.replace('Home')}
-          >
-            <Text style={styles.skipText}>{t('authOnboarding.skipForNow')}</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -225,14 +293,5 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '700',
-  },
-  skipButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  skipText: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 16,
-    fontWeight: '500',
   },
 });

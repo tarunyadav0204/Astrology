@@ -480,9 +480,15 @@ async def calculate_chart_only(
 
 
 @router.post("/chart-house-insight")
-async def chart_house_insight(request: HouseInsightRequest, current_user: User = Depends(get_current_user)):
-    """Build a calculator-backed insight payload for a selected house."""
+async def chart_house_insight(
+    request: HouseInsightRequest,
+    http_request: Request,
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    """Build a calculator-backed insight payload for a selected house. Public for guest chart viewing."""
     try:
+        if current_user is None:
+            _enforce_guest_chart_only_rate_limit(http_request)
         if request.house_num < 1 or request.house_num > 12:
             raise HTTPException(status_code=400, detail="house_num must be between 1 and 12")
 
@@ -500,9 +506,16 @@ async def chart_house_insight(request: HouseInsightRequest, current_user: User =
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/calculate-all-charts")
-async def calculate_all_charts(request: dict, current_user: User = Depends(get_current_user)):
-    """Calculate all charts including divisional charts"""
+async def calculate_all_charts(
+    request: dict,
+    http_request: Request,
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    """Calculate all charts including divisional charts. Public for guest free chart tools."""
     try:
+        if current_user is None:
+            _enforce_guest_chart_only_rate_limit(http_request)
+            http_request.state._guest_chart_batch = True
         birth_data = request.get('birth_data', {})
         birth_hash = _birth_hash_from_dict(birth_data)
         cache_key = build_chart_cache_key("calculate-all-charts", birth_hash) if birth_hash else None
@@ -537,10 +550,14 @@ async def calculate_all_charts(request: dict, current_user: User = Depends(get_c
         
         for division in [2, 3, 4, 7, 9, 10, 12, 16, 20, 24, 27, 30, 40, 45, 60]:
             try:
-                div_result = await calculate_divisional_chart({
-                    'birth_data': birth_data,
-                    'division': division  # Use 'division' not 'division_number'
-                }, current_user)
+                div_result = await calculate_divisional_chart(
+                    {
+                        'birth_data': birth_data,
+                        'division': division  # Use 'division' not 'division_number'
+                    },
+                    http_request,
+                    current_user,
+                )
                 divisional_charts[f'd{division}'] = div_result['divisional_chart']
             except Exception as e:
                 print(f"Error calculating D{division}: {e}")
@@ -578,8 +595,15 @@ async def calculate_all_charts(request: dict, current_user: User = Depends(get_c
         return {"success": False, "error": str(e)}
 
 @router.post("/calculate-divisional-chart")
-async def calculate_divisional_chart(request: dict, current_user: User = Depends(get_current_user)):
-    """Calculate accurate divisional charts using proper Vedic formulas"""
+async def calculate_divisional_chart(
+    request: dict,
+    http_request: Request,
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    """Calculate accurate divisional charts using proper Vedic formulas. Public for guest free charts."""
+    # Skip per-call limit when batched from calculate-all-charts (already limited once).
+    if current_user is None and not getattr(http_request.state, "_guest_chart_batch", False):
+        _enforce_guest_chart_only_rate_limit(http_request)
     def get_divisional_sign(sign, degree_in_sign, division):
         """Calculate divisional sign using proper Vedic formulas with boundary buffer"""
         EPS = 1e-9  # Prevent 10.0 becoming 9.999

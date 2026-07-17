@@ -17,6 +17,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { downloadPdfToLocalUri, sharePDFOnWhatsApp } from '../../utils/pdfGenerator';
+import { goBackOrHome } from '../../navigation/navHelpers';
 
 const LOAD_TIMEOUT_MS = 20000;
 const MAX_BASE64_HTML_CHARS = 5_500_000;
@@ -269,7 +270,7 @@ export default function ReportViewerScreen({ navigation, route }) {
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <View style={[styles.toolbar, { borderBottomColor: surfaceBorder }]}>
           <ToolbarIcon
-            onPress={() => navigation.goBack()}
+            onPress={() => goBackOrHome(navigation)}
             icon="chevron-back"
             color={colors.text}
             backgroundColor={surface}

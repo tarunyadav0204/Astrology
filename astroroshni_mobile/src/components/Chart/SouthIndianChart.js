@@ -14,7 +14,8 @@ const SouthIndianChart = ({
   onRotate, 
   cosmicTheme = false, 
   showKarakas = false, 
-  karakas = null 
+  karakas = null,
+  size = null, // PWA/web: explicit pixel square (avoids % SVG collapse)
 }) => {
   const [contextMenu, setContextMenu] = useState({ show: false, rashiIndex: null, signName: null });
   const { t } = useTranslation();
@@ -197,13 +198,18 @@ const SouthIndianChart = ({
   };
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        size ? { width: size, height: size, alignSelf: 'center' } : null,
+      ]}
+    >
       <Svg
         viewBox="0 0 340 340"
-        width="100%"
-        height="100%"
+        width={size || '100%'}
+        height={size || '100%'}
         preserveAspectRatio="xMidYMid meet"
-        style={styles.svg}
+        style={[styles.svg, size ? { width: size, height: size } : null]}
       >
         <Defs>
           <ClipPath id="southChartClip">
@@ -437,7 +443,7 @@ const styles = StyleSheet.create({
   container: Platform.select({
     web: {
       width: '100%',
-      height: '100%',
+      aspectRatio: 1,
       alignSelf: 'stretch',
       position: 'relative',
     },
@@ -450,7 +456,7 @@ const styles = StyleSheet.create({
   svg: Platform.select({
     web: {
       width: '100%',
-      height: '100%',
+      aspectRatio: 1,
       display: 'block',
     },
     default: {

@@ -7,7 +7,9 @@
     "skipSubtext": "Explora la aplicación y agrega tu perfil más tarde",
     "emptyStateTitle": "Agrega tu perfil de nacimiento",
     "emptyStateBody": "Tu fecha, hora y lugar de nacimiento desbloquean tu carta védica, conocimientos personalizados y guía cósmica. Puedes agregar o cambiar esto en cualquier momento.",
-    "emptyStateCta": "Agregar perfil de nacimiento"
+    "emptyStateCta": "Agregar perfil de nacimiento",
+    "chartRequiredTitle": "Se requiere carta natal",
+    "chartRequiredBody": "Tu cuenta aún no tiene carta natal. Añade los datos de nacimiento para desbloquear cartas, dashas y funciones personalizadas."
   },
   "menu": {
     "title": "Menú Cósmico",
@@ -260,7 +262,10 @@
     "deleteAccountFailed": "No se pudo eliminar la cuenta. Inténtalo de nuevo.",
     "deleteAccountUnexpectedError": "Algo salió mal al eliminar tu cuenta. Inténtalo de nuevo.",
     "deleteAccountAndData": "Eliminar cuenta y datos",
-    "logout": "Cerrar sesión"
+    "logout": "Cerrar sesión",
+    "signUnavailable": "—",
+    "guestSignInTitle": "Explorando como invitado",
+    "guestSignInBody": "Inicia sesión para guardar cartas, comprar créditos y desbloquear insights de pago."
   },
   "accountSecurity": {
     "title": "Cuenta y seguridad",
@@ -337,7 +342,8 @@
     "featureAi": "Predicciones con IA",
     "featureDaily": "Guía cósmica diaria",
     "createBirthChart": "Crear mi carta natal",
-    "skipForNow": "Omitir por ahora"
+    "skipForNow": "Omitir por ahora",
+    "chartRequiredSubtitle": "Se requiere una carta natal para las funciones basadas en la carta. Añade tus datos de nacimiento para continuar."
   },
   "chat": {
     "chartEssence": "Esencia de la Carta de {{name}}",
@@ -361,7 +367,9 @@
   "home": {
     "greeting": {
       "subtitle": "Tu diseño cósmico te espera. Elige tu camino hacia la iluminación.",
-      "lifePath": "Camino de Vida de {{name}}"
+      "lifePath": "Camino de Vida de {{name}}",
+      "hello": "Hola",
+      "guestName": "Explorador"
     },
     "firstQuestionFree": {
       "title": "¡Tu primera pregunta es gratis!",
@@ -635,6 +643,11 @@
       "watchHint": "Toca reproducir para abrir un video breve de tu nakshatra lunar.",
       "watchHintMissing": "Tu video guía aparecerá aquí cuando tu carta esté lista.",
       "openVideo": "Abrir video"
+    },
+    "guestNudge": {
+      "title": "Crea tu carta natal gratis",
+      "body": "Cartas y dashas son gratis: no hace falta cuenta. Inicia sesión para chat, análisis o créditos.",
+      "cta": "Añadir datos de nacimiento"
     }
   },
   "reports": {
@@ -1216,5 +1229,23 @@
       "timing_of_events": "Momento de los acontecimientos",
       "remedial_measures": "Medidas remediales"
     }
+  },
+  "authGate": {
+    "title": "Inicia sesión para continuar",
+    "defaultMessage": "Crea una cuenta gratis para continuar. Tus cartas en este dispositivo se guardarán en tu cuenta.",
+    "messageGeneric": "Inicia sesión para usar {{feature}}. Las herramientas de carta gratis siguen disponibles sin cuenta.",
+    "messageChat": "Inicia sesión para preguntar a AstroRoshni: tu primera pregunta estándar puede ser gratis.",
+    "messageAnalysis": "Inicia sesión para ejecutar análisis de vida. Las herramientas de carta y dasha gratis siguen disponibles sin cuenta.",
+    "messageEvents": "Inicia sesión para abrir Predicciones (anuales y mensuales). Las herramientas de carta y dasha gratis siguen disponibles sin cuenta.",
+    "messageCredits": "Inicia sesión para comprar créditos y desbloquear funciones de pago.",
+    "messageReports": "Inicia sesión para abrir Reports Studio. Las herramientas de carta gratis siguen disponibles sin cuenta.",
+    "cta": "Iniciar sesión / Registrarse",
+    "dismiss": "Seguir explorando herramientas gratis",
+    "featureChat": "Chat con IA",
+    "featureAnalysis": "Análisis de vida",
+    "featureEvents": "Predicciones",
+    "featureCredits": "créditos",
+    "featureReports": "Reports Studio",
+    "messageSpeech": "Inicia sesión para usar el chat de voz. El tiempo de conversación usa créditos."
   }
 }

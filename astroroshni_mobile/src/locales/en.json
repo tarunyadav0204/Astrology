@@ -7,7 +7,27 @@
     "skipSubtext": "Explore the app and add your profile later",
     "emptyStateTitle": "Welcome to AstroRoshni",
     "emptyStateBody": "To unlock the full AstroRoshni experience, we first need your birth details. Almost every feature is personalized to a native's birth chart, so please add your date, time and place of birth. You can change this anytime.",
-    "emptyStateCta": "Add birth profile"
+    "emptyStateCta": "Add birth profile",
+    "chartRequiredTitle": "Birth chart required",
+    "chartRequiredBody": "Your account has no birth chart yet. Add birth details to unlock charts, dashas, and personalized features."
+  },
+  "authGate": {
+    "title": "Sign in to continue",
+    "defaultMessage": "Create a free account to continue. Your charts on this device will be saved to your account.",
+    "messageGeneric": "Sign in to use {{feature}}. Free chart tools stay available without an account.",
+    "messageChat": "Sign in to ask AstroRoshni — your first standard question can be free.",
+    "messageAnalysis": "Sign in to run life analysis. Free chart and dasha tools stay available without an account.",
+    "messageEvents": "Sign in to open Predictions (yearly & monthly). Free chart and dasha tools stay available without an account.",
+    "messageCredits": "Sign in to buy credits and unlock paid features.",
+    "messageReports": "Sign in to open Reports Studio. Free chart tools stay available without an account.",
+    "messageSpeech": "Sign in to use speech chat. Talk time uses credits.",
+    "cta": "Sign in / Register",
+    "dismiss": "Keep exploring free tools",
+    "featureChat": "AI chat",
+    "featureAnalysis": "Life analysis",
+    "featureEvents": "Predictions",
+    "featureCredits": "credits",
+    "featureReports": "Reports Studio"
   },
   "menu": {
     "title": "Cosmic Menu",
@@ -427,6 +447,9 @@
     "moonSign": "Moon Sign",
     "ascendant": "Ascendant",
     "calculating": "Calculating...",
+    "signUnavailable": "—",
+    "guestSignInTitle": "Exploring as guest",
+    "guestSignInBody": "Sign in to save charts to your account, buy credits, and unlock paid insights.",
     "currentRunningDashas": "Current Running Dashas",
     "loading": "Loading...",
     "quickActions": {
@@ -539,7 +562,8 @@
     "featureAi": "AI-Powered Study",
     "featureDaily": "Daily Chart Notes",
     "createBirthChart": "Create My Birth Chart",
-    "skipForNow": "Skip for now"
+    "skipForNow": "Skip for now",
+    "chartRequiredSubtitle": "A birth chart is required to use chart-based features. Add your birth details to continue."
   },
   "chat": {
     "chartEssence": "{{name}}'s Chart Essence",
@@ -848,7 +872,14 @@
   "home": {
     "greeting": {
       "subtitle": "Your chart blueprint awaits. Choose your path to understanding.",
-      "lifePath": "{{name}}'s Life Path"
+      "lifePath": "{{name}}'s Life Path",
+      "hello": "Hello",
+      "guestName": "Explorer"
+    },
+    "guestNudge": {
+      "title": "Create your free birth chart",
+      "body": "Charts and dashas are free — no account needed. Sign in when you want chat, analysis, or credits.",
+      "cta": "Add birth details"
     },
     "firstQuestionFree": {
       "title": "Your first question is free!",

@@ -14,10 +14,15 @@ from db import execute, get_conn
 logger = logging.getLogger(__name__)
 
 _SQL_REL_PATH = os.path.join("migrations", "add_app_installations.sql")
+_GUEST_ACTIVITY_SQL_REL_PATH = os.path.join("migrations", "add_guest_activity.sql")
 
 
 def _sql_path() -> str:
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), _SQL_REL_PATH)
+
+
+def _guest_activity_sql_path() -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), _GUEST_ACTIVITY_SQL_REL_PATH)
 
 
 def _split_sql_statements(raw: str) -> list[str]:
@@ -61,3 +66,27 @@ def ensure_app_installations_schema() -> None:
             conn.commit()
     except Exception as e:
         logger.warning("Could not ensure app_installations schema: %s", e)
+
+
+def ensure_guest_activity_schema() -> None:
+    """Create guest_activity table if missing. Safe on every backend start."""
+    path = _guest_activity_sql_path()
+    try:
+        with open(path, encoding="utf-8") as f:
+            raw = f.read()
+    except OSError as e:
+        logger.warning("Could not read guest_activity migration file %s: %s", path, e)
+        return
+
+    statements = _split_sql_statements(raw)
+    if not statements:
+        logger.warning("No SQL statements parsed from %s", path)
+        return
+
+    try:
+        with get_conn() as conn:
+            for stmt in statements:
+                execute(conn, stmt)
+            conn.commit()
+    except Exception as e:
+        logger.warning("Could not ensure guest_activity schema: %s", e)

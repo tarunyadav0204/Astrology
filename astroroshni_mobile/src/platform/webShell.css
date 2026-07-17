@@ -65,6 +65,23 @@ input,
 textarea,
 select {
   font-size: 16px;
+  /* Kill browser default blue focus rectangle on PWA (Chrome/Safari). */
+  outline: none !important;
+  outline-width: 0 !important;
+  outline-style: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible {
+  outline: none !important;
+  outline-width: 0 !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
 }
 
 /* Vertical scrollports (Home feed, chat list, etc.). */

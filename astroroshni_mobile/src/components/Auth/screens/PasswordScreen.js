@@ -27,6 +27,7 @@ import {
 } from '../../../auth/guestAuth';
 import { useAuthGate } from '../../../auth/AuthGateContext';
 import { trackGA4EventOnly } from '../../../utils/analytics';
+import { resetToRoute } from '../../../navigation/navHelpers';
 
 export default function PasswordScreen({ 
   formData, 
@@ -192,10 +193,7 @@ export default function PasswordScreen({
         }
 
         const resetTo = (routeName, params) => {
-          navigation.reset({
-            index: 0,
-            routes: [{ name: routeName, params }],
-          });
+          resetToRoute(navigation, routeName, params);
         };
 
         // Merge any guest-local charts onto the account before routing.
@@ -247,11 +245,11 @@ export default function PasswordScreen({
               }
               resetTo('Home');
             } else {
-              resetTo('BirthProfileIntro');
+              resetTo('BirthProfileIntro', { chartRequired: true });
             }
           } catch (_) {
             // If charts lookup fails, keep the safe onboarding path.
-            resetTo('BirthProfileIntro');
+            resetTo('BirthProfileIntro', { chartRequired: true });
           }
         }
       } else {
@@ -510,6 +508,9 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     paddingVertical: 16,
     fontWeight: '500',
+    ...(Platform.OS === 'web'
+      ? { outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none' }
+      : null),
   },
   eyeButton: {
     padding: 4,

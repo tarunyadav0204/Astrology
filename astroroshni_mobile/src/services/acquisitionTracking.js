@@ -311,3 +311,31 @@ export async function linkAcquisitionInstallationToUser() {
     if (__DEV__) console.warn('[acquisition] link-user error', e?.message);
   }
 }
+
+/**
+ * Ops metric: guests used today (distinct installation_id per event/day on backend).
+ * Events: guest_open | guest_chart_created | auth_gate_shown
+ */
+export async function trackGuestActivity(eventName) {
+  try {
+    const event = safeEventToken(eventName);
+    if (!event) return;
+    const installation_id = await getOrCreateInstallationId();
+    trackGA4EventOnly(event, { platform: Platform.OS }).catch(() => {});
+    const url = `${API_BASE_URL.replace(/\/+$/, '')}${getEndpoint('/guest-activity')}`;
+    await fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        installation_id,
+        event,
+        platform: Platform.OS,
+      }),
+    });
+  } catch (_) {
+    /* non-fatal */
+  }
+}

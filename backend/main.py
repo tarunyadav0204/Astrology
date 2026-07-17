@@ -49,7 +49,7 @@ from vedic_predictions.api.badhaka_maraka_endpoint import router as badhaka_mara
 from planetary_dignities import router as planetary_dignities_router
 from chara_karakas import router as chara_karakas_router
 from shadbala.routes import router as shadbala_router
-from auth import get_current_user, User
+from auth import get_current_user, get_optional_user, User
 from app.kp.routes.kp_routes import router as kp_router
 from career_analysis.career_router import router as career_router
 from career_analysis.career_ai_router import router as career_ai_router
@@ -629,6 +629,11 @@ async def lifespan(app: FastAPI):
                 "ensure_app_installations_schema",
                 lambda: __import__("acquisition_schema", fromlist=["ensure_app_installations_schema"]).ensure_app_installations_schema(),
                 "app_installations schema ready",
+            )
+            _startup_step(
+                "ensure_guest_activity_schema",
+                lambda: __import__("acquisition_schema", fromlist=["ensure_guest_activity_schema"]).ensure_guest_activity_schema(),
+                "guest_activity schema ready",
             )
             _startup_step(
                 "ensure_admin_company_expenses_schema",
@@ -3963,7 +3968,15 @@ async def calculate_sub_dashas(request: dict):
     return {'sub_dashas': calculator.strip_internal_period_fields(sub_raw)}
 
 @app.post("/api/calculate-ashtakavarga")
-async def calculate_ashtakavarga(request: dict, current_user: User = Depends(get_current_user)):
+async def calculate_ashtakavarga(
+    request: dict,
+    http_request: Request,
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    """Ashtakavarga points. Public for guest free charts (rate-limited)."""
+    if current_user is None:
+        from charts.routes import _enforce_guest_chart_only_rate_limit
+        _enforce_guest_chart_only_rate_limit(http_request)
     import traceback
     try:
         from calculators.ashtakavarga import AshtakavargaCalculator

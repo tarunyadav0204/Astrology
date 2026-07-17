@@ -19,6 +19,7 @@ export default function BirthProfileIntroScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const returnTo = route.params?.returnTo;
+  const chartRequired = Boolean(route.params?.chartRequired);
   const [hasCharts, setHasCharts] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -79,10 +80,17 @@ export default function BirthProfileIntroScreen({ navigation, route }) {
             <Ionicons name="planet-outline" size={56} color="#FFD700" />
           </View>
           <Text style={styles.title}>
-            {t('birthProfileIntro.title', 'Your birth chart powers your experience')}
+            {chartRequired
+              ? t('birthProfileIntro.chartRequiredTitle', 'Birth chart required')
+              : t('birthProfileIntro.title', 'Your birth chart powers your experience')}
           </Text>
           <Text style={styles.body}>
-          {t('birthProfileIntro.body', 'We use your date, time and place of birth to calculate your Vedic chart and personalize chart-based insights. You can add or change this anytime in Profile.')}
+          {chartRequired
+            ? t(
+                'birthProfileIntro.chartRequiredBody',
+                'Your account has no birth chart yet. Add birth details to unlock charts, dashas, and personalized features.',
+              )
+            : t('birthProfileIntro.body', 'We use your date, time and place of birth to calculate your Vedic chart and personalize chart-based insights. You can add or change this anytime in Profile.')}
           </Text>
 
           {loading ? (
@@ -103,6 +111,7 @@ export default function BirthProfileIntroScreen({ navigation, route }) {
                 </LinearGradient>
               </TouchableOpacity>
 
+              {!chartRequired ? (
               <TouchableOpacity onPress={handleSkip} activeOpacity={0.7} style={styles.skipWrap}>
                 <Text style={styles.skipText}>
                   {t('birthProfileIntro.skip', 'Skip for now')}
@@ -111,6 +120,7 @@ export default function BirthProfileIntroScreen({ navigation, route }) {
                   {t('birthProfileIntro.skipSubtext', 'Explore the app and add your profile later')}
                 </Text>
               </TouchableOpacity>
+              ) : null}
             </>
           )}
         </View>

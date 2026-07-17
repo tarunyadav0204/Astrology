@@ -72,7 +72,7 @@ export default function ProfileScreen({ navigation, route }) {
   useAnalytics('ProfileScreen');
   const { theme, toggleTheme, colors } = useTheme();
   const { credits } = useCredits();
-  const { requireAuthForPaid, isGuest } = useAuthGate();
+  const { requireAuthForPaid, isGuest, refreshAuthState } = useAuthGate();
   const [userData, setUserData] = useState(null);
   const [birthData, setBirthData] = useState(null);
   const [stats, setStats] = useState({ totalChats: 0, chartsViewed: 0, podcastsCount: 0 });
@@ -280,9 +280,18 @@ export default function ProfileScreen({ navigation, route }) {
   ];
 
   const getSignName = (signNumber) => {
+    if (signNumber === undefined || signNumber === null || signNumber === '') {
+      return null;
+    }
     const en = ZODIAC_KEYS[signNumber];
-    if (en == null) return signNumber;
+    if (en == null) return null;
     return t(`signs.${en}`, en);
+  };
+
+  const formatSignLabel = (signNumber) => {
+    const name = getSignName(signNumber);
+    if (!name) return t('profile.signUnavailable', '—');
+    return `${getSignIcon(signNumber)} ${name}`;
   };
 
   const getDashaPlanetLabel = (planet) => {
@@ -566,8 +575,8 @@ export default function ProfileScreen({ navigation, route }) {
                     style={styles.addCreditsButton}
                     onPress={async () => {
                       const authOk = await requireAuthForPaid({
-                        feature: 'credits',
-                        message: 'Sign in to buy credits and unlock paid insights.',
+                        feature: t('authGate.featureCredits'),
+                        message: t('authGate.messageCredits'),
                         resume: { resumeRoute: 'Credits', resumeParams: {} },
                       });
                       if (!authOk) return;
@@ -670,7 +679,7 @@ export default function ProfileScreen({ navigation, route }) {
                       if (birthData) {
                         navigation.navigate('Chart', { birthData });
                       } else {
-                        navigation.navigate('Home');
+                        navigation.navigate('BirthForm', { returnTo: 'Profile' });
                       }
                     }}
                   >
@@ -696,7 +705,7 @@ export default function ProfileScreen({ navigation, route }) {
                       <Text style={[styles.chartDetailValue, { color: colors.text }]}>
                         {loadingChart
                           ? t('profile.calculating', 'Calculating...')
-                          : `${getSignIcon(chartData?.planets?.Sun?.sign)} ${getSignName(chartData?.planets?.Sun?.sign)}`}
+                          : formatSignLabel(chartData?.planets?.Sun?.sign)}
                       </Text>
                     </View>
                     <View style={styles.chartDetailRow}>
@@ -706,7 +715,7 @@ export default function ProfileScreen({ navigation, route }) {
                       <Text style={[styles.chartDetailValue, { color: colors.text }]}>
                         {loadingChart
                           ? t('profile.calculating', 'Calculating...')
-                          : `${getSignIcon(chartData?.planets?.Moon?.sign)} ${getSignName(chartData?.planets?.Moon?.sign)}`}
+                          : formatSignLabel(chartData?.planets?.Moon?.sign)}
                       </Text>
                     </View>
                     <View style={styles.chartDetailRow}>
@@ -716,7 +725,7 @@ export default function ProfileScreen({ navigation, route }) {
                       <Text style={[styles.chartDetailValue, { color: colors.text }]}>
                         {loadingChart
                           ? t('profile.calculating', 'Calculating...')
-                          : `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}`}
+                          : formatSignLabel(chartData?.houses?.[0]?.sign)}
                       </Text>
                     </View>
                   </View>
@@ -952,12 +961,18 @@ export default function ProfileScreen({ navigation, route }) {
               </View>
             </Animated.View>
 
+            {!isGuest ? (
             <TouchableOpacity 
               style={[styles.logoutButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.2)' : 'rgba(255, 107, 53, 0.15)', borderColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.5)' : 'rgba(255, 107, 53, 0.4)' }]}
               onPress={async () => {
-                await storage.clearAll();
-                const { replaceWithLogin } = require('../../navigation/replaceWithLogin');
-                replaceWithLogin(navigation);
+                try {
+                  await storage.clearAll();
+                } catch (_) {}
+                try {
+                  await refreshAuthState?.();
+                } catch (_) {}
+                // Guest mode: return to Home as guest instead of a Login wall.
+                navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
               }}
             >
               <Text
@@ -969,6 +984,7 @@ export default function ProfileScreen({ navigation, route }) {
                 {`🚪 ${t('profile.logout', 'Logout')}`}
               </Text>
             </TouchableOpacity>
+            ) : null}
 
             <View style={styles.bottomSpacer} />
           </GHScrollView>

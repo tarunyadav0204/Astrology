@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,174 @@ import AppAlertModal from '../Common/AppAlertModal';
 import { isGuestId, makeGuestProfileId } from '../../auth/guestAuth';
 
 const { width } = Dimensions.get('window');
+const isWeb = Platform.OS === 'web';
+
+const MONTH_LABELS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const WHEEL_ITEM_HEIGHT = 44;
+const WHEEL_VISIBLE_ROWS = 5;
+const WHEEL_PAD = WHEEL_ITEM_HEIGHT * Math.floor(WHEEL_VISIBLE_ROWS / 2);
+
+const daysInMonth = (year, monthIndex) => new Date(year, monthIndex + 1, 0).getDate();
+
+const clampBirthDateParts = (year, monthIndex, day) => {
+  const maxDay = daysInMonth(year, monthIndex);
+  const safeDay = Math.min(Math.max(1, day), maxDay);
+  const next = new Date(year, monthIndex, safeDay, 12, 0, 0, 0);
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  if (next > today) {
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0, 0);
+  }
+  if (year < 1900) return new Date(1900, 0, 1, 12, 0, 0, 0);
+  return next;
+};
+
+/** iOS-style scroll wheel for PWA (native DateTimePicker/Picker are not spinners on web). */
+function WebWheelSpinner({ options, value, onChange, textColor, mutedColor }) {
+  const scrollRef = useRef(null);
+  const isUserScrollingRef = useRef(false);
+  const isProgrammaticRef = useRef(false);
+  const settleTimerRef = useRef(null);
+  const latestOffsetRef = useRef(0);
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((opt) => String(opt.value) === String(value)),
+  );
+  const [visualIndex, setVisualIndex] = useState(selectedIndex);
+
+  const indexFromOffset = useCallback((y) => Math.max(
+    0,
+    Math.min(options.length - 1, Math.round(y / WHEEL_ITEM_HEIGHT)),
+  ), [options.length]);
+
+  const scrollToIndex = useCallback((index, animated) => {
+    const clamped = Math.max(0, Math.min(options.length - 1, index));
+    isProgrammaticRef.current = true;
+    latestOffsetRef.current = clamped * WHEEL_ITEM_HEIGHT;
+    scrollRef.current?.scrollTo({
+      y: latestOffsetRef.current,
+      animated: !!animated,
+    });
+    // Clear programmatic flag after scroll settles (web + native).
+    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+    settleTimerRef.current = setTimeout(() => {
+      isProgrammaticRef.current = false;
+    }, animated ? 220 : 50);
+  }, [options.length]);
+
+  useEffect(() => {
+    if (isUserScrollingRef.current) return undefined;
+    setVisualIndex(selectedIndex);
+    const id = requestAnimationFrame(() => scrollToIndex(selectedIndex, false));
+    return () => cancelAnimationFrame(id);
+  }, [selectedIndex, options.length, scrollToIndex]);
+
+  useEffect(() => () => {
+    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+  }, []);
+
+  const commitIndex = useCallback((index) => {
+    const clamped = Math.max(0, Math.min(options.length - 1, index));
+    setVisualIndex(clamped);
+    const next = options[clamped];
+    if (next && String(next.value) !== String(value)) {
+      onChange(next.value);
+    }
+    // Snap to exact row so the center band matches the committed value.
+    scrollToIndex(clamped, true);
+  }, [onChange, options, scrollToIndex, value]);
+
+  const scheduleCommitFromOffset = useCallback((y) => {
+    latestOffsetRef.current = y;
+    const index = indexFromOffset(y);
+    setVisualIndex(index);
+    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+    settleTimerRef.current = setTimeout(() => {
+      isUserScrollingRef.current = false;
+      isProgrammaticRef.current = false;
+      commitIndex(indexFromOffset(latestOffsetRef.current));
+    }, 140);
+  }, [commitIndex, indexFromOffset]);
+
+  return (
+    <View style={styles.webWheelColumn}>
+      <View
+        pointerEvents="none"
+        style={[styles.webWheelHighlight, { borderColor: mutedColor }]}
+      />
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={WHEEL_ITEM_HEIGHT}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        disableIntervalMomentum
+        nestedScrollEnabled
+        scrollEventThrottle={16}
+        onScrollBeginDrag={() => {
+          isUserScrollingRef.current = true;
+          isProgrammaticRef.current = false;
+        }}
+        onScroll={(event) => {
+          const y = event.nativeEvent.contentOffset.y;
+          latestOffsetRef.current = y;
+          const index = indexFromOffset(y);
+          if (index !== visualIndex) setVisualIndex(index);
+
+          // Web mouse-wheel / trackpad often never fires drag/momentum end.
+          // Treat any non-programmatic scroll as user input and commit after settle.
+          if (isProgrammaticRef.current) return;
+          isUserScrollingRef.current = true;
+          scheduleCommitFromOffset(y);
+        }}
+        onMomentumScrollEnd={(event) => {
+          if (isProgrammaticRef.current) return;
+          scheduleCommitFromOffset(event.nativeEvent.contentOffset.y);
+        }}
+        onScrollEndDrag={(event) => {
+          if (isProgrammaticRef.current) return;
+          scheduleCommitFromOffset(event.nativeEvent.contentOffset.y);
+        }}
+        contentContainerStyle={{ paddingVertical: WHEEL_PAD }}
+        style={styles.webWheelScroll}
+      >
+        {options.map((opt, index) => {
+          const active = index === visualIndex;
+          return (
+            <TouchableOpacity
+              key={`${opt.value}-${opt.label}`}
+              activeOpacity={0.7}
+              onPress={() => {
+                isUserScrollingRef.current = false;
+                isProgrammaticRef.current = false;
+                commitIndex(index);
+              }}
+              style={styles.webWheelItem}
+            >
+              <Text
+                style={[
+                  styles.webWheelItemText,
+                  {
+                    color: textColor,
+                    opacity: active ? 1 : 0.35,
+                    fontWeight: active ? '700' : '500',
+                    fontSize: active ? 20 : 16,
+                  },
+                ]}
+              >
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
 
 const RELATION_OPTIONS = [
   { key: 'self', label: 'Myself', icon: 'person-circle-outline' },
@@ -303,6 +471,22 @@ export default function BirthFormScreen({ navigation, route }) {
       }, 300);
       setSearchTimeout(timeout);
     }
+  };
+
+  const applyTempTimeToForm = (hour, minute, period) => {
+    const hours =
+      period === 'PM'
+        ? hour === 12
+          ? 12
+          : hour + 12
+        : hour === 12
+          ? 0
+          : hour;
+    setFormData((prev) => {
+      const base = prev.time instanceof Date ? new Date(prev.time) : new Date();
+      base.setHours(hours, minute, 0, 0);
+      return { ...prev, time: base };
+    });
   };
 
   const handleRelationChange = (relation) => {
@@ -637,6 +821,15 @@ export default function BirthFormScreen({ navigation, route }) {
         chartData: chartData
       });
 
+      if (isGuest || isGuestId(birthChartId)) {
+        try {
+          const { trackGuestActivity } = require('../../services/acquisitionTracking');
+          trackGuestActivity('guest_chart_created').catch(() => {});
+        } catch (_) {
+          /* optional */
+        }
+      }
+
       triggerConfetti();
       setTimeout(() => {
         const successMessage = updateGender ? t('birthForm.alerts.success.genderUpdated', 'Gender updated successfully!') : editProfile ? t('birthForm.alerts.success.profileUpdated', 'Profile updated successfully!') : t('birthForm.alerts.success.chartCalculated', 'Birth chart calculated successfully!');
@@ -648,7 +841,19 @@ export default function BirthFormScreen({ navigation, route }) {
     } catch (error) {
       submittingRef.current = false;
       setLoading(false);
-      Alert.alert(t('birthForm.alerts.error.title', 'Error'), error.response?.data?.message || t('birthForm.alerts.error.default', 'Failed to process birth details'));
+      const detail =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        error?.message;
+      const detailText = Array.isArray(detail)
+        ? detail.map((d) => d?.msg || String(d)).filter(Boolean).join('\n')
+        : typeof detail === 'string'
+          ? detail
+          : null;
+      Alert.alert(
+        t('birthForm.alerts.error.title', 'Error'),
+        detailText || t('birthForm.alerts.error.default', 'Failed to process birth details'),
+      );
     }
   };
 
@@ -988,7 +1193,7 @@ export default function BirthFormScreen({ navigation, route }) {
               </TouchableOpacity>
             </View>
 
-            {/* Date Picker */}
+            {/* Date Picker — iOS spinner / PWA scroll wheels / Android native */}
             {Platform.OS === 'ios' ? (
               <Modal visible={showDatePicker} transparent animationType="slide">
                 <View style={[styles.modalOverlay, { backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.65)' : 'rgba(28, 25, 23, 0.45)' }]}>
@@ -1023,6 +1228,86 @@ export default function BirthFormScreen({ navigation, route }) {
                   </View>
                 </View>
               </Modal>
+            ) : isWeb ? (
+              <Modal
+                visible={showDatePicker}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowDatePicker(false)}
+              >
+                <View style={[styles.modalOverlay, { backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.65)' : 'rgba(28, 25, 23, 0.45)' }]}>
+                  <View style={[styles.pickerContainer, { borderTopColor: colors.primary, borderTopWidth: 3 }]}>
+                    <LinearGradient
+                      colors={pickerSheetGradient}
+                      style={[styles.pickerGradient, { paddingBottom: Math.max(20, insets.bottom + 8) }]}
+                    >
+                      <View style={[styles.pickerHeader, { borderBottomColor: pickerSheetHeaderBorder }]}>
+                        <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                          <Text style={[styles.pickerButton, { color: colors.textSecondary }]}>{t('birthForm.picker.cancel', 'Cancel')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                          <Text style={[styles.pickerButton, styles.pickerButtonDone, { color: colors.primary }]}>{t('birthForm.picker.done', 'Done')}</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.webWheelRow}>
+                        <WebWheelSpinner
+                          textColor={colors.text}
+                          mutedColor={theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(249,115,22,0.35)'}
+                          value={(formData.date instanceof Date ? formData.date : new Date()).getDate()}
+                          onChange={(day) => {
+                            const current = formData.date instanceof Date ? formData.date : new Date();
+                            handleInputChange(
+                              'date',
+                              clampBirthDateParts(current.getFullYear(), current.getMonth(), Number(day)),
+                            );
+                          }}
+                          options={Array.from(
+                            {
+                              length: daysInMonth(
+                                (formData.date instanceof Date ? formData.date : new Date()).getFullYear(),
+                                (formData.date instanceof Date ? formData.date : new Date()).getMonth(),
+                              ),
+                            },
+                            (_, i) => ({ value: i + 1, label: String(i + 1) }),
+                          )}
+                        />
+                        <WebWheelSpinner
+                          textColor={colors.text}
+                          mutedColor={theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(249,115,22,0.35)'}
+                          value={(formData.date instanceof Date ? formData.date : new Date()).getMonth()}
+                          onChange={(month) => {
+                            const current = formData.date instanceof Date ? formData.date : new Date();
+                            handleInputChange(
+                              'date',
+                              clampBirthDateParts(current.getFullYear(), Number(month), current.getDate()),
+                            );
+                          }}
+                          options={MONTH_LABELS.map((label, index) => ({
+                            value: index,
+                            label: label.slice(0, 3),
+                          }))}
+                        />
+                        <WebWheelSpinner
+                          textColor={colors.text}
+                          mutedColor={theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(249,115,22,0.35)'}
+                          value={(formData.date instanceof Date ? formData.date : new Date()).getFullYear()}
+                          onChange={(year) => {
+                            const current = formData.date instanceof Date ? formData.date : new Date();
+                            handleInputChange(
+                              'date',
+                              clampBirthDateParts(Number(year), current.getMonth(), current.getDate()),
+                            );
+                          }}
+                          options={Array.from({ length: new Date().getFullYear() - 1899 }, (_, i) => {
+                            const year = new Date().getFullYear() - i;
+                            return { value: year, label: String(year) };
+                          })}
+                        />
+                      </View>
+                    </LinearGradient>
+                  </View>
+                </View>
+              </Modal>
             ) : (
               showDatePicker && (
                 <DateTimePicker
@@ -1041,7 +1326,7 @@ export default function BirthFormScreen({ navigation, route }) {
               )
             )}
 
-            {/* Time Picker */}
+            {/* Time Picker — iOS spinner / PWA scroll wheels / Android native */}
             {Platform.OS === 'ios' ? (
               <Modal visible={showTimePicker} transparent animationType="slide">
                 <View style={[styles.modalOverlay, { backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.65)' : 'rgba(28, 25, 23, 0.45)' }]}>
@@ -1054,20 +1339,17 @@ export default function BirthFormScreen({ navigation, route }) {
                         <TouchableOpacity onPress={() => setShowTimePicker(false)}>
                           <Text style={[styles.pickerButton, { color: colors.textSecondary }]}>{t('birthForm.picker.cancel', 'Cancel')}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => {
-                          const hours = tempPeriod === 'PM' ? (tempHour === 12 ? 12 : tempHour + 12) : (tempHour === 12 ? 0 : tempHour);
-                          const newTime = new Date();
-                          newTime.setHours(hours, tempMinute, 0, 0);
-                          handleInputChange('time', newTime);
-                          setShowTimePicker(false);
-                        }}>
+                        <TouchableOpacity onPress={() => setShowTimePicker(false)}>
                           <Text style={[styles.pickerButton, styles.pickerButtonDone, { color: colors.primary }]}>{t('birthForm.picker.done', 'Done')}</Text>
                         </TouchableOpacity>
                       </View>
                       <View style={styles.customPickerRow}>
                         <Picker
                           selectedValue={tempHour}
-                          onValueChange={setTempHour}
+                          onValueChange={(hour) => {
+                            setTempHour(hour);
+                            applyTempTimeToForm(hour, tempMinute, tempPeriod);
+                          }}
                           style={styles.customPicker}
                           itemStyle={[styles.pickerItem, { color: colors.text }]}
                         >
@@ -1077,7 +1359,10 @@ export default function BirthFormScreen({ navigation, route }) {
                         </Picker>
                         <Picker
                           selectedValue={tempMinute}
-                          onValueChange={setTempMinute}
+                          onValueChange={(minute) => {
+                            setTempMinute(minute);
+                            applyTempTimeToForm(tempHour, minute, tempPeriod);
+                          }}
                           style={styles.customPicker}
                           itemStyle={[styles.pickerItem, { color: colors.text }]}
                         >
@@ -1087,13 +1372,84 @@ export default function BirthFormScreen({ navigation, route }) {
                         </Picker>
                         <Picker
                           selectedValue={tempPeriod}
-                          onValueChange={setTempPeriod}
+                          onValueChange={(period) => {
+                            setTempPeriod(period);
+                            applyTempTimeToForm(tempHour, tempMinute, period);
+                          }}
                           style={styles.customPicker}
                           itemStyle={[styles.pickerItem, { color: colors.text }]}
                         >
                           <Picker.Item label="AM" value="AM" />
                           <Picker.Item label="PM" value="PM" />
                         </Picker>
+                      </View>
+                    </LinearGradient>
+                  </View>
+                </View>
+              </Modal>
+            ) : isWeb ? (
+              <Modal
+                visible={showTimePicker}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowTimePicker(false)}
+              >
+                <View style={[styles.modalOverlay, { backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.65)' : 'rgba(28, 25, 23, 0.45)' }]}>
+                  <View style={[styles.pickerContainer, { borderTopColor: colors.primary, borderTopWidth: 3 }]}>
+                    <LinearGradient
+                      colors={pickerSheetGradient}
+                      style={[styles.pickerGradient, { paddingBottom: Math.max(20, insets.bottom + 8) }]}
+                    >
+                      <View style={[styles.pickerHeader, { borderBottomColor: pickerSheetHeaderBorder }]}>
+                        <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                          <Text style={[styles.pickerButton, { color: colors.textSecondary }]}>{t('birthForm.picker.cancel', 'Cancel')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                          <Text style={[styles.pickerButton, styles.pickerButtonDone, { color: colors.primary }]}>{t('birthForm.picker.done', 'Done')}</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.webWheelRow}>
+                        <WebWheelSpinner
+                          textColor={colors.text}
+                          mutedColor={theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(249,115,22,0.35)'}
+                          value={tempHour}
+                          onChange={(hour) => {
+                            const nextHour = Number(hour);
+                            setTempHour(nextHour);
+                            applyTempTimeToForm(nextHour, tempMinute, tempPeriod);
+                          }}
+                          options={Array.from({ length: 12 }, (_, i) => ({
+                            value: i + 1,
+                            label: String(i + 1),
+                          }))}
+                        />
+                        <WebWheelSpinner
+                          textColor={colors.text}
+                          mutedColor={theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(249,115,22,0.35)'}
+                          value={tempMinute}
+                          onChange={(minute) => {
+                            const nextMinute = Number(minute);
+                            setTempMinute(nextMinute);
+                            applyTempTimeToForm(tempHour, nextMinute, tempPeriod);
+                          }}
+                          options={Array.from({ length: 60 }, (_, i) => ({
+                            value: i,
+                            label: String(i).padStart(2, '0'),
+                          }))}
+                        />
+                        <WebWheelSpinner
+                          textColor={colors.text}
+                          mutedColor={theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(249,115,22,0.35)'}
+                          value={tempPeriod}
+                          onChange={(period) => {
+                            setTempPeriod(period);
+                            applyTempTimeToForm(tempHour, tempMinute, period);
+                          }}
+                          options={[
+                            { value: 'AM', label: 'AM' },
+                            { value: 'PM', label: 'PM' },
+                          ]}
+                        />
                       </View>
                     </LinearGradient>
                   </View>
@@ -1256,6 +1612,9 @@ const styles = StyleSheet.create({
     padding: 18,
     fontSize: 18,
     textAlign: 'center',
+    ...(Platform.OS === 'web'
+      ? { outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none' }
+      : null),
   },
   relationPicker: {
     marginTop: 18,
@@ -1539,6 +1898,42 @@ const styles = StyleSheet.create({
   },
   picker: {
     height: 200,
+  },
+  webWheelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  webWheelColumn: {
+    flex: 1,
+    height: WHEEL_ITEM_HEIGHT * WHEEL_VISIBLE_ROWS,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  webWheelScroll: {
+    flex: 1,
+  },
+  webWheelItem: {
+    height: WHEEL_ITEM_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webWheelItemText: {
+    textAlign: 'center',
+  },
+  webWheelHighlight: {
+    position: 'absolute',
+    left: 4,
+    right: 4,
+    top: WHEEL_ITEM_HEIGHT * 2,
+    height: WHEEL_ITEM_HEIGHT,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderRadius: 8,
+    zIndex: 2,
   },
   customPickerRow: {
     flexDirection: 'row',

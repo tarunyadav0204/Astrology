@@ -23,7 +23,8 @@ const NorthIndianChart = ({
   highlightHouse = null, 
   glowAnimation = null, 
   hideInstructions = false,
-  onHousePress // New prop for drawer
+  onHousePress, // New prop for drawer
+  size = null, // PWA/web: explicit pixel square (avoids % SVG collapse)
 }) => {
   const { theme, colors } = useTheme();
   const { t } = useTranslation();
@@ -259,13 +260,18 @@ const NorthIndianChart = ({
   });
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        size ? { width: size, height: size, alignSelf: 'center' } : null,
+      ]}
+    >
       <Svg
         viewBox="0 0 400 400"
-        width="100%"
-        height="100%"
+        width={size || '100%'}
+        height={size || '100%'}
         preserveAspectRatio="xMidYMid meet"
-        style={styles.svg}
+        style={[styles.svg, size ? { width: size, height: size } : null]}
       >
         <Defs>
           <ClipPath id="chartClip">
@@ -579,11 +585,12 @@ const NorthIndianChart = ({
 
 const styles = StyleSheet.create({
   container: Platform.select({
-    web: { width: '100%', height: '100%', alignSelf: 'stretch', position: 'relative' },
+    // Prefer aspectRatio over height:% so the chart stays visible before size is measured.
+    web: { width: '100%', aspectRatio: 1, alignSelf: 'stretch', position: 'relative' },
     default: { flex: 1, width: '100%', aspectRatio: 1 },
   }),
   svg: Platform.select({
-    web: { width: '100%', height: '100%', display: 'block' },
+    web: { width: '100%', aspectRatio: 1, display: 'block' },
     default: { width: '100%', height: '100%', aspectRatio: 1 },
   }),
   tooltip: { position: 'absolute', top: 20, left: 20, right: 20, padding: 12, borderRadius: 12, alignItems: 'center', zIndex: 100 },

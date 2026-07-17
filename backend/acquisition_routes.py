@@ -188,6 +188,17 @@ class AcquisitionContactBody(BaseModel):
     email: Optional[str] = Field(None, max_length=255)
 
 
+_GUEST_ACTIVITY_EVENTS = frozenset(
+    {"guest_open", "guest_chart_created", "auth_gate_shown"}
+)
+
+
+class GuestActivityBody(BaseModel):
+    installation_id: str = Field(..., min_length=36, max_length=36)
+    event: str = Field(..., min_length=1, max_length=64)
+    platform: str = Field("unknown", max_length=32)
+
+
 def _validate_installation_id(s: str) -> str:
     t = (s or "").strip()
     if not _UUID_RE.match(t):
@@ -383,6 +394,82 @@ async def acquisition_event(body: AcquisitionEventBody):
         conn.commit()
 
     return {"ok": True}
+
+
+@router.post("/guest-activity")
+async def record_guest_activity(body: GuestActivityBody):
+    """Record a guest funnel event (one row per installation_id + event + calendar day)."""
+    iid = _validate_installation_id(body.installation_id)
+    event = _safe_token(body.event, max_len=64)
+    if not event or event not in _GUEST_ACTIVITY_EVENTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"event must be one of: {', '.join(sorted(_GUEST_ACTIVITY_EVENTS))}",
+        )
+    platform = _safe_token(body.platform, max_len=32) or "unknown"
+    # Calendar day in IST so ops "guests today" matches India product day.
+    day = datetime.now(IST_TZ).date().isoformat()
+
+    with get_conn() as conn:
+        execute(
+            conn,
+            """
+            INSERT INTO guest_activity (installation_id, event, day, platform, created_at)
+            VALUES (?::uuid, ?, ?::date, ?, NOW())
+            ON CONFLICT (installation_id, event, day) DO NOTHING
+            """,
+            (iid, event, day, platform),
+        )
+        conn.commit()
+
+    return {"ok": True, "day": day}
+
+
+@router.get("/admin/guest-activity/daily")
+async def admin_guest_activity_daily(
+    day: Optional[str] = Query(None, description="YYYY-MM-DD (IST). Defaults to today IST."),
+    current_user: User = Depends(get_current_user),
+):
+    """Distinct guests (installation_ids) with any guest_activity row on the given day."""
+    if getattr(current_user, "role", None) != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    if day:
+        try:
+            day_val = datetime.strptime(day.strip(), "%Y-%m-%d").date().isoformat()
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="day must be YYYY-MM-DD") from e
+    else:
+        day_val = datetime.now(IST_TZ).date().isoformat()
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            SELECT COUNT(DISTINCT installation_id)
+            FROM guest_activity
+            WHERE day = ?::date
+            """,
+            (day_val,),
+        )
+        total = int((cur.fetchone() or [0])[0] or 0)
+        cur = execute(
+            conn,
+            """
+            SELECT event, COUNT(DISTINCT installation_id) AS guests
+            FROM guest_activity
+            WHERE day = ?::date
+            GROUP BY event
+            ORDER BY event
+            """,
+            (day_val,),
+        )
+        by_event = {str(row[0]): int(row[1] or 0) for row in cur.fetchall()}
+
+    return {
+        "day": day_val,
+        "distinct_guests": total,
+        "by_event": by_event,
+    }
 
 
 @router.post("/acquisition/contact")
