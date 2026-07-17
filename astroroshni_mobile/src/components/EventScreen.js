@@ -32,6 +32,7 @@ import { generateEventTimelinePDF, sharePDFOnWhatsApp, getLogoDataUriForModule }
 import { trackEvent } from '../utils/analytics';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { userFacingTimelineError } from '../utils/timelineUserErrors';
+import { useAuthGate } from '../auth/AuthGateContext';
 
 const { width } = Dimensions.get('window');
 
@@ -98,6 +99,7 @@ export default function EventScreen({ route }) {
   const navigation = useNavigation();
   const { t } = useTranslation();
   const { credits, fetchBalance } = useCredits();
+  const { requireAuthForPaid } = useAuthGate();
   const { theme, colors } = useTheme();
   const isIOS = Platform.OS === 'ios';
   const onPrimaryText = '#ffffff';
@@ -1226,6 +1228,12 @@ export default function EventScreen({ route }) {
 
   const handleContinue = async () => {
     if (continueChecking) return;
+    const authOk = await requireAuthForPaid({
+      feature: 'life events timeline',
+      message: 'Sign in to generate your yearly timeline. Cached timelines reopen free after purchase.',
+      resume: { resumeRoute: 'EventScreen', resumeParams: {} },
+    });
+    if (!authOk) return;
     setContinueChecking(true);
     try {
       const birthData = await getBirthDetails();

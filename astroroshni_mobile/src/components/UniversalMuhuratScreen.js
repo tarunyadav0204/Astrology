@@ -9,11 +9,13 @@ import { storage } from '../services/storage';
 import { API_BASE_URL, getEndpoint, COLORS } from '../utils/constants';
 import LocationPicker from './LocationPicker';
 import { useCredits } from '../credits/CreditContext';
+import { useAuthGate } from '../auth/AuthGateContext';
 import { pricingAPI } from '../services/api';
 
 export default function UniversalMuhuratScreen({ route, navigation }) {
   const { config } = route.params; 
   const { credits, fetchBalance } = useCredits();
+  const { requireAuthForPaid } = useAuthGate();
   
   const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
@@ -98,6 +100,13 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
       Alert.alert("Missing Data", "Please verify your profile and location.");
       return;
     }
+
+    const authOk = await requireAuthForPaid({
+      feature: 'muhurat search',
+      message: 'Sign in to run a muhurat search. Credits are charged only after you confirm.',
+      resume: { resumeRoute: 'UniversalMuhurat', resumeParams: route?.params || {} },
+    });
+    if (!authOk) return;
 
     if (credits < creditInfo.cost) {
       Alert.alert(

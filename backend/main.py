@@ -3412,7 +3412,7 @@ async def analyze_transits(request: TransitRequest):
     }
 
 @app.post("/api/calculate-transits")
-async def calculate_transits(request: TransitRequest, current_user: User = Depends(get_current_user)):
+async def calculate_transits(request: TransitRequest):
     ty, tm, td = parse_calendar_date_y_m_d(request.transit_date)
     jd = swe.julday(ty, tm, td, 12.0)
     

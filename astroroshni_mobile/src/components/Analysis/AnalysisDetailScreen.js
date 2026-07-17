@@ -17,8 +17,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
 import { useCredits } from '../../credits/CreditContext';
-import { storage } from '../../services/storage';
 import { pricingAPI } from '../../services/api';
+import { storage } from '../../services/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cleanupStorage } from '../../services/storageCleanup';
 import * as Print from 'expo-print';
@@ -26,6 +26,7 @@ import * as Sharing from 'expo-sharing';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { trackAstrologyEvent, trackEvent } from '../../utils/analytics';
 import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
+import { useAuthGate } from '../../auth/AuthGateContext';
 
 export default function AnalysisDetailScreen({ route, navigation }) {
   const { analysisType, title, cost: costFromParams, originalCost: originalCostFromParams } = route.params;
@@ -34,6 +35,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
   const { credits, fetchBalance } = useCredits();
+  const { requireAuthForPaid } = useAuthGate();
   const [cost, setCost] = useState(costFromParams ?? 0);
   const [originalCost, setOriginalCost] = useState(
     typeof originalCostFromParams === 'number' ? originalCostFromParams : null
@@ -264,6 +266,21 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     // Ensure forceRegenerate is a boolean
     const shouldForceRegenerate = forceRegenerate === true;
     // console.log('🔄 Force regenerate (cleaned):', shouldForceRegenerate);
+
+    const authOk = await requireAuthForPaid({
+      feature: `${analysisType || 'life'} analysis`,
+      message: 'Sign in to run this analysis. Credits are charged only after you confirm.',
+      resume: {
+        resumeRoute: 'AnalysisDetail',
+        resumeParams: {
+          analysisType,
+          title,
+          cost: costFromParams,
+          originalCost: originalCostFromParams,
+        },
+      },
+    });
+    if (!authOk) return;
     
     // --- PROGENY VALIDATION BLOCK ---
     if (analysisType === 'progeny') {

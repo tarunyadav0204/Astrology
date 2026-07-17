@@ -1,13 +1,14 @@
 """Chart calculation routes"""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 import logging
 import traceback
 import time
+from collections import defaultdict, deque
 from pydantic import BaseModel
-from auth import get_current_user, User
+from auth import get_current_user, get_optional_user, User
 from calculators.chart_calculator import ChartCalculator
 from calculators.vedic_graha_drishti import attach_graha_drishti_to_chart
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
@@ -35,6 +36,35 @@ from db import get_conn, execute
 from utils.birth_hash import birth_hash_from_parts
 
 logger = logging.getLogger(__name__)
+
+# Simple in-memory rate limit for public chart-only (guest) calls.
+_GUEST_CHART_ONLY_WINDOW_SEC = 60
+_GUEST_CHART_ONLY_MAX = 20
+_guest_chart_only_hits: Dict[str, deque] = defaultdict(deque)
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For") or request.headers.get("x-forwarded-for")
+    if forwarded:
+        return str(forwarded).split(",")[0].strip() or "unknown"
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+def _enforce_guest_chart_only_rate_limit(request: Request) -> None:
+    key = _client_ip(request)
+    now = time.time()
+    bucket = _guest_chart_only_hits[key]
+    while bucket and now - bucket[0] > _GUEST_CHART_ONLY_WINDOW_SEC:
+        bucket.popleft()
+    if len(bucket) >= _GUEST_CHART_ONLY_MAX:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many chart calculations. Please wait a moment and try again.",
+        )
+    bucket.append(now)
+
 
 try:
     encryptor = EncryptionManager()
@@ -378,9 +408,16 @@ def get_divisional_sign(sign, degree_in_sign, division):
         return (sign + part) % 12
 
 @router.post("/calculate-chart-only")
-async def calculate_chart_only(request: dict, current_user: User = Depends(get_current_user)):
-    """Calculate basic chart data only"""
+async def calculate_chart_only(
+    request: dict,
+    http_request: Request,
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    """Calculate basic chart data only (no DB write). Public for guest mode with rate limits."""
     try:
+        if current_user is None:
+            _enforce_guest_chart_only_rate_limit(http_request)
+
         # Mobile app sends data directly, not wrapped in birth_data
         if 'birth_data' in request:
             birth_data = request.get('birth_data', {})
@@ -432,10 +469,12 @@ async def calculate_chart_only(request: dict, current_user: User = Depends(get_c
         # Return chart data directly (not wrapped in success/chart_data)
         return chart_data
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception(
             "calculate-chart-only failed for user_id=%s",
-            getattr(current_user, "userid", None),
+            getattr(current_user, "userid", None) if current_user else None,
         )
         raise HTTPException(status_code=500, detail=str(e))
 

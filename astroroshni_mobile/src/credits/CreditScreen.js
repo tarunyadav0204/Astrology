@@ -35,6 +35,8 @@ import {
 } from './androidUserChoiceRazorpay';
 import { getCreditPackMeta } from './creditPackCatalog';
 import { openRazorpayCheckout } from '../platform/payments';
+import { useAuthGate } from '../auth/AuthGateContext';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 const PENDING_GOOGLE_PLAY_CREDIT_PURCHASES_KEY = 'pendingGooglePlayCreditPurchasesV1';
@@ -304,6 +306,27 @@ const CreditScreen = ({ navigation }) => {
       }
     : androidLightCardFixStyle;
   const { credits, loading, redeemCode, fetchBalance, subscriptionTierName, subscriptionDiscountPercent } = useCredits();
+  const { requireAuthForPaid } = useAuthGate();
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const ok = await requireAuthForPaid({
+          feature: 'credits',
+          message: 'Sign in to buy credits and unlock paid insights.',
+          resume: { resumeRoute: 'Credits', resumeParams: {} },
+        });
+        if (!cancelled && !ok) {
+          navigation.goBack();
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [navigation, requireAuthForPaid])
+  );
+
   const [promoCode, setPromoCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
   const [history, setHistory] = useState([]);

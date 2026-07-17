@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { chatAPI, pricingAPI } from '../services/api';
 import { storage } from '../services/storage';
 import { useCredits } from '../credits/CreditContext';
+import { useAuthGate } from '../auth/AuthGateContext';
 import MonthlyAccordion from './MonthlyAccordion';
 import ConfirmCreditsModal from './ConfirmCreditsModal';
 import { generateEventTimelinePDF, sharePDFOnWhatsApp, getLogoDataUriForModule } from '../utils/pdfGenerator';
@@ -37,6 +38,7 @@ export default function MonthlyDeepScreen() {
   const route = useRoute();
   const { year, month } = route.params || {};
   const { credits, fetchBalance } = useCredits();
+  const { requireAuthForPaid } = useAuthGate();
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const bgGradient = theme === 'dark'
@@ -420,6 +422,12 @@ export default function MonthlyDeepScreen() {
     if (creditsModalInFlightRef.current || showMonthlyCreditsModal) {
       return true;
     }
+    const authOk = await requireAuthForPaid({
+      feature: 'monthly deep timeline',
+      message: 'Sign in to generate a monthly deep reading.',
+      resume: { resumeRoute: 'MonthlyDeep', resumeParams: {} },
+    });
+    if (!authOk) return false;
     creditsModalInFlightRef.current = true;
     try {
       const refreshedCredits = await fetchBalance();
@@ -451,7 +459,7 @@ export default function MonthlyDeepScreen() {
     } finally {
       creditsModalInFlightRef.current = false;
     }
-  }, [credits, fetchBalance, creditCost, navigation, showMonthlyCreditsModal]);
+  }, [credits, fetchBalance, creditCost, navigation, showMonthlyCreditsModal, requireAuthForPaid]);
 
   useEffect(() => {
     pricingAPI.getPricing().then((res) => {

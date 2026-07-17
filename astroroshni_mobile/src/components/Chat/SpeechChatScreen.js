@@ -28,6 +28,7 @@ import { buildQueryContext } from '../../utils/queryContext';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
 import { useTheme } from '../../context/ThemeContext';
 import { speechRecognition } from '../../native/speechRecognition';
+import { useAuthGate } from '../../auth/AuthGateContext';
 
 const POLL_INTERVAL_MS = 1400;
 const MAX_POLLS = 90;
@@ -259,6 +260,7 @@ function TaraSpeakingAvatar({ status, compact = false, tiny = false }) {
 export default function SpeechChatScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
+  const { requireAuthForPaid } = useAuthGate();
   const [userName, setUserName] = useState('');
   const [birthData, setBirthData] = useState(route.params?.birthData || null);
   const [sessionId, setSessionId] = useState(null);
@@ -421,6 +423,12 @@ export default function SpeechChatScreen({ navigation, route }) {
 
   const startSpeechBillingSession = async () => {
     if (billingSessionRef.current?.session_id) return true;
+    const authOk = await requireAuthForPaid({
+      feature: 'speech chat',
+      message: 'Sign in to use speech chat. Talk time uses credits.',
+      resume: { resumeRoute: 'SpeechChat', resumeParams: route?.params || {} },
+    });
+    if (!authOk) return false;
     try {
       const res = await creditAPI.startSpeechSession();
       const data = res?.data || {};

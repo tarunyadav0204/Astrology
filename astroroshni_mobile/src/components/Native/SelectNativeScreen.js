@@ -216,6 +216,26 @@ export default function SelectNativeScreen({ navigation, route }) {
         setLoadingMore(true);
       }
       const currentNative = await storage.getBirthDetails();
+      const authToken = await storage.getAuthToken();
+
+      // Guests: local AsyncStorage profiles only (no server list).
+      if (!authToken) {
+        const savedProfiles = await storage.getBirthProfiles();
+        const q = String(search || '').trim().toLowerCase();
+        const localList = (savedProfiles || []).filter((profile) => {
+          if (!shouldShowForGenderFilter(profile, nativeGenderFilter)) return false;
+          if (!q) return true;
+          return String(profile.name || '').toLowerCase().includes(q);
+        });
+        setProfiles(localList);
+        setOffset(localList.length);
+        setHasMore(false);
+        setTotalCharts(localList.length);
+        if (currentNative) {
+          setSelectedProfile(currentNative.name);
+        }
+        return;
+      }
       
       // Fetch saved charts from API
       const { chartAPI } = require('../../services/api');
@@ -288,6 +308,8 @@ export default function SelectNativeScreen({ navigation, route }) {
 
   const syncSelfBirthDetails = async () => {
     try {
+      const token = await storage.getAuthToken();
+      if (!token) return;
       const { authAPI } = require('../../services/api');
       const response = await authAPI.getSelfBirthChart();
       if (response?.data?.has_self_chart) {
@@ -387,7 +409,8 @@ export default function SelectNativeScreen({ navigation, route }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              if (profile.id && profile.id !== 'self') {
+              const token = await storage.getAuthToken();
+              if (token && profile.id && profile.id !== 'self' && !String(profile.id).startsWith('guest_')) {
                 await chartAPI.deleteChart(profile.id);
               }
               await storage.removeBirthProfile(profile.name);
@@ -405,6 +428,18 @@ export default function SelectNativeScreen({ navigation, route }) {
 
   const handleConnectToProfile = async (profile) => {
     try {
+      const token = await storage.getAuthToken();
+      if (!token || String(profile.id || '').startsWith('guest_')) {
+        Alert.alert(
+          'Sign in required',
+          'Sign in to connect this chart to your account profile.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Sign in', onPress: () => navigation.navigate('Login') },
+          ],
+        );
+        return;
+      }
       await chartAPI.setChartAsSelf(profile.id);
       Alert.alert('Success', '✅ Chart connected to your profile!');
       // Must reset list: default loadProfiles() appends next page and never refetches row[0..n], so "You" badge would stay stale.

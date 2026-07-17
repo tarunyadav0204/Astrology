@@ -54,6 +54,7 @@ import NativeSelectorChip from '../Common/NativeSelectorChip';
 import AppAlertModal from '../Common/AppAlertModal';
 import { useCredits } from '../../credits/CreditContext';
 import { formatCreditsInr } from '../../credits/creditPackCatalog';
+import { useAuthGate } from '../../auth/AuthGateContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
@@ -464,6 +465,7 @@ export default function ChatScreen({ navigation, route }) {
     chatCountdownSeconds,
     isGuruMember,
   } = useCredits();
+  const { requireAuthForPaid, isGuest } = useAuthGate();
   const insets = useSafeAreaInsets();
   
   // Mundane mode state
@@ -2710,6 +2712,20 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const handleGreetingOptionSelect = async (option) => {
+    // Chat / partnership / mundane immediately need an account (credit or free-question).
+    // Other screens may open for browsing; their generate/spend paths gate separately.
+    const needsAuthNow = new Set(['question', 'partnership', 'mundane']);
+    if (needsAuthNow.has(option.action)) {
+      const ok = await requireAuthForPaid({
+        feature: option.action === 'question' ? 'AI chat' : option.action,
+        message:
+          option.action === 'question'
+            ? 'Sign in to ask AstroRoshni — your first standard question can be free.'
+            : `Sign in to use ${option.action}. Free chart tools stay available without an account.`,
+        resume: { resumeRoute: 'Home', resumeParams: {} },
+      });
+      if (!ok) return;
+    }
     
     if (option.action === 'partnership') {
       openPartnershipModal(option.cost);
@@ -4387,6 +4403,12 @@ export default function ChatScreen({ navigation, route }) {
       partnershipStep,
       hasBirthData: Boolean(birthData),
     });
+    const authOk = await requireAuthForPaid({
+      feature: 'AI chat',
+      message: 'Sign in to ask AstroRoshni — your first standard question can be free.',
+      resume: { resumeRoute: 'Home', resumeParams: {} },
+    });
+    if (!authOk) return;
     if (activeWaitSideMessage) {
       await sendWaitConversationReply(messageText);
       return;

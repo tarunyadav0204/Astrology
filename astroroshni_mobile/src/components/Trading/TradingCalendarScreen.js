@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCredits } from '../../credits/CreditContext';
+import { useAuthGate } from '../../auth/AuthGateContext';
 import { API_BASE_URL } from '../../utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { pricingAPI } from '../../services/api';
@@ -20,6 +21,7 @@ export default function TradingCalendarScreen({ navigation }) {
   const [premiumAnalysis, setPremiumAnalysis] = useState(false);
   const [premiumCost, setPremiumCost] = useState(200);
   const { credits, fetchBalance } = useCredits();
+  const { requireAuthForPaid } = useAuthGate();
 
   useEffect(() => {
     fetchBalance();
@@ -40,7 +42,13 @@ export default function TradingCalendarScreen({ navigation }) {
     }
   };
 
-  const confirmAndRunAnalysis = () => {
+  const confirmAndRunAnalysis = async () => {
+    const authOk = await requireAuthForPaid({
+      feature: 'trading calendar',
+      message: 'Sign in to run the trading calendar analysis.',
+      resume: { resumeRoute: 'TradingCalendar', resumeParams: {} },
+    });
+    if (!authOk) return;
     const cost = premiumAnalysis ? premiumCost : monthlyCost;
     if (credits < cost) {
       Alert.alert("Insufficient Credits", `You need ${cost} credits for monthly calendar. Please purchase more credits.`, [

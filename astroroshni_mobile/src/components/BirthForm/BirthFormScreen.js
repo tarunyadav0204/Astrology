@@ -29,6 +29,7 @@ import locationCache from '../../services/locationCache';
 import { useTheme } from '../../context/ThemeContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import AppAlertModal from '../Common/AppAlertModal';
+import { isGuestId, makeGuestProfileId } from '../../auth/guestAuth';
 
 const { width } = Dimensions.get('window');
 
@@ -559,13 +560,23 @@ export default function BirthFormScreen({ navigation, route }) {
 
       // 1. Calculate chart and handle save/update
       let chartData, birthChartId;
+      const authToken = await storage.getAuthToken();
+      const isGuest = !authToken;
       
-      if (editProfile?.id) {
-        // EDIT MODE: Calculate chart only (no DB save) and update existing record
+      if (editProfile?.id && !isGuest && !isGuestId(editProfile.id)) {
+        // EDIT MODE (logged in, server id): Calculate chart only (no DB save) and update existing record
         console.log('✏️ Edit mode: Updating existing chart ID:', editProfile.id);
         chartData = await chartAPI.calculateChartOnly(birthData);
         await chartAPI.updateChart(editProfile.id, birthData);
         birthChartId = editProfile.id;
+      } else if (isGuest || (editProfile?.id && isGuestId(editProfile.id))) {
+        // GUEST MODE: compute-only (public), persist locally with guest id
+        console.log('👤 Guest mode: local chart only');
+        const response = await chartAPI.calculateChartOnly(birthData);
+        chartData = response?.data || response;
+        birthChartId = (editProfile?.id && isGuestId(editProfile.id))
+          ? editProfile.id
+          : makeGuestProfileId();
       } else {
         // CREATE MODE: Calculate and save new chart
         console.log('➕ Create mode: Saving new chart');
@@ -588,13 +599,21 @@ export default function BirthFormScreen({ navigation, route }) {
         console.log('✅ Got birth_chart_id:', birthChartId);
       }
       
-      const yogiData = await chartAPI.calculateYogi(birthData);
+      let yogiData = null;
+      if (!isGuest) {
+        try {
+          yogiData = await chartAPI.calculateYogi(birthData);
+        } catch (_) {
+          /* optional enrichment */
+        }
+      }
 
-      // 3. Create profile data with REAL ID from database
+      // 3. Create profile data with REAL ID from database (or guest local id)
       const profileData = {
         ...formData,
         time: formData.time.toTimeString().split(' ')[0],
-        id: birthChartId
+        id: birthChartId,
+        isGuestLocal: isGuest || isGuestId(birthChartId),
       };
       
       // 4. THEN save to local storage with real ID

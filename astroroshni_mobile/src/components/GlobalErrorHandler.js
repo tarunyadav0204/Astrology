@@ -46,8 +46,21 @@ export default function GlobalErrorHandler() {
           break;
 
         case 'auth':
-          // Auth errors: clear stack so user cannot swipe back into Home.
-          replaceWithLogin(navigation);
+          // Only force Login when an authenticated session expired.
+          // Guests exploring free tools should stay on Home.
+          (async () => {
+            try {
+              const { storage } = require('../services/storage');
+              const userData = await storage.getUserData();
+              const token = await storage.getAuthToken();
+              if (!token && !userData) {
+                return;
+              }
+            } catch (_) {
+              /* fall through to login */
+            }
+            replaceWithLogin(navigation);
+          })();
           break;
 
         default:
