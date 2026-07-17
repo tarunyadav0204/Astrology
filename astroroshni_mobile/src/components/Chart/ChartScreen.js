@@ -1430,10 +1430,17 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 20,
     paddingHorizontal: 0,
-    marginHorizontal: -20,
+    // Native: counteract legacy parent padding. Web/PWA: stay edge-to-edge for full-width charts.
+    marginHorizontal: Platform.OS === 'web' ? 0 : -20,
+    ...(Platform.OS === 'web'
+      ? { width: '100%', alignSelf: 'stretch', overflow: 'visible' }
+      : {}),
   },
   chartWrapper: {
     flex: 1,
+    ...(Platform.OS === 'web'
+      ? { width: '100%', alignSelf: 'stretch' }
+      : {}),
   },
   captureFooter: {
     alignItems: 'center',

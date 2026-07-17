@@ -23,7 +23,7 @@ import DateNavigator from '../Common/DateNavigator';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 
-const { width } = Dimensions.get('window');
+const isWeb = Platform.OS === 'web';
 
 const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, onOpenChartGuide, division, navigation, onHousePress }, ref) => {
   const { t } = useTranslation();
@@ -36,6 +36,19 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const [showKarakas, setShowKarakas] = useState(false);
   const [karakas, setKarakas] = useState(null);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  // PWA/web: aspectRatio + paddingTop shrinks nested SVGs; use an explicit full-width square.
+  const [webChartSize, setWebChartSize] = useState(() => (isWeb ? Math.floor(Dimensions.get('window').width) : null));
+
+  useEffect(() => {
+    if (!isWeb) return undefined;
+    const syncSize = ({ window: nextWindow } = {}) => {
+      const nextWidth = Math.floor((nextWindow || Dimensions.get('window')).width);
+      setWebChartSize((prev) => (prev === nextWidth ? prev : nextWidth));
+    };
+    syncSize();
+    const subscription = Dimensions.addEventListener('change', syncSize);
+    return () => subscription?.remove?.();
+  }, []);
   
   useEffect(() => {
     if (chartType && chartType !== currentChartType) {
@@ -421,10 +434,24 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         </View>
       )}
       
-      <View style={[styles.chartContainer, cosmicTheme && styles.cosmicChartContainer, currentChartType === 'transit' && cosmicTheme && styles.chartContainerTransit]}>
+      <View
+        style={[
+          styles.chartContainer,
+          cosmicTheme && styles.cosmicChartContainer,
+          currentChartType === 'transit' && cosmicTheme && styles.chartContainerTransit,
+          isWeb && webChartSize
+            ? {
+                width: webChartSize,
+                height: webChartSize,
+                maxWidth: '100%',
+                alignSelf: 'center',
+              }
+            : null,
+        ]}
+      >
         {cosmicTheme && (
           <>
-            <View style={[styles.floatingControls, currentChartType === 'transit' && styles.floatingControlsTransit]}>
+            <View style={[styles.floatingControls, isWeb && styles.floatingControlsWeb, currentChartType === 'transit' && styles.floatingControlsTransit]}>
               <TouchableOpacity
                 onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
                 style={[styles.floatingButton, showDegreeNakshatra && styles.floatingButtonActive]}
@@ -463,7 +490,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 </TouchableOpacity>
               ) : null}
             </View>
-            <View style={styles.infoButtonContainer}>
+            <View style={[styles.infoButtonContainer, isWeb && styles.infoButtonContainerWeb]}>
               <TouchableOpacity onPress={() => setShowInfoModal(true)} style={styles.infoButton}>
                 <Ionicons name="information-circle-outline" size={20} color="#fff" />
               </TouchableOpacity>
@@ -473,7 +500,11 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         
         <Animated.View 
           {...(disableSwipe ? {} : panResponder.panHandlers)}
-          style={[styles.swipeArea, { transform: [{ translateX: slideAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: [-20, 0, 20], extrapolate: 'clamp' }) }] }]}
+          style={[
+            styles.swipeArea,
+            isWeb && styles.swipeAreaWeb,
+            { transform: [{ translateX: slideAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: [-20, 0, 20], extrapolate: 'clamp' }) }] },
+          ]}
         >
           {renderChart(currentChartType, getChartData())}
         </Animated.View>
@@ -616,18 +647,51 @@ const styles = StyleSheet.create({
   chartIndicators: { flexDirection: 'row', gap: 6 },
   indicator: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.border, marginHorizontal: 3 },
   indicatorActive: { backgroundColor: COLORS.accent, width: 24, height: 6, borderRadius: 3 },
-  chartContainer: { width: '100%', aspectRatio: 1, position: 'relative', alignItems: 'center', justifyContent: 'center', padding: 0, paddingTop: 60 },
-  cosmicChartContainer: { width: '100%', aspectRatio: 1, padding: 0, paddingTop: 60, marginBottom: 20 },
+  chartContainer: Platform.select({
+    web: {
+      width: '100%',
+      position: 'relative',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 0,
+    },
+    default: {
+      width: '100%',
+      aspectRatio: 1,
+      position: 'relative',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 0,
+      paddingTop: 60,
+    },
+  }),
+  cosmicChartContainer: Platform.select({
+    web: {
+      width: '100%',
+      padding: 0,
+      marginBottom: 12,
+    },
+    default: {
+      width: '100%',
+      aspectRatio: 1,
+      padding: 0,
+      paddingTop: 60,
+      marginBottom: 20,
+    },
+  }),
   swipeArea: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
+  swipeAreaWeb: { flex: 0, width: '100%', height: '100%', alignSelf: 'stretch' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: 16, color: COLORS.textSecondary },
   floatingControls: { position: 'absolute', top: 10, left: 30, flexDirection: 'row', gap: 8, zIndex: 10 },
+  floatingControlsWeb: { left: 8 },
   floatingControlsTransit: { top: 10 },
   chartContainerTransit: { marginTop: 20 },
   floatingButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
   floatingButtonActive: { backgroundColor: 'rgba(255, 107, 53, 0.8)', borderColor: 'rgba(255, 107, 53, 1)' },
   floatingButtonText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   infoButtonContainer: { position: 'absolute', top: 10, right: 30, zIndex: 10 },
+  infoButtonContainerWeb: { right: 8 },
   infoButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
   quickActionsGrid: { marginTop: 24, paddingHorizontal: 36, gap: 12 },
   quickActionsRow: { flexDirection: 'row', gap: 12 },
