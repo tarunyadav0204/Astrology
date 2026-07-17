@@ -92,9 +92,14 @@ Without the edge router, `/mobile/` and `/mobile/index.html` still work from the
 | Platform | How users save it | What we ship |
 |----------|-------------------|--------------|
 | **iOS Safari** | Share → **Add to Home Screen** (no one-tap API) | `apple-mobile-web-app-*` meta, `apple-touch-icon`, in-app guide modal |
-| **Android Chrome** | Browser **Install app** / our Install button when `beforeinstallprompt` fires | Web manifest (192/512 icons, `display: standalone`, `start_url`/`scope` `/mobile/`) + minimal `/mobile/sw.js` |
+| **Android Chrome** | Chrome **⋮ → Install app** or **Add to Home screen** | Web manifest + `/mobile/sw.js` (we do **not** hijack `beforeinstallprompt`, so Chrome keeps its native Install UI) |
 
 Both open full-screen from the home icon. CRA on `/` is unchanged. Play/native builds never load this UI.
+
+**Android tips if Install is missing**
+1. Open exactly `https://astroroshni.com/mobile/` (trailing slash) in **Chrome**, not an in-app browser.
+2. If the Play Store app is already installed, Chrome often hides **Install app** — use **Add to Home screen** instead.
+3. Wait a few seconds after load so the service worker can register, then check **⋮** again.
 
 **Test after deploy:** open `https://astroroshni.com/mobile/` on a real phone (HTTPS required for Chrome install).
 

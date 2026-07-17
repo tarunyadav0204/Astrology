@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BlurView } from 'expo-blur';
-import { Audio, Video, ResizeMode } from 'expo-av';
+import { Audio } from 'expo-av';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -37,6 +37,7 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 import { getGrahaDrishtiToHouseSign } from '../../utils/grahaDrishti';
 import { calculateGandantaLocal, getGandantaHouseMatches } from '../../utils/gandanta';
 import AppScrollView, { VerticalPageScroll } from '../../platform/AppScrollView';
+import GuideVideoPlayer from '../../platform/GuideVideoPlayer';
 
 const { width, height } = Dimensions.get('window');
 export default function ChartScreen({ navigation, route, onHeaderStateChange }) {
@@ -143,7 +144,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   }, []);
 
   useEffect(() => {
-    if (!showGuidePlayer) return;
+    if (!showGuidePlayer || Platform.OS === 'web') return undefined;
     let cancelled = false;
     const enableAudio = async () => {
       try {
@@ -174,6 +175,15 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
       }
     };
   }, [showGuidePlayer]);
+
+  useEffect(() => {
+    if (!showGuidePlayer || guidePlayerStatus !== 'loading') return undefined;
+    // Web/expo-av sometimes never fires ready — don't leave a permanent spinner over the player.
+    const timer = setTimeout(() => {
+      setGuidePlayerStatus((prev) => (prev === 'loading' ? 'ready' : prev));
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [showGuidePlayer, guidePlayerStatus]);
 
   const handleSwipe = useCallback((event) => {
     const { translationX, state, velocityX } = event.nativeEvent;
@@ -861,33 +871,33 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
           animationType="fade"
           onRequestClose={() => setShowGuidePlayer(false)}
         >
-          <View style={styles.guidePlayerOverlay}>
+          <View style={styles.guidePlayerOverlay} pointerEvents="box-none">
             <StatusBar hidden />
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowGuidePlayer(false)} />
-            <View style={styles.guidePlayerBackplate} />
+            <Pressable
+              style={[StyleSheet.absoluteFill, styles.guidePlayerDismissLayer]}
+              onPress={() => setShowGuidePlayer(false)}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close', 'Close')}
+            />
+            <View style={styles.guidePlayerBackplate} pointerEvents="none" />
             <TouchableOpacity onPress={() => setShowGuidePlayer(false)} style={styles.guidePlayerClose}>
               <Ionicons name="close" size={22} color="#fff" />
             </TouchableOpacity>
             {chartGuideVideoUrl ? (
-              <View style={styles.guidePlayerVideoFrame}>
-                <Video
-                  source={{ uri: chartGuideVideoUrl }}
+              <View style={styles.guidePlayerVideoFrame} pointerEvents="auto">
+                <GuideVideoPlayer
+                  uri={chartGuideVideoUrl}
                   style={styles.guidePlayerVideo}
-                  useNativeControls
-                  resizeMode={ResizeMode.COVER}
                   shouldPlay
-                  isLooping={false}
-                  isMuted={false}
-                  volume={1.0}
                   onLoadStart={() => setGuidePlayerStatus('loading')}
-                  onReadyForDisplay={() => setGuidePlayerStatus('ready')}
+                  onReady={() => setGuidePlayerStatus('ready')}
                   onError={(error) => {
-                    console.log('[ChartScreen] guide video native error:', error);
+                    console.log('[ChartScreen] guide video error:', error);
                     setGuidePlayerStatus('error');
                   }}
                 />
                 {guidePlayerStatus === 'loading' && (
-                  <View style={styles.guidePlayerLoadingOverlay}>
+                  <View style={styles.guidePlayerLoadingOverlay} pointerEvents="none">
                     <ActivityIndicator size="large" color="#fff" />
                   </View>
                 )}
@@ -1807,9 +1817,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 0,
   },
+  guidePlayerDismissLayer: {
+    zIndex: 0,
+  },
   guidePlayerBackplate: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#000',
+    zIndex: 0,
   },
   guidePlayerClose: {
     position: 'absolute',
@@ -1830,6 +1844,7 @@ const styles = StyleSheet.create({
     borderRadius: 0,
     overflow: 'hidden',
     backgroundColor: '#000',
+    zIndex: 2,
   },
   guidePlayerVideo: {
     width: '100%',
@@ -1841,7 +1856,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.25)',
+    zIndex: 3,
   },
+
   actionButton: {
     flexGrow: 1,
     minWidth: 120,

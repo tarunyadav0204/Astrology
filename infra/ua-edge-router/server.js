@@ -127,6 +127,18 @@ const server = http.createServer(async (req, res) => {
     const forceApp =
       url.searchParams.get('force_app') === '1' || cookies.force_app === '1';
 
+    // Canonicalize /mobile → /mobile/ so the document URL stays inside PWA scope `/mobile/`.
+    // (Scope prefix matching does NOT treat `/mobile` as inside `/mobile/`.)
+    if (pathname === '/mobile') {
+      const qs = url.search ? url.search : '';
+      res.writeHead(301, {
+        location: `/mobile/${qs}`,
+        'cache-control': 'no-cache',
+      });
+      res.end();
+      return;
+    }
+
     // Bookmark / old escape hatch → canonical Expo entry
     if (forceApp && !isExpoMobilePath(pathname) && !forceWeb) {
       res.writeHead(302, {

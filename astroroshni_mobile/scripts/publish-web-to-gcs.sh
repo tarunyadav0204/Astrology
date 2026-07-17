@@ -25,13 +25,25 @@ echo "Publishing Expo Web assets to ${TARGET} (non-destructive)"
 gsutil -h "Cache-Control:no-cache" -h "Content-Type:text/html; charset=utf-8" \
   cp "$DIST/expo-index.html" "${TARGET}/mobile/index.html"
 if [[ -f "$DIST/mobile/sw.js" ]]; then
-  gsutil -h "Cache-Control:no-cache" -h "Content-Type:application/javascript; charset=utf-8" \
+  gsutil -h "Cache-Control:no-cache" \
+    -h "Content-Type:application/javascript; charset=utf-8" \
+    -h "Service-Worker-Allowed:/mobile/" \
     cp "$DIST/mobile/sw.js" "${TARGET}/mobile/sw.js"
 fi
 if [[ -f "$DIST/mobile/manifest.webmanifest" ]]; then
   gsutil -h "Cache-Control:no-cache" -h "Content-Type:application/manifest+json" \
     cp "$DIST/mobile/manifest.webmanifest" "${TARGET}/mobile/manifest.webmanifest"
 fi
+# PWA icons must resolve under /mobile/ (manifest prefers these paths)
+for icon in pwa-icon-192.png pwa-icon-512.png apple-touch-icon.png; do
+  if [[ -f "$DIST/mobile/$icon" ]]; then
+    gsutil -h "Cache-Control:public, max-age=86400" -h "Content-Type:image/png" \
+      cp "$DIST/mobile/$icon" "${TARGET}/mobile/$icon"
+  elif [[ -f "$DIST/$icon" ]]; then
+    gsutil -h "Cache-Control:public, max-age=86400" -h "Content-Type:image/png" \
+      cp "$DIST/$icon" "${TARGET}/mobile/$icon"
+  fi
+done
 
 # Keep root copy for debugging / health checks
 gsutil -h "Cache-Control:no-cache" -h "Content-Type:text/html; charset=utf-8" \

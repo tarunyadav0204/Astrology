@@ -84,6 +84,24 @@ cat > "$DIST/expo-manifest.webmanifest" <<'EOF'
   "theme_color": "#f97316",
   "icons": [
     {
+      "src": "/mobile/pwa-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/mobile/pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/mobile/pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
       "src": "/pwa-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
@@ -94,12 +112,6 @@ cat > "$DIST/expo-manifest.webmanifest" <<'EOF'
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "/pwa-icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
     }
   ]
 }
@@ -112,20 +124,26 @@ import pathlib, sys
 path = pathlib.Path(sys.argv[1])
 html = path.read_text(encoding='utf-8')
 head_bits = '''
-<link rel="manifest" href="/expo-manifest.webmanifest" />
+<link rel="manifest" href="/mobile/manifest.webmanifest" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-title" content="AstroRoshni" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="apple-touch-icon" href="/mobile/apple-touch-icon.png" />
 '''
-if 'expo-manifest.webmanifest' not in html:
+# Prefer /mobile/manifest; replace any older root manifest link from a prior export.
+html = html.replace('<link rel="manifest" href="/expo-manifest.webmanifest" />', '')
+if '/mobile/manifest.webmanifest' not in html:
+    html = html.replace('</head>', head_bits + '</head>', 1)
+elif 'apple-mobile-web-app-title' not in html:
     html = html.replace('</head>', head_bits + '</head>', 1)
 sw_bits = '''
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('/mobile/sw.js', { scope: '/mobile/' }).catch(function () {});
+    navigator.serviceWorker.register('/mobile/sw.js', { scope: '/mobile/' }).catch(function (err) {
+      console.warn('[PWA] SW registration failed', err);
+    });
   });
 }
 </script>
