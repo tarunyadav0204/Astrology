@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -35,6 +36,26 @@ export async function downloadPdfToLocalUri(pdfUrl, fileNamePrefix = 'report') {
   if (!pdfUrl) {
     throw new Error('Missing PDF URL');
   }
+
+  // expo-file-system downloadAsync is unavailable on web (shim has null cacheDirectory).
+  // Prefer a blob URL; if GCS/CORS blocks fetch, fall back to the signed remote URL
+  // (iframes / window.open can still load it — unlike native FileSystem).
+  if (Platform.OS === 'web') {
+    try {
+      const response = await fetch(pdfUrl);
+      if (!response.ok) {
+        throw new Error(`PDF download failed (${response.status})`);
+      }
+      const blob = await response.blob();
+      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        return URL.createObjectURL(blob);
+      }
+    } catch (error) {
+      console.warn('[PDF] Web fetch/blob failed, using remote URL:', error?.message || error);
+    }
+    return pdfUrl;
+  }
+
   const safePrefix = String(fileNamePrefix || 'report').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'report';
   const cacheRoot = FileSystem.cacheDirectory || FileSystem.documentDirectory || '';
   const folder = `${cacheRoot}reports/`;

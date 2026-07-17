@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -263,7 +264,7 @@ export default function ChartsHubScreen({ navigation, route }) {
         </View>
       </SafeAreaView>
 
-      <View style={styles.content}>
+      <View style={[styles.content, Platform.OS === 'web' ? styles.contentWeb : null]}>
         {activeTab === 'chart' ? (
           <ChartScreen
             key={`chart-${birthData?.id || birthData?.name || 'none'}`}
@@ -388,5 +389,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  contentWeb: {
+    minHeight: 0,
+    overflow: 'hidden',
   },
 });

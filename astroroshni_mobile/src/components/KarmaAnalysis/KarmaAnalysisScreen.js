@@ -118,30 +118,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   const [isChangingChart, setIsChangingChart] = useState(false);
   const lastTrackedAnalysisRef = useRef(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadBirthData();
-      fetchKarmaCost();
-      // Don't restart if already loading/polling
-      if (!loading && !pollingInterval) {
-        if (selectedChartId) {
-          checkExistingAnalysis();
-        }
-      }
-    }, [loadBirthData])
-  );
-
-  const fetchKarmaCost = async () => {
-    try {
-      const response = await pricingAPI.getPricing();
-      const data = response?.data || response;
-      const cost = data?.pricing?.karma != null ? Number(data.pricing.karma) : 25;
-      setKarmaCost(cost);
-    } catch (err) {
-      console.error('Error fetching karma cost:', err);
-    }
-  };
-
+  // Declared before useFocusEffect — that hook reads loadBirthData in its dep array.
   const loadBirthData = useCallback(async () => {
     try {
       console.log('[KarmaAnalysis] Loading birth data...');
@@ -179,7 +156,31 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
     } catch (err) {
       console.error('[KarmaAnalysis] Error loading birth data:', err);
     }
-  }, [selectedChartId]);
+  }, [selectedChartId, navigation]);
+
+  const fetchKarmaCost = async () => {
+    try {
+      const response = await pricingAPI.getPricing();
+      const data = response?.data || response;
+      const cost = data?.pricing?.karma != null ? Number(data.pricing.karma) : 25;
+      setKarmaCost(cost);
+    } catch (err) {
+      console.error('Error fetching karma cost:', err);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadBirthData();
+      fetchKarmaCost();
+      // Don't restart if already loading/polling
+      if (!loading && !pollingInterval) {
+        if (selectedChartId) {
+          checkExistingAnalysis();
+        }
+      }
+    }, [loadBirthData])
+  );
 
   useEffect(() => {
     if (selectedChartId && !loading && !isChangingChart) {

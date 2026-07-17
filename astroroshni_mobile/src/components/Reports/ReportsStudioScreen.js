@@ -10,6 +10,8 @@ import {
   Modal,
   ActivityIndicator,
   AppState,
+  Platform,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -75,6 +77,22 @@ const REPORT_TYPE_FALLBACKS = [
 ];
 
 const buildReportPdfFileName = (reportId) => `report-${String(reportId || 'latest').replace(/[^a-zA-Z0-9_-]+/g, '_')}`;
+
+const HISTORY_STATUS_META = {
+  completed: { icon: 'checkmark-circle', tint: '#22c55e' },
+  processing: { icon: 'hourglass-outline', tint: '#f59e0b' },
+  pending: { icon: 'time-outline', tint: '#f59e0b' },
+  failed: { icon: 'close-circle', tint: '#f43f5e' },
+};
+
+const normalizeHistoryStatus = (value) => String(value || '').trim().toLowerCase();
+
+const formatHistoryDate = (value, locale = 'en-IN') => {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(parsed);
+};
 
 const normalizeLanguageCode = (value) => {
   const normalized = String(value || '').trim().toLowerCase();
@@ -219,6 +237,9 @@ export default function ReportsStudioScreen({ navigation, route }) {
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [pendingForceRegenerate, setPendingForceRegenerate] = useState(false);
   const [checkingExistingReport, setCheckingExistingReport] = useState(false);
+  const [pastReports, setPastReports] = useState([]);
+  const [loadingPastReports, setLoadingPastReports] = useState(true);
+  const [openingPastReportId, setOpeningPastReportId] = useState(null);
   const pollTimerRef = useRef(null);
   const reportSessionRef = useRef(null);
   const mountedRef = useRef(true);
@@ -466,7 +487,10 @@ export default function ReportsStudioScreen({ navigation, route }) {
 
   const openGeneratedReport = async () => {
     try {
-      if (pdfGenerationState === 'building') {
+      const reportId = reportJobId || reportDocument?.report_id;
+      const pdfUrl = reportDocument?.pdf_url || (reportId ? await resolveReportPdfUrl(reportId) : '');
+
+      if (pdfGenerationState === 'building' && !generatedPdfUri && !pdfUrl) {
         Alert.alert(
           t('reports.pdfBuildingTitle', 'PDF is still loading'),
           t('reports.pdfBuildingBody', 'The report is ready, but the PDF is still being prepared. Please try again in a moment.')
@@ -474,26 +498,72 @@ export default function ReportsStudioScreen({ navigation, route }) {
         return;
       }
 
-      const reportId = reportJobId || reportDocument?.report_id;
-      const pdfUrl = reportDocument?.pdf_url || (reportId ? await resolveReportPdfUrl(reportId) : '');
-      const pdfUri = generatedPdfUri || (pdfUrl && reportId ? await ensureLocalPdf(reportId, pdfUrl) : '');
-      if (!pdfUri) {
+      let pdfUri = generatedPdfUri || '';
+      if (!pdfUri && pdfUrl) {
+        try {
+          pdfUri = reportId ? await ensureLocalPdf(reportId, pdfUrl) : await downloadPdfToLocalUri(pdfUrl, 'report');
+        } catch (downloadError) {
+          // Native needs a local file; on web the signed URL is enough to open.
+          if (Platform.OS !== 'web') throw downloadError;
+          console.warn('Open report: local PDF prepare failed, using remote URL', downloadError?.message);
+          pdfUri = pdfUrl;
+        }
+      }
+      if (!pdfUri && !pdfUrl) {
         throw new Error(t('reports.pdfOpenUnavailable', 'We could not open the PDF right now.'));
       }
+
       navigation.navigate('ReportViewer', {
-        pdfUri,
-        pdfUrl,
+        pdfUri: pdfUri || pdfUrl,
+        pdfUrl: pdfUrl || pdfUri,
         title: reportDocument?.premium_report?.headline || t('reports.viewerTitle', 'Your report'),
         subtitle: currentLanguageLabel,
       });
     } catch (error) {
       console.error('Open report PDF failed:', error);
+      if (Platform.OS === 'web') {
+        const reportId = reportJobId || reportDocument?.report_id;
+        const fallbackUrl = reportDocument?.pdf_url || (reportId ? await resolveReportPdfUrl(reportId).catch(() => '') : '');
+        if (fallbackUrl) {
+          try {
+            await Linking.openURL(fallbackUrl);
+            return;
+          } catch (_) {
+            /* fall through to alert */
+          }
+        }
+      }
       Alert.alert(
         t('reports.pdfErrorTitle', 'PDF error'),
         genericPdfError
       );
     }
   };
+
+  const loadPastReports = useCallback(async () => {
+    try {
+      const token = await storage.getAuthToken();
+      if (!token) {
+        if (mountedRef.current) {
+          setPastReports([]);
+          setLoadingPastReports(false);
+        }
+        return;
+      }
+      const res = await reportAPI.getHistory({ limit: 20, offset: 0 });
+      const items = res?.data?.data || [];
+      if (mountedRef.current) {
+        setPastReports(Array.isArray(items) ? items : []);
+      }
+    } catch (error) {
+      if (error?.response?.status !== 404) {
+        console.error('[ReportsStudio] past reports load failed', error);
+      }
+      if (mountedRef.current) setPastReports([]);
+    } finally {
+      if (mountedRef.current) setLoadingPastReports(false);
+    }
+  }, []);
 
   const hydrateCompletedReport = async (reportId, { silent = false } = {}) => {
     if (!reportId) return false;
@@ -560,6 +630,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
         setPdfGenerationState('building');
         // Refresh balance after job completion (fresh generate deducts; cache reopen is a no-op).
         fetchBalance?.().catch(() => {});
+        loadPastReports();
         try {
           const pdfUrl = data.pdf_url || await resolveReportPdfUrl(reportId, data.pdf_url || '');
           if (!pdfUrl) {
@@ -668,7 +739,9 @@ export default function ReportsStudioScreen({ navigation, route }) {
   useFocusEffect(
     useCallback(() => {
       restoreReportSession();
-    }, [restoreReportSession])
+      setLoadingPastReports(true);
+      loadPastReports();
+    }, [restoreReportSession, loadPastReports])
   );
 
   useEffect(() => {
@@ -953,6 +1026,74 @@ export default function ReportsStudioScreen({ navigation, route }) {
       if (!ready) return;
     }
     await openGeneratedReport();
+  };
+
+  const openPastReport = async (item) => {
+    if (normalizeHistoryStatus(item?.status) !== 'completed') {
+      Alert.alert(
+        t('reports.historyNotReadyTitle', 'Report not ready'),
+        t('reports.historyNotReadyBody', 'This report is still being prepared.')
+      );
+      return;
+    }
+    try {
+      setOpeningPastReportId(item.report_id);
+      const pdfUrl = await resolveReportPdfUrl(item.report_id);
+      if (!pdfUrl) throw new Error(t('reports.pdfOpenUnavailable', 'We could not open the PDF right now.'));
+      let pdfUri = pdfUrl;
+      try {
+        pdfUri = await downloadPdfToLocalUri(pdfUrl, buildReportPdfFileName(item.report_id));
+      } catch (downloadError) {
+        if (Platform.OS !== 'web') throw downloadError;
+        pdfUri = pdfUrl;
+      }
+      navigation.navigate('ReportViewer', {
+        pdfUri,
+        pdfUrl,
+        title: item.title || t('reports.viewerTitle', 'Your report'),
+        subtitle: item.person_a_name && item.person_b_name
+          ? `${item.person_a_name} vs ${item.person_b_name}`
+          : t('reports.viewerSubtitle', 'Open the generated PDF inside the app.'),
+      });
+    } catch (error) {
+      console.error('[ReportsStudio] open past report failed', error);
+      if (Platform.OS === 'web') {
+        try {
+          const fallbackUrl = await resolveReportPdfUrl(item.report_id).catch(() => '');
+          if (fallbackUrl) {
+            await Linking.openURL(fallbackUrl);
+            return;
+          }
+        } catch (_) {
+          /* fall through */
+        }
+      }
+      Alert.alert(t('reports.pdfErrorTitle', 'PDF error'), genericPdfError);
+    } finally {
+      setOpeningPastReportId(null);
+    }
+  };
+
+  const sharePastReport = async (item) => {
+    if (normalizeHistoryStatus(item?.status) !== 'completed') {
+      Alert.alert(
+        t('reports.historyNotReadyTitle', 'Report not ready'),
+        t('reports.historyNotReadyBody', 'This report is still being prepared.')
+      );
+      return;
+    }
+    try {
+      setOpeningPastReportId(item.report_id);
+      const pdfUrl = await resolveReportPdfUrl(item.report_id);
+      if (!pdfUrl) throw new Error(t('reports.pdfOpenUnavailable', 'We could not open the PDF right now.'));
+      const pdfUri = await downloadPdfToLocalUri(pdfUrl, buildReportPdfFileName(item.report_id));
+      await sharePDFOnWhatsApp(pdfUri);
+    } catch (error) {
+      console.error('[ReportsStudio] share past report failed', error);
+      Alert.alert(t('reports.pdfErrorTitle', 'PDF error'), genericPdfError);
+    } finally {
+      setOpeningPastReportId(null);
+    }
   };
 
   const currentLanguageLabel = useMemo(() => {
@@ -1704,6 +1845,135 @@ export default function ReportsStudioScreen({ navigation, route }) {
                 </View>
               ) : null}
 
+            <View style={styles.pastReportsSection}>
+              <View style={styles.pastReportsHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.pastReportsTitle, { color: colors.text }]}>
+                    {t('reports.pastReportsTitle', 'Your past reports')}
+                  </Text>
+                  <Text style={[styles.pastReportsSubtitle, { color: colors.textSecondary }]}>
+                    {t('reports.pastReportsSubtitle', 'Reports you have already generated stay here so you can open them again.')}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('ReportHistory')}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('reports.historyTitle', 'Report History')}
+                >
+                  <Text style={[styles.pastReportsSeeAll, { color: colors.primary }]}>
+                    {t('reports.seeAllHistory', 'See all')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {loadingPastReports ? (
+                <View style={[styles.pastReportsEmpty, { borderColor: colors.cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : colors.surface }]}>
+                  <ActivityIndicator color={colors.primary} />
+                </View>
+              ) : pastReports.length === 0 ? (
+                <View style={[styles.pastReportsEmpty, { borderColor: colors.cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : colors.surface }]}>
+                  <Ionicons name="documents-outline" size={22} color={colors.textSecondary} />
+                  <Text style={[styles.pastReportsEmptyTitle, { color: colors.text }]}>
+                    {t('reports.historyEmptyTitle', 'No reports yet')}
+                  </Text>
+                  <Text style={[styles.pastReportsEmptyBody, { color: colors.textSecondary }]}>
+                    {t('reports.historyEmptyBody', 'When you generate a report, it will appear here so you can open it again later.')}
+                  </Text>
+                </View>
+              ) : (
+                pastReports.map((item) => {
+                  const typeMeta = reportTypeMap.get(item.report_type) || REPORT_TYPE_FALLBACKS[0];
+                  const statusMeta = HISTORY_STATUS_META[normalizeHistoryStatus(item.status)] || HISTORY_STATUS_META.pending;
+                  const isOpening = openingPastReportId === item.report_id;
+                  const isCompleted = normalizeHistoryStatus(item.status) === 'completed';
+                  const dateLabel = formatHistoryDate(
+                    item.completed_at || item.created_at,
+                    i18n.language === 'en' ? 'en-IN' : undefined
+                  );
+                  return (
+                    <View
+                      key={item.report_id || `${item.report_type}-${item.created_at}`}
+                      style={[
+                        styles.pastReportCard,
+                        {
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface,
+                          borderColor: isDark ? 'rgba(255,255,255,0.12)' : colors.cardBorder,
+                        },
+                      ]}
+                    >
+                      <View style={styles.pastReportTopRow}>
+                        <View style={[styles.pastReportIconWrap, { backgroundColor: `${(typeMeta.gradient || ['#f97316'])[0]}18` }]}>
+                          <Text style={styles.pastReportIconText}>{typeMeta.icon || '📄'}</Text>
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={[styles.pastReportTitle, { color: colors.text }]} numberOfLines={1}>
+                            {item.title || typeMeta.title || t('reports.viewerTitle', 'Your report')}
+                          </Text>
+                          <Text style={[styles.pastReportSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
+                            {item.person_a_name && item.person_b_name
+                              ? `${item.person_a_name} vs ${item.person_b_name}`
+                              : item.person_a_name || item.subtitle || t('reports.historySubtitleFallback', 'Generated report')}
+                          </Text>
+                          <View style={styles.pastReportMetaRow}>
+                            <View style={[styles.pastReportStatusPill, { backgroundColor: `${statusMeta.tint}18` }]}>
+                              <Ionicons name={statusMeta.icon} size={12} color={statusMeta.tint} />
+                              <Text style={[styles.pastReportStatusText, { color: statusMeta.tint }]}>
+                                {t(`reports.status.${normalizeHistoryStatus(item.status)}`, item.status || 'pending')}
+                              </Text>
+                            </View>
+                            {item.language ? (
+                              <Text style={[styles.pastReportLang, { color: colors.textTertiary || colors.textSecondary }]}>
+                                {String(item.language).toUpperCase()}
+                              </Text>
+                            ) : null}
+                          </View>
+                          {dateLabel ? (
+                            <Text style={[styles.pastReportDate, { color: colors.textTertiary || colors.textSecondary }]}>
+                              {dateLabel}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+                      <View style={styles.pastReportActions}>
+                        <TouchableOpacity
+                          onPress={() => openPastReport(item)}
+                          disabled={isOpening || !isCompleted}
+                          style={[
+                            styles.pastReportPrimaryBtn,
+                            { backgroundColor: colors.primary },
+                            (isOpening || !isCompleted) && styles.pastReportBtnDisabled,
+                          ]}
+                        >
+                          {isOpening ? (
+                            <ActivityIndicator color="#fff" size="small" />
+                          ) : (
+                            <Text style={styles.pastReportPrimaryBtnText}>{t('reports.openPdf', 'Open PDF')}</Text>
+                          )}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => sharePastReport(item)}
+                          disabled={isOpening || !isCompleted}
+                          style={[
+                            styles.pastReportSecondaryBtn,
+                            {
+                              borderColor: colors.cardBorder,
+                              backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : colors.surface,
+                            },
+                            (isOpening || !isCompleted) && styles.pastReportBtnDisabled,
+                          ]}
+                        >
+                          <Text style={[styles.pastReportSecondaryBtnText, { color: colors.text }]}>
+                            {t('reports.sharePdf', 'Share')}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+
           </ScrollView>
 
           <ConfirmCreditsModal
@@ -1826,6 +2096,137 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingBottom: 36,
+  },
+  pastReportsSection: {
+    marginTop: 22,
+    gap: 12,
+  },
+  pastReportsHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  pastReportsTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  pastReportsSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 3,
+  },
+  pastReportsSeeAll: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  pastReportsEmpty: {
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingVertical: 22,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    gap: 8,
+  },
+  pastReportsEmptyTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  pastReportsEmptyBody: {
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
+  },
+  pastReportCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    gap: 12,
+  },
+  pastReportTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  pastReportIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pastReportIconText: {
+    fontSize: 20,
+  },
+  pastReportTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  pastReportSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  pastReportMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    flexWrap: 'wrap',
+  },
+  pastReportStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  pastReportStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  pastReportLang: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  pastReportDate: {
+    fontSize: 11,
+    marginTop: 6,
+  },
+  pastReportActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  pastReportPrimaryBtn: {
+    flex: 1,
+    borderRadius: 14,
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  pastReportPrimaryBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  pastReportSecondaryBtn: {
+    flex: 1,
+    borderRadius: 14,
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    paddingHorizontal: 12,
+  },
+  pastReportSecondaryBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  pastReportBtnDisabled: {
+    opacity: 0.55,
   },
   resumeBanner: {
     marginTop: 2,

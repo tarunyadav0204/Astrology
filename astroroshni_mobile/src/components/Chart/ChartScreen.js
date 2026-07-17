@@ -14,7 +14,7 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { PanGestureHandler, State, GestureHandlerRootView, ScrollView } from 'react-native-gesture-handler';
+import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BlurView } from 'expo-blur';
 import { Audio, Video, ResizeMode } from 'expo-av';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,6 +36,7 @@ import { useTranslation } from 'react-i18next';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { getGrahaDrishtiToHouseSign } from '../../utils/grahaDrishti';
 import { calculateGandantaLocal, getGandantaHouseMatches } from '../../utils/gandanta';
+import AppScrollView, { VerticalPageScroll } from '../../platform/AppScrollView';
 
 const { width, height } = Dimensions.get('window');
 export default function ChartScreen({ navigation, route, onHeaderStateChange }) {
@@ -635,16 +636,18 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
     }
   };
 
+  const webFlexFix = Platform.OS === 'web' ? { minHeight: 0 } : null;
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={styles.container}>
+    <GestureHandlerRootView style={[{ flex: 1 }, webFlexFix]}>
+      <View style={[styles.container, webFlexFix]}>
         <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
         <LinearGradient 
           colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd] : [colors.gradientStart, colors.gradientStart]} 
           style={StyleSheet.absoluteFill} 
         />
         
-        <SafeAreaView style={styles.safeArea} edges={embedded ? [] : ['top']}>
+        <SafeAreaView style={[styles.safeArea, webFlexFix]} edges={embedded ? [] : ['top']}>
           {!embedded ? (
           <View style={styles.compactHeader}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.closeButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}>
@@ -689,10 +692,14 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
               </View>
             </View>
           ) : chartData && birthData ? (
-            <View style={{ flex: 1 }}>
-              <ScrollView 
-                style={{ flex: 1 }} 
-                contentContainerStyle={{ flexGrow: 1 }}
+            <View style={{ flex: 1, ...(Platform.OS === 'web' ? { minHeight: 0 } : null) }}>
+              <VerticalPageScroll
+                style={{ flex: 1 }}
+                contentContainerStyle={
+                  Platform.OS === 'web'
+                    ? { paddingBottom: 12 }
+                    : { flexGrow: 1 }
+                }
                 showsVerticalScrollIndicator={false}
               >
                 <View 
@@ -700,37 +707,46 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     styles.mainContent,
                     theme === 'dark' 
                       ? { backgroundColor: '#1a0033' } 
-                      : { backgroundColor: '#fff5f0' }
+                      : { backgroundColor: '#fff5f0' },
+                    Platform.OS === 'web' ? { flexGrow: 0, flexBasis: 'auto' } : null,
                   ]}
                 >
-                  <View style={styles.chartAndNavContainer}>
-                    <PanGestureHandler 
-                      onGestureEvent={onGestureEvent}
-                      onHandlerStateChange={handleSwipe}
-                      activeOffsetX={[-8, 8]}
-                      failOffsetY={[-80, 80]}
-                      shouldCancelWhenOutside={false}
-                    >
+                  <View style={[
+                    styles.chartAndNavContainer,
+                    Platform.OS === 'web' ? { flexGrow: 0, flexBasis: 'auto' } : null,
+                  ]}>
+                    {(() => {
+                      const chartSwipeBody = (
                       <Animated.View 
                         style={{ 
-                          flex: 1,
+                          ...(Platform.OS === 'web' ? {} : { flex: 1 }),
                           transform: [{ translateX: chartTranslateX }] 
                         }}
                       >
                         <View 
                           ref={captureViewRef}
                           collapsable={false} 
-                          style={styles.captureArea}
+                          style={[
+                            styles.captureArea,
+                            Platform.OS === 'web' ? { flexGrow: 0, flexBasis: 'auto' } : null,
+                          ]}
                         >
                           <LinearGradient
                             colors={theme === 'dark' ? ['#1a0033', '#2d1b4e'] : ['#ffffff', '#fff5f0']}
                             style={[
                               styles.captureGradient,
-                              { paddingBottom: (insets.bottom || 16) + 80 }
+                              { paddingBottom: (insets.bottom || 16) + 80 },
+                              Platform.OS === 'web' ? { flexGrow: 0, flexBasis: 'auto' } : null,
                             ]}
                           >
-                            <View style={styles.chartArea}>
-                              <View style={styles.chartWrapper}>
+                            <View style={[
+                              styles.chartArea,
+                              Platform.OS === 'web' ? { flexGrow: 0, flexBasis: 'auto' } : null,
+                            ]}>
+                              <View style={[
+                                styles.chartWrapper,
+                                Platform.OS === 'web' ? { flexGrow: 0, flexBasis: 'auto' } : null,
+                              ]}>
                                 <ChartWidget 
                                   ref={chartWidgetRef}
                                   chartData={getChartDataForType(chartTypes[currentChartIndex].id)}
@@ -777,10 +793,24 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                           </LinearGradient>
                         </View>
                       </Animated.View>
-                    </PanGestureHandler>
+                      );
+                      // PanGestureHandler steals vertical touch on web; chart pills still change type.
+                      if (Platform.OS === 'web') return chartSwipeBody;
+                      return (
+                        <PanGestureHandler 
+                          onGestureEvent={onGestureEvent}
+                          onHandlerStateChange={handleSwipe}
+                          activeOffsetX={[-8, 8]}
+                          failOffsetY={[-80, 80]}
+                          shouldCancelWhenOutside={false}
+                        >
+                          {chartSwipeBody}
+                        </PanGestureHandler>
+                      );
+                    })()}
                   </View>
                 </View>
-              </ScrollView>
+              </VerticalPageScroll>
 
               <View style={[styles.bottomNavContainer, { 
                 backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 1)' : 'rgba(255, 255, 255, 1)',
@@ -790,7 +820,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                 {Platform.OS === 'ios' && (
                   <BlurView intensity={theme === 'dark' ? 40 : 60} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />
                 )}
-                <ScrollView
+                <AppScrollView
                   ref={bottomNavScrollRef}
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -811,7 +841,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                       </Text>
                     </TouchableOpacity>
                   ))}
-                </ScrollView>
+                </AppScrollView>
               </View>
             </View>
           ) : (
@@ -896,7 +926,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
               
               {selectedHouse && (
                 <View style={styles.drawerInner}>
-                  <ScrollView
+                  <AppScrollView
                     style={styles.drawerScroll}
                     contentContainerStyle={styles.drawerScrollContent}
                     showsVerticalScrollIndicator
@@ -1222,7 +1252,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     
                     {/* Extra padding for scroll */}
                     <View style={{ height: 40 }} />
-                  </ScrollView>
+                  </AppScrollView>
 
                   {/* Sticky Quick Actions at Bottom */}
                   <View style={[styles.drawerActions, { 

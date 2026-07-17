@@ -159,6 +159,22 @@ export default function ReportViewerScreen({ navigation, route }) {
         return;
       }
 
+      // Web / PWA: embed blob: or the signed https URL directly.
+      // Do not use Google gview (often blocked in iframes). Avoid FileSystem (unavailable on web).
+      if (Platform.OS === 'web') {
+        const webUri = pdfUri || pdfUrl;
+        if (!webUri) {
+          markError(t('reports.pdfOpenUnavailable', 'We could not open the PDF right now.'));
+          return;
+        }
+        setViewerSource({ uri: webUri });
+        setPreparing(false);
+        loadTimerRef.current = setTimeout(() => {
+          markError(t('reports.viewerLoadTimeout', 'Preview is taking too long. Try Open externally.'));
+        }, LOAD_TIMEOUT_MS);
+        return;
+      }
+
       if (Platform.OS === 'ios' && pdfUri) {
         setViewerSource({ uri: pdfUri });
         setPreparing(false);

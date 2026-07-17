@@ -782,6 +782,9 @@
     "historyNotReadyTitle": "Report not ready",
     "historyNotReadyBody": "This report is still being prepared.",
     "historySubtitleFallback": "Generated report",
+    "pastReportsTitle": "Your past reports",
+    "pastReportsSubtitle": "Reports you have already generated stay here so you can open them again.",
+    "seeAllHistory": "See all",
     "goToReports": "Create a report",
     "reportHistoryMenu": "Report History",
     "status": {
