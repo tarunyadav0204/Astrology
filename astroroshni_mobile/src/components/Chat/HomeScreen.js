@@ -808,34 +808,59 @@ export default function HomeScreen({
 const loadCurrentNative = async () => {
     try {
       const { storage } = require('../../services/storage');
+      const { isGuestId } = require('../../auth/guestAuth');
+      const token = await storage.getAuthToken();
+      const isGuest = !token;
 
       // First try to get single birth details
       let selectedNative = await storage.getBirthDetails();
+      // Guests must not keep a logged-in account chart after logout.
+      if (
+        selectedNative &&
+        isGuest &&
+        !isGuestId(selectedNative.id || selectedNative.birth_chart_id)
+      ) {
+        try {
+          await storage.clearBirthDetails();
+        } catch (_) {}
+        selectedNative = null;
+      }
       if (selectedNative && (selectedNative.id || selectedNative.birth_chart_id)) {
         setCurrentNativeData(selectedNative);
         return selectedNative;
       }
 
-      // If nothing selected, sync "self" from backend as a safe default.
-      try {
-        const { authAPI } = require('../../services/api');
-        const response = await authAPI.getSelfBirthChart();
-        if (response?.data?.has_self_chart) {
-          const selfData = {
-            ...response.data,
-            id: response.data.birth_chart_id, // normalize id field
-          };
-          await storage.setBirthDetails(selfData);
-          setCurrentNativeData(selfData);
-          return selfData;
+      // Logged-in only: sync "self" from backend as a safe default.
+      if (!isGuest) {
+        try {
+          const { authAPI } = require('../../services/api');
+          const response = await authAPI.getSelfBirthChart();
+          if (response?.data?.has_self_chart) {
+            const selfData = {
+              ...response.data,
+              id: response.data.birth_chart_id, // normalize id field
+            };
+            await storage.setBirthDetails(selfData);
+            setCurrentNativeData(selfData);
+            return selfData;
+          }
+        } catch (e) {
+          // If self-chart sync fails, fall back to profiles.
         }
-      } catch (e) {
-        // If self-chart sync fails, fall back to profiles.
       }
 
       // If no single birth details, get from profiles
       if (!selectedNative) {
-        const profiles = await storage.getBirthProfiles();
+        let profiles = await storage.getBirthProfiles();
+        if (isGuest && Array.isArray(profiles)) {
+          const guestOnly = profiles.filter((p) => isGuestId(p?.id));
+          if (guestOnly.length !== profiles.length) {
+            try {
+              await storage.setBirthProfiles(guestOnly);
+            } catch (_) {}
+          }
+          profiles = guestOnly;
+        }
 
         if (profiles && profiles.length > 0) {
           // Use the first profile or find 'self' relation
@@ -843,8 +868,8 @@ const loadCurrentNative = async () => {
         }
       }
 
-      setCurrentNativeData(selectedNative);
-      return selectedNative;
+      setCurrentNativeData(selectedNative || null);
+      return selectedNative || null;
     } catch (error) {
       return null;
     }

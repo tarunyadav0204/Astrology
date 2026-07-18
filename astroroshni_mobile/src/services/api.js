@@ -283,13 +283,29 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Unauthorized - clear token
+    // Unauthorized — clear account session keys so guest Home is not blocked by
+    // leftover userData / last-selected birth chart ("Hello Tarun", signs, etc.).
     if (error.response?.status === 401 && !shouldSuppressGlobalError(error)) {
-      await AsyncStorage.removeItem('authToken');
+      try {
+        await AsyncStorage.multiRemove([
+          'authToken',
+          'userData',
+          'birthDetails',
+          'birthProfiles',
+          'chartData',
+        ]);
+      } catch (_) {
+        await AsyncStorage.removeItem('authToken');
+        try {
+          await AsyncStorage.removeItem('userData');
+        } catch (__) {
+          /* ignore */
+        }
+      }
       if (errorHandlerCallback) {
         errorHandlerCallback({
           type: 'auth',
-          message: 'Session expired. Please login again.'
+          message: 'Session expired. Continuing as guest.',
         });
       }
     }
@@ -755,10 +771,18 @@ export const chartAPI = {
   },
   
   calculateKarkamsaChart: (chartData, atmakaraka) =>
-    api.post(getEndpoint('/karkamsa-chart'), { chart_data: chartData, atmakaraka }),
-  
+    api.post(
+      getEndpoint('/karkamsa-chart'),
+      { chart_data: chartData, atmakaraka },
+      BACKGROUND_REQUEST_CONFIG,
+    ),
+
   calculateSwamsaChart: (chartData, atmakaraka) =>
-    api.post(getEndpoint('/swamsa-chart'), { chart_data: chartData, atmakaraka }),
+    api.post(
+      getEndpoint('/swamsa-chart'),
+      { chart_data: chartData, atmakaraka },
+      BACKGROUND_REQUEST_CONFIG,
+    ),
   
   scanPhysicalTraits: (birthData, birthChartId = null) => 
     api.post(getEndpoint('/scan-physical'), { birth_data: birthData, birth_chart_id: birthChartId }),
@@ -796,7 +820,8 @@ export const nudgeAPI = {
 };
 
 export const creditAPI = {
-  getBalance: () => api.get(getEndpoint('/credits/balance')),
+  // Balance is polled on mount; handle 401 locally as guest (do not hard-login).
+  getBalance: () => api.get(getEndpoint('/credits/balance'), BACKGROUND_REQUEST_CONFIG),
   getSubscriptionDetails: () => api.get(getEndpoint('/credits/subscription')),
   getHistory: () => api.get(getEndpoint('/credits/history')),
   startSpeechSession: () => api.post(getEndpoint('/credits/speech-session/start'), {}, GLOBAL_ERROR_CONFIG),

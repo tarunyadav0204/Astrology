@@ -238,7 +238,8 @@ if (isMiuiFontBugDevice && !global.__ASTROROSHNI_MIUI_TEXT_PATCHED__) {
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
-  const [initialRoute, setInitialRoute] = useState('Welcome');
+  // Guest-first: land on Home unless bootstrap decides otherwise (web continue, etc.).
+  const [initialRoute, setInitialRoute] = useState('Home');
   const [webContinueToken] = useState(() => getWebContinueTokenFromLocation());
   const [initialTheme, setInitialTheme] = useState(null);
   const [forceUpdateInfo, setForceUpdateInfo] = useState(null);
@@ -389,22 +390,17 @@ export default function App() {
       if (authToken) {
         try {
           const { chartAPI } = require('./src/services/api');
+          // Suppress global 401 handler during bootstrap — we handle guest fallback here.
           const response = await Promise.race([
-            chartAPI.getExistingCharts(),
+            chartAPI.getExistingCharts('', 10, 0, { suppressGlobalError: true }),
             new Promise((_, reject) =>
               setTimeout(() => reject(new Error('Timeout')), 10000)
             )
           ]);
           if (response.data && response.data.charts && response.data.charts.length > 0) {
-            const localBirthData = await storage.getBirthDetails();
-            if (localBirthData) {
-              setInitialRoute('Home');
-            } else {
-              setInitialRoute('Home');
-            }
-          } else {
-            setInitialRoute('Home');
+            await storage.getBirthDetails();
           }
+          setInitialRoute('Home');
         } catch (apiError) {
           // Backend GET /api/birth-charts uses get_current_user → returns 401 for invalid/expired token.
           // Axios puts status on error.response.status. Only clear session on 401; on timeout/network error go Home.
@@ -415,8 +411,7 @@ export default function App() {
           }
           if (isUnauth) {
             try {
-              await storage.removeAuthToken();
-              await storage.removeItem('userData');
+              await storage.clearAccountSession();
             } catch (clearErr) {
               console.log('Clear storage on bootstrap auth fail:', clearErr);
             }

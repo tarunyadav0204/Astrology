@@ -3,7 +3,6 @@ import { useNavigation } from '@react-navigation/native';
 import * as Sentry from '@sentry/react-native';
 import { setGlobalErrorHandler } from '../services/api';
 import { useError } from '../context/ErrorContext';
-import { replaceWithLogin } from '../navigation/replaceWithLogin';
 
 export default function GlobalErrorHandler() {
   const navigation = useNavigation();
@@ -46,20 +45,25 @@ export default function GlobalErrorHandler() {
           break;
 
         case 'auth':
-          // Only force Login when an authenticated session expired.
-          // Guests exploring free tools should stay on Home.
+          // Expired/invalid session → clear account + chart leftovers, explore as guest on Home.
+          // Do not hard-reset to Login (that fights guest-mode product policy).
           (async () => {
             try {
               const { storage } = require('../services/storage');
-              const userData = await storage.getUserData();
-              const token = await storage.getAuthToken();
-              if (!token && !userData) {
+              await storage.clearAccountSession();
+            } catch (_) {
+              /* ignore */
+            }
+            try {
+              const state = navigation.getState?.();
+              const current = state?.routes?.[state.index || 0]?.name;
+              if (current === 'Home' || current === 'Welcome' || current === 'Login') {
                 return;
               }
+              navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
             } catch (_) {
-              /* fall through to login */
+              /* ignore */
             }
-            replaceWithLogin(navigation);
           })();
           break;
 

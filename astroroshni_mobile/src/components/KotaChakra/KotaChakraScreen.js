@@ -55,9 +55,20 @@ const KotaChakraScreen = ({ route, navigation }) => {
       
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
-        Alert.alert('Error', 'Authentication required');
-        const { replaceWithLogin } = require('../../navigation/replaceWithLogin');
-        replaceWithLogin(navigation);
+        Alert.alert(
+          'Sign in required',
+          'Kota Chakra needs a saved account chart. You can keep exploring free tools on Home.',
+          [
+            { text: 'Stay', style: 'cancel' },
+            {
+              text: 'Sign in',
+              onPress: () => {
+                const { replaceWithLogin } = require('../../navigation/replaceWithLogin');
+                replaceWithLogin(navigation);
+              },
+            },
+          ]
+        );
         return;
       }
       

@@ -2865,12 +2865,35 @@ export default function ChatScreen({ navigation, route }) {
 
   const checkBirthData = async () => {
     try {
+      const { isGuestId } = require('../../auth/guestAuth');
+      const token = await storage.getAuthToken();
+      const isGuest = !token;
+
       // First try to get single birth details
       let selectedBirthData = await storage.getBirthDetails();
+      if (
+        selectedBirthData &&
+        isGuest &&
+        !isGuestId(selectedBirthData.id || selectedBirthData.birth_chart_id)
+      ) {
+        try {
+          await storage.clearBirthDetails();
+        } catch (_) {}
+        selectedBirthData = null;
+      }
       
       // If no single birth details, get from profiles
       if (!selectedBirthData) {
-        const profiles = await storage.getBirthProfiles();
+        let profiles = await storage.getBirthProfiles();
+        if (isGuest && Array.isArray(profiles)) {
+          const guestOnly = profiles.filter((p) => isGuestId(p?.id));
+          if (guestOnly.length !== profiles.length) {
+            try {
+              await storage.setBirthProfiles(guestOnly);
+            } catch (_) {}
+          }
+          profiles = guestOnly;
+        }
         
         if (profiles && profiles.length > 0) {
           // Use the first profile or find 'self' relation
@@ -4863,10 +4886,14 @@ export default function ChatScreen({ navigation, route }) {
   const performLogout = async () => {
     setShowLogoutConfirm(false);
     try {
-      await storage.clearAll();
+      // Drop auth + account birth chart so Home does not keep "Hello <name>" / signs.
+      await storage.clearAccountSession();
     } catch (_) {
       /* still leave the session */
     }
+    try {
+      setBirthData(null);
+    } catch (_) {}
     try {
       await refreshAuthState?.();
     } catch (_) {}

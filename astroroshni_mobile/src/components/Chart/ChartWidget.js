@@ -77,10 +77,15 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const [transitDate, setTransitDate] = useState(new Date());
   
   const activeChartTypeRef = useRef(currentChartType);
+  const chartDataCacheRef = useRef(chartDataCache);
   
   useEffect(() => {
     activeChartTypeRef.current = currentChartType;
   }, [currentChartType]);
+
+  useEffect(() => {
+    chartDataCacheRef.current = chartDataCache;
+  }, [chartDataCache]);
   
   const chartTypes = [
     'lagna', 'navamsa', 'transit', 'karkamsa', 'swamsa', 'saptamsa', 'dasamsa', 'dwadasamsa', 'shodasamsa', 
@@ -107,10 +112,29 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     shashtyamsa: 'Shashtyamsa (D60)'
   };
   
+  // Keys must match ChartScreen chart type ids (and swipe list aliases).
   const chartDivisions = {
-    hora: 2, drekkana: 3, chaturthamsa: 4, navamsa: 9, saptamsa: 7, dashamsa: 10, dwadashamsa: 12, shodamsa: 16,
-    vimsamsa: 20, chaturvimsamsa: 24, saptavimshamsa: 27,
-    trimsamsa: 30, khavedamsa: 40, akshavedamsa: 45, shashtyamsa: 60,
+    hora: 2,
+    drekkana: 3,
+    chaturthamsa: 4,
+    navamsa: 9,
+    saptamsa: 7,
+    dashamsa: 10,
+    dasamsa: 10,
+    dwadashamsa: 12,
+    dwadasamsa: 12,
+    shodamsa: 16,
+    shodasamsa: 16,
+    vimsamsa: 20,
+    vimshamsa: 20,
+    chaturvimsamsa: 24,
+    chaturvimshamsa: 24,
+    saptavimshamsa: 27,
+    trimsamsa: 30,
+    trimshamsa: 30,
+    khavedamsa: 40,
+    akshavedamsa: 45,
+    shashtyamsa: 60,
   };
 
   const toggleStyle = useCallback(() => {
@@ -203,38 +227,33 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   };
 
   const getChartData = () => {
-    if (currentChartType === 'lagna') return chartData;
-    if (currentChartType === 'transit') return currentChartData || chartData;
-    return chartDataCache[currentChartType] || chartData;
+    if (currentChartType === 'lagna') return chartData || lagnaChartData || currentChartData;
+    if (currentChartType === 'transit') return currentChartData || chartDataCache.transit;
+    return chartDataCache[currentChartType] || currentChartData || null;
   };
 
+  // Seed lagna into local cache when parent provides it.
   useEffect(() => {
-    if (chartData) {
-      setCurrentChartData(chartData);
+    const lagna = chartType === 'lagna' ? chartData : lagnaChartData;
+    if (lagna?.planets) {
+      setChartDataCache((prev) => (prev.lagna === lagna ? prev : { ...prev, lagna }));
       if (currentChartType === 'lagna') {
-        setChartDataCache(prev => ({ ...prev, lagna: chartData }));
-      }
-      setLoading(false);
-    }
-  }, [chartData, currentChartType]);
-  
-  useEffect(() => {
-    if (!chartData) {
-      if (currentChartType === 'transit') {
-        loadChartData('transit', true);
-      } else if (currentChartType === 'karkamsa' || currentChartType === 'swamsa') {
-        loadChartData(currentChartType, true);
-      } else if (division && division > 1) {
-        loadDivisionalChart(division);
-      } else {
-        loadChartData(currentChartType, true);
+        setCurrentChartData(lagna);
+        setLoading(false);
       }
     }
-  }, [currentChartType, division]);
-  
-  const loadDivisionalChart = async (divisionNumber) => {
-    if (!birthData || !divisionNumber || loading) return;
-    const targetChartType = Object.keys(chartDivisions).find(type => chartDivisions[type] === divisionNumber);
+  }, [chartData, lagnaChartData, chartType, currentChartType]);
+
+  const loadDivisionalChart = useCallback(async (divisionNumber, typeKey) => {
+    if (!birthData || !divisionNumber || divisionNumber <= 1) return;
+    const cacheKey = typeKey || currentChartType;
+    if (chartDataCacheRef.current[cacheKey]) {
+      if (activeChartTypeRef.current === cacheKey) {
+        setCurrentChartData(chartDataCacheRef.current[cacheKey]);
+        setLoading(false);
+      }
+      return;
+    }
     try {
       setLoading(true);
       const formattedData = {
@@ -246,33 +265,47 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       };
       const response = await chartAPI.calculateDivisionalChart(formattedData, divisionNumber);
       const data = response.data.divisional_chart;
-      if (data && targetChartType) {
-        setChartDataCache(prev => ({ ...prev, [targetChartType]: data }));
-        setCurrentChartData(data);
+      if (data) {
+        setChartDataCache((prev) => ({ ...prev, [cacheKey]: data }));
+        if (activeChartTypeRef.current === cacheKey) {
+          setCurrentChartData(data);
+        }
       }
     } catch (error) {
       console.error(`Error loading divisional chart D${divisionNumber}:`, error);
     } finally {
-      setLoading(false);
+      if (activeChartTypeRef.current === cacheKey) setLoading(false);
     }
-  };
+  }, [birthData, currentChartType]);
 
-  const loadChartData = async (type, setCurrent = true, customDate = null) => {
-    if (chartDataCache[type] && !(type === 'transit' && customDate)) {
-      if (setCurrent) setCurrentChartData(chartDataCache[type]);
-      return;
-    }
+  const loadChartData = useCallback(async (type, setCurrent = true, customDate = null) => {
+    const typeAtStart = type;
     if (type === 'lagna') {
-      const data = chartData;
-      setChartDataCache(prev => ({ ...prev, [type]: data }));
-      if (setCurrent) setCurrentChartData(data);
+      const data = chartData || lagnaChartData;
+      if (data) {
+        setChartDataCache((prev) => ({ ...prev, lagna: data }));
+        if (setCurrent) {
+          setCurrentChartData(data);
+          setLoading(false);
+        }
+      }
       return;
     }
     if (!birthData) return;
-    if (loading && setCurrent) return;
-    const typeAtStart = currentChartType;
+    const cachedHit =
+      chartDataCacheRef.current[type] && !(type === 'transit' && customDate)
+        ? chartDataCacheRef.current[type]
+        : null;
+    if (cachedHit) {
+      if (setCurrent && activeChartTypeRef.current === typeAtStart) {
+        setCurrentChartData(cachedHit);
+        setLoading(false);
+      }
+      return;
+    }
     try {
       if (setCurrent) setLoading(true);
+
       const formattedData = {
         ...birthData,
         date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
@@ -282,8 +315,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       };
       let response;
       let data;
-      if (chartDivisions[type]) {
-        response = await chartAPI.calculateDivisionalChart(formattedData, chartDivisions[type]);
+      const divisionNumber = chartDivisions[type] || (division > 1 ? division : null);
+      if (divisionNumber) {
+        response = await chartAPI.calculateDivisionalChart(formattedData, divisionNumber);
         data = response.data.divisional_chart;
       } else if (type === 'transit') {
         const targetDate = customDate || transitDate;
@@ -294,20 +328,29 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         let loadedKarakas = karakas;
         if (!loadedKarakas?.Atmakaraka?.planet) loadedKarakas = await loadKarakas();
         if (loadedKarakas?.Atmakaraka?.planet) {
-          const d1Data = lagnaChartData || chartDataCache.lagna || chartData;
-          if (!d1Data || !d1Data.planets) throw new Error('D1 chart data required');
+          let resolvedD1 = lagnaChartData || chartData || chartDataCacheRef.current.lagna;
+          if (!resolvedD1?.planets) {
+            const d1Res = await chartAPI.calculateChartOnly(formattedData, {
+              suppressGlobalError: true,
+            });
+            resolvedD1 = d1Res?.data;
+            if (resolvedD1) {
+              setChartDataCache((prev) => ({ ...prev, lagna: resolvedD1 }));
+            }
+          }
+          if (!resolvedD1?.planets) throw new Error('D1 chart data required');
           const atmakaraka = loadedKarakas.Atmakaraka.planet;
           if (type === 'karkamsa') {
-            response = await chartAPI.calculateKarkamsaChart(d1Data, atmakaraka);
+            response = await chartAPI.calculateKarkamsaChart(resolvedD1, atmakaraka);
             data = response.data.karkamsa?.karkamsa_chart;
           } else {
-            response = await chartAPI.calculateSwamsaChart(d1Data, atmakaraka);
+            response = await chartAPI.calculateSwamsaChart(resolvedD1, atmakaraka);
             data = response.data.swamsa?.swamsa_chart;
           }
         }
       }
       if (data && activeChartTypeRef.current === typeAtStart) {
-        setChartDataCache(prev => ({ ...prev, [type]: data }));
+        setChartDataCache((prev) => ({ ...prev, [type]: data }));
         if (setCurrent) setCurrentChartData(data);
       }
     } catch (error) {
@@ -315,7 +358,56 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     } finally {
       if (setCurrent && activeChartTypeRef.current === typeAtStart) setLoading(false);
     }
-  };
+  }, [
+    birthData,
+    chartData,
+    lagnaChartData,
+    division,
+    transitDate,
+    karakas,
+    loadKarakas,
+  ]);
+
+  // Always resolve the active chart when type/division/birth changes.
+  // (Previously only loaded when parent chartData was null, and skipped while `loading`
+  // was true — which left Hora/D10/etc stuck on "Loading..." for guests.)
+  useEffect(() => {
+    const type = currentChartType;
+    if (!type) return;
+
+    if (type === 'lagna') {
+      const data = chartData || lagnaChartData;
+      if (data) {
+        setCurrentChartData(data);
+        setChartDataCache((prev) => ({ ...prev, lagna: data }));
+        setLoading(false);
+      }
+      return;
+    }
+
+    const cached = chartDataCacheRef.current[type];
+    if (cached && type !== 'transit') {
+      setCurrentChartData(cached);
+      setLoading(false);
+      return;
+    }
+
+    if (type === 'transit') {
+      loadChartData('transit', true);
+      return;
+    }
+    if (type === 'karkamsa' || type === 'swamsa') {
+      loadChartData(type, true);
+      return;
+    }
+    if (division && division > 1) {
+      loadDivisionalChart(division, type);
+      return;
+    }
+    if (chartDivisions[type]) {
+      loadChartData(type, true);
+    }
+  }, [currentChartType, division, birthData?.id, birthData?.date, birthData?.time, loadChartData, loadDivisionalChart, chartData, lagnaChartData]);
 
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => false,

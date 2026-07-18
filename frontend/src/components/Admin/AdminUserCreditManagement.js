@@ -14,6 +14,8 @@ const AdminUserCreditManagement = () => {
   const [adjustModal, setAdjustModal] = useState(null); // { user, type: 'add'|'remove', amount: '', description: '' }
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
+  const [messageTone, setMessageTone] = useState('success'); // 'success' | 'error' | 'pending'
+  const [webBusy, setWebBusy] = useState(null); // { userid, sendWhatsapp }
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -55,7 +57,14 @@ const AdminUserCreditManagement = () => {
   };
 
   const handleWebTopup = async (user, sendWhatsapp) => {
-    setMessage(null);
+    const label = user.name || user.phone || 'user';
+    setWebBusy({ userid: user.userid, sendWhatsapp: Boolean(sendWhatsapp) });
+    setMessageTone('pending');
+    setMessage(
+      sendWhatsapp
+        ? `Sending WhatsApp template to ${label}…`
+        : `Creating web credits link for ${label}…`
+    );
     setSubmitting(true);
     try {
       const response = await fetch('/api/credits/admin/web-topup-link', {
@@ -82,15 +91,18 @@ const AdminUserCreditManagement = () => {
           /* ignore */
         }
       }
+      setMessageTone('success');
       if (sendWhatsapp) {
-        setMessage(`WhatsApp template sent. Link copied: ${url}`);
+        setMessage(`WhatsApp sent to ${label}. Link copied.`);
       } else {
-        setMessage(`Link ready (copied): ${url}`);
+        setMessage(`Link copied for ${label}.`);
       }
     } catch (err) {
+      setMessageTone('error');
       setMessage(err.message || 'Failed to create web top-up link');
     } finally {
       setSubmitting(false);
+      setWebBusy(null);
     }
   };
 
@@ -142,12 +154,6 @@ const AdminUserCreditManagement = () => {
         Search users and add or remove credits. Use <strong>Copy web link</strong> / <strong>WhatsApp</strong> for the
         reusable PWA Credits continue link (10% web top-up). Template: <code>credits_web_topup_bonus</code>.
       </p>
-      {message && !adjustModal && (
-        <div className={`modal-message ${String(message).includes('failed') || String(message).includes('Failed') ? 'error' : 'success'}`} style={{ marginBottom: 12 }}>
-          {message}
-        </div>
-      )}
-
       <div className="filters-row">
         <div className="form-field search-field">
           <label>Search by name or phone</label>
@@ -212,8 +218,13 @@ const AdminUserCreditManagement = () => {
                         onClick={() => handleWebTopup(user, false)}
                         disabled={submitting || !user.phone}
                         title="Copy reusable PWA Credits link"
+                        aria-busy={
+                          webBusy?.userid === user.userid && webBusy?.sendWhatsapp === false
+                        }
                       >
-                        Copy web link
+                        {webBusy?.userid === user.userid && webBusy?.sendWhatsapp === false
+                          ? 'Copying…'
+                          : 'Copy web link'}
                       </button>
                       <button
                         type="button"
@@ -221,8 +232,13 @@ const AdminUserCreditManagement = () => {
                         onClick={() => handleWebTopup(user, true)}
                         disabled={submitting || !user.phone}
                         title="Send credits_web_topup_bonus template on WhatsApp"
+                        aria-busy={
+                          webBusy?.userid === user.userid && webBusy?.sendWhatsapp === true
+                        }
                       >
-                        WhatsApp
+                        {webBusy?.userid === user.userid && webBusy?.sendWhatsapp === true
+                          ? 'Sending…'
+                          : 'WhatsApp'}
                       </button>
                     </td>
                   </tr>
@@ -296,6 +312,24 @@ const AdminUserCreditManagement = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {message && !adjustModal && (
+        <div
+          className={`web-topup-toast ${messageTone}`}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="web-topup-toast-text">{message}</span>
+          <button
+            type="button"
+            className="web-topup-toast-dismiss"
+            onClick={() => setMessage(null)}
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
         </div>
       )}
     </div>

@@ -117,6 +117,59 @@ export const storage = {
   setItem: (key, value) => AsyncStorage.setItem(key, value),
   getItem: (key) => AsyncStorage.getItem(key),
   removeItem: (key) => AsyncStorage.removeItem(key),
+
+  /**
+   * Logout / expired-session cleanup for guest Home.
+   * Clears auth + selected birth chart / profiles / chat caches so the previous
+   * account native (e.g. "Hello Tarun") cannot linger. Keeps theme, language,
+   * and acquisition/install keys.
+   */
+  clearAccountSession: async () => {
+    const knownKeys = [
+      'authToken',
+      'userData',
+      'birthDetails',
+      'birthProfiles',
+      'birthData',
+      'chartData',
+      'chatHistory',
+      'favorites',
+      'pendingRegistration',
+      'guest_pending_paid_action',
+    ];
+    try {
+      await AsyncStorage.multiRemove(knownKeys);
+    } catch (_) {
+      await Promise.all(knownKeys.map((k) => AsyncStorage.removeItem(k).catch(() => {})));
+    }
+    try {
+      await clearFacebookUserId();
+    } catch (_) {
+      /* ignore */
+    }
+    try {
+      const allKeys = await AsyncStorage.getAllKeys();
+      const ephemeral = (allKeys || []).filter((key) => {
+        if (!key) return false;
+        return (
+          key.startsWith('home_chart_cache:') ||
+          key.startsWith('chatMessages_') ||
+          key.startsWith('chatSessions_') ||
+          key.startsWith('chatSelectedMode_') ||
+          key.startsWith('pendingChatMessages_') ||
+          key.startsWith('pendingFeedback_') ||
+          key.startsWith('monthly_welcome:') ||
+          key.startsWith('chat-entry:') ||
+          key.startsWith('chatRating')
+        );
+      });
+      if (ephemeral.length) {
+        await AsyncStorage.multiRemove(ephemeral);
+      }
+    } catch (_) {
+      /* ignore key scan failures */
+    }
+  },
   
   // Clear all data
   clearAll: () => AsyncStorage.clear(),

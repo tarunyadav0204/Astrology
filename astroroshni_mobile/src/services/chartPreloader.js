@@ -62,10 +62,43 @@ class ChartPreloader {
     if (!charts) return null;
 
     if (chartType === 'lagna') {
-      return charts.lagna;
+      return charts.lagna || charts.chart_data || null;
     }
-    
-    return charts.divisional_charts?.[chartType];
+
+    const div = charts.divisional_charts || {};
+    if (div[chartType]) return div[chartType];
+
+    // calculate-all-charts stores keys as d2/d9/... — map UI ids to those.
+    const divisionByType = {
+      hora: 2,
+      drekkana: 3,
+      chaturthamsa: 4,
+      saptamsa: 7,
+      navamsa: 9,
+      dashamsa: 10,
+      dasamsa: 10,
+      dwadashamsa: 12,
+      dwadasamsa: 12,
+      shodamsa: 16,
+      shodasamsa: 16,
+      vimsamsa: 20,
+      vimshamsa: 20,
+      chaturvimsamsa: 24,
+      chaturvimshamsa: 24,
+      saptavimshamsa: 27,
+      trimsamsa: 30,
+      trimshamsa: 30,
+      khavedamsa: 40,
+      akshavedamsa: 45,
+      shashtyamsa: 60,
+      transit: 'transit',
+      karkamsa: 'karkamsa',
+      swamsa: 'swamsa',
+    };
+    const mapped = divisionByType[chartType];
+    if (mapped == null) return null;
+    if (typeof mapped === 'number') return div[`d${mapped}`] || null;
+    return div[mapped] || null;
   }
 
   /**

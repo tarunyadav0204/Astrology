@@ -1130,9 +1130,15 @@ async def calculate_indu_lagna(request: dict, current_user: User = Depends(get_c
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/karkamsa-chart")
-async def calculate_karkamsa_chart(request: dict, current_user: User = Depends(get_current_user)):
-    """Calculate Karkamsa chart (D9 recast with Atmakaraka's D9 sign as ascendant)"""
+async def calculate_karkamsa_chart(
+    request: dict,
+    http_request: Request,
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    """Calculate Karkamsa chart (D9 recast with Atmakaraka's D9 sign as ascendant). Public for guest free charts."""
     try:
+        if current_user is None:
+            _enforce_guest_chart_only_rate_limit(http_request)
         chart_data = request.get('chart_data', {})
         atmakaraka = request.get('atmakaraka')
         
@@ -1156,6 +1162,8 @@ async def calculate_karkamsa_chart(request: dict, current_user: User = Depends(g
                 "interpretation": karkamsa_interpretation
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error calculating Karkamsa chart: {e}")
         import traceback
@@ -1163,9 +1171,15 @@ async def calculate_karkamsa_chart(request: dict, current_user: User = Depends(g
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/swamsa-chart")
-async def calculate_swamsa_chart(request: dict, current_user: User = Depends(get_current_user)):
-    """Calculate Swamsa chart (D12 recast with Atmakaraka's D12 sign as ascendant)"""
+async def calculate_swamsa_chart(
+    request: dict,
+    http_request: Request,
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    """Calculate Swamsa chart (D12 recast with Atmakaraka's D12 sign as ascendant). Public for guest free charts."""
     try:
+        if current_user is None:
+            _enforce_guest_chart_only_rate_limit(http_request)
         chart_data = request.get('chart_data', {})
         atmakaraka = request.get('atmakaraka')
         
@@ -1189,6 +1203,8 @@ async def calculate_swamsa_chart(request: dict, current_user: User = Depends(get
                 "interpretation": swamsa_interpretation
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error calculating Swamsa chart: {e}")
         import traceback
