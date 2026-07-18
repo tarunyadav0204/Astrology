@@ -91,34 +91,62 @@ def _build_link_payload(userid: int, *, rotate: bool = False) -> dict:
     return {"userid": int(userid), "token": token, "url": url}
 
 
-def send_credits_web_topup_whatsapp(*, userid: int, name: str, phone: str, token: str) -> bool:
+def send_credits_web_topup_whatsapp(
+    *, userid: int, name: str, phone: str, token: str
+) -> tuple[bool, Optional[str]]:
+    """Returns (ok, error_detail)."""
     phone_number_id = _template_phone_number_id()
     if not phone_number_id:
-        logger.warning("credits web topup WA skipped: missing WHATSAPP_PHONE_NUMBER_ID")
-        return False
+        msg = "missing WHATSAPP_PHONE_NUMBER_ID / WHATSAPP_NUDGE_PHONE_NUMBER_ID on server"
+        logger.warning("credits web topup WA skipped: %s", msg)
+        return False, msg
     recipient = _digits_only(phone)
     if not recipient:
-        logger.warning("credits web topup WA skipped: no phone for userid=%s", userid)
-        return False
+        msg = f"no phone digits for userid={userid}"
+        logger.warning("credits web topup WA skipped: %s", msg)
+        return False, msg
     display_name = (name or "there").strip() or "there"
     # Meta template body often rejects newlines / odd chars in variables.
     display_name = re.sub(r"\s+", " ", display_name)[:60]
     try:
         from whatsapp.messaging import send_whatsapp_template
 
-        return bool(
-            send_whatsapp_template(
+        # Meta often stores English as en_US; try configured lang then en_US/en.
+        lang_candidates = []
+        for code in (
+            CREDITS_WEB_TOPUP_TEMPLATE_LANG,
+            "en_US",
+            "en",
+        ):
+            c = (code or "").strip()
+            if c and c not in lang_candidates:
+                lang_candidates.append(c)
+
+        last_err = None
+        for lang in lang_candidates:
+            # Template uses named body var {{customer_name}}, not positional {{1}}.
+            ok, err = send_whatsapp_template(
                 to=recipient,
                 phone_number_id=phone_number_id,
                 template_name=CREDITS_WEB_TOPUP_TEMPLATE,
-                language_code=CREDITS_WEB_TOPUP_TEMPLATE_LANG,
-                body_params=[display_name],
+                language_code=lang,
+                body_named_params={"customer_name": display_name},
                 url_button_suffix=token,
+                return_error=True,
             )
-        )
-    except Exception:
+            if ok:
+                if lang != CREDITS_WEB_TOPUP_TEMPLATE_LANG:
+                    logger.info(
+                        "credits web topup WA sent with language fallback userid=%s lang=%s",
+                        userid,
+                        lang,
+                    )
+                return True, None
+            last_err = err
+        return False, last_err or "template send failed"
+    except Exception as e:
         logger.exception("credits web topup WA send failed userid=%s", userid)
-        return False
+        return False, str(e)
 
 
 @admin_router.post("/admin/web-topup-link")
@@ -133,8 +161,9 @@ async def admin_web_topup_link(body: AdminWebTopupBody, current_user: User = Dep
         raise HTTPException(status_code=400, detail="User has no phone on file")
     payload = _build_link_payload(userid, rotate=bool(body.rotate))
     wa_sent = False
+    wa_error = None
     if body.send_whatsapp:
-        wa_sent = send_credits_web_topup_whatsapp(
+        wa_sent, wa_error = send_credits_web_topup_whatsapp(
             userid=userid,
             name=name,
             phone=phone,
@@ -143,7 +172,11 @@ async def admin_web_topup_link(body: AdminWebTopupBody, current_user: User = Dep
         if not wa_sent:
             raise HTTPException(
                 status_code=502,
-                detail="Link created but WhatsApp template send failed. Check token/phone_number_id/template approval.",
+                detail=(
+                    "Link created but WhatsApp template send failed. "
+                    f"template={CREDITS_WEB_TOPUP_TEMPLATE} lang={CREDITS_WEB_TOPUP_TEMPLATE_LANG}. "
+                    f"Meta error: {wa_error or 'unknown'}"
+                ),
             )
     return {
         **payload,
@@ -151,4 +184,6 @@ async def admin_web_topup_link(body: AdminWebTopupBody, current_user: User = Dep
         "phone": phone,
         "whatsapp_sent": wa_sent,
         "template_name": CREDITS_WEB_TOPUP_TEMPLATE,
+        "template_language": CREDITS_WEB_TOPUP_TEMPLATE_LANG,
+        "whatsapp_error": wa_error,
     }

@@ -71,7 +71,8 @@ const AdminUserCreditManagement = () => {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data.detail || data.message || 'Request failed');
+        const detail = data.detail || data.message || 'Request failed';
+        throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
       }
       const url = data.url || '';
       if (url && navigator?.clipboard?.writeText) {

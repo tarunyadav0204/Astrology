@@ -106,30 +106,53 @@ def send_whatsapp_template(
     template_name: str,
     language_code: str = "en",
     body_params: Optional[List[str]] = None,
+    body_named_params: Optional[Dict[str, str]] = None,
     button_payload: Optional[str] = None,
     url_button_suffix: Optional[str] = None,
     url_button_index: str = "0",
-) -> bool:
+    return_error: bool = False,
+):
     """Send an approved WhatsApp message template to a phone/wa recipient.
 
-    url_button_suffix: dynamic path segment for a URL button
-    (e.g. template URL `https://astroroshni.com/mobile/c/{{1}}` → pass the token only).
+    body_params: positional {{1}}, {{2}}, ... values.
+    body_named_params: named vars e.g. {"customer_name": "Tarun"} for {{customer_name}}.
+    url_button_suffix: dynamic suffix for a URL button variable
+    (e.g. template URL `https://astroroshni.com/mobile/?c=` → pass the token only).
+
+    When return_error=True, returns (ok: bool, error: Optional[str]).
     """
     token, ver = _graph_messages_url()
     if not token or not phone_number_id:
-        logger.warning("Skipping WhatsApp template send: missing WHATSAPP_ACCESS_TOKEN or phone_number_id")
-        return False
+        msg = "missing WHATSAPP_ACCESS_TOKEN or phone_number_id"
+        logger.warning("Skipping WhatsApp template send: %s", msg)
+        return (False, msg) if return_error else False
     to_s = (to or "").strip()
     if not to_s:
-        logger.warning("Skipping WhatsApp template send: missing recipient")
-        return False
+        msg = "missing recipient"
+        logger.warning("Skipping WhatsApp template send: %s", msg)
+        return (False, msg) if return_error else False
     components: List[Dict[str, Any]] = []
-    params = [str(p or "").strip() for p in (body_params or [])]
-    if params:
+    body_parameter_objs: List[Dict[str, Any]] = []
+    named = body_named_params or {}
+    for key, value in named.items():
+        name = str(key or "").strip()
+        if not name:
+            continue
+        body_parameter_objs.append(
+            {
+                "type": "text",
+                "parameter_name": name,
+                "text": str(value or "").strip()[:1024] or "there",
+            }
+        )
+    if not body_parameter_objs:
+        for p in body_params or []:
+            body_parameter_objs.append({"type": "text", "text": str(p or "").strip()[:1024]})
+    if body_parameter_objs:
         components.append(
             {
                 "type": "body",
-                "parameters": [{"type": "text", "text": p[:1024]} for p in params],
+                "parameters": body_parameter_objs,
             }
         )
     if button_payload:
@@ -181,12 +204,20 @@ def send_whatsapp_template(
             timeout=30,
         )
         if not (200 <= r.status_code < 300):
-            logger.warning("WhatsApp template send failed: %s %s", r.status_code, (r.text or "")[:800])
-            return False
-        return True
+            err_text = (r.text or "")[:800]
+            logger.warning(
+                "WhatsApp template send failed: status=%s template=%s lang=%s to=%s body=%s",
+                r.status_code,
+                template_name,
+                language_code,
+                to_s[-4:].rjust(len(to_s), "*") if len(to_s) > 4 else "****",
+                err_text,
+            )
+            return (False, f"Meta {r.status_code}: {err_text}") if return_error else False
+        return (True, None) if return_error else True
     except Exception as e:
         logger.exception("WhatsApp template send error: %s", e)
-        return False
+        return (False, str(e)) if return_error else False
 
 
 def send_whatsapp_interactive_list(
