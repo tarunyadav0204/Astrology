@@ -157,10 +157,18 @@ const linking = {
 };
 const APP_CONFIG_FETCH_TIMEOUT_MS = 6000;
 
-/** WhatsApp / CRM continue links: /mobile/c/:token */
+/**
+ * WhatsApp / CRM continue links.
+ * Prefer ?c=TOKEN on /mobile/ (works on GCS without SPA deep-link rewrite).
+ * Also accept legacy path /mobile/c/:token when the edge router is in front.
+ */
 function getWebContinueTokenFromLocation() {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
   try {
+    const params = new URLSearchParams(String(window.location?.search || ''));
+    const fromQuery = String(params.get('c') || params.get('continue') || '').trim();
+    if (fromQuery) return decodeURIComponent(fromQuery);
+
     const path = String(window.location?.pathname || '');
     const match = path.match(/\/(?:mobile\/)?c\/([^/?#]+)/i);
     if (!match?.[1]) return null;

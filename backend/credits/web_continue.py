@@ -115,8 +115,9 @@ def rotate_continue_token(userid: int) -> str:
 
 
 def build_continue_url(raw_token: str) -> str:
+    """Land on /mobile/?c=TOKEN (GCS serves /mobile/ as a real object; /mobile/c/... 404s without the edge router)."""
     tok = (raw_token or "").strip()
-    return f"{_public_mobile_base()}/c/{tok}"
+    return f"{_public_mobile_base()}/?c={tok}"
 
 
 def resolve_continue_token(raw_token: str) -> Optional[Dict[str, Any]]:
