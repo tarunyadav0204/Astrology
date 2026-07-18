@@ -2959,6 +2959,8 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_chat_worker_user_allowlist,
             is_free_question_enabled,
             is_free_question_parashari_only_enabled,
+            is_web_topup_bonus_enabled,
+            get_web_topup_bonus_percent,
             is_first_purchase_bonus_enabled,
             is_purchase_discount_enabled,
             is_parallel_branch_planner_enabled,
@@ -3060,6 +3062,8 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             ),
             "free_question_enabled": is_free_question_enabled(),
             "free_question_parashari_only_enabled": is_free_question_parashari_only_enabled(),
+            "web_topup_bonus_enabled": is_web_topup_bonus_enabled(),
+            "web_topup_bonus_percent": get_web_topup_bonus_percent(),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching settings: {str(e)}")

@@ -114,3 +114,27 @@ def create_access_token_for_phone(phone: str, expire_minutes: int = 180) -> str:
         raise ValueError("phone is required for token")
     expire = datetime.utcnow() + timedelta(minutes=int(expire_minutes))
     return jwt.encode({"sub": p, "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def create_access_token_for_user(
+    *,
+    phone: str,
+    userid: int,
+    name: str = "",
+    expire_minutes: int = 43200,
+) -> str:
+    """Mint a browser login JWT (same claims as POST /api/login). Default 30 days."""
+    p = (phone or "").strip()
+    if not p:
+        raise ValueError("phone is required for token")
+    expire = datetime.utcnow() + timedelta(minutes=int(expire_minutes))
+    return jwt.encode(
+        {
+            "sub": p,
+            "userid": int(userid),
+            "name": (name or "").strip() or None,
+            "exp": expire,
+        },
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )

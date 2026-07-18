@@ -107,8 +107,14 @@ def send_whatsapp_template(
     language_code: str = "en",
     body_params: Optional[List[str]] = None,
     button_payload: Optional[str] = None,
+    url_button_suffix: Optional[str] = None,
+    url_button_index: str = "0",
 ) -> bool:
-    """Send an approved WhatsApp message template to a phone/wa recipient."""
+    """Send an approved WhatsApp message template to a phone/wa recipient.
+
+    url_button_suffix: dynamic path segment for a URL button
+    (e.g. template URL `https://astroroshni.com/mobile/c/{{1}}` → pass the token only).
+    """
     token, ver = _graph_messages_url()
     if not token or not phone_number_id:
         logger.warning("Skipping WhatsApp template send: missing WHATSAPP_ACCESS_TOKEN or phone_number_id")
@@ -136,6 +142,21 @@ def send_whatsapp_template(
                     {
                         "type": "payload",
                         "payload": truncate_whatsapp(str(button_payload), 200),
+                    }
+                ],
+            }
+        )
+    suffix = (url_button_suffix or "").strip()
+    if suffix:
+        components.append(
+            {
+                "type": "button",
+                "sub_type": "url",
+                "index": str(url_button_index or "0"),
+                "parameters": [
+                    {
+                        "type": "text",
+                        "text": suffix[:2000],
                     }
                 ],
             }

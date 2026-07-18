@@ -14,6 +14,7 @@ import i18n from './src/locales/i18n';
 
 import WelcomeScreen from './src/components/Welcome/WelcomeScreen';
 import ModernAuthFlow from './src/components/Auth/ModernAuthFlow';
+import WebContinueScreen from './src/components/Auth/WebContinueScreen';
 import ChatScreen from './src/components/Chat/ChatScreen';
 import ChatHistoryScreen from './src/components/Chat/ChatHistoryScreen';
 import ChatViewScreen from './src/components/Chat/ChatViewScreen';
@@ -124,6 +125,7 @@ const linking = {
       BlogPostDetail: 'blog/:slug',
       Profile: 'profile',
       Credits: 'credits',
+      WebContinue: 'c/:token',
       About: 'about',
       Support: 'contact',
       MuhuratHub: 'muhurat-finder',
@@ -154,6 +156,20 @@ const linking = {
   },
 };
 const APP_CONFIG_FETCH_TIMEOUT_MS = 6000;
+
+/** WhatsApp / CRM continue links: /mobile/c/:token */
+function getWebContinueTokenFromLocation() {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  try {
+    const path = String(window.location?.pathname || '');
+    const match = path.match(/\/(?:mobile\/)?c\/([^/?#]+)/i);
+    if (!match?.[1]) return null;
+    return decodeURIComponent(match[1]).trim() || null;
+  } catch (_) {
+    return null;
+  }
+}
+
 const MIUI_BRAND_RE = /xiaomi|redmi|poco/i;
 const isMiuiFontBugDevice =
   Platform.OS === 'android' &&
@@ -215,6 +231,7 @@ if (isMiuiFontBugDevice && !global.__ASTROROSHNI_MIUI_TEXT_PATCHED__) {
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [initialRoute, setInitialRoute] = useState('Welcome');
+  const [webContinueToken] = useState(() => getWebContinueTokenFromLocation());
   const [initialTheme, setInitialTheme] = useState(null);
   const [forceUpdateInfo, setForceUpdateInfo] = useState(null);
   const [fatalRuntimeError, setFatalRuntimeError] = useState(null);
@@ -340,6 +357,18 @@ export default function App() {
 
       // Check if this build is still allowed by backend config.
       await checkForceUpdate();
+
+      const continueToken = getWebContinueTokenFromLocation() || webContinueToken;
+      if (continueToken) {
+        setInitialRoute('WebContinue');
+        trackGA4EventOnly('app_open', {
+          auth_state: 'web_continue',
+          app_version: Application.nativeApplicationVersion || '',
+          app_build: Application.nativeBuildVersion || '',
+          platform: Platform.OS,
+        }).catch(() => {});
+        return;
+      }
 
       const authToken = await storage.getAuthToken();
       trackGA4EventOnly('app_open', {
@@ -666,7 +695,7 @@ export default function App() {
               <AuthGateProvider>
               <ThemedStatusBar />
         <Stack.Navigator
-          initialRouteName={initialRoute}
+          initialRouteName={webContinueToken ? 'WebContinue' : initialRoute}
           screenOptions={{
             headerStyle: {
               backgroundColor: '#ff6b35',
@@ -755,6 +784,12 @@ export default function App() {
             name="Credits" 
             component={CreditScreen}
             options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="WebContinue"
+            component={WebContinueScreen}
+            initialParams={webContinueToken ? { token: webContinueToken } : undefined}
+            options={{ headerShown: false, gestureEnabled: false }}
           />
           <Stack.Screen 
             name="Profile" 

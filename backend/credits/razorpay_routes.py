@@ -133,13 +133,19 @@ def _format_inr(paise: int) -> str:
 
 def get_razorpay_credit_packs() -> List[Dict[str, Any]]:
     """Active packs only — respects admin credit_product_catalog.is_active."""
+    from utils.admin_settings import get_web_topup_bonus_percent, is_web_topup_bonus_enabled
+
     packs: List[Dict[str, Any]] = []
     active_amounts = set(credit_service.list_active_credit_amounts())
+    web_bonus_on = is_web_topup_bonus_enabled()
+    web_bonus_percent = int(get_web_topup_bonus_percent() or 0) if web_bonus_on else 0
     for c in ALLOWED_CREDITS:
         if c not in active_amounts:
             continue
         paise = _expected_paise_for_pack(c)
         meta = CREDIT_PACK_META.get(c) or {}
+        pack_bonus = int(meta.get("bonus_credits") or 0)
+        web_bonus = credit_service.calculate_web_topup_bonus_credits(c) if web_bonus_on else 0
         packs.append(
             {
                 "credits": c,
@@ -152,7 +158,10 @@ def get_razorpay_credit_packs() -> List[Dict[str, Any]]:
                 "questions": meta.get("questions"),
                 "save_percent": meta.get("save_percent") or 0,
                 "value_prop": meta.get("value_prop"),
-                "pack_bonus_credits": int(meta.get("bonus_credits") or 0),
+                "pack_bonus_credits": pack_bonus,
+                "web_topup_bonus_percent": web_bonus_percent,
+                "web_topup_bonus_credits": web_bonus,
+                "total_credits": int(c) + pack_bonus + web_bonus,
             }
         )
     return packs
@@ -406,8 +415,10 @@ def _process_captured_payment(payment: Dict[str, Any]) -> Dict[str, Any]:
         "bonus_credits_added": bonus_added,
         "first_purchase_bonus_credits_added": int(extras.get("first_purchase_bonus_credits_added") or 0),
         "discount_credits_added": int(extras.get("discount_credits_added") or 0),
+        "web_topup_bonus_credits_added": int(extras.get("web_topup_bonus_credits_added") or 0),
         "first_purchase_bonus": extras.get("first_purchase_bonus"),
         "purchase_discount": extras.get("purchase_discount"),
+        "web_topup_bonus": extras.get("web_topup_bonus"),
         "message": "Credits added",
         "userid": userid,
     }

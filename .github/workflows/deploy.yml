@@ -696,7 +696,12 @@ jobs:
         run: |
           set -euo pipefail
           gcloud config set project "${GCP_PROJECT_ID}"
-          gsutil -m rsync -r -d frontend/build "gs://${GCP_FRONTEND_SITE_BUCKET}"
+          # Exclude Expo Web PWA paths from rsync -d. Without this, a CRA-only deploy
+          # deletes /mobile/, /_expo/, and Expo /assets from the shared site bucket
+          # (users then see the 404 maintenance page at /mobile/).
+          gsutil -m rsync -r -d \
+            -x '^(mobile(/.*)?|_expo(/.*)?|expo-index\.html|assets/(node_modules|src|assets)(/.*)?)$' \
+            frontend/build "gs://${GCP_FRONTEND_SITE_BUCKET}"
           gsutil -m setmeta -h "Cache-Control:no-cache" "gs://${GCP_FRONTEND_SITE_BUCKET}/**/*.html" || true
           gsutil -m setmeta -h "Cache-Control:public, max-age=31536000, immutable" "gs://${GCP_FRONTEND_SITE_BUCKET}/static/**" || true
           gsutil -m setmeta -h "Cache-Control:public, max-age=31536000, immutable" "gs://${GCP_FRONTEND_SITE_BUCKET}/_next/static/**" || true

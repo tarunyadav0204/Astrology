@@ -922,6 +922,16 @@ def is_free_question_parashari_only_enabled() -> bool:
     return _parse_bool_setting(get_setting("free_question_parashari_only_enabled"), default=False)
 
 
+def is_web_topup_bonus_enabled() -> bool:
+    """Extra credits on Razorpay/web credit purchases (default ON — 10% product offer)."""
+    return _parse_bool_setting(get_setting("web_topup_bonus_enabled"), default=True)
+
+
+def get_web_topup_bonus_percent() -> int:
+    """Percent extra credits on Razorpay/web pack purchases. Default 10."""
+    return _parse_int_setting(get_setting("web_topup_bonus_percent"), default=10, minimum=0, maximum=100)
+
+
 def get_play_payment_service_base_url() -> Optional[str]:
     """Base URL for the Play payment service Cloud Run app."""
     value = (get_setting("play_payment_service_base_url") or os.getenv("PLAY_PAYMENT_SERVICE_BASE_URL") or "").strip()

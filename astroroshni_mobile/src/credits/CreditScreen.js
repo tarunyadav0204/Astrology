@@ -1799,7 +1799,7 @@ const CreditScreen = ({ navigation }) => {
                   {t('credits.page.chooseYourPackWithTara')}
                 </Text>
                 <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary, marginBottom: 12 }]}>
-                  Secure checkout (UPI, cards, netbanking) — same packs as the website.
+                  Secure checkout (UPI, cards, netbanking). Web purchases include 10% extra credits.
                 </Text>
                 {razorpayCatalogLoading ? (
                   <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>
@@ -1822,8 +1822,11 @@ const CreditScreen = ({ navigation }) => {
                       const questions = pack.questions ?? meta.questions;
                       const packBonusCredits =
                         Number(pack.pack_bonus_credits ?? meta.bonusCredits) || 0;
+                      const webBonusCredits = Number(pack.web_topup_bonus_credits) || 0;
+                      const webBonusPercent = Number(pack.web_topup_bonus_percent) || 0;
                       const totalCredits =
-                        Number(pack.total_credits) || pack.credits + packBonusCredits;
+                        Number(pack.total_credits) ||
+                        pack.credits + packBonusCredits + webBonusCredits;
                       const isPopular = Boolean(badge);
                       return (
                         <TouchableOpacity
@@ -1866,7 +1869,14 @@ const CreditScreen = ({ navigation }) => {
                                     : t('credits.page.questionsCount', { count: questions })}
                                 </Text>
                               ) : null}
-                              {packBonusCredits > 0 ? (
+                              {webBonusCredits > 0 ? (
+                                <Text style={[styles.creditPackBonus, { color: colors.primary }]}>
+                                  {webBonusPercent > 0
+                                    ? `${pack.credits} + ${webBonusCredits} web bonus (${webBonusPercent}%)`
+                                    : `${pack.credits} + ${webBonusCredits} web bonus`}
+                                  {packBonusCredits > 0 ? ` + ${packBonusCredits} pack bonus` : ''}
+                                </Text>
+                              ) : packBonusCredits > 0 ? (
                                 <Text style={[styles.creditPackBonus, { color: colors.primary }]}>
                                   {t('credits.page.packBonusLine', {
                                     base: pack.credits,

@@ -2905,6 +2905,96 @@ class CreditService:
         except Exception:
             return False
 
+    def calculate_web_topup_bonus_credits(self, purchased_credits: int) -> int:
+        """Percent bonus for Razorpay/web packs (default 10%)."""
+        from utils.admin_settings import get_web_topup_bonus_percent, is_web_topup_bonus_enabled
+
+        if not is_web_topup_bonus_enabled():
+            return 0
+        percent = int(get_web_topup_bonus_percent() or 0)
+        base = int(purchased_credits or 0)
+        if percent <= 0 or base <= 0:
+            return 0
+        return max(0, int(base * percent) // 100)
+
+    def maybe_apply_web_topup_bonus(
+        self,
+        *,
+        userid: int,
+        purchased_credits: int,
+        purchase_source: str,
+        purchase_reference_id: str,
+        product_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Award web/Razorpay top-up bonus (idempotent per payment). Not applied to Google Play."""
+        from utils.admin_settings import get_web_topup_bonus_percent, is_web_topup_bonus_enabled
+
+        src = str(purchase_source or "").strip().lower()
+        if src != "razorpay":
+            return {
+                "applied": False,
+                "eligible": False,
+                "bonus_credits": 0,
+                "reason": "not_razorpay",
+            }
+        if not is_web_topup_bonus_enabled():
+            return {
+                "applied": False,
+                "eligible": False,
+                "bonus_credits": 0,
+                "reason": "disabled",
+            }
+        percent = int(get_web_topup_bonus_percent() or 0)
+        bonus = self.calculate_web_topup_bonus_credits(purchased_credits)
+        if bonus <= 0:
+            return {
+                "applied": False,
+                "eligible": False,
+                "bonus_credits": 0,
+                "percent": percent,
+                "reason": "zero_bonus",
+            }
+        reference_id = f"{purchase_source}:{purchase_reference_id}:web_topup"
+        if self.has_transaction_with_reference(userid, "web_topup_bonus", reference_id):
+            return {
+                "applied": False,
+                "eligible": True,
+                "bonus_credits": bonus,
+                "percent": percent,
+                "reason": "already_applied",
+            }
+        metadata = json.dumps(
+            {
+                "purchase_source": purchase_source,
+                "purchase_reference_id": purchase_reference_id,
+                "product_id": product_id,
+                "purchased_credits": int(purchased_credits),
+                "percent": percent,
+            }
+        )
+        ok = self.add_credits(
+            userid,
+            bonus,
+            "web_topup_bonus",
+            reference_id=reference_id,
+            description=f"Web top-up bonus: +{bonus} credits ({percent}%)",
+            metadata=metadata,
+        )
+        if not ok:
+            return {
+                "applied": False,
+                "eligible": True,
+                "bonus_credits": bonus,
+                "percent": percent,
+                "reason": "bonus_write_failed",
+            }
+        return {
+            "applied": True,
+            "eligible": True,
+            "bonus_credits": bonus,
+            "percent": percent,
+        }
+
     def apply_purchase_extras(
         self,
         *,
@@ -2914,7 +3004,7 @@ class CreditService:
         purchase_reference_id: str,
         product_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Apply pack bonus, first-purchase bonus, and open purchase discount for a verified purchase."""
+        """Apply pack bonus, first-purchase bonus, open purchase discount, and web top-up bonus."""
         pack_result = self.maybe_apply_pack_bonus(
             userid=userid,
             purchased_credits=purchased_credits,
@@ -2936,17 +3026,27 @@ class CreditService:
             purchase_reference_id=purchase_reference_id,
             product_id=product_id,
         )
+        web_result = self.maybe_apply_web_topup_bonus(
+            userid=userid,
+            purchased_credits=purchased_credits,
+            purchase_source=purchase_source,
+            purchase_reference_id=purchase_reference_id,
+            product_id=product_id,
+        )
         pack_added = int(pack_result.get("bonus_credits") or 0) if pack_result.get("applied") else 0
         first_added = int(first_result.get("bonus_credits") or 0) if first_result.get("applied") else 0
         discount_added = int(discount_result.get("bonus_credits") or 0) if discount_result.get("applied") else 0
+        web_added = int(web_result.get("bonus_credits") or 0) if web_result.get("applied") else 0
         return {
             "pack_bonus": pack_result,
             "first_purchase_bonus": first_result,
             "purchase_discount": discount_result,
+            "web_topup_bonus": web_result,
             "pack_bonus_credits_added": pack_added,
             "first_purchase_bonus_credits_added": first_added,
             "discount_credits_added": discount_added,
-            "bonus_credits_added": pack_added + first_added + discount_added,
+            "web_topup_bonus_credits_added": web_added,
+            "bonus_credits_added": pack_added + first_added + discount_added + web_added,
         }
 
     def add_credits(self, userid: int, amount: int, source: str, reference_id: str = None, description: str = None, metadata: str = None) -> bool:

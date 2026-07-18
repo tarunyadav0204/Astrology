@@ -54,6 +54,45 @@ const AdminUserCreditManagement = () => {
     setMessage(null);
   };
 
+  const handleWebTopup = async (user, sendWhatsapp) => {
+    setMessage(null);
+    setSubmitting(true);
+    try {
+      const response = await fetch('/api/credits/admin/web-topup-link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAdminAuthHeaders(),
+        },
+        body: JSON.stringify({
+          userid: user.userid,
+          send_whatsapp: Boolean(sendWhatsapp),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || 'Request failed');
+      }
+      const url = data.url || '';
+      if (url && navigator?.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(url);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      if (sendWhatsapp) {
+        setMessage(`WhatsApp template sent. Link copied: ${url}`);
+      } else {
+        setMessage(`Link ready (copied): ${url}`);
+      }
+    } catch (err) {
+      setMessage(err.message || 'Failed to create web top-up link');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleAdjust = async () => {
     if (!adjustModal) return;
     const amount = parseInt(adjustModal.amount, 10);
@@ -98,7 +137,15 @@ const AdminUserCreditManagement = () => {
   return (
     <div className="admin-user-credit-management">
       <h2>User Credit Management</h2>
-      <p className="section-hint">Search users and add or remove credits. Changes are recorded in the ledger.</p>
+      <p className="section-hint">
+        Search users and add or remove credits. Use <strong>Copy web link</strong> / <strong>WhatsApp</strong> for the
+        reusable PWA Credits continue link (10% web top-up). Template: <code>credits_web_topup_bonus</code>.
+      </p>
+      {message && !adjustModal && (
+        <div className={`modal-message ${String(message).includes('failed') || String(message).includes('Failed') ? 'error' : 'success'}`} style={{ marginBottom: 12 }}>
+          {message}
+        </div>
+      )}
 
       <div className="filters-row">
         <div className="form-field search-field">
@@ -157,6 +204,24 @@ const AdminUserCreditManagement = () => {
                         disabled={!(user.credits > 0)}
                       >
                         Remove
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-add"
+                        onClick={() => handleWebTopup(user, false)}
+                        disabled={submitting || !user.phone}
+                        title="Copy reusable PWA Credits link"
+                      >
+                        Copy web link
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-add"
+                        onClick={() => handleWebTopup(user, true)}
+                        disabled={submitting || !user.phone}
+                        title="Send credits_web_topup_bonus template on WhatsApp"
+                      >
+                        WhatsApp
                       </button>
                     </td>
                   </tr>
