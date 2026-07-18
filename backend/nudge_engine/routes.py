@@ -2868,3 +2868,114 @@ async def admin_nudge_stats_overview(
     except Exception as e:
         logger.exception("admin_nudge_stats_overview failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to load nudge stats") from e
+
+
+# ---------------------------------------------------------------------------
+# NL Audience Builder (admin)
+# ---------------------------------------------------------------------------
+
+
+class AudienceNlPromptBody(BaseModel):
+    prompt: str = Field(..., min_length=8, max_length=4000)
+
+
+class AudienceNlExecuteBody(BaseModel):
+    sql: str = Field(..., min_length=10, max_length=20000)
+    page: int = 1
+    page_size: int = 50
+
+
+class AudienceNlGenerateAndRunBody(BaseModel):
+    prompt: str = Field(..., min_length=8, max_length=4000)
+    page: int = 1
+    page_size: int = 50
+
+
+@router.post("/admin/audience-nl/generate")
+async def admin_audience_nl_generate(
+    body: AudienceNlPromptBody,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    from .audience_nl import ensure_admin_audience_user_facts_view, generate_audience_sql
+
+    try:
+        ensure_admin_audience_user_facts_view()
+
+        def _work():
+            return generate_audience_sql(body.prompt)
+
+        out = await run_in_threadpool(_work)
+        logger.info(
+            "audience_nl_generate admin=%s model=%s sql_len=%s",
+            current_user.userid,
+            out.get("model_used"),
+            len(out.get("sql") or ""),
+        )
+        return {"ok": True, **out}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("admin_audience_nl_generate failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to generate audience SQL") from e
+
+
+@router.post("/admin/audience-nl/execute")
+async def admin_audience_nl_execute(
+    body: AudienceNlExecuteBody,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    from .audience_nl import ensure_admin_audience_user_facts_view, execute_audience_sql
+
+    try:
+        ensure_admin_audience_user_facts_view()
+
+        def _work():
+            return execute_audience_sql(body.sql, page=body.page, page_size=body.page_size)
+
+        out = await run_in_threadpool(_work)
+        logger.info(
+            "audience_nl_execute admin=%s total=%s page=%s",
+            current_user.userid,
+            out.get("total"),
+            out.get("page"),
+        )
+        return {"ok": True, **out}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("admin_audience_nl_execute failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to execute audience SQL") from e
+
+
+@router.post("/admin/audience-nl/generate-and-run")
+async def admin_audience_nl_generate_and_run(
+    body: AudienceNlGenerateAndRunBody,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    from .audience_nl import ensure_admin_audience_user_facts_view, generate_and_run
+
+    try:
+        ensure_admin_audience_user_facts_view()
+
+        def _work():
+            return generate_and_run(body.prompt, page=body.page, page_size=body.page_size)
+
+        out = await run_in_threadpool(_work)
+        logger.info(
+            "audience_nl_generate_and_run admin=%s total=%s",
+            current_user.userid,
+            out.get("total"),
+        )
+        return {"ok": True, **out}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("admin_audience_nl_generate_and_run failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to generate and run audience query") from e

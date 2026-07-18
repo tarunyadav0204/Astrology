@@ -30,6 +30,7 @@ import BlogDashboard from '../Blog/BlogDashboard';
 import AdminNudgeTriggerDefinitions from './AdminNudgeTriggerDefinitions';
 import AdminNudgeScheduler from './AdminNudgeScheduler';
 import AdminNudgeCampaigns from './AdminNudgeCampaigns';
+import AdminAudienceBuilder from './AdminAudienceBuilder';
 import AdminNudgeAnalytics from './AdminNudgeAnalytics';
 import AdminIssues from './AdminIssues';
 import AdminGooglePlayTestimonials from './AdminGooglePlayTestimonials';
@@ -272,6 +273,14 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setActiveSubTab('userProfile');
   };
   const openNudgeCampaignFromCreditsSegment = useCallback((draft) => {
+    setActiveTab('notifications');
+    setNotifSubTab('nudge_campaigns');
+    setCampaignDraftPrefill({
+      ...draft,
+      nonce: Date.now(),
+    });
+  }, []);
+  const openNudgeCampaignFromAudienceBuilder = useCallback((draft) => {
     setActiveTab('notifications');
     setNotifSubTab('nudge_campaigns');
     setCampaignDraftPrefill({
@@ -4756,6 +4765,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </button>
               <button
                 type="button"
+                className={`sub-tab ${notifSubTab === 'audience_builder' ? 'active' : ''}`}
+                onClick={() => setNotifSubTab('audience_builder')}
+              >
+                Audience builder
+              </button>
+              <button
+                type="button"
                 className={`sub-tab ${notifSubTab === 'nudge_analytics' ? 'active' : ''}`}
                 onClick={() => setNotifSubTab('nudge_analytics')}
               >
@@ -5414,6 +5430,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 prefillDraft={campaignDraftPrefill}
                 onPrefillConsumed={() => setCampaignDraftPrefill(null)}
               />
+            )}
+            {notifSubTab === 'audience_builder' && (
+              <AdminAudienceBuilder onCreateCampaign={openNudgeCampaignFromAudienceBuilder} />
             )}
             {notifSubTab === 'nudge_analytics' && <AdminNudgeAnalytics />}
             {notifSubTab === 'sent_today' && (

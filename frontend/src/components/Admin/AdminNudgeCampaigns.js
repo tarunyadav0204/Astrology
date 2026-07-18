@@ -146,6 +146,11 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
     setPreview(null);
     setAudienceEstimate(null);
     setAudiencePreview(null);
+    const audienceType = prefillDraft.audience_type || 'credit_intelligence_segment';
+    const userIdsPrefill =
+      prefillDraft.audience_user_ids ||
+      (Array.isArray(prefillDraft.user_ids) ? prefillDraft.user_ids.join(', ') : '') ||
+      '';
     setForm({
       ...emptyForm,
       name: prefillDraft.name || '',
@@ -153,10 +158,11 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
       body_template: prefillDraft.body_template || '',
       question_template: prefillDraft.question_template || '',
       landing_screen: prefillDraft.landing_screen || 'chat',
-      audience_type: prefillDraft.audience_type || 'credit_intelligence_segment',
+      audience_type: audienceType,
       audience_segment_key: prefillDraft.audience_segment_key || '',
       audience_from_date: prefillDraft.audience_from_date || '',
       audience_to_date: prefillDraft.audience_to_date || '',
+      audience_user_ids: audienceType === 'user_ids' ? String(userIdsPrefill) : '',
     });
     if (typeof onPrefillConsumed === 'function') onPrefillConsumed();
     window.scrollTo({ top: 0, behavior: 'smooth' });

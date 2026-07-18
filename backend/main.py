@@ -690,6 +690,14 @@ async def lifespan(app: FastAPI):
                     logger.debug("startup_step_ok step=init_nudge_tables message=nudge engine tables initialized")
             except Exception as e:
                 log_lifecycle_event("startup_step_failed", level=logging.WARNING, step="init_nudge_tables", error=str(e))
+            _startup_step(
+                "ensure_admin_audience_user_facts_view",
+                lambda: __import__(
+                    "nudge_engine.audience_nl",
+                    fromlist=["ensure_admin_audience_user_facts_view"],
+                ).ensure_admin_audience_user_facts_view(),
+                "admin_audience_user_facts view ready",
+            )
             try:
                 ensure_testimonials_table()
                 logger.debug("startup_step_ok step=ensure_testimonials_table message=app testimonials table initialized")
