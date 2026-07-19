@@ -271,10 +271,35 @@ fi
 
 # Activate virtual environment and install dependencies
 source venv/bin/activate
+# Prefer venv interpreter's pip — bare `pip3` can install into system Python.
+VENV_PYTHON="${APP_ROOT}/backend/venv/bin/python"
+if [ ! -x "${VENV_PYTHON}" ]; then
+  VENV_PYTHON="$(command -v python3)"
+fi
 if [ "${needs_backend_pip}" = "true" ]; then
-  echo "📦 Installing backend dependencies..."
-  PIP_DISABLE_PIP_VERSION_CHECK=1 pip3 install -q -r requirements.txt
-  echo "✅ Backend dependencies installed"
+  echo "📦 Installing backend dependencies into ${VENV_PYTHON}..."
+  PIP_DISABLE_PIP_VERSION_CHECK=1 "${VENV_PYTHON}" -m pip install -r requirements.txt
+  echo "🔎 Verifying reportlab shapable + uharfbuzz in venv..."
+  if ! "${VENV_PYTHON}" - <<'PY'
+import inspect
+import reportlab
+from reportlab.pdfbase.ttfonts import TTFont
+import uharfbuzz  # noqa: F401
+print(f"reportlab={reportlab.Version}")
+print(f"uharfbuzz_ok=True")
+assert "shapable" in inspect.signature(TTFont.__init__).parameters, (
+    f"TTFont still lacks shapable= (reportlab={reportlab.Version}). "
+    "Upgrade reportlab>=4.1 in the venv."
+)
+# Smoke-register path without needing a font file for kwarg acceptance.
+print("shapable_kwarg_ok=True")
+PY
+  then
+    echo "❌ Backend venv is missing a working reportlab/uharfbuzz shapable stack after pip"
+    "${VENV_PYTHON}" -m pip show reportlab uharfbuzz || true
+    exit 1
+  fi
+  echo "✅ Backend dependencies installed and verified"
 else
   echo "⏭️ Skipping pip install (requirements.txt unchanged — use [pip] in commit message, FORCE_BACKEND_PIP=true, or workflow checkbox to force)"
 fi
@@ -292,7 +317,11 @@ deploy_timing "encryption setup finished"
 
 # --- Phase 2: restart backend when backend/ changed or API unhealthy (skip for frontend-only) ---
 restart_backend=true
-if [ "${FORCE_FULL_DEPLOY}" != "true" ]; then
+if [ "${needs_backend_pip}" = "true" ]; then
+  # Dependency changes must pick up the new venv packages.
+  restart_backend=true
+  echo "🔄 Backend restart required after pip install"
+elif [ "${FORCE_FULL_DEPLOY}" != "true" ]; then
   backend_changed=false
   if [ -n "${CHANGED_FILES}" ] && echo "${CHANGED_FILES}" | grep -qE '^backend/'; then
     backend_changed=true

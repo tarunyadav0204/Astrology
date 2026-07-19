@@ -123,7 +123,15 @@ source venv/bin/activate
 
 if [ "${FORCE_BACKEND_PIP}" = "true" ]; then
   echo "📦 Installing backend dependencies for baked image..."
-  PIP_DISABLE_PIP_VERSION_CHECK=1 pip3 install -q -r requirements.txt
+  PIP_DISABLE_PIP_VERSION_CHECK=1 python -m pip install -r requirements.txt
+  python - <<'PY'
+import inspect
+import reportlab
+from reportlab.pdfbase.ttfonts import TTFont
+import uharfbuzz  # noqa: F401
+assert "shapable" in inspect.signature(TTFont.__init__).parameters, reportlab.Version
+print(f"verified reportlab={reportlab.Version} uharfbuzz=ok")
+PY
   prep_timing "backend pip finished"
 fi
 

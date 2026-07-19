@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 from calculators.ashtakavarga import AshtakavargaCalculator
 from calculators.base_calculator import BaseCalculator
 from calculators.chart_calculator import ChartCalculator
+from calculators.color_calculator import ColorCalculator
 from calculators.friendship_calculator import FriendshipCalculator
 from calculators.nakshatra_remedy_calculator import NakshatraRemedyCalculator
 from calculators.navatara_calculator import NavataraCalculator
@@ -27,6 +28,7 @@ from vedic_predictions.config.functional_nature import (
 )
 from vedic_predictions.config.nakshatra_data import NAKSHATRA_DATA, PADA_CHARACTERISTICS
 
+from ..assembly.shodashvarga import SHODASHVARGA_DIVISIONS
 from .base_context_builder import calculate_chart_for_birth, calculate_divisional_chart
 from .shared_branch_context import build_nakshatra_context
 from ..cache.report_hash import normalize_birth_data, normalize_language
@@ -41,6 +43,8 @@ SIGN_NAMES = [
 SIGN_LORDS = BaseCalculator.SIGN_LORDS
 
 CORE_PLANETS = ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"]
+# Classical Panchadha Maitri matrices use the seven grahas (same as Relationships tab).
+FRIENDSHIP_MATRIX_PLANETS = ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"]
 
 NAKSHATRA_NAMES = [
     "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya",
@@ -477,6 +481,44 @@ def _natural_relation(friendship_calc: FriendshipCalculator, planet: str, other:
 def _temporal_relation(planet_sign: int, other_sign: int) -> str:
     diff = (other_sign - planet_sign) % 12
     return "friend" if diff in {1, 2, 3, 9, 10, 11} else "enemy"
+
+
+def _friendship_matrices(chart: Dict[str, Any]) -> Dict[str, Any]:
+    """Build natural / temporal / compound planet×planet friendship matrices."""
+    friendship_calc = FriendshipCalculator()
+    planets_data = chart.get("planets") or {}
+    signs: Dict[str, int] = {}
+    for planet in FRIENDSHIP_MATRIX_PLANETS:
+        pdata = planets_data.get(planet) if isinstance(planets_data.get(planet), dict) else {}
+        try:
+            signs[planet] = int(pdata.get("sign", 0)) % 12
+        except Exception:
+            signs[planet] = 0
+
+    natural: Dict[str, Dict[str, str]] = {}
+    temporal: Dict[str, Dict[str, str]] = {}
+    compound: Dict[str, Dict[str, str]] = {}
+    for p1 in FRIENDSHIP_MATRIX_PLANETS:
+        natural[p1] = {}
+        temporal[p1] = {}
+        compound[p1] = {}
+        for p2 in FRIENDSHIP_MATRIX_PLANETS:
+            if p1 == p2:
+                natural[p1][p2] = "self"
+                temporal[p1][p2] = "self"
+                compound[p1][p2] = "self"
+                continue
+            natural[p1][p2] = _natural_relation(friendship_calc, p1, p2)
+            temporal[p1][p2] = _temporal_relation(signs[p1], signs[p2])
+            compound[p1][p2] = friendship_calc.calculate_compound_relation(
+                p1, p2, signs[p1], signs[p2]
+            )
+    return {
+        "planets": list(FRIENDSHIP_MATRIX_PLANETS),
+        "natural": natural,
+        "temporal": temporal,
+        "compound": compound,
+    }
 
 
 def _short_avastha(raw: str) -> str:
@@ -965,6 +1007,25 @@ def _dasha_pack(birth_payload: Dict[str, Any]) -> Dict[str, Any]:
     antar = current.get("antardasha") or {}
     if not maha.get("planet") or not antar.get("planet"):
         raise JanamKundliContextError("Current mahadasha/antardasha unavailable")
+
+    def _antar_rows(maha_row: Dict[str, Any]) -> List[Dict[str, Any]]:
+        rows: List[Dict[str, Any]] = []
+        try:
+            listed = calc.list_antardashas(maha_row) or []
+        except Exception as exc:
+            raise JanamKundliContextError(
+                f"Antardasha listing failed for {maha_row.get('planet')}: {exc}"
+            ) from exc
+        for ad in listed:
+            if not isinstance(ad, dict) or not ad.get("planet"):
+                continue
+            rows.append({
+                "planet": ad.get("planet"),
+                "start": _dt_iso(ad.get("start")),
+                "end": _dt_iso(ad.get("end")),
+            })
+        return rows
+
     maha_list = []
     for row in current.get("maha_dashas") or []:
         if not isinstance(row, dict) or not row.get("planet"):
@@ -974,19 +1035,19 @@ def _dasha_pack(birth_payload: Dict[str, Any]) -> Dict[str, Any]:
             "start": _dt_iso(row.get("start")),
             "end": _dt_iso(row.get("end")),
             "years": row.get("years"),
+            "antardashas": _antar_rows(row),
         })
-    antardashas = []
-    try:
-        for ad in calc.list_antardashas(maha) or []:
-            if not isinstance(ad, dict):
-                continue
-            antardashas.append({
-                "planet": ad.get("planet"),
-                "start": _dt_iso(ad.get("start")),
-                "end": _dt_iso(ad.get("end")),
-            })
-    except Exception as exc:
-        raise JanamKundliContextError(f"Antardasha listing failed: {exc}") from exc
+
+    # Keep current-MD antardashas for present_phase / metrics consumers.
+    current_planet = maha.get("planet")
+    current_antardashas = []
+    for maha_row in maha_list:
+        if maha_row.get("planet") == current_planet:
+            current_antardashas = list(maha_row.get("antardashas") or [])
+            break
+    if not current_antardashas:
+        current_antardashas = _antar_rows(maha)
+
     return {
         "current": {
             "mahadasha": {
@@ -1006,7 +1067,7 @@ def _dasha_pack(birth_payload: Dict[str, Any]) -> Dict[str, Any]:
             },
         },
         "maha_dashas": maha_list,
-        "current_antardashas": antardashas,
+        "current_antardashas": current_antardashas,
         "raw_current": current,
     }
 
@@ -1114,6 +1175,40 @@ SEVA_HI = {
 }
 
 
+def _split_color_phrases(raw: Any) -> List[str]:
+    return [p.strip() for p in str(raw or "").split(",") if p.strip()]
+
+
+def _avoid_colors_for_planets(
+    malefics: List[str],
+    *,
+    exclude_planets: Optional[set] = None,
+    favored_color_blobs: Optional[List[str]] = None,
+    limit: int = 6,
+) -> str:
+    """Build avoid list from malefic planets, never repeating favored/current-dasha colors."""
+    exclude = set(exclude_planets or set())
+    favored_keys = {
+        phrase.lower()
+        for blob in (favored_color_blobs or [])
+        for phrase in _split_color_phrases(blob)
+    }
+    out: List[str] = []
+    seen = set()
+    for planet in malefics or []:
+        if planet in exclude or planet not in RemedyEngine.COLORS:
+            continue
+        for phrase in _split_color_phrases(RemedyEngine.COLORS.get(planet)):
+            key = phrase.lower()
+            if key in favored_keys or key in seen:
+                continue
+            seen.add(key)
+            out.append(phrase)
+            if len(out) >= limit:
+                return ", ".join(out)
+    return ", ".join(out)
+
+
 def _actionable_remedy_card(planet: str, *, role: str, malefics: List[str]) -> Dict[str, Any]:
     """One planet's step-by-step upaya: day/time, mantra count, charity, colors."""
     timing = PLANET_REMEDY_TIMING.get(planet) or {
@@ -1122,15 +1217,12 @@ def _actionable_remedy_card(planet: str, *, role: str, malefics: List[str]) -> D
         "best_time_hi": "सूर्योदय के बाद प्रातः",
     }
     wear = RemedyEngine.COLORS.get(planet) or ""
-    avoid_colors = []
-    for m in malefics:
-        if m == planet:
-            continue
-        c = RemedyEngine.COLORS.get(m)
-        if c and c not in avoid_colors:
-            avoid_colors.append(c)
-    # Cap avoid list so the PDF stays readable.
-    avoid_colors = avoid_colors[:2]
+    avoid = _avoid_colors_for_planets(
+        malefics,
+        exclude_planets={planet},
+        favored_color_blobs=[wear],
+        limit=4,
+    )
     return {
         "planet": planet,
         "role": role,
@@ -1147,7 +1239,7 @@ def _actionable_remedy_card(planet: str, *, role: str, malefics: List[str]) -> D
         "seva_hi": SEVA_HI.get(planet),
         "diet": RemedyEngine.DIET.get(planet),
         "wear_colors": wear,
-        "avoid_colors": ", ".join(avoid_colors) if avoid_colors else "",
+        "avoid_colors": avoid,
         "direction": RemedyEngine.DIRECTIONS.get(planet),
         "gemstone": RemedyEngine.GEMSTONES.get(planet),
     }
@@ -1175,6 +1267,23 @@ def _build_actionable_remedies(
             role = "Priority planet"
         cards.append(_actionable_remedy_card(planet, role=role, malefics=malefics))
     return cards
+
+
+def _strip_gemstone_suitability(raw: Any) -> str:
+    text = str(raw or "").strip()
+    suffix = ", only if suitability checks support it"
+    if text.endswith(suffix):
+        return text[: -len(suffix)].strip()
+    if suffix in text:
+        return text.split(suffix)[0].strip().rstrip(",")
+    return text
+
+
+def _gemstone_name_for_planet(planet: Optional[str]) -> Optional[str]:
+    """Clean stone name without the engine's English suitability suffix."""
+    if not planet:
+        return None
+    return _strip_gemstone_suitability(RemedyEngine.GEMSTONES.get(planet)) or None
 
 
 def _gemstone_remedy_pack(chart: Dict[str, Any], dasha: Dict[str, Any]) -> Dict[str, Any]:
@@ -1208,23 +1317,7 @@ def _gemstone_remedy_pack(chart: Dict[str, Any], dasha: Dict[str, Any]) -> Dict[
     priority_order = list(blueprint.get("priority_order") or focus_planets)
     sections = blueprint.get("remedy_sections") or {}
     actionable = _build_actionable_remedies(priority_order, md, ad, malefics)
-    lifestyle = {
-        "current_md": md,
-        "current_ad": ad,
-        "wear_colors": RemedyEngine.COLORS.get(md or "") or RemedyEngine.COLORS.get(ad or "") or "",
-        "support_colors": RemedyEngine.COLORS.get(ad or "") if ad and ad != md else "",
-        "avoid_colors": ", ".join(
-            list(RemedyEngine.COLORS[p] for p in malefics if p in RemedyEngine.COLORS)[:2]
-        ),
-        "note": (
-            "Favor current Mahadasha lord colors in clothing/workspace; soften functional-malefic colors "
-            "during important meetings and travel."
-        ),
-        "note_hi": (
-            "वर्तमान महादशा स्वामी के रंग वस्त्र/कार्यक्षेत्र में रखें; महत्वपूर्ण बैठक व यात्रा में "
-            "कार्यात्मक पाप ग्रहों के रंग कम रखें।"
-        ),
-    }
+    lifestyle = ColorCalculator(chart).calculate(current_md=md, current_ad=ad)
     return {
         "ascendant_sign": asc,
         "ascendant_sign_name": SIGN_NAMES[asc],
@@ -1232,21 +1325,35 @@ def _gemstone_remedy_pack(chart: Dict[str, Any], dasha: Dict[str, Any]) -> Dict[
         "functional_malefics": malefics,
         "life_stone": {
             "planet": life_stone_planet,
-            "gemstone": RemedyEngine.GEMSTONES.get(life_stone_planet),
+            "gemstone": _gemstone_name_for_planet(life_stone_planet),
             "role": "Lagna lord / life stone candidate",
+            "role_hi": "लग्न स्वामी — जीवन रत्न उम्मीदवार",
+            "meaning": "Supports vitality, body, and overall life direction (1st house lord).",
+            "meaning_hi": "शरीर, जीवनशक्ति और जीवन दिशा का आधार (प्रथम भाव स्वामी)।",
         },
         "lucky_stone": {
             "planet": lucky_stone_planet,
-            "gemstone": RemedyEngine.GEMSTONES.get(lucky_stone_planet),
+            "gemstone": _gemstone_name_for_planet(lucky_stone_planet),
             "role": "5th lord / luck stone candidate",
+            "role_hi": "पंचमेश — भाग्य/सुख रत्न उम्मीदवार",
+            "meaning": "Linked with intelligence, creativity, and gains from past merit (5th house lord).",
+            "meaning_hi": "बुद्धि, सृजन और पुण्य से लाभ से जुड़ा (पंचम भाव स्वामी)।",
         },
         "bhagya_ratna": {
             "planet": bhagya_planet,
-            "gemstone": RemedyEngine.GEMSTONES.get(bhagya_planet),
+            "gemstone": _gemstone_name_for_planet(bhagya_planet),
             "role": "9th lord / bhagya ratna candidate",
+            "role_hi": "नवमेश — भाग्यरत्न उम्मीदवार",
+            "meaning": "Supports fortune, dharma, and long-term grace (9th house lord).",
+            "meaning_hi": "भाग्य, धर्म और दीर्घकालिक अनुग्रह का सहारा (नवम भाव स्वामी)।",
         },
         "avoid_stones": [
-            {"planet": p, "gemstone": RemedyEngine.GEMSTONES.get(p), "reason": "Functional malefic for this lagna"}
+            {
+                "planet": p,
+                "gemstone": _gemstone_name_for_planet(p),
+                "reason": "Functional malefic for this lagna",
+                "reason_hi": "इस लग्न के लिए कार्यात्मक पाप ग्रह — साधारणतः न पहनें",
+            }
             for p in avoid
         ],
         "priority_planets": focus_planets,
@@ -1316,8 +1423,17 @@ def build_janam_kundli_report_context(request: Any) -> Dict[str, Any]:
     if not (chart.get("planets") or {}).get("Moon"):
         raise JanamKundliContextError("D1 chart missing Moon")
 
-    d9 = _require(calculate_divisional_chart(chart, 9), "D9")
-    d10 = _require(calculate_divisional_chart(chart, 10), "D10")
+    # Full classical Shodashvarga set for continuous PDF chart atlas.
+    shodashvarga_charts: Dict[int, Any] = {1: chart}
+    for division in SHODASHVARGA_DIVISIONS:
+        if division == 1:
+            continue
+        shodashvarga_charts[division] = _require(
+            calculate_divisional_chart(chart, division),
+            f"D{division}",
+        )
+    d9 = shodashvarga_charts[9]
+    d10 = shodashvarga_charts[10]
     moon_chart = _build_moon_chart(chart)
     chalit_chart = _build_chalit_chart(chart)
     chalit_shifts = _build_chalit_shift_notes(chart)
@@ -1349,6 +1465,7 @@ def build_janam_kundli_report_context(request: Any) -> Dict[str, Any]:
     planet_rows = _planet_matrix(chart, birth_payload, nak_positions)
     d9_planet_rows = _divisional_planet_matrix(d9)
     d10_planet_rows = _divisional_planet_matrix(d10)
+    friendship_matrices = _friendship_matrices(chart)
     special_points = _special_points_pack(chart, birth_payload)
     ashtakavarga = _ashtakavarga_pack(chart, birth_payload)
 
@@ -1396,6 +1513,7 @@ def build_janam_kundli_report_context(request: Any) -> Dict[str, Any]:
         "planet_matrix": planet_rows,
         "d9_planet_matrix": d9_planet_rows,
         "d10_planet_matrix": d10_planet_rows,
+        "friendship_matrices": friendship_matrices,
         "special_points": special_points,
         "chalit_house_shifts": chalit_shifts,
         "ashtakavarga": {
@@ -1432,6 +1550,7 @@ def build_janam_kundli_report_context(request: Any) -> Dict[str, Any]:
         "chalit_chart": chalit_chart,
         "d9_chart": d9,
         "d10_chart": d10,
+        "shodashvarga_charts": shodashvarga_charts,
         "bhav_chalit": chart.get("bhav_chalit") or {},
         "branches": {
             "nakshatra": nakshatra,
@@ -1440,6 +1559,7 @@ def build_janam_kundli_report_context(request: Any) -> Dict[str, Any]:
             "ashtakavarga": ashtakavarga["sarvashtakavarga"],
             "yogas": yogas,
             "dasha": dasha["raw_current"],
+            "shodashvarga": {f"D{d}": True for d in SHODASHVARGA_DIVISIONS},
         },
         "fact_pack": fact_pack,
         "current_dashas": dasha["raw_current"],

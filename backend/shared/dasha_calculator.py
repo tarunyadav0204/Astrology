@@ -75,19 +75,50 @@ class DashaCalculator:
             return str(maha_end)
         return (maha_end + timedelta(seconds=1)).strftime('%Y-%m-%d')
 
+    def _maha_ad_timeline_start(self, maha_dasha: Dict) -> tuple:
+        """Return (timeline_start, maha_start, maha_end, window_end).
+
+        Balance (partial) mahadashas begin at birth, but antardashas must be timed from the
+        *full* mahadasha origin — otherwise early ADs are replayed and the last AD (often Mars
+        in a Rahu balance) is dropped when the walk overshoots maha_end.
+        """
+        maha_planet = maha_dasha['planet']
+        maha_start, maha_end = self._period_bounds(maha_dasha)
+        window_end = maha_end + timedelta(seconds=1)  # stored end is transition-1s
+        full_days = self.DASHA_PERIODS[maha_planet] * self.YEAR_LEN
+        span_days = (window_end - maha_start).total_seconds() / 86400.0
+        if span_days < full_days - 1.0:
+            timeline_start = window_end - timedelta(days=full_days)
+        else:
+            timeline_start = maha_start
+        return timeline_start, maha_start, maha_end, window_end
+
     def list_antardashas(self, maha_dasha: Dict, target_date: datetime = None) -> List[Dict[str, Any]]:
         """All antardashas for a mahadasha — same math as `_calculate_antardasha`."""
         maha_planet = maha_dasha['planet']
-        current, maha_end = self._period_bounds(maha_dasha)
+        timeline_start, maha_start, maha_end, window_end = self._maha_ad_timeline_start(maha_dasha)
         start_index = self.PLANET_ORDER.index(maha_planet)
         periods = []
+        current = timeline_start
         for i in range(9):
             planet = self.PLANET_ORDER[(start_index + i) % 9]
             antar_years = (self.DASHA_PERIODS[maha_planet] * self.DASHA_PERIODS[planet]) / 120
             end = current + timedelta(days=antar_years * self.YEAR_LEN)
-            periods.append(self._serialize_period(planet, current, end, antar_years, target_date))
+            # Keep ADs that intersect the visible mahadasha window (clips balance fragment).
+            if end > maha_start and current < window_end:
+                disp_start = max(current, maha_start)
+                disp_end = min(end, window_end)
+                row = self._serialize_period(planet, disp_start, disp_end, antar_years, None)
+                if target_date is not None:
+                    # Half-open [start, end) so adjacent ADs don't both claim the boundary.
+                    # Last AD (clipped to MD transition) stays inclusive through maha_end.
+                    if disp_end >= window_end:
+                        row['current'] = disp_start <= target_date <= maha_end
+                    else:
+                        row['current'] = disp_start <= target_date < disp_end
+                periods.append(row)
             current = end
-            if current >= maha_end:
+            if current >= window_end:
                 break
         return periods
 
@@ -370,31 +401,15 @@ class DashaCalculator:
             }
     
     def _calculate_antardasha(self, maha_dasha: Dict, current_date: datetime) -> Dict:
-        """Calculate current antardasha within mahadasha"""
-        maha_planet = maha_dasha['planet']
-        maha_start = maha_dasha['start']
-        maha_end = maha_dasha['end']
-        
-        start_index = self.PLANET_ORDER.index(maha_planet)
-        current_antar_date = maha_start
-        
-        for i in range(9):
-            antar_planet = self.PLANET_ORDER[(start_index + i) % 9]
-            antar_period = (self.DASHA_PERIODS[maha_planet] * self.DASHA_PERIODS[antar_planet]) / 120
-            antar_days = antar_period * self.YEAR_LEN
-            antar_end = current_antar_date + timedelta(days=antar_days)
-            
-            if current_antar_date <= current_date <= antar_end:
-                return {
-                    'planet': antar_planet,
-                    'start': current_antar_date,
-                    'end': antar_end
-                }
-            
-            current_antar_date = antar_end
-        
-        # Default to first antardasha
-        return {'planet': maha_planet, 'start': maha_start, 'end': maha_end}
+        """Calculate current antardasha within mahadasha (balance-aware)."""
+        maha_start, maha_end = self._period_bounds(maha_dasha)
+        for ad in self.list_antardashas(maha_dasha, current_date):
+            if not ad.get('current'):
+                continue
+            start = ad.get('_start_dt') or self._as_dt(ad.get('start'))
+            end = ad.get('_end_dt') or self._as_dt(ad.get('end'))
+            return {'planet': ad['planet'], 'start': start, 'end': end}
+        return {'planet': maha_dasha['planet'], 'start': maha_start, 'end': maha_end}
     
     def _calculate_pratyantardasha(self, maha_dasha: Dict, antar_dasha: Dict, current_date: datetime) -> Dict:
         """Calculate current pratyantardasha within antardasha"""

@@ -62,10 +62,10 @@ PROGENY_REPORT_CONFIG = ReportTypeConfig(
 JANAM_KUNDLI_REPORT_CONFIG = ReportTypeConfig(
     key="janam_kundli",
     title="Janam Kundli Report",
-    page_count=24,
-    required_branches=("nakshatra", "d9", "d10", "ashtakavarga", "dasha", "yogas"),
+    page_count=26,
+    required_branches=("nakshatra", "d9", "d10", "ashtakavarga", "dasha", "yogas", "shodashvarga"),
     enabled=True,
-    summary="Personalized 24-page Janam Kundli PDF with charts, dashas, yogas, and life guidance (English/Hindi).",
+    summary="Personalized Janam Kundli PDF with full Shodashvarga charts, dashas, yogas, and life guidance (English/Hindi).",
 )
 
 

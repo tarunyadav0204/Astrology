@@ -55,6 +55,40 @@ def _annotate_chart(chart: Any, person: Dict[str, Any]) -> Any:
     return annotated
 
 
+def _janam_kundli_chart_data(context: Dict[str, Any], person: Dict[str, Any]) -> Dict[str, Any]:
+    """D1 + Moon + Chalit + full Shodashvarga atlas for PDF chart_refs."""
+    chart_data: Dict[str, Any] = {
+        "boy": _annotate_chart(context.get("chart"), person),
+        "native": _annotate_chart(context.get("chart"), person),
+        "native_d1": _annotate_chart(context.get("chart"), person),
+        "boy_d1": _annotate_chart(context.get("chart"), person),
+        "native_moon": _annotate_chart(context.get("moon_chart"), person),
+        "boy_moon": _annotate_chart(context.get("moon_chart"), person),
+        "native_chalit": _annotate_chart(context.get("chalit_chart"), person),
+        "boy_chalit": _annotate_chart(context.get("chalit_chart"), person),
+    }
+    shodash = context.get("shodashvarga_charts") or {}
+    if isinstance(shodash, dict):
+        for division, payload in shodash.items():
+            try:
+                d = int(division)
+            except Exception:
+                continue
+            annotated = _annotate_chart(payload, person)
+            chart_data[f"native_d{d}"] = annotated
+            chart_data[f"boy_d{d}"] = annotated
+    # Backward-compatible aliases when only d9/d10 were computed.
+    if "native_d9" not in chart_data and context.get("d9_chart"):
+        annotated = _annotate_chart(context.get("d9_chart"), person)
+        chart_data["native_d9"] = annotated
+        chart_data["boy_d9"] = annotated
+    if "native_d10" not in chart_data and context.get("d10_chart"):
+        annotated = _annotate_chart(context.get("d10_chart"), person)
+        chart_data["native_d10"] = annotated
+        chart_data["boy_d10"] = annotated
+    return chart_data
+
+
 def _apply_document_cache_usage(cached: Dict[str, Any]) -> Dict[str, Any]:
     cached = dict(cached)
     original_usage = None
@@ -704,8 +738,8 @@ async def build_and_cache_janam_kundli_report(
     from .branding import apply_branding_to_cached_report, resolve_report_branding
 
     subject_hash = build_subject_hash(request.birth_data, request.report_type, request.language)
-    # v2: Hindi page chrome + diamond North Indian charts
-    report_version = JANAM_KUNDLI_REPORT_CONFIG.key + "_v2"
+    # v3: continuous Shodashvarga chart atlas in PDF
+    report_version = JANAM_KUNDLI_REPORT_CONFIG.key + "_v3"
     resolved_report_id = report_id or subject_hash[:16]
     effective_cost = credit_service.get_effective_cost(
         userid,
@@ -800,20 +834,7 @@ async def build_and_cache_janam_kundli_report(
         faq=faq_items,
         cta={"text": "Open from My Reports anytime."},
         premium_report=premium.get("report") or {},
-        chart_data={
-            "boy": _annotate_chart(context["chart"], person),
-            "native": _annotate_chart(context["chart"], person),
-            "native_d1": _annotate_chart(context["chart"], person),
-            "boy_d1": _annotate_chart(context["chart"], person),
-            "native_moon": _annotate_chart(context.get("moon_chart"), person),
-            "boy_moon": _annotate_chart(context.get("moon_chart"), person),
-            "native_chalit": _annotate_chart(context.get("chalit_chart"), person),
-            "boy_chalit": _annotate_chart(context.get("chalit_chart"), person),
-            "native_d9": _annotate_chart(context.get("d9_chart"), person),
-            "boy_d9": _annotate_chart(context.get("d9_chart"), person),
-            "native_d10": _annotate_chart(context.get("d10_chart"), person),
-            "boy_d10": _annotate_chart(context.get("d10_chart"), person),
-        },
+        chart_data=_janam_kundli_chart_data(context, person),
         chart_style=("south" if getattr(request, "chart_style", "both") == "south" else "north"),
         cached=False,
         branding=branding,

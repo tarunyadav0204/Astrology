@@ -72,7 +72,7 @@ const REPORT_TYPE_FALLBACKS = [
     key: 'janam_kundli',
     title: 'Janam Kundli Report',
     subtitle: 'Full birth chart PDF — charts, dashas, yogas, life guidance',
-    description: 'A 24-page personalized Janam Kundli with D1/Moon/D9/D10 charts, Ashtakavarga, Vimshottari dashas, yogas, and age-aware guidance (English/Hindi).',
+    description: 'A personalized Janam Kundli with full Shodashvarga charts (D1–D60), Ashtakavarga, Vimshottari dashas, yogas, and age-aware guidance (English/Hindi).',
     icon: '🕉️',
     gradient: ['#ea580c', '#f97316'],
     enabled: true,

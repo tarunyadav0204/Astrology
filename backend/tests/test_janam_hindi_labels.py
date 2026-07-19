@@ -88,7 +88,7 @@ def test_practical_remedies_has_day_time_count_and_colors():
     titles = [t["title"] for t in page["tables"]]
     assert "Step-by-step planetary remedies" in titles
     assert "Mantra practice details" in titles
-    assert "Color therapy (current dasha)" in titles
+    assert "Color therapy (chart-based)" in titles
     step = next(t for t in page["tables"] if t["title"].startswith("Step-by-step"))
     assert step["rows"][0][2] == "Saturday"
     assert "108" in step["rows"][0][4]

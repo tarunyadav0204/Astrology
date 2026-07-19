@@ -27,8 +27,8 @@ PAGE_META = {
         "hi": ("नवांश कुंडली (डी-९)", "छिपी शक्तियाँ तथा विवाह/मध्यायु प्रवृत्ति"),
     },
     "planetary_positions": {
-        "en": ("Planetary Degrees, Dignities & Relations", "Degree, nakshatra, dignity, retrograde, combustion"),
-        "hi": ("ग्रह अंश, दशा और संबंध", "अंश, नक्षत्र, बल, वक्री, अस्त"),
+        "en": ("Planetary Degrees, Dignities & Relations", "Dignity, aspects, and natural / temporal / compound friendship"),
+        "hi": ("ग्रह अंश, दशा और संबंध", "दशा, दृष्टि और प्राकृतिक / तात्कालिक / संयुक्त मित्रता"),
     },
     "chalit_chart": {
         "en": ("Chalit Chart & Bhava Sphuta", "House boundary shifts from D1"),
@@ -87,16 +87,16 @@ PAGE_META = {
         "hi": ("शनि साढ़े साती", "चंद्र राशि के सापेक्ष शनि गोचर काल"),
     },
     "dasha_tree": {
-        "en": ("Vimshottari Dasha Tree", "Master life cycles"),
-        "hi": ("विंशोत्तरी दशा वृक्ष", "मुख्य जीवन चक्र"),
+        "en": ("Vimshottari Dasha Tree", "Mahadasha and Antardasha dates"),
+        "hi": ("विंशोत्तरी दशा वृक्ष", "महादशा और अन्तर्दशा तिथियाँ"),
     },
     "present_phase": {
         "en": ("The Present Phase", "Current Mahadasha and Antardasha"),
         "hi": ("वर्तमान चरण", "वर्तमान महादशा और अन्तर्दशा"),
     },
     "gemstones": {
-        "en": ("Gemstone Recommendations", "Functional-benefic candidates"),
-        "hi": ("रत्न सुझाव", "कार्यात्मक शुभ ग्रहों के आधार पर"),
+        "en": ("Gemstone Recommendations", "Life, luck, and fortune stone candidates"),
+        "hi": ("रत्न सुझाव", "जीवन, भाग्य और भाग्यरत्न उम्मीदवार"),
     },
     "practical_remedies": {
         "en": ("Practical Daily Remedies", "Day, time, mantra counts, charity, and colors"),

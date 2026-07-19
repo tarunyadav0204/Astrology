@@ -6,6 +6,13 @@ from typing import Any, Dict, List, Optional
 
 from ..models import ReportMetric, ReportPage
 from .janam_kundli_i18n import age_title, is_hindi, page_title_subtitle, t, yes_no
+from .shodashvarga import (
+    SHODASHVARGA_DIVISIONS,
+    build_janam_kundli_blueprint,
+    chart_manifest_refs,
+    is_shodashvarga_page_key,
+    shodashvarga_atlas_title_subtitle,
+)
 from .janam_kundli_labels import (
     format_clock,
     label_activity,
@@ -47,34 +54,9 @@ from .janam_kundli_labels import (
     localize_evidence_text,
 )
 
-# Shadbala omitted; honest 24-page blueprint keys (titles localized at assemble time).
-JANAM_KUNDLI_PAGE_BLUEPRINT = [
-    {"num": 1, "key": "cover", "charts": ["native_d1"]},
-    # Merged into cover for PDF density; kept in blueprint for API/LLM section keys.
-    {"num": 2, "key": "birth_panchang", "charts": [], "skip_render": True},
-    {"num": 3, "key": "primary_charts", "charts": ["native_moon"]},
-    {"num": 4, "key": "navamsha", "charts": ["native_d9"]},
-    {"num": 5, "key": "planetary_positions", "charts": []},
-    {"num": 6, "key": "chalit_chart", "charts": ["native_chalit"]},
-    {"num": 7, "key": "dashamsha", "charts": ["native_d10"]},
-    {"num": 8, "key": "ashtakavarga", "charts": []},
-    {"num": 9, "key": "past_life_blueprint", "charts": []},
-    {"num": 10, "key": "personality", "charts": []},
-    {"num": 11, "key": "emotional_blueprint", "charts": []},
-    {"num": 12, "key": "education_intellect", "charts": []},
-    {"num": 13, "key": "career_profession", "charts": ["native_d10"]},
-    {"num": 14, "key": "wealth_finances", "charts": []},
-    {"num": 15, "key": "love_relationships", "charts": ["native_d9"]},
-    {"num": 16, "key": "health_profiles", "charts": []},
-    {"num": 17, "key": "major_yogas", "charts": []},
-    {"num": 18, "key": "dosha_checks", "charts": []},
-    {"num": 19, "key": "sade_sati", "charts": []},
-    {"num": 20, "key": "dasha_tree", "charts": []},
-    {"num": 21, "key": "present_phase", "charts": []},
-    {"num": 22, "key": "gemstones", "charts": []},
-    {"num": 23, "key": "practical_remedies", "charts": []},
-    {"num": 24, "key": "closing_guidance", "charts": []},
-]
+# Shadbala omitted. Continuous Shodashvarga atlas (16 charts) sits after Dashamsha.
+JANAM_KUNDLI_PAGE_BLUEPRINT = build_janam_kundli_blueprint()
+JANAM_KUNDLI_PAGE_COUNT = len(JANAM_KUNDLI_PAGE_BLUEPRINT)
 
 AGE_HEADER_KEYS = {
     "education_intellect",
@@ -118,6 +100,9 @@ def _page(
     notes=None,
     section_key: str | None = None,
     skip_render: bool = False,
+    charts_per_row: int | None = None,
+    chart_compact: bool = False,
+    tables_per_row: int | None = None,
 ) -> Dict[str, Any]:
     return ReportPage(
         page_number=num,
@@ -132,6 +117,9 @@ def _page(
         cta=None,
         section_key=section_key,
         skip_render=skip_render,
+        charts_per_row=charts_per_row,
+        chart_compact=bool(chart_compact),
+        tables_per_row=tables_per_row,
     ).model_dump()
 
 
@@ -225,9 +213,10 @@ def _friendship_cell(row: Dict[str, Any], language: str) -> str:
     natural = label_friendship(row.get("natural_friendship"), language) or "—"
     temporal = label_friendship(row.get("temporal_friendship"), language) or "—"
     compound = label_friendship(row.get("compound_friendship"), language) or "—"
+    # No Unicode arrows — Mukta renders →/← as empty boxes in PDF.
     if is_hindi(language):
-        return f"प्राकृतिक {natural} · तात्कालिक {temporal} → {compound}"
-    return f"N {natural} · T {temporal} → {compound}"
+        return f"प्राकृतिक {natural} · तात्कालिक {temporal} · योग {compound}"
+    return f"N {natural} · T {temporal} · = {compound}"
 
 
 def _houses_ruled_cell(row: Dict[str, Any]) -> str:
@@ -302,7 +291,7 @@ def _planet_relations_table(rows: List[Dict[str, Any]], language: str) -> Dict[s
             t(language, "Functional", "कार्यात्मक"),
             t(language, "Lordship", "स्वामित्व"),
             t(language, "Dispositor", "नियामक"),
-            t(language, "Aspects ←", "दृष्टि ←"),
+            t(language, "Aspects", "दृष्टि"),
             t(language, "Gandanta", "गंडांत"),
             t(language, "Special", "विशेष"),
             t(language, "Avastha", "अवस्था"),
@@ -316,6 +305,81 @@ def _planet_table(rows: List[Dict[str, Any]], language: str) -> List[Dict[str, A
     if not rows:
         return []
     return [_planet_placement_table(rows, language), _planet_relations_table(rows, language)]
+
+
+def _friendship_matrix_cell(value: Any, language: str) -> str:
+    key = str(value or "").strip().lower()
+    if not key or key == "self":
+        return "—"
+    if is_hindi(language):
+        return label_friendship(key, language) or "—"
+    short = {
+        "great_friend": "GF",
+        "friend": "F",
+        "neutral": "N",
+        "enemy": "E",
+        "great_enemy": "GE",
+        "own_sign": "Own",
+    }
+    return short.get(key) or label_friendship(key, language) or "—"
+
+
+def _friendship_matrix_table(
+    matrix: Dict[str, Any],
+    planets: List[str],
+    language: str,
+    *,
+    title_en: str,
+    title_hi: str,
+) -> Dict[str, Any]:
+    headers = [t(language, "Planet", "ग्रह")] + [
+        label_planet_abbr(p, language) for p in planets
+    ]
+    rows = []
+    for p1 in planets:
+        row_map = matrix.get(p1) if isinstance(matrix.get(p1), dict) else {}
+        rows.append([
+            label_planet_abbr(p1, language),
+            *[_friendship_matrix_cell(row_map.get(p2), language) for p2 in planets],
+        ])
+    return {
+        "title": t(language, title_en, title_hi),
+        "headers": headers,
+        "rows": rows,
+        "compact": True,
+    }
+
+
+def _friendship_matrix_tables(pack: Dict[str, Any], language: str) -> List[Dict[str, Any]]:
+    """Natural, temporal, and compound (Panchadha) friendship matrices."""
+    if not isinstance(pack, dict):
+        return []
+    planets = [str(p) for p in (pack.get("planets") or []) if p]
+    if not planets:
+        return []
+    return [
+        _friendship_matrix_table(
+            pack.get("natural") if isinstance(pack.get("natural"), dict) else {},
+            planets,
+            language,
+            title_en="Natural friendship (Naisargika Maitri)",
+            title_hi="प्राकृतिक मित्रता (नैसर्गिक मैत्री)",
+        ),
+        _friendship_matrix_table(
+            pack.get("temporal") if isinstance(pack.get("temporal"), dict) else {},
+            planets,
+            language,
+            title_en="Temporal friendship (Tatkalika Maitri)",
+            title_hi="तात्कालिक मित्रता (तात्कालिक मैत्री)",
+        ),
+        _friendship_matrix_table(
+            pack.get("compound") if isinstance(pack.get("compound"), dict) else {},
+            planets,
+            language,
+            title_en="Compound friendship (Panchadha Maitri)",
+            title_hi="संयुक्त मित्रता (पंचधा मैत्री)",
+        ),
+    ]
 
 
 def _planet_short_table(rows: List[Dict[str, Any]], language: str, *, title_en: str, title_hi: str) -> Dict[str, Any]:
@@ -674,19 +738,157 @@ def _dosha_table(doshas: Dict[str, Any], language: str) -> Dict[str, Any]:
     }
 
 
-def _dasha_table(maha_dashas: List[Dict[str, Any]], language: str) -> Dict[str, Any]:
+def _dasha_date_cell(value: Any) -> str:
+    text = _clean(value)
+    if not text:
+        return "—"
+    # Prefer compact calendar date for dense dasha tables.
+    return text[:10]
+
+
+def _mahadasha_overview_table(maha_dashas: List[Dict[str, Any]], language: str) -> Optional[Dict[str, Any]]:
+    rows = []
+    for row in maha_dashas:
+        rows.append([
+            label_planet(row.get("planet"), language) or "—",
+            _dasha_date_cell(row.get("start")),
+            _dasha_date_cell(row.get("end")),
+        ])
+    if not rows:
+        return None
     return {
         "title": t(language, "Mahadasha timeline", "महादशा समयरेखा"),
         "headers": [
-            t(language, "Planet", "ग्रह"),
+            t(language, "Mahadasha", "महादशा"),
             t(language, "Start", "आरंभ"),
             t(language, "End", "समाप्ति"),
         ],
-        "rows": [
-            [label_planet(r.get("planet"), language) or "—", _clean(r.get("start")) or "—", _clean(r.get("end")) or "—"]
-            for r in maha_dashas[:12]
-        ],
+        "rows": rows,
+        "compact": True,
+        "full_width": True,
     }
+
+
+def _mahadasha_antar_tables(maha_dashas: List[Dict[str, Any]], language: str) -> List[Dict[str, Any]]:
+    """One compact Antardasha table under each Mahadasha (planet + start/end)."""
+    tables: List[Dict[str, Any]] = []
+    hi = is_hindi(language)
+    for maha in maha_dashas:
+        planet = label_planet(maha.get("planet"), language) or "—"
+        start = _dasha_date_cell(maha.get("start"))
+        end = _dasha_date_cell(maha.get("end"))
+        # Short title for 3-up grid cards.
+        title = (
+            f"{planet} · {start}–{end}"
+            if hi
+            else f"{planet} · {start}–{end}"
+        )
+        antars = maha.get("antardashas") or []
+        rows = [
+            [
+                label_planet(ad.get("planet"), language) or "—",
+                _dasha_date_cell(ad.get("start")),
+                _dasha_date_cell(ad.get("end")),
+            ]
+            for ad in antars
+            if isinstance(ad, dict)
+        ]
+        if not rows:
+            continue
+        tables.append({
+            "title": title,
+            "headers": [
+                t(language, "AD", "अं"),
+                t(language, "Start", "आरंभ"),
+                t(language, "End", "समाप्ति"),
+            ],
+            "rows": rows,
+            "compact": True,
+        })
+    return tables
+
+
+def _dasha_tables(maha_dashas: List[Dict[str, Any]], language: str) -> List[Dict[str, Any]]:
+    tables: List[Dict[str, Any]] = []
+    overview = _mahadasha_overview_table(maha_dashas, language)
+    if overview:
+        tables.append(overview)
+    tables.extend(_mahadasha_antar_tables(maha_dashas, language))
+    return tables
+
+
+def _gemstone_page_tables(rem: Dict[str, Any], language: str) -> List[Dict[str, Any]]:
+    """Clear candidate + avoid tables for the gemstone page (no English suitability clauses)."""
+    hi = is_hindi(language)
+    tables: List[Dict[str, Any]] = []
+
+    def _meaning(row: Dict[str, Any]) -> str:
+        if hi:
+            return _clean(row.get("meaning_hi") or row.get("meaning")) or "—"
+        return _clean(row.get("meaning") or row.get("meaning_hi")) or "—"
+
+    def _role(row: Dict[str, Any], fallback_en: str, fallback_hi: str) -> str:
+        if hi:
+            return _clean(row.get("role_hi")) or t(language, fallback_en, fallback_hi)
+        return _clean(row.get("role")) or fallback_en
+
+    suggest_rows = []
+    for key, fallback_en, fallback_hi in (
+        ("life_stone", "Life stone", "जीवन रत्न"),
+        ("lucky_stone", "Lucky stone", "भाग्य रत्न"),
+        ("bhagya_ratna", "Fortune stone", "भाग्यरत्न"),
+    ):
+        row = rem.get(key) if isinstance(rem.get(key), dict) else {}
+        if not row:
+            continue
+        suggest_rows.append([
+            t(language, fallback_en, fallback_hi),
+            label_planet(row.get("planet"), language) or "—",
+            label_gemstone(row.get("gemstone"), language) or "—",
+            _role(row, fallback_en, fallback_hi),
+            _meaning(row),
+        ])
+    if suggest_rows:
+        tables.append({
+            "title": t(language, "Recommended gemstone candidates", "सुझाए गए रत्न उम्मीदवार"),
+            "headers": [
+                t(language, "Type", "प्रकार"),
+                t(language, "Planet", "ग्रह"),
+                t(language, "Gemstone", "रत्न"),
+                t(language, "Based on", "आधार"),
+                t(language, "What it supports", "किसमें सहायक"),
+            ],
+            "rows": suggest_rows,
+            "compact": True,
+            "full_width": True,
+        })
+
+    avoid_rows = []
+    for row in rem.get("avoid_stones") or []:
+        if not isinstance(row, dict):
+            continue
+        if hi:
+            reason = _clean(row.get("reason_hi")) or label_reason(row.get("reason"), language) or "—"
+        else:
+            reason = _clean(row.get("reason")) or "—"
+        avoid_rows.append([
+            label_planet(row.get("planet"), language) or "—",
+            label_gemstone(row.get("gemstone"), language) or "—",
+            reason,
+        ])
+    if avoid_rows:
+        tables.append({
+            "title": t(language, "Usually avoid for this lagna", "इस लग्न के लिए सामान्यतः वर्जित"),
+            "headers": [
+                t(language, "Planet", "ग्रह"),
+                t(language, "Gemstone", "रत्न"),
+                t(language, "Why", "कारण"),
+            ],
+            "rows": avoid_rows,
+            "compact": True,
+            "full_width": True,
+        })
+    return tables
 
 
 def _best_time_cell(row: Dict[str, Any], language: str) -> str:
@@ -744,28 +946,51 @@ def _lifestyle_colors_table(lifestyle: Dict[str, Any], language: str) -> Optiona
     if not isinstance(lifestyle, dict) or not lifestyle:
         return None
     wear = label_colors(lifestyle.get("wear_colors"), language) or "—"
-    support = label_colors(lifestyle.get("support_colors"), language) or "—"
     avoid = label_colors(lifestyle.get("avoid_colors"), language) or "—"
+    period = (
+        _clean(lifestyle.get("period_note_hi"))
+        if is_hindi(language)
+        else _clean(lifestyle.get("period_note"))
+    ) or "—"
     note = (
         _clean(lifestyle.get("note_hi"))
         if is_hindi(language)
         else _clean(lifestyle.get("note"))
     ) or "—"
+    favor_ev = lifestyle.get("favor_evidence") or []
+    avoid_ev = lifestyle.get("avoid_evidence") or []
+    if is_hindi(language):
+        # Keep evidence planets/reasons in English classical labels; color names localized above.
+        favor_detail = wear
+        avoid_detail = avoid
+    else:
+        favor_bits = [
+            _clean(item.get("evidence"))
+            for item in favor_ev
+            if isinstance(item, dict) and item.get("evidence")
+        ]
+        avoid_bits = [
+            _clean(item.get("evidence"))
+            for item in avoid_ev
+            if isinstance(item, dict) and item.get("evidence")
+        ]
+        favor_detail = "; ".join(favor_bits) if favor_bits else wear
+        avoid_detail = "; ".join(avoid_bits) if avoid_bits else avoid
     return {
-        "title": t(language, "Color therapy (current dasha)", "रंग चिकित्सा (वर्तमान दशा)"),
+        "title": t(language, "Color therapy (chart-based)", "रंग चिकित्सा (कुंडली आधारित)"),
         "headers": [t(language, "Item", "विषय"), t(language, "Guidance", "मार्गदर्शन")],
         "rows": [
             [
-                t(language, "Wear / favor (MD)", "धारण / अनुकूल (महादशा)"),
-                wear,
+                t(language, "Favor (chart-supportive)", "अनुकूल (कुंडली-सहायक)"),
+                favor_detail if favor_detail and favor_detail != "—" else t(language, "None listed", "कोई रंग नहीं"),
             ],
             [
-                t(language, "Support (AD)", "सहायक (अन्तर्दशा)"),
-                support,
+                t(language, "Avoid (chart-challenging)", "वर्जित (कुंडली-चुनौतीपूर्ण)"),
+                avoid_detail if avoid_detail and avoid_detail != "—" else t(language, "None listed", "कोई रंग नहीं"),
             ],
             [
-                t(language, "Soften / avoid", "कम रखें / बचें"),
-                avoid,
+                t(language, "Period note (MD/AD emphasis)", "दशा नोट (महादशा/अन्तर्दशा)"),
+                period,
             ],
             [
                 t(language, "How to use", "कैसे अपनाएँ"),
@@ -841,6 +1066,12 @@ def assemble_janam_kundli_pages(context: Dict[str, Any], premium_report: Dict[st
         key = bp["key"]
         section = sections.get(key)
         title, subtitle = page_title_subtitle(key, language)
+        if is_shodashvarga_page_key(key):
+            title, subtitle = shodashvarga_atlas_title_subtitle(
+                int(bp.get("atlas_page") or 1),
+                int(bp.get("atlas_pages") or 1),
+                hindi=hi,
+            )
         if key in AGE_HEADER_KEYS:
             title = age_title(key, bracket, language, title)
 
@@ -939,12 +1170,13 @@ def assemble_janam_kundli_pages(context: Dict[str, Any], premium_report: Dict[st
                 )
 
         elif key == "planetary_positions":
-            tables = _planet_table(fact.get("planet_matrix") or [], language)
+            tables = list(_planet_table(fact.get("planet_matrix") or [], language))
+            tables.extend(_friendship_matrix_tables(fact.get("friendship_matrices") or {}, language))
             if not summary:
                 summary = (
-                    "डी-१ से ग्रह स्थिति, नक्षत्र-पद, दशा, मित्रता, दृष्टि, गंडांत और विशेष भूमिकाएँ।"
+                    "डी-१ से ग्रह स्थिति, नक्षत्र-पद, दशा, पंचधा मैत्री तालिकाएँ, दृष्टि, गंडांत और विशेष भूमिकाएँ।"
                     if hi
-                    else "D1 planet placement, nakshatra-pada, dignity, friendship, aspects, gandanta, and special roles."
+                    else "D1 planet placement, nakshatra-pada, dignity, Panchadha Maitri matrices, aspects, gandanta, and special roles."
                 )
 
         elif key == "chalit_chart":
@@ -999,6 +1231,14 @@ def assemble_janam_kundli_pages(context: Dict[str, Any], premium_report: Dict[st
                     "डी-१० दशांश उसी जन्म आँकड़ों से व्यावसायिक अधिकार कुंडली है।"
                     if hi
                     else "D-10 Dashamsha is the professional authority chart derived from the same birth data."
+                )
+
+        elif is_shodashvarga_page_key(key):
+            if not summary:
+                summary = (
+                    f"पारंपरिक षोडशवर्ग — {len(SHODASHVARGA_DIVISIONS)} विभागीय कुंडलियाँ।"
+                    if hi
+                    else f"Classical Shodashvarga — all {len(SHODASHVARGA_DIVISIONS)} divisional charts."
                 )
 
         elif key == "ashtakavarga":
@@ -1187,29 +1427,46 @@ def assemble_janam_kundli_pages(context: Dict[str, Any], premium_report: Dict[st
                 _metric(
                     t(language, "Current", "वर्तमान"),
                     (
-                        f"{current.get('start_date')} → {current.get('end_date')}"
+                        f"{current.get('start_date')} - {current.get('end_date')}"
                         if current
                         else t(language, "Not active", "सक्रिय नहीं")
                     ),
                 ),
                 _metric(
                     t(language, "Upcoming", "आगामी"),
-                    f"{upcoming.get('start_date')} → {upcoming.get('end_date')}" if upcoming else "—",
+                    f"{upcoming.get('start_date')} - {upcoming.get('end_date')}" if upcoming else "—",
                 ),
             ]
-            if not summary:
-                summary = (
-                    "जन्म चंद्र राशि तथा उससे १२वें/१वें/२वें भाव पर शनि गोचर से साढ़े साती काल।"
+            # Always show a short definition; LLM text (if any) moves to notes.
+            explanation = (
+                "साढ़े साती शनि का लगभग साढ़े सात वर्ष का गोचर काल है। जब शनि जन्म चंद्र राशि से "
+                "पहले वाली राशि में आता है तब यह आरंभ होता है, चंद्र राशि में रहते हुए मध्य चरण रहता है, "
+                "और चंद्र के बाद वाली राशि छोड़ने पर समाप्त होता है। इसे उदय, चरम और अस्त — तीन चरणों में "
+                "देखा जाता है; यह अनिवार्य अशुभता नहीं, बल्कि अनुशासन, पुनर्गठन और धैर्य की परीक्षा का काल माना जाता है।"
+                if hi
+                else (
+                    "Sade Sati is a Saturn transit lasting about seven and a half years. It begins when Saturn "
+                    "enters the sign before your natal Moon, continues while Saturn is in your Moon sign, and "
+                    "ends after Saturn leaves the sign after your Moon. Tradition reads it in three phases — "
+                    "rising, peak, and setting — as a period of discipline, restructuring, and tests of patience, "
+                    "not inevitable misfortune."
+                )
+            )
+            if summary and summary != explanation:
+                notes = [summary, *notes]
+            summary = explanation
+            basis = _clean(ss.get("moon_sign_basis"))
+            if basis and basis not in notes:
+                notes.append(
+                    "आधार: जन्म चंद्र राशि तथा उससे १२वें, १वें और २वें भाव पर शनि गोचर।"
                     if hi
-                    else (
-                        _clean(ss.get("moon_sign_basis"))
-                        or "Sade Sati periods from Saturn transit relative to natal Moon sign."
-                    )
+                    else f"Basis: {basis}."
                 )
 
         elif key == "dasha_tree":
             dasha = fact.get("dasha") or {}
-            tables = [_dasha_table(dasha.get("maha_dashas") or [], language)]
+            maha_rows = dasha.get("maha_dashas") or []
+            tables = _dasha_tables(maha_rows, language)
             cur = dasha.get("current") or {}
             metrics = [
                 _metric(
@@ -1223,62 +1480,76 @@ def assemble_janam_kundli_pages(context: Dict[str, Any], premium_report: Dict[st
             ]
             if not summary:
                 summary = (
-                    "जन्म चंद्र नक्षत्र से गणना की गई विंशोत्तरी महादशा समयरेखा।"
+                    "विंशोत्तरी महादशा और प्रत्येक महादशा के अंतर्गत अन्तर्दशा आरंभ–समाप्ति तिथियाँ।"
                     if hi
-                    else "Vimshottari Mahadasha timeline calculated from natal Moon nakshatra."
+                    else (
+                        "Vimshottari Mahadasha timeline with Antardasha start/end dates "
+                        "listed under each Mahadasha."
+                    )
                 )
 
         elif key == "gemstones":
             rem = fact.get("remedies") or {}
+            # Always use calculator facts — LLM bullets often stay English and confuse Hindi PDFs.
+            tables = _gemstone_page_tables(rem, language)
             life = rem.get("life_stone") or {}
             lucky = rem.get("lucky_stone") or {}
             bhagya = rem.get("bhagya_ratna") or {}
             metrics = [
                 _metric(
                     t(language, "Life stone", "जीवन रत्न"),
-                    f"{label_planet(life.get('planet'), language)}: {label_gemstone(life.get('gemstone'), language)}",
+                    f"{label_planet(life.get('planet'), language)} · {label_gemstone(life.get('gemstone'), language)}",
                 ),
                 _metric(
                     t(language, "Lucky stone", "भाग्य रत्न"),
-                    f"{label_planet(lucky.get('planet'), language)}: {label_gemstone(lucky.get('gemstone'), language)}",
+                    f"{label_planet(lucky.get('planet'), language)} · {label_gemstone(lucky.get('gemstone'), language)}",
                 ),
                 _metric(
-                    t(language, "Bhagya ratna", "भाग्यरत्न"),
-                    f"{label_planet(bhagya.get('planet'), language)}: {label_gemstone(bhagya.get('gemstone'), language)}",
+                    t(language, "Fortune stone", "भाग्यरत्न"),
+                    f"{label_planet(bhagya.get('planet'), language)} · {label_gemstone(bhagya.get('gemstone'), language)}",
                 ),
             ]
             avoid = rem.get("avoid_stones") or []
-            bullets = bullets or [
-                (
-                    (
-                        f"वर्जित उम्मीदवार: {label_planet(a.get('planet'), language)} — "
-                        f"{label_gemstone(a.get('gemstone'), language)} "
-                        f"({label_reason(a.get('reason'), language)})"
+            if hi:
+                bullets = [
+                    "जीवन रत्न = लग्न स्वामी; भाग्य रत्न = पंचमेश; भाग्यरत्न = नवमेश।",
+                    "नीचे दी गई तालिका केवल उम्मीदवार दिखाती है — जाँच के बिना न पहनें।",
+                ]
+                if avoid:
+                    names = ", ".join(
+                        f"{label_planet(a.get('planet'), language)} ({label_gemstone(a.get('gemstone'), language)})"
+                        for a in avoid
                     )
-                    if hi
-                    else (
-                        f"Avoid candidate: {a.get('planet')} — {a.get('gemstone')} "
-                        f"({a.get('reason')})"
-                    )
-                )
-                for a in avoid
-            ]
-            suitability = _clean(rem.get("suitability_note"))
-            if hi and suitability:
-                suitability = (
-                    "रत्न कार्यात्मक स्वभाव और भावेशों से सशर्त उम्मीदवार हैं; व्यक्तिगत उपयुक्तता की पुष्टि के बाद ही धारण करें।"
-                )
-            notes = notes or ([suitability] if suitability else [])
-            benefics = [label_planet(p, language) for p in (rem.get("functional_benefics") or [])]
-            if not summary:
+                    bullets.append(f"सामान्यतः वर्जित: {names}।")
+                notes = [
+                    "रत्न सुझाव लग्न के कार्यात्मक शुभ/पाप भावस्वामियों से बने हैं। "
+                    "व्यक्तिगत कुंडली जाँच, धातु/अंगुली और स्वास्थ्य परामर्श के बाद ही धारण करें।"
+                ]
+                benefics = [label_planet(p, language) for p in (rem.get("functional_benefics") or [])]
                 summary = (
-                    f"{label_sign(rem.get('ascendant_sign_name'), language)} लग्न के लिए कार्यात्मक शुभ: "
-                    f"{', '.join(benefics)}."
-                    if hi
-                    else (
-                        f"Functional benefics for {_clean((rem.get('ascendant_sign_name')))} lagna: "
-                        f"{', '.join(rem.get('functional_benefics') or [])}."
+                    f"{label_sign(rem.get('ascendant_sign_name'), language)} लग्न के कार्यात्मक शुभ ग्रह: "
+                    f"{', '.join(benefics) or '—'}। नीचे तीन मुख्य रत्न-उम्मीदवार और वर्जित रत्न दिए गए हैं।"
+                )
+            else:
+                bullets = [
+                    "Life stone = lagna lord; Lucky stone = 5th lord; Fortune stone = 9th lord.",
+                    "Tables below are candidates only — do not wear without a suitability check.",
+                ]
+                if avoid:
+                    names = ", ".join(
+                        f"{label_planet(a.get('planet'), language)} ({label_gemstone(a.get('gemstone'), language)})"
+                        for a in avoid
                     )
+                    bullets.append(f"Usually avoid: {names}.")
+                notes = [
+                    "Gemstone ideas come from functional benefic/malefic lords for this lagna. "
+                    "Wear only after personal chart confirmation, metal/finger choice, and health advice."
+                ]
+                benefics = [label_planet(p, language) for p in (rem.get("functional_benefics") or [])]
+                summary = (
+                    f"Functional benefics for {label_sign(rem.get('ascendant_sign_name'), language)} lagna: "
+                    f"{', '.join(benefics) or '—'}. "
+                    f"Below are three main gemstone candidates and stones to avoid."
                 )
 
         elif key == "practical_remedies":
@@ -1356,6 +1627,10 @@ def assemble_janam_kundli_pages(context: Dict[str, Any], premium_report: Dict[st
                 notes=notes,
                 section_key=key,
                 skip_render=bool(bp.get("skip_render")),
+                charts_per_row=bp.get("charts_per_row"),
+                chart_compact=bool(bp.get("chart_compact")),
+                # Dasha antardasha cards: 3 compact tables per row.
+                tables_per_row=3 if key == "dasha_tree" else bp.get("tables_per_row"),
             )
         )
 
@@ -1364,10 +1639,4 @@ def assemble_janam_kundli_pages(context: Dict[str, Any], premium_report: Dict[st
 
 def build_janam_kundli_chart_manifest(context: Dict[str, Any]) -> List[Dict[str, Any]]:
     style = context.get("chart_style") or "both"
-    return [
-        {"ref": "native_d1", "style": style},
-        {"ref": "native_moon", "style": style},
-        {"ref": "native_chalit", "style": style},
-        {"ref": "native_d9", "style": style},
-        {"ref": "native_d10", "style": style},
-    ]
+    return chart_manifest_refs(style)

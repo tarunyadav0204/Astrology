@@ -2,8 +2,11 @@
 
 from reports.assembly.janam_kundli_page_assembler import (
     JANAM_KUNDLI_PAGE_BLUEPRINT,
+    JANAM_KUNDLI_PAGE_COUNT,
     assemble_janam_kundli_pages,
+    build_janam_kundli_chart_manifest,
 )
+from reports.assembly.shodashvarga import SHODASHVARGA_DIVISIONS
 from reports.report_types import JANAM_KUNDLI_REPORT_CONFIG, REPORT_TYPE_CONFIGS
 from reports.constants import SUPPORTED_REPORT_TYPES
 
@@ -78,8 +81,48 @@ def test_hindi_pdf_styles_enable_shaping():
     assert styles["ARSectionTitle"].shaping == 1
 
 
+def test_label_gemstone_strips_suitability_english():
+    from reports.assembly.janam_kundli_labels import label_gemstone, normalize_gemstone_name
+
+    raw = "Blue Sapphire, only if suitability checks support it"
+    assert normalize_gemstone_name(raw) == "Blue Sapphire"
+    assert label_gemstone(raw, "hindi") == "नीलम"
+    assert label_gemstone("Diamond or White Sapphire, only if suitability checks support it", "hindi") == "हीरा या सफेद पुखराज"
+    assert label_gemstone(raw, "english") == "Blue Sapphire"
+
+
+def test_lifestyle_colors_table_is_chart_based():
+    """Assembler color table uses chart-based labels (not MD-as-favor)."""
+    from reports.assembly.janam_kundli_page_assembler import _lifestyle_colors_table
+
+    lifestyle = {
+        "wear_colors": "Red, deep orange",
+        "avoid_colors": "Blue, dark grey, black",
+        "period_note": "Current Mahadasha (Saturn) is chart-challenging — do not treat its colors as lucky.",
+        "period_note_hi": "वर्तमान महादशा (Saturn) चार्ट में चुनौतीपूर्ण है।",
+        "note": "Colors are scored from lagna functional nature.",
+        "note_hi": "रंग लग्न के कार्यात्मक स्वभाव से आँके गए हैं।",
+        "favor_evidence": [
+            {"color": "Red", "evidence": "Red ← Mars (functional benefic; yogakaraka)"},
+        ],
+        "avoid_evidence": [
+            {"color": "Blue", "evidence": "Blue ← Saturn (functional malefic; current MD (caution))"},
+        ],
+    }
+    table = _lifestyle_colors_table(lifestyle, "english")
+    assert table["title"] == "Color therapy (chart-based)"
+    labels = [row[0] for row in table["rows"]]
+    assert "Favor (chart-supportive)" in labels
+    assert "Avoid (chart-challenging)" in labels
+    assert "Period note (MD/AD emphasis)" in labels
+    favor_row = next(r for r in table["rows"] if r[0].startswith("Favor"))
+    avoid_row = next(r for r in table["rows"] if r[0].startswith("Avoid"))
+    assert "Mars" in favor_row[1]
+    assert "Saturn" in avoid_row[1]
+
+
 def test_hindi_latin_fallback_keeps_st_ligatures():
-    """Mukta+HarfBuzz corrupts Latin 'st' (trust, AstroRoshni); Latin runs use Noto/Helvetica."""
+    """Mukta+HarfBuzz corrupts Latin 'st' (trust, AstroRoshni); Latin-only runs use Noto."""
     from reportlab.pdfbase.pdfmetrics import getFont
     from reports.pdf_fonts import resolve_pdf_fonts, rich_text_for_fonts
 
@@ -92,24 +135,59 @@ def test_hindi_latin_fallback_keeps_st_ligatures():
     astro = rich_text_for_fonts("Prepared with AstroRoshni", fonts)
     assert "AstroRoshni" in astro
     assert fonts.latin_regular in astro
-    # Mixed line: Latin brand + Hindi label still split correctly.
-    mixed = rich_text_for_fonts("AstroRoshni · जन्म कुंडली", fonts)
-    assert "AstroRoshni" in mixed
-    assert "जन्म" in mixed
-    assert fonts.latin_regular in mixed
-    assert fonts.regular in mixed
+    # Mixed Indic lines must NOT mid-split fonts (breaks Paragraph shaping).
+    mixed = rich_text_for_fonts("शनि (Saturn) 10वें भाव", fonts)
+    assert "Saturn" in mixed
+    assert "10वें" in mixed
+    assert "<font" not in mixed
+    assert fonts.latin_regular not in mixed
+
+
+def test_hindi_mixed_narrative_pdf_keeps_english_parentheticals():
+    """Regression: rich-font splits used to garble '(Saturn)' and tofu '10वें'."""
+    from io import BytesIO
+
+    from pypdf import PdfReader
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.pdfgen import canvas
+    from reportlab.platypus import Paragraph
+
+    from reports.pdf_fonts import resolve_pdf_fonts, rich_text_for_fonts
+
+    fonts = resolve_pdf_fonts("hindi")
+    style = ParagraphStyle(
+        "ARBodyTest",
+        fontName=fonts.regular,
+        fontSize=11,
+        leading=15,
+        shaping=1,
+    )
+    sample = "10वें (कर्म) भाव का स्वामी मंगल (Mars) है और शनि (Saturn) 7वें भाव में है।"
+    buf = BytesIO()
+    c = canvas.Canvas(buf)
+    para = Paragraph(rich_text_for_fonts(sample, fonts), style)
+    para.wrap(480, 200)
+    para.drawOn(c, 40, 700)
+    c.save()
+    extracted = PdfReader(BytesIO(buf.getvalue())).pages[0].extract_text() or ""
+    assert "Saturn" in extracted
+    assert "Mars" in extracted
+    assert "\uffff" not in extracted
+    assert "dm¡" not in extracted
+    assert "^m~" not in extracted
 
 
 def test_janam_kundli_registered_and_enabled():
     assert "janam_kundli" in SUPPORTED_REPORT_TYPES
     assert "janam_kundli" in REPORT_TYPE_CONFIGS
     assert JANAM_KUNDLI_REPORT_CONFIG.enabled is True
-    assert JANAM_KUNDLI_REPORT_CONFIG.page_count == 24
+    assert JANAM_KUNDLI_REPORT_CONFIG.page_count == JANAM_KUNDLI_PAGE_COUNT
+    assert JANAM_KUNDLI_REPORT_CONFIG.page_count == 26
 
 
-def test_janam_blueprint_has_24_pages_without_shadbala():
+def test_janam_blueprint_has_shodashvarga_atlas_without_shadbala():
     keys = [p["key"] for p in JANAM_KUNDLI_PAGE_BLUEPRINT]
-    assert len(keys) == 24
+    assert len(keys) == 26
     assert "shadbala" not in keys
     assert keys[0] == "cover"
     assert JANAM_KUNDLI_PAGE_BLUEPRINT[0]["charts"] == ["native_d1"]
@@ -118,6 +196,21 @@ def test_janam_blueprint_has_24_pages_without_shadbala():
     assert JANAM_KUNDLI_PAGE_BLUEPRINT[2]["charts"] == ["native_moon"]
     assert "present_phase" in keys
     assert "ashtakavarga" in keys
+    shodash_pages = [p for p in JANAM_KUNDLI_PAGE_BLUEPRINT if str(p.get("key") or "").startswith("shodashvarga")]
+    assert len(shodash_pages) == 2  # 16 charts packed 9 per page (3×3), then 7
+    assert shodash_pages[0]["key"] == "shodashvarga_1"
+    assert shodash_pages[0]["charts_per_row"] == 3
+    assert shodash_pages[0]["chart_compact"] is True
+    assert len(shodash_pages[0]["charts"]) == 9
+    assert shodash_pages[0]["charts"][0] == "native_d1"
+    assert len(shodash_pages[1]["charts"]) == 7
+    assert shodash_pages[1]["charts"][-1] == "native_d60"
+    # Continuous block sits immediately after dashamsha.
+    dash_idx = keys.index("dashamsha")
+    assert keys[dash_idx + 1: dash_idx + 3] == ["shodashvarga_1", "shodashvarga_2"]
+    manifest_refs = [m["ref"] for m in build_janam_kundli_chart_manifest({"chart_style": "north"})]
+    for division in SHODASHVARGA_DIVISIONS:
+        assert f"native_d{division}" in manifest_refs
 
 
 def _minimal_fact_pack():
@@ -173,6 +266,99 @@ def _minimal_fact_pack():
                 "pada": 3,
             }
         ],
+        "friendship_matrices": {
+            "planets": ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"],
+            "natural": {
+                "Sun": {
+                    "Sun": "self", "Moon": "friend", "Mars": "friend", "Mercury": "neutral",
+                    "Jupiter": "friend", "Venus": "enemy", "Saturn": "enemy",
+                },
+                "Moon": {
+                    "Sun": "friend", "Moon": "self", "Mars": "neutral", "Mercury": "friend",
+                    "Jupiter": "neutral", "Venus": "neutral", "Saturn": "neutral",
+                },
+                "Mars": {
+                    "Sun": "friend", "Moon": "neutral", "Mars": "self", "Mercury": "enemy",
+                    "Jupiter": "friend", "Venus": "neutral", "Saturn": "enemy",
+                },
+                "Mercury": {
+                    "Sun": "friend", "Moon": "enemy", "Mars": "neutral", "Mercury": "self",
+                    "Jupiter": "neutral", "Venus": "friend", "Saturn": "neutral",
+                },
+                "Jupiter": {
+                    "Sun": "friend", "Moon": "neutral", "Mars": "friend", "Mercury": "enemy",
+                    "Jupiter": "self", "Venus": "enemy", "Saturn": "neutral",
+                },
+                "Venus": {
+                    "Sun": "enemy", "Moon": "enemy", "Mars": "enemy", "Mercury": "friend",
+                    "Jupiter": "neutral", "Venus": "self", "Saturn": "friend",
+                },
+                "Saturn": {
+                    "Sun": "enemy", "Moon": "enemy", "Mars": "enemy", "Mercury": "friend",
+                    "Jupiter": "enemy", "Venus": "friend", "Saturn": "self",
+                },
+            },
+            "temporal": {
+                "Sun": {
+                    "Sun": "self", "Moon": "friend", "Mars": "enemy", "Mercury": "friend",
+                    "Jupiter": "friend", "Venus": "enemy", "Saturn": "friend",
+                },
+                "Moon": {
+                    "Sun": "friend", "Moon": "self", "Mars": "friend", "Mercury": "enemy",
+                    "Jupiter": "friend", "Venus": "friend", "Saturn": "enemy",
+                },
+                "Mars": {
+                    "Sun": "enemy", "Moon": "friend", "Mars": "self", "Mercury": "friend",
+                    "Jupiter": "enemy", "Venus": "friend", "Saturn": "friend",
+                },
+                "Mercury": {
+                    "Sun": "friend", "Moon": "enemy", "Mars": "friend", "Mercury": "self",
+                    "Jupiter": "friend", "Venus": "enemy", "Saturn": "friend",
+                },
+                "Jupiter": {
+                    "Sun": "friend", "Moon": "friend", "Mars": "enemy", "Mercury": "friend",
+                    "Jupiter": "self", "Venus": "friend", "Saturn": "enemy",
+                },
+                "Venus": {
+                    "Sun": "enemy", "Moon": "friend", "Mars": "friend", "Mercury": "enemy",
+                    "Jupiter": "friend", "Venus": "self", "Saturn": "friend",
+                },
+                "Saturn": {
+                    "Sun": "friend", "Moon": "enemy", "Mars": "friend", "Mercury": "friend",
+                    "Jupiter": "enemy", "Venus": "friend", "Saturn": "self",
+                },
+            },
+            "compound": {
+                "Sun": {
+                    "Sun": "self", "Moon": "great_friend", "Mars": "neutral", "Mercury": "friend",
+                    "Jupiter": "great_friend", "Venus": "great_enemy", "Saturn": "neutral",
+                },
+                "Moon": {
+                    "Sun": "great_friend", "Moon": "self", "Mars": "friend", "Mercury": "neutral",
+                    "Jupiter": "friend", "Venus": "friend", "Saturn": "enemy",
+                },
+                "Mars": {
+                    "Sun": "neutral", "Moon": "friend", "Mars": "self", "Mercury": "neutral",
+                    "Jupiter": "neutral", "Venus": "friend", "Saturn": "neutral",
+                },
+                "Mercury": {
+                    "Sun": "great_friend", "Moon": "great_enemy", "Mars": "friend", "Mercury": "self",
+                    "Jupiter": "friend", "Venus": "neutral", "Saturn": "friend",
+                },
+                "Jupiter": {
+                    "Sun": "great_friend", "Moon": "friend", "Mars": "neutral", "Mercury": "neutral",
+                    "Jupiter": "self", "Venus": "neutral", "Saturn": "enemy",
+                },
+                "Venus": {
+                    "Sun": "great_enemy", "Moon": "neutral", "Mars": "neutral", "Mercury": "neutral",
+                    "Jupiter": "friend", "Venus": "self", "Saturn": "great_friend",
+                },
+                "Saturn": {
+                    "Sun": "neutral", "Moon": "great_enemy", "Mars": "neutral", "Mercury": "great_friend",
+                    "Jupiter": "great_enemy", "Venus": "great_friend", "Saturn": "self",
+                },
+            },
+        },
         "special_points": {
             "yogi": {"lord": "Jupiter", "sign_name": "Sagittarius"},
             "avayogi": {"lord": "Mercury", "sign_name": "Gemini"},
@@ -243,18 +429,71 @@ def _minimal_fact_pack():
                 "mahadasha": {"planet": "Rahu", "start": "2020-01-01", "end": "2038-01-01"},
                 "antardasha": {"planet": "Sun", "start": "2026-01-01", "end": "2026-07-01"},
             },
-            "maha_dashas": [{"planet": "Rahu", "start": "2020-01-01", "end": "2038-01-01"}],
-            "current_antardashas": [],
+            "maha_dashas": [
+                {
+                    "planet": "Rahu",
+                    "start": "2020-01-01",
+                    "end": "2038-01-01",
+                    "antardashas": [
+                        {"planet": "Rahu", "start": "2020-01-01", "end": "2022-09-13"},
+                        {"planet": "Jupiter", "start": "2022-09-13", "end": "2025-02-06"},
+                        {"planet": "Saturn", "start": "2025-02-06", "end": "2027-12-13"},
+                        {"planet": "Mercury", "start": "2027-12-13", "end": "2030-06-31"},
+                        {"planet": "Ketu", "start": "2030-07-01", "end": "2031-07-20"},
+                        {"planet": "Venus", "start": "2031-07-20", "end": "2034-07-20"},
+                        {"planet": "Sun", "start": "2034-07-20", "end": "2035-06-14"},
+                        {"planet": "Moon", "start": "2035-06-14", "end": "2036-12-13"},
+                        {"planet": "Mars", "start": "2036-12-13", "end": "2038-01-01"},
+                    ],
+                },
+                {
+                    "planet": "Jupiter",
+                    "start": "2038-01-01",
+                    "end": "2054-01-01",
+                    "antardashas": [
+                        {"planet": "Jupiter", "start": "2038-01-01", "end": "2040-02-18"},
+                        {"planet": "Saturn", "start": "2040-02-18", "end": "2042-09-01"},
+                    ],
+                },
+            ],
+            "current_antardashas": [
+                {"planet": "Rahu", "start": "2020-01-01", "end": "2022-09-13"},
+            ],
         },
         "sade_sati": {"periods": [], "current_period": None, "upcoming_period": None, "moon_sign_basis": "test"},
         "life_themes": {"sun": {"sign_name": "Taurus"}, "lords": {}, "placements": {}},
         "remedies": {
             "ascendant_sign_name": "Cancer",
             "functional_benefics": ["Mars", "Jupiter", "Moon"],
-            "life_stone": {"planet": "Moon", "gemstone": "Pearl"},
-            "lucky_stone": {"planet": "Mars", "gemstone": "Red Coral"},
-            "bhagya_ratna": {"planet": "Jupiter", "gemstone": "Yellow Sapphire"},
-            "avoid_stones": [],
+            "life_stone": {
+                "planet": "Moon",
+                "gemstone": "Pearl",
+                "role_hi": "लग्न स्वामी — जीवन रत्न उम्मीदवार",
+                "meaning_hi": "शरीर और जीवन दिशा का आधार।",
+                "meaning": "Supports vitality and life direction.",
+            },
+            "lucky_stone": {
+                "planet": "Mars",
+                "gemstone": "Red Coral",
+                "role_hi": "पंचमेश — भाग्य रत्न उम्मीदवार",
+                "meaning_hi": "बुद्धि और सृजन से जुड़ा।",
+                "meaning": "Linked with intelligence and creativity.",
+            },
+            "bhagya_ratna": {
+                "planet": "Jupiter",
+                "gemstone": "Yellow Sapphire",
+                "role_hi": "नवमेश — भाग्यरत्न उम्मीदवार",
+                "meaning_hi": "भाग्य और धर्म का सहारा।",
+                "meaning": "Supports fortune and dharma.",
+            },
+            "avoid_stones": [
+                {
+                    "planet": "Saturn",
+                    "gemstone": "Blue Sapphire, only if suitability checks support it",
+                    "reason": "Functional malefic for this lagna",
+                    "reason_hi": "इस लग्न के लिए कार्यात्मक पाप ग्रह — साधारणतः न पहनें",
+                }
+            ],
             "suitability_note": "Conditional",
             "remedy_blueprint": {"priority_order": ["Rahu", "Sun"], "mantras": [], "caution": "Be steady"},
             "actionable_remedies": [
@@ -298,12 +537,21 @@ def _minimal_fact_pack():
             "lifestyle_colors": {
                 "current_md": "Rahu",
                 "current_ad": "Sun",
-                "wear_colors": "Smoke grey, dark blue, earthy tones",
+                "wear_colors": "Gold, saffron, orange",
                 "support_colors": "Gold, saffron, orange",
-                "avoid_colors": "White, silver, cream",
-                "note": "Favor current Mahadasha lord colors.",
-                "note_hi": "वर्तमान महादशा स्वामी के रंग अनुकूल रखें।",
+                "avoid_colors": "Blue, dark grey, black",
+                "period_note": "Current Mahadasha (Rahu) is mixed/neutral for color.",
+                "period_note_hi": "वर्तमान महादशा (Rahu) रंग दृष्टि से मिश्रित/सम है।",
+                "favor_evidence": [
+                    {"color": "Gold", "evidence": "Gold ← Sun (functional benefic)"},
+                ],
+                "avoid_evidence": [
+                    {"color": "Blue", "evidence": "Blue ← Saturn (functional malefic)"},
+                ],
+                "note": "Colors are scored from lagna functional nature, yogakaraka/lordship, and dignity.",
+                "note_hi": "रंग लग्न के कार्यात्मक स्वभाव, योगकारक/भावेश और दशा से आँके गए हैं।",
             },
+
         },
         "nakshatra_deep_dive": {
             "moon": {
@@ -392,7 +640,7 @@ def test_assemble_pages_from_minimal_facts():
         {"person": fact_pack["person"], "language": "english", "fact_pack": fact_pack},
         {"sections": [], "headline": "Janam Kundli for Asha"},
     )
-    assert len(pages) == 24
+    assert len(pages) == 26
     assert pages[0]["title"] == "Janam Kundli"
     assert pages[0]["chart_refs"] == ["native_d1"]
     cover_titles = [t.get("title") for t in pages[0]["tables"]]
@@ -400,8 +648,8 @@ def test_assemble_pages_from_minimal_facts():
     assert any("planet" in (title or "").lower() or "ग्रह" in (title or "") for title in cover_titles)
     assert pages[1]["skip_render"] is True
     assert pages[2]["chart_refs"] == ["native_moon"]
-    assert pages[11]["title"]  # age-aware education title
-    assert "Intellectual" in pages[11]["title"] or "Education" in pages[11]["title"]
+    edu = next(p for p in pages if p.get("section_key") == "education_intellect")
+    assert "Intellectual" in edu["title"] or "Education" in edu["title"]
     yoga_page = next(p for p in pages if p["title"] == "Yogas Catalog")
     assert len(yoga_page["tables"]) == 2
     assert "Auspicious yogas (1)" in yoga_page["tables"][0]["title"]
@@ -413,6 +661,40 @@ def test_assemble_pages_from_minimal_facts():
     assert ashta["tables"][1]["rows"][0][0] == "Sun"
     assert ashta["tables"][1]["rows"][0][-1] == "49"
 
+    planet_page = next(p for p in pages if p.get("section_key") == "planetary_positions")
+    assert len(planet_page["tables"]) >= 5  # placement + relations + 3 friendship matrices
+    friend_titles = [t.get("title") for t in planet_page["tables"][2:5]]
+    assert "Natural friendship (Naisargika Maitri)" in friend_titles[0]
+    assert "Temporal friendship (Tatkalika Maitri)" in friend_titles[1]
+    assert "Compound friendship (Panchadha Maitri)" in friend_titles[2]
+    natural = planet_page["tables"][2]
+    assert natural["rows"][0][0] == "Su"  # Sun abbr
+    assert natural["rows"][0][1] == "—"  # self
+    assert natural["rows"][0][2] == "F"  # Sun→Moon friend
+
+    shodash_pages = [p for p in pages if str(p.get("section_key") or "").startswith("shodashvarga")]
+    assert len(shodash_pages) == 2
+    assert shodash_pages[0]["title"].startswith("Shodashvarga Charts")
+    assert shodash_pages[0]["charts_per_row"] == 3
+    assert shodash_pages[0]["chart_compact"] is True
+    assert shodash_pages[0]["chart_refs"][0] == "native_d1"
+    assert len(shodash_pages[0]["chart_refs"]) == 9
+    assert len(shodash_pages[1]["chart_refs"]) == 7
+    assert shodash_pages[1]["chart_refs"][-1] == "native_d60"
+
+    dasha_page = next(p for p in pages if p.get("section_key") == "dasha_tree")
+    assert dasha_page["tables_per_row"] == 3
+    assert len(dasha_page["tables"]) >= 3  # overview + one table per mahadasha
+    assert dasha_page["tables"][0]["title"] == "Mahadasha timeline"
+    assert dasha_page["tables"][0].get("full_width") is True
+    assert dasha_page["tables"][0]["rows"][0][:3] == ["Rahu", "2020-01-01", "2038-01-01"]
+    assert dasha_page["tables"][1]["title"].startswith("Rahu ·")
+    assert "2020-01-01" in dasha_page["tables"][1]["title"]
+    assert dasha_page["tables"][1]["headers"][0] == "AD"
+    assert dasha_page["tables"][1]["rows"][0][0] == "Rahu"
+    assert dasha_page["tables"][1]["rows"][6][0] == "Sun"
+    assert dasha_page["tables"][2]["title"].startswith("Jupiter ·")
+
 
 def test_assemble_pages_hindi_titles():
     fact_pack = _minimal_fact_pack()
@@ -421,8 +703,22 @@ def test_assemble_pages_hindi_titles():
         {"sections": [], "headline": "आशा की जन्म कुंडली"},
     )
     assert pages[0]["title"] == "जन्म कुंडली"
-    assert "बौद्धिक" in pages[11]["title"] or "शिक्षा" in pages[11]["title"]
+    edu = next(p for p in pages if p.get("section_key") == "education_intellect")
+    assert "बौद्धिक" in edu["title"] or "शिक्षा" in edu["title"]
     assert pages[1]["tables"][0]["headers"][0] == "तथ्य"
+    shodash = next(p for p in pages if p.get("section_key") == "shodashvarga_1")
+    assert shodash["title"].startswith("षोडशवर्ग")
+    assert shodash["charts_per_row"] == 3
+    assert "native_d1" in shodash["chart_refs"]
+
+    gem = next(p for p in pages if p.get("section_key") == "gemstones")
+    assert gem["title"] == "रत्न सुझाव"
+    assert "Blue Sapphire" not in (gem.get("summary") or "")
+    assert all("only if suitability" not in b for b in (gem.get("bullets") or []))
+    assert len(gem["tables"]) >= 2
+    assert gem["tables"][0]["rows"][0][2] == "मोती"
+    assert gem["tables"][1]["rows"][0][1] == "नीलम"
+    assert "पाप" in gem["tables"][1]["rows"][0][2]
 
 
 def test_panchang_nested_dicts_and_hindi_labels():
@@ -479,20 +775,27 @@ def test_panchang_nested_dicts_and_hindi_labels():
     assert "भिन्नाष्टकवर्ग" in ashta["tables"][1]["title"]
     assert ashta["tables"][1]["rows"][0][0] == "सूर्य"
 
-    # planetary_positions keeps the same full D1 analysis tables
+    # planetary_positions keeps D1 analysis tables plus three friendship matrices
     planet_rows = pages[4]["tables"][0]["rows"]
     assert planet_rows[0][0] == "सूर्य"
     assert "वृषभ" in planet_rows[0][1]
     assert "कृत्तिका" in planet_rows[0][3]
+    assert len(pages[4]["tables"]) >= 5
+    assert "प्राकृतिक मित्रता" in pages[4]["tables"][2]["title"]
+    assert "तात्कालिक मित्रता" in pages[4]["tables"][3]["title"]
+    assert "संयुक्त मित्रता" in pages[4]["tables"][4]["title"]
+    assert pages[4]["tables"][2]["rows"][0][2] == "मित्र"  # Sun→Moon
 
     # D9 / D10 short matrices
-    assert pages[3]["tables"][0]["title"] == "डी-९ ग्रह सारिणी"
-    assert pages[3]["tables"][0]["rows"][0][2] == "स्वगृह"
-    assert pages[6]["tables"][0]["title"] == "डी-१० ग्रह सारिणी"
-    assert pages[6]["tables"][0]["rows"][0][2] == "उच्च"
+    navamsha = next(p for p in pages if p.get("section_key") == "navamsha")
+    dashamsha = next(p for p in pages if p.get("section_key") == "dashamsha")
+    assert navamsha["tables"][0]["title"] == "डी-९ ग्रह सारिणी"
+    assert navamsha["tables"][0]["rows"][0][2] == "स्वगृह"
+    assert dashamsha["tables"][0]["title"] == "डी-१० ग्रह सारिणी"
+    assert dashamsha["tables"][0]["rows"][0][2] == "उच्च"
 
     # emotional_blueprint / nakshatra deep-dive + Tara Bal
-    emo = pages[10]
+    emo = next(p for p in pages if p.get("section_key") == "emotional_blueprint")
     assert "नक्षत्र" in emo["title"]
     emo_titles = [tbl["title"] for tbl in emo["tables"]]
     assert "नक्षत्र पहचान" in emo_titles

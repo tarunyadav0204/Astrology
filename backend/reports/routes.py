@@ -803,7 +803,7 @@ async def lookup_existing_janam_kundli_report(
 ):
     resolved_language = normalize_language(request.language)
     subject_hash = build_subject_hash(request.birth_data, request.report_type, resolved_language)
-    report_version = JANAM_KUNDLI_REPORT_CONFIG.key + "_v2"
+    report_version = JANAM_KUNDLI_REPORT_CONFIG.key + "_v3"
 
     job = get_latest_completed_report_job(
         current_user.userid,
@@ -916,7 +916,7 @@ async def start_janam_kundli_report_job(
         save_report_branding(current_user.userid, request.branding, get_conn, execute)
 
     subject_hash = build_subject_hash(request.birth_data, request.report_type, resolved_language)
-    report_version = JANAM_KUNDLI_REPORT_CONFIG.key + "_v2"
+    report_version = JANAM_KUNDLI_REPORT_CONFIG.key + "_v3"
     request_json = json.dumps(request.model_dump() if hasattr(request, "model_dump") else request.dict())
     cached = None
     if not request.force_regenerate:

@@ -91,6 +91,11 @@ class ReportPage(BaseModel):
     cta: Optional[str] = None
     section_key: Optional[str] = None
     skip_render: bool = False
+    # Dense atlas layout (e.g. Shodashvarga): N charts per row, compact diamonds.
+    charts_per_row: Optional[int] = None
+    chart_compact: bool = False
+    # Dense table grid (e.g. dasha antardasha cards): N tables per row.
+    tables_per_row: Optional[int] = None
 
 
 class ReportDocument(BaseModel):

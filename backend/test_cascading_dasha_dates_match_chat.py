@@ -53,6 +53,11 @@ def test_tarun_saturn_mahadasha_matches_astrosage():
     rahu = dashas["maha_dashas"][0]
     assert rahu["planet"] == "Rahu"
     assert calc.maha_end_date_str(rahu["end"]) == "1995-11-04"
+    # Balance Rahu MD must still list all 9 ADs (ending with Mars), not truncate early.
+    rahu_ads = calc.list_antardashas(rahu)
+    assert len(rahu_ads) == 9
+    assert [a["planet"] for a in rahu_ads][-1] == "Mars"
+    assert rahu_ads[-1]["end"] == "1995-11-04"
     # AD must use same 365.25 year as MD; calendar-midnight MD bounds match AstroSage.
     assert dashas["antardasha"]["planet"] == "Rahu"
     assert dashas["antardasha"]["start"] == "2025-06-16"

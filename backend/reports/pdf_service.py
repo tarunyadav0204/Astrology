@@ -26,6 +26,7 @@ from reportlab.platypus import (
 
 from utils.env_json import parse_json_from_env
 
+from .assembly.shodashvarga import SHODASHVARGA_DIVISIONS, shodashvarga_label
 from .pdf_fonts import PdfFontSet, resolve_pdf_fonts, rich_text_for_fonts
 from .assembly.janam_kundli_i18n import is_hindi
 from .assembly.janam_kundli_labels import PLANET_ABBR_EN, PLANET_ABBR_HI, label_sign
@@ -134,11 +135,23 @@ def _escape_html(text: Any) -> str:
     )
 
 
+_PDF_ARROW_RE = re.compile(
+    "["
+    "\u2190-\u21ff"  # arrows
+    "\u27f0-\u27ff"  # supplemental arrows-A
+    "\u2900-\u297f"  # supplemental arrows-B
+    "\uffe9-\uffec"  # halfwidth arrows
+    "]"
+)
+
+
 def _clean_markup(text: Any) -> str:
     value = _safe_text(text)
     value = re.sub(r"<term\b[^>]*>(.*?)</term>", r"\1", value, flags=re.IGNORECASE | re.DOTALL)
     value = re.sub(r"<[^>]+>", "", value)
     value = value.replace("**", "").replace("*", "")
+    # Mukta lacks most Unicode arrow glyphs — they render as empty boxes in PDF.
+    value = _PDF_ARROW_RE.sub("=", value)
     return value.strip()
 
 
@@ -758,22 +771,34 @@ def _render_north_indian_diamond_chart(
     *,
     compact: bool = False,
 ) -> Table:
-    # Cover side-by-side uses ~100mm column; allow a larger compact diamond there.
-    max_diamond = 86 * mm if compact else 78 * mm
-    min_diamond = 52 * mm if compact else 52 * mm
-    chart_size = max(min_diamond, min(width - 6 * mm, max_diamond))
+    # Dense atlas (3–4 per row) needs diamonds that shrink with column width.
+    if compact and width <= 55 * mm:
+        max_diamond = max(28 * mm, width - 2 * mm)
+        min_diamond = 26 * mm
+        pad = 1.5
+        title_size = "7"
+    elif compact:
+        max_diamond = 86 * mm
+        min_diamond = 40 * mm
+        pad = 3
+        title_size = "8"
+    else:
+        max_diamond = 78 * mm
+        min_diamond = 52 * mm
+        pad = 6
+        title_size = "8"
+    chart_size = max(min_diamond, min(width - (2 * mm if compact else 6 * mm), max_diamond))
     drawing = _build_north_indian_diamond_drawing(house_map, size=chart_size)
     asc_name = label_sign(
         _ZODIAC_SIGNS[int((chart_data.get("ascendant", 0) or 0) / 30) % 12],
         _PDF_LANGUAGE.get(),
     )
     caption = Paragraph(
-        f"<b>{_escape_html(title)}</b> · <font size='8'>{_escape_html(asc_name)}</font>"
+        f"<b>{_escape_html(title)}</b> · <font size='{title_size}'>{_escape_html(asc_name)}</font>"
         if compact
-        else f"<b>{_escape_html(title)}</b><br/><font size='8'>{_escape_html(asc_name)}</font>",
+        else f"<b>{_escape_html(title)}</b><br/><font size='{title_size}'>{_escape_html(asc_name)}</font>",
         styles["ARBodySmall"],
     )
-    pad = 3 if compact else 6
     inner = Table([[drawing]], colWidths=[chart_size])
     inner.setStyle(TableStyle([
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
@@ -903,6 +928,7 @@ def _chart_block(
     width: float = _HALF_CONTENT_WIDTH,
     *,
     compact: bool = False,
+    short_title: bool = False,
 ) -> Optional[Table]:
     chart_data = report_document.get("chart_data") or {}
     boy_name = _person_label(report_document, "boy", "Person A")
@@ -911,13 +937,13 @@ def _chart_block(
     # Critical: never mix north for one partner and south for the other.
     style = _resolve_draw_style(report_document)
 
-    boy_d1 = _chart_payload(chart_data.get("boy") or chart_data.get("native"))
+    boy_d1 = _chart_payload(chart_data.get("boy") or chart_data.get("native") or chart_data.get("native_d1"))
     girl_d1 = _chart_payload(chart_data.get("girl"))
     boy_d9 = _chart_payload(chart_data.get("boy_d9") or chart_data.get("native_d9"))
     girl_d9 = _chart_payload(chart_data.get("girl_d9"))
     boy_d2 = _chart_payload(chart_data.get("boy_d2") or chart_data.get("native_d2"))
     girl_d2 = _chart_payload(chart_data.get("girl_d2"))
-    boy_d7 = _chart_payload(chart_data.get("boy_d7"))
+    boy_d7 = _chart_payload(chart_data.get("boy_d7") or chart_data.get("native_d7"))
     girl_d7 = _chart_payload(chart_data.get("girl_d7"))
     native_d10 = _chart_payload(chart_data.get("native_d10") or chart_data.get("boy_d10"))
     native_d30 = _chart_payload(chart_data.get("native_d30") or chart_data.get("boy_d30"))
@@ -926,12 +952,12 @@ def _chart_block(
 
     hi = is_hindi(_PDF_LANGUAGE.get())
     labels = {
-        "d1": "डी-१ राशि" if hi else "D1 Rashi",
-        "d2": "डी-२ होरा" if hi else "D2 Hora",
-        "d7": "डी-७ सप्तमांश" if hi else "D7 Saptamsha",
-        "d9": "डी-९ नवांश" if hi else "D9 Navamsa",
-        "d10": "डी-१० दशमांश" if hi else "D10 Dasamsa",
-        "d30": "डी-३० त्रिंशांश" if hi else "D30 Trimsamsa",
+        "d1": shodashvarga_label(1, hindi=hi),
+        "d2": shodashvarga_label(2, hindi=hi),
+        "d7": shodashvarga_label(7, hindi=hi),
+        "d9": shodashvarga_label(9, hindi=hi),
+        "d10": shodashvarga_label(10, hindi=hi),
+        "d30": shodashvarga_label(30, hindi=hi),
         "moon": "चंद्र कुंडली" if hi else "Chandra Kundli",
         "chalit": "भाव चलित" if hi else "Bhava Chalit",
     }
@@ -959,43 +985,86 @@ def _chart_block(
         "native_chalit": (native_chalit, _chart_title(native_chalit, native_name, labels["chalit"]), style),
         "boy_chalit": (native_chalit, _chart_title(native_chalit, native_name, labels["chalit"]), style),
     }
+    # Dynamic Shodashvarga refs: native_d3, native_d12, … native_d60
+    for division in SHODASHVARGA_DIVISIONS:
+        label = shodashvarga_label(division, hindi=hi)
+        payload = _chart_payload(
+            chart_data.get(f"native_d{division}")
+            or chart_data.get(f"boy_d{division}")
+            or (chart_data.get("native") if division == 1 else None)
+            or (chart_data.get("boy") if division == 1 else None)
+        )
+        ref_map[f"native_d{division}"] = (
+            payload,
+            _chart_title(payload, native_name, label),
+            style,
+        )
+        ref_map[f"boy_d{division}"] = (
+            payload,
+            _chart_title(payload, native_name, label),
+            style,
+        )
+
     chart_info = ref_map.get(ref)
     if not chart_info:
         return None
     chart, title, draw_style = chart_info
     if not chart:
         return None
+    if short_title:
+        # Dense atlas: keep only the varga label (drop native name prefix).
+        title = title.split(" · ")[-1].strip() or title
     grid = _render_chart_grid(
         chart, style=draw_style, title=title, styles=styles, width=width, compact=compact
     )
     return Table([[grid]], colWidths=[width])
 
 
-def _chart_table(report_document: Dict[str, Any], refs: Sequence[str], styles: Dict[str, ParagraphStyle]) -> Optional[Table]:
+def _chart_table(
+    report_document: Dict[str, Any],
+    refs: Sequence[str],
+    styles: Dict[str, ParagraphStyle],
+    *,
+    columns: int = 2,
+    compact: bool = False,
+) -> Optional[Table]:
+    cols = max(1, min(int(columns or 2), 4))
+    gutter = _TABLE_GUTTER if cols <= 2 else 2 * mm
+    col_width = (_CONTENT_WIDTH - gutter * (cols - 1)) / cols
     blocks: List[Any] = []
     for ref in refs or []:
-        block = _chart_block(report_document, ref, styles, width=_HALF_CONTENT_WIDTH)
+        block = _chart_block(
+            report_document,
+            ref,
+            styles,
+            width=col_width,
+            compact=compact or cols >= 3,
+            short_title=cols >= 3,
+        )
         if block is not None:
-            blocks.append((ref, block))
+            blocks.append(block)
     if not blocks:
         return None
 
     rows: List[List[Any]] = []
-    col_width = (_CONTENT_WIDTH - _TABLE_GUTTER) / 2
-    for index in range(0, len(blocks), 2):
-        pair = blocks[index:index + 2]
-        if len(pair) == 1:
-            full = _chart_block(report_document, pair[0][0], styles, width=_CONTENT_WIDTH)
-            rows.append([full or pair[0][1]])
-        else:
-            rows.append([pair[0][1], pair[1][1]])
-    table = Table(rows, colWidths=[col_width, col_width] if len(rows[0]) > 1 else [_CONTENT_WIDTH], hAlign="LEFT")
+    for index in range(0, len(blocks), cols):
+        chunk = list(blocks[index: index + cols])
+        # Pad incomplete final row so Table column counts stay consistent.
+        while len(chunk) < cols:
+            chunk.append("")
+        rows.append(chunk)
+
+    table = Table(
+        rows,
+        colWidths=[col_width] * cols,
+        hAlign="LEFT",
+    )
     table.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), gutter / 2 if cols > 1 else 0),
         ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3 if cols >= 3 else 4),
     ]))
     return table
 
@@ -1528,25 +1597,27 @@ def _render_page(page: Dict[str, Any], report_document: Dict[str, Any], styles: 
 
     chart_refs = page.get("chart_refs") or []
     if chart_refs:
-        chart_table = _chart_table(report_document, chart_refs, styles)
+        try:
+            columns = int(page.get("charts_per_row") or 2)
+        except Exception:
+            columns = 2
+        chart_table = _chart_table(
+            report_document,
+            chart_refs,
+            styles,
+            columns=columns,
+            compact=bool(page.get("chart_compact")),
+        )
         if chart_table:
             story.append(Spacer(1, 4 * mm))
             story.append(chart_table)
 
     tables = page.get("tables") or []
-    for table_data in tables:
-        rows = table_data.get("rows") or []
-        if not rows:
-            continue
-        headers = table_data.get("headers") or []
-        # List-rows often carry headers separately; dict-rows already expand keys as header.
-        render_rows: List[Any] = list(rows)
-        if headers and isinstance(rows[0], (list, tuple)):
-            render_rows = [list(headers)] + [list(r) for r in rows]
-        story.append(Spacer(1, 3 * mm))
-        story.append(_p(table_data.get("title") or "Supporting reference", styles["ARSectionSubtitle"]))
-        compact = bool(table_data.get("compact")) or len(headers) >= 12
-        story.append(_table_from_rows(render_rows, styles, compact=compact))
+    try:
+        tables_per_row = int(page.get("tables_per_row") or 1)
+    except Exception:
+        tables_per_row = 1
+    story.extend(_render_page_tables(tables, styles, columns=tables_per_row))
 
     cta = page.get("cta")
     if cta:
@@ -1554,6 +1625,120 @@ def _render_page(page: Dict[str, Any], report_document: Dict[str, Any], styles: 
         story.append(Table([[_p(cta, styles["ARBodySmall"])]], colWidths=[_CONTENT_WIDTH]))
 
     return story
+
+
+def _prepare_table_render_rows(table_data: Dict[str, Any]) -> List[Any]:
+    rows = table_data.get("rows") or []
+    if not rows:
+        return []
+    headers = table_data.get("headers") or []
+    render_rows: List[Any] = list(rows)
+    if headers and isinstance(rows[0], (list, tuple)):
+        render_rows = [list(headers)] + [list(r) for r in rows]
+    return render_rows
+
+
+def _table_card(
+    table_data: Dict[str, Any],
+    styles: Dict[str, ParagraphStyle],
+    *,
+    width: float,
+) -> Table:
+    """Title + compact data table sized to a grid cell."""
+    render_rows = _prepare_table_render_rows(table_data)
+    headers = table_data.get("headers") or []
+    compact = bool(table_data.get("compact")) or len(headers) >= 12 or width < 80 * mm
+    title = _safe_text(table_data.get("title") or "Supporting reference")
+    title_style = styles["ARBodySmall"] if width < 80 * mm else styles["ARSectionSubtitle"]
+    body = _table_from_rows(render_rows, styles, width=width, compact=compact)
+    card = Table(
+        [[_p(title, title_style)], [body]],
+        colWidths=[width],
+    )
+    card.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (0, 0), 1),
+        ("BOTTOMPADDING", (0, 1), (0, 1), 0),
+    ]))
+    return card
+
+
+def _render_page_tables(
+    tables: Sequence[Dict[str, Any]],
+    styles: Dict[str, ParagraphStyle],
+    *,
+    columns: int = 1,
+) -> List[Any]:
+    """Render page tables; optionally pack non-full-width tables into an N-column grid."""
+    flowables: List[Any] = []
+    cols = max(1, min(int(columns or 1), 4))
+    grid_buffer: List[Any] = []
+
+    def flush_grid() -> None:
+        nonlocal grid_buffer
+        if not grid_buffer:
+            return
+        # Explicit spacer columns so table cards never share a border.
+        gutter = 4 * mm if cols >= 2 else 0
+        col_width = (_CONTENT_WIDTH - gutter * (cols - 1)) / cols
+        col_widths: List[float] = []
+        for i in range(cols):
+            col_widths.append(col_width)
+            if i < cols - 1:
+                col_widths.append(gutter)
+        rows: List[List[Any]] = []
+        for index in range(0, len(grid_buffer), cols):
+            chunk = list(grid_buffer[index: index + cols])
+            while len(chunk) < cols:
+                chunk.append("")
+            if cols == 1:
+                rows.append(chunk)
+            else:
+                row: List[Any] = []
+                for i, cell in enumerate(chunk):
+                    row.append(cell)
+                    if i < cols - 1:
+                        row.append("")
+                rows.append(row)
+        grid = Table(rows, colWidths=col_widths, hAlign="LEFT")
+        grid.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5 * mm),
+        ]))
+        flowables.append(Spacer(1, 3 * mm))
+        flowables.append(grid)
+        grid_buffer = []
+
+    for table_data in tables or []:
+        if not isinstance(table_data, dict):
+            continue
+        render_rows = _prepare_table_render_rows(table_data)
+        if not render_rows:
+            continue
+        full_width = bool(table_data.get("full_width")) or cols <= 1
+        if full_width:
+            flush_grid()
+            headers = table_data.get("headers") or []
+            compact = bool(table_data.get("compact")) or len(headers) >= 12
+            flowables.append(Spacer(1, 3 * mm))
+            flowables.append(
+                _p(table_data.get("title") or "Supporting reference", styles["ARSectionSubtitle"])
+            )
+            flowables.append(_table_from_rows(render_rows, styles, compact=compact))
+            continue
+
+        gutter = 4 * mm if cols >= 2 else 0
+        col_width = (_CONTENT_WIDTH - gutter * (cols - 1)) / cols
+        grid_buffer.append(_table_card(table_data, styles, width=col_width))
+
+    flush_grid()
+    return flowables
 
 
 def _footer_brand_line(language: Any = None, report_type: Any = None, branding: Any = None) -> str:

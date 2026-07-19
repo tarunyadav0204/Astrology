@@ -817,8 +817,27 @@ def label_pada_nature(value: Any, language: Any) -> str:
     return text
 
 
-def label_gemstone(value: Any, language: Any) -> str:
+_GEMSTONE_SUITABILITY_SUFFIXES = (
+    ", only if suitability checks support it",
+    " only if suitability checks support it",
+)
+
+
+def normalize_gemstone_name(value: Any) -> str:
+    """Strip remedy-engine suitability clauses; keep the stone name only."""
     text = str(value or "").strip()
+    if not text:
+        return ""
+    for suffix in _GEMSTONE_SUITABILITY_SUFFIXES:
+        if text.endswith(suffix):
+            text = text[: -len(suffix)].strip()
+        elif suffix in text:
+            text = text.split(suffix)[0].strip().rstrip(",")
+    return text.strip(" ,;")
+
+
+def label_gemstone(value: Any, language: Any) -> str:
+    text = normalize_gemstone_name(value)
     if not text:
         return ""
     if is_hindi(language):
@@ -826,7 +845,7 @@ def label_gemstone(value: Any, language: Any) -> str:
         mapped = _lookup(GEMSTONE_HI, text)
         if mapped:
             return mapped
-        parts = [p.strip() for p in text.replace(" or ", "|").split("|") if p.strip()]
+        parts = [p.strip() for p in re.split(r"\s+or\s+", text, flags=re.IGNORECASE) if p.strip()]
         if len(parts) > 1:
             return " या ".join(label_gemstone(p, language) for p in parts)
         return text

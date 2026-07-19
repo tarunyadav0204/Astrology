@@ -69,12 +69,16 @@ def _ttfont_supports_shapable() -> bool:
 
 
 def _make_ttfont(name: str, path: Path, *, shapable: bool) -> TTFont:
-    """Register-compatible TTFont; older ReportLab builds omit the shapable kwarg."""
-    if shapable and _ttfont_supports_shapable():
-        return TTFont(name, str(path), shapable=True)
-    if (not shapable) and _ttfont_supports_shapable():
-        return TTFont(name, str(path), shapable=False)
-    return TTFont(name, str(path))
+    """Register-compatible TTFont; older ReportLab builds omit the shapable kwarg.
+
+    Always try/except — do not trust signature inspection alone (stale venv / odd wraps).
+    """
+    try:
+        return TTFont(name, str(path), shapable=bool(shapable))
+    except TypeError as exc:
+        if "shapable" not in str(exc):
+            raise
+        return TTFont(name, str(path))
 
 
 def _register_pair(
@@ -207,38 +211,21 @@ def escape_pdf_text(text: str) -> str:
 
 
 def rich_text_for_fonts(text: str, fonts: PdfFontSet, *, bold: bool = False) -> str:
-    """Escape text and, when needed, wrap Latin vs script runs in <font> tags."""
+    """Escape text and, when needed, route Latin-only runs to the Latin fallback font.
+
+    Important: do **not** insert mid-string ``<font>`` switches on mixed Indic lines.
+    ReportLab ``Paragraph(shaping=1)`` corrupts those splits — e.g.
+    ``शनि (Saturn) 10वें`` becomes ``(dm¡¢~z(`` plus tofu after digits.
+    Latin-only chrome ("Prepared with AstroRoshni", "trust") still uses the
+    non-shapable Latin face so Mukta+HarfBuzz does not ligature-corrupt ``st``.
+    """
     value = text or ""
     if not fonts.needs_latin_fallback:
         return escape_pdf_text(value)
 
-    primary = fonts.bold if bold else fonts.regular
     latin = fonts.latin_bold if bold else fonts.latin_regular
-    parts = []
-    buffer = []
-    current_is_indic = None
+    # Mixed Indic + Latin/digits: keep one shapable primary run (style fontName).
+    if _INDIC_CHAR.search(value):
+        return escape_pdf_text(value)
 
-    def flush():
-        nonlocal buffer, current_is_indic
-        if not buffer or current_is_indic is None:
-            buffer = []
-            return
-        chunk = escape_pdf_text("".join(buffer))
-        font_name = primary if current_is_indic else latin
-        parts.append(f'<font name="{font_name}">{chunk}</font>')
-        buffer = []
-
-    for ch in value:
-        is_indic = bool(_INDIC_CHAR.match(ch))
-        # Whitespace / punctuation stay with the current run when possible.
-        if ch.isspace() or ch in ".,;:!?()[]{}-/—–·•'\"“”‘’":
-            buffer.append(ch)
-            continue
-        if current_is_indic is None:
-            current_is_indic = is_indic
-        elif is_indic != current_is_indic:
-            flush()
-            current_is_indic = is_indic
-        buffer.append(ch)
-    flush()
-    return "".join(parts) if parts else escape_pdf_text(value)
+    return f'<font name="{latin}">{escape_pdf_text(value)}</font>'
