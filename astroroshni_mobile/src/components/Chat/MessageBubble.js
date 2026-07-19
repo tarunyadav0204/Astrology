@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
   View,
@@ -33,6 +33,12 @@ import { useCredits } from '../../credits/CreditContext';
 import { useAuthGate } from '../../auth/AuthGateContext';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import PodcastPlayerModal from '../PodcastPlayerModal';
+import { creditAPI } from '../../services/api';
+import {
+  freeDetailRevealClickedStorageKey,
+  freeDetailUnlockStorageKey,
+  splitFreeAnswerContent,
+} from '../../utils/freeAnswerSplit';
 
 /** Avoid replaying slide-in when a tall bubble remounts (Android clipping / recycle). */
 const messageBubbleEntryPlayedIds = new Set();
@@ -56,9 +62,13 @@ function MessageBubble({
 }) {
   const { t } = useTranslation();
   const { theme } = useTheme();
-  const { podcastCost, credits } = useCredits();
+  const { podcastCost, credits, pricing, refreshCredits } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
   const navigation = useNavigation();
+  const standardChatCost = Math.max(1, Number(pricing?.chat ?? pricing?.standard ?? 1) || 1);
+  const [detailUnlocked, setDetailUnlocked] = useState(false);
+  const [showRevealCreditsModal, setShowRevealCreditsModal] = useState(false);
+  const blurShownTrackedRef = useRef(false);
   // Init from the played-ids set so FlatList remounts do not flash translateY:50 for one frame
   // (that looked like the long answer bouncing between sections while reading).
   const entryIdForAnim = String(message?.messageId || message?.id || message?.clientRequestId || '');
@@ -1342,12 +1352,87 @@ function MessageBubble({
     isNativeGate,
   ]);
 
+  const isFreeQuestionAnswer =
+    message.role === 'assistant' &&
+    !message.isTyping &&
+    !isClarification &&
+    !isNativeGate &&
+    Boolean(gateMetadata.free_question_completed);
+  const freeSplit = isFreeQuestionAnswer ? splitFreeAnswerContent(contentStr) : null;
+  const canBlurFreeDetail =
+    Boolean(freeSplit?.canBlur) && !isInstantChatMessage;
+
+  useEffect(() => {
+    let cancelled = false;
+    const mid = message.messageId || message.id;
+    if (!canBlurFreeDetail || !mid) {
+      return undefined;
+    }
+    (async () => {
+      try {
+        const v = await AsyncStorage.getItem(freeDetailUnlockStorageKey(mid));
+        if (!cancelled && v === '1') setDetailUnlocked(true);
+      } catch (_) {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canBlurFreeDetail, message.messageId, message.id]);
+
+  useEffect(() => {
+    if (!canBlurFreeDetail || detailUnlocked || blurShownTrackedRef.current) return;
+    const mid = message.messageId || message.id;
+    if (!mid) return;
+    blurShownTrackedRef.current = true;
+    creditAPI.recordFreeAnswerFunnelEvent('blur_shown', String(mid)).catch(() => {});
+  }, [canBlurFreeDetail, detailUnlocked, message.messageId, message.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!canBlurFreeDetail || detailUnlocked) return undefined;
+      const mid = message.messageId || message.id;
+      if (!mid) return undefined;
+      let alive = true;
+      (async () => {
+        try {
+          const clicked = await AsyncStorage.getItem(freeDetailRevealClickedStorageKey(mid));
+          if (clicked !== '1') return;
+          await refreshCredits?.();
+          if (!alive) return;
+          // Unlock after the user tapped reveal and returned with a positive balance.
+          if (Number(credits) > 0) {
+            try {
+              await AsyncStorage.setItem(freeDetailUnlockStorageKey(mid), '1');
+            } catch (_) {
+              /* ignore */
+            }
+            setDetailUnlocked(true);
+          }
+        } catch (_) {
+          /* ignore */
+        }
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [canBlurFreeDetail, detailUnlocked, credits, refreshCredits, message.messageId, message.id]),
+  );
+
   // Loading rows use LoadingBubble (isTyping), not MessageBubble — skip empty assistant rows safely.
   if (!contentStr.trim()) {
     return null;
   }
 
-  const formattedContent = formatContent(contentStr);
+  const shouldBlurDetail = canBlurFreeDetail && !detailUnlocked;
+
+  const displayContent = shouldBlurDetail ? freeSplit.quick : contentStr;
+  const detailTeaser = shouldBlurDetail
+    ? String(freeSplit.detail || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 280)
+    : '';
+
+  const formattedContent = formatContent(displayContent);
   const renderedElements = renderFormattedText(formattedContent);
 
   const chartName = message.native_name || null;
@@ -1627,6 +1712,47 @@ function MessageBubble({
         <View style={styles.messageContent}>
           {renderedElements}
         </View>
+
+        {shouldBlurDetail && (
+          <View style={styles.freeDetailPaywall}>
+            <View style={styles.freeDetailBlurBlock} pointerEvents="none">
+              <Text style={styles.freeDetailTeaser} numberOfLines={5}>
+                {detailTeaser ||
+                  t(
+                    'chat.freeDetailTeaserFallback',
+                    'Key Insights, Astrological Analysis, Timing & more…',
+                  )}
+              </Text>
+              <View style={styles.freeDetailBlurOverlay} />
+            </View>
+            <TouchableOpacity
+              style={styles.freeDetailRevealBtn}
+              activeOpacity={0.9}
+              onPress={() => setShowRevealCreditsModal(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.revealDetailedAnswerA11y', 'Reveal the detailed answer')}
+            >
+              <LinearGradient
+                colors={['#ea580c', '#f97316']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.freeDetailRevealGradient}
+              >
+                <Ionicons name="lock-open-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+                <Text style={styles.freeDetailRevealText}>
+                  {t('chat.revealDetailedAnswer', 'Reveal the detailed answer')}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <Text style={styles.freeDetailHint}>
+              {t(
+                'chat.revealDetailedAnswerHint',
+                'Standard mode · {{count}} credits',
+                { count: standardChatCost },
+              )}
+            </Text>
+          </View>
+        )}
 
         {isNativeGate && !message.isTyping && (
           <View style={styles.nativeGateActionsWrap}>
@@ -2078,6 +2204,47 @@ function MessageBubble({
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <ConfirmCreditsModal
+        visible={showRevealCreditsModal}
+        onClose={() => setShowRevealCreditsModal(false)}
+        title={t('chat.revealDetailedAnswer', 'Reveal the detailed answer')}
+        description={t(
+          'chat.revealDetailedAnswerDesc',
+          'Unlock Key Insights, Astrological Analysis, Timing & Guidance, and Final Verdict. Uses Standard mode credits.',
+        )}
+        cost={standardChatCost}
+        credits={credits}
+        confirmLabel={
+          Number(credits) >= standardChatCost
+            ? t('chat.unlockNow', 'Unlock now')
+            : t('chat.getCredits', 'Get credits')
+        }
+        onConfirm={async () => {
+          const mid = message.messageId || message.id;
+          setShowRevealCreditsModal(false);
+          if (mid) {
+            try {
+              await AsyncStorage.setItem(freeDetailRevealClickedStorageKey(mid), '1');
+            } catch (_) {
+              /* ignore */
+            }
+            creditAPI.recordFreeAnswerFunnelEvent('reveal_clicked', String(mid)).catch(() => {});
+          }
+          if (Number(credits) >= standardChatCost) {
+            if (mid) {
+              try {
+                await AsyncStorage.setItem(freeDetailUnlockStorageKey(mid), '1');
+              } catch (_) {
+                /* ignore */
+              }
+            }
+            setDetailUnlocked(true);
+            return;
+          }
+          navigation.navigate('Credits');
+        }}
+      />
 
       <ConfirmCreditsModal
         visible={showPodcastCreditsModal}
@@ -3064,5 +3231,53 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     color: '#7c2d12',
     fontWeight: '600',
     marginBottom: 12,
+  },
+  freeDetailPaywall: {
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  freeDetailBlurBlock: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 247, 237, 0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(234, 88, 12, 0.18)',
+    minHeight: 96,
+    justifyContent: 'center',
+    padding: 14,
+    marginBottom: 10,
+  },
+  freeDetailTeaser: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#78716c',
+  },
+  freeDetailBlurOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+  },
+  freeDetailRevealBtn: {
+    borderRadius: 999,
+    overflow: 'hidden',
+    alignSelf: 'stretch',
+  },
+  freeDetailRevealGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+  },
+  freeDetailRevealText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  freeDetailHint: {
+    marginTop: 6,
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#a8a29e',
+    fontWeight: '600',
   },
 });

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { jsPDF } from 'jspdf';
 import { showToast } from '../../utils/toast';
 import { useCredits } from '../../context/CreditContext';
+import { splitFreeAnswerContent } from '../../utils/freeAnswerSplit';
 import NorthIndianChart from '../Charts/NorthIndianChart';
 import {
     stopAndRevokePodcastPlayback,
@@ -196,8 +197,12 @@ const MessageBubble = ({
     podcastAutoLaunchMessageId = null,
     podcastAutoLaunchKey = 0,
     instantLoaderRevealWords = 1,
+    onOpenCreditsModal = null,
 }) => {
-    const { podcastCost, refreshBalance } = useCredits();
+    const { podcastCost, refreshBalance, credits, chatCost } = useCredits();
+    const standardChatCost = Math.max(1, Number(chatCost) || 1);
+    const [detailUnlocked, setDetailUnlocked] = useState(false);
+    const blurShownTrackedRef = useRef(false);
     const [showActions, setShowActions] = useState(false);
     const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
     const messageRef = useRef(null);
@@ -312,6 +317,114 @@ const MessageBubble = ({
             ].includes(gateIntent),
         [message.message_type, message.intent_gate, message.gate_metadata, gateIntent],
     );
+
+    const isFreeQuestionAnswer =
+        message.role === 'assistant' &&
+        !message.isTyping &&
+        !message.isProcessing &&
+        message.message_type !== 'clarification' &&
+        !isNativeGate &&
+        Boolean(gateMetadata.free_question_completed);
+    const freeSplit = useMemo(
+        () => (isFreeQuestionAnswer ? splitFreeAnswerContent(message.content) : null),
+        [isFreeQuestionAnswer, message.content],
+    );
+    const canBlurFreeDetail = Boolean(freeSplit?.canBlur);
+    const shouldBlurDetail = canBlurFreeDetail && !detailUnlocked;
+
+    useEffect(() => {
+        const mid = message.messageId || message.id;
+        if (!canBlurFreeDetail || !mid) return;
+        try {
+            if (localStorage.getItem(`free_detail_unlocked:${mid}`) === '1') {
+                setDetailUnlocked(true);
+            }
+        } catch (_) {
+            /* ignore */
+        }
+    }, [canBlurFreeDetail, message.messageId, message.id]);
+
+    useEffect(() => {
+        if (!canBlurFreeDetail || detailUnlocked || blurShownTrackedRef.current) return;
+        const mid = message.messageId || message.id;
+        if (!mid) return;
+        blurShownTrackedRef.current = true;
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+            fetch('/api/credits/free-answer-funnel/event', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    event: 'blur_shown',
+                    message_id: String(mid),
+                    platform: 'web',
+                }),
+            }).catch(() => {});
+        } catch (_) {
+            /* ignore */
+        }
+    }, [canBlurFreeDetail, detailUnlocked, message.messageId, message.id]);
+
+    useEffect(() => {
+        if (!canBlurFreeDetail || detailUnlocked || Number(credits) <= 0) return;
+        const mid = message.messageId || message.id;
+        if (!mid) return;
+        try {
+            if (localStorage.getItem(`free_detail_reveal_clicked:${mid}`) !== '1') return;
+            localStorage.setItem(`free_detail_unlocked:${mid}`, '1');
+            setDetailUnlocked(true);
+        } catch (_) {
+            /* ignore */
+        }
+    }, [canBlurFreeDetail, detailUnlocked, credits, message.messageId, message.id]);
+
+    const handleRevealDetailedAnswer = useCallback(() => {
+        const mid = message.messageId || message.id;
+        if (mid) {
+            try {
+                localStorage.setItem(`free_detail_reveal_clicked:${mid}`, '1');
+            } catch (_) {
+                /* ignore */
+            }
+            try {
+                const token = localStorage.getItem('token');
+                if (token) {
+                    fetch('/api/credits/free-answer-funnel/event', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({
+                            event: 'reveal_clicked',
+                            message_id: String(mid),
+                            platform: 'web',
+                        }),
+                    }).catch(() => {});
+                }
+            } catch (_) {
+                /* ignore */
+            }
+        }
+        if (Number(credits) >= standardChatCost) {
+            if (mid) {
+                try {
+                    localStorage.setItem(`free_detail_unlocked:${mid}`, '1');
+                } catch (_) {
+                    /* ignore */
+                }
+            }
+            setDetailUnlocked(true);
+            return;
+        }
+        if (typeof onOpenCreditsModal === 'function') {
+            onOpenCreditsModal();
+        }
+    }, [message.messageId, message.id, credits, standardChatCost, onOpenCreditsModal]);
 
     const getCleanMessageText = useCallback(() => {
         if (!message?.content) return '';
@@ -1173,9 +1286,40 @@ const MessageBubble = ({
                         <>
                             {/* Always use ResponseRenderer for assistant messages */}
                             {message.role === 'assistant' ? (
-                                <div dangerouslySetInnerHTML={{ __html: formatContent(message.content, message) }} />
+                                <div
+                                    dangerouslySetInnerHTML={{
+                                        __html: formatContent(
+                                            shouldBlurDetail ? freeSplit.quick : message.content,
+                                            message,
+                                        ),
+                                    }}
+                                />
                             ) : (
                                 <div dangerouslySetInnerHTML={{ __html: formatContent(message.content) }} />
+                            )}
+                            {shouldBlurDetail && (
+                                <div className="free-detail-paywall">
+                                    <div className="free-detail-blur-block">
+                                        <p className="free-detail-teaser">
+                                            {(freeSplit.detail || '')
+                                                .replace(/<[^>]+>/g, ' ')
+                                                .replace(/\s+/g, ' ')
+                                                .trim()
+                                                .slice(0, 280) ||
+                                                'Key Insights, Astrological Analysis, Timing & more…'}
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="free-detail-reveal-btn"
+                                        onClick={handleRevealDetailedAnswer}
+                                    >
+                                        Reveal the detailed answer
+                                    </button>
+                                    <div className="free-detail-hint">
+                                        Standard mode · {standardChatCost} credits
+                                    </div>
+                                </div>
                             )}
                         </>
                     )}

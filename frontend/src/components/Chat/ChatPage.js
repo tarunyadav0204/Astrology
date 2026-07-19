@@ -2855,6 +2855,7 @@ const ChatPage = ({ onLogin }) => {
                             podcastAutoLaunchMessageId={podcastPromoMessageId}
                             podcastAutoLaunchKey={podcastAutoLaunchKey}
                             instantLoaderRevealWords={instantLoaderWordCount}
+                            onOpenCreditsModal={() => setShowCreditsModal(true)}
                         />
                         <div ref={messagesEndRef} />
                     </div>

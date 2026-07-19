@@ -1142,6 +1142,53 @@ async def get_first_purchase_bonus_status(
     )
 
 
+class FreeAnswerFunnelEventBody(BaseModel):
+    event: str
+    message_id: Optional[str] = None
+    platform: Optional[str] = None
+
+
+@router.post("/free-answer-funnel/event")
+async def record_free_answer_funnel_event(
+    body: FreeAnswerFunnelEventBody,
+    current_user: User = Depends(get_current_user),
+):
+    """Client breadcrumb: blur_shown | reveal_clicked (conversion is recorded on purchase)."""
+    from credits.free_answer_funnel import record_funnel_event
+
+    try:
+        inserted = record_funnel_event(
+            userid=int(current_user.userid),
+            event_name=body.event,
+            message_id=body.message_id,
+            platform=body.platform,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("free_answer_funnel event failed user=%s", current_user.userid)
+        raise HTTPException(status_code=500, detail="Failed to record funnel event") from e
+    return {"ok": True, "inserted": inserted}
+
+
+@router.get("/admin/free-answer-funnel")
+async def admin_free_answer_funnel(
+    from_date: Optional[str] = Query(default=None),
+    to_date: Optional[str] = Query(default=None),
+    current_user: User = Depends(get_current_user),
+):
+    """Admin funnel: saw blur → tapped reveal → purchased credits."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    from credits.free_answer_funnel import get_funnel_analytics
+
+    try:
+        return get_funnel_analytics(from_date=from_date, to_date=to_date)
+    except Exception as e:
+        logger.exception("free_answer_funnel analytics failed")
+        raise HTTPException(status_code=500, detail="Failed to load free-answer funnel") from e
+
+
 @router.post("/google-play/verify")
 async def verify_google_play_purchase(
     request: GooglePlayVerifyRequest,

@@ -855,6 +855,16 @@ export const creditAPI = {
     const qs = purchasedCredits != null ? `?purchased_credits=${encodeURIComponent(purchasedCredits)}` : '';
     return api.get(getEndpoint(`/credits/first-purchase-bonus/status${qs}`));
   },
+  recordFreeAnswerFunnelEvent: (event, messageId = null, platform = null) =>
+    api.post(
+      getEndpoint('/credits/free-answer-funnel/event'),
+      {
+        event,
+        message_id: messageId || undefined,
+        platform: platform || Platform.OS,
+      },
+      BACKGROUND_REQUEST_CONFIG,
+    ),
   getSubscriptionPlans: () => api.get(getEndpoint('/credits/google-play/subscription-plans')),
   syncSubscription: (purchaseToken, productId, orderId = null) =>
     api.post(getEndpoint('/credits/google-play/subscription/sync'), {

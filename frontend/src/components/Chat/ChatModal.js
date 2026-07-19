@@ -1247,6 +1247,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                             onContinueSingleChartGate={handleContinueSingleChartGate}
                                             onRelationshipContextGate={handleRelationshipContextGate}
                                             onStartPartnershipGate={handleStartPartnershipGate}
+                                            onOpenCreditsModal={() => setShowCreditsModal(true)}
                                         />
                                     </div>
                                     <ChatInput 

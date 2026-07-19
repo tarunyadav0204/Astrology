@@ -12,6 +12,7 @@ import AdminCreditsDashboard from './AdminCreditsDashboard';
 import AdminCreditsIntelligence from './AdminCreditsIntelligence';
 import AdminQuestionCostSummary from './AdminQuestionCostSummary';
 import AdminUserCreditManagement from './AdminUserCreditManagement';
+import AdminFreeAnswerFunnel from './AdminFreeAnswerFunnel';
 import AdminGooglePlayRefund from './AdminGooglePlayRefund';
 import AdminSubscriptionPurchases from './AdminSubscriptionPurchases';
 import AdminSubscriptionEvents from './AdminSubscriptionEvents';
@@ -3142,6 +3143,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             User Credit Management
           </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'freeAnswerFunnel' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('freeAnswerFunnel')}
+          >
+            Free answer funnel
+          </button>
           <button 
             className={`subtab ${activeSubTab === 'daily' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('daily')}
@@ -4457,6 +4465,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'credits' && activeSubTab === 'userCredits' && (
           <AdminUserCreditManagement />
+        )}
+
+        {activeTab === 'credits' && activeSubTab === 'freeAnswerFunnel' && (
+          <AdminFreeAnswerFunnel />
         )}
 
         {activeTab === 'credits' && activeSubTab === 'daily' && (

@@ -1,0 +1,138 @@
+.admin-free-answer-funnel {
+  padding: 1rem 0 2rem;
+}
+
+.admin-free-answer-funnel .faf-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+}
+
+.admin-free-answer-funnel .faf-header h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+}
+
+.admin-free-answer-funnel .faf-header p {
+  margin: 0;
+  max-width: 36rem;
+  color: #57534e;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.admin-free-answer-funnel .faf-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: flex-end;
+}
+
+.admin-free-answer-funnel .faf-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #78716c;
+}
+
+.admin-free-answer-funnel .faf-filters input,
+.admin-free-answer-funnel .faf-filters button {
+  padding: 0.4rem 0.65rem;
+  border: 1px solid #d6d3d1;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: #fff;
+}
+
+.admin-free-answer-funnel .faf-filters button {
+  cursor: pointer;
+  background: #ea580c;
+  border-color: #ea580c;
+  color: #fff;
+  font-weight: 600;
+}
+
+.admin-free-answer-funnel .faf-filters button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.admin-free-answer-funnel .faf-error {
+  padding: 0.75rem 1rem;
+  background: #fef2f2;
+  color: #b91c1c;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.admin-free-answer-funnel .faf-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.admin-free-answer-funnel .faf-step {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  min-width: 11rem;
+  flex: 1;
+}
+
+.admin-free-answer-funnel .faf-step-num {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: #ea580c;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.admin-free-answer-funnel .faf-step-label {
+  font-weight: 700;
+  color: #9a3412;
+  font-size: 0.9rem;
+}
+
+.admin-free-answer-funnel .faf-step-users {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #1c1917;
+  margin-top: 0.15rem;
+}
+
+.admin-free-answer-funnel .faf-step-meta {
+  font-size: 0.75rem;
+  color: #78716c;
+  margin-top: 0.15rem;
+}
+
+.admin-free-answer-funnel .faf-arrow {
+  color: #c2410c;
+  font-weight: 700;
+  padding: 0 0.15rem;
+}
+
+.admin-free-answer-funnel .faf-summary {
+  margin-top: 1.25rem;
+  padding: 0.85rem 1rem;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 10px;
+  color: #065f46;
+  font-size: 0.95rem;
+}

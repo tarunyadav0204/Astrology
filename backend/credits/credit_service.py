@@ -3037,6 +3037,12 @@ class CreditService:
         first_added = int(first_result.get("bonus_credits") or 0) if first_result.get("applied") else 0
         discount_added = int(discount_result.get("bonus_credits") or 0) if discount_result.get("applied") else 0
         web_added = int(web_result.get("bonus_credits") or 0) if web_result.get("applied") else 0
+        try:
+            from credits.free_answer_funnel import mark_converted_after_purchase
+
+            mark_converted_after_purchase(int(userid))
+        except Exception:
+            logger.debug("free_answer_funnel conversion mark skipped", exc_info=True)
         return {
             "pack_bonus": pack_result,
             "first_purchase_bonus": first_result,

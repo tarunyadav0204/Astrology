@@ -31,6 +31,7 @@ const MessageList = ({
     podcastAutoLaunchMessageId = null,
     podcastAutoLaunchKey = 0,
     instantLoaderRevealWords = 1,
+    onOpenCreditsModal = null,
 }) => {
     React.useEffect(() => {
         const processingMessages = (messages || []).filter((message) => message?.isProcessing);
@@ -84,6 +85,7 @@ const MessageList = ({
                                 podcastAutoLaunchMessageId={podcastAutoLaunchMessageId}
                                 podcastAutoLaunchKey={podcastAutoLaunchKey}
                                 instantLoaderRevealWords={instantLoaderRevealWords}
+                                onOpenCreditsModal={onOpenCreditsModal}
                             />
                         </div>
                         <FeedbackComponent 
