@@ -11,19 +11,27 @@ from .assembly.page_assembler import assemble_partnership_pages, build_chart_man
 from .assembly.pdf_manifest_builder import build_pdf_manifest
 from .assembly.wealth_page_assembler import assemble_wealth_pages, build_wealth_chart_manifest
 from .assembly.health_page_assembler import assemble_health_pages, build_health_chart_manifest
+from .assembly.janam_kundli_page_assembler import assemble_janam_kundli_pages, build_janam_kundli_chart_manifest
 from .cache.report_hash import build_pair_hash, build_subject_hash, normalize_birth_data
 from .cache.report_storage import get_cached_report, upsert_report_cache
 from .context.base_context_builder import calculate_divisional_chart
 from .context.partnership_context_builder import build_partnership_report_context
 from .context.wealth_context_builder import build_wealth_report_context
 from .context.health_context_builder import build_health_report_context
+from .context.janam_kundli_context_builder import build_janam_kundli_report_context
 from .llm.report_llm_service import (
     generate_partnership_premium_report,
     generate_wealth_premium_report,
     generate_health_premium_report,
+    generate_janam_kundli_premium_report,
 )
 from .models import ReportDocument
-from .report_types import PARTNERSHIP_REPORT_CONFIG, WEALTH_REPORT_CONFIG, HEALTH_REPORT_CONFIG
+from .report_types import (
+    PARTNERSHIP_REPORT_CONFIG,
+    WEALTH_REPORT_CONFIG,
+    HEALTH_REPORT_CONFIG,
+    JANAM_KUNDLI_REPORT_CONFIG,
+)
 from .pdf_service import store_report_pdf
 
 
@@ -675,6 +683,181 @@ async def process_health_report_job(
     execute_fn=execute,
 ) -> Dict[str, Any]:
     return await build_and_cache_health_report(
+        userid,
+        request,
+        credit_service=credit_service,
+        get_conn=get_conn,
+        execute_fn=execute_fn,
+        report_id=report_id,
+    )
+
+
+async def build_and_cache_janam_kundli_report(
+    userid: int,
+    request: Any,
+    *,
+    credit_service: CreditService,
+    get_conn: Any,
+    execute_fn=execute,
+    report_id: str | None = None,
+) -> Dict[str, Any]:
+    from .branding import apply_branding_to_cached_report, resolve_report_branding
+
+    subject_hash = build_subject_hash(request.birth_data, request.report_type, request.language)
+    # v2: Hindi page chrome + diamond North Indian charts
+    report_version = JANAM_KUNDLI_REPORT_CONFIG.key + "_v2"
+    resolved_report_id = report_id or subject_hash[:16]
+    effective_cost = credit_service.get_effective_cost(
+        userid,
+        credit_service.get_credit_setting("janam_kundli_report_cost"),
+        "janam_kundli_report_cost",
+    )
+    branding = resolve_report_branding(
+        userid,
+        getattr(request, "branding", None),
+        get_conn,
+        execute_fn,
+        persist=getattr(request, "branding", None) is not None,
+    )
+
+    if not request.force_regenerate:
+        cached = get_cached_report(
+            userid, request.report_type, subject_hash, request.language, report_version, get_conn, execute_fn
+        )
+        if cached:
+            cached = _apply_document_cache_usage(cached)
+            cached["report_id"] = resolved_report_id
+            cached["cached"] = True
+            cached["credits_charged"] = 0
+            # Re-stamp branding + re-render PDF when practice branding changed (no re-charge).
+            cached = apply_branding_to_cached_report(cached, branding, store_pdf_fn=store_report_pdf)
+            upsert_report_cache(
+                userid,
+                request.report_type,
+                subject_hash,
+                request.language,
+                report_version,
+                cached,
+                get_conn,
+                execute_fn,
+            )
+            return cached
+
+    if credit_service.get_user_credits(userid) < effective_cost:
+        return {"ok": False, "error": f"Insufficient credits. You need {effective_cost} credits."}
+
+    context = build_janam_kundli_report_context(request)
+    person = normalize_birth_data(request.birth_data)
+
+    premium = await generate_janam_kundli_premium_report(
+        userid,
+        context,
+        language=context["language"],
+        force_regenerate=bool(request.force_regenerate),
+        effective_cost=effective_cost,
+        credit_service=credit_service,
+        get_conn=get_conn,
+        execute_fn=execute_fn,
+        spend_on_success=False,
+    )
+    if not premium.get("ok"):
+        return {"ok": False, "error": premium.get("error") or "Janam Kundli report generation failed"}
+
+    dashas = context.get("current_dashas") or {}
+    fact = context.get("fact_pack") or {}
+    faq_items = []
+
+    report_payload = ReportDocument(
+        report_id=resolved_report_id,
+        report_type=request.report_type,
+        language=context["language"],
+        generated_at=datetime.now(),
+        report_version=report_version,
+        status="completed",
+        pair={"native": person, "boy": person},
+        score_summary={
+            "grade": (fact.get("ascendant") or {}).get("sign_name"),
+            "verdict": (premium.get("report") or {}).get("janam_verdict"),
+            "age_bracket": fact.get("age_bracket"),
+            "current_dashas": {
+                "mahadasha": (dashas.get("mahadasha") or {}).get("planet"),
+                "antardasha": (dashas.get("antardasha") or {}).get("planet"),
+                "pratyantardasha": (dashas.get("pratyantardasha") or {}).get("planet"),
+            },
+        },
+        branch_payloads=context.get("branches") or {},
+        pages=assemble_janam_kundli_pages(
+            {
+                "person": person,
+                "language": context["language"],
+                "chart_style": request.chart_style,
+                "fact_pack": fact,
+                "current_dashas": dashas,
+            },
+            premium.get("report") or {},
+        ),
+        chart_manifest=build_janam_kundli_chart_manifest({"chart_style": request.chart_style}),
+        faq=faq_items,
+        cta={"text": "Open from My Reports anytime."},
+        premium_report=premium.get("report") or {},
+        chart_data={
+            "boy": _annotate_chart(context["chart"], person),
+            "native": _annotate_chart(context["chart"], person),
+            "native_d1": _annotate_chart(context["chart"], person),
+            "boy_d1": _annotate_chart(context["chart"], person),
+            "native_moon": _annotate_chart(context.get("moon_chart"), person),
+            "boy_moon": _annotate_chart(context.get("moon_chart"), person),
+            "native_chalit": _annotate_chart(context.get("chalit_chart"), person),
+            "boy_chalit": _annotate_chart(context.get("chalit_chart"), person),
+            "native_d9": _annotate_chart(context.get("d9_chart"), person),
+            "boy_d9": _annotate_chart(context.get("d9_chart"), person),
+            "native_d10": _annotate_chart(context.get("d10_chart"), person),
+            "boy_d10": _annotate_chart(context.get("d10_chart"), person),
+        },
+        chart_style=("south" if getattr(request, "chart_style", "both") == "south" else "north"),
+        cached=False,
+        branding=branding,
+    ).model_dump()
+
+    report_payload["pdf_manifest"] = build_pdf_manifest(report_payload)
+    report_payload.update(store_report_pdf(report_payload))
+
+    if not credit_service.spend_credits(
+        userid,
+        effective_cost,
+        "janam_kundli_report",
+        f"Janam Kundli report for {person.get('name') or 'native'}",
+    ):
+        return {"ok": False, "error": "Credit deduction failed"}
+
+    report_payload["credits_charged"] = int(effective_cost)
+    premium_report = premium.get("report") if isinstance(premium.get("report"), dict) else {}
+    if isinstance(premium_report.get("llm_usage"), dict):
+        report_payload["llm_usage"] = premium_report["llm_usage"]
+
+    upsert_report_cache(
+        userid,
+        request.report_type,
+        subject_hash,
+        request.language,
+        report_version,
+        report_payload,
+        get_conn,
+        execute_fn,
+    )
+    return report_payload
+
+
+async def process_janam_kundli_report_job(
+    report_id: str,
+    userid: int,
+    request: Any,
+    *,
+    credit_service: CreditService,
+    get_conn: Any,
+    execute_fn=execute,
+) -> Dict[str, Any]:
+    return await build_and_cache_janam_kundli_report(
         userid,
         request,
         credit_service=credit_service,

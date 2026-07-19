@@ -50,6 +50,28 @@ class HealthReportRequest(BaseModel):
     include_images: bool = True
 
 
+class ReportBranding(BaseModel):
+    """Practice / pandit branding stamped on generated PDF cover + footer."""
+
+    business_name: str = ""
+    tagline: str = ""
+    phone: str = ""
+    email: str = ""
+    website: str = ""
+    address: str = ""
+    show_powered_by: bool = True
+
+
+class JanamKundliReportRequest(BaseModel):
+    report_type: Literal["janam_kundli"] = "janam_kundli"
+    birth_data: BirthInput
+    language: str = "english"
+    chart_style: Literal["north", "south", "both"] = "both"
+    force_regenerate: bool = False
+    include_images: bool = True
+    branding: Optional[ReportBranding] = None
+
+
 class ReportMetric(BaseModel):
     label: str
     value: str
@@ -67,6 +89,8 @@ class ReportPage(BaseModel):
     tables: List[Dict[str, Any]] = Field(default_factory=list)
     notes: List[str] = Field(default_factory=list)
     cta: Optional[str] = None
+    section_key: Optional[str] = None
+    skip_render: bool = False
 
 
 class ReportDocument(BaseModel):
@@ -87,3 +111,4 @@ class ReportDocument(BaseModel):
     chart_data: Dict[str, Any] = Field(default_factory=dict)
     chart_style: str = "north"
     cached: bool = False
+    branding: Dict[str, Any] = Field(default_factory=dict)

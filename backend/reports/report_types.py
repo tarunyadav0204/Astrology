@@ -59,6 +59,15 @@ PROGENY_REPORT_CONFIG = ReportTypeConfig(
     summary="Coming soon",
 )
 
+JANAM_KUNDLI_REPORT_CONFIG = ReportTypeConfig(
+    key="janam_kundli",
+    title="Janam Kundli Report",
+    page_count=24,
+    required_branches=("nakshatra", "d9", "d10", "ashtakavarga", "dasha", "yogas"),
+    enabled=True,
+    summary="Personalized 24-page Janam Kundli PDF with charts, dashas, yogas, and life guidance (English/Hindi).",
+)
+
 
 REPORT_TYPE_CONFIGS = {
     "partnership": PARTNERSHIP_REPORT_CONFIG,
@@ -66,6 +75,7 @@ REPORT_TYPE_CONFIGS = {
     "wealth": WEALTH_REPORT_CONFIG,
     "health": HEALTH_REPORT_CONFIG,
     "progeny": PROGENY_REPORT_CONFIG,
+    "janam_kundli": JANAM_KUNDLI_REPORT_CONFIG,
 }
 
 

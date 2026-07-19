@@ -18,6 +18,7 @@ export const CreditProvider = ({ children }) => {
     const [partnershipReportCost, setPartnershipReportCost] = useState(9);
     const [wealthReportCost, setWealthReportCost] = useState(9);
     const [healthReportCost, setHealthReportCost] = useState(9);
+    const [janamKundliReportCost, setJanamKundliReportCost] = useState(300);
     const [wealthCost, setWealthCost] = useState(5);
     const [marriageCost, setMarriageCost] = useState(3);
     const [healthCost, setHealthCost] = useState(3);
@@ -127,6 +128,8 @@ export const CreditProvider = ({ children }) => {
             if (pricing.wealth_report != null) setWealthReportCost(Number(pricing.wealth_report) || 9);
             const healthReportPrice = pricing.health_report ?? pricing.health_report_cost;
             if (healthReportPrice != null) setHealthReportCost(Number(healthReportPrice) || 9);
+            const janamReportPrice = pricing.janam_kundli_report ?? pricing.janam_kundli_report_cost;
+            if (janamReportPrice != null) setJanamKundliReportCost(Number(janamReportPrice) || 300);
             if (pricing.wealth != null) setWealthCost(Number(pricing.wealth) || 5);
             if (pricing.marriage != null) setMarriageCost(Number(pricing.marriage) || 3);
             if (pricing.health != null) setHealthCost(Number(pricing.health) || 3);
@@ -233,6 +236,7 @@ export const CreditProvider = ({ children }) => {
             partnershipReportCost,
             wealthReportCost,
             healthReportCost,
+            janamKundliReportCost,
             wealthCost,
             marriageCost,
             healthCost,

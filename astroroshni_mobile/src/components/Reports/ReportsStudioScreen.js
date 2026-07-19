@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View,
   Text,
+  TextInput,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
@@ -68,6 +69,15 @@ const REPORT_TYPE_FALLBACKS = [
     enabled: true,
   },
   {
+    key: 'janam_kundli',
+    title: 'Janam Kundli Report',
+    subtitle: 'Full birth chart PDF — charts, dashas, yogas, life guidance',
+    description: 'A 24-page personalized Janam Kundli with D1/Moon/D9/D10 charts, Ashtakavarga, Vimshottari dashas, yogas, and age-aware guidance (English/Hindi).',
+    icon: '🕉️',
+    gradient: ['#ea580c', '#f97316'],
+    enabled: true,
+  },
+  {
     key: 'progeny',
     title: 'Progeny Report',
     subtitle: 'Coming soon',
@@ -79,6 +89,16 @@ const REPORT_TYPE_FALLBACKS = [
 ];
 
 const buildReportPdfFileName = (reportId) => `report-${String(reportId || 'latest').replace(/[^a-zA-Z0-9_-]+/g, '_')}`;
+
+const EMPTY_REPORT_BRANDING = {
+  business_name: '',
+  tagline: '',
+  phone: '',
+  email: '',
+  website: '',
+  address: '',
+  show_powered_by: true,
+};
 
 const HISTORY_STATUS_META = {
   completed: { icon: 'checkmark-circle', tint: '#22c55e' },
@@ -158,7 +178,9 @@ const isSameReportPair = (personA, personB, otherA, otherB) => {
   );
 };
 
-const isSingleChartReport = (reportType) => reportType === 'wealth' || reportType === 'health';
+const isSingleChartReport = (reportType) => (
+  reportType === 'wealth' || reportType === 'health' || reportType === 'janam_kundli'
+);
 
 const isSameReportSelection = (reportType, personA, personB, otherA, otherB) => {
   if (!personA || !otherA) return false;
@@ -243,6 +265,8 @@ export default function ReportsStudioScreen({ navigation, route }) {
   const [pastReports, setPastReports] = useState([]);
   const [loadingPastReports, setLoadingPastReports] = useState(true);
   const [openingPastReportId, setOpeningPastReportId] = useState(null);
+  const [reportBranding, setReportBranding] = useState(EMPTY_REPORT_BRANDING);
+  const [brandingLoaded, setBrandingLoaded] = useState(false);
   const pollTimerRef = useRef(null);
   const reportSessionRef = useRef(null);
   const mountedRef = useRef(true);
@@ -412,6 +436,31 @@ export default function ReportsStudioScreen({ navigation, route }) {
     const lang = normalizeLanguageCode(i18n.language);
     setReportLanguage((current) => current || lang);
   }, [i18n.language]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadBranding = async () => {
+      try {
+        const response = await reportAPI.getReportBranding();
+        // Axios: response.data === { success, branding }
+        const branding = response?.data?.branding || response?.data?.data?.branding;
+        if (!cancelled && branding && typeof branding === 'object') {
+          setReportBranding({ ...EMPTY_REPORT_BRANDING, ...branding });
+        }
+      } catch (error) {
+        // Unauthenticated or first-time users simply start with empty branding.
+        console.warn('Report branding load skipped:', error?.message || error);
+      } finally {
+        if (!cancelled) setBrandingLoaded(true);
+      }
+    };
+    loadBranding();
+    return () => { cancelled = true; };
+  }, []);
+
+  const updateBrandingField = useCallback((key, value) => {
+    setReportBranding((prev) => ({ ...prev, [key]: value }));
+  }, []);
 
   const fetchReportTypes = async () => {
     try {
@@ -607,9 +656,11 @@ export default function ReportsStudioScreen({ navigation, route }) {
     try {
       const statusResponse = reportType === 'health'
         ? await reportAPI.getHealthReportStatus(reportId)
-        : reportType === 'wealth'
-          ? await reportAPI.getWealthReportStatus(reportId)
-          : await reportAPI.getPartnershipReportStatus(reportId);
+        : reportType === 'janam_kundli'
+          ? await reportAPI.getJanamKundliReportStatus(reportId)
+          : reportType === 'wealth'
+            ? await reportAPI.getWealthReportStatus(reportId)
+            : await reportAPI.getPartnershipReportStatus(reportId);
       const statusPayload = statusResponse?.data || {};
       const status = String(statusPayload.status || '').toLowerCase();
       setProcessingStatus(status || 'pending');
@@ -803,14 +854,16 @@ export default function ReportsStudioScreen({ navigation, route }) {
       try {
         const response = selectedReportType === 'health'
           ? await reportAPI.lookupExistingHealthReport(selectedPersonA, reportLanguage, { chartStyle: 'both' })
-          : selectedReportType === 'wealth'
-            ? await reportAPI.lookupExistingWealthReport(selectedPersonA, reportLanguage, { chartStyle: 'both' })
-            : await reportAPI.lookupExistingPartnershipReport(
-              selectedPersonA,
-              selectedPersonB,
-              reportLanguage,
-              { chartStyle: 'both' }
-            );
+          : selectedReportType === 'janam_kundli'
+            ? await reportAPI.lookupExistingJanamKundliReport(selectedPersonA, reportLanguage, { chartStyle: 'both' })
+            : selectedReportType === 'wealth'
+              ? await reportAPI.lookupExistingWealthReport(selectedPersonA, reportLanguage, { chartStyle: 'both' })
+              : await reportAPI.lookupExistingPartnershipReport(
+                selectedPersonA,
+                selectedPersonB,
+                reportLanguage,
+                { chartStyle: 'both' }
+              );
         if (cancelled || !mountedRef.current || existingLookupKeyRef.current !== lookupKey) {
           return;
         }
@@ -902,6 +955,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
       && selectedReportType !== 'partnership'
       && selectedReportType !== 'wealth'
       && selectedReportType !== 'health'
+      && selectedReportType !== 'janam_kundli'
     ) {
       Alert.alert(
         t('reports.comingSoonTitle', 'Coming soon'),
@@ -914,10 +968,11 @@ export default function ReportsStudioScreen({ navigation, route }) {
       selectedReportType !== 'partnership'
       && selectedReportType !== 'wealth'
       && selectedReportType !== 'health'
+      && selectedReportType !== 'janam_kundli'
     ) {
       Alert.alert(
         t('reports.unavailableTitle', 'Not ready yet'),
-        t('reports.unavailableBody', 'Only partnership, wealth, and health reports are available in this release.')
+        t('reports.unavailableBody', 'Only partnership, wealth, health, and Janam Kundli reports are available in this release.')
       );
       return;
     }
@@ -935,7 +990,9 @@ export default function ReportsStudioScreen({ navigation, route }) {
         t('reports.missingChartTitle', 'Choose a chart'),
         selectedReportType === 'health'
           ? t('reports.missingChartBodyHealth', 'Please select a birth chart before generating your health report.')
-          : t('reports.missingChartBody', 'Please select a birth chart before generating your wealth report.')
+          : selectedReportType === 'janam_kundli'
+            ? t('reports.missingChartBodyJanam', 'Please select a birth chart before generating your Janam Kundli.')
+            : t('reports.missingChartBody', 'Please select a birth chart before generating your wealth report.')
       );
       return;
     }
@@ -968,18 +1025,25 @@ export default function ReportsStudioScreen({ navigation, route }) {
           forceRegenerate,
           chartStyle: 'both',
         })
-        : selectedReportType === 'wealth'
-          ? await reportAPI.startWealthReport(selectedPersonA, reportLanguage, {
+        : selectedReportType === 'janam_kundli'
+          ? await reportAPI.startJanamKundliReport(selectedPersonA, reportLanguage, {
             includeImages: true,
             forceRegenerate,
             chartStyle: 'both',
+            branding: reportBranding,
           })
-          : await reportAPI.startPartnershipReport(
-            selectedPersonA,
-            selectedPersonB,
-            reportLanguage,
-            { includeImages: true, forceRegenerate, chartStyle: 'both' }
-          );
+          : selectedReportType === 'wealth'
+            ? await reportAPI.startWealthReport(selectedPersonA, reportLanguage, {
+              includeImages: true,
+              forceRegenerate,
+              chartStyle: 'both',
+            })
+            : await reportAPI.startPartnershipReport(
+              selectedPersonA,
+              selectedPersonB,
+              reportLanguage,
+              { includeImages: true, forceRegenerate, chartStyle: 'both' }
+            );
       const reportId = response?.data?.report_id;
       if (!reportId) {
         throw new Error(t('reports.startFailed', 'Could not start the report.'));
@@ -1688,6 +1752,60 @@ export default function ReportsStudioScreen({ navigation, route }) {
                       {t('reports.change', 'Change')}
                     </Text>
                   </TouchableOpacity>
+                  {selectedReportType === 'janam_kundli' ? (
+                    <View
+                      style={[
+                        styles.brandingCard,
+                        {
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface,
+                          borderColor: isDark ? 'rgba(255,255,255,0.12)' : colors.cardBorder,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.reviewTitle, { color: colors.text }]}>
+                        {t('reports.brandingTitle', 'Your branding on the PDF')}
+                      </Text>
+                      <Text style={[styles.languageSubtitle, { color: colors.textSecondary, marginBottom: 8 }]}>
+                        {t(
+                          'reports.brandingHelp',
+                          'Saved to your account — used on cover and footer. Leave blank for AstroRoshni branding.'
+                        )}
+                      </Text>
+                      {[
+                        ['business_name', t('reports.brandingBusiness', 'Practice / business name'), 'Pandit Sharma Jyotish'],
+                        ['tagline', t('reports.brandingTagline', 'Tagline (optional)'), 'Vedic guidance you can trust'],
+                        ['phone', t('reports.brandingPhone', 'Phone'), '+91 …'],
+                        ['email', t('reports.brandingEmail', 'Email'), 'you@example.com'],
+                        ['website', t('reports.brandingWebsite', 'Website'), 'https://…'],
+                        ['address', t('reports.brandingAddress', 'Address (optional)'), 'City, State'],
+                      ].map(([key, label, placeholder]) => (
+                        <View key={key} style={styles.brandingField}>
+                          <Text style={[styles.brandingLabel, { color: colors.textSecondary }]}>{label}</Text>
+                          <TextInput
+                            value={String(reportBranding[key] || '')}
+                            onChangeText={(text) => updateBrandingField(key, text)}
+                            placeholder={placeholder}
+                            placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : '#94a3b8'}
+                            autoCapitalize={key === 'email' || key === 'website' ? 'none' : 'words'}
+                            keyboardType={key === 'phone' ? 'phone-pad' : (key === 'email' ? 'email-address' : 'default')}
+                            style={[
+                              styles.brandingInput,
+                              {
+                                color: colors.text,
+                                borderColor: isDark ? 'rgba(255,255,255,0.14)' : colors.cardBorder,
+                                backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
+                              },
+                            ]}
+                          />
+                        </View>
+                      ))}
+                      {!brandingLoaded ? (
+                        <Text style={[styles.languageSubtitle, { color: colors.textSecondary }]}>
+                          {t('reports.brandingLoading', 'Loading saved branding…')}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
                   <View style={styles.stepActions}>
                     <TouchableOpacity
                       onPress={goToPreviousStep}
@@ -2544,6 +2662,23 @@ const styles = StyleSheet.create({
   languageTitle: { fontSize: 15, fontWeight: '800' },
   languageSubtitle: { fontSize: 12, marginTop: 4, lineHeight: 17 },
   languageChange: { fontSize: 12, fontWeight: '800' },
+  brandingCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    marginTop: 12,
+    gap: 8,
+  },
+  brandingField: { gap: 4 },
+  brandingLabel: { fontSize: 12, fontWeight: '600' },
+  brandingInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+    fontSize: 14,
+    fontWeight: '600',
+  },
   statusCard: {
     borderWidth: 1,
     borderRadius: 18,

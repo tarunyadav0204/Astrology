@@ -70,7 +70,7 @@ def build_report_cache_key(request: Any) -> str:
     payload = normalize_report_request(request)
     report_type = payload.get("report_type", "partnership")
     language = payload.get("language", "english")
-    if report_type == "wealth":
+    if report_type in {"wealth", "health", "janam_kundli"}:
         subject = payload.get("birth_data") or payload.get("subject") or payload.get("person")
         return build_subject_hash(subject, report_type, language)
     person_a = payload.get("boy_birth_data") or payload.get("person_a")

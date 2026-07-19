@@ -442,6 +442,7 @@ class CreditService:
                 ("career_report_cost", 15, "Credits per career PDF report"),
                 ("wealth_report_cost", 9, "Credits per wealth PDF report"),
                 ("health_report_cost", 9, "Credits per health PDF report"),
+                ("janam_kundli_report_cost", 300, "Credits per Janam Kundli PDF report"),
                 ("progeny_report_cost", 15, "Credits per progeny PDF report"),
                 ("karma_analysis_cost", 25, "Credits per karma analysis"),
                 ("ashtakavarga_life_predictions_cost", 15, "Credits per Ashtakavarga life predictions (Dots of Destiny)"),
@@ -3661,7 +3662,7 @@ class CreditService:
             'chat_question_cost', 'instant_chat_cost', 'speech_chat_cost', 'speech_chat_per_minute_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost',
             'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost',
             'progeny_analysis_cost', 'partnership_report_cost', 'career_report_cost', 'wealth_report_cost',
-            'health_report_cost', 'progeny_report_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
+            'health_report_cost', 'janam_kundli_report_cost', 'progeny_report_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
             'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost',
             'event_timeline_cost', 'karma_analysis_cost', 'ashtakavarga_life_predictions_cost', 'podcast_cost'
         )
@@ -3748,6 +3749,7 @@ class CreditService:
                 ("career_report_cost", 15, "Credits per career PDF report"),
                 ("wealth_report_cost", 9, "Credits per wealth PDF report"),
                 ("health_report_cost", 9, "Credits per health PDF report"),
+                ("janam_kundli_report_cost", 300, "Credits per Janam Kundli PDF report"),
                 ("progeny_report_cost", 15, "Credits per progeny PDF report"),
             ]
             for key, value, desc in report_defaults:

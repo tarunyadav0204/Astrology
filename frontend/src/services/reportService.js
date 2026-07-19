@@ -154,6 +154,60 @@ export const reportService = {
     return parseJson(response);
   },
 
+  lookupExistingJanamKundliReport: async (person, language = 'english', options = {}) => {
+    const response = await fetch('/api/reports/janam_kundli/existing', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        report_type: 'janam_kundli',
+        birth_data: person,
+        language,
+        chart_style: options.chartStyle || 'both',
+        force_regenerate: false,
+        include_images: options.includeImages !== false,
+      }),
+    });
+    return parseJson(response);
+  },
+
+  getReportBranding: async () => {
+    const response = await fetch('/api/reports/branding', { headers: authHeaders() });
+    return parseJson(response);
+  },
+
+  saveReportBranding: async (branding) => {
+    const response = await fetch('/api/reports/branding', {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify(branding || {}),
+    });
+    return parseJson(response);
+  },
+
+  startJanamKundliReport: async (person, language = 'english', options = {}) => {
+    const response = await fetch('/api/reports/janam_kundli/start', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        report_type: 'janam_kundli',
+        birth_data: person,
+        language,
+        chart_style: options.chartStyle || 'both',
+        force_regenerate: Boolean(options.forceRegenerate),
+        include_images: options.includeImages !== false,
+        ...(options.branding ? { branding: options.branding } : {}),
+      }),
+    });
+    return parseJson(response);
+  },
+
+  getJanamKundliReportStatus: async (reportId) => {
+    const response = await fetch(`/api/reports/janam_kundli/status/${encodeURIComponent(reportId)}`, {
+      headers: authHeaders(),
+    });
+    return parseJson(response);
+  },
+
   getReportPdfUrl: async (reportId) => {
     const response = await fetch(`/api/reports/pdf/${encodeURIComponent(reportId)}`, {
       headers: authHeaders(),

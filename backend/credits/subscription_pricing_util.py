@@ -121,6 +121,7 @@ def get_base_pricing_with_originals(credit_service: Any) -> Tuple[Dict[str, int]
         ("wealth_report", "wealth_report_cost"),
         ("health", "health_analysis_cost"),
         ("health_report", "health_report_cost"),
+        ("janam_kundli_report", "janam_kundli_report_cost"),
         ("marriage", "marriage_analysis_cost"),
         ("education", "education_analysis_cost"),
         ("progeny", "progeny_analysis_cost"),

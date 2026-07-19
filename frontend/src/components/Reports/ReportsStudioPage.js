@@ -48,6 +48,13 @@ const REPORT_TYPES = [
     enabled: true,
   },
   {
+    key: 'janam_kundli',
+    title: 'Janam Kundli Report',
+    subtitle: 'Full birth chart PDF — charts, dashas, yogas, life guidance',
+    description: 'A 24-page personalized Janam Kundli with D1/Moon/D9/D10 charts, Ashtakavarga, Vimshottari dashas, yogas, and age-aware guidance (English/Hindi).',
+    enabled: true,
+  },
+  {
     key: 'progeny',
     title: 'Progeny Report',
     subtitle: 'Coming soon',
@@ -277,17 +284,21 @@ const formatBirthLine = (person) => {
   return parts.join(' · ');
 };
 
-const singleChartProcessingMessage = (reportType) => (
-  reportType === 'health'
-    ? 'We are reading your chart and assembling the health report now.'
-    : 'We are reading your chart and assembling the wealth report now.'
-);
+const singleChartProcessingMessage = (reportType) => {
+  if (reportType === 'health') return 'We are reading your chart and assembling the health report now.';
+  if (reportType === 'janam_kundli') return 'We are calculating your Janam Kundli and assembling the PDF now.';
+  return 'We are reading your chart and assembling the wealth report now.';
+};
 
-const singleChartReadyMessage = (reportType) => (
-  reportType === 'health'
-    ? 'Your health report for this chart is ready. Open it anytime, or regenerate for a fresh reading.'
-    : 'Your wealth report for this chart is ready. Open it anytime, or regenerate for a fresh reading.'
-);
+const singleChartReadyMessage = (reportType) => {
+  if (reportType === 'health') {
+    return 'Your health report for this chart is ready. Open it anytime, or regenerate for a fresh reading.';
+  }
+  if (reportType === 'janam_kundli') {
+    return 'Your Janam Kundli for this chart is ready. Open it anytime, or regenerate for a fresh reading.';
+  }
+  return 'Your wealth report for this chart is ready. Open it anytime, or regenerate for a fresh reading.';
+};
 
 const ChartSlotCard = ({
   title,
@@ -350,7 +361,7 @@ const ReportsStudioPage = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { birthData } = useAstrology();
-  const { credits, partnershipReportCost, wealthReportCost, healthReportCost, fetchBalance } = useCredits();
+  const { credits, partnershipReportCost, wealthReportCost, healthReportCost, janamKundliReportCost, fetchBalance } = useCredits();
 
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [activeStep, setActiveStep] = useState(1);
@@ -368,18 +379,30 @@ const ReportsStudioPage = ({
   const [confirmMode, setConfirmMode] = useState(null); // 'generate' | 'regenerate' | null
   const [chartPickerTarget, setChartPickerTarget] = useState(null); // 'personA' | 'personB' | null
   const [chartPickerTab, setChartPickerTab] = useState('saved'); // 'saved' | 'new'
+  const [reportBranding, setReportBranding] = useState({
+    business_name: '',
+    tagline: '',
+    phone: '',
+    email: '',
+    website: '',
+    address: '',
+    show_powered_by: true,
+  });
   const pollRef = useRef(null);
   const mountedRef = useRef(true);
 
   const isWealth = selectedType === 'wealth';
   const isHealth = selectedType === 'health';
-  const isSingleChart = isWealth || isHealth;
+  const isJanamKundli = selectedType === 'janam_kundli';
+  const isSingleChart = isWealth || isHealth || isJanamKundli;
   const reportCost = Number(
-    isHealth
-      ? (healthReportCost || 9)
-      : isWealth
-        ? (wealthReportCost || 9)
-        : (partnershipReportCost || 9)
+    isJanamKundli
+      ? (janamKundliReportCost || 300)
+      : isHealth
+        ? (healthReportCost || 9)
+        : isWealth
+          ? (wealthReportCost || 9)
+          : (partnershipReportCost || 9)
   ) || 9;
 
   useEffect(() => {
@@ -388,6 +411,22 @@ const ReportsStudioPage = ({
       mountedRef.current = false;
       if (pollRef.current) clearTimeout(pollRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await reportService.getReportBranding();
+        const branding = data?.branding;
+        if (!cancelled && branding && typeof branding === 'object') {
+          setReportBranding((prev) => ({ ...prev, ...branding }));
+        }
+      } catch {
+        // First-time / signed-out users keep empty defaults.
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -419,9 +458,11 @@ const ReportsStudioPage = ({
     try {
       const payload = reportType === 'health'
         ? await reportService.getHealthReportStatus(id)
-        : reportType === 'wealth'
-          ? await reportService.getWealthReportStatus(id)
-          : await reportService.getPartnershipReportStatus(id);
+        : reportType === 'janam_kundli'
+          ? await reportService.getJanamKundliReportStatus(id)
+          : reportType === 'wealth'
+            ? await reportService.getWealthReportStatus(id)
+            : await reportService.getPartnershipReportStatus(id);
       const status = String(payload?.status || '').toLowerCase();
       if (!mountedRef.current) return;
 
@@ -439,14 +480,17 @@ const ReportsStudioPage = ({
 
       if (status === 'failed') {
         setLoading(false);
-        setError('Something went wrong while preparing your report. Please try again in a moment.');
+        setError(
+          payload?.error
+          || 'Something went wrong while preparing your report. Please try again in a moment.'
+        );
         setStatusMessage('');
         return;
       }
 
       setStatusMessage(
         status === 'processing'
-          ? ((reportType === 'wealth' || reportType === 'health')
+          ? ((reportType === 'wealth' || reportType === 'health' || reportType === 'janam_kundli')
             ? singleChartProcessingMessage(reportType)
             : 'We are reading both charts and assembling the report now.')
           : "We're getting started on your report. This usually takes just a moment."
@@ -464,7 +508,7 @@ const ReportsStudioPage = ({
 
   useEffect(() => {
     let cancelled = false;
-    const typeOk = selectedType === 'partnership' || selectedType === 'wealth' || selectedType === 'health';
+    const typeOk = selectedType === 'partnership' || selectedType === 'wealth' || selectedType === 'health' || selectedType === 'janam_kundli';
     if (!user || !personA || !typeOk || (selectedType === 'partnership' && !personB)) {
       setExistingReady(false);
       setReportId(null);
@@ -478,9 +522,11 @@ const ReportsStudioPage = ({
       try {
         const data = selectedType === 'health'
           ? await reportService.lookupExistingHealthReport(personA, language)
-          : selectedType === 'wealth'
-            ? await reportService.lookupExistingWealthReport(personA, language)
-            : await reportService.lookupExistingPartnershipReport(personA, personB, language);
+          : selectedType === 'janam_kundli'
+            ? await reportService.lookupExistingJanamKundliReport(personA, language)
+            : selectedType === 'wealth'
+              ? await reportService.lookupExistingWealthReport(personA, language)
+              : await reportService.lookupExistingPartnershipReport(personA, personB, language);
         if (cancelled || !mountedRef.current) return;
         if (data?.exists && data?.report_id) {
           const status = String(data.status || '').toLowerCase();
@@ -494,7 +540,7 @@ const ReportsStudioPage = ({
             setActiveStep(3);
             setStatusMessage(
               status === 'processing'
-                ? ((selectedType === 'wealth' || selectedType === 'health')
+                ? ((selectedType === 'wealth' || selectedType === 'health' || selectedType === 'janam_kundli')
                   ? singleChartProcessingMessage(selectedType)
                   : 'We are reading both charts and assembling the report now.')
                 : "We're getting started on your report. This usually takes just a moment."
@@ -503,7 +549,7 @@ const ReportsStudioPage = ({
           } else {
             setExistingReady(true);
             setStatusMessage(
-              (selectedType === 'wealth' || selectedType === 'health')
+              (selectedType === 'wealth' || selectedType === 'health' || selectedType === 'janam_kundli')
                 ? singleChartReadyMessage(selectedType)
                 : 'Your report for this pair is ready. Open it anytime, or regenerate for a fresh reading.'
             );
@@ -537,7 +583,7 @@ const ReportsStudioPage = ({
 
   const startGeneration = async ({ forceRegenerate = false } = {}) => {
     if (!requireLogin()) return;
-    if (selectedType === 'wealth' || selectedType === 'health') {
+    if (selectedType === 'wealth' || selectedType === 'health' || selectedType === 'janam_kundli') {
       if (!personA) {
         setError('Please select a birth chart before generating.');
         return;
@@ -569,15 +615,21 @@ const ReportsStudioPage = ({
           forceRegenerate,
           chartStyle: 'both',
         })
-        : selectedType === 'wealth'
-          ? await reportService.startWealthReport(personA, language, {
+        : selectedType === 'janam_kundli'
+          ? await reportService.startJanamKundliReport(personA, language, {
             forceRegenerate,
             chartStyle: 'both',
+            branding: reportBranding,
           })
-          : await reportService.startPartnershipReport(personA, personB, language, {
-            forceRegenerate,
-            chartStyle: 'both',
-          });
+          : selectedType === 'wealth'
+            ? await reportService.startWealthReport(personA, language, {
+              forceRegenerate,
+              chartStyle: 'both',
+            })
+            : await reportService.startPartnershipReport(personA, personB, language, {
+              forceRegenerate,
+              chartStyle: 'both',
+            });
       const id = started?.report_id;
       if (!id) throw new Error('Could not start the report.');
       setReportId(id);
@@ -724,7 +776,7 @@ const ReportsStudioPage = ({
                   onClick={() => {
                     if (!item.enabled) return;
                     setSelectedType(item.key);
-                    if (item.key === 'wealth' || item.key === 'health') setPersonB(null);
+                    if (item.key === 'wealth' || item.key === 'health' || item.key === 'janam_kundli') setPersonB(null);
                     setActiveStep(2);
                   }}
                 >
@@ -833,6 +885,37 @@ const ReportsStudioPage = ({
                   <option key={item.code} value={item.code}>{item.label}</option>
                 ))}
               </select>
+
+              {isJanamKundli ? (
+                <div className="reports-branding-panel">
+                  <h3>Your branding on the PDF</h3>
+                  <p className="reports-branding-help">
+                    Saved to your account for next time. Leave the practice name blank to keep AstroRoshni branding.
+                  </p>
+                  <div className="reports-branding-grid">
+                    {[
+                      ['business_name', 'Practice / business name', 'Pandit Sharma Jyotish'],
+                      ['tagline', 'Tagline (optional)', 'Vedic guidance you can trust'],
+                      ['phone', 'Phone', '+91 …'],
+                      ['email', 'Email', 'you@example.com'],
+                      ['website', 'Website', 'https://…'],
+                      ['address', 'Address (optional)', 'City, State'],
+                    ].map(([key, label, placeholder]) => (
+                      <label key={key} className="reports-branding-field" htmlFor={`reports-branding-${key}`}>
+                        <span>{label}</span>
+                        <input
+                          id={`reports-branding-${key}`}
+                          type={key === 'email' ? 'email' : (key === 'phone' ? 'tel' : 'text')}
+                          value={reportBranding[key] || ''}
+                          placeholder={placeholder}
+                          disabled={loading}
+                          onChange={(e) => setReportBranding((prev) => ({ ...prev, [key]: e.target.value }))}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="reports-actions">
                 <button type="button" className="reports-secondary-btn" onClick={() => setActiveStep(2)} disabled={loading}>

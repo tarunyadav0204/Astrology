@@ -1075,6 +1075,32 @@ export const reportAPI = {
     api.get(getEndpoint(`/reports/wealth/status/${encodeURIComponent(reportId)}`)),
   getWealthReport: (reportId) =>
     api.get(getEndpoint(`/reports/wealth/${encodeURIComponent(reportId)}`)),
+  getReportBranding: () => api.get(getEndpoint('/reports/branding')),
+  saveReportBranding: (branding) =>
+    api.put(getEndpoint('/reports/branding'), branding || {}),
+  startJanamKundliReport: (person, language = 'english', options = {}) =>
+    api.post(getEndpoint('/reports/janam_kundli/start'), {
+      report_type: 'janam_kundli',
+      birth_data: person,
+      language,
+      chart_style: options.chartStyle || 'both',
+      force_regenerate: Boolean(options.forceRegenerate),
+      include_images: options.includeImages !== false,
+      ...(options.branding ? { branding: options.branding } : {}),
+    }),
+  lookupExistingJanamKundliReport: (person, language = 'english', options = {}) =>
+    api.post(getEndpoint('/reports/janam_kundli/existing'), {
+      report_type: 'janam_kundli',
+      birth_data: person,
+      language,
+      chart_style: options.chartStyle || 'both',
+      force_regenerate: false,
+      include_images: options.includeImages !== false,
+    }),
+  getJanamKundliReportStatus: (reportId) =>
+    api.get(getEndpoint(`/reports/janam_kundli/status/${encodeURIComponent(reportId)}`)),
+  getJanamKundliReport: (reportId) =>
+    api.get(getEndpoint(`/reports/janam_kundli/${encodeURIComponent(reportId)}`)),
   startHealthReport: (person, language = 'english', options = {}) =>
     api.post(getEndpoint('/reports/health/start'), {
       report_type: 'health',

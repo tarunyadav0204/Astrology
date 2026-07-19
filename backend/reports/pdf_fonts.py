@@ -35,8 +35,9 @@ _LANGUAGE_FONT_FILES: Dict[str, Tuple[str, str]] = {
     "mandarin": ("NotoSans-Regular.ttf", "NotoSans-Bold.ttf"),
 }
 
-# Script fonts that often omit Latin letters — pair with Noto Sans for ASCII/Latin runs.
-_NEEDS_LATIN_FALLBACK = frozenset({"tamil", "telugu", "gujarati"})
+# Pair with Noto Sans for ASCII/Latin runs.
+# Hindi/Marathi Mukta + HarfBuzz mis-shapes Latin clusters like "st" (trust, AstroRoshni).
+_NEEDS_LATIN_FALLBACK = frozenset({"tamil", "telugu", "gujarati", "hindi", "marathi"})
 
 _INDIC_CHAR = re.compile(
     r"[\u0900-\u097F\u0980-\u09FF\u0A00-\u0A7F\u0A80-\u0AFF"
@@ -57,13 +58,33 @@ class PdfFontSet:
         return self.regular
 
 
-def _register_pair(family: str, regular_path: Path, bold_path: Path) -> Tuple[str, str]:
+def _register_pair(
+    family: str,
+    regular_path: Path,
+    bold_path: Path,
+    *,
+    shapable: Optional[bool] = None,
+) -> Tuple[str, str]:
+    """Register TTF pair. shapable=True enables HarfBuzz for Indic scripts when uharfbuzz is installed."""
     regular_name = family
     bold_name = f"{family}-Bold"
+    if shapable is None:
+        # ReportLab shapes Devanagari/Tamil/etc. only when uharfbuzz is importable.
+        try:
+            import uharfbuzz  # noqa: F401
+
+            shapable = True
+        except Exception:
+            shapable = False
+            logger.warning(
+                "uharfbuzz not installed — Indic PDF text may show incorrect conjuncts/matras. "
+                "Install with: pip install uharfbuzz"
+            )
+
     if regular_name not in pdfmetrics.getRegisteredFontNames():
-        pdfmetrics.registerFont(TTFont(regular_name, str(regular_path)))
+        pdfmetrics.registerFont(TTFont(regular_name, str(regular_path), shapable=bool(shapable)))
     if bold_name not in pdfmetrics.getRegisteredFontNames():
-        pdfmetrics.registerFont(TTFont(bold_name, str(bold_path)))
+        pdfmetrics.registerFont(TTFont(bold_name, str(bold_path), shapable=bool(shapable)))
     try:
         registerFontFamily(family, normal=regular_name, bold=bold_name)
     except Exception:
@@ -77,7 +98,8 @@ def _register_latin_fallback() -> Tuple[str, str]:
     regular = _FONTS_DIR / "NotoSans-Regular.ttf"
     bold = _FONTS_DIR / "NotoSans-Bold.ttf"
     if regular.is_file() and bold.is_file():
-        return _register_pair("ARSans", regular, bold)
+        # Never shape the Latin fallback — avoids "st"/"fi" ligature corruption.
+        return _register_pair("ARSans", regular, bold, shapable=False)
     return "Helvetica", "Helvetica-Bold"
 
 

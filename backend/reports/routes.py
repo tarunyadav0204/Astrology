@@ -9,11 +9,19 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Header, 
 from auth import User, get_current_user
 from credits.credit_service import CreditService
 from db import execute, get_conn
-from .models import PartnershipReportRequest, WealthReportRequest, HealthReportRequest
+from .models import (
+    PartnershipReportRequest,
+    WealthReportRequest,
+    HealthReportRequest,
+    JanamKundliReportRequest,
+    ReportBranding,
+)
+from .branding import get_saved_report_branding, save_report_branding
 from .orchestrator import (
     build_and_cache_partnership_report,
     build_and_cache_wealth_report,
     build_and_cache_health_report,
+    build_and_cache_janam_kundli_report,
     process_partnership_report_job,
 )
 from .cache.report_hash import build_pair_hash, build_subject_hash, normalize_language
@@ -26,7 +34,12 @@ from .cache.report_storage import (
     update_report_job,
 )
 from .report_registry import list_supported_report_types
-from .report_types import PARTNERSHIP_REPORT_CONFIG, WEALTH_REPORT_CONFIG, HEALTH_REPORT_CONFIG
+from .report_types import (
+    PARTNERSHIP_REPORT_CONFIG,
+    WEALTH_REPORT_CONFIG,
+    HEALTH_REPORT_CONFIG,
+    JANAM_KUNDLI_REPORT_CONFIG,
+)
 from .pdf_service import sign_report_pdf_url, store_report_pdf
 from .task_queue import (
     enqueue_report_processing_task,
@@ -91,6 +104,11 @@ def _build_report_history_item(job: Dict[str, Any]) -> Dict[str, Any]:
         person_b_name = ""
         title = premium.get("headline") or "Health report"
         subtitle = premium.get("health_verdict") or premium.get("headline") or score_summary.get("verdict") or "Ready to open"
+    elif report_type == "janam_kundli":
+        person_a_name = native.get("name") or native_pair.get("name") or boy.get("name") or boy_pair.get("name") or "Native"
+        person_b_name = ""
+        title = premium.get("headline") or "Janam Kundli report"
+        subtitle = premium.get("janam_verdict") or premium.get("headline") or score_summary.get("verdict") or "Ready to open"
     else:
         person_a_name = boy.get("name") or boy_pair.get("name") or "Person A"
         person_b_name = girl.get("name") or girl_pair.get("name") or "Person B"
@@ -778,6 +796,222 @@ async def get_health_report(report_id: str, current_user: User = Depends(get_cur
     return await get_partnership_report(report_id, current_user)
 
 
+@router.post("/janam_kundli/existing")
+async def lookup_existing_janam_kundli_report(
+    request: JanamKundliReportRequest,
+    current_user: User = Depends(get_current_user),
+):
+    resolved_language = normalize_language(request.language)
+    subject_hash = build_subject_hash(request.birth_data, request.report_type, resolved_language)
+    report_version = JANAM_KUNDLI_REPORT_CONFIG.key + "_v2"
+
+    job = get_latest_completed_report_job(
+        current_user.userid,
+        request.report_type,
+        subject_hash,
+        resolved_language,
+        report_version,
+        get_conn,
+        execute,
+    )
+    cached = get_cached_report(
+        current_user.userid,
+        request.report_type,
+        subject_hash,
+        resolved_language,
+        report_version,
+        get_conn,
+        execute,
+    )
+    active = get_latest_active_report_job(
+        current_user.userid,
+        request.report_type,
+        subject_hash,
+        resolved_language,
+        report_version,
+        get_conn,
+        execute,
+    )
+
+    if not job and not cached and not active:
+        return {
+            "exists": False,
+            "report_id": None,
+            "status": None,
+            "has_pdf": False,
+            "cached": False,
+            "in_progress": False,
+        }
+
+    if job or cached:
+        result_data = {}
+        report_id = None
+        if job:
+            report_id = job.get("report_id")
+            result_data = job.get("result_data") if isinstance(job.get("result_data"), dict) else {}
+        if cached and isinstance(cached, dict):
+            if not result_data:
+                result_data = cached
+            if not report_id:
+                report_id = cached.get("report_id")
+        has_pdf = bool(result_data.get("pdf_gcs_path") or result_data.get("pdf_url"))
+        return {
+            "exists": True,
+            "report_id": report_id,
+            "status": "completed",
+            "has_pdf": has_pdf,
+            "cached": True,
+            "in_progress": False,
+            "language": resolved_language,
+            "report_type": request.report_type,
+            "report_version": report_version,
+        }
+
+    active_status = str(active.get("status") or "pending").lower()
+    if active_status not in ("pending", "processing"):
+        active_status = "pending"
+    return {
+        "exists": True,
+        "report_id": active.get("report_id"),
+        "status": active_status,
+        "has_pdf": False,
+        "cached": False,
+        "in_progress": True,
+        "language": resolved_language,
+        "report_type": request.report_type,
+        "report_version": report_version,
+    }
+
+
+@router.get("/branding")
+async def get_report_branding(current_user: User = Depends(get_current_user)):
+    branding = get_saved_report_branding(current_user.userid, get_conn, execute)
+    return {"success": True, "branding": branding}
+
+
+@router.put("/branding")
+async def put_report_branding(
+    branding: ReportBranding,
+    current_user: User = Depends(get_current_user),
+):
+    saved = save_report_branding(current_user.userid, branding, get_conn, execute)
+    return {"success": True, "branding": saved}
+
+
+@router.post("/janam_kundli/start")
+async def start_janam_kundli_report_job(
+    request: JanamKundliReportRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+):
+    if not JANAM_KUNDLI_REPORT_CONFIG.enabled:
+        raise HTTPException(status_code=404, detail="Janam Kundli report is not enabled")
+
+    resolved_language = normalize_language(request.language)
+    if resolved_language not in {"english", "hindi"}:
+        raise HTTPException(status_code=400, detail="Janam Kundli supports english and hindi only")
+
+    # Persist branding from the generate form so next run is prefilled.
+    if request.branding is not None:
+        save_report_branding(current_user.userid, request.branding, get_conn, execute)
+
+    subject_hash = build_subject_hash(request.birth_data, request.report_type, resolved_language)
+    report_version = JANAM_KUNDLI_REPORT_CONFIG.key + "_v2"
+    request_json = json.dumps(request.model_dump() if hasattr(request, "model_dump") else request.dict())
+    cached = None
+    if not request.force_regenerate:
+        active = get_latest_active_report_job(
+            current_user.userid,
+            request.report_type,
+            subject_hash,
+            resolved_language,
+            report_version,
+            get_conn,
+            execute,
+        )
+        if active and active.get("report_id"):
+            status = str(active.get("status") or "pending").lower()
+            return {
+                "success": True,
+                "report_id": active.get("report_id"),
+                "status": status if status in ("pending", "processing") else "pending",
+                "message": "Janam Kundli report already in progress.",
+                "resumed": True,
+            }
+        cached = get_cached_report(
+            current_user.userid,
+            request.report_type,
+            subject_hash,
+            resolved_language,
+            report_version,
+            get_conn,
+            execute,
+        )
+    report_id = str(uuid.uuid4())
+    if cached is None:
+        cost = credit_service.get_effective_cost(
+            current_user.userid,
+            credit_service.get_credit_setting("janam_kundli_report_cost"),
+            "janam_kundli_report_cost",
+        )
+        balance = credit_service.get_user_credits(current_user.userid)
+        if balance < cost:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Insufficient credits. You need {cost} credits.",
+            )
+
+    create_report_job(
+        report_id,
+        current_user.userid,
+        request.report_type,
+        subject_hash,
+        resolved_language,
+        request_json,
+        report_version,
+        get_conn,
+        execute,
+    )
+
+    queued = enqueue_report_processing_task(report_id=report_id)
+    if not queued:
+        if report_tasks_enabled() and not local_report_tasks_enabled():
+            update_report_job(
+                report_id,
+                status="failed",
+                error_message="Report worker queue unavailable",
+                get_conn=get_conn,
+                execute_fn=execute,
+            )
+            raise HTTPException(
+                status_code=503,
+                detail="Report worker queue unavailable. Please try again in a moment.",
+            )
+        background_tasks.add_task(
+            _run_janam_kundli_report_job,
+            report_id,
+            current_user.userid,
+            request,
+        )
+
+    return {
+        "success": True,
+        "report_id": report_id,
+        "status": "pending",
+        "message": "Janam Kundli report started.",
+    }
+
+
+@router.get("/janam_kundli/status/{report_id}")
+async def get_janam_kundli_report_status(report_id: str, current_user: User = Depends(get_current_user)):
+    return await get_partnership_report_status(report_id, current_user)
+
+
+@router.get("/janam_kundli/{report_id}")
+async def get_janam_kundli_report(report_id: str, current_user: User = Depends(get_current_user)):
+    return await get_partnership_report(report_id, current_user)
+
+
 @router.post("/internal/process")
 async def process_report_task(
     request: dict,
@@ -884,6 +1118,24 @@ async def _run_health_report_job(report_id: str, userid: int, request: HealthRep
         update_report_job(report_id, status="failed", error_message=str(exc), get_conn=get_conn, execute_fn=execute)
 
 
+async def _run_janam_kundli_report_job(report_id: str, userid: int, request: JanamKundliReportRequest):
+    try:
+        update_report_job(report_id, status="processing", get_conn=get_conn, execute_fn=execute)
+        payload = await build_and_cache_janam_kundli_report(
+            userid,
+            request,
+            credit_service=credit_service,
+            get_conn=get_conn,
+            execute_fn=execute,
+            report_id=report_id,
+        )
+        if not payload.get("report_type"):
+            raise RuntimeError(payload.get("error") or "Report generation failed")
+        update_report_job(report_id, status="completed", result_data=payload, get_conn=get_conn, execute_fn=execute)
+    except Exception as exc:
+        update_report_job(report_id, status="failed", error_message=str(exc), get_conn=get_conn, execute_fn=execute)
+
+
 async def _process_report_job(report_id: str):
     job = get_report_job(report_id, get_conn, execute)
     if not job:
@@ -950,6 +1202,27 @@ async def _process_report_job(report_id: str):
             request = HealthReportRequest.model_validate(request_data)
             update_report_job(report_id, status="processing", get_conn=get_conn, execute_fn=execute)
             payload = await build_and_cache_health_report(
+                int(job.get("userid")),
+                request,
+                credit_service=credit_service,
+                get_conn=get_conn,
+                execute_fn=execute,
+                report_id=report_id,
+            )
+            if not payload.get("report_type"):
+                raise RuntimeError(payload.get("error") or "Report generation failed")
+            update_report_job(report_id, status="completed", result_data=payload, get_conn=get_conn, execute_fn=execute)
+            return {
+                "success": True,
+                "report_id": report_id,
+                "status": "completed",
+                "data": _attach_pdf_url(payload),
+            }
+
+        if report_type == "janam_kundli":
+            request = JanamKundliReportRequest.model_validate(request_data)
+            update_report_job(report_id, status="processing", get_conn=get_conn, execute_fn=execute)
+            payload = await build_and_cache_janam_kundli_report(
                 int(job.get("userid")),
                 request,
                 credit_service=credit_service,
