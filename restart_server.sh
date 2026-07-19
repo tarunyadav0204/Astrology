@@ -16,7 +16,8 @@ FAILURE_COUNT=0
 FAILURE_THRESHOLD="${FAILURE_THRESHOLD:-3}"
 PROBE_TIMEOUT="${PROBE_TIMEOUT:-5}"
 CHECK_INTERVAL="${CHECK_INTERVAL:-10}"
-STARTUP_WAIT="${STARTUP_WAIT:-10}"
+# Cold start with 2 uvicorn workers + DB schema ensure often exceeds 10s.
+STARTUP_WAIT="${STARTUP_WAIT:-120}"
 PORT_CLEAR_WAIT_SECONDS="${PORT_CLEAR_WAIT_SECONDS:-10}"
 
 timestamp_utc() {
@@ -124,9 +125,17 @@ while true; do
     '$BOOTSTRAP_SCRIPT'
   " >/dev/null 2>&1 || true
 
-  sleep "$STARTUP_WAIT"
+  # Poll until healthy instead of a single check after a blind sleep.
+  startup_ok=0
+  for _ in $(seq 1 "${STARTUP_WAIT}"); do
+    if curl -fsS --max-time "$PROBE_TIMEOUT" "$PROBE_URL" > /dev/null 2>&1; then
+      startup_ok=1
+      break
+    fi
+    sleep 1
+  done
 
-  if curl -fsS --max-time "$PROBE_TIMEOUT" "$PROBE_URL" > /dev/null 2>&1; then
+  if [ "$startup_ok" -eq 1 ]; then
     log_watchdog "restart_success" "failure_count=${FAILURE_COUNT} startup_wait=${STARTUP_WAIT} probe_url=${PROBE_URL}"
     FAILURE_COUNT=0
   else

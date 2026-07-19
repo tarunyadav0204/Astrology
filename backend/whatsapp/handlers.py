@@ -32,7 +32,6 @@ from .phone_utils import (
 )
 
 from .chat_worker import schedule_whatsapp_chart_chat
-from .schema import ensure_whatsapp_schema
 from nudge_engine.whatsapp_fallback import (
     WHATSAPP_NUDGE_CONTINUE_BUTTON_ID,
     build_whatsapp_nudge_body,
@@ -1923,7 +1922,7 @@ def _handle_idle_greeting(
 
 
 def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
-    ensure_whatsapp_schema()
+    # Schema is ensured once at API startup (main.py lifespan), not per message.
     messages = extract_inbound_messages(payload)
     if not messages:
         return

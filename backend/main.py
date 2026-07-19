@@ -246,7 +246,16 @@ class _StartupDbLock:
         try:
             self.conn_ctx = get_conn()
             self.conn = self.conn_ctx.__enter__()
+            # Fail fast if another worker/process already holds schema locks.
+            execute(self.conn, "SET lock_timeout = '15s'")
+            execute(self.conn, "SET statement_timeout = '120s'")
             execute(self.conn, "SELECT pg_advisory_lock(%s)", (STARTUP_DB_LOCK_KEY,))
+            # Session advisory locks survive commit; avoid idle-in-transaction
+            # for the whole startup DDL window.
+            try:
+                self.conn.commit()
+            except Exception:
+                pass
             return self.conn
         except Exception:
             if self.conn_ctx is not None:
@@ -265,6 +274,13 @@ class _StartupDbLock:
                     execute(self.conn, "SELECT pg_advisory_unlock(%s)", (STARTUP_DB_LOCK_KEY,))
                 except Exception:
                     pass
+                try:
+                    self.conn.commit()
+                except Exception:
+                    try:
+                        self.conn.rollback()
+                    except Exception:
+                        pass
         finally:
             if self.conn_ctx is not None:
                 return self.conn_ctx.__exit__(exc_type, exc, tb)
@@ -565,47 +581,70 @@ MIN_ANDROID_VERSION_CODE = int(os.getenv("MIN_ANDROID_VERSION_CODE", "0"))
 MIN_IOS_BUILD_NUMBER = int(os.getenv("MIN_IOS_BUILD_NUMBER", "0"))
 
 
-def ensure_users_signup_client_column() -> None:
-    """Add signup_client (web | mobile | whatsapp) for registration source; safe to run repeatedly."""
+def _ensure_users_column(column_sql: str, label: str) -> None:
+    """Add a users column with a short lock wait so boot cannot hang on ALTER."""
     try:
         with get_conn() as conn:
-            execute(conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_client TEXT")
-            conn.commit()
+            try:
+                execute(conn, "SET LOCAL lock_timeout = '5s'")
+                execute(conn, column_sql)
+                conn.commit()
+            except Exception as e:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                logger.warning("Could not ensure %s: %s", label, e)
     except Exception as e:
-        logger.warning("Could not ensure users.signup_client column: %s", e)
+        logger.warning("Could not ensure %s: %s", label, e)
+
+
+def ensure_users_signup_client_column() -> None:
+    """Add signup_client (web | mobile | whatsapp) for registration source; safe to run repeatedly."""
+    _ensure_users_column(
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_client TEXT",
+        "users.signup_client column",
+    )
 
 
 def ensure_users_gender_column() -> None:
     """Add users.gender for registration-time capture; safe to run repeatedly."""
-    try:
-        with get_conn() as conn:
-            execute(conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS gender TEXT")
-            conn.commit()
-    except Exception as e:
-        logger.warning("Could not ensure users.gender column: %s", e)
+    _ensure_users_column(
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS gender TEXT",
+        "users.gender column",
+    )
 
 
 def ensure_users_userid_default() -> None:
     """Postgres guard: users.userid must auto-generate when INSERT omits it."""
     try:
         with get_conn() as conn:
-            execute(conn, "CREATE SEQUENCE IF NOT EXISTS users_userid_seq")
-            execute(
-                conn,
-                """
-                SELECT setval(
-                    'users_userid_seq',
-                    GREATEST(COALESCE((SELECT MAX(userid) FROM users), 1), 1),
-                    (SELECT COUNT(*) > 0 FROM users)
+            try:
+                execute(conn, "SET LOCAL lock_timeout = '5s'")
+                execute(conn, "SET LOCAL statement_timeout = '30s'")
+                execute(conn, "CREATE SEQUENCE IF NOT EXISTS users_userid_seq")
+                execute(
+                    conn,
+                    """
+                    SELECT setval(
+                        'users_userid_seq',
+                        GREATEST(COALESCE((SELECT MAX(userid) FROM users), 1), 1),
+                        (SELECT COUNT(*) > 0 FROM users)
+                    )
+                    """,
                 )
-                """,
-            )
-            execute(
-                conn,
-                "ALTER TABLE users ALTER COLUMN userid SET DEFAULT nextval('users_userid_seq'::regclass)",
-            )
-            execute(conn, "ALTER SEQUENCE users_userid_seq OWNED BY users.userid")
-            conn.commit()
+                execute(
+                    conn,
+                    "ALTER TABLE users ALTER COLUMN userid SET DEFAULT nextval('users_userid_seq'::regclass)",
+                )
+                execute(conn, "ALTER SEQUENCE users_userid_seq OWNED BY users.userid")
+                conn.commit()
+            except Exception as e:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                logger.warning("Could not ensure users.userid default sequence: %s", e)
     except Exception as e:
         logger.warning("Could not ensure users.userid default sequence: %s", e)
 
@@ -690,6 +729,11 @@ async def lifespan(app: FastAPI):
                     logger.debug("startup_step_ok step=init_nudge_tables message=nudge engine tables initialized")
             except Exception as e:
                 log_lifecycle_event("startup_step_failed", level=logging.WARNING, step="init_nudge_tables", error=str(e))
+            _startup_step(
+                "ensure_whatsapp_schema",
+                lambda: __import__("whatsapp.schema", fromlist=["ensure_whatsapp_schema"]).ensure_whatsapp_schema(),
+                "whatsapp schema ready",
+            )
             _startup_step(
                 "ensure_admin_audience_user_facts_view",
                 lambda: __import__(

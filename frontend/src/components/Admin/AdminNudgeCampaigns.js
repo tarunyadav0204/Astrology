@@ -72,6 +72,8 @@ const emptyForm = {
   current_dasha_contains: '',
   landing_screen: 'chat',
   scheduled_at: '',
+  audience_nl_prompt: '',
+  audience_nl_sql: '',
 };
 
 async function apiFetch(url, options = {}) {
@@ -163,6 +165,8 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
       audience_from_date: prefillDraft.audience_from_date || '',
       audience_to_date: prefillDraft.audience_to_date || '',
       audience_user_ids: audienceType === 'user_ids' ? String(userIdsPrefill) : '',
+      audience_nl_prompt: prefillDraft.audience_nl_prompt || '',
+      audience_nl_sql: prefillDraft.audience_nl_sql || '',
     });
     if (typeof onPrefillConsumed === 'function') onPrefillConsumed();
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -178,6 +182,12 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
         .split(/[\s,]+/)
         .map((x) => Number(x))
         .filter((n) => Number.isInteger(n) && n > 0);
+      if (form.audience_nl_prompt) {
+        audience.nl_prompt = String(form.audience_nl_prompt).slice(0, 4000);
+      }
+      if (form.audience_nl_sql) {
+        audience.nl_sql = String(form.audience_nl_sql).slice(0, 20000);
+      }
     }
     if (form.audience_type === 'credit_intelligence_segment') {
       audience.segment_key = String(form.audience_segment_key || '').trim();
