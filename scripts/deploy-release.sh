@@ -143,11 +143,29 @@ if [ "${FORCE_BACKEND_PIP}" = "true" ]; then
   needs_backend_pip=true
 fi
 
+# Self-heal: MIG replacements / skipped pip can leave a venv with old reportlab
+# (no TTFont shapable=) or missing uharfbuzz — force install when the PDF stack is broken.
+if [ "${needs_backend_pip}" = "false" ] && [ -d "backend/venv" ]; then
+  if ! "backend/venv/bin/python" - <<'PY' >/dev/null 2>&1
+import inspect
+import reportlab
+from reportlab.pdfbase.ttfonts import TTFont
+import uharfbuzz  # noqa: F401
+assert "shapable" in inspect.signature(TTFont.__init__).parameters, reportlab.Version
+PY
+  then
+    echo "⚠️ Forcing backend pip: reportlab/uharfbuzz shapable stack missing or too old in venv"
+    needs_backend_pip=true
+  fi
+fi
+
 if [ "${SKIP_BACKEND_PIP}" = "true" ] && [ "${FORCE_BACKEND_PIP}" != "true" ]; then
   if [ -z "${PREV_HEAD}" ] || [ "${FORCE_FULL_DEPLOY}" = "true" ]; then
     echo "⚠️ SKIP_BACKEND_PIP ignored (first deploy or FORCE_FULL_DEPLOY)"
   elif echo "${CHANGED_FILES}" | grep -qE '^backend/requirements\.txt$'; then
     echo "⚠️ SKIP_BACKEND_PIP ignored (backend/requirements.txt changed)"
+  elif [ "${needs_backend_pip}" = "true" ]; then
+    echo "⚠️ SKIP_BACKEND_PIP ignored (PDF dependency self-heal required)"
   else
     needs_backend_pip=false
   fi

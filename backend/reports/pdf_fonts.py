@@ -58,6 +58,25 @@ class PdfFontSet:
         return self.regular
 
 
+def _ttfont_supports_shapable() -> bool:
+    """ReportLab < ~4.1 rejects TTFont(..., shapable=...)."""
+    try:
+        import inspect
+
+        return "shapable" in inspect.signature(TTFont.__init__).parameters
+    except Exception:
+        return False
+
+
+def _make_ttfont(name: str, path: Path, *, shapable: bool) -> TTFont:
+    """Register-compatible TTFont; older ReportLab builds omit the shapable kwarg."""
+    if shapable and _ttfont_supports_shapable():
+        return TTFont(name, str(path), shapable=True)
+    if (not shapable) and _ttfont_supports_shapable():
+        return TTFont(name, str(path), shapable=False)
+    return TTFont(name, str(path))
+
+
 def _register_pair(
     family: str,
     regular_path: Path,
@@ -69,22 +88,29 @@ def _register_pair(
     regular_name = family
     bold_name = f"{family}-Bold"
     if shapable is None:
-        # ReportLab shapes Devanagari/Tamil/etc. only when uharfbuzz is importable.
+        # ReportLab shapes Devanagari/Tamil/etc. only when uharfbuzz is importable
+        # *and* this ReportLab build accepts shapable=.
+        has_harfbuzz = False
         try:
             import uharfbuzz  # noqa: F401
 
-            shapable = True
+            has_harfbuzz = True
         except Exception:
-            shapable = False
             logger.warning(
                 "uharfbuzz not installed — Indic PDF text may show incorrect conjuncts/matras. "
                 "Install with: pip install uharfbuzz"
             )
+        supports_shapable = _ttfont_supports_shapable()
+        if has_harfbuzz and not supports_shapable:
+            logger.warning(
+                "ReportLab TTFont has no shapable= support — upgrade reportlab>=4.1 for Hindi shaping."
+            )
+        shapable = bool(has_harfbuzz and supports_shapable)
 
     if regular_name not in pdfmetrics.getRegisteredFontNames():
-        pdfmetrics.registerFont(TTFont(regular_name, str(regular_path), shapable=bool(shapable)))
+        pdfmetrics.registerFont(_make_ttfont(regular_name, regular_path, shapable=bool(shapable)))
     if bold_name not in pdfmetrics.getRegisteredFontNames():
-        pdfmetrics.registerFont(TTFont(bold_name, str(bold_path), shapable=bool(shapable)))
+        pdfmetrics.registerFont(_make_ttfont(bold_name, bold_path, shapable=bool(shapable)))
     try:
         registerFontFamily(family, normal=regular_name, bold=bold_name)
     except Exception:

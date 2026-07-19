@@ -31,5 +31,6 @@ google-cloud-bigquery>=3.11.0
 psycopg2-binary==2.9.9
 sentry-sdk[fastapi]>=2.19.0,<3
 
-reportlab==4.2.2
-uharfbuzz>=0.45.0
+# Hindi/Indic PDF reports (TTFont shapable= requires reportlab>=4.1 + uharfbuzz)
+reportlab==4.2.5
+uharfbuzz==0.55.0

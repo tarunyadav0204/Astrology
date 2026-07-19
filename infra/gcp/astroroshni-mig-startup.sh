@@ -80,6 +80,8 @@ sudo -u "${APP_USER}" bash -lc "
   export SERVE_FRONTEND_LOCALLY=false
   export SYNC_GCP_SECRETS=true
   export DEFER_FRONTEND_BUILD=true
+  # New/replaced MIG VMs must install backend deps from requirements.txt (venv may be absent or stale).
+  export FORCE_BACKEND_PIP=true
   bash deploy.sh
 "
 
