@@ -289,7 +289,7 @@ print(f"reportlab={reportlab.Version}")
 print(f"uharfbuzz_ok=True")
 assert "shapable" in inspect.signature(TTFont.__init__).parameters, (
     f"TTFont still lacks shapable= (reportlab={reportlab.Version}). "
-    "Upgrade reportlab>=4.1 in the venv."
+    "Need reportlab>=4.4 (shapable landed in 4.4; pin is reportlab==5.0.0)."
 )
 # Smoke-register path without needing a font file for kwarg acceptance.
 print("shapable_kwarg_ok=True")

@@ -59,7 +59,7 @@ class PdfFontSet:
 
 
 def _ttfont_supports_shapable() -> bool:
-    """ReportLab < ~4.1 rejects TTFont(..., shapable=...)."""
+    """ReportLab < 4.4 rejects TTFont(..., shapable=...)."""
     try:
         import inspect
 
@@ -107,7 +107,7 @@ def _register_pair(
         supports_shapable = _ttfont_supports_shapable()
         if has_harfbuzz and not supports_shapable:
             logger.warning(
-                "ReportLab TTFont has no shapable= support — upgrade reportlab>=4.1 for Hindi shaping."
+                "ReportLab TTFont has no shapable= support — upgrade reportlab>=4.4 for Hindi shaping."
             )
         shapable = bool(has_harfbuzz and supports_shapable)
 
