@@ -232,6 +232,7 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
       landing_screen: 'chat',
       audience_type: 'user_ids',
       audience_user_ids: ids.join(', '),
+      require_self_chart: false,
       audience_nl_prompt: prompt,
       audience_nl_sql: sql,
     });

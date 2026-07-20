@@ -1,7 +1,7 @@
 """Database helpers for nudge engine: tables and user resolution."""
 import json
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -1506,6 +1506,62 @@ def get_campaign_delivery_user_ids(conn, *, campaign_id: int, userids: List[int]
     return {int(r[0]) for r in (cur.fetchall() or [])}
 
 
+def campaign_delivery_progress(conn, campaign_id: int) -> Dict[str, int]:
+    """Recipient-level campaign progress used by dispatch status and the admin UI."""
+    cur = execute(
+        conn,
+        """
+        SELECT
+            COUNT(DISTINCT userid) AS processed,
+            COUNT(DISTINCT userid) FILTER (
+                WHERE COALESCE(send_status, '') = 'sent'
+                  AND COALESCE(channel, 'stored') <> 'stored'
+            ) AS delivered,
+            COUNT(DISTINCT userid) FILTER (
+                WHERE COALESCE(is_primary, TRUE)
+                  AND COALESCE(channel, 'stored') = 'stored'
+            ) AS undelivered,
+            COUNT(*) FILTER (WHERE COALESCE(send_status, '') = 'failed') AS failed_attempts
+        FROM nudge_deliveries
+        WHERE campaign_id = %s
+        """,
+        (int(campaign_id),),
+    )
+    row = cur.fetchone() or (0, 0, 0, 0)
+    return {
+        "processed": int(row[0] or 0),
+        "delivered": int(row[1] or 0),
+        "undelivered": int(row[2] or 0),
+        "failed_attempts": int(row[3] or 0),
+    }
+
+
+def refresh_campaign_delivery_status(conn, campaign_id: int) -> Dict[str, int]:
+    """
+    Mark a sending campaign sent only after every eligible recipient has a
+    persisted delivery outcome. Returns recipient-level progress.
+    """
+    progress = campaign_delivery_progress(conn, int(campaign_id))
+    cur = execute(
+        conn,
+        "SELECT total_targeted, status FROM nudge_campaigns WHERE id = %s",
+        (int(campaign_id),),
+    )
+    row = cur.fetchone()
+    if not row:
+        return progress
+    total_targeted = int(row[0] or 0)
+    status = str(row[1] or "")
+    if status == "sending" and progress["processed"] >= total_targeted:
+        update_campaign(
+            conn,
+            int(campaign_id),
+            status="sent",
+            dispatched_at=datetime.now(IST_TZ),
+        )
+    return progress
+
+
 # ---------------------------------------------------------------------------
 # Conversions (nudge → user asked a chat question)
 # ---------------------------------------------------------------------------
@@ -1728,6 +1784,7 @@ def campaign_stats(conn, campaign_id: int) -> Dict[str, Any]:
     conv = _conversion_summary(conn, "campaign_id = %s", (cid,))
     conv_by_channel = _conversions_by_channel(conn, "c.campaign_id = %s", (cid,))
     window_conversions = count_window_conversions(conn, "d.campaign_id = %s", (cid,))
+    progress = campaign_delivery_progress(conn, cid)
     targeted = sends.get("targeted") or 0
     conversions = conv.get("conversions") or 0
     return {
@@ -1739,6 +1796,7 @@ def campaign_stats(conn, campaign_id: int) -> Dict[str, Any]:
         "conversions_by_channel": conv_by_channel,
         "time_buckets": conv.get("time_buckets"),
         "median_seconds_to_question": conv.get("median_seconds"),
+        "progress": progress,
     }
 
 

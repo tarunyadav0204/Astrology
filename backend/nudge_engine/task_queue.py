@@ -9,6 +9,12 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
+# Stable Cloud Run service URL. This is deliberately used as a safety fallback
+# when an older VM-era http:// target remains in the shared production env.
+DEFAULT_NUDGE_WORKER_TARGET_BASE_URL = (
+    "https://astroroshni-nudge-worker-jqbgarn4ea-el.a.run.app"
+)
+
 
 def nudge_tasks_enabled() -> bool:
     return (os.getenv("NUDGE_TASKS_ENABLED") or "").strip().lower() in {"1", "true", "yes", "on"}
@@ -40,11 +46,25 @@ def _queue_name(task_kind: Optional[str] = None) -> str:
 
 
 def _target_base_url() -> str:
-    return (
+    configured = (
         os.getenv("NUDGE_TASKS_TARGET_BASE_URL")
         or os.getenv("CHAT_TASKS_TARGET_BASE_URL")
         or ""
     ).strip().rstrip("/")
+    fallback = (
+        os.getenv("NUDGE_CLOUD_RUN_WORKER_URL")
+        or DEFAULT_NUDGE_WORKER_TARGET_BASE_URL
+    ).strip().rstrip("/")
+    if not configured:
+        return fallback
+    if configured.lower().startswith("http://"):
+        logger.warning(
+            "Ignoring insecure legacy nudge task target %s; using Cloud Run worker %s",
+            configured,
+            fallback,
+        )
+        return fallback
+    return configured
 
 
 def _public_api_base_url() -> str:

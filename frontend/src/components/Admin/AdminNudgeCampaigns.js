@@ -53,7 +53,7 @@ const emptyForm = {
   audience_segment_key: '',
   audience_from_date: '',
   audience_to_date: '',
-  require_self_chart: true,
+  require_self_chart: false,
   has_email: '',
   has_whatsapp: '',
   free_question_available: '',
@@ -124,8 +124,8 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
     setAudiencePreview(null);
   };
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError('');
     try {
       const body = await apiFetch('/api/nudge/admin/campaigns');
@@ -134,13 +134,19 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
     } catch (e) {
       setError(e.message || 'Failed to load campaigns');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!campaigns.some((campaign) => campaign.status === 'sending')) return undefined;
+    const timer = window.setInterval(() => load(true), 5000);
+    return () => window.clearInterval(timer);
+  }, [campaigns, load]);
 
   useEffect(() => {
     if (!prefillDraft) return;
@@ -165,6 +171,7 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
       audience_from_date: prefillDraft.audience_from_date || '',
       audience_to_date: prefillDraft.audience_to_date || '',
       audience_user_ids: audienceType === 'user_ids' ? String(userIdsPrefill) : '',
+      require_self_chart: prefillDraft.require_self_chart === true,
       audience_nl_prompt: prefillDraft.audience_nl_prompt || '',
       audience_nl_sql: prefillDraft.audience_nl_sql || '',
     });
@@ -444,8 +451,9 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
         });
         showResult(
           true,
-          `Dispatched: ${body.users_targeted || 0} users in ${body.batches || 0} batch(es)` +
-            (body.queued ? ' (queued via Cloud Tasks).' : '.')
+          body.queued
+            ? `Queued: ${body.users_targeted || 0} eligible${body.users_selected != null ? ` of ${body.users_selected} selected` : ''} users in ${body.batches || 0} batch(es). Delivery counts will update after the worker finishes.`
+            : `Processed: ${body.users_targeted || 0} eligible users in ${body.batches || 0} batch(es).`
         );
       } else if (action === 'test-send') {
         const body = await apiFetch(`/api/nudge/admin/campaigns/${campaignId}/test-send`, {
@@ -507,7 +515,7 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
       draft: 'Draft',
       scheduled: 'Scheduled',
       paused: 'Paused',
-      sending: 'Sending...',
+      sending: 'Queued / sending',
       sent: 'Sent',
       cancelled: 'Cancelled',
     }),
@@ -559,7 +567,8 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
         <div className="nudge-console-legend">
           <div><strong>Draft:</strong> saved, not live yet</div>
           <div><strong>Scheduled:</strong> will launch at the chosen time</div>
-          <div><strong>Sent:</strong> already dispatched</div>
+          <div><strong>Queued / sending:</strong> accepted for delivery but not finished yet</div>
+          <div><strong>Sent:</strong> every eligible recipient has a recorded delivery outcome</div>
           <div><strong>Pause:</strong> temporarily stop a scheduled or draft campaign without deleting it</div>
         </div>
       </div>
@@ -1034,10 +1043,18 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
               </div>
 
               <div className="nudge-campaign-card__facts">
+                <div>
+                  <span>Selected</span>
+                  <strong>
+                    {campaign.audience_filter?.type === 'user_ids'
+                      ? (campaign.audience_filter.user_ids || []).length
+                      : 'Dynamic'}
+                  </strong>
+                </div>
                 <div><span>Channels</span><strong>{(campaign.channels || []).join(' -> ')}</strong></div>
                 <div><span>Policy</span><strong>{campaign.channel_policy}</strong></div>
                 <div><span>Scheduled</span><strong>{campaign.scheduled_at ? new Date(campaign.scheduled_at).toLocaleString() : 'Draft only'}</strong></div>
-                <div><span>Targeted</span><strong>{campaign.total_targeted || 0}</strong></div>
+                <div><span>Eligible</span><strong>{campaign.total_targeted || 0}</strong></div>
                 <div><span>Mode</span><strong>{campaign.ai_personalize ? 'AI personalized' : 'Template only'}</strong></div>
               </div>
 
@@ -1048,11 +1065,27 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
                     ? 'This campaign is paused. Resume it as scheduled if it has a send time, or resume it as a draft for further editing.'
                   : campaign.status === 'draft'
                     ? 'This campaign is saved but not live yet. You can edit it, test it, or send it immediately.'
-                    : 'This campaign has already been dispatched. You can still test it to yourself for a quick check.'}
+                    : campaign.status === 'sending'
+                      ? 'This campaign is queued or being processed. It is not considered sent until every eligible recipient has a delivery outcome.'
+                      : 'This campaign has finished processing. You can still test it to yourself for a quick check.'}
               </div>
 
               {campaign.stats?.sends ? (
                 <div className="nudge-campaign-card__facts" style={{ marginTop: '12px' }}>
+                  <div>
+                    <span>Queued / pending</span>
+                    <strong>
+                      {Math.max(
+                        0,
+                        Number(campaign.total_targeted || 0) -
+                          Number(campaign.stats.progress?.processed || 0)
+                      )}
+                    </strong>
+                  </div>
+                  <div><span>Processed</span><strong>{campaign.stats.progress?.processed || 0}</strong></div>
+                  <div><span>Delivered</span><strong>{campaign.stats.progress?.delivered || 0}</strong></div>
+                  <div><span>Undelivered</span><strong>{campaign.stats.progress?.undelivered || 0}</strong></div>
+                  <div><span>Failed attempts</span><strong>{campaign.stats.progress?.failed_attempts || 0}</strong></div>
                   <div><span>Push sent</span><strong>{campaign.stats.sends.push || 0}</strong></div>
                   <div><span>WhatsApp direct</span><strong>{campaign.stats.sends.whatsapp_direct || 0}</strong></div>
                   <div><span>WhatsApp template</span><strong>{campaign.stats.sends.whatsapp_template || 0}</strong></div>

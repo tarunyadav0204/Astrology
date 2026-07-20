@@ -566,6 +566,7 @@ def process_campaign_batch(*, campaign_id: int, user_ids: List[int]) -> Dict[str
                 logger.warning(
                     "campaign %s delivery failed for user %s: %s", campaign_id, uid, e
                 )
+        summary["progress"] = db.refresh_campaign_delivery_status(conn, int(campaign_id))
         conn.commit()
     return summary
 
@@ -579,7 +580,19 @@ def _dispatch_one_campaign(conn, campaign: Dict[str, Any]) -> Dict[str, Any]:
     campaign_id = int(campaign["id"])
     previous_status = str(campaign.get("status") or "draft").strip().lower() or "draft"
     previous_scheduled_at = campaign.get("scheduled_at")
-    audience = resolve_campaign_audience(conn, campaign.get("audience_filter") or {})
+    audience_filter = campaign.get("audience_filter") or {}
+    selected_user_ids = (
+        sorted(
+            {
+                int(uid)
+                for uid in (audience_filter.get("user_ids") or [])
+                if isinstance(uid, int) or str(uid).isdigit()
+            }
+        )
+        if str(audience_filter.get("type") or "").strip().lower() == "user_ids"
+        else []
+    )
+    audience = resolve_campaign_audience(conn, audience_filter)
     db.update_campaign(
         conn,
         campaign_id,
@@ -659,22 +672,26 @@ def _dispatch_one_campaign(conn, campaign: Dict[str, Any]) -> Dict[str, Any]:
                     process_campaign_batch(campaign_id=campaign_id, user_ids=chunk)
                 )
 
-        db.update_campaign(
-            conn,
-            campaign_id,
-            status="sent",
-            dispatched_at=datetime.now(IST_TZ),
-            total_targeted=len(audience),
-        )
+        if not audience:
+            db.update_campaign(
+                conn,
+                campaign_id,
+                status="sent",
+                dispatched_at=datetime.now(IST_TZ),
+                total_targeted=0,
+            )
         conn.commit()
+        current_campaign = db.get_campaign(conn, campaign_id) or {}
 
         out: Dict[str, Any] = {
             "campaign_id": campaign_id,
+            "users_selected": len(selected_user_ids) if selected_user_ids else None,
             "users_targeted": len(audience),
             "batches": len(batches),
             "queued": bool(tasks_enabled and enqueue_nudge_task),
             "tasks_enqueued": enqueued,
             "enqueue_failed": enqueue_failed,
+            "status": current_campaign.get("status") or ("sending" if audience else "sent"),
         }
         if inline_summaries:
             out["delivered"] = sum(int(s.get("delivered") or 0) for s in inline_summaries)
