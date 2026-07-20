@@ -2891,6 +2891,10 @@ class AudienceNlGenerateAndRunBody(BaseModel):
     page_size: int = 50
 
 
+class AnalyticsNlExecuteBody(BaseModel):
+    sql: str = Field(..., min_length=10, max_length=20000)
+
+
 @router.post("/admin/audience-nl/generate")
 async def admin_audience_nl_generate(
     body: AudienceNlPromptBody,
@@ -2979,3 +2983,60 @@ async def admin_audience_nl_generate_and_run(
     except Exception as e:
         logger.exception("admin_audience_nl_generate_and_run failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to generate and run audience query") from e
+
+
+@router.post("/admin/analytics-nl/execute")
+async def admin_analytics_nl_execute(
+    body: AnalyticsNlExecuteBody,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    from .analytics_nl import (
+        ensure_admin_analytics_purchase_facts_view,
+        execute_analytics_sql,
+    )
+
+    try:
+        ensure_admin_analytics_purchase_facts_view()
+        out = await run_in_threadpool(lambda: execute_analytics_sql(body.sql))
+        logger.info(
+            "analytics_nl_execute admin=%s rows=%s",
+            current_user.userid,
+            out.get("row_count"),
+        )
+        return {"ok": True, **out}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("admin_analytics_nl_execute failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to execute analytics SQL") from e
+
+
+@router.post("/admin/analytics-nl/generate-and-run")
+async def admin_analytics_nl_generate_and_run(
+    body: AudienceNlPromptBody,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    from .analytics_nl import (
+        ensure_admin_analytics_purchase_facts_view,
+        generate_and_run_analytics,
+    )
+
+    try:
+        ensure_admin_analytics_purchase_facts_view()
+        out = await run_in_threadpool(lambda: generate_and_run_analytics(body.prompt))
+        logger.info(
+            "analytics_nl_generate_and_run admin=%s rows=%s model=%s",
+            current_user.userid,
+            out.get("row_count"),
+            out.get("model_used"),
+        )
+        return {"ok": True, **out}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("admin_analytics_nl_generate_and_run failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to generate and run analytics query") from e

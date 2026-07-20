@@ -2928,7 +2928,11 @@ async def verify_reset_code(request: VerifyResetCode):
 @app.post("/api/reset-password-with-token")
 async def reset_password_with_token(request: ResetPasswordWithToken):
     from datetime import datetime
-    
+
+    pw_err = _validate_new_password_strength(request.new_password)
+    if pw_err:
+        raise HTTPException(status_code=400, detail=pw_err)
+
     with get_conn() as conn:
         # Verify token is valid and not used
         cur = execute(
@@ -2946,13 +2950,16 @@ async def reset_password_with_token(request: ResetPasswordWithToken):
             raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
         phone = result[0]
+        user = _find_user_row_by_phone_variants(conn, phone)
+        if not user:
+            raise HTTPException(status_code=404, detail="Account not found for this reset request")
 
-        # Update password
+        # Update password using the canonical users.phone (not only the code-row phone string)
         hashed_password = hash_password(request.new_password)
         execute(
             conn,
-            "UPDATE users SET password = %s WHERE phone = %s",
-            (hashed_password, phone),
+            "UPDATE users SET password = %s WHERE userid = %s",
+            (hashed_password, user[0]),
         )
 
         # Mark token as used
@@ -2963,7 +2970,7 @@ async def reset_password_with_token(request: ResetPasswordWithToken):
         )
 
         conn.commit()
-    
+
     return {"message": "Password reset successfully"}
 
 @app.post("/api/reset-password")

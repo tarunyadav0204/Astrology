@@ -14,6 +14,45 @@
   max-width: 720px;
 }
 
+.audience-builder__mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 240px));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.audience-builder__mode-tabs button {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  padding: 10px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.audience-builder__mode-tabs button span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.audience-builder__mode-tabs button.is-active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+  box-shadow: 0 0 0 1px #2563eb;
+}
+
+.audience-builder__mode-tabs button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .audience-builder__prompt-block,
 .audience-builder__sql-block {
   margin-bottom: 14px;
@@ -123,6 +162,58 @@
   margin-bottom: 10px;
 }
 
+.audience-builder__analytics-results {
+  margin: 14px 0;
+}
+
+.audience-builder__analytics-group {
+  margin-bottom: 12px;
+}
+
+.audience-builder__analytics-group-title {
+  margin-bottom: 7px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.audience-builder__metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.audience-builder__metric-card {
+  min-height: 84px;
+  border: 1px solid #dbeafe;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #eff6ff, #fff);
+  padding: 13px 14px;
+  box-sizing: border-box;
+}
+
+.audience-builder__metric-card span {
+  display: block;
+  margin-bottom: 8px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.audience-builder__metric-card strong {
+  color: #0f172a;
+  font-size: 1.35rem;
+  line-height: 1.15;
+}
+
+.audience-builder__analytics-empty {
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #64748b;
+  padding: 28px 14px;
+  text-align: center;
+  font-size: 14px;
+}
+
 .audience-builder__table-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -172,4 +263,10 @@
   gap: 12px;
   margin-top: 12px;
   font-size: 14px;
+}
+
+@media (max-width: 600px) {
+  .audience-builder__mode-tabs {
+    grid-template-columns: 1fr;
+  }
 }

@@ -1,8 +1,15 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { toast } from 'react-toastify';
-import { authService } from '../../services/authService';
+import { authService, toUserFriendlyAuthError } from '../../services/authService';
 import PhoneWithCountrySelect from './PhoneWithCountrySelect';
 import { buildFullPhone, isNationalPhoneValid } from '../../utils/countryCodes';
+
+const validateNewPassword = (password) => {
+  if (!password || !String(password).trim()) return 'Please enter a new password';
+  if (String(password).length < 8) return 'Password must be at least 8 characters';
+  if (!/\d/.test(String(password))) return 'Password must include at least one number';
+  return null;
+};
 
 // Get app name based on domain
 const getAppName = () => {
@@ -29,7 +36,9 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
   const [resetData, setResetData] = useState({ phone: '', email: '', code: '', newPassword: '' });
   const [resetStep, setResetStep] = useState(1);
   const [resetToken, setResetToken] = useState('');
+  const [resetError, setResetError] = useState('');
   const [biometricSupported, setBiometricSupported] = useState(false);
+  const newPasswordInputRef = useRef(null);
   
   React.useEffect(() => {
     // Check if biometric authentication is supported
@@ -117,7 +126,12 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
       }
       setResetStep(2);
     } catch (error) {
-      toast.error(error.message || 'Phone number not found');
+      toast.error(
+        toUserFriendlyAuthError(
+          error,
+          'Could not send the reset code. Please check your details and try again.'
+        )
+      );
     } finally {
       setLoading(false);
     }
@@ -133,33 +147,69 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
         phone: fullPhone,
         code: resetData.code
       });
-      setResetToken(response.reset_token);
+      const token = response?.reset_token || '';
+      if (!token) {
+        throw new Error('That code could not be verified. Please request a new one.');
+      }
+      setResetToken(token);
+      setResetError('');
+      setResetData((prev) => ({ ...prev, newPassword: '' }));
       toast.success('Code verified! Enter new password.');
       setResetStep(3);
     } catch (error) {
-      toast.error(error.message || 'Invalid or expired code');
+      toast.error(
+        toUserFriendlyAuthError(
+          error,
+          'That code is invalid or has expired. Please request a new one.'
+        )
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const handleResetPassword = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+    if (e?.preventDefault) e.preventDefault();
+    if (loading) return;
 
+    // Prefer live input value — iOS/PWA autofill often fills the DOM without firing onChange.
+    const typedPassword =
+      (newPasswordInputRef.current && newPasswordInputRef.current.value) ||
+      resetData.newPassword ||
+      '';
+    const password = String(typedPassword).trim();
+    const validationError = validateNewPassword(password);
+    if (validationError) {
+      setResetError(validationError);
+      toast.error(validationError);
+      return;
+    }
+    if (!resetToken) {
+      const msg = 'Reset session expired. Please verify the code again.';
+      setResetError(msg);
+      toast.error(msg);
+      setResetStep(2);
+      return;
+    }
+
+    setResetError('');
+    setLoading(true);
     try {
       await authService.resetPasswordWithToken({
         token: resetToken,
-        new_password: resetData.newPassword
+        new_password: password,
       });
-      toast.success('Password reset successfully!');
+      toast.success('Password reset successfully! You can log in now.');
       setShowForgotPassword(false);
       setResetStep(1);
       setResetData({ phone: '', email: '', code: '', newPassword: '' });
       setResetCountryCode('+91');
       setResetToken('');
+      setResetError('');
     } catch (error) {
-      toast.error(error.message || 'Password reset failed');
+      const msg = toUserFriendlyAuthError(error, 'Could not reset your password. Please try again.');
+      setResetError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -385,24 +435,45 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
                 New Password
               </label>
               <input
+                ref={newPasswordInputRef}
                 type="password"
+                name="newPassword"
                 value={resetData.newPassword}
-                onChange={(e) => setResetData(prev => ({ ...prev, newPassword: e.target.value }))}
-                placeholder="Enter new password"
+                onChange={(e) => {
+                  setResetError('');
+                  setResetData((prev) => ({ ...prev, newPassword: e.target.value }));
+                }}
+                placeholder="Min 8 characters, include a number"
+                autoComplete="new-password"
                 required
+                minLength={8}
                 style={{
                   width: '100%',
                   padding: '0.75rem',
                   border: '2px solid rgba(233, 30, 99, 0.2)',
                   borderRadius: '12px',
                   fontSize: '16px',
-                  background: 'rgba(255, 255, 255, 0.8)'
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  WebkitAppearance: 'none',
+                  WebkitUserSelect: 'text',
+                  WebkitTouchCallout: 'default',
                 }}
               />
+              <p style={{ margin: '0.5rem 0 0', color: '#666', fontSize: '0.85rem' }}>
+                Use at least 8 characters and include a number.
+              </p>
+              {resetError ? (
+                <p style={{ margin: '0.5rem 0 0', color: '#c62828', fontSize: '0.9rem', fontWeight: 600 }}>
+                  {resetError}
+                </p>
+              ) : null}
             </div>
             <button
-              type="submit"
+              type="button"
               disabled={loading}
+              // Prevent iOS/PWA from stealing the tap when the keyboard dismisses.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleResetPassword}
               style={{
                 width: '100%',
                 padding: '1rem',
@@ -414,7 +485,8 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
                 fontWeight: '700',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 opacity: loading ? 0.6 : 1,
-                marginBottom: '1rem'
+                marginBottom: '1rem',
+                touchAction: 'manipulation',
               }}
             >
               {loading ? 'Resetting...' : 'Reset Password'}

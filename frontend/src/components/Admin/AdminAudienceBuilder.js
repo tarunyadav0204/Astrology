@@ -43,8 +43,27 @@ function formatPurchaseAmount(row) {
 
 const EXAMPLE =
   'Users who bought credits in the last 60 days, still have a credit balance, and have not asked a chat question in 14 days.';
+const ANALYTICS_EXAMPLE = 'What was the total credit purchase this month?';
+
+function humanizeColumn(value) {
+  return String(value || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatAnalyticsValue(column, value, row) {
+  if (value == null || value === '') return '—';
+  const number = Number(value);
+  if (!Number.isFinite(number)) return String(value);
+  const formatted = number.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (String(column).includes('amount')) {
+    return String(row.currency || '').toUpperCase() === 'INR' ? `₹${formatted}` : formatted;
+  }
+  return formatted;
+}
 
 export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
+  const [mode, setMode] = useState('audience');
   const [prompt, setPrompt] = useState(EXAMPLE);
   const [explanation, setExplanation] = useState('');
   const [sql, setSql] = useState('');
@@ -60,6 +79,8 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+  const [analyticsColumns, setAnalyticsColumns] = useState([]);
+  const [analyticsRows, setAnalyticsRows] = useState([]);
 
   const pageIds = useMemo(() => rows.map((r) => Number(r.userid)).filter(Boolean), [rows]);
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
@@ -78,17 +99,54 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
     }
   }, []);
 
+  const applyAnalyticsResult = useCallback((body) => {
+    setExplanation(body.explanation || '');
+    setSql(body.sql || '');
+    setAnalyticsColumns(Array.isArray(body.columns) ? body.columns : []);
+    setAnalyticsRows(Array.isArray(body.rows) ? body.rows : []);
+    setWarnings(Array.isArray(body.warnings) ? body.warnings : []);
+  }, []);
+
+  const changeMode = (nextMode) => {
+    if (nextMode === mode || busy) return;
+    setMode(nextMode);
+    setPrompt(nextMode === 'analytics' ? ANALYTICS_EXAMPLE : EXAMPLE);
+    setExplanation('');
+    setSql('');
+    setShowSql(false);
+    setWarnings([]);
+    setError('');
+    setStatus('');
+    setRows([]);
+    setAllUserIds([]);
+    setTotal(0);
+    setSelected(new Set());
+    setAnalyticsColumns([]);
+    setAnalyticsRows([]);
+  };
+
   const runGenerateAndRun = async () => {
     setBusy(true);
     setError('');
-    setStatus('Generating audience and running query…');
+    setStatus(mode === 'analytics' ? 'Generating analytics and running query…' : 'Generating audience and running query…');
     try {
-      const body = await apiFetch('/api/nudge/admin/audience-nl/generate-and-run', {
+      const endpoint =
+        mode === 'analytics'
+          ? '/api/nudge/admin/analytics-nl/generate-and-run'
+          : '/api/nudge/admin/audience-nl/generate-and-run';
+      const body = await apiFetch(endpoint, {
         method: 'POST',
-        body: JSON.stringify({ prompt, page: 1, page_size: pageSize }),
+        body: JSON.stringify(
+          mode === 'analytics' ? { prompt } : { prompt, page: 1, page_size: pageSize }
+        ),
       });
-      applyResult(body);
-      setStatus(`Found ${body.total || 0} users`);
+      if (mode === 'analytics') {
+        applyAnalyticsResult(body);
+        setStatus(body.row_count ? `Returned ${body.row_count} result row${body.row_count === 1 ? '' : 's'}` : 'No data matched');
+      } else {
+        applyResult(body);
+        setStatus(`Found ${body.total || 0} users`);
+      }
       setShowSql(false);
     } catch (err) {
       setError(err.message || 'Failed');
@@ -107,13 +165,22 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
     setError('');
     setStatus('Running query…');
     try {
-      const body = await apiFetch('/api/nudge/admin/audience-nl/execute', {
+      const endpoint =
+        mode === 'analytics' ? '/api/nudge/admin/analytics-nl/execute' : '/api/nudge/admin/audience-nl/execute';
+      const body = await apiFetch(endpoint, {
         method: 'POST',
-        body: JSON.stringify({ sql, page: nextPage, page_size: pageSize }),
+        body: JSON.stringify(
+          mode === 'analytics' ? { sql } : { sql, page: nextPage, page_size: pageSize }
+        ),
       });
-      applyResult(body, { keepSelection: true });
-      setPage(nextPage);
-      setStatus(`Found ${body.total || 0} users`);
+      if (mode === 'analytics') {
+        applyAnalyticsResult(body);
+        setStatus(body.row_count ? `Returned ${body.row_count} result row${body.row_count === 1 ? '' : 's'}` : 'No data matched');
+      } else {
+        applyResult(body, { keepSelection: true });
+        setPage(nextPage);
+        setStatus(`Found ${body.total || 0} users`);
+      }
     } catch (err) {
       setError(err.message || 'Failed');
       setStatus('');
@@ -176,27 +243,54 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
     <div className="audience-builder">
       <div className="audience-builder__header">
         <div>
-          <h2>Audience builder</h2>
+          <h2>Audience & analytics builder</h2>
           <p className="audience-builder__hint">
-            Describe who you want in plain English. We generate a safe query, show matching users, then you
-            select rows and start a campaign.
+            Ask for a campaign audience or a purchase metric in plain English. Queries run only against
+            curated admin data.
           </p>
         </div>
       </div>
 
+      <div className="audience-builder__mode-tabs" role="tablist" aria-label="Builder mode">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'audience'}
+          className={mode === 'audience' ? 'is-active' : ''}
+          onClick={() => changeMode('audience')}
+          disabled={busy}
+        >
+          Audience
+          <span>User lists for campaigns</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'analytics'}
+          className={mode === 'analytics' ? 'is-active' : ''}
+          onClick={() => changeMode('analytics')}
+          disabled={busy}
+        >
+          Analytics
+          <span>Totals, counts, and trends</span>
+        </button>
+      </div>
+
       <div className="audience-builder__prompt-block">
-        <label htmlFor="audience-nl-prompt">Audience description</label>
+        <label htmlFor="audience-nl-prompt">
+          {mode === 'analytics' ? 'Analytics question' : 'Audience description'}
+        </label>
         <textarea
           id="audience-nl-prompt"
           rows={4}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           disabled={busy}
-          placeholder={EXAMPLE}
+          placeholder={mode === 'analytics' ? ANALYTICS_EXAMPLE : EXAMPLE}
         />
         <div className="audience-builder__actions">
           <button type="button" className="audience-builder__primary" onClick={runGenerateAndRun} disabled={busy}>
-            {busy ? 'Working…' : 'Generate & run'}
+            {busy ? 'Working…' : mode === 'analytics' ? 'Ask & run' : 'Generate & run'}
           </button>
           <button type="button" className="audience-builder__secondary" onClick={() => runExecute(1)} disabled={busy || !sql}>
             Re-run SQL
@@ -250,6 +344,33 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
         </div>
       ) : null}
 
+      {mode === 'analytics' && analyticsRows.length > 0 ? (
+        <div className="audience-builder__analytics-results">
+          {analyticsRows.map((row, rowIndex) => (
+            <div className="audience-builder__analytics-group" key={`analytics-${rowIndex}`}>
+              {analyticsRows.length > 1 ? (
+                <div className="audience-builder__analytics-group-title">
+                  Result {rowIndex + 1}
+                  {row.currency ? ` · ${row.currency}` : ''}
+                  {row.provider ? ` · ${humanizeColumn(row.provider)}` : ''}
+                </div>
+              ) : null}
+              <div className="audience-builder__metric-grid">
+                {analyticsColumns
+                  .filter((column) => !['currency', 'provider'].includes(column))
+                  .map((column) => (
+                    <div className="audience-builder__metric-card" key={`${rowIndex}-${column}`}>
+                      <span>{humanizeColumn(column)}</span>
+                      <strong>{formatAnalyticsValue(column, row[column], row)}</strong>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {mode === 'audience' ? (
       <div className="audience-builder__table-toolbar">
         <div>
           <strong>{total}</strong> matching · <strong>{selected.size}</strong> selected
@@ -279,7 +400,9 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
           </button>
         </div>
       </div>
+      ) : null}
 
+      {mode === 'audience' ? (
       <div className="audience-builder__table-wrap">
         <table className="audience-builder__table">
           <thead>
@@ -338,8 +461,13 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
           </tbody>
         </table>
       </div>
+      ) : analyticsRows.length === 0 && !busy ? (
+        <div className="audience-builder__analytics-empty">
+          Ask a purchase question to see totals, counts, or grouped results.
+        </div>
+      ) : null}
 
-      {total > pageSize ? (
+      {mode === 'audience' && total > pageSize ? (
         <div className="audience-builder__pager">
           <button
             type="button"
