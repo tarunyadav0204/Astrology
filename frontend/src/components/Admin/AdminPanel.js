@@ -38,6 +38,17 @@ import AdminGooglePlayTestimonials from './AdminGooglePlayTestimonials';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AdminPanel.css';
 
+function todayInIST() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 /** API may return boolean, 0/1, or legacy strings for promo_codes.is_active */
 function promoCodeIsActive(value) {
   if (value === true || value === 1) return true;
@@ -445,7 +456,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [notifTodayLoading, setNotifTodayLoading] = useState(false);
   const [notifTodayError, setNotifTodayError] = useState(null);
   const [notifHistoryDate, setNotifHistoryDate] = useState(
-    new Date().toISOString().slice(0, 10)
+    todayInIST()
   );
   const [selectedEmailReminderUserIds, setSelectedEmailReminderUserIds] = useState([]);
   const [emailReminderSubject, setEmailReminderSubject] = useState('Turn on AstroRoshni notifications for timely life signals');
@@ -635,6 +646,14 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       }
     }
   }, [activeTab, activeSubTab, notifSubTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'notifications' || notifSubTab !== 'sent_today') return undefined;
+    const timer = window.setInterval(() => {
+      fetchTodayDeliveries();
+    }, 10000);
+    return () => window.clearInterval(timer);
+  }, [activeTab, notifSubTab, notifHistoryDate]);
 
   useEffect(() => {
     const jobId = notifBulkJob?.job_id;
@@ -4793,8 +4812,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 type="button"
                 className={`sub-tab ${notifSubTab === 'sent_today' ? 'active' : ''}`}
                 onClick={() => {
+                  const today = todayInIST();
+                  setNotifHistoryDate(today);
                   setNotifSubTab('sent_today');
-                  fetchTodayDeliveries();
+                  fetchTodayDeliveries(today);
                 }}
               >
                 Sent today

@@ -29,6 +29,7 @@ SERVE_FRONTEND_LOCALLY="${SERVE_FRONTEND_LOCALLY:-true}"
 FRONTEND_LOG_FILE="${FRONTEND_LOG_FILE:-${LOG_DIR}/frontend.log}"
 SYNC_GCP_SECRETS="${SYNC_GCP_SECRETS:-true}"
 APP_ENV_SECRET_NAME="${APP_ENV_SECRET_NAME:-APP_ENV_FILE}"
+NUDGE_TASKS_SECRET_NAME="${NUDGE_TASKS_SECRET_NAME:-NUDGE_TASKS_SECRET}"
 WHATSAPP_FLOW_PRIVATE_KEY_SECRET_NAME="${WHATSAPP_FLOW_PRIVATE_KEY_SECRET_NAME:-WHATSAPP_FLOW_PRIVATE_KEY_FILE}"
 WHATSAPP_FLOW_PRIVATE_KEY_PATH="${WHATSAPP_FLOW_PRIVATE_KEY_PATH:-/home/tarun_yadav/AstrologyApp/backend/flow_endpoint_private.pem}"
 PLAY_PAYMENT_SERVICE_SHARED_SECRET_NAME="${PLAY_PAYMENT_SERVICE_SHARED_SECRET_NAME:-PLAY_PAYMENT_SERVICE_SHARED_SECRET}"
@@ -118,9 +119,38 @@ sync_gcp_secret_to_file() {
   mv "${temp_path}" "${target_path}"
 }
 
+overlay_gcp_secret_in_env_file() {
+  local secret_name="$1"
+  local env_key="$2"
+  local env_path="$3"
+  local secret_path merged_path
+
+  secret_path="$(mktemp "${env_path}.${env_key}.secret.XXXXXX")"
+  merged_path="$(mktemp "${env_path}.${env_key}.merged.XXXXXX")"
+  chmod 600 "${secret_path}" "${merged_path}" 2>/dev/null || true
+  if ! gcloud secrets versions access latest --secret="${secret_name}" > "${secret_path}"; then
+    rm -f "${secret_path}" "${merged_path}"
+    echo "❌ Failed to read Secret Manager secret: ${secret_name}"
+    exit 1
+  fi
+  if [ ! -s "${secret_path}" ]; then
+    rm -f "${secret_path}" "${merged_path}"
+    echo "❌ Secret Manager secret is empty: ${secret_name}"
+    exit 1
+  fi
+  grep -v "^${env_key}=" "${env_path}" > "${merged_path}" || true
+  printf '%s=' "${env_key}" >> "${merged_path}"
+  tr -d '\r\n' < "${secret_path}" >> "${merged_path}"
+  printf '\n' >> "${merged_path}"
+  chmod 600 "${merged_path}"
+  mv "${merged_path}" "${env_path}"
+  rm -f "${secret_path}"
+}
+
 if [ "${SYNC_GCP_SECRETS}" = "true" ]; then
   echo "🔑 Pulling runtime secrets from Google Secret Manager..."
   sync_gcp_secret_to_file "${APP_ENV_SECRET_NAME}" "${BACKEND_DIR}/.env" 600
+  overlay_gcp_secret_in_env_file "${NUDGE_TASKS_SECRET_NAME}" "NUDGE_TASKS_SECRET" "${BACKEND_DIR}/.env"
   sync_gcp_secret_to_file "${WHATSAPP_FLOW_PRIVATE_KEY_SECRET_NAME}" "${WHATSAPP_FLOW_PRIVATE_KEY_PATH}" 600
   sync_gcp_secret_to_file "${PLAY_PAYMENT_SERVICE_SHARED_SECRET_NAME}" "${PLAY_PAYMENT_SERVICE_SHARED_SECRET_PATH}" 600
   if ! grep -q "BEGIN .*PRIVATE KEY" "${WHATSAPP_FLOW_PRIVATE_KEY_PATH}"; then

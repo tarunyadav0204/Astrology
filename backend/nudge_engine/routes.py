@@ -2839,6 +2839,44 @@ async def admin_campaign_stats(
         raise HTTPException(status_code=500, detail="Failed to load campaign stats") from e
 
 
+@router.get("/admin/campaigns/{campaign_id}/question-funnel")
+async def admin_campaign_question_funnel(
+    campaign_id: int,
+    window_days: int = Query(7, ge=1, le=30),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    asked: Optional[bool] = Query(None),
+    current_user: User = Depends(get_current_user),
+):
+    """Recipient-level campaign funnel: targeted -> delivered -> asked within N days."""
+    _require_admin(current_user)
+    try:
+        def _work():
+            with db.get_conn() as conn:
+                db.init_nudge_tables(conn)
+                campaign = db.get_campaign(conn, int(campaign_id))
+                if not campaign:
+                    return None
+                return db.campaign_question_funnel(
+                    conn,
+                    int(campaign_id),
+                    window_days=window_days,
+                    page=page,
+                    page_size=page_size,
+                    asked=asked,
+                )
+
+        result = await run_in_threadpool(_work)
+        if result is None:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        return {"ok": True, **result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_campaign_question_funnel failed id=%s: %s", campaign_id, e)
+        raise HTTPException(status_code=500, detail="Failed to load campaign question funnel") from e
+
+
 @router.get("/admin/stats/overview")
 async def admin_nudge_stats_overview(
     start_date: Optional[str] = Query(None, description="YYYY-MM-DD; default 7 days ago (IST)"),

@@ -1659,12 +1659,12 @@ def _delivery_channel_counts(conn, where_sql: str, params: Tuple[Any, ...]) -> D
                COUNT(*) FILTER (WHERE channel = 'push' AND COALESCE(send_status, 'sent') = 'sent') AS push,
                COUNT(*) FILTER (WHERE channel IN ('whatsapp', 'whatsapp_template') AND COALESCE(send_status, 'sent') = 'sent') AS whatsapp,
                COUNT(*) FILTER (WHERE channel = 'whatsapp' AND COALESCE(send_status, 'sent') = 'sent'
-                                AND COALESCE(data_json, '') NOT LIKE '%"from_template_continue": true%') AS whatsapp_direct,
+                                AND COALESCE(data_json, '') NOT LIKE '%%"from_template_continue": true%%') AS whatsapp_direct,
                COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND COALESCE(send_status, 'sent') = 'sent') AS whatsapp_template,
                COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND clicked_at IS NOT NULL) AS whatsapp_template_clicked,
                COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND read_at IS NOT NULL) AS whatsapp_template_message_sent,
                COUNT(*) FILTER (WHERE channel = 'whatsapp' AND COALESCE(send_status, 'sent') = 'sent'
-                                AND COALESCE(data_json, '') LIKE '%"from_template_continue": true%') AS whatsapp_after_continue,
+                                AND COALESCE(data_json, '') LIKE '%%"from_template_continue": true%%') AS whatsapp_after_continue,
                COUNT(*) FILTER (WHERE channel = 'email' AND COALESCE(send_status, 'sent') = 'sent') AS email,
                COUNT(*) FILTER (WHERE COALESCE(send_status, '') = 'failed') AS failed_attempts,
                COUNT(*) FILTER (WHERE COALESCE(is_primary, TRUE)
@@ -1797,6 +1797,177 @@ def campaign_stats(conn, campaign_id: int) -> Dict[str, Any]:
         "time_buckets": conv.get("time_buckets"),
         "median_seconds_to_question": conv.get("median_seconds"),
         "progress": progress,
+    }
+
+
+def campaign_question_funnel(
+    conn,
+    campaign_id: int,
+    *,
+    window_days: int = 7,
+    page: int = 1,
+    page_size: int = 50,
+    asked: Optional[bool] = None,
+) -> Dict[str, Any]:
+    """
+    Recipient-level funnel from campaign delivery to a later user chat message.
+
+    A chat within the selected window is an observed conversion. `tap_attributed`
+    is stricter and means the chat carried the nudge delivery-group identifier.
+    """
+    cid = int(campaign_id)
+    days = max(1, min(int(window_days), 30))
+    page = max(1, int(page))
+    page_size = max(1, min(int(page_size), 200))
+    asked_filter = ""
+    if asked is True:
+        asked_filter = "WHERE first_question_at IS NOT NULL"
+    elif asked is False:
+        asked_filter = "WHERE first_question_at IS NULL"
+
+    cte = """
+        WITH recipients AS (
+            SELECT DISTINCT ON (d.userid)
+                d.userid,
+                d.delivery_group_id,
+                d.created_at AS delivered_at,
+                COALESCE(d.channel, 'stored') AS primary_channel,
+                EXISTS (
+                    SELECT 1
+                    FROM nudge_deliveries sent
+                    WHERE sent.campaign_id = d.campaign_id
+                      AND sent.userid = d.userid
+                      AND COALESCE(sent.send_status, '') = 'sent'
+                      AND COALESCE(sent.channel, 'stored') <> 'stored'
+                ) AS channel_delivered,
+                EXISTS (
+                    SELECT 1
+                    FROM nudge_deliveries clicked
+                    WHERE clicked.campaign_id = d.campaign_id
+                      AND clicked.userid = d.userid
+                      AND clicked.clicked_at IS NOT NULL
+                ) AS clicked
+            FROM nudge_deliveries d
+            WHERE d.campaign_id = %s
+              AND COALESCE(d.is_primary, TRUE)
+            ORDER BY d.userid, d.created_at ASC, d.id ASC
+        ),
+        recipient_funnel AS (
+            SELECT
+                r.*,
+                u.name,
+                u.phone,
+                q.first_question_at,
+                COALESCE(q.questions_in_window, 0)::integer AS questions_in_window,
+                CASE
+                    WHEN q.first_question_at IS NULL THEN NULL
+                    ELSE EXTRACT(EPOCH FROM (q.first_question_at - r.delivered_at)) / 3600.0
+                END AS hours_to_first_question,
+                (c.delivery_group_id IS NOT NULL) AS tap_attributed
+            FROM recipients r
+            LEFT JOIN users u ON u.userid = r.userid
+            LEFT JOIN LATERAL (
+                SELECT
+                    MIN(cm.timestamp) AS first_question_at,
+                    COUNT(*)::integer AS questions_in_window
+                FROM chat_sessions cs
+                JOIN chat_messages cm ON cm.session_id = cs.session_id
+                WHERE cs.user_id = r.userid
+                  AND cm.sender = 'user'
+                  AND cm.timestamp >= r.delivered_at
+                  AND cm.timestamp < r.delivered_at + (%s || ' days')::interval
+            ) q ON TRUE
+            LEFT JOIN nudge_conversions c
+              ON c.delivery_group_id = r.delivery_group_id
+        )
+    """
+    base_params: Tuple[Any, ...] = (cid, str(days))
+    summary_cur = execute(
+        conn,
+        cte
+        + """
+        SELECT
+            COUNT(*) AS targeted,
+            COUNT(*) FILTER (WHERE channel_delivered) AS delivered,
+            COUNT(*) FILTER (WHERE clicked) AS clicked,
+            COUNT(*) FILTER (WHERE first_question_at IS NOT NULL) AS asked,
+            COUNT(*) FILTER (WHERE tap_attributed) AS tap_attributed,
+            COUNT(*) FILTER (WHERE first_question_at IS NULL) AS not_asked,
+            COUNT(*) FILTER (
+                WHERE channel_delivered AND first_question_at IS NOT NULL
+            ) AS delivered_and_asked
+        FROM recipient_funnel
+        """,
+        base_params,
+    )
+    summary_row = summary_cur.fetchone() or (0, 0, 0, 0, 0, 0, 0)
+    summary = {
+        "targeted": int(summary_row[0] or 0),
+        "delivered": int(summary_row[1] or 0),
+        "clicked": int(summary_row[2] or 0),
+        "asked": int(summary_row[3] or 0),
+        "tap_attributed": int(summary_row[4] or 0),
+        "not_asked": int(summary_row[5] or 0),
+        "delivered_and_asked": int(summary_row[6] or 0),
+    }
+    summary["asked_rate"] = (
+        round(summary["asked"] / summary["targeted"], 4) if summary["targeted"] else 0.0
+    )
+    summary["delivered_asked_rate"] = (
+        round(summary["delivered_and_asked"] / summary["delivered"], 4)
+        if summary["delivered"]
+        else 0.0
+    )
+
+    count_cur = execute(
+        conn,
+        cte + f"SELECT COUNT(*) FROM recipient_funnel {asked_filter}",
+        base_params,
+    )
+    filtered_total_row = count_cur.fetchone()
+    filtered_total = int(filtered_total_row[0] or 0) if filtered_total_row else 0
+    offset = (page - 1) * page_size
+    rows_cur = execute(
+        conn,
+        cte
+        + f"""
+        SELECT userid, name, phone, delivered_at, primary_channel, channel_delivered,
+               clicked, first_question_at, questions_in_window,
+               hours_to_first_question, tap_attributed
+        FROM recipient_funnel
+        {asked_filter}
+        ORDER BY (first_question_at IS NULL), first_question_at ASC NULLS LAST, userid
+        LIMIT %s OFFSET %s
+        """,
+        base_params + (page_size, offset),
+    )
+    items = []
+    for row in rows_cur.fetchall() or []:
+        items.append(
+            {
+                "user_id": int(row[0]),
+                "name": row[1] or "",
+                "phone": row[2] or "",
+                "delivered_at": row[3].isoformat() if hasattr(row[3], "isoformat") else str(row[3]),
+                "channel": row[4] or "stored",
+                "channel_delivered": bool(row[5]),
+                "clicked": bool(row[6]),
+                "first_question_at": (
+                    row[7].isoformat() if hasattr(row[7], "isoformat") else (str(row[7]) if row[7] else None)
+                ),
+                "questions_in_window": int(row[8] or 0),
+                "hours_to_first_question": float(row[9]) if row[9] is not None else None,
+                "tap_attributed": bool(row[10]),
+            }
+        )
+    return {
+        "campaign_id": cid,
+        "window_days": days,
+        "summary": summary,
+        "items": items,
+        "page": page,
+        "page_size": page_size,
+        "filtered_total": filtered_total,
     }
 
 
