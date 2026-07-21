@@ -242,7 +242,7 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
       body_template: form.body_template.trim(),
       question_template: form.question_template.trim(),
       channel_policy: form.channel_policy,
-      channels: form.channels,
+      channels: form.channel_policy === 'push_only' ? ['push'] : form.channels,
       ai_personalize: !!form.ai_personalize,
       ai_base_prompt: form.ai_base_prompt.trim(),
       audience_filter: audience,
@@ -612,6 +612,7 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
               <select value={form.channel_policy} onChange={(e) => setField('channel_policy', e.target.value)}>
                 <option value="waterfall">Waterfall - stop at first successful channel</option>
                 <option value="blast">Blast - send on every selected channel</option>
+                <option value="push_only">PN only - send push notification only</option>
               </select>
             </div>
             <div className="form-field">
@@ -626,32 +627,42 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
 
           <div className="form-field">
             <label>Channel order</label>
-            <div className="nudge-channel-stack">
-              {form.channels.map((channel, idx) => (
-                <div key={channel} className="nudge-channel-row">
-                  <div className="nudge-channel-order">{idx + 1}</div>
-                  <div className="nudge-channel-name">{channel}</div>
-                  <div className="nudge-channel-actions">
-                    <button type="button" className="notif-search-btn" onClick={() => moveChannel(channel, -1)}>
-                      Move up
-                    </button>
-                    <button type="button" className="notif-search-btn" onClick={() => moveChannel(channel, 1)}>
-                      Move down
-                    </button>
-                    <button type="button" className="delete-btn" onClick={() => toggleChannel(channel)}>
-                      Remove
-                    </button>
-                  </div>
+            {form.channel_policy === 'push_only' ? (
+              <div className="nudge-channel-stack">
+                <div className="nudge-channel-row">
+                  <div className="nudge-channel-order">1</div>
+                  <div className="nudge-channel-name">push</div>
+                  <div className="nudge-channel-actions">No WhatsApp or email fallback</div>
                 </div>
-              ))}
-              <div className="nudge-channel-add">
-                {CHANNEL_OPTIONS.filter((channel) => !form.channels.includes(channel)).map((channel) => (
-                  <button key={channel} type="button" className="notif-search-btn" onClick={() => toggleChannel(channel)}>
-                    Add {channel}
-                  </button>
-                ))}
               </div>
-            </div>
+            ) : (
+              <div className="nudge-channel-stack">
+                {form.channels.map((channel, idx) => (
+                  <div key={channel} className="nudge-channel-row">
+                    <div className="nudge-channel-order">{idx + 1}</div>
+                    <div className="nudge-channel-name">{channel}</div>
+                    <div className="nudge-channel-actions">
+                      <button type="button" className="notif-search-btn" onClick={() => moveChannel(channel, -1)}>
+                        Move up
+                      </button>
+                      <button type="button" className="notif-search-btn" onClick={() => moveChannel(channel, 1)}>
+                        Move down
+                      </button>
+                      <button type="button" className="delete-btn" onClick={() => toggleChannel(channel)}>
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <div className="nudge-channel-add">
+                  {CHANNEL_OPTIONS.filter((channel) => !form.channels.includes(channel)).map((channel) => (
+                    <button key={channel} type="button" className="notif-search-btn" onClick={() => toggleChannel(channel)}>
+                      Add {channel}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -1052,7 +1063,10 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
                   </strong>
                 </div>
                 <div><span>Channels</span><strong>{(campaign.channels || []).join(' -> ')}</strong></div>
-                <div><span>Policy</span><strong>{campaign.channel_policy}</strong></div>
+                <div>
+                  <span>Policy</span>
+                  <strong>{campaign.channel_policy === 'push_only' ? 'PN only' : campaign.channel_policy}</strong>
+                </div>
                 <div><span>Scheduled</span><strong>{campaign.scheduled_at ? new Date(campaign.scheduled_at).toLocaleString() : 'Draft only'}</strong></div>
                 <div><span>Eligible</span><strong>{campaign.total_targeted || 0}</strong></div>
                 <div><span>Mode</span><strong>{campaign.ai_personalize ? 'AI personalized' : 'Template only'}</strong></div>

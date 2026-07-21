@@ -183,7 +183,7 @@ class CampaignUpsertRequest(BaseModel):
     title_template: str
     body_template: str
     question_template: str = ""
-    channel_policy: str = "waterfall"  # "waterfall" or "blast"
+    channel_policy: str = "waterfall"  # "waterfall", "blast", or "push_only"
     channels: List[str] = Field(default_factory=lambda: ["push", "whatsapp", "email"])
     ai_personalize: bool = False
     ai_base_prompt: str = ""
@@ -2354,7 +2354,10 @@ def _validate_campaign_payload(body: CampaignUpsertRequest) -> Dict[str, Any]:
 
     policy = (body.channel_policy or "waterfall").strip().lower()
     if policy not in ALLOWED_POLICIES:
-        raise HTTPException(status_code=400, detail="channel_policy must be 'waterfall' or 'blast'")
+        raise HTTPException(
+            status_code=400,
+            detail="channel_policy must be 'waterfall', 'blast', or 'push_only'",
+        )
 
     channels: List[str] = []
     for ch in body.channels or []:
@@ -2363,6 +2366,8 @@ def _validate_campaign_payload(body: CampaignUpsertRequest) -> Dict[str, Any]:
             channels.append(c)
     if not channels:
         raise HTTPException(status_code=400, detail="At least one channel is required")
+    if policy == "push_only":
+        channels = ["push"]
 
     landing = str(body.landing_screen or "chat").strip().lower().replace("-", "_").replace(" ", "_")
     if landing not in LANDING_SCREEN_TO_CTA:
@@ -2921,12 +2926,14 @@ class AudienceNlExecuteBody(BaseModel):
     sql: str = Field(..., min_length=10, max_length=20000)
     page: int = 1
     page_size: int = 50
+    push_only: bool = False
 
 
 class AudienceNlGenerateAndRunBody(BaseModel):
     prompt: str = Field(..., min_length=8, max_length=4000)
     page: int = 1
     page_size: int = 50
+    push_only: bool = False
 
 
 class AnalyticsNlExecuteBody(BaseModel):
@@ -2976,7 +2983,12 @@ async def admin_audience_nl_execute(
         ensure_admin_audience_user_facts_view()
 
         def _work():
-            return execute_audience_sql(body.sql, page=body.page, page_size=body.page_size)
+            return execute_audience_sql(
+                body.sql,
+                page=body.page,
+                page_size=body.page_size,
+                push_only=body.push_only,
+            )
 
         out = await run_in_threadpool(_work)
         logger.info(
@@ -3005,7 +3017,12 @@ async def admin_audience_nl_generate_and_run(
         ensure_admin_audience_user_facts_view()
 
         def _work():
-            return generate_and_run(body.prompt, page=body.page, page_size=body.page_size)
+            return generate_and_run(
+                body.prompt,
+                page=body.page,
+                page_size=body.page_size,
+                push_only=body.push_only,
+            )
 
         out = await run_in_threadpool(_work)
         logger.info(

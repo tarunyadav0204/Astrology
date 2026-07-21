@@ -288,7 +288,34 @@ def _serialize_cell(value: Any) -> Any:
     return value
 
 
-def execute_audience_sql(sql: str, *, page: int = 1, page_size: int = 50) -> Dict[str, Any]:
+def _audience_user_ids_sql(normalized_sql: str, *, push_only: bool = False) -> str:
+    push_clause = ""
+    if push_only:
+        push_clause = f"""
+        AND EXISTS (
+            SELECT 1
+            FROM {VIEW_NAME} AS push_facts
+            WHERE push_facts.userid = audience_sub.userid
+              AND push_facts.has_device_token = TRUE
+        )
+        """
+    return f"""
+    SELECT DISTINCT userid
+    FROM (
+        {normalized_sql}
+    ) AS audience_sub
+    WHERE userid IS NOT NULL
+    {push_clause}
+    """
+
+
+def execute_audience_sql(
+    sql: str,
+    *,
+    page: int = 1,
+    page_size: int = 50,
+    push_only: bool = False,
+) -> Dict[str, Any]:
     """
     Run validated filter SQL, then return DISPLAY_COLUMNS rows for matching userids.
     """
@@ -297,13 +324,7 @@ def execute_audience_sql(sql: str, *, page: int = 1, page_size: int = 50) -> Dic
     page_size = max(1, min(200, int(page_size or 50)))
 
     # Ensure filter query returns userid; wrap to collect ids.
-    wrap_sql = f"""
-    SELECT DISTINCT userid
-    FROM (
-        {normalized}
-    ) AS audience_sub
-    WHERE userid IS NOT NULL
-    """
+    wrap_sql = _audience_user_ids_sql(normalized, push_only=bool(push_only))
 
     with get_conn() as conn:
         try:
@@ -334,6 +355,7 @@ def execute_audience_sql(sql: str, *, page: int = 1, page_size: int = 50) -> Dic
                     "warnings": warnings,
                     "sql": normalized,
                     "user_ids": [],
+                    "push_only": bool(push_only),
                 }
 
             offset = (page - 1) * page_size
@@ -373,12 +395,24 @@ def execute_audience_sql(sql: str, *, page: int = 1, page_size: int = 50) -> Dic
         "warnings": warnings,
         "sql": normalized,
         "user_ids": user_ids,
+        "push_only": bool(push_only),
     }
 
 
-def generate_and_run(prompt: str, *, page: int = 1, page_size: int = 50) -> Dict[str, Any]:
+def generate_and_run(
+    prompt: str,
+    *,
+    page: int = 1,
+    page_size: int = 50,
+    push_only: bool = False,
+) -> Dict[str, Any]:
     generated = generate_audience_sql(prompt)
-    executed = execute_audience_sql(generated["sql"], page=page, page_size=page_size)
+    executed = execute_audience_sql(
+        generated["sql"],
+        page=page,
+        page_size=page_size,
+        push_only=push_only,
+    )
     return {
         **executed,
         "explanation": generated.get("explanation"),

@@ -81,6 +81,7 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
   const [status, setStatus] = useState('');
   const [analyticsColumns, setAnalyticsColumns] = useState([]);
   const [analyticsRows, setAnalyticsRows] = useState([]);
+  const [pushOnly, setPushOnly] = useState(false);
 
   const pageIds = useMemo(() => rows.map((r) => Number(r.userid)).filter(Boolean), [rows]);
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
@@ -121,6 +122,7 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
     setAllUserIds([]);
     setTotal(0);
     setSelected(new Set());
+    setPushOnly(false);
     setAnalyticsColumns([]);
     setAnalyticsRows([]);
   };
@@ -137,7 +139,7 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
       const body = await apiFetch(endpoint, {
         method: 'POST',
         body: JSON.stringify(
-          mode === 'analytics' ? { prompt } : { prompt, page: 1, page_size: pageSize }
+          mode === 'analytics' ? { prompt } : { prompt, page: 1, page_size: pageSize, push_only: pushOnly }
         ),
       });
       if (mode === 'analytics') {
@@ -145,7 +147,7 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
         setStatus(body.row_count ? `Returned ${body.row_count} result row${body.row_count === 1 ? '' : 's'}` : 'No data matched');
       } else {
         applyResult(body);
-        setStatus(`Found ${body.total || 0} users`);
+        setStatus(`Found ${body.total || 0}${pushOnly ? ' push-enabled' : ''} users`);
       }
       setShowSql(false);
     } catch (err) {
@@ -156,7 +158,7 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
     }
   };
 
-  const runExecute = async (nextPage = page) => {
+  const runExecute = async (nextPage = page, pushOnlyOverride = pushOnly, keepSelection = true) => {
     if (!sql.trim()) {
       setError('Generate or paste SQL first');
       return;
@@ -170,16 +172,18 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
       const body = await apiFetch(endpoint, {
         method: 'POST',
         body: JSON.stringify(
-          mode === 'analytics' ? { sql } : { sql, page: nextPage, page_size: pageSize }
+          mode === 'analytics'
+            ? { sql }
+            : { sql, page: nextPage, page_size: pageSize, push_only: pushOnlyOverride }
         ),
       });
       if (mode === 'analytics') {
         applyAnalyticsResult(body);
         setStatus(body.row_count ? `Returned ${body.row_count} result row${body.row_count === 1 ? '' : 's'}` : 'No data matched');
       } else {
-        applyResult(body, { keepSelection: true });
+        applyResult(body, { keepSelection });
         setPage(nextPage);
-        setStatus(`Found ${body.total || 0} users`);
+        setStatus(`Found ${body.total || 0}${pushOnlyOverride ? ' push-enabled' : ''} users`);
       }
     } catch (err) {
       setError(err.message || 'Failed');
@@ -216,6 +220,15 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
   };
 
   const clearSelection = () => setSelected(new Set());
+
+  const togglePushOnly = (event) => {
+    const nextPushOnly = Boolean(event.target.checked);
+    setPushOnly(nextPushOnly);
+    setSelected(new Set());
+    if (sql.trim()) {
+      runExecute(1, nextPushOnly, false);
+    }
+  };
 
   const createCampaign = () => {
     if (typeof onCreateCampaign !== 'function') return;
@@ -373,8 +386,19 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
 
       {mode === 'audience' ? (
       <div className="audience-builder__table-toolbar">
-        <div>
-          <strong>{total}</strong> matching · <strong>{selected.size}</strong> selected
+        <div className="audience-builder__selection-summary">
+          <span>
+            <strong>{total}</strong> matching · <strong>{selected.size}</strong> selected
+          </span>
+          <label className="audience-builder__push-filter">
+            <input
+              type="checkbox"
+              checked={pushOnly}
+              onChange={togglePushOnly}
+              disabled={busy}
+            />
+            Push enabled only
+          </label>
         </div>
         <div className="audience-builder__actions">
           <button type="button" className="audience-builder__secondary" onClick={togglePage} disabled={!rows.length}>

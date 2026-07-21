@@ -1,6 +1,6 @@
 """
 Channel orchestrator: deliver one logical nudge over push / WhatsApp / email
-with a per-send policy (waterfall or blast), and persist one nudge_deliveries
+with a per-send policy (waterfall, blast, or push only), and persist one nudge_deliveries
 row per attempted channel sharing a delivery_group_id.
 
 Every push/WhatsApp/email payload carries nudge_id = delivery_group_id so the
@@ -85,6 +85,7 @@ def deliver_nudge(
     Deliver one logical nudge to one user:
     - policy "waterfall": try channels in order, stop at the first success.
     - policy "blast": attempt every requested channel the user is reachable on.
+    - policy "push_only": attempt push only, with no WhatsApp/email fallback.
 
     Always writes nudge_deliveries rows (one per attempted channel; a single
     'stored' row when nothing succeeded so the nudge still reaches the in-app
@@ -94,7 +95,7 @@ def deliver_nudge(
     sent_at = sent_at or date.today()
     group_id = new_delivery_group_id()
     policy = (policy or "waterfall").strip().lower()
-    if _push_only_mode():
+    if _push_only_mode() or policy == "push_only":
         requested = ["push"]
     else:
         requested = [c for c in (channels or []) if c in SUPPORTED_CHANNELS] or list(

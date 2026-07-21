@@ -95,6 +95,45 @@ const escapeHtmlTextContent = (s) =>
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
 
+const writeTextToClipboard = async (text) => {
+    const value = String(text || '');
+
+    if (navigator.clipboard?.writeText) {
+        try {
+            await navigator.clipboard.writeText(value);
+            return;
+        } catch (error) {
+            // Installed PWAs and some mobile browsers can expose the API but
+            // reject it because of clipboard permissions. Fall back below.
+            console.warn('[MessageBubble] Clipboard API unavailable, using fallback', error);
+        }
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = value;
+    textarea.setAttribute('readonly', '');
+    textarea.setAttribute('aria-hidden', 'true');
+    Object.assign(textarea.style, {
+        position: 'fixed',
+        top: '0',
+        left: '-9999px',
+        opacity: '0',
+        pointerEvents: 'none',
+    });
+
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+    try {
+        if (!document.execCommand('copy')) {
+            throw new Error('Browser rejected the clipboard copy command');
+        }
+    } finally {
+        textarea.remove();
+    }
+};
+
 const convertMarkdownTablesToStackedBlocks = (text) => {
     const lines = String(text || '').split('\n');
     const out = [];
@@ -1014,9 +1053,10 @@ const MessageBubble = ({
     const handleCopyClick = async () => {
         try {
             const cleanText = cleanTextForCopy(message.content);
-            await navigator.clipboard.writeText(cleanText);
+            await writeTextToClipboard(cleanText);
             showToast('Message copied!', 'success');
         } catch (err) {
+            console.error('[MessageBubble] Failed to copy message', err);
             showToast('Copy failed', 'error');
         }
     };

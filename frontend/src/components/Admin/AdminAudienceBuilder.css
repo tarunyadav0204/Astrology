@@ -224,6 +224,36 @@
   font-size: 14px;
 }
 
+.audience-builder__selection-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.audience-builder__push-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.audience-builder__push-filter input {
+  margin: 0;
+}
+
+.audience-builder__push-filter:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .audience-builder__table-wrap {
   overflow-x: auto;
   border: 1px solid #dee2e6;

@@ -22,6 +22,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
 import { generatePDF, sharePDFOnWhatsApp, getLogoDataUriForModule } from '../../utils/pdfGenerator';
@@ -514,7 +515,7 @@ function MessageBubble({
 
   const copyToClipboard = async () => {
     try {
-      const cleanText = message.content
+      const cleanText = String(message.content || '')
         .replace(/\*\*(.*?)\*\*/g, '$1')
         .replace(/\*(.*?)\*/g, '$1')
         .replace(/###\s*(.*?)$/gm, '$1')
@@ -522,13 +523,11 @@ function MessageBubble({
         .replace(/•\s*/g, '• ')
         .trim();
 
-      const clipboard = require('expo-clipboard');
-      if (clipboard?.setStringAsync) {
-        await clipboard.setStringAsync(cleanText);
-      }
+      await Clipboard.setStringAsync(cleanText);
       Alert.alert('Copied!', 'Message copied to clipboard');
     } catch (error) {
-      // Error copying to clipboard
+      console.error('[MessageBubble] Failed to copy message', error);
+      Alert.alert('Copy failed', 'Unable to copy this message. Please try again.');
     }
   };
 

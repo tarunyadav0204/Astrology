@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 IST_TZ = ZoneInfo("Asia/Kolkata")
 
 ALLOWED_CHANNELS = ("push", "whatsapp", "email")
-ALLOWED_POLICIES = ("waterfall", "blast")
+ALLOWED_POLICIES = ("waterfall", "blast", "push_only")
 ALLOWED_AUDIENCE_TYPES = (
     "all",
     "has_device_token",
@@ -426,6 +426,20 @@ def estimate_campaign_audience(conn, audience_filter: Dict[str, Any]) -> Dict[st
     }
 
 
+def filter_push_reachable_user_ids(conn, user_ids: List[int]) -> List[int]:
+    """Keep campaign targets that currently have at least one push device token."""
+    clean_ids = sorted({int(uid) for uid in user_ids or [] if int(uid) > 0})
+    if not clean_ids:
+        return []
+    cur = execute(
+        conn,
+        "SELECT DISTINCT userid FROM device_tokens WHERE userid = ANY(%s)",
+        (clean_ids,),
+    )
+    reachable = {int(row[0]) for row in (cur.fetchall() or []) if row and row[0] is not None}
+    return [uid for uid in user_ids if int(uid) in reachable]
+
+
 # ---------------------------------------------------------------------------
 # Rendering
 # ---------------------------------------------------------------------------
@@ -593,6 +607,8 @@ def _dispatch_one_campaign(conn, campaign: Dict[str, Any]) -> Dict[str, Any]:
         else []
     )
     audience = resolve_campaign_audience(conn, audience_filter)
+    if str(campaign.get("channel_policy") or "").strip().lower() == "push_only":
+        audience = filter_push_reachable_user_ids(conn, audience)
     db.update_campaign(
         conn,
         campaign_id,

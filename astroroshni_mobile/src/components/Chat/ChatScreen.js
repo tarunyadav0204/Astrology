@@ -519,6 +519,14 @@ export default function ChatScreen({ navigation, route }) {
   const premiumGlowLoopRef = useRef(null);
   const badgeFadeHandleRef = useRef(null);
 
+  // The first free question is always answered in Standard mode. Preserve any
+  // paid-mode selection, but hide choices that cannot affect this free send.
+  useEffect(() => {
+    if (!freeQuestionAvailable) return;
+    setShowModeSelector(false);
+    setShowChatModeIntro(false);
+  }, [freeQuestionAvailable]);
+
   useEffect(() => {
     premiumGlowLoopRef.current && stopAnimationLoop(premiumGlowLoopRef.current);
     premiumGlowLoopRef.current = null;
@@ -3922,7 +3930,9 @@ export default function ChatScreen({ navigation, route }) {
         // When using first question free, send as standard so backend applies free-question logic
         const useFreeQuestion = !partnershipMode && !isMundane && freeQuestionAvailable;
         const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && isInstantAnalysis;
-        const requestedTier = useInstantChat ? 'instant' : (isPremiumAnalysis ? 'premium' : 'standard');
+        const requestedTier = useFreeQuestion
+          ? 'standard'
+          : (useInstantChat ? 'instant' : (isPremiumAnalysis ? 'premium' : 'standard'));
         
         // Prepend relationship info to question for better backend context/logging
         const finalQuestion = (partnershipMode && partnershipRelation)
@@ -4192,6 +4202,7 @@ export default function ChatScreen({ navigation, route }) {
     const shouldShowModeIntro =
       !showGreeting &&
       birthData &&
+      !freeQuestionAvailable &&
       !partnershipMode &&
       !isMundane &&
       !loading &&
@@ -4213,6 +4224,7 @@ export default function ChatScreen({ navigation, route }) {
     activeWaitSideMessage,
     birthData,
     currentPersonId,
+    freeQuestionAvailable,
     isMundane,
     isTyping,
     loading,
@@ -4493,7 +4505,9 @@ export default function ChatScreen({ navigation, route }) {
     const useFreeQuestion = !partnershipMode && !isMundane && freeQuestionAvailable;
     const isProModelFlow = !useFreeQuestion && isPremiumAnalysis;
     const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && isInstantAnalysis;
-    const outgoingTier = useInstantChat ? 'instant' : (isPremiumAnalysis ? 'premium' : 'standard');
+    const outgoingTier = useFreeQuestion
+      ? 'standard'
+      : (useInstantChat ? 'instant' : (isPremiumAnalysis ? 'premium' : 'standard'));
     const pendingSubjectGateOverride = subjectGateOverrideRef.current;
     subjectGateOverrideRef.current = null;
     const subjectGateOverride =
@@ -5681,7 +5695,7 @@ export default function ChatScreen({ navigation, route }) {
               ]}
             >
               {/* Expanded row to the left: Standard | Premium with cost/discount (only when not partnership/mundane) */}
-              {!partnershipMode && !isMundane && showModeSelector && (
+              {!partnershipMode && !isMundane && !freeQuestionAvailable && showModeSelector && (
                 <View style={styles.modeSelectorExpanded}>
                   {instantChatEnabled && (
                     <TouchableOpacity
@@ -5777,7 +5791,7 @@ export default function ChatScreen({ navigation, route }) {
                 blurOnSubmit={false}
               />
 
-              {!partnershipMode && !isMundane && (
+              {!partnershipMode && !isMundane && !freeQuestionAvailable && (
                 <TouchableOpacity
                   style={styles.premiumToggleButton}
                   onPress={() => {
@@ -6040,7 +6054,7 @@ export default function ChatScreen({ navigation, route }) {
         </Modal>
 
         <Modal
-          visible={showChatModeIntro}
+          visible={showChatModeIntro && !freeQuestionAvailable}
           transparent
           animationType="slide"
           onRequestClose={() => {
