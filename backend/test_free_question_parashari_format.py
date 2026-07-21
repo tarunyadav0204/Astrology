@@ -67,3 +67,10 @@ def test_free_question_elaborate_blocks_invented_schools():
     text = free_question_elaborate_instruction()
     assert "PARASHARI-ONLY" in text
     assert "Do NOT invent KP" in text
+    assert "Do NOT include remedies" in text
+
+
+def test_parashari_only_format_forbids_inline_remedies():
+    fmt = build_parashari_only_response_format()
+    assert "Do NOT include remedy layers" in fmt
+    assert "wellness playbooks" in fmt or "yoga/pranayama" in fmt

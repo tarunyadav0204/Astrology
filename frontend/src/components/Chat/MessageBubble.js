@@ -203,6 +203,7 @@ const MessageBubble = ({
     const standardChatCost = Math.max(1, Number(chatCost) || 1);
     const [detailUnlocked, setDetailUnlocked] = useState(false);
     const blurShownTrackedRef = useRef(false);
+    const remedyShownTrackedRef = useRef(false);
     const [showActions, setShowActions] = useState(false);
     const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
     const messageRef = useRef(null);
@@ -220,6 +221,11 @@ const MessageBubble = ({
     const nextActionFollowUps = Array.isArray(nextAction?.follow_up_questions)
         ? nextAction.follow_up_questions.map((item) => String(item || '').trim()).filter(Boolean)
         : [];
+    const remedyCardButton = nextActionFollowUps[0] || '';
+    const hasRemedyCardCopy = Boolean(
+        isRemedyNextAction && nextActionTitle && nextActionReason && remedyCardButton
+    );
+    const showNextActionCard = hasNextAction && (isRemedyNextAction ? hasRemedyCardCopy : true);
     const remedyClickPrompt = isRemedyNextAction
         ? [
               'Generate a remedy-only reading.',
@@ -381,6 +387,31 @@ const MessageBubble = ({
             /* ignore */
         }
     }, [canBlurFreeDetail, detailUnlocked, credits, message.messageId, message.id]);
+
+    useEffect(() => {
+        if (!showNextActionCard || !isRemedyNextAction || remedyShownTrackedRef.current) return;
+        const mid = message.messageId || message.id;
+        if (!mid) return;
+        remedyShownTrackedRef.current = true;
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+            fetch('/api/credits/remedy-funnel/event', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    event: 'card_shown',
+                    message_id: String(mid),
+                    platform: 'web',
+                }),
+            }).catch(() => {});
+        } catch (_) {
+            /* ignore */
+        }
+    }, [showNextActionCard, isRemedyNextAction, message.messageId, message.id]);
 
     const handleRevealDetailedAnswer = useCallback(() => {
         const mid = message.messageId || message.id;
@@ -1325,7 +1356,7 @@ const MessageBubble = ({
                     )}
                 </div>
 
-                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && hasNextAction && (
+                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && showNextActionCard && (
                     <div
                         className="remedy-next-action-card"
                         style={{
@@ -1341,11 +1372,11 @@ const MessageBubble = ({
                         }}
                     >
                         <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.02em', color: isRemedyNextAction ? '#9a3412' : '#3347a3', marginBottom: 8 }}>
-                            {isRemedyNextAction ? 'Practical remedy plan' : (nextActionTitle || 'Next step')}
+                            {isRemedyNextAction ? nextActionTitle : (nextActionTitle || 'Next step')}
                         </div>
-                        {isRemedyNextAction && (
+                        {isRemedyNextAction && nextActionReason && (
                             <div style={{ fontSize: 13, lineHeight: 1.45, color: isRemedyNextAction ? '#14532d' : '#334155', marginBottom: 10, fontWeight: 700 }}>
-                                Tap to generate practical remedies for this issue.
+                                {nextActionReason}
                             </div>
                         )}
                         {!isRemedyNextAction && nextActionReason && (
@@ -1364,6 +1395,28 @@ const MessageBubble = ({
                                             ? String(nextActionFollowUps[0]).trim()
                                         : String(nextActionTitle || 'Open follow-up').trim()
                                     );
+                                const sourceMessageId = message.messageId || message.id;
+                                if (isRemedyNextAction && sourceMessageId) {
+                                    try {
+                                        const token = localStorage.getItem('token');
+                                        if (token) {
+                                            fetch('/api/credits/remedy-funnel/event', {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    Authorization: `Bearer ${token}`,
+                                                },
+                                                body: JSON.stringify({
+                                                    event: 'card_clicked',
+                                                    message_id: String(sourceMessageId),
+                                                    platform: 'web',
+                                                }),
+                                            }).catch(() => {});
+                                        }
+                                    } catch (_) {
+                                        /* ignore */
+                                    }
+                                }
                                 console.log('[MessageBubble] remedy card clicked', {
                                     hasNextAction,
                                     isRemedyNextAction,
@@ -1397,6 +1450,7 @@ const MessageBubble = ({
                                             remedy_followup: isRemedyNextAction,
                                             open_remedy: isRemedyNextAction,
                                             source_next_action: nextAction,
+                                            source_message_id: sourceMessageId ? String(sourceMessageId) : undefined,
                                             remedy_title: nextActionTitle || undefined,
                                             remedy_reason: nextActionReason || undefined,
                                             remedy_follow_up_questions: nextActionFollowUps,
@@ -1421,7 +1475,7 @@ const MessageBubble = ({
                             }}
                         >
                             {isRemedyNextAction
-                                ? 'Generate remedies'
+                                ? remedyCardButton
                                 : (nextActionFollowUps[0] ? String(nextActionFollowUps[0]) : 'Open follow-up')}
                         </button>
                     </div>

@@ -69,6 +69,7 @@ function MessageBubble({
   const [detailUnlocked, setDetailUnlocked] = useState(false);
   const [showRevealCreditsModal, setShowRevealCreditsModal] = useState(false);
   const blurShownTrackedRef = useRef(false);
+  const remedyShownTrackedRef = useRef(false);
   // Init from the played-ids set so FlatList remounts do not flash translateY:50 for one frame
   // (that looked like the long answer bouncing between sections while reading).
   const entryIdForAnim = String(message?.messageId || message?.id || message?.clientRequestId || '');
@@ -79,6 +80,12 @@ function MessageBubble({
   const isPartnership = partnership || message.partnership_mode;
   const messageChatTier = String(message?.chatTier || message?.chat_tier || '').trim().toLowerCase();
   const isInstantChatMessage = messageChatTier === 'instant';
+  const hasRemedyCard = Boolean(
+    message.next_action?.type === 'remedy'
+      && message.next_action?.title
+      && message.next_action?.reason
+      && message.next_action?.follow_up_questions?.[0]
+  );
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
   const [isLoadingPodcast, setIsLoadingPodcast] = useState(false);
@@ -1389,6 +1396,14 @@ function MessageBubble({
     creditAPI.recordFreeAnswerFunnelEvent('blur_shown', String(mid)).catch(() => {});
   }, [canBlurFreeDetail, detailUnlocked, message.messageId, message.id]);
 
+  useEffect(() => {
+    if (!hasRemedyCard || remedyShownTrackedRef.current) return;
+    const mid = message.messageId || message.id;
+    if (!mid) return;
+    remedyShownTrackedRef.current = true;
+    creditAPI.recordRemedyFunnelEvent('card_shown', String(mid)).catch(() => {});
+  }, [hasRemedyCard, message.messageId, message.id]);
+
   useFocusEffect(
     useCallback(() => {
       if (!canBlurFreeDetail || detailUnlocked) return undefined;
@@ -1899,43 +1914,23 @@ function MessageBubble({
           </View>
         )}
 
-        {message.next_action?.type === 'remedy' && (
+        {hasRemedyCard ? (
           <View style={styles.remedyCard}>
-            {console.log('[Mobile MessageBubble] remedy card render', {
-              messageId: message.messageId,
-              nextAction: message.next_action,
-            })}
-            <View style={styles.remedyCardHeader}>
-              <View style={styles.remedyBadge}>
-                <Ionicons name="leaf-outline" size={14} color="#16a34a" />
-                <Text style={styles.remedyBadgeText}>
-                  {t('chat.remedyCardLabel', 'Remedy')}
-                </Text>
-              </View>
-            </View>
-            {message.next_action?.title ? (
-              <Text style={styles.remedyCardTitle}>{message.next_action.title}</Text>
-            ) : null}
-            {message.next_action?.reason ? (
-              <Text style={styles.remedyCardReason}>{message.next_action.reason}</Text>
-            ) : (
-              <Text style={styles.remedyCardReason}>
-                {t('chat.remedyCardDefaultReason', 'A practical next step based on your chart answer.')}
-              </Text>
-            )}
+            <Text style={styles.remedyCardTitle}>{message.next_action.title}</Text>
+            <Text style={styles.remedyCardReason}>{message.next_action.reason}</Text>
             <TouchableOpacity
               style={styles.remedyCardButton}
               onPress={() => {
-                const remedyPrompt = (
-                  message.next_action?.follow_up_questions?.[0]
-                  || message.next_action?.title
-                  || t('chat.askForRemedy', 'Show me the remedy')
-                ).trim();
+                const remedyPrompt = String(message.next_action.follow_up_questions[0]).trim();
+                const sourceMessageId = message.messageId || message.id;
+                if (sourceMessageId) {
+                  creditAPI.recordRemedyFunnelEvent('card_clicked', String(sourceMessageId)).catch(() => {});
+                }
                 if (onRemedyFollowUpClick) {
                   onRemedyFollowUpClick(remedyPrompt, {
                     source: 'remedy_card',
                     nextAction: message.next_action || null,
-                    messageId: message.messageId || null,
+                    messageId: sourceMessageId || null,
                   });
                   return;
                 }
@@ -1944,12 +1939,12 @@ function MessageBubble({
               activeOpacity={0.88}
             >
               <Text style={styles.remedyCardButtonText}>
-                {t('chat.openRemedy', 'Open remedy')}
+                {message.next_action.follow_up_questions[0]}
               </Text>
               <Ionicons name="arrow-forward" size={16} color="#fff" />
             </TouchableOpacity>
           </View>
-        )}
+        ) : null}
 
         {/* Hint when a response timed out or send failed: tell user to tap refresh or retry */}
         {(message.showRestartButton || message.showSendRetryButton) && (

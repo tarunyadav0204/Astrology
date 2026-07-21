@@ -865,6 +865,16 @@ export const creditAPI = {
       },
       BACKGROUND_REQUEST_CONFIG,
     ),
+  recordRemedyFunnelEvent: (event, messageId = null, platform = null) =>
+    api.post(
+      getEndpoint('/credits/remedy-funnel/event'),
+      {
+        event,
+        message_id: messageId || undefined,
+        platform: platform || Platform.OS,
+      },
+      BACKGROUND_REQUEST_CONFIG,
+    ),
   getSubscriptionPlans: () => api.get(getEndpoint('/credits/google-play/subscription-plans')),
   syncSubscription: (purchaseToken, productId, orderId = null) =>
     api.post(getEndpoint('/credits/google-play/subscription/sync'), {

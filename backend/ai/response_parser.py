@@ -122,15 +122,26 @@ class ResponseParser:
     @staticmethod
     def parse_next_action_metadata(text: str) -> Tuple[str, Optional[Dict[str, object]]]:
         """
-        Find NEXT_ACTION_META: {...} line in text, parse JSON, strip the line from text.
+        Find NEXT_ACTION_META: {...} in text, parse JSON, strip the line from text.
+        Uses balanced-brace parsing so nested arrays/strings do not break extraction.
         Returns (stripped_text, next_action or None).
         """
-        pattern = re.compile(r'\n?\s*NEXT_ACTION_META:\s*(\{[^}]+\})\s*$', re.IGNORECASE | re.DOTALL)
-        match = pattern.search(text)
-        if not match:
+        src = text or ""
+        markers = list(re.finditer(r"\n?\s*NEXT_ACTION_META:\s*", src, re.IGNORECASE))
+        if not markers:
+            return text, None
+        marker = markers[-1]
+        brace_at = src.find("{", marker.end())
+        if brace_at < 0:
             return text, None
         try:
-            meta = json.loads(match.group(1))
+            from ai.prediction_anchor import _extract_balanced_json_object
+
+            extracted = _extract_balanced_json_object(src, brace_at)
+            if not extracted:
+                return text, None
+            json_str, json_end = extracted
+            meta = json.loads(json_str)
             if not isinstance(meta, dict):
                 return text, None
             next_action = {
@@ -143,7 +154,12 @@ class ResponseParser:
                 ][:3],
                 "source": str(meta.get("source") or "merge").strip(),
             }
-            stripped = text[:match.start()].rstrip()
+            end = json_end
+            while end < len(src) and src[end] in " \t\r":
+                end += 1
+            if end < len(src) and src[end] == "\n":
+                end += 1
+            stripped = (src[: marker.start()] + src[end:]).rstrip()
             return stripped, next_action
         except (json.JSONDecodeError, TypeError, ValueError):
             return text, None

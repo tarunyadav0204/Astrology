@@ -28,10 +28,21 @@ _stub_module("chat.chat_context_builder", ChatContextBuilder=_Dummy)
 _stub_module("context_agents.base", AgentContext=_Dummy)
 _stub_module("shared.dasha_calculator", DashaCalculator=_Dummy)
 _stub_module("utils.admin_settings", get_gemini_instant_model=lambda: "stub-model")
+# Keep real remedy-CTA helpers; only stub time resolution for period-window tests.
+import utils.query_context as _qc_mod
+
 _stub_module(
     "utils.query_context",
     resolve_query_now=lambda qc=None: __import__("datetime").datetime(2026, 5, 1, 12, 0, 0),
-    normalize_query_context=lambda qc=None: qc or {},
+    normalize_query_context=_qc_mod.normalize_query_context,
+    is_remedy_followup_request=_qc_mod.is_remedy_followup_request,
+    is_remedy_chain_question=_qc_mod.is_remedy_chain_question,
+    clamp_remedy_modes_on_intent=_qc_mod.clamp_remedy_modes_on_intent,
+    ensure_remedy_cta_next_action=_qc_mod.ensure_remedy_cta_next_action,
+    NO_INLINE_REMEDY_PLAN_RULE=_qc_mod.NO_INLINE_REMEDY_PLAN_RULE,
+    NEXT_ACTION_NONE_IN_REMEDY_MODE=_qc_mod.NEXT_ACTION_NONE_IN_REMEDY_MODE,
+    apply_normal_answer_remedy_guards=_qc_mod.apply_normal_answer_remedy_guards,
+    REMEDY_CARD_FOMO_COPY_RULES=_qc_mod.REMEDY_CARD_FOMO_COPY_RULES,
 )
 
 from ai.evidence_planner_schema import normalize_evidence_plan
@@ -991,6 +1002,23 @@ def test_infer_answer_mode_married_this_year_prefers_event_prediction():
     assert _infer_answer_mode("When will I get married this year?", intent, []) == "event_prediction"
 
 
+def test_infer_answer_mode_remedy_only_with_cta_flags():
+    from chat.instant_chat_pipeline import _clamp_remedy_answer_mode, _explicit_remedy_followup_requested
+
+    plain = {"mode": "RECOMMEND_REMEDY_FOR_PROBLEM", "answer_mode": "remedy_action", "category": "health"}
+    assert not _explicit_remedy_followup_requested(plain)
+    assert _infer_answer_mode("What remedies for my anxiety?", plain, []) != "remedy_action"
+    assert _clamp_remedy_answer_mode("remedy_action", plain, "what should I do for anxiety") == "problem_diagnosis"
+
+    cta = {
+        "category": "health",
+        "query_context": {"remedy_followup": True, "follow_up_type": "remedy_action"},
+    }
+    assert _explicit_remedy_followup_requested(cta)
+    assert _infer_answer_mode("Show me remedies", cta, []) == "remedy_action"
+    assert _clamp_remedy_answer_mode("remedy_action", cta, "Show me remedies") == "remedy_action"
+
+
 def test_open_ended_life_event_when_detects_job_and_ex():
     assert _looks_like_open_ended_life_event_when("When will I get a job?", {"mode": "ANALYZE_TOPIC_POTENTIAL"})
     assert _looks_like_open_ended_life_event_when("When will my ex come back?", {"mode": "LIFESPAN_EVENT_TIMING"})
@@ -1034,5 +1062,6 @@ if __name__ == "__main__":
     test_normalize_question_text_treats_same_retry_as_same_question()
     test_conversational_non_question_detects_deferrals()
     test_infer_answer_mode_married_this_year_prefers_event_prediction()
+    test_infer_answer_mode_remedy_only_with_cta_flags()
     test_open_ended_life_event_when_detects_job_and_ex()
     print("instant answer mode tests passed")

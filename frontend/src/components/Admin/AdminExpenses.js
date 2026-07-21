@@ -12,11 +12,23 @@ function formatInr(amountStr, currency) {
   }
 }
 
+function todayInIST() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((part) => part.type === type)?.value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
 const AdminExpenses = () => {
   const [expenseView, setExpenseView] = useState('log');
 
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
+  const [summary, setSummary] = useState({ count: 0, totals_by_currency: [] });
   const [page, setPage] = useState(1);
   const [limit] = useState(50);
   const [loading, setLoading] = useState(true);
@@ -25,6 +37,9 @@ const AdminExpenses = () => {
   const [dateTo, setDateTo] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [categoryApplied, setCategoryApplied] = useState('');
+  const [vendorFilter, setVendorFilter] = useState('');
+  const [paidByFilter, setPaidByFilter] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const [vendors, setVendors] = useState([]);
   const [paidByList, setPaidByList] = useState([]);
@@ -32,7 +47,7 @@ const AdminExpenses = () => {
   const [newVendorLabel, setNewVendorLabel] = useState('');
   const [newPaidByLabel, setNewPaidByLabel] = useState('');
 
-  const [spentDate, setSpentDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [spentDate, setSpentDate] = useState(todayInIST);
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('INR');
   const [vendorId, setVendorId] = useState('');
@@ -40,6 +55,9 @@ const AdminExpenses = () => {
   const [category, setCategory] = useState('');
   const [notes, setNotes] = useState('');
   const [invoiceFile, setInvoiceFile] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editingHasInvoice, setEditingHasInvoice] = useState(false);
+  const [removeInvoice, setRemoveInvoice] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const loadMasters = useCallback(async (includeInactive) => {
@@ -61,32 +79,32 @@ const AdminExpenses = () => {
   }, []);
 
   useEffect(() => {
-    if (expenseView === 'masters') {
-      loadMasters(true);
-    } else {
-      loadMasters(false);
-    }
+    loadMasters(true);
   }, [expenseView, loadMasters]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (pageOverride) => {
     setLoading(true);
     setError('');
     try {
-      const params = { page, limit };
+      const params = { page: pageOverride || page, limit };
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo) params.date_to = dateTo;
       if (categoryApplied.trim()) params.category = categoryApplied.trim();
+      if (vendorFilter) params.vendor_id = vendorFilter;
+      if (paidByFilter) params.paid_by_id = paidByFilter;
       const data = await adminService.getAdminExpenses(params);
       setItems(data.items || []);
       setTotal(Number(data.total) || 0);
+      setSummary(data.summary || { count: Number(data.total) || 0, totals_by_currency: [] });
     } catch (e) {
       setError(e?.message || 'Failed to load');
       setItems([]);
       setTotal(0);
+      setSummary({ count: 0, totals_by_currency: [] });
     } finally {
       setLoading(false);
     }
-  }, [page, limit, dateFrom, dateTo, categoryApplied]);
+  }, [page, limit, dateFrom, dateTo, categoryApplied, vendorFilter, paidByFilter]);
 
   useEffect(() => {
     if (expenseView === 'log') {
@@ -96,8 +114,30 @@ const AdminExpenses = () => {
 
   const activeVendors = vendors.filter((x) => x.is_active);
   const activePaidBy = paidByList.filter((x) => x.is_active);
+  const selectedInactiveVendor = editingId
+    ? vendors.find((x) => !x.is_active && String(x.id) === String(vendorId))
+    : null;
+  const selectedInactivePaidBy = editingId
+    ? paidByList.find((x) => !x.is_active && String(x.id) === String(paidById))
+    : null;
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
+
+  const resetExpenseForm = () => {
+    setEditingId(null);
+    setEditingHasInvoice(false);
+    setRemoveInvoice(false);
+    setSpentDate(todayInIST());
+    setAmount('');
+    setCurrency('INR');
+    setVendorId('');
+    setPaidById('');
+    setCategory('');
+    setNotes('');
+    setInvoiceFile(null);
+    const el = document.getElementById('admin-expense-invoice-input');
+    if (el) el.value = '';
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -116,21 +156,58 @@ const AdminExpenses = () => {
       fd.append('paid_by_id', String(paidById));
       fd.append('category', category.trim());
       fd.append('notes', notes.trim());
+      fd.append('remove_invoice', removeInvoice ? 'true' : 'false');
       if (invoiceFile) fd.append('invoice', invoiceFile);
-      await adminService.createAdminExpense(fd);
-      setAmount('');
-      setCategory('');
-      setNotes('');
-      setInvoiceFile(null);
-      const el = document.getElementById('admin-expense-invoice-input');
-      if (el) el.value = '';
+      if (editingId) {
+        await adminService.updateAdminExpense(editingId, fd);
+      } else {
+        await adminService.createAdminExpense(fd);
+      }
+      resetExpenseForm();
       setPage(1);
-      await loadMasters(false);
-      await load();
+      await loadMasters(true);
+      await load(1);
     } catch (err) {
       setError(err?.message || 'Save failed');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const startEdit = (row) => {
+    setEditingId(row.id);
+    setEditingHasInvoice(Boolean(row.has_invoice));
+    setRemoveInvoice(false);
+    setSpentDate(row.spent_date || todayInIST());
+    setAmount(String(row.amount || ''));
+    setCurrency(row.currency || 'INR');
+    setVendorId(row.vendor_id ? String(row.vendor_id) : '');
+    setPaidById(row.paid_by_id ? String(row.paid_by_id) : '');
+    setCategory(row.category || '');
+    setNotes(row.notes || '');
+    setInvoiceFile(null);
+    const input = document.getElementById('admin-expense-invoice-input');
+    if (input) input.value = '';
+    window.setTimeout(() => {
+      document.getElementById('admin-expense-entry-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    setError('');
+    try {
+      await adminService.exportAdminExpenses({
+        date_from: dateFrom,
+        date_to: dateTo,
+        category: categoryApplied.trim(),
+        vendor_id: vendorFilter,
+        paid_by_id: paidByFilter,
+      });
+    } catch (e) {
+      setError(e?.message || 'Export failed');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -415,6 +492,40 @@ const AdminExpenses = () => {
                 placeholder="e.g. infra"
               />
             </label>
+            <label>
+              <span>Vendor</span>
+              <select
+                value={vendorFilter}
+                onChange={(e) => {
+                  setPage(1);
+                  setVendorFilter(e.target.value);
+                }}
+              >
+                <option value="">All vendors</option>
+                {vendors.map((vendor) => (
+                  <option key={vendor.id} value={String(vendor.id)}>
+                    {vendor.label}{vendor.is_active ? '' : ' (inactive)'}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Paid by</span>
+              <select
+                value={paidByFilter}
+                onChange={(e) => {
+                  setPage(1);
+                  setPaidByFilter(e.target.value);
+                }}
+              >
+                <option value="">All paid-by entries</option>
+                {paidByList.map((payer) => (
+                  <option key={payer.id} value={String(payer.id)}>
+                    {payer.label}{payer.is_active ? '' : ' (inactive)'}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               type="button"
               className="users-search-btn"
@@ -425,9 +536,19 @@ const AdminExpenses = () => {
             >
               Refresh
             </button>
+            <button
+              type="button"
+              className="users-search-btn"
+              onClick={handleExport}
+              disabled={exporting}
+              style={{ background: '#217346' }}
+            >
+              {exporting ? 'Exporting…' : 'Export to Excel'}
+            </button>
           </div>
 
           <form
+            id="admin-expense-entry-form"
             onSubmit={handleSubmit}
             style={{
               border: '1px solid #e5e7eb',
@@ -437,7 +558,29 @@ const AdminExpenses = () => {
               background: '#fafafa',
             }}
           >
-            <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16 }}>Add expense</h3>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 12,
+                marginBottom: 12,
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: 16 }}>
+                {editingId ? `Edit expense #${editingId}` : 'Add expense'}
+              </h3>
+              {editingId ? (
+                <button
+                  type="button"
+                  className="users-pagination-btn"
+                  onClick={resetExpenseForm}
+                  disabled={saving}
+                >
+                  Cancel edit
+                </button>
+              ) : null}
+            </div>
             <div className="users-management-filters">
               <label>
                 <span>Spent date</span>
@@ -471,6 +614,11 @@ const AdminExpenses = () => {
                   style={{ minWidth: 160 }}
                 >
                   <option value="">Select vendor…</option>
+                  {selectedInactiveVendor ? (
+                    <option value={String(selectedInactiveVendor.id)}>
+                      {selectedInactiveVendor.label} (inactive)
+                    </option>
+                  ) : null}
                   {activeVendors.map((v) => (
                     <option key={v.id} value={String(v.id)}>
                       {v.label}
@@ -487,6 +635,11 @@ const AdminExpenses = () => {
                   style={{ minWidth: 160 }}
                 >
                   <option value="">Select paid by…</option>
+                  {selectedInactivePaidBy ? (
+                    <option value={String(selectedInactivePaidBy.id)}>
+                      {selectedInactivePaidBy.label} (inactive)
+                    </option>
+                  ) : null}
                   {activePaidBy.map((p) => (
                     <option key={p.id} value={String(p.id)}>
                       {p.label}
@@ -514,7 +667,7 @@ const AdminExpenses = () => {
                 style={{ padding: 8, borderRadius: 4, border: '1px solid #ddd', maxWidth: '100%' }}
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: '#555' }}>Invoice (optional)</span>
               <input
                 id="admin-expense-invoice-input"
@@ -522,9 +675,23 @@ const AdminExpenses = () => {
                 accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*"
                 onChange={(e) => setInvoiceFile(e.target.files?.[0] || null)}
               />
-            </label>
+              {editingId && editingHasInvoice ? (
+                <span style={{ fontSize: 12, color: '#555' }}>
+                  A new file will replace the current invoice.
+                  <label style={{ display: 'inline-flex', flexDirection: 'row', gap: 6, marginLeft: 12 }}>
+                    <input
+                      type="checkbox"
+                      checked={removeInvoice}
+                      disabled={Boolean(invoiceFile)}
+                      onChange={(e) => setRemoveInvoice(e.target.checked)}
+                    />
+                    Remove current invoice
+                  </label>
+                </span>
+              ) : null}
+            </div>
             <button type="submit" className="users-search-btn" disabled={saving}>
-              {saving ? 'Saving…' : 'Save expense'}
+              {saving ? 'Saving…' : editingId ? 'Update expense' : 'Save expense'}
             </button>
           </form>
 
@@ -534,6 +701,47 @@ const AdminExpenses = () => {
             <div className="loading">Loading…</div>
           ) : (
             <>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 12,
+                  marginBottom: 16,
+                }}
+              >
+                <div
+                  style={{
+                    minWidth: 170,
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 8,
+                    padding: '12px 14px',
+                    background: '#fff',
+                  }}
+                >
+                  <div style={{ color: '#666', fontSize: 12 }}>Filtered expenses</div>
+                  <div style={{ fontSize: 22, fontWeight: 700 }}>{summary.count || 0}</div>
+                </div>
+                {(summary.totals_by_currency || []).map((entry) => (
+                  <div
+                    key={entry.currency}
+                    style={{
+                      minWidth: 170,
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 8,
+                      padding: '12px 14px',
+                      background: '#fff',
+                    }}
+                  >
+                    <div style={{ color: '#666', fontSize: 12 }}>
+                      Filtered total · {entry.currency}
+                    </div>
+                    <div style={{ fontSize: 22, fontWeight: 700 }}>
+                      {formatInr(entry.amount, entry.currency)}
+                    </div>
+                    <div style={{ color: '#888', fontSize: 12 }}>{entry.count} entries</div>
+                  </div>
+                ))}
+              </div>
               <div className="users-table">
                 <table>
                   <thead>
@@ -583,14 +791,24 @@ const AdminExpenses = () => {
                             {row.created_at ? new Date(row.created_at).toLocaleString('en-IN') : '—'}
                           </td>
                           <td>
-                            <button
-                              type="button"
-                              className="users-pagination-btn"
-                              style={{ padding: '4px 10px', fontSize: 12, background: '#666' }}
-                              onClick={() => handleDelete(row.id)}
-                            >
-                              Delete
-                            </button>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                className="users-pagination-btn"
+                                style={{ padding: '4px 10px', fontSize: 12 }}
+                                onClick={() => startEdit(row)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="users-pagination-btn"
+                                style={{ padding: '4px 10px', fontSize: 12, background: '#666' }}
+                                onClick={() => handleDelete(row.id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))

@@ -433,6 +433,8 @@ export const adminService = {
     if (params.date_from != null && params.date_from !== '') sp.set('date_from', params.date_from);
     if (params.date_to != null && params.date_to !== '') sp.set('date_to', params.date_to);
     if (params.category != null && params.category !== '') sp.set('category', params.category);
+    if (params.vendor_id != null && params.vendor_id !== '') sp.set('vendor_id', String(params.vendor_id));
+    if (params.paid_by_id != null && params.paid_by_id !== '') sp.set('paid_by_id', String(params.paid_by_id));
     if (params.page != null) sp.set('page', String(params.page));
     if (params.limit != null) sp.set('limit', String(params.limit));
     const qs = sp.toString();
@@ -461,6 +463,49 @@ export const adminService = {
       throw new Error(msg);
     }
     return response.json();
+  },
+
+  async updateAdminExpense(expenseId, formData) {
+    const response = await fetch(getAdminEndpoint(`/admin/expenses/${expenseId}`), {
+      method: 'PATCH',
+      headers: getAdminAuthHeaders(),
+      body: formData,
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      const detail = err.detail;
+      throw new Error(typeof detail === 'string' ? detail : detail ? JSON.stringify(detail) : 'Failed to update expense');
+    }
+    return response.json();
+  },
+
+  async exportAdminExpenses(params = {}) {
+    const sp = new URLSearchParams();
+    if (params.date_from) sp.set('date_from', params.date_from);
+    if (params.date_to) sp.set('date_to', params.date_to);
+    if (params.category) sp.set('category', params.category);
+    if (params.vendor_id) sp.set('vendor_id', String(params.vendor_id));
+    if (params.paid_by_id) sp.set('paid_by_id', String(params.paid_by_id));
+    const qs = sp.toString();
+    const url = getAdminEndpoint('/admin/expenses/export') + (qs ? `?${qs}` : '');
+    const response = await fetch(url, { headers: getAdminAuthHeaders() });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to export expenses');
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="([^"]+)"/i);
+    const filename = match?.[1] || 'expenses.xlsx';
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+    return { ok: true, filename };
   },
 
   async deleteAdminExpense(expenseId) {

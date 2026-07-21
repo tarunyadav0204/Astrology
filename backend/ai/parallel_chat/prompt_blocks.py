@@ -150,7 +150,7 @@ def _is_health_category(intent_category: str) -> bool:
 
 def build_parashari_branch_static(intent_category: str, death_analysis_unlocked: bool = False) -> str:
     health_prompt_line = (
-        "For health questions, separate **Constitution/Vitality -> Disease Pattern -> Body-System Focus -> Current Activation -> Preventive Guidance**. Do not name diseases or give treatment instructions; stay at the level of astrological susceptibility, timing pressure, and preventive/recovery logic."
+        "For health questions, separate **Constitution/Vitality -> Disease Pattern -> Body-System Focus -> Current Activation -> Astrological Prevention Themes** (timing/vulnerability only). Do not name diseases or give treatment instructions; do not prescribe diet, exercise, yoga, pranayama, or dosha routines unless REMEDY FOLLOW-UP MODE is active."
         if _is_health_category(intent_category)
         else ""
     )
@@ -189,7 +189,7 @@ def build_parashari_branch_static(intent_category: str, death_analysis_unlocked:
 
 def build_parashari_final_answer_static(intent_category: str, death_analysis_unlocked: bool = False) -> str:
     health_prompt_line = (
-        "For health questions, separate **Constitution/Vitality -> Disease Pattern -> Body-System Focus -> Current Activation -> Preventive Guidance**. Do not name diseases or give treatment instructions; stay at the level of astrological susceptibility, timing pressure, and preventive/recovery logic."
+        "For health questions, separate **Constitution/Vitality -> Disease Pattern -> Body-System Focus -> Current Activation -> Astrological Prevention Themes** (timing/vulnerability only). Do not name diseases or give treatment instructions; do not prescribe diet, exercise, yoga, pranayama, or dosha routines unless REMEDY FOLLOW-UP MODE is active."
         if _is_health_category(intent_category)
         else ""
     )
@@ -248,14 +248,15 @@ Use this exact structure for the final user-facing answer:
 [Include avastha, dignity, dispositors, yogi/avayogi, gandanta, or other Parashari-side supporting evidence only when present and relevant.]
 
 4. ### Timing & Guidance
-[Practical roadmap: what phase the native is in, what to do now, what to avoid, and how to use the stronger period.]
+[Timing roadmap only: active dasha/transit phase, when pressure eases or peaks, and astrological vulnerability themes. Do NOT write diet/exercise/yoga/pranayama/dosha prescriptions or numbered lifestyle action lists—the app offers a separate Remedies CTA.]
 
-5. <div class="final-thoughts-card">**Final Verdict**: [One concise closing judgment.]</div>
+5. <div class="final-thoughts-card">**Final Verdict**: [One concise closing judgment—astrological, not a wellness checklist.]</div>
 
 ### ABSOLUTE RESTRICTIONS
 - Do NOT mention or imply other schools or branches such as Jaimini, KP, Nadi, Ashtakavarga, Nakshatra branch, Sudarshana, or "other methods."
 - Do NOT create sections titled "The Jaimini View", "KP Stellar Perspective", "Nadi Interpretation", "Ashtakavarga", or similar.
 - Do NOT say "other branches confirm" or "other systems support this." This answer must read as one self-contained Parashari reading.
+- Do NOT include remedy layers, upaya dumps, or practical wellness playbooks in this normal reading.
 """
 
 
@@ -275,6 +276,7 @@ For major relationship outcomes, require confluence of Mahadasha/Antardasha supp
 slow-planet transits; do not promise reconciliation from a favorable Pratyantardasha alone when MD/AD
 lords are obstructive (e.g. 6th/8th/12th).
 Follow the Parashari-only response format below. Prefer clarity over multi-school synthesis.
+Do NOT include remedies, upayas, mantras, gemstones, charity/seva lists, OR practical wellness playbooks (diet, exercise, yoga, pranayama, dosha routines) unless this turn is an explicit Remedies CTA follow-up.
 """
 
 
@@ -329,6 +331,8 @@ Use this exact structure for the final user-facing answer:
 - Do NOT give a full career / marriage / finance / health analysis unless it is directly needed to justify the remedy.
 - Do NOT produce a generic chart reading.
 - Do NOT mention or imply other schools or branches such as Jaimini, KP, Nadi, Ashtakavarga, or Sudarshana.
+- Do NOT append NEXT_ACTION_META with type="remedy" — the user is already in remedy mode. If required, use type="none" only.
+- Do NOT include a Follow-up section, follow-up chips, or prompts asking for more remedies.
 """
 
 
@@ -458,7 +462,7 @@ def build_nadi_branch_static(intent_category: str = "", death_analysis_unlocked:
 
 def build_parashari_branch_static_agent(intent_category: str, death_analysis_unlocked: bool = False) -> str:
     health_prompt_line = (
-        "For health questions, explicitly separate **Constitution/Vitality -> Disease Pattern -> Sensitive Body Systems -> Current Activation -> Preventive Guidance**. Use `px.health` first: `score` = calculator-level health score when available, `pattern` = acute/chronic/sensitivity/mixed/preventive, `tone` = flare-up/wear-and-tear/mind-body, `risk` = vitality-vs-acute-vs-chronic-vs-mental pressure, `body` / `ph` = sensitive body systems and afflicted grahas, `hh` = key health-house summaries, `charak` / `charak_agent` = coarse Dr.-Charak-style dosha cue, `rw` = ranked risk windows, `dv.D30` = whether Trimsamsa confirmation exists. Do not give medical diagnosis; describe astrological vulnerability, timing pressure, and preventive logic only."
+        "For health questions, explicitly separate **Constitution/Vitality -> Disease Pattern -> Sensitive Body Systems -> Current Activation -> Astrological Prevention Themes**. Use `px.health` first: `score` = calculator-level health score when available, `pattern` = acute/chronic/sensitivity/mixed/preventive, `tone` = flare-up/wear-and-tear/mind-body, `risk` = vitality-vs-acute-vs-chronic-vs-mental pressure, `body` / `ph` = sensitive body systems and afflicted grahas, `hh` = key health-house summaries, `charak` / `charak_agent` = coarse Dr.-Charak-style dosha cue, `rw` = ranked risk windows, `dv.D30` = whether Trimsamsa confirmation exists. Do not give medical diagnosis; describe astrological vulnerability and timing pressure only—no diet/exercise/yoga/pranayama playbooks unless REMEDY FOLLOW-UP MODE is active."
         if _is_health_category(intent_category)
         else ""
     )

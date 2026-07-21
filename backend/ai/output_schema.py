@@ -177,10 +177,16 @@ FAQ_META: {"category": "<one of: career, marriage, health, education, progeny, w
 NEXT_ACTION_META_INSTRUCTION = """
 CRITICAL - NEXT ACTION METADATA (do not include this line in the main answer the user sees):
 At the very end of your response, before FAQ_META, output exactly one line in this exact format:
-NEXT_ACTION_META: {"type":"<remedy|diagnosis|timing|clarification|comparison|chart_explanation|none>","title":"<short label>","reason":"<short reason in the same language as the answer>","confidence":"<high|medium|low>","follow_up_questions":["<up to 3 short user-facing options>"],"source":"merge"}
+NEXT_ACTION_META: {"type":"<remedy|diagnosis|timing|clarification|comparison|chart_explanation|none>","title":"<short label>","reason":"<short reason>","confidence":"<high|medium|low>","follow_up_questions":["<up to 3 short user-facing options>"],"source":"merge"}
 - If no follow-up is needed, set type to "none" and follow_up_questions to an empty array.
-- If the best immediate next step is a practical remedy reading, you MUST use type="remedy" and keep the title/remedy language clear enough for the UI card to say the user can click for remedies.
-- For remedy follow-ups, the follow_up_questions should be practical remedy layers or remedy-entry prompts, not generic reading prompts.
+- If the best immediate next step is a practical remedy reading, you MUST use type="remedy". This is required even when the main answer must NOT contain inline remedies—the card opens remedy mode.
+- For type="remedy", write ALL card copy in the SAME language/script as the user's current question:
+  * title = FOMO headline (4–10 words, specific to this chart pressure, gentle urgency)
+  * reason = one FOMO subline (why opening remedies now helps in this dasha/window)
+  * follow_up_questions[0] = short button label only (e.g. "Show my remedies" / "उपाय देखें")
+  The UI shows ONLY title, reason, and follow_up_questions[0] on the remedy card — no generic English boilerplate.
+- For non-remedy types, follow_up_questions can be normal follow-up prompts.
+- If REMEDY FOLLOW-UP MODE is active (user already opened the Remedies CTA), set type to "none" — remedies belong in the answer body, not another card.
 - Keep the line valid JSON and short.
 """
 
@@ -219,12 +225,13 @@ Your response MUST follow this exact sequence. The subsection headers under "Ast
    - #### Timing Synthesis: [Synthesize all dasha systems including KP significators]
    - #### Triple Perspective (Sudarshana): [Analyze from Lagna, Moon, Sun]
    - #### Divisional Chart Analysis: [Analyze relevant D-chart]
-4. ### Nakshatra Insights: [Analysis + Remedies. This section is MANDATORY if nakshatra data is available.]
-5. ### Timing & Guidance: [Actionable roadmap]
-6. <div class="final-thoughts-card">**Final Verdict**: [Conclusion based on the HOLISTIC_SYNTHESIS_RULE]</div>
+4. ### Nakshatra Insights: [Nakshatra analysis only—themes, shakti, deity context. Do NOT add remedies, upayas, mantras, gemstones, or charity lists here. This section is MANDATORY if nakshatra data is available.]
+5. ### Timing & Guidance: [Timing roadmap only: active dasha/transit phases, when pressure eases or peaks, and astrological vulnerability themes. Do NOT write a wellness/remedy playbook—no diet, exercise, yoga, pranayama, dosha prescriptions, or numbered "do this" lifestyle lists. The app offers a separate Remedies CTA for practical steps.]
+6. <div class="final-thoughts-card">**Final Verdict**: [Conclusion based on the HOLISTIC_SYNTHESIS_RULE. Do not end with a lifestyle remedy checklist—keep it astrological.]</div>
 
 ### 🚨 FORMATTING RULES
 - [HEADERS]: Use ### for main headers, #### for subsections.
+- [NO INLINE REMEDIES]: Do not include remedy layers, upayas, gemstones, mantras, charity/seva lists, OR practical wellness plans (diet/exercise/yoga/pranayama/dosha routines) in this normal reading. Timing & Guidance = phases and chart themes only.
 """
 
 # Template B: Event Prediction Timeline
@@ -263,9 +270,6 @@ TEMPLATE_REMEDIAL_GUIDANCE = """
 
 ### What to avoid
 [Brief caution on overdoing remedies, gemstone suitability, or fear-based language.]
-
-### Follow-up
-[One to three natural follow-up prompts for the next remedy layer.]
 """
 
 # Template C: Daily Summary
@@ -503,6 +507,8 @@ SCHEMA_MAPPING = {
     'PREDICT_PERIOD_OUTLOOK': TEMPLATE_DEEP_DIVE,
     'PREDICT_EVENTS_FOR_PERIOD': TEMPLATE_DEV_EVENT_LOG,
     'PREDICT_DAILY': TEMPLATE_DAILY_SUMMARY,
+    # CTA-only remedy mode (query_context.remedy_followup). Wording-only asks are remapped away before schema selection.
+    'RECOMMEND_REMEDY_FOR_PROBLEM': TEMPLATE_REMEDIAL_GUIDANCE,
     'REMEDIAL_GUIDANCE': TEMPLATE_REMEDIAL_GUIDANCE,
     'MUNDANE': TEMPLATE_MUNDANE,
     'DEV_EVENT_LOG': TEMPLATE_DEV_EVENT_LOG,
@@ -593,7 +599,13 @@ def get_response_schema_for_mode(mode: str, premium_analysis: bool = False, char
         base_schema = SCHEMA_MAPPING.get(mode.upper(), SCHEMA_MAPPING['DEFAULT'])
     
     # Programmatically add common blocks to all schemas except special cases
-    if mode.upper() not in ['DEV_EVENT_LOG', 'LIFESPAN_EVENT_TIMING', 'LIFE_TERMINATION_RESEARCH']:
+    if mode.upper() not in [
+        'DEV_EVENT_LOG',
+        'LIFESPAN_EVENT_TIMING',
+        'LIFE_TERMINATION_RESEARCH',
+        'RECOMMEND_REMEDY_FOR_PROBLEM',
+        'REMEDIAL_GUIDANCE',
+    ]:
         # Ensure there's a newline before appending
         schema_with_common_blocks = base_schema.strip() + "\n"
         # Only attach follow-up questions block; glossary is injected by backend
@@ -875,7 +887,7 @@ RESPONSE_SKELETON = """
 #### [Protocol] View: (Parashari, Jaimini, or Nadi results). For Parashari "Provide a Technically Exhaustive analysis. For the Parashari View, go into deep detail for every dasha level. Do not summarize; explain the 'why' behind every prediction using house significations."
 #### Timing Synthesis: (Synthesize Vimshottari MD/AD/PD + Chara Sign + Yogini Lord)
 #### Triple Perspective: Compare house strength from Lagna, Moon, and Sun.
-### Nakshatra Insights: Star Shakti + Biological (Vriksha) remedy.
-### Timing & Guidance: Specific monthly roadmap for next 6-12 months.
+### Nakshatra Insights: Star Shakti and mansion themes (no remedy dump).
+### Timing & Guidance: Specific monthly roadmap for next 6-12 months (priorities/cautions only—not remedies).
 [FINAL THOUGHTS CARD]: Outlook anchored in classical text authority (cite BPHS, Saravali, or Phaladeepika).
 """

@@ -13,6 +13,7 @@ import AdminCreditsIntelligence from './AdminCreditsIntelligence';
 import AdminQuestionCostSummary from './AdminQuestionCostSummary';
 import AdminUserCreditManagement from './AdminUserCreditManagement';
 import AdminFreeAnswerFunnel from './AdminFreeAnswerFunnel';
+import AdminRemedyFunnel from './AdminRemedyFunnel';
 import AdminGooglePlayRefund from './AdminGooglePlayRefund';
 import AdminSubscriptionPurchases from './AdminSubscriptionPurchases';
 import AdminSubscriptionEvents from './AdminSubscriptionEvents';
@@ -3375,6 +3376,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Reports
           </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'remedyFunnel' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('remedyFunnel')}
+          >
+            Remedy funnel
+          </button>
         </div>
       )}
 
@@ -4122,6 +4130,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         )}
         {activeTab === 'chat' && activeSubTab === 'reports' && (
           <AdminReportHistory />
+        )}
+
+        {activeTab === 'chat' && activeSubTab === 'remedyFunnel' && (
+          <AdminRemedyFunnel />
         )}
 
         {activeTab === 'ledger' && (

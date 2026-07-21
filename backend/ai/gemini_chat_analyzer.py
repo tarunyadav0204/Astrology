@@ -1020,6 +1020,23 @@ class GeminiChatAnalyzer:
             # Parse and strip FAQ_META line (category + canonical_question for dashboard/FAQs)
             cleaned_text, faq_metadata = ResponseParser.parse_faq_metadata(cleaned_text)
             cleaned_text, next_action = ResponseParser.parse_next_action_metadata(cleaned_text)
+            from utils.query_context import (
+                apply_normal_answer_remedy_guards,
+                resolve_remedy_followup_active,
+            )
+
+            intent_block = enhanced_context.get("intent") if isinstance(enhanced_context.get("intent"), dict) else {}
+            remedy_active = resolve_remedy_followup_active(intent_block, combined_question=user_question)
+            cleaned_text, next_action, _ = apply_normal_answer_remedy_guards(
+                content=cleaned_text,
+                next_action=next_action,
+                follow_up_questions=None,
+                answer_mode=str(intent_block.get("answer_mode") or ""),
+                category=str(intent_block.get("category") or ""),
+                question=user_question,
+                language=language,
+                remedy_followup_active=remedy_active,
+            )
             cleaned_text, prediction_anchor_meta = ResponseParser.parse_prediction_anchor_metadata(cleaned_text)
             if faq_metadata and debug_logging:
                 logger.debug(
@@ -1109,6 +1126,23 @@ class GeminiChatAnalyzer:
             
             # Parse response for images / follow-ups / analysis steps
             parsed_response = ResponseParser.parse_images_in_chat_response(cleaned_text)
+            if remedy_active:
+                from utils.query_context import apply_remedy_mode_delivery_guards
+
+                parsed_response["content"], next_action, follow_ups = apply_remedy_mode_delivery_guards(
+                    content=parsed_response["content"],
+                    next_action=next_action,
+                    follow_up_questions=parsed_response.get("follow_up_questions"),
+                    remedy_followup_active=True,
+                    answer_mode="remedy_action",
+                )
+                parsed_response["follow_up_questions"] = follow_ups
+            else:
+                from utils.query_context import strip_inline_remedy_sections_from_content
+
+                parsed_response["content"] = strip_inline_remedy_sections_from_content(
+                    parsed_response["content"]
+                )
 
             # Resolve terms & glossary using our own glossary_terms table
             from ai.term_matcher import find_terms_in_text

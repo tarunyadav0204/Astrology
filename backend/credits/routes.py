@@ -1189,6 +1189,53 @@ async def admin_free_answer_funnel(
         raise HTTPException(status_code=500, detail="Failed to load free-answer funnel") from e
 
 
+class RemedyFunnelEventBody(BaseModel):
+    event: str
+    message_id: Optional[str] = None
+    platform: Optional[str] = None
+
+
+@router.post("/remedy-funnel/event")
+async def record_remedy_funnel_event(
+    body: RemedyFunnelEventBody,
+    current_user: User = Depends(get_current_user),
+):
+    """Client breadcrumb: card_shown | card_clicked (remedy_delivered is recorded server-side)."""
+    from credits.remedy_funnel import record_funnel_event
+
+    try:
+        inserted = record_funnel_event(
+            userid=int(current_user.userid),
+            event_name=body.event,
+            message_id=body.message_id,
+            platform=body.platform,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("remedy_funnel event failed user=%s", current_user.userid)
+        raise HTTPException(status_code=500, detail="Failed to record funnel event") from e
+    return {"ok": True, "inserted": inserted}
+
+
+@router.get("/admin/remedy-funnel")
+async def admin_remedy_funnel(
+    from_date: Optional[str] = Query(default=None),
+    to_date: Optional[str] = Query(default=None),
+    current_user: User = Depends(get_current_user),
+):
+    """Admin funnel: saw remedy card → tapped CTA → got remedy-only answer."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    from credits.remedy_funnel import get_funnel_analytics
+
+    try:
+        return get_funnel_analytics(from_date=from_date, to_date=to_date)
+    except Exception as e:
+        logger.exception("remedy_funnel analytics failed")
+        raise HTTPException(status_code=500, detail="Failed to load remedy funnel") from e
+
+
 @router.post("/google-play/verify")
 async def verify_google_play_purchase(
     request: GooglePlayVerifyRequest,

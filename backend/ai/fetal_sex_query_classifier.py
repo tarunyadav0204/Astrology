@@ -14,11 +14,26 @@ import asyncio
 import json
 import logging
 import os
+import re
 from typing import Any, Dict
 
 import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
+
+_SHORT_CLARIFICATION_PICK = re.compile(
+    r"^(all|both|everything|a|b|c|d|e|f|1|2|3|4|type\s+[a-f]|option\s+[a-f])(\s|$|[,!.])",
+    re.IGNORECASE,
+)
+
+
+def is_short_clarification_reply(question: str) -> bool:
+    """Lettered quick-reply answers (All, A, B, …) are never fetal-sex requests."""
+    q = (question or "").strip()
+    if not q or len(q) > 40:
+        return False
+    return bool(_SHORT_CLARIFICATION_PICK.match(q))
+
 
 FETAL_SEX_REFUSAL_MESSAGE = (
     "I'm not able to answer questions about determining an unborn baby's sex or gender. "
@@ -95,6 +110,8 @@ Set fetal_sex_determination_request = true ONLY when the message is mainly askin
 - Garbha / fetus gender, "ladka ya ladki" **in a pregnancy or unborn-baby sense**, "pink or blue", ultrasound-style guessing from astrology, etc.
 
 Set fetal_sex_determination_request = false when:
+- **Remedy / upay / mantra / dasha / nakshatra remedy requests** (e.g. "generate a remedy-only reading", health remedies, Saturn-Rahu remedies) — never fetal sex
+- **Short clarification picks** replying to a prior A/B/C question (e.g. "All", "A", "B", "Type C") — never fetal sex on their own
 - **Another woman / third party / affair / extramarital involvement** (e.g. Hindi "mere aur mere pati/pati ke beech koi ladki hai", "koi aur aurat", "relationship mein koi aur hai") — words like ladki/aurat/ladka here refer to **people already born**, not fetal sex. These are relationship-trust questions, NOT fetal sex; always false here.
 - General children / progeny / pregnancy timing without asking for sex (e.g. "when will I conceive", "will I have kids")
 - Questions about **already-born** children (their life, health, education) even if words like "son" or "daughter" appear
@@ -134,5 +151,14 @@ Return ONLY valid JSON (no markdown):
 
 async def should_refuse_fetal_sex_determination(*, question: str, language: str = "english") -> bool:
     """True => caller should return FETAL_SEX_REFUSAL_MESSAGE and skip the main model."""
-    result = await FetalSexQueryClassifier().classify(question=question, language=language or "english")
+    q = (question or "").strip()
+    if not q:
+        return False
+    if is_short_clarification_reply(q):
+        return False
+    from utils.query_context import is_remedy_chain_question
+
+    if is_remedy_chain_question(q):
+        return False
+    result = await FetalSexQueryClassifier().classify(question=q, language=language or "english")
     return bool(result.get("blocked"))

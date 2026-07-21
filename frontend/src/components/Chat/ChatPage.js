@@ -1303,6 +1303,10 @@ const ChatPage = ({ onLogin }) => {
                     const mt = status.message_type || 'answer';
                     const gated = mt === 'native_gate' || mt === 'clarification';
 
+                    if (!gated) {
+                        setPendingFollowUpQueryContext(null);
+                    }
+
                     setMessages((prev) => {
                         const wasInstantTier = prev.some(
                             (m) =>
@@ -1344,6 +1348,7 @@ const ChatPage = ({ onLogin }) => {
                 }
 
                 if (status.status === 'failed') {
+                    setPendingFollowUpQueryContext(null);
                     setMessages(prev =>
                         prev.map(m =>
                             m.processingClientId === processingClientId
@@ -1664,7 +1669,6 @@ const ChatPage = ({ onLogin }) => {
             const serverUserMessageId = result.user_message_id;
             const chartInsights = Array.isArray(result.chart_insights) ? result.chart_insights : [];
             const loadingMessages = Array.isArray(result.loading_messages) ? result.loading_messages : [];
-            setPendingFollowUpQueryContext(null);
 
             setMessages(prev =>
                 prev.map(m => (m.messageId === userMessageId ? { ...m, messageId: serverUserMessageId, isFromDatabase: true } : m))

@@ -1992,8 +1992,24 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         log_ask_phase("safety_gates", message_id=assistant_message_id, fetal_gate_skipped=True)
     else:
         from ai.fetal_sex_query_classifier import FETAL_SEX_REFUSAL_MESSAGE, should_refuse_fetal_sex_determination
+        from utils.query_context import is_remedy_followup_request
+
+        ask_query_context = request.get("query_context") or request.get("queryContext")
+        skip_fetal_sex_gate = is_remedy_followup_request({"query_context": ask_query_context})
+        if not skip_fetal_sex_gate:
+            try:
+                with get_conn() as conn:
+                    cur = execute(
+                        conn,
+                        "SELECT clarification_count FROM conversation_state WHERE session_id = %s",
+                        (session_id,),
+                    )
+                    row = cur.fetchone()
+                    skip_fetal_sex_gate = bool(row and int(row[0] or 0) > 0)
+            except Exception:
+                logger.warning("fetal sex gate clarification_count lookup failed session_id=%s", session_id)
         try:
-            if await should_refuse_fetal_sex_determination(
+            if not skip_fetal_sex_gate and await should_refuse_fetal_sex_determination(
                 question=sanitize_text(question),
                 language=str(language or "english"),
             ):
@@ -2025,7 +2041,11 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 }
         except Exception as exc:
             logger.warning("fetal sex gate skipped after error: %s", exc)
-        log_ask_phase("safety_gates", message_id=assistant_message_id, fetal_gate_skipped=False)
+        log_ask_phase(
+            "safety_gates",
+            message_id=assistant_message_id,
+            fetal_gate_skipped=bool(skip_fetal_sex_gate),
+        )
 
     # Atomic free claim only after safety gates that return without an answer.
     if free_eligible:
@@ -2113,6 +2133,23 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             session_id,
             json.dumps(worker_intent_metadata.get("query_context"), ensure_ascii=False, default=str, sort_keys=True),
         )
+    try:
+        from utils.query_context import is_remedy_followup_request
+        from credits.remedy_funnel import record_funnel_event
+
+        qc = worker_intent_metadata.get("query_context")
+        if is_remedy_followup_request({"query_context": qc}):
+            source_mid = None
+            if isinstance(qc, dict):
+                source_mid = qc.get("source_message_id") or qc.get("sourceMessageId")
+            record_funnel_event(
+                userid=int(current_user.userid),
+                event_name="card_clicked",
+                message_id=str(source_mid).strip() if source_mid else None,
+                platform=str(request.get("platform") or "web")[:40],
+            )
+    except Exception:
+        logger.exception("remedy funnel card_clicked failed user=%s", current_user.userid)
     
     # Start processing. Cloud Tasks gives us durable retry across VM restarts; BackgroundTasks remains
     # the local/dev fallback and keeps the rollout safe until queue env is enabled.
@@ -3168,6 +3205,13 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 or cached_render_target == "plain_text"
                 or cached_plain_text_output
             )
+            query_context = (
+                cached_intent.get("query_context")
+                if isinstance(cached_intent, dict) and isinstance(cached_intent.get("query_context"), dict)
+                else None
+            )
+            from utils.query_context import resolve_remedy_followup_active
+
             force_ready = question.startswith('@All_Events') or is_whatsapp_plain_text
             
             # Check if this is a clarification response and combine with original question
@@ -3198,11 +3242,13 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             clarification_count=clarification_count,
                         )
             
-            query_context = (
-                cached_intent.get("query_context")
-                if isinstance(cached_intent, dict) and isinstance(cached_intent.get("query_context"), dict)
-                else None
+            remedy_followup_active = resolve_remedy_followup_active(
+                {"query_context": query_context},
+                combined_question=combined_question,
             )
+            if remedy_followup_active:
+                force_ready = True
+
             max_clarifications = 0 if is_whatsapp_plain_text else (
                 INSTANT_MAX_CLARIFICATIONS if is_instant_chat else STANDARD_MAX_CLARIFICATIONS
             )
@@ -3227,6 +3273,18 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 )
             intent_router_ms = round((time.time() - routing_start) * 1000, 1)
             MAX_CLARIFICATIONS = max_clarifications
+
+            if remedy_followup_active and intent.get('status') == 'CLARIFY':
+                _chat_log_event(
+                    "intent_failsafe_triggered",
+                    session_id=session_id,
+                    message_id=message_id,
+                    from_status="CLARIFY",
+                    forced_mode="REMEDY_FOLLOWUP",
+                )
+                intent['status'] = 'READY'
+                intent['answer_mode'] = 'remedy_action'
+                intent['mode'] = 'RECOMMEND_REMEDY_FOR_PROBLEM'
             
             # FAIL-SAFE: Force LIFESPAN_EVENT_TIMING for "When/Year" questions to avoid clarification trap.
             timing_keywords = ['when', 'year', 'which year', 'what year', 'kab', 'saal', 'samay']
@@ -3663,6 +3721,13 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             log_chat_error(user_id, birth_data.get('name', 'Unknown'), '', init_error, question, birth_data, 'backend')
             raise init_error
 
+        if isinstance(intent, dict) and isinstance(cached_intent, dict):
+            qc_merge = cached_intent.get("query_context")
+            if isinstance(qc_merge, dict):
+                intent = {**intent, "query_context": qc_merge}
+                if isinstance(context, dict):
+                    context = {**context, "intent": intent}
+
         if is_instant_chat:
             llm_start = time.time()
             result = await generate_instant_chat_response(
@@ -3731,6 +3796,48 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             mode=intent.get('mode', 'default'),
             success=bool(result.get('success')),
         )
+
+        if result.get("success"):
+            from utils.query_context import apply_normal_answer_remedy_guards, resolve_remedy_followup_active
+
+            raw_query_context = (
+                cached_intent.get("query_context")
+                if isinstance(cached_intent, dict) and isinstance(cached_intent.get("query_context"), dict)
+                else None
+            )
+            # The original request breadcrumb is authoritative. Keep the intent
+            # copy as a fallback, but never rely on a model-selected answer_mode.
+            remedy_active = resolve_remedy_followup_active(
+                {"query_context": raw_query_context},
+                combined_question=combined_question,
+            ) or resolve_remedy_followup_active(
+                intent if isinstance(intent, dict) else {},
+                combined_question=combined_question,
+            )
+            before_guard_action_type = str((result.get("next_action") or {}).get("type") or "")
+            cleaned_response, cleaned_action, cleared_followups = apply_normal_answer_remedy_guards(
+                content=str(result.get("response") or ""),
+                next_action=result.get("next_action"),
+                follow_up_questions=result.get("follow_up_questions"),
+                answer_mode=str((intent or {}).get("answer_mode") or ""),
+                category=str((intent or {}).get("category") or ""),
+                question=combined_question,
+                language=language,
+                remedy_followup_active=remedy_active,
+            )
+            result["response"] = cleaned_response
+            result["next_action"] = cleaned_action
+            result["follow_up_questions"] = cleared_followups
+            logger.info(
+                "chat_remedy_delivery_guard message_id=%s explicit_followup=%s answer_mode=%s "
+                "next_action_before=%s next_action_after=%s followups_after=%s",
+                message_id,
+                bool(remedy_active),
+                str((intent or {}).get("answer_mode") or ""),
+                before_guard_action_type or "none",
+                str((cleaned_action or {}).get("type") or "none"),
+                len(cleared_followups or []),
+            )
         
         # Update database with result
         persistence_start = time.time()
@@ -4113,6 +4220,27 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
 
         if result.get('success'):
             await _close_wait_side_conversation(message_id)
+            try:
+                qc = (
+                    cached_intent.get("query_context")
+                    if isinstance(cached_intent, dict) and isinstance(cached_intent.get("query_context"), dict)
+                    else None
+                )
+                from utils.query_context import is_remedy_followup_request
+                from credits.remedy_funnel import record_funnel_event
+
+                if is_remedy_followup_request({"query_context": qc}):
+                    source_mid = None
+                    if isinstance(qc, dict):
+                        source_mid = qc.get("source_message_id") or qc.get("sourceMessageId")
+                    record_funnel_event(
+                        userid=int(user_id),
+                        event_name="remedy_delivered",
+                        message_id=str(source_mid).strip() if source_mid else str(message_id),
+                        platform="server",
+                    )
+            except Exception:
+                logger.exception("remedy funnel remedy_delivered failed message_id=%s", message_id)
         
         # Extract facts AFTER transaction commits to avoid database lock
         if result.get('success') and birth_chart_id:

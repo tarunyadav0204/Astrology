@@ -1017,6 +1017,9 @@ class IntentRouter:
         apply_daily_micro_intent_guards(result, user_question)
         if normalized_query_context:
             result["query_context"] = normalized_query_context
+        from utils.query_context import clamp_remedy_modes_on_intent
+
+        clamp_remedy_modes_on_intent(result, user_question)
         result["evidence_plan"] = normalize_evidence_plan(
             result.get("evidence_plan"),
             question=user_question,
@@ -1146,7 +1149,7 @@ Modes:
 - LIFE_TERMINATION_RESEARCH: only with the configured unlock phrase and explicit death/longevity-end timing.
 - ANALYZE_PERSONALITY: nature, traits, temperament, self-understanding.
 - ANALYZE_TOPIC_POTENTIAL: "how is my career/marriage/health/money/relationship" style readings.
-- RECOMMEND_REMEDY_FOR_PROBLEM: remedy/upay/action for a specific problem.
+- RECOMMEND_REMEDY_FOR_PROBLEM: ONLY when query_context already marks a Remedies CTA follow-up. Wording like "what should I do" / "upay" alone is NOT enough — use ANALYZE_ROOT_CAUSE or ANALYZE_TOPIC_POTENTIAL with answer_mode problem_diagnosis / topic_reading so the UI can offer the Remedies card.
 
 Answer modes:
 - explanation_mechanism: how/why a previous chart claim was made.
@@ -1157,7 +1160,7 @@ Answer modes:
 - potential_capacity: suitability, promise, aptitude, capacity.
 - comparison_choice: choosing between options.
 - problem_diagnosis: why something is blocked, delayed, unstable, difficult.
-- remedy_action: remedy/upay/fix/action.
+- remedy_action: ONLY when query_context already marks a Remedies CTA follow-up (remedy_followup / open_remedy / follow_up_type=remedy_action). Never choose from wording alone.
 - topic_reading: focused reading when no other answer mode fits.
 
 Categories:
@@ -1319,7 +1322,7 @@ Rules:
 - Use `LIFE_TERMINATION_RESEARCH` only when the configured death/longevity unlock phrase is present and the user explicitly asks death/life-termination/lifespan-end timing. This is not normal health mode.
 - Use `ANALYZE_PERSONALITY` for personality/self-understanding questions.
 - Use `ANALYZE_TOPIC_POTENTIAL` for "how is my career/love/money/health" style questions.
-- Use `RECOMMEND_REMEDY_FOR_PROBLEM` for remedy requests tied to a specific problem.
+- Use `RECOMMEND_REMEDY_FOR_PROBLEM` ONLY when query_context already marks a Remedies CTA follow-up. Plain "what should I do" / upay wording → `ANALYZE_ROOT_CAUSE` + `problem_diagnosis` (not a full remedy dump).
 - IMPORTANT: clarification is ALLOWED in instant mode. Do NOT default to READY when the ask is genuinely unclear.
 - Return `CLARIFY` only when the user has not made the core topic specific enough to answer well in one instant reply, or when the message explicitly contains separate unrelated asks.
 - Good reasons to `CLARIFY`:
@@ -1373,7 +1376,7 @@ UNIVERSAL ANSWER MODE:
 - `potential_capacity`: suitability, promise, capacity, aptitude
 - `comparison_choice`: choice between two or more options
 - `problem_diagnosis`: why something is blocked, unstable, delayed, difficult, or leaking
-- `remedy_action`: what to do, remedy, upay, fix, action
+- `remedy_action`: ONLY when query_context already marks a Remedies CTA follow-up. Wording like remedy/upay/fix/action alone is NOT enough — use `problem_diagnosis` or `topic_reading`.
 - `topic_reading`: focused reading when no other answer mode fits
 
 EVIDENCE PLAN:
@@ -1855,7 +1858,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
         - "ANALYZE_TOPIC_POTENTIAL": Assesses the potential of a life area (e.g., "Tell me about my financial prospects.").
         - "ANALYZE_PERSONALITY": Describes the user's character based on their chart (e.g., "What does my chart say about me?", "What are my strengths?").
         - "ANALYZE_ROOT_CAUSE": For deep-seated "why" questions (e.g., "Why do I always struggle with self-confidence?").
-        - "RECOMMEND_REMEDY_FOR_PROBLEM": Suggests remedies for a specific issue (e.g., "I have a lot of anxiety. What can I do?").
+        - "RECOMMEND_REMEDY_FOR_PROBLEM": ONLY when the client already marked a Remedies CTA follow-up. For wording-only asks like "I have anxiety, what can I do?", use ANALYZE_ROOT_CAUSE / problem_diagnosis instead (UI offers Remedies separately).
 
         CHART-FOCUS DETECTION:
         Decide whether the user is asking for a specific chart/lens reading rather than a normal life-topic reading.

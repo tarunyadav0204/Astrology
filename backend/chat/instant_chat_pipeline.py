@@ -19,6 +19,13 @@ from chat.chat_context_builder import ChatContextBuilder
 from context_agents.base import AgentContext
 from shared.dasha_calculator import DashaCalculator
 from utils.admin_settings import get_gemini_instant_model
+from utils.query_context import (
+    is_remedy_followup_request,
+    NO_INLINE_REMEDY_PLAN_RULE,
+    NEXT_ACTION_NONE_IN_REMEDY_MODE,
+    apply_normal_answer_remedy_guards,
+    REMEDY_CARD_FOMO_COPY_RULES,
+)
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
@@ -3218,31 +3225,28 @@ def _looks_like_remedy_question(question: str) -> bool:
     return any(marker in q for marker in markers)
 
 
-def _explicit_remedy_followup_requested(intent: Optional[Dict[str, Any]]) -> bool:
-    """
-    Remedy should only run when the client explicitly marks the request as a remedy follow-up.
-    We do not infer it from generic wording because that can hijack the first answer.
-    """
-    query_context = (intent or {}).get("query_context")
-    if not isinstance(query_context, dict):
-        return False
+def _explicit_remedy_followup_requested(
+    intent: Optional[Dict[str, Any]],
+    question: str = "",
+) -> bool:
+    """True only for explicit Remedies CTA flags or remedy-chain question text."""
+    from utils.query_context import is_remedy_chain_question, is_remedy_followup_request
 
-    candidate_values = [
-        query_context.get("follow_up_type"),
-        query_context.get("followUpType"),
-        query_context.get("chat_action"),
-        query_context.get("chatAction"),
-        query_context.get("mode"),
-        query_context.get("answer_mode"),
-    ]
-    normalized = {str(value or "").strip().lower() for value in candidate_values if str(value or "").strip()}
-    if normalized & {"remedy", "remedy_followup", "remedy_action"}:
-        return True
-    if bool(query_context.get("remedy_followup")) or bool(query_context.get("remedy_action")):
-        return True
-    if bool(query_context.get("open_remedy")) or bool(query_context.get("openRemedy")):
-        return True
-    return False
+    return is_remedy_followup_request(intent) or is_remedy_chain_question(question)
+
+
+def _clamp_remedy_answer_mode(
+    mode: str,
+    intent: Optional[Dict[str, Any]],
+    question: str = "",
+) -> str:
+    """Never enter remedy_action unless the Remedies CTA set explicit query_context flags."""
+    resolved = str(mode or "").strip() or "topic_reading"
+    if resolved == "remedy_action" and not _explicit_remedy_followup_requested(intent, question):
+        if _looks_like_problem_question(question) or _looks_like_remedy_question(question):
+            return "problem_diagnosis"
+        return "topic_reading"
+    return resolved
 
 
 def _looks_like_potential_question(question: str, intent: Optional[Dict[str, Any]]) -> bool:
@@ -3337,7 +3341,7 @@ def _looks_like_event_prediction_question(question: str, intent: Optional[Dict[s
 def _infer_answer_mode(question: str, intent: Optional[Dict[str, Any]], history: List[Dict[str, Any]]) -> str:
     if _looks_like_explanatory_followup(question, history):
         return "explanation_mechanism"
-    if _explicit_remedy_followup_requested(intent):
+    if _explicit_remedy_followup_requested(intent, question):
         return "remedy_action"
     if _looks_like_comparison_question(question):
         return "comparison_choice"
@@ -3397,7 +3401,7 @@ Answer mode meanings:
 - potential_capacity: user asks suitability, aptitude, promise, fit, capacity
 - comparison_choice: user asks between two or more options
 - problem_diagnosis: user asks why something is blocked, unstable, delayed, leaking, or difficult
-- remedy_action: user asks what to do, how to fix, remedy, upay, practical action
+- remedy_action: ONLY when the client already marked this turn as a Remedies CTA follow-up (query_context.remedy_followup / open_remedy / follow_up_type=remedy_action). Never choose remedy_action from wording alone (e.g. "what should I do", "upay", "solution") — those stay problem_diagnosis or topic_reading; the UI will offer a Remedies card when appropriate.
 - topic_reading: default focused reading when none of the above fit best
 
 Also infer the target_subject_key from the allowed_target_subjects list.
@@ -3430,6 +3434,14 @@ async def _infer_answer_mode_with_llm(
     prompt = _build_answer_mode_router_prompt(question, intent, history)
     model_name = get_gemini_instant_model()
     selected_model = analyzer.get_named_gemini_model(model_name, premium_analysis=False)
+
+    def _pack(mode: str, target_subject: Optional[Dict[str, Any]] = None, **extra: Any) -> Dict[str, Any]:
+        return {
+            "answer_mode": _clamp_remedy_answer_mode(mode, intent, question),
+            "target_subject": target_subject or _fallback_target_subject(question),
+            **extra,
+        }
+
     try:
         llm_result = await analyzer.generate_text_from_prompt(
             prompt,
@@ -3442,10 +3454,10 @@ async def _infer_answer_mode_with_llm(
         )
     except Exception as exc:
         logger.warning("instant answer mode llm classification failed: %s", exc)
-        return {"answer_mode": _infer_answer_mode(question, intent, history), "target_subject": _fallback_target_subject(question)}
+        return _pack(_infer_answer_mode(question, intent, history))
     if not llm_result.get("success"):
         logger.warning("instant answer mode llm classification unsuccessful: %s", llm_result.get("error"))
-        return {"answer_mode": _infer_answer_mode(question, intent, history), "target_subject": _fallback_target_subject(question)}
+        return _pack(_infer_answer_mode(question, intent, history))
     raw = str(llm_result.get("response") or "").strip()
     target_subject: Optional[Dict[str, Any]] = None
     try:
@@ -3465,11 +3477,7 @@ async def _infer_answer_mode_with_llm(
         if mode in ANSWER_MODES:
             if target_subject is None:
                 target_subject = _fallback_target_subject(question)
-            return {
-                "answer_mode": mode,
-                "target_subject": target_subject,
-                "needs_year_clarification": needs_year_clarification,
-            }
+            return _pack(mode, target_subject, needs_year_clarification=needs_year_clarification)
     except Exception:
         pass
     m = re.search(r'"answer_mode"\s*:\s*"([^"]+)"', raw)
@@ -3491,18 +3499,9 @@ async def _infer_answer_mode_with_llm(
             if target_subject is None:
                 target_subject = _fallback_target_subject(question)
             needs_year_clarification = False
-            return {
-                "answer_mode": mode,
-                "target_subject": target_subject,
-                "needs_year_clarification": needs_year_clarification,
-            }
+            return _pack(mode, target_subject, needs_year_clarification=needs_year_clarification)
     logger.warning("instant answer mode llm output invalid, falling back: %s", _truncate(raw, 240))
-    fallback_mode = _infer_answer_mode(question, intent, history)
-    return {
-        "answer_mode": fallback_mode,
-        "target_subject": _fallback_target_subject(question),
-        "needs_year_clarification": False,
-    }
+    return _pack(_infer_answer_mode(question, intent, history), needs_year_clarification=False)
 
 
 def _mode_selection_from_intent(intent: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -3511,6 +3510,7 @@ def _mode_selection_from_intent(intent: Optional[Dict[str, Any]]) -> Optional[Di
     mode = str(intent.get("answer_mode") or "").strip()
     if mode not in ANSWER_MODES:
         return None
+    mode = _clamp_remedy_answer_mode(mode, intent, str(intent.get("original_question") or ""))
     target_key = _normalize_relationship_target_key(intent.get("target_subject_key") or "")
     target_subject: Optional[Dict[str, Any]] = None
     if target_key in TARGET_SUBJECTS:
@@ -4520,11 +4520,10 @@ def _instant_parashari_instruction_block(
                 "- `normalized_evidence.remedy_blueprint.remedy_sections.biological`: include this as the biological / tree-based remedy layer when available.",
                 "- `normalized_evidence.remedy_blueprint.remedy_sections.nakshatra`: include this as a distinct nakshatra remedy layer when available; mention shakti, deity, vriksha, mantra, and the actionable remedy.",
                 "- `normalized_evidence.remedy_blueprint.special_points`: use Mudakku, Gandanta, and Mrityu Bhaga only when present. Explain them briefly and precisely.",
-                "- `normalized_evidence.remedy_blueprint.follow_up_prompts`: use these to propose the next remedy question, not as a new diagnosis.",
                 "- `normalized_evidence.remedy_blueprint.caution`: use this to avoid overcommitting to gemstones or too many remedies at once.",
                 "- `normalized_evidence.current_timing` and `active_dashas_formatted`: use these only to identify the planet(s) currently pressing the issue.",
                 "- `normalized_evidence.divisional_specifics`: use only if the blueprint actually points there. Do not widen into general astrology.",
-                "The user should see a focused remedy card, with the strongest remedy layers first and one clear follow-up question if needed.",
+                "The user should see a complete remedy reading in one pass — no Follow-up section, no follow-up chips, and no second remedy CTA.",
                 "Do not turn the answer into a broad horoscope or a long explanation of all planets.",
                 "If the user is already positively channeling the planet through study, research, service, teaching, building, or disciplined work, say that directly and treat it as the strongest remedy layer.",
             ]
@@ -5854,6 +5853,12 @@ def _build_instant_prompt(
         time_relation,
         normalized_evidence,
     )
+    if answer_mode != "remedy_action":
+        analysis_block = (
+            analysis_block
+            + "\nCRITICAL: "
+            + NO_INLINE_REMEDY_PLAN_RULE
+        )
     identity_block = (
         """You are Tara, the voice guide on AstroRoshni (speech / voice chat).
 
@@ -5904,11 +5909,23 @@ Follow-up rules:
 - If the user's last message was very short (e.g. "in general"), start the follow-up with a brief topic anchor so they know what it refers to (e.g. "Eating habits — want a timeframe next?").
 - Do not repeat the same clarification dimension you already resolved (e.g. don't ask general vs timed again if they just chose general).
 - Valid JSON array of strings only inside the markers; no trailing comma."""
-    next_action_tail = """
+    if answer_mode == "remedy_action":
+        next_action_tail = f"""
+
+At the very end of the answer, append exactly one line:
+NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","follow_up_questions":[],"source":"instant"}}
+{NEXT_ACTION_NONE_IN_REMEDY_MODE}
+Keep it short and valid JSON.
+"""
+    else:
+        next_action_tail = f"""
 
 At the very end of the answer, append exactly one line in this format:
-NEXT_ACTION_META: {"type":"<remedy|diagnosis|timing|clarification|comparison|chart_explanation|none>","title":"<short label>","reason":"<short reason in the same language as the answer>","confidence":"<high|medium|low>","follow_up_questions":["<up to 3 short user-facing options>"],"source":"instant"}
-Always include this line. If no follow-up is needed, set type to "none" and follow_up_questions to an empty array.
+NEXT_ACTION_META: {{"type":"<remedy|diagnosis|timing|clarification|comparison|chart_explanation|none>","title":"<FOMO headline>","reason":"<FOMO subline>","confidence":"<high|medium|low>","follow_up_questions":["<button label>"],"source":"instant"}}
+Always include this line.
+- If the reading discusses health problems, stress, blocks, afflictions, or active chart pressure, you MUST set type="remedy" (main answer must NOT contain inline remedies — the card opens remedy mode).
+- If no follow-up is needed, set type to "none" and follow_up_questions to an empty array.
+{REMEDY_CARD_FOMO_COPY_RULES}
 Keep it short and valid JSON.
 """
     timing_lock_block = ""
@@ -6014,7 +6031,11 @@ async def generate_instant_chat_response(
         )
     if bool((mode_selection or {}).get("needs_year_clarification")):
         return _instant_lifetime_event_year_clarification_response(language, speech_mode=speech_mode)
-    answer_mode = str((mode_selection or {}).get("answer_mode") or "topic_reading")
+    answer_mode = _clamp_remedy_answer_mode(
+        str((mode_selection or {}).get("answer_mode") or "topic_reading"),
+        intent,
+        question,
+    )
     target_subject = (mode_selection or {}).get("target_subject") if isinstance(mode_selection, dict) else None
     instant_context = _build_instant_context(
         birth_data=birth_data,
@@ -6117,8 +6138,28 @@ async def generate_instant_chat_response(
         response_content = _polish_speech_event_answer(response_content, prompt_context)
         response_content = _truncate_speech_answer(response_content)
     next_action = parsed_response.get("next_action") or {}
-    combined_followups = list(next_action.get("follow_up_questions") or parsed_response.get("follow_up_questions", []))
-    if not combined_followups and speech_followups:
+    category = str(
+        (intent or {}).get("category")
+        or ((instant_context.get("intent_summary") or {}).get("category"))
+        or "general"
+    )
+    remedy_active = _explicit_remedy_followup_requested(intent, question)
+    response_content, next_action, combined_followups = apply_normal_answer_remedy_guards(
+        content=response_content,
+        next_action=next_action if next_action else None,
+        follow_up_questions=list(
+            (next_action or {}).get("follow_up_questions")
+            or parsed_response.get("follow_up_questions")
+            or []
+        ),
+        answer_mode=answer_mode,
+        category=category,
+        question=question,
+        language=(language or "english").strip().lower(),
+        remedy_followup_active=remedy_active,
+    )
+    next_action = next_action or {}
+    if not combined_followups and speech_followups and not remedy_active:
         combined_followups = list(speech_followups)
     logger.info(
         "instant_chat_next_action_decoded type=%s title=%s confidence=%s follow_up_count=%s speech_mode=%s",

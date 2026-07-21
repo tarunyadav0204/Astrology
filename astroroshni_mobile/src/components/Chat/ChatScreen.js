@@ -4710,6 +4710,7 @@ export default function ChatScreen({ navigation, route }) {
     if (!questionText || !String(questionText).trim()) {
       return;
     }
+    const sourceMessageId = metadata.messageId || metadata.message_id || null;
     await sendMessageRef.current?.(String(questionText).trim(), {
       queryContext: {
         follow_up_type: 'remedy_action',
@@ -4718,6 +4719,7 @@ export default function ChatScreen({ navigation, route }) {
         open_remedy: true,
         remedy_card_source: metadata.source || 'remedy_card',
         remedy_next_action_title: metadata.nextAction?.title || null,
+        source_message_id: sourceMessageId ? String(sourceMessageId) : undefined,
       },
     });
   };

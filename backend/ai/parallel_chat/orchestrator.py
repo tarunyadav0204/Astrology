@@ -53,24 +53,10 @@ def _chart_focus_branch_plan(intent: Dict[str, Any]) -> Tuple[List[str], Optiona
     return ordered, reason
 
 
-def _has_remedy_followup_request(intent: Dict[str, Any]) -> bool:
-    if not isinstance(intent, dict):
-        return False
-    query_context = intent.get("query_context")
-    if not isinstance(query_context, dict):
-        query_context = {}
-    normalized = {
-        str(intent.get("follow_up_type") or "").strip().lower(),
-        str(query_context.get("follow_up_type") or "").strip().lower(),
-    }
-    if normalized & {"remedy", "remedy_followup", "remedy_action"}:
-        return True
-    return bool(
-        query_context.get("remedy_followup")
-        or query_context.get("remedy_action")
-        or query_context.get("open_remedy")
-        or query_context.get("openRemedy")
-    )
+def _has_remedy_followup_request(intent: Dict[str, Any], user_question: str = "") -> bool:
+    from utils.query_context import resolve_remedy_followup_active
+
+    return resolve_remedy_followup_active(intent, combined_question=user_question)
 
 
 def _skipped_branch_output(branch_label: str, reason: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
@@ -647,7 +633,7 @@ async def run_parallel_chat_pipeline(
     free_question_parashari_only = bool(
         using_free_question and is_free_question_parashari_only_enabled()
     )
-    remedy_followup_requested = _has_remedy_followup_request(intent)
+    remedy_followup_requested = _has_remedy_followup_request(intent, user_question)
     enabled_branches, branch_scope_reason = _chart_focus_branch_plan(intent)
     if free_question_parashari_only:
         enabled_branches = ["parashari"]
@@ -743,8 +729,9 @@ async def run_parallel_chat_pipeline(
         remedy_followup_note = (
             "REMEDY FOLLOW-UP MODE: This is not a new chart diagnosis. Use the existing chart context to explain "
             "only the remedy path the user clicked. Do not restate the full answer, do not branch-by-branch analyze, "
-            "and do not drift into generic predictions. Prioritize practical remedy layers, behavioral correction, "
-            "and one next-step follow-up prompt."
+            "and do not drift into generic predictions. Prioritize practical remedy layers and behavioral correction. "
+            "End at Final Verdict. Do NOT add follow-up sections, chips, or prompts asking for more remedies. "
+            "Do NOT append NEXT_ACTION_META with type=remedy — use type=none only."
         )
         if isinstance(par_static, str):
             par_static = f"{par_static}\n\n{remedy_followup_note}"
@@ -1122,6 +1109,13 @@ async def run_parallel_chat_pipeline(
                     )
             except Exception:
                 logger.exception("free_question_lifespan_evidence_inject_failed")
+        from utils.query_context import NEXT_ACTION_NONE_IN_REMEDY_MODE, NO_INLINE_REMEDY_PLAN_RULE
+
+        next_action_block = (
+            NEXT_ACTION_NONE_IN_REMEDY_MODE
+            if remedy_followup_requested
+            else NEXT_ACTION_META_INSTRUCTION.strip()
+        )
         final_user = (
             f"{time_context}\n\n"
             f"{hist_text}"
@@ -1130,7 +1124,7 @@ async def run_parallel_chat_pipeline(
             f"SPECIALIST_BRANCH_OUTPUTS_JSON:\n{_json_compact(parashari_branch_bundle)}\n"
             f"CURRENT QUESTION: {user_question}\n"
             f"{final_check}\n{FAQ_META_INSTRUCTION.strip()}"
-            f"\n{NEXT_ACTION_META_INSTRUCTION.strip()}"
+            f"\n{next_action_block}"
         )
         if remedy_followup_requested:
             final_user = (
@@ -1138,6 +1132,11 @@ async def run_parallel_chat_pipeline(
                 "REMEDY FOLLOW-UP MODE: Use the specialist output to give a remedy-only reading. "
                 "Do not return a general chart reading or branch-by-branch synthesis. "
                 "The answer must be a remedy card response with practical steps only."
+            )
+        else:
+            final_user = (
+                f"{final_user}\n"
+                f"NO INLINE REMEDY PLAN: {NO_INLINE_REMEDY_PLAN_RULE}"
             )
         final_prompt = f"{final_static}\n\n{final_user}"
         t_final = time.time()
@@ -1218,6 +1217,18 @@ async def run_parallel_chat_pipeline(
                 cleaned_text = analyzer._fix_pronoun_usage(cleaned_text, native_name)
         cleaned_text, faq_metadata = ResponseParser.parse_faq_metadata(cleaned_text)
         cleaned_text, next_action = ResponseParser.parse_next_action_metadata(cleaned_text)
+        from utils.query_context import apply_normal_answer_remedy_guards
+
+        cleaned_text, next_action, _ = apply_normal_answer_remedy_guards(
+            content=cleaned_text,
+            next_action=next_action,
+            follow_up_questions=None,
+            answer_mode=str((intent or {}).get("answer_mode") or ""),
+            category=str((intent or {}).get("category") or category or ""),
+            question=user_question,
+            language=language,
+            remedy_followup_active=remedy_followup_requested,
+        )
         cleaned_text, prediction_anchor_meta = ResponseParser.parse_prediction_anchor_metadata(cleaned_text)
         if len(cleaned_text) < 50:
             _log_parallel_llm_summary(_parallel_usage_rows)
@@ -1257,6 +1268,23 @@ async def run_parallel_chat_pipeline(
                 json.dumps(next_action, default=str, ensure_ascii=False, sort_keys=True),
             )
         parsed_response = ResponseParser.parse_images_in_chat_response(cleaned_text)
+        if remedy_followup_requested:
+            from utils.query_context import apply_remedy_mode_delivery_guards
+
+            parsed_response["content"], next_action, follow_ups = apply_remedy_mode_delivery_guards(
+                content=parsed_response["content"],
+                next_action=next_action,
+                follow_up_questions=parsed_response.get("follow_up_questions"),
+                remedy_followup_active=True,
+                answer_mode="remedy_action",
+            )
+            parsed_response["follow_up_questions"] = follow_ups
+        else:
+            from utils.query_context import strip_inline_remedy_sections_from_content
+
+            parsed_response["content"] = strip_inline_remedy_sections_from_content(
+                parsed_response["content"]
+            )
         matched_term_ids, matched_glossary = find_terms_in_text(parsed_response["content"], language=language)
         model_name = syn.get("chat_llm_model")
         token_usage = {
@@ -1409,6 +1437,13 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
             )
     except Exception:
         logger.exception("parallel_lifespan_evidence_inject_failed")
+    from utils.query_context import NEXT_ACTION_NONE_IN_REMEDY_MODE, NO_INLINE_REMEDY_PLAN_RULE
+
+    next_action_block = (
+        NEXT_ACTION_NONE_IN_REMEDY_MODE
+        if remedy_followup_requested
+        else NEXT_ACTION_META_INSTRUCTION.strip()
+    )
     merge_user = (
         f"{time_context}\n\n"
         f"{merge_cached_note}"
@@ -1420,9 +1455,20 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
         f"{timing_contract_block}"
         f"{'' if _runtime_for('merge')['cached_model'] else f'CURRENT QUESTION: {user_question}' + chr(10)}"
         f"{final_check}\n{FAQ_META_INSTRUCTION.strip()}"
-        f"\n{NEXT_ACTION_META_INSTRUCTION.strip()}"
+        f"\n{next_action_block}"
         f"{prediction_anchor_meta_tail}"
     )
+    if remedy_followup_requested:
+        merge_user = (
+            f"{merge_user}\n"
+            "REMEDY FOLLOW-UP MODE: Give a remedy-only reading with practical steps in the answer body. "
+            "Do NOT append NEXT_ACTION_META with type=remedy."
+        )
+    else:
+        merge_user = (
+            f"{merge_user}\n"
+            f"NO INLINE REMEDY PLAN: {NO_INLINE_REMEDY_PLAN_RULE}"
+        )
     merge_static = "\n\n".join(
         [
             build_merge_role_preamble(),
@@ -1555,6 +1601,18 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
 
     cleaned_text, faq_metadata = ResponseParser.parse_faq_metadata(cleaned_text)
     cleaned_text, next_action = ResponseParser.parse_next_action_metadata(cleaned_text)
+    from utils.query_context import apply_normal_answer_remedy_guards, apply_remedy_mode_delivery_guards, strip_inline_remedy_sections_from_content
+
+    cleaned_text, next_action, _ = apply_normal_answer_remedy_guards(
+        content=cleaned_text,
+        next_action=next_action,
+        follow_up_questions=None,
+        answer_mode=str((intent or {}).get("answer_mode") or ""),
+        category=str((intent or {}).get("category") or category or ""),
+        question=user_question,
+        language=language,
+        remedy_followup_active=remedy_followup_requested,
+    )
     cleaned_text, prediction_anchor_meta = ResponseParser.parse_prediction_anchor_metadata(cleaned_text)
     if len(cleaned_text) < 50:
         _log_parallel_llm_summary(_parallel_usage_rows)
@@ -1595,6 +1653,19 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
             json.dumps(next_action, default=str, ensure_ascii=False, sort_keys=True),
         )
     parsed_response = ResponseParser.parse_images_in_chat_response(cleaned_text)
+    if remedy_followup_requested:
+        parsed_response["content"], next_action, follow_ups = apply_remedy_mode_delivery_guards(
+            content=parsed_response["content"],
+            next_action=next_action,
+            follow_up_questions=parsed_response.get("follow_up_questions"),
+            remedy_followup_active=True,
+            answer_mode="remedy_action",
+        )
+        parsed_response["follow_up_questions"] = follow_ups
+    else:
+        parsed_response["content"] = strip_inline_remedy_sections_from_content(
+            parsed_response["content"]
+        )
     matched_term_ids, matched_glossary = find_terms_in_text(parsed_response["content"], language=language)
 
     summary_image_url = None
