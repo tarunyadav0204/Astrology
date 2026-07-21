@@ -195,8 +195,75 @@ def _gemini_response_text(response: Any) -> str:
     return "\n".join(parts).strip()
 
 
+def _calendar_day_question_audience(prompt: str) -> Optional[Dict[str, Any]]:
+    """Return an exact query for common yesterday-but-not-today audience requests."""
+    text = " ".join(str(prompt or "").strip().lower().split())
+    mentions_questions = bool(
+        re.search(r"\b(question|questions|chat|chats|chatted|chatting)\b", text)
+    )
+    excludes_today = bool(
+        re.search(
+            r"\b(?:but\s+)?not\s+today\b|\bno\s+(?:paid\s+)?(?:questions?|chats?)\s+today\b",
+            text,
+        )
+    )
+    if "yesterday" not in text or not mentions_questions or not excludes_today:
+        return None
+
+    paid = bool(re.search(r"\b(paid|charged|credit[- ]charged)\b", text))
+    yesterday_column = "paid_questions_yesterday" if paid else "questions_asked_yesterday"
+    today_column = "paid_questions_today" if paid else "questions_asked_today"
+    order_column = "last_paid_question_at" if paid else "last_user_chat_at"
+    normalized, warnings = validate_audience_sql(
+        f"""
+        SELECT *
+        FROM {VIEW_NAME}
+        WHERE {yesterday_column} > 0
+          AND {today_column} = 0
+        ORDER BY {order_column} DESC NULLS LAST
+        """
+    )
+    activity = "credit-charged questions" if paid else "questions"
+    return {
+        "explanation": (
+            f"Users with one or more {activity} during yesterday's Asia/Kolkata calendar day "
+            f"and zero {activity} during today's Asia/Kolkata calendar day."
+        ),
+        "sql": normalized,
+        "warnings": warnings,
+        "model_used": "deterministic-calendar-day",
+    }
+
+
+def validate_prompt_sql_alignment(prompt: str, sql: str) -> None:
+    """Reject rolling-window proxies for explicit calendar-day question audiences."""
+    text = " ".join(str(prompt or "").strip().lower().split())
+    if "yesterday" not in text or not re.search(
+        r"\b(question|questions|chat|chats|chatted|chatting)\b",
+        text,
+    ):
+        return
+    lowered_sql = str(sql or "").lower()
+    paid = bool(re.search(r"\b(paid|charged|credit[- ]charged)\b", text))
+    expected = "paid_questions_yesterday" if paid else "questions_asked_yesterday"
+    if expected not in lowered_sql:
+        raise ValueError(
+            f"Calendar-day question audiences must use {expected}; rolling-window count differences are not allowed"
+        )
+
+
 def generate_audience_sql(prompt: str) -> Dict[str, Any]:
     """Ask Gemini for explanation + SELECT against admin_audience_user_facts."""
+    user_prompt = (prompt or "").strip()
+    if len(user_prompt) < 8:
+        raise ValueError("Describe the audience in a bit more detail")
+    if len(user_prompt) > 4000:
+        user_prompt = user_prompt[:4000]
+
+    exact_calendar_query = _calendar_day_question_audience(user_prompt)
+    if exact_calendar_query:
+        return exact_calendar_query
+
     api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY is not set")
@@ -218,12 +285,6 @@ def generate_audience_sql(prompt: str) -> Dict[str, Any]:
     if not model:
         raise RuntimeError("No Gemini model available")
 
-    user_prompt = (prompt or "").strip()
-    if len(user_prompt) < 8:
-        raise ValueError("Describe the audience in a bit more detail")
-    if len(user_prompt) > 4000:
-        user_prompt = user_prompt[:4000]
-
     system = f"""You are an analytics SQL assistant for AstroRoshni admin campaigns.
 
 {schema_prompt_block()}
@@ -236,6 +297,9 @@ Rules:
 5. Use UTC-aware comparisons with NOW() AT TIME ZONE 'UTC' when needed.
 6. Add a reasonable ORDER BY (e.g. last_purchase_at DESC NULLS LAST) when helpful.
 7. You may omit LIMIT; the server will add one.
+8. For exact calendar days, use the exact *_today / *_yesterday columns. Never subtract rolling counts.
+9. "Paid question" means a credit-charged question; use paid_questions_today, paid_questions_yesterday, or last_paid_question_at.
+10. "Question" without "paid" uses questions_asked_today / questions_asked_yesterday for calendar-day requests.
 
 Example audience: users who bought credits, still have balance, no chat in 14 days.
 Example SQL:
@@ -262,6 +326,7 @@ ORDER BY last_purchase_at DESC NULLS LAST
         # Sometimes models put SQL in a code fence key
         sql = str(parsed.get("query") or "").strip()
     normalized, warnings = validate_audience_sql(sql)
+    validate_prompt_sql_alignment(user_prompt, normalized)
     return {
         "explanation": explanation or "Audience filter generated.",
         "sql": normalized,

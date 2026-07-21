@@ -2940,6 +2940,10 @@ class AnalyticsNlExecuteBody(BaseModel):
     sql: str = Field(..., min_length=10, max_length=20000)
 
 
+class DataExplorerNlExecuteBody(BaseModel):
+    sql: str = Field(..., min_length=10, max_length=30000)
+
+
 @router.post("/admin/audience-nl/generate")
 async def admin_audience_nl_generate(
     body: AudienceNlPromptBody,
@@ -3095,3 +3099,71 @@ async def admin_analytics_nl_generate_and_run(
     except Exception as e:
         logger.exception("admin_analytics_nl_generate_and_run failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to generate and run analytics query") from e
+
+
+def _ensure_data_explorer_views() -> None:
+    """Create/refresh the two governed views exposed to Data Explorer."""
+    from .analytics_nl import ensure_admin_analytics_purchase_facts_view
+    from .audience_nl import ensure_admin_audience_user_facts_view
+
+    ensure_admin_audience_user_facts_view()
+    ensure_admin_analytics_purchase_facts_view()
+
+
+@router.post("/admin/data-explorer/execute")
+async def admin_data_explorer_execute(
+    body: DataExplorerNlExecuteBody,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    from .data_explorer_nl import execute_data_explorer_sql
+
+    try:
+        def _work():
+            _ensure_data_explorer_views()
+            return execute_data_explorer_sql(body.sql)
+
+        out = await run_in_threadpool(_work)
+        logger.info(
+            "data_explorer_execute admin=%s rows=%s relations=%s",
+            current_user.userid,
+            out.get("row_count"),
+            out.get("relations_used"),
+        )
+        return {"ok": True, **out}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("admin_data_explorer_execute failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to execute Data Explorer SQL") from e
+
+
+@router.post("/admin/data-explorer/generate-and-run")
+async def admin_data_explorer_generate_and_run(
+    body: AudienceNlPromptBody,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    from .data_explorer_nl import generate_and_run_data_explorer
+
+    try:
+        def _work():
+            _ensure_data_explorer_views()
+            return generate_and_run_data_explorer(body.prompt)
+
+        out = await run_in_threadpool(_work)
+        logger.info(
+            "data_explorer_generate_and_run admin=%s rows=%s model=%s relations=%s",
+            current_user.userid,
+            out.get("row_count"),
+            out.get("model_used"),
+            out.get("relations_used"),
+        )
+        return {"ok": True, **out}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("admin_data_explorer_generate_and_run failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to generate and run Data Explorer query") from e

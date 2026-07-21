@@ -16,6 +16,8 @@
 - [x] Restore the normal chat-mode picker after the free question is consumed.
 - [x] Add a server-backed “Push enabled only” filter to Audience Builder user selection.
 - [x] Add a PN-only campaign policy with no WhatsApp or email fallback.
+- [x] Replace rolling-count guesses in Audience Builder with exact IST today/yesterday and paid-question facts.
+- [x] Add a governed Data Explorer for cross-table business questions using live approved schemas, read-only SQL, sensitive-field blocking, timeouts, and 500-row limits.
 
 ### Validation
 

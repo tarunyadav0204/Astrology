@@ -44,6 +44,7 @@ function formatPurchaseAmount(row) {
 const EXAMPLE =
   'Users who bought credits in the last 60 days, still have a credit balance, and have not asked a chat question in 14 days.';
 const ANALYTICS_EXAMPLE = 'What was the total credit purchase this month?';
+const EXPLORER_EXAMPLE = 'Which campaigns produced the most user questions within 7 days of delivery?';
 
 function humanizeColumn(value) {
   return String(value || '')
@@ -60,6 +61,14 @@ function formatAnalyticsValue(column, value, row) {
     return String(row.currency || '').toUpperCase() === 'INR' ? `₹${formatted}` : formatted;
   }
   return formatted;
+}
+
+function formatExplorerValue(value) {
+  if (value == null || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'number') return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
 }
 
 export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
@@ -81,6 +90,10 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
   const [status, setStatus] = useState('');
   const [analyticsColumns, setAnalyticsColumns] = useState([]);
   const [analyticsRows, setAnalyticsRows] = useState([]);
+  const [explorerColumns, setExplorerColumns] = useState([]);
+  const [explorerRows, setExplorerRows] = useState([]);
+  const [explorerUserIds, setExplorerUserIds] = useState([]);
+  const [explorerRelations, setExplorerRelations] = useState([]);
   const [pushOnly, setPushOnly] = useState(false);
 
   const pageIds = useMemo(() => rows.map((r) => Number(r.userid)).filter(Boolean), [rows]);
@@ -108,10 +121,21 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
     setWarnings(Array.isArray(body.warnings) ? body.warnings : []);
   }, []);
 
+  const applyExplorerResult = useCallback((body) => {
+    setExplanation(body.explanation || '');
+    setSql(body.sql || '');
+    setExplorerColumns(Array.isArray(body.columns) ? body.columns : []);
+    setExplorerRows(Array.isArray(body.rows) ? body.rows : []);
+    setExplorerUserIds(Array.isArray(body.audience_user_ids) ? body.audience_user_ids.map(Number).filter(Boolean) : []);
+    setExplorerRelations(Array.isArray(body.relations_used) ? body.relations_used : []);
+    setTruncated(Boolean(body.truncated));
+    setWarnings(Array.isArray(body.warnings) ? body.warnings : []);
+  }, []);
+
   const changeMode = (nextMode) => {
     if (nextMode === mode || busy) return;
     setMode(nextMode);
-    setPrompt(nextMode === 'analytics' ? ANALYTICS_EXAMPLE : EXAMPLE);
+    setPrompt(nextMode === 'analytics' ? ANALYTICS_EXAMPLE : nextMode === 'explorer' ? EXPLORER_EXAMPLE : EXAMPLE);
     setExplanation('');
     setSql('');
     setShowSql(false);
@@ -125,25 +149,40 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
     setPushOnly(false);
     setAnalyticsColumns([]);
     setAnalyticsRows([]);
+    setExplorerColumns([]);
+    setExplorerRows([]);
+    setExplorerUserIds([]);
+    setExplorerRelations([]);
   };
 
   const runGenerateAndRun = async () => {
     setBusy(true);
     setError('');
-    setStatus(mode === 'analytics' ? 'Generating analytics and running query…' : 'Generating audience and running query…');
+    setStatus(
+      mode === 'audience'
+        ? 'Generating audience and running query…'
+        : mode === 'analytics'
+          ? 'Generating analytics and running query…'
+          : 'Finding the relevant data and running query…'
+    );
     try {
       const endpoint =
         mode === 'analytics'
           ? '/api/nudge/admin/analytics-nl/generate-and-run'
+          : mode === 'explorer'
+            ? '/api/nudge/admin/data-explorer/generate-and-run'
           : '/api/nudge/admin/audience-nl/generate-and-run';
       const body = await apiFetch(endpoint, {
         method: 'POST',
         body: JSON.stringify(
-          mode === 'analytics' ? { prompt } : { prompt, page: 1, page_size: pageSize, push_only: pushOnly }
+          mode === 'audience' ? { prompt, page: 1, page_size: pageSize, push_only: pushOnly } : { prompt }
         ),
       });
       if (mode === 'analytics') {
         applyAnalyticsResult(body);
+        setStatus(body.row_count ? `Returned ${body.row_count} result row${body.row_count === 1 ? '' : 's'}` : 'No data matched');
+      } else if (mode === 'explorer') {
+        applyExplorerResult(body);
         setStatus(body.row_count ? `Returned ${body.row_count} result row${body.row_count === 1 ? '' : 's'}` : 'No data matched');
       } else {
         applyResult(body);
@@ -168,17 +207,22 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
     setStatus('Running query…');
     try {
       const endpoint =
-        mode === 'analytics' ? '/api/nudge/admin/analytics-nl/execute' : '/api/nudge/admin/audience-nl/execute';
+        mode === 'analytics'
+          ? '/api/nudge/admin/analytics-nl/execute'
+          : mode === 'explorer'
+            ? '/api/nudge/admin/data-explorer/execute'
+            : '/api/nudge/admin/audience-nl/execute';
       const body = await apiFetch(endpoint, {
         method: 'POST',
         body: JSON.stringify(
-          mode === 'analytics'
-            ? { sql }
-            : { sql, page: nextPage, page_size: pageSize, push_only: pushOnlyOverride }
+          mode === 'audience' ? { sql, page: nextPage, page_size: pageSize, push_only: pushOnlyOverride } : { sql }
         ),
       });
       if (mode === 'analytics') {
         applyAnalyticsResult(body);
+        setStatus(body.row_count ? `Returned ${body.row_count} result row${body.row_count === 1 ? '' : 's'}` : 'No data matched');
+      } else if (mode === 'explorer') {
+        applyExplorerResult(body);
         setStatus(body.row_count ? `Returned ${body.row_count} result row${body.row_count === 1 ? '' : 's'}` : 'No data matched');
       } else {
         applyResult(body, { keepSelection });
@@ -251,16 +295,32 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
     });
   };
 
+  const createExplorerCampaign = () => {
+    if (typeof onCreateCampaign !== 'function' || !explorerUserIds.length) return;
+    onCreateCampaign({
+      name: 'Data Explorer audience',
+      title_template: '',
+      body_template: '',
+      question_template: '',
+      landing_screen: 'chat',
+      audience_type: 'user_ids',
+      audience_user_ids: explorerUserIds.join(', '),
+      require_self_chart: false,
+      audience_nl_prompt: prompt,
+      audience_nl_sql: sql,
+    });
+  };
+
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
 
   return (
     <div className="audience-builder">
       <div className="audience-builder__header">
         <div>
-          <h2>Audience & analytics builder</h2>
+          <h2>Audience, analytics & data explorer</h2>
           <p className="audience-builder__hint">
-            Ask for a campaign audience or a purchase metric in plain English. Queries run only against
-            curated admin data.
+            Build campaign audiences, answer purchase questions, or explore approved business data in plain
+            English. Every query is read-only and sensitive fields stay unavailable.
           </p>
         </div>
       </div>
@@ -288,11 +348,22 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
           Analytics
           <span>Totals, counts, and trends</span>
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'explorer'}
+          className={mode === 'explorer' ? 'is-active' : ''}
+          onClick={() => changeMode('explorer')}
+          disabled={busy}
+        >
+          Data Explorer
+          <span>Questions across approved tables</span>
+        </button>
       </div>
 
       <div className="audience-builder__prompt-block">
         <label htmlFor="audience-nl-prompt">
-          {mode === 'analytics' ? 'Analytics question' : 'Audience description'}
+          {mode === 'audience' ? 'Audience description' : mode === 'analytics' ? 'Analytics question' : 'Data question'}
         </label>
         <textarea
           id="audience-nl-prompt"
@@ -300,11 +371,11 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           disabled={busy}
-          placeholder={mode === 'analytics' ? ANALYTICS_EXAMPLE : EXAMPLE}
+          placeholder={mode === 'analytics' ? ANALYTICS_EXAMPLE : mode === 'explorer' ? EXPLORER_EXAMPLE : EXAMPLE}
         />
         <div className="audience-builder__actions">
           <button type="button" className="audience-builder__primary" onClick={runGenerateAndRun} disabled={busy}>
-            {busy ? 'Working…' : mode === 'analytics' ? 'Ask & run' : 'Generate & run'}
+            {busy ? 'Working…' : mode === 'audience' ? 'Generate & run' : 'Ask & run'}
           </button>
           <button type="button" className="audience-builder__secondary" onClick={() => runExecute(1)} disabled={busy || !sql}>
             Re-run SQL
@@ -384,6 +455,47 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
         </div>
       ) : null}
 
+      {mode === 'explorer' && explorerRelations.length > 0 ? (
+        <div className="audience-builder__sources">
+          <span>Sources</span>
+          {explorerRelations.map((relation) => (
+            <code key={relation}>{relation}</code>
+          ))}
+        </div>
+      ) : null}
+
+      {mode === 'explorer' && explorerUserIds.length > 0 && typeof onCreateCampaign === 'function' ? (
+        <div className="audience-builder__explorer-campaign">
+          <span>This result contains {explorerUserIds.length} unique user ID{explorerUserIds.length === 1 ? '' : 's'}.</span>
+          <button type="button" className="audience-builder__primary" onClick={createExplorerCampaign}>
+            Create campaign with these users
+          </button>
+        </div>
+      ) : null}
+
+      {mode === 'explorer' && explorerRows.length > 0 ? (
+        <div className="audience-builder__table-wrap audience-builder__explorer-table-wrap">
+          <table className="audience-builder__table">
+            <thead>
+              <tr>
+                {explorerColumns.map((column) => (
+                  <th key={column}>{humanizeColumn(column)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {explorerRows.map((row, rowIndex) => (
+                <tr key={`explorer-${rowIndex}`}>
+                  {explorerColumns.map((column) => (
+                    <td key={`${rowIndex}-${column}`}>{formatExplorerValue(row[column])}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
       {mode === 'audience' ? (
       <div className="audience-builder__table-toolbar">
         <div className="audience-builder__selection-summary">
@@ -443,6 +555,10 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
               <th>Last purchase amt</th>
               <th>Last chat</th>
               <th>Days since chat</th>
+              <th>Questions yesterday</th>
+              <th>Questions today</th>
+              <th>Paid questions yesterday</th>
+              <th>Paid questions today</th>
               <th>Push</th>
               <th>WhatsApp</th>
             </tr>
@@ -450,7 +566,7 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={13} className="audience-builder__empty">
+                <td colSpan={17} className="audience-builder__empty">
                   No rows yet. Generate an audience to preview users.
                 </td>
               </tr>
@@ -477,6 +593,10 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
                     <td>{formatPurchaseAmount(row)}</td>
                     <td>{formatDate(row.last_user_chat_at)}</td>
                     <td>{row.days_since_last_chat == null ? '—' : row.days_since_last_chat}</td>
+                    <td>{row.questions_asked_yesterday ?? 0}</td>
+                    <td>{row.questions_asked_today ?? 0}</td>
+                    <td>{row.paid_questions_yesterday ?? 0}</td>
+                    <td>{row.paid_questions_today ?? 0}</td>
                     <td>{row.has_device_token ? 'Yes' : '—'}</td>
                     <td>{row.has_whatsapp ? 'Yes' : '—'}</td>
                   </tr>
@@ -486,9 +606,13 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
           </tbody>
         </table>
       </div>
-      ) : analyticsRows.length === 0 && !busy ? (
+      ) : mode === 'analytics' && analyticsRows.length === 0 && !busy ? (
         <div className="audience-builder__analytics-empty">
           Ask a purchase question to see totals, counts, or grouped results.
+        </div>
+      ) : mode === 'explorer' && explorerRows.length === 0 && !busy ? (
+        <div className="audience-builder__analytics-empty">
+          Ask about users, chats, purchases, subscriptions, campaigns, conversions, acquisition, or expenses.
         </div>
       ) : null}
 
