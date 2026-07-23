@@ -46,14 +46,6 @@ const BAND_LABELS = {
   insufficient: 'Not enough chart support',
 };
 const STATE_ORDER = { fully_reinforced: 5, dasha_transit_activated: 4, dasha_connected: 3, transit_only: 2, dormant: 1 };
-const STATE_COLORS = {
-  fully_reinforced: '#6d28d9', dasha_transit_activated: '#9f67e8',
-  dasha_connected: '#c4b5fd', transit_only: '#94a3b8', dormant: '#d1d5db',
-};
-const STATE_TEXT_COLORS = {
-  fully_reinforced: '#ffffff', dasha_transit_activated: '#ffffff',
-  dasha_connected: '#33204f', transit_only: '#243447', dormant: '#6b7280',
-};
 const OUTCOME_COLORS = { supportive: '#16a34a', mixed: '#f59e0b', challenging: '#dc2626', neutral: '#64748b' };
 const SYNTHESIS_STRENGTH_LABELS = { high: 'Strong chart agreement', well_supported: 'Good chart agreement', moderate: 'Developing chart theme' };
 const subjectContextLabel = (subject) => subject === 'self' ? 'For you' : `May involve your ${subject}`;
@@ -155,7 +147,29 @@ const chartIdFrom = (data) => data?.chart_id || data?.birth_chart_id || data?.id
 const unique = (items) => [...new Set(items.filter(Boolean))];
 
 export default function ActivationExplorerScreen({ navigation, route }) {
-  const { colors, theme } = useTheme();
+  const { colors, theme, androidLightCardFixStyle } = useTheme();
+  const isDark = theme === 'dark';
+  const ui = {
+    surface: isDark ? '#28143b' : '#ffffff',
+    surfaceRaised: isDark ? '#321a48' : '#fffaf6',
+    surfaceMuted: isDark ? 'rgba(255,255,255,0.055)' : '#f8f5f2',
+    border: isDark ? 'rgba(255,255,255,0.11)' : 'rgba(28,25,23,0.09)',
+    header: isDark ? '#1e0a30' : '#fffaf7',
+  };
+  const activationColors = {
+    fully_reinforced: '#f97316',
+    dasha_transit_activated: isDark ? '#c2410c' : '#fb923c',
+    dasha_connected: isDark ? 'rgba(249,115,22,0.24)' : '#ffedd5',
+    transit_only: isDark ? 'rgba(255,255,255,0.10)' : '#e7e5e4',
+    dormant: isDark ? 'rgba(255,255,255,0.035)' : '#f5f5f4',
+  };
+  const activationTextColors = {
+    fully_reinforced: '#ffffff',
+    dasha_transit_activated: '#ffffff',
+    dasha_connected: isDark ? '#fed7aa' : '#7c2d12',
+    transit_only: isDark ? 'rgba(255,255,255,0.78)' : '#57534e',
+    dormant: isDark ? 'rgba(255,255,255,0.42)' : '#a8a29e',
+  };
   const [birthData, setBirthData] = useState(route?.params?.birthData || null);
   const [asOf, setAsOf] = useState(localDate);
   const [horizonDays, setHorizonDays] = useState(90);
@@ -258,20 +272,24 @@ export default function ActivationExplorerScreen({ navigation, route }) {
     setAsOf(localDate(next));
   };
 
-  const card = [styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }];
+  const card = [
+    styles.card,
+    { backgroundColor: ui.surface, borderColor: ui.border },
+    !isDark && androidLightCardFixStyle,
+  ];
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}> 
       <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid] : [colors.gradientStart, colors.gradientMid]} style={StyleSheet.absoluteFill} />
-      <View style={[styles.header, { borderBottomColor: colors.cardBorder }]}> 
-        <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()} accessibilityLabel="Go back">
+      <View style={[styles.header, { backgroundColor: ui.header, borderBottomColor: ui.border }]}>
+        <TouchableOpacity style={[styles.headerButton, { backgroundColor: ui.surfaceMuted }]} onPress={() => navigation.goBack()} accessibilityLabel="Go back">
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCopy}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>What’s active now?</Text>
           <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>{birthData?.name || 'Selected chart'} · your chart explained</Text>
         </View>
-        <TouchableOpacity style={styles.headerButton} onPress={loadExplorer} accessibilityLabel="Recalculate">
+        <TouchableOpacity style={[styles.headerButton, { backgroundColor: ui.surfaceMuted }]} onPress={loadExplorer} accessibilityLabel="Recalculate">
           <Ionicons name="refresh" size={22} color={colors.text} />
         </TouchableOpacity>
       </View>
@@ -279,12 +297,12 @@ export default function ActivationExplorerScreen({ navigation, route }) {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[card, styles.controls]}>
           <View style={styles.dateControl}>
-            <TouchableOpacity onPress={() => shiftDate(-1)} style={styles.miniButton}><Ionicons name="chevron-back" size={18} color={colors.text} /></TouchableOpacity>
-            <View style={styles.controlCopy}><Text style={[styles.eyebrow, { color: colors.textSecondary }]}>CALCULATION DATE</Text><Text style={[styles.controlValue, { color: colors.text }]}>{asOf}</Text></View>
-            <TouchableOpacity onPress={() => shiftDate(1)} style={styles.miniButton}><Ionicons name="chevron-forward" size={18} color={colors.text} /></TouchableOpacity>
+            <TouchableOpacity onPress={() => shiftDate(-1)} style={[styles.miniButton, { backgroundColor: ui.surfaceMuted }]}><Ionicons name="chevron-back" size={18} color={colors.text} /></TouchableOpacity>
+            <View style={styles.controlCopy}><Text style={[styles.eyebrow, { color: colors.textSecondary }]}>VIEW FROM</Text><Text style={[styles.controlValue, { color: colors.text }]}>{new Date(`${asOf}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</Text></View>
+            <TouchableOpacity onPress={() => shiftDate(1)} style={[styles.miniButton, { backgroundColor: ui.surfaceMuted }]}><Ionicons name="chevron-forward" size={18} color={colors.text} /></TouchableOpacity>
           </View>
           <View style={styles.segmentRow}>
-            {[30, 90, 180].map((days) => <TouchableOpacity key={days} onPress={() => setHorizonDays(days)} style={[styles.segment, horizonDays === days && { backgroundColor: colors.primary }]}><Text style={[styles.segmentText, { color: horizonDays === days ? '#fff' : colors.textSecondary }]}>{days} days</Text></TouchableOpacity>)}
+            {[30, 90, 180].map((days) => <TouchableOpacity key={days} onPress={() => setHorizonDays(days)} style={[styles.segment, { borderColor: horizonDays === days ? colors.primary : ui.border, backgroundColor: horizonDays === days ? colors.primary : ui.surfaceMuted }]}><Text style={[styles.segmentText, { color: horizonDays === days ? '#fff' : colors.textSecondary }]}>{days} days</Text></TouchableOpacity>)}
           </View>
         </View>
 
@@ -292,13 +310,13 @@ export default function ActivationExplorerScreen({ navigation, route }) {
         {!loading && error ? <View style={[card, styles.state]}><Ionicons name="alert-circle-outline" size={34} color={colors.error} /><Text style={[styles.stateTitle, { color: colors.text }]}>Calculation could not be completed</Text><Text style={[styles.stateText, { color: colors.textSecondary }]}>{error}</Text><TouchableOpacity onPress={loadExplorer} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={styles.primaryButtonText}>Try again</Text></TouchableOpacity></View> : null}
 
         {!loading && result ? <>
-          <View style={[card, styles.dashaCard]}>
+          <LinearGradient colors={isDark ? ['#3b1d52', '#28143b'] : ['#fff0e4', '#ffffff']} style={[styles.card, styles.dashaCard, { borderColor: ui.border }]}>
             <Text style={[styles.eyebrow, { color: colors.textSecondary }]}>YOUR CURRENT TIMING CYCLE</Text>
             <Text style={[styles.dashaChain, { color: colors.text }]}>{currentWindow?.mahadasha || '—'} <Text style={{ color: colors.primary }}>major →</Text> {currentWindow?.antardasha || '—'} <Text style={{ color: colors.primary }}>sub-period →</Text> {currentWindow?.pratyantardasha || '—'}</Text>
             <Text style={[styles.meta, { color: colors.textSecondary }]}>{shortDate(currentWindow?.start_date)} – {shortDate(currentWindow?.end_date)} · {currentRows.filter((row) => !['transit_only', 'dormant'].includes(row.state)).length} houses active now · based on D1</Text>
-          </View>
+          </LinearGradient>
 
-          <View style={[card, styles.viewTabs]}>
+          <View style={[styles.viewTabs, { backgroundColor: ui.surfaceMuted, borderColor: ui.border }]}>
             {[['houses', 'House by House'], ['manifestations', 'Combined Life Themes']].map(([key, label]) => <TouchableOpacity key={key} onPress={() => setActiveTab(key)} style={[styles.viewTab, activeTab === key && { backgroundColor: colors.primary }]}><Text style={[styles.viewTabText, { color: activeTab === key ? '#fff' : colors.textSecondary }]}>{label}</Text></TouchableOpacity>)}
           </View>
 
@@ -309,23 +327,23 @@ export default function ActivationExplorerScreen({ navigation, route }) {
             <View style={styles.houseGrid}>{Array.from({ length: 12 }, (_, index) => index + 1).map((houseNumber) => {
               const house = displayedHouseRows.find((row) => row.house === houseNumber);
               const selected = selectedHouse?.house === houseNumber;
-              const stateColor = STATE_COLORS[house?.state || 'dormant'];
-              const stateTextColor = STATE_TEXT_COLORS[house?.state || 'dormant'];
-              return <TouchableOpacity key={houseNumber} onPress={() => { setSelectedHouseNumber(houseNumber); setSelectedWindowStart(null); }} style={[styles.houseTile, { borderColor: selected ? colors.text : stateColor, borderWidth: selected ? 2 : 1, backgroundColor: stateColor }]}><View style={[styles.outcomeDot, { backgroundColor: OUTCOME_COLORS[house?.outcome?.tone || 'neutral'] }]} /><Text style={[styles.houseNumber, { color: stateTextColor }]}>H{houseNumber}</Text><Text style={[styles.houseState, { color: stateTextColor, opacity: 0.86 }]} numberOfLines={2}>{STATE_LABELS[house?.state] || 'Not active'}</Text></TouchableOpacity>;
+              const stateColor = activationColors[house?.state || 'dormant'];
+              const stateTextColor = activationTextColors[house?.state || 'dormant'];
+              return <TouchableOpacity key={houseNumber} onPress={() => { setSelectedHouseNumber(houseNumber); setSelectedWindowStart(null); }} style={[styles.houseTile, { borderColor: selected ? colors.primary : ui.border, borderWidth: selected ? 2 : 1, backgroundColor: stateColor }]}><View style={[styles.outcomeDot, { backgroundColor: OUTCOME_COLORS[house?.outcome?.tone || 'neutral'] }]} /><Text style={[styles.houseNumber, { color: stateTextColor }]}>H{houseNumber}</Text><Text style={[styles.houseState, { color: stateTextColor }]} numberOfLines={2}>{STATE_LABELS[house?.state] || 'Not active'}</Text></TouchableOpacity>;
             })}</View>
-            <View style={styles.legendBlock}><Text style={[styles.legendTitle, { color: colors.text }]}>How clearly it is activated</Text><View style={styles.legendWrap}>{[['fully_reinforced', 'Strongly active'], ['dasha_transit_activated', 'Active now'], ['dasha_connected', 'Period connected'], ['transit_only', 'Background']].map(([state, label]) => <View key={state} style={styles.legendItem}><View style={[styles.legendSwatch, { backgroundColor: STATE_COLORS[state] }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>{label}</Text></View>)}</View><Text style={[styles.legendTitle, { color: colors.text }]}>What kind of experience it may bring</Text><View style={styles.legendWrap}>{[['supportive', 'Constructive'], ['mixed', 'Mixed'], ['challenging', 'Pressure'], ['neutral', 'Unclear']].map(([tone, label]) => <View key={tone} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: OUTCOME_COLORS[tone] }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>{label}</Text></View>)}</View></View>
+            <View style={[styles.legendBlock, { backgroundColor: ui.surfaceMuted }]}><Text style={[styles.legendTitle, { color: colors.text }]}>Activation</Text><View style={styles.legendWrap}>{[['fully_reinforced', 'Strong'], ['dasha_transit_activated', 'Active'], ['dasha_connected', 'Period'], ['transit_only', 'Background']].map(([state, label]) => <View key={state} style={styles.legendItem}><View style={[styles.legendSwatch, { backgroundColor: activationColors[state] }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>{label}</Text></View>)}</View><Text style={[styles.legendTitle, { color: colors.text }]}>Likely experience</Text><View style={styles.legendWrap}>{[['supportive', 'Constructive'], ['mixed', 'Mixed'], ['challenging', 'Pressure'], ['neutral', 'Unclear']].map(([tone, label]) => <View key={tone} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: OUTCOME_COLORS[tone] }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>{label}</Text></View>)}</View></View>
           </View>
 
           {selectedHouse ? <View style={card}>
-            <View style={styles.detailHeading}><View style={{ flex: 1 }}><Text style={[styles.eyebrow, { color: colors.primary }]}>HOUSE {selectedHouse.house}</Text><Text style={[styles.sectionTitle, { color: colors.text }]}>{HOUSE_LABELS[selectedHouse.house]}</Text><Text style={[styles.meta, { color: colors.textSecondary }]}>{STATE_EXPLANATIONS[selectedHouse.state]} · {OUTCOME_LABELS[selectedHouse.outcome?.tone]}</Text></View><View style={[styles.band, { backgroundColor: `${STATE_COLORS[selectedHouse.state] || colors.primary}30` }]}><Text style={{ color: STATE_COLORS[selectedHouse.state] || colors.primary, fontWeight: '800', textAlign: 'center' }}>{BAND_LABELS[selectedHouse.activation?.band] || 'Chart agreement unavailable'}</Text></View></View>
+            <View style={styles.detailHeading}><View style={{ flex: 1 }}><Text style={[styles.eyebrow, { color: colors.primary }]}>HOUSE {selectedHouse.house}</Text><Text style={[styles.sectionTitle, { color: colors.text }]}>{HOUSE_LABELS[selectedHouse.house]}</Text><Text style={[styles.meta, { color: colors.textSecondary }]}>{STATE_EXPLANATIONS[selectedHouse.state]} · {OUTCOME_LABELS[selectedHouse.outcome?.tone]}</Text></View><View style={[styles.band, { backgroundColor: `${colors.primary}18` }]}><Text style={{ color: colors.primary, fontWeight: '600', textAlign: 'center', fontSize: 11 }}>{BAND_LABELS[selectedHouse.activation?.band] || 'Chart agreement unavailable'}</Text></View></View>
             {selectedHouseWindows.length > 1 ? <View style={styles.windowPicker}><Text style={[styles.reasonTitle, { color: colors.text }]}>Inspect a timing window</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.windowPickerRow}>{selectedHouseWindows.map((row) => { const active = row.window.start_date === selectedHouse.window?.start_date; return <TouchableOpacity key={`${row.window.start_date}-${row.window.end_date}`} onPress={() => setSelectedWindowStart(row.window.start_date)} style={[styles.windowChip, { borderColor: active ? colors.primary : colors.cardBorder, backgroundColor: active ? colors.primary : colors.cardBackground }]}><Text style={[styles.windowChipText, { color: active ? '#fff' : colors.textSecondary }]}>{shortDate(row.window.start_date)} – {shortDate(row.window.end_date)}</Text></TouchableOpacity>; })}</ScrollView></View> : null}
             <Text style={[styles.subheading, { color: colors.text }]}>Why this house matters now</Text>
             {[
               ['1', 'Birth-chart foundation', promise ? `${promise.lord} rules this house; planets placed here: ${promise.occupants?.join(', ') || 'none'}; planets aspecting it: ${promise.aspecting_planets?.join(', ') || 'none'}.` : 'Birth-chart foundation is unavailable.'],
               ['2', 'Connection to your current period', levels.length ? `${directDashaConnections.join('; ') || 'No direct connection'}.${cooperativeCarriers.length ? ` ${cooperativeCarriers.join(', ')} also participates because it has a natal relationship with the directly connected period planet.` : ''}` : 'The current major and sub-period planets do not have a strong natal connection to this house, so it remains background context.'],
               ['3', 'What is triggering it now', timingTransitConnections.length ? selectedHouse.activation?.natal_position_reinforced ? `${timingTransitConnections.join('; ')}. ${repeatedDashaPlanets.join(', ') || 'The active period planet'} also returns to its natal position, strengthening the timing.` : `${timingTransitConnections.join('; ')}. These transits bring attention here, although the active period planet is not also repeating its natal position.` : 'No strong transit trigger was found.'],
-            ].map(([number, title, body]) => <View key={number} style={styles.reasonRow}><View style={[styles.reasonNumber, { backgroundColor: colors.primary }]}><Text style={styles.reasonNumberText}>{number}</Text></View><View style={{ flex: 1 }}><Text style={[styles.reasonTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.reasonBody, { color: colors.textSecondary }]}>{body}</Text></View></View>)}
-            <View style={[styles.facts, { borderColor: colors.cardBorder }]}><Text style={[styles.fact, { color: colors.textSecondary }]}>House lord  <Text style={{ color: colors.text, fontWeight: '800' }}>{selectedHouse.house_lord || promise?.lord || '—'}</Text></Text><Text style={[styles.fact, { color: colors.textSecondary }]}>Overall direction  <Text style={{ color: colors.text, fontWeight: '800' }}>{OUTCOME_LABELS[selectedHouse.outcome?.tone] || 'Unclear'}</Text></Text><TouchableOpacity onPress={() => setShowOutcomeReasons(true)} accessibilityRole="button" accessibilityLabel="See what helps or adds pressure"><Text style={[styles.fact, { color: colors.textSecondary }]}>Planetary influences  <Text style={{ color: colors.text, fontWeight: '800' }}>{selectedHouse.outcome?.supportive_factors || 0} helpful · {selectedHouse.outcome?.mixed_factors || 0} mixed · {selectedHouse.outcome?.challenging_factors || 0} pressure</Text></Text><Text style={[styles.factorLink, { color: colors.primary }]}>See what helps or adds pressure</Text></TouchableOpacity><Text style={[styles.fact, { color: colors.textSecondary }]}>Planets connecting this house to the current period  <Text style={{ color: colors.text, fontWeight: '800' }}>{carriers.join(', ') || 'None'}</Text></Text></View>
+            ].map(([number, title, body]) => <View key={number} style={[styles.reasonRow, { backgroundColor: ui.surfaceMuted }]}><View style={[styles.reasonNumber, { backgroundColor: `${colors.primary}1f` }]}><Text style={[styles.reasonNumberText, { color: colors.primary }]}>{number}</Text></View><View style={{ flex: 1 }}><Text style={[styles.reasonTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.reasonBody, { color: colors.textSecondary }]}>{body}</Text></View></View>)}
+            <View style={[styles.facts, { borderColor: ui.border, backgroundColor: ui.surfaceMuted }]}><Text style={[styles.fact, { color: colors.textSecondary }]}>House lord  <Text style={{ color: colors.text, fontWeight: '600' }}>{selectedHouse.house_lord || promise?.lord || '—'}</Text></Text><Text style={[styles.fact, { color: colors.textSecondary }]}>Overall direction  <Text style={{ color: colors.text, fontWeight: '600' }}>{OUTCOME_LABELS[selectedHouse.outcome?.tone] || 'Unclear'}</Text></Text><TouchableOpacity onPress={() => setShowOutcomeReasons(true)} accessibilityRole="button" accessibilityLabel="See what helps or adds pressure"><Text style={[styles.fact, { color: colors.textSecondary }]}>Planetary influences  <Text style={{ color: colors.text, fontWeight: '600' }}>{selectedHouse.outcome?.supportive_factors || 0} helpful · {selectedHouse.outcome?.mixed_factors || 0} mixed · {selectedHouse.outcome?.challenging_factors || 0} pressure</Text></Text><Text style={[styles.factorLink, { color: colors.primary }]}>See what helps or adds pressure  →</Text></TouchableOpacity><Text style={[styles.fact, { color: colors.textSecondary }]}>Planets connecting this house to the current period  <Text style={{ color: colors.text, fontWeight: '600' }}>{carriers.join(', ') || 'None'}</Text></Text></View>
             <Text style={[styles.subheading, { color: colors.text }]}>What you may notice in life</Text>
             {manifestationGroups.length ? manifestationGroups.map((group) => <View key={group.subject} style={styles.personGroup}><Text style={[styles.personHeading, { color: colors.primary }]}>{sentence(group.subject)}</Text>{group.items.map((item, index) => <View key={`${item.signature_key || item.label}-${index}`} style={[styles.manifestation, { borderColor: colors.cardBorder }]}><Text style={[styles.reasonTitle, { color: colors.text }]}>{item.label}</Text><Text style={[styles.reasonBody, { color: colors.textSecondary }]}>{item.tone_interpretation}</Text>{(item.manifestations || []).map((manifestation) => <Text key={manifestation} style={[styles.bullet, { color: colors.textSecondary }]}>• {manifestation}</Text>)}</View>)}</View>) : <Text style={[styles.stateText, { color: colors.textSecondary }]}>This house is active, but the chart does not narrow it to a clear real-life theme in this period.</Text>}
             <Text style={[styles.subheading, { color: colors.text }]}>When it can become noticeable</Text>
@@ -340,10 +358,10 @@ export default function ActivationExplorerScreen({ navigation, route }) {
             {chartManifestations.length ? chartManifestations.map((item) => {
               const expanded = expandedManifestation === item.manifestation_id;
               const toneColor = OUTCOME_COLORS[item.outcome_tone] || OUTCOME_COLORS.neutral;
-              return <View key={item.manifestation_id} style={[styles.manifestationCard, { borderColor: colors.cardBorder, borderLeftColor: toneColor }]}>
-                <View style={styles.manifestationHeading}><View style={{ flex: 1 }}><Text style={[styles.eyebrow, { color: colors.textSecondary }]}>{subjectContextLabel(item.subject)} · {sentence(item.domain)}</Text><Text style={[styles.manifestationTitle, { color: colors.text }]}>{sentence(item.label)}</Text></View><Text style={[styles.confidence, { color: toneColor }]}>{SYNTHESIS_STRENGTH_LABELS[item.synthesis_strength] || 'Evidence available'}</Text></View>
+              return <View key={item.manifestation_id} style={[styles.manifestationCard, { backgroundColor: ui.surfaceRaised, borderColor: ui.border, borderLeftColor: toneColor }]}>
+                <View style={styles.manifestationHeading}><View style={{ flex: 1 }}><Text style={[styles.eyebrow, { color: colors.textSecondary }]}>{subjectContextLabel(item.subject)} · {sentence(item.domain)}</Text><Text style={[styles.manifestationTitle, { color: colors.text }]}>{sentence(item.label)}</Text></View><View style={[styles.confidenceBadge, { backgroundColor: `${toneColor}16` }]}><Text style={[styles.confidence, { color: toneColor }]}>{SYNTHESIS_STRENGTH_LABELS[item.synthesis_strength] || 'Evidence available'}</Text></View></View>
                 <View style={styles.manifestationChips}><Text style={[styles.manifestationChip, { color: toneColor, backgroundColor: `${toneColor}18` }]}>{OUTCOME_LABELS[item.outcome_tone] || sentence(item.outcome_tone)}</Text><Text style={[styles.manifestationChip, { color: colors.textSecondary, backgroundColor: `${toneColor}12` }]}>{item.window?.start_date <= asOf && item.window?.end_date >= asOf ? 'Active now' : 'Upcoming'} · {shortDate(item.window?.start_date)} – {shortDate(item.window?.end_date)}</Text></View>
-                <View style={styles.manifestationHouses}>{(item.house_roles || []).map((role) => <View key={`${role.native_house}-${role.relative_house}`} style={[styles.manifestationHouse, { borderColor: colors.cardBorder }]}><Text style={[styles.comboHouses, { color: toneColor }]}>H{role.native_house}{item.subject !== 'self' ? ` · for your ${item.subject}, this is H${role.relative_house}` : ''}</Text><Text style={[styles.reasonBody, { color: colors.textSecondary }]}>{role.role}</Text></View>)}</View>
+                <View style={styles.manifestationHouses}>{(item.house_roles || []).map((role) => <View key={`${role.native_house}-${role.relative_house}`} style={[styles.manifestationHouse, { backgroundColor: ui.surfaceMuted, borderColor: ui.border }]}><Text style={[styles.comboHouses, { color: toneColor }]}>H{role.native_house}{item.subject !== 'self' ? ` · for your ${item.subject}, this is H${role.relative_house}` : ''}</Text><Text style={[styles.reasonBody, { color: colors.textSecondary }]}>{role.role}</Text></View>)}</View>
                 <Text style={[styles.reasonTitle, { color: colors.text, marginTop: 14 }]}>What you may notice</Text>
                 <Text style={[styles.reasonBody, { color: colors.text }]}>{item.summary}</Text>
                 {(item.possibilities || []).map((possibility) => <Text key={possibility} style={[styles.bullet, { color: colors.textSecondary }]}>• {possibility}</Text>)}
@@ -372,7 +390,7 @@ export default function ActivationExplorerScreen({ navigation, route }) {
       </ScrollView>
       <Modal visible={showOutcomeReasons} transparent animationType="slide" onRequestClose={() => setShowOutcomeReasons(false)}>
         <View style={styles.modalBackdrop}>
-          <SafeAreaView style={[styles.reasonSheet, { backgroundColor: theme === 'dark' ? '#21112e' : '#ffffff' }]}>
+          <SafeAreaView style={[styles.reasonSheet, { backgroundColor: isDark ? '#241333' : '#ffffff' }]}>
             <View style={[styles.reasonSheetHeader, { borderColor: colors.cardBorder }]}>
               <View style={{ flex: 1 }}><Text style={[styles.eyebrow, { color: colors.primary }]}>HOUSE {selectedHouse?.house || '—'}</Text><Text style={[styles.sectionTitle, { color: colors.text }]}>Why this result?</Text><Text style={[styles.meta, { color: colors.textSecondary }]}>{OUTCOME_LABELS[selectedHouse?.outcome?.tone] || 'Unclear'}</Text></View>
               <TouchableOpacity onPress={() => setShowOutcomeReasons(false)} style={styles.modalClose} accessibilityLabel="Close reasons"><Ionicons name="close" size={24} color={colors.text} /></TouchableOpacity>
@@ -393,8 +411,171 @@ export default function ActivationExplorerScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1 }, header: { minHeight: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, borderBottomWidth: 1 }, headerButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' }, headerCopy: { flex: 1, alignItems: 'center' }, headerTitle: { fontSize: 19, fontWeight: '800' }, headerSubtitle: { fontSize: 11, marginTop: 2 }, content: { padding: 14, paddingBottom: 42, gap: 12, width: '100%', maxWidth: 900, alignSelf: 'center' },
-  card: { borderWidth: 1, borderRadius: 18, padding: 16 }, controls: { gap: 12 }, dateControl: { flexDirection: 'row', alignItems: 'center' }, controlCopy: { flex: 1, alignItems: 'center' }, eyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 }, controlValue: { fontSize: 17, fontWeight: '800', marginTop: 3 }, miniButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }, segmentRow: { flexDirection: 'row', gap: 8 }, segment: { flex: 1, minHeight: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(128,128,128,0.14)' }, segmentText: { fontSize: 12, fontWeight: '700' }, viewTabs: { flexDirection: 'row', gap: 8, padding: 6 }, viewTab: { flex: 1, minHeight: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, viewTabText: { fontSize: 12, fontWeight: '800', textAlign: 'center' },
-  state: { alignItems: 'center', paddingVertical: 44, gap: 10 }, stateTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center' }, stateText: { fontSize: 13, lineHeight: 19, textAlign: 'center' }, primaryButton: { borderRadius: 12, paddingHorizontal: 20, paddingVertical: 11, marginTop: 6 }, primaryButtonText: { color: '#fff', fontWeight: '800' }, dashaCard: { gap: 8 }, dashaChain: { fontSize: Platform.OS === 'web' ? 21 : 18, fontWeight: '900' }, meta: { fontSize: 12, lineHeight: 17 }, sectionTitle: { fontSize: 19, fontWeight: '900' }, sectionIntro: { fontSize: 12, lineHeight: 18, marginTop: 4, marginBottom: 14 },
-  houseGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, houseTile: { position: 'relative', width: '23%', minHeight: 72, borderRadius: 13, padding: 8, justifyContent: 'center' }, outcomeDot: { position: 'absolute', top: 7, right: 7, width: 10, height: 10, borderRadius: 5, borderWidth: 1.5, borderColor: '#ffffff' }, houseNumber: { fontSize: 17, fontWeight: '900' }, houseState: { fontSize: 9, fontWeight: '700', marginTop: 5, lineHeight: 12 }, legendBlock: { marginTop: 14, gap: 7 }, legendTitle: { fontSize: 11, fontWeight: '800', marginTop: 3 }, legendWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 }, legendSwatch: { width: 12, height: 12, borderRadius: 3 }, legendDot: { width: 9, height: 9, borderRadius: 5 }, legendText: { fontSize: 10 }, detailHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 }, band: { maxWidth: 145, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 10 }, windowPicker: { marginTop: 14, gap: 8 }, windowPickerRow: { gap: 7, paddingRight: 8 }, windowChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 8 }, windowChipText: { fontSize: 11, fontWeight: '700' }, subheading: { fontSize: 15, fontWeight: '900', marginTop: 22, marginBottom: 10 }, reasonRow: { flexDirection: 'row', gap: 10, marginBottom: 13 }, reasonNumber: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, reasonNumberText: { color: '#fff', fontWeight: '900' }, reasonTitle: { fontSize: 14, fontWeight: '800' }, reasonBody: { fontSize: 12, lineHeight: 18, marginTop: 3 }, facts: { borderTopWidth: 1, borderBottomWidth: 1, paddingVertical: 12, gap: 8, marginTop: 5 }, fact: { fontSize: 12 }, factorLink: { marginTop: 4, fontSize: 12, fontWeight: '800', textDecorationLine: 'underline' }, personGroup: { marginBottom: 12 }, personHeading: { fontSize: 12, fontWeight: '900', letterSpacing: 0.8, marginBottom: 7, textTransform: 'uppercase' }, manifestation: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 8 }, bullet: { fontSize: 12, lineHeight: 18, marginTop: 3 }, timing: { fontSize: 13, fontWeight: '800' }, combo: { borderTopWidth: 1, paddingVertical: 12 }, comboHouses: { fontSize: 11, fontWeight: '900', marginBottom: 3 }, manifestationSection: { gap: 4 }, manifestationCard: { borderWidth: 1, borderLeftWidth: 5, borderRadius: 15, padding: 14, marginTop: 12 }, manifestationHeading: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' }, manifestationTitle: { fontSize: 17, lineHeight: 22, fontWeight: '900', marginTop: 3 }, confidence: { fontSize: 15, fontWeight: '900' }, manifestationChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }, manifestationChip: { fontSize: 10, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 999 }, manifestationHouses: { gap: 7, marginTop: 12 }, manifestationHouse: { borderWidth: 1, borderRadius: 11, padding: 10 }, explainButton: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14 }, explanation: { borderTopWidth: 1, marginTop: 10, paddingTop: 8 }, manifestationFactors: { borderTopWidth: 1, paddingTop: 10, marginTop: 12 }, manifestationFactor: { marginTop: 9 }, manifestationEmpty: { alignItems: 'center', gap: 7, paddingVertical: 26 }, traceHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 }, copyButton: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 5 }, json: { marginTop: 14, padding: 12, borderRadius: 12, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 9, lineHeight: 13 }, modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(20,10,28,0.72)' }, reasonSheet: { width: '100%', maxHeight: '90%', borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: 'hidden' }, reasonSheetHeader: { flexDirection: 'row', alignItems: 'flex-start', padding: 18, borderBottomWidth: 1 }, modalClose: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' }, reasonSheetContent: { padding: 16, paddingBottom: 32, gap: 14 }, reasonGroup: { borderTopWidth: 4, borderWidth: 1, borderRadius: 14, padding: 13 }, reasonGroupTitle: { fontSize: 16, fontWeight: '900', marginBottom: 8 }, outcomeReason: { paddingVertical: 11, borderTopWidth: 1 }, outcomeReasonHeading: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 }, reasonWeight: { fontSize: 10 }, componentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 7 }, componentDot: { width: 7, height: 7, borderRadius: 4, marginTop: 8 }, reasonFootnote: { fontSize: 11, lineHeight: 16 },
+  safeArea: { flex: 1 },
+  header: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+  },
+  headerButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCopy: { flex: 1, alignItems: 'flex-start' },
+  headerTitle: { fontSize: 20, lineHeight: 25, fontWeight: '700', letterSpacing: -0.35 },
+  headerSubtitle: { fontSize: 12, lineHeight: 17, marginTop: 1 },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 48,
+    gap: 14,
+    width: '100%',
+    maxWidth: 900,
+    alignSelf: 'center',
+  },
+  card: {
+    borderWidth: 1,
+    borderRadius: 22,
+    padding: 18,
+    ...Platform.select({
+      ios: { shadowColor: '#13051f', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.10, shadowRadius: 16 },
+      android: { elevation: 2 },
+      default: { boxShadow: '0 6px 22px rgba(30, 10, 45, 0.08)' },
+    }),
+  },
+  controls: { gap: 14 },
+  dateControl: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  controlCopy: { flex: 1, alignItems: 'center' },
+  eyebrow: { fontSize: 10, lineHeight: 14, fontWeight: '700', letterSpacing: 1.1 },
+  controlValue: { fontSize: 16, lineHeight: 21, fontWeight: '600', marginTop: 3 },
+  miniButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  segmentRow: { flexDirection: 'row', gap: 8 },
+  segment: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentText: { fontSize: 12, lineHeight: 16, fontWeight: '600' },
+  viewTabs: {
+    flexDirection: 'row',
+    gap: 6,
+    padding: 5,
+    borderWidth: 1,
+    borderRadius: 17,
+  },
+  viewTab: { flex: 1, minHeight: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  viewTabText: { fontSize: 12, lineHeight: 16, fontWeight: '600', textAlign: 'center' },
+  state: { alignItems: 'center', paddingVertical: 46, paddingHorizontal: 24, gap: 10 },
+  stateTitle: { fontSize: 18, lineHeight: 24, fontWeight: '700', textAlign: 'center' },
+  stateText: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  primaryButton: { borderRadius: 22, paddingHorizontal: 22, paddingVertical: 12, marginTop: 8 },
+  primaryButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  dashaCard: { gap: 8, overflow: 'hidden' },
+  dashaChain: { fontSize: Platform.OS === 'web' ? 21 : 19, lineHeight: 28, fontWeight: '700', letterSpacing: -0.3 },
+  meta: { fontSize: 13, lineHeight: 19 },
+  sectionTitle: { fontSize: 21, lineHeight: 27, fontWeight: '700', letterSpacing: -0.35 },
+  sectionIntro: { fontSize: 14, lineHeight: 21, marginTop: 5, marginBottom: 17 },
+  houseGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  houseTile: {
+    position: 'relative',
+    width: '31.5%',
+    minHeight: 86,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    justifyContent: 'center',
+  },
+  outcomeDot: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: '#ffffff',
+  },
+  houseNumber: { fontSize: 19, lineHeight: 23, fontWeight: '700', letterSpacing: -0.2 },
+  houseState: { fontSize: 11, lineHeight: 15, fontWeight: '500', marginTop: 6 },
+  legendBlock: { marginTop: 16, gap: 9, padding: 13, borderRadius: 15 },
+  legendTitle: { fontSize: 12, lineHeight: 16, fontWeight: '600', marginTop: 2 },
+  legendWrap: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 8 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendSwatch: { width: 11, height: 11, borderRadius: 4 },
+  legendDot: { width: 9, height: 9, borderRadius: 5 },
+  legendText: { fontSize: 11, lineHeight: 15 },
+  detailHeading: { gap: 12 },
+  band: { alignSelf: 'flex-start', maxWidth: 210, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 999 },
+  windowPicker: { marginTop: 18, gap: 9 },
+  windowPickerRow: { gap: 8, paddingRight: 8 },
+  windowChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9 },
+  windowChipText: { fontSize: 12, lineHeight: 16, fontWeight: '600' },
+  subheading: { fontSize: 17, lineHeight: 22, fontWeight: '700', marginTop: 26, marginBottom: 12, letterSpacing: -0.2 },
+  reasonRow: { flexDirection: 'row', gap: 11, marginBottom: 10, padding: 13, borderRadius: 15 },
+  reasonNumber: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  reasonNumberText: { fontSize: 12, fontWeight: '700' },
+  reasonTitle: { fontSize: 14, lineHeight: 19, fontWeight: '600' },
+  reasonBody: { fontSize: 13, lineHeight: 20, marginTop: 4 },
+  facts: { borderWidth: 1, borderRadius: 16, padding: 14, gap: 11, marginTop: 6 },
+  fact: { fontSize: 13, lineHeight: 19 },
+  factorLink: { marginTop: 5, fontSize: 13, lineHeight: 18, fontWeight: '600' },
+  personGroup: { marginBottom: 14 },
+  personHeading: { fontSize: 11, lineHeight: 15, fontWeight: '700', letterSpacing: 1, marginBottom: 8, textTransform: 'uppercase' },
+  manifestation: { borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 9 },
+  bullet: { fontSize: 13, lineHeight: 20, marginTop: 5 },
+  timing: { fontSize: 14, lineHeight: 20, fontWeight: '600' },
+  combo: { borderTopWidth: 1, paddingVertical: 12 },
+  comboHouses: { fontSize: 11, lineHeight: 15, fontWeight: '700', marginBottom: 3, letterSpacing: 0.25 },
+  manifestationSection: { gap: 3 },
+  manifestationCard: {
+    borderWidth: 1,
+    borderLeftWidth: 3,
+    borderRadius: 20,
+    padding: 17,
+    marginTop: 13,
+  },
+  manifestationHeading: { gap: 12, alignItems: 'flex-start' },
+  manifestationTitle: { fontSize: 20, lineHeight: 26, fontWeight: '700', marginTop: 4, letterSpacing: -0.3 },
+  confidenceBadge: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 6 },
+  confidence: { fontSize: 11, lineHeight: 15, fontWeight: '600' },
+  manifestationChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 12 },
+  manifestationChip: { fontSize: 11, lineHeight: 15, fontWeight: '600', paddingHorizontal: 9, paddingVertical: 7, borderRadius: 999 },
+  manifestationHouses: { gap: 8, marginTop: 14 },
+  manifestationHouse: { borderWidth: 1, borderRadius: 14, padding: 12 },
+  explainButton: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
+  explanation: { borderTopWidth: 1, marginTop: 8, paddingTop: 2 },
+  manifestationFactors: { borderTopWidth: 1, paddingTop: 12, marginTop: 14 },
+  manifestationFactor: { marginTop: 11 },
+  manifestationEmpty: { alignItems: 'center', gap: 8, paddingVertical: 30, paddingHorizontal: 12 },
+  traceHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  copyButton: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  json: { marginTop: 14, padding: 12, borderRadius: 12, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 9, lineHeight: 13 },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15,5,25,0.78)' },
+  reasonSheet: {
+    width: '100%',
+    maxHeight: '92%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    overflow: 'hidden',
+  },
+  reasonSheetHeader: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 20, paddingTop: 22, paddingBottom: 18, borderBottomWidth: 1 },
+  modalClose: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  reasonSheetContent: { padding: 18, paddingBottom: 38, gap: 14 },
+  reasonGroup: { borderTopWidth: 3, borderWidth: 1, borderRadius: 18, padding: 15 },
+  reasonGroupTitle: { fontSize: 17, lineHeight: 22, fontWeight: '700', marginBottom: 8 },
+  outcomeReason: { paddingVertical: 13, borderTopWidth: StyleSheet.hairlineWidth },
+  outcomeReasonHeading: { gap: 4 },
+  reasonWeight: { fontSize: 11, lineHeight: 15 },
+  componentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, marginTop: 8 },
+  componentDot: { width: 7, height: 7, borderRadius: 4, marginTop: 8 },
+  reasonFootnote: { fontSize: 12, lineHeight: 18 },
 });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import BlogMarkdownEditor from './BlogMarkdownEditor';
 import './BlogEditor.css';
 
 const BlogEditor = ({ postId, onSave, onCancel }) => {
@@ -16,6 +17,7 @@ const BlogEditor = ({ postId, onSave, onCancel }) => {
     });
     const [loading, setLoading] = useState(false);
     const [imageUploading, setImageUploading] = useState(false);
+    const [featuredUploading, setFeaturedUploading] = useState(false);
     const [imageAltText, setImageAltText] = useState('');
 
     useEffect(() => {
@@ -28,7 +30,6 @@ const BlogEditor = ({ postId, onSave, onCancel }) => {
         try {
             const response = await axios.get(`/api/blog/posts/${postId}`);
             const postData = response.data;
-            // Convert tags array to comma-separated string for editing
             setPost({
                 ...postData,
                 tags: Array.isArray(postData.tags) ? postData.tags.join(', ') : postData.tags || ''
@@ -41,7 +42,6 @@ const BlogEditor = ({ postId, onSave, onCancel }) => {
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         if (name === 'title' && !post.slug) {
-            // Auto-generate slug from title if slug is empty
             const autoSlug = value.toLowerCase()
                 .replace(/[^\w\s-]/g, '')
                 .replace(/[-\s]+/g, '-')
@@ -52,43 +52,43 @@ const BlogEditor = ({ postId, onSave, onCancel }) => {
         }
     };
 
-    const handleImageUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        setImageUploading(true);
+    const uploadImageFile = async (file, altText = 'Image') => {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('alt_text', imageAltText.trim() || 'Image');
+        formData.append('alt_text', altText);
+        const response = await axios.post('/api/blog/upload-image', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return response.data.url;
+    };
 
+    const handleContentImageUpload = async (file) => {
+        setImageUploading(true);
         try {
-            const response = await axios.post('/api/blog/upload-image', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-            
-            const imageUrl = response.data.url;
-            setPost(prev => ({ ...prev, featured_image: imageUrl }));
-            
-            // Insert image into content at cursor position with alt text
-            const textarea = document.getElementById('content-editor');
-            const cursorPos = textarea.selectionStart;
-            const textBefore = post.content.substring(0, cursorPos);
-            const textAfter = post.content.substring(cursorPos);
-            const altText = imageAltText.trim() || 'Image';
-            const imageMarkdown = `\n![${altText}](${imageUrl})\n`;
-            
-            setPost(prev => ({
-                ...prev,
-                content: textBefore + imageMarkdown + textAfter
-            }));
-            
-            // Clear alt text after successful upload
-            setImageAltText('');
+            return await uploadImageFile(file, imageAltText.trim() || 'Image');
         } catch (error) {
             console.error('Error uploading image:', error);
             alert('Failed to upload image');
+            return null;
         } finally {
             setImageUploading(false);
+        }
+    };
+
+    const handleFeaturedImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setFeaturedUploading(true);
+        try {
+            const imageUrl = await uploadImageFile(file, imageAltText.trim() || 'Featured image');
+            setPost(prev => ({ ...prev, featured_image: imageUrl }));
+            setImageAltText('');
+        } catch (error) {
+            console.error('Error uploading featured image:', error);
+            alert('Failed to upload featured image');
+        } finally {
+            setFeaturedUploading(false);
         }
     };
 
@@ -97,7 +97,7 @@ const BlogEditor = ({ postId, onSave, onCancel }) => {
         try {
             const postData = {
                 ...post,
-                tags: typeof post.tags === 'string' 
+                tags: typeof post.tags === 'string'
                     ? post.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
                     : post.tags || []
             };
@@ -107,7 +107,7 @@ const BlogEditor = ({ postId, onSave, onCancel }) => {
             } else {
                 await axios.post('/api/blog/posts', postData);
             }
-            
+
             onSave && onSave();
         } catch (error) {
             console.error('Error saving post:', error);
@@ -209,49 +209,42 @@ const BlogEditor = ({ postId, onSave, onCancel }) => {
                 </div>
 
                 <div className="form-group">
-                    <label>Image Upload</label>
+                    <label>Featured Image</label>
                     <div className="image-upload">
                         <div className="alt-text-input">
                             <input
                                 type="text"
                                 value={imageAltText}
                                 onChange={(e) => setImageAltText(e.target.value)}
-                                placeholder="Enter alt text for the image (optional)"
+                                placeholder="Alt text for uploaded images (optional)"
                                 className="alt-text-field"
                             />
                         </div>
                         <input
                             type="file"
                             accept="image/*"
-                            onChange={handleImageUpload}
-                            disabled={imageUploading}
+                            onChange={handleFeaturedImageUpload}
+                            disabled={featuredUploading}
                         />
-                        {imageUploading && <span>Uploading...</span>}
+                        {featuredUploading && <span>Uploading featured image...</span>}
                         {post.featured_image && (
                             <img src={post.featured_image} alt="Featured" className="featured-preview" />
                         )}
                         <small className="help-text">
-                            Enter descriptive alt text for better accessibility and SEO (optional).
+                            Cover image for the post card and social share preview. Use the content editor toolbar to insert inline images.
                         </small>
                     </div>
                 </div>
 
                 <div className="form-group">
                     <label>Content</label>
-                    <textarea
-                        id="content-editor"
-                        name="content"
+                    <BlogMarkdownEditor
                         value={post.content}
-                        onChange={handleInputChange}
-                        placeholder="Write your blog post content here. You can use Markdown formatting."
-                        rows="20"
-                        className="content-editor"
+                        onChange={(content) => setPost((prev) => ({ ...prev, content }))}
+                        onUploadImage={handleContentImageUpload}
+                        imageUploading={imageUploading}
+                        placeholder="Write your blog post. Use the toolbar for headings, lists, links, and images."
                     />
-                    <div className="editor-help">
-                        <small>
-                            Markdown supported: **bold**, *italic*, [link](url), ![image](url)
-                        </small>
-                    </div>
                 </div>
             </div>
         </div>
