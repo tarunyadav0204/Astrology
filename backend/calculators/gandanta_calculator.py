@@ -82,7 +82,9 @@ class GandantaCalculator(BaseCalculator):
             else:
                 distance = longitude
         else:
-            junction_point = gandanta_range['start'] + 4  # 30° of previous sign
+            # The exact junction is the midpoint of the traditional 3°20′
+            # bands on either side (120° or 240°), not start + 4°.
+            junction_point = (gandanta_range['start'] + gandanta_range['end']) / 2
             distance = abs(longitude - junction_point)
         
         return round(distance, 2)

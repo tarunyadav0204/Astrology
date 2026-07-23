@@ -86,8 +86,26 @@
 }
 
 .result-icon {
-  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
   margin-right: 12px;
+  border-radius: 8px;
+  background: rgba(233, 30, 99, 0.08);
+  color: #ad1457;
+}
+
+.result-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.search-result-item:hover .result-icon {
+  background: rgba(233, 30, 99, 0.14);
+  color: #880e4f;
 }
 
 .result-title {

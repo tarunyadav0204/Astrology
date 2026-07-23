@@ -34,6 +34,7 @@ import ReportViewerScreen from './src/components/Reports/ReportViewerScreen';
 import ReportHistoryScreen from './src/components/Reports/ReportHistoryScreen';
 import KarmaAnalysisScreen from './src/components/KarmaAnalysis/KarmaAnalysisScreen';
 import ChartScreen from './src/components/Chart/ChartScreen';
+import ActivationExplorerScreen from './src/components/Chart/ActivationExplorerScreen';
 import ChartsHubScreen from './src/components/Chart/ChartsHubScreen';
 import PlanetaryPositionsScreen from './src/components/Chart/PlanetaryPositionsScreen';
 import TradingDashboardScreen from './src/components/Trading/TradingDashboardScreen';
@@ -119,6 +120,7 @@ const linking = {
       RelationshipMatch: 'kundli-matching',
       ReportsStudio: 'reports',
       ChartsHub: 'charts',
+      ActivationExplorer: 'charts/activations',
       ReportViewer: 'reports/view',
       ReportHistory: 'reports/history',
       BlogList: 'blog',
@@ -852,6 +854,11 @@ export default function App() {
           <Stack.Screen
             name="Chart"
             component={ChartScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ActivationExplorer"
+            component={ActivationExplorerScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 

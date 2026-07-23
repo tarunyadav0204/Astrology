@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
@@ -8,6 +8,7 @@ import DashaBrowser from '../DashaBrowser/DashaBrowser';
 import TransitControls from '../TransitControls/TransitControls';
 import { useAstrology } from '../../context/AstrologyContext';
 import { generatePageSEO } from '../../config/seo.config';
+import { apiService } from '../../services/apiService';
 import '../Analysis/AnalysisDetailPage.css';
 import './ChartsDashasWorkspacePage.css';
 
@@ -49,10 +50,45 @@ const ChartsDashasWorkspacePage = ({
   const [birthModalTab, setBirthModalTab] = useState('saved');
   const [transitDate, setTransitDate] = useState(new Date());
   const [selectedDivision, setSelectedDivision] = useState(10);
+  const [activationPreview, setActivationPreview] = useState(null);
   const seoData = generatePageSEO('chartsDashasWorkspace', { path: '/charts-dashas' });
   const hasChart = Boolean(birthData && chartData);
   const selectedDivisionalChart =
     DIVISIONAL_CHART_OPTIONS.find((option) => option.value === selectedDivision) || DIVISIONAL_CHART_OPTIONS[5];
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user || !birthData || !chartData) {
+      setActivationPreview(null);
+      return () => { cancelled = true; };
+    }
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    const asOf = new Date(now.getTime() - offset).toISOString().slice(0, 10);
+    apiService.getActivationExplorer({
+      birthChartId: birthData.chart_id || birthData.birth_chart_id || birthData.id || null,
+      birthData,
+      asOf,
+      horizonDays: 30,
+      trace: false,
+    }).then((data) => {
+      if (!cancelled) setActivationPreview(data);
+    }).catch(() => {
+      if (!cancelled) setActivationPreview(null);
+    });
+    return () => { cancelled = true; };
+  }, [birthData, chartData, user]);
+
+  const activationPreviewRows = useMemo(() => {
+    if (!activationPreview?.house_activations?.length) return [];
+    const firstStart = activationPreview.house_activations[0].window?.start_date;
+    return activationPreview.house_activations.filter((row) => row.window?.start_date === firstStart);
+  }, [activationPreview]);
+
+  const activationPreviewWindow = activationPreviewRows[0]?.window;
+  const activationPreviewCount = activationPreviewRows.filter(
+    (row) => !['transit_only', 'dormant'].includes(row.state)
+  ).length;
 
   const structuredData = useMemo(
     () => ({
@@ -227,6 +263,34 @@ const ChartsDashasWorkspacePage = ({
                     </div>
                   </article>
                 </div>
+              </section>
+
+              <section className="charts-dashas-activation-entry" aria-label="Current activation explorer">
+                <div className="charts-dashas-activation-entry__icon" aria-hidden>✦</div>
+                <div className="charts-dashas-activation-entry__copy">
+                  <p>Deterministic Parashari prediction lab</p>
+                  <h2>What is activated now?</h2>
+                  <span>
+                    Inspect every activated house, the natal and dasha links behind it, possible manifestations,
+                    and exact Sun and Moon timing triggers.
+                  </span>
+                </div>
+                <div className="charts-dashas-activation-entry__preview">
+                  {activationPreviewWindow ? (
+                    <>
+                      <strong>{activationPreviewWindow.mahadasha} → {activationPreviewWindow.antardasha} → {activationPreviewWindow.pratyantardasha}</strong>
+                      <span>{activationPreviewCount} predictive houses in the current window</span>
+                    </>
+                  ) : (
+                    <>
+                      <strong>D1 → Dasha → Transit</strong>
+                      <span>Open the real calculation trace</span>
+                    </>
+                  )}
+                </div>
+                <button type="button" onClick={() => navigate('/charts-dashas/activations')}>
+                  Explore activations <span aria-hidden>→</span>
+                </button>
               </section>
 
               <section className="charts-dashas-section" aria-label="Divisional and transit charts">

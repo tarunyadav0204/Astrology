@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import NavigationHeader from '../Shared/NavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import './BlogList.css';
 
 const BlogList = () => {
+    const [searchParams, setSearchParams] = useSearchParams();
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [categories, setCategories] = useState([]);
-    const [selectedCategory, setSelectedCategory] = useState('');
+    const selectedCategory = searchParams.get('category') || '';
 
     useEffect(() => {
         fetchPosts();
@@ -39,6 +40,14 @@ const BlogList = () => {
             console.error('Error fetching categories:', error);
             setCategories([]); // Set empty array on error
         }
+    };
+
+    const setSelectedCategory = (category) => {
+        if (!category) {
+            setSearchParams({});
+            return;
+        }
+        setSearchParams({ category });
     };
 
     const formatDate = (dateString) => {

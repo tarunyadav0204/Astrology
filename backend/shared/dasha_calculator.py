@@ -200,7 +200,13 @@ class DashaCalculator:
         """Remove non-JSON helper keys before returning from an API."""
         return [{k: v for k, v in p.items() if not k.startswith('_')} for p in periods]
 
-    def calculate_current_dashas(self, birth_data: Dict, current_date: datetime = None) -> Dict[str, Any]:
+    def calculate_current_dashas(
+        self,
+        birth_data: Dict,
+        current_date: datetime = None,
+        *,
+        strict: bool = False,
+    ) -> Dict[str, Any]:
         """Calculate current dasha periods using accurate Vimshottari method.
 
         Returns a dict with:
@@ -386,6 +392,8 @@ class DashaCalculator:
             }
             
         except Exception as e:
+            if strict:
+                raise RuntimeError("Vimshottari dasha calculation failed") from e
             # print(f"Error calculating dashas: {e}")
             # import traceback
             # print(f"Traceback: {traceback.format_exc()}")
@@ -508,9 +516,15 @@ class DashaCalculator:
         """Calculate dashas for a specific date"""
         return self.calculate_current_dashas(birth_data, target_date)
 
-    def _resolve_levels_at(self, birth_data: Dict, current_date: datetime) -> Dict[str, Any]:
+    def _resolve_levels_at(
+        self,
+        birth_data: Dict,
+        current_date: datetime,
+        *,
+        strict: bool = False,
+    ) -> Dict[str, Any]:
         """Resolve MD/AD/PD (with real start/end datetimes) at current_date."""
-        dashas = self.calculate_current_dashas(birth_data, current_date)
+        dashas = self.calculate_current_dashas(birth_data, current_date, strict=strict)
         maha_list = dashas.get("maha_dashas") or []
         current_maha = None
         for maha in maha_list:
@@ -559,6 +573,7 @@ class DashaCalculator:
         end_date: datetime,
         *,
         max_periods: int = 2000,
+        strict: bool = False,
     ) -> List[Dict]:
         """Get all PD-level dasha changes in [start_date, end_date] using real PD ends.
 
@@ -570,7 +585,7 @@ class DashaCalculator:
         truncated = False
 
         while current_date <= end_date:
-            levels = self._resolve_levels_at(birth_data, current_date)
+            levels = self._resolve_levels_at(birth_data, current_date, strict=strict)
             pd = levels["pratyantardasha"]
             ad = levels["antardasha"]
             md = levels["mahadasha"]
@@ -578,7 +593,11 @@ class DashaCalculator:
             pr = levels["prana"]
             pd_end = pd.get("end")
             if not isinstance(pd_end, datetime):
-                # Fallback: one day step if internals failed
+                if strict:
+                    raise RuntimeError(
+                        "Vimshottari dasha calculation returned a PD without a real end date"
+                    )
+                # Backward-compatible behavior for legacy callers.
                 pd_end = current_date + timedelta(days=1)
             period_end = min(pd_end, end_date)
             row_start = max(current_date, pd.get("start") or current_date)

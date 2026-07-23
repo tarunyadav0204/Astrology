@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAstrology } from '../../context/AstrologyContext';
 import { DASHBOARD_CONFIG } from '../../config/dashboard.config';
 import { getCurrentDomainConfig, ASTROROSHNI_OPEN_NATIVE_SELECTOR_SESSION_KEY } from '../../config/domains.config';
@@ -22,7 +23,16 @@ import BirthFormModal from '../BirthForm/BirthFormModal';
 import UserSettings from '../UserSettings';
 import AdminTab from '../AdminTab/AdminTab';
 import TransitDateControls from '../TransitDateControls/TransitDateControls';
-import { DashboardContainer, Header, BackButton, Title, GridContainer, GridItem } from './Dashboard.styles';
+import {
+  DashboardContainer,
+  Header,
+  BackButton,
+  Title,
+  GridContainer,
+  GridItem,
+  ActivationEntry,
+  ActivationMobileButton,
+} from './Dashboard.styles';
 
 
 
@@ -180,6 +190,7 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefH
 };
 
 const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurrentView, onLogout, user }) => {
+  const navigate = useNavigate();
   const { birthData, chartData, setBirthData, setChartData } = useAstrology();
   const [layouts, setLayouts] = useState(DASHBOARD_CONFIG.defaultLayout);
   const [transitDate, setTransitDate] = useState(new Date());
@@ -443,28 +454,44 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
             >
               {mobileSubTab === 'lagna' && (
                 <div style={{ height: '100%', width: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                  <ChartWidget
-                    title="Lagna Chart"
-                    chartType="lagna"
-                    chartData={chartData}
-                    birthData={birthData}
-                    defaultStyle={userSettings.default_chart_style}
-                    chartRefHighlight={chartRefHighlight}
-                    embedInDashboard
-                  />
+                  <div style={{ flex: 1, minHeight: 0, width: '100%' }}>
+                    <ChartWidget
+                      title="Lagna Chart"
+                      chartType="lagna"
+                      chartData={chartData}
+                      birthData={birthData}
+                      defaultStyle={userSettings.default_chart_style}
+                      chartRefHighlight={chartRefHighlight}
+                      embedInDashboard
+                    />
+                  </div>
+                  <ActivationMobileButton type="button" onClick={() => navigate('/charts-dashas/activations')}>
+                    <span aria-hidden>✦</span>
+                    <strong>What is activated now?</strong>
+                    <small>See why, possible results and timing</small>
+                    <b aria-hidden>→</b>
+                  </ActivationMobileButton>
                 </div>
               )}
               {mobileSubTab === 'navamsa' && (
                 <div style={{ height: '100%', width: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                  <ChartWidget
-                    title="Navamsa Chart"
-                    chartType="navamsa"
-                    chartData={chartData}
-                    birthData={birthData}
-                    defaultStyle={userSettings.default_chart_style}
-                    chartRefHighlight={chartRefHighlight}
-                    embedInDashboard
-                  />
+                  <div style={{ flex: 1, minHeight: 0, width: '100%' }}>
+                    <ChartWidget
+                      title="Navamsa Chart"
+                      chartType="navamsa"
+                      chartData={chartData}
+                      birthData={birthData}
+                      defaultStyle={userSettings.default_chart_style}
+                      chartRefHighlight={chartRefHighlight}
+                      embedInDashboard
+                    />
+                  </div>
+                  <ActivationMobileButton type="button" onClick={() => navigate('/charts-dashas/activations')}>
+                    <span aria-hidden>✦</span>
+                    <strong>What is activated now?</strong>
+                    <small>D1-based prediction logic and timing</small>
+                    <b aria-hidden>→</b>
+                  </ActivationMobileButton>
                 </div>
               )}
               {mobileSubTab === 'transit' && (
@@ -698,6 +725,18 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                 embedInDashboard
               />
             </GridItem>
+
+            <ActivationEntry>
+              <span className="activation-entry-icon" aria-hidden>✦</span>
+              <div>
+                <small>Deterministic Parashari prediction lab</small>
+                <strong>What is activated now?</strong>
+                <p>See active houses, why they are activated, possible results and Sun–Moon timing windows.</p>
+              </div>
+              <button type="button" onClick={() => navigate('/charts-dashas/activations')}>
+                Explore activations <span aria-hidden>→</span>
+              </button>
+            </ActivationEntry>
             
             <div style={{ 
               gridColumn: '1 / -1', 

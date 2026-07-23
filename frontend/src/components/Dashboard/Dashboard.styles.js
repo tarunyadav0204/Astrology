@@ -126,6 +126,115 @@ export const GridItem = styled.div.withConfig({
   `}
 `;
 
+export const ActivationEntry = styled.section`
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  min-height: 66px;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid rgba(194, 24, 91, 0.16);
+  background: linear-gradient(135deg, #fff 0%, #fff2f6 100%);
+  box-shadow: 0 4px 14px rgba(86, 32, 62, 0.08);
+
+  .activation-entry-icon {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #c2185b, #f97316);
+    color: #fff;
+    font-size: 1rem;
+  }
+
+  small,
+  strong,
+  p {
+    display: block;
+  }
+
+  small {
+    color: #c2185b;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  strong {
+    margin-top: 0.12rem;
+    color: #302231;
+    font-size: 1rem;
+  }
+
+  p {
+    margin: 0.12rem 0 0;
+    color: #6c606c;
+    font-size: 0.75rem;
+  }
+
+  button {
+    border: 0;
+    border-radius: 9px;
+    padding: 0.65rem 0.85rem;
+    background: #3c2035;
+    color: #fff;
+    font-size: 0.76rem;
+    font-weight: 800;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  @media (max-width: 768px) {
+    display: none;
+  }
+`;
+
+export const ActivationMobileButton = styled.button`
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.42rem;
+  width: calc(100% - 0.7rem);
+  min-height: 44px;
+  margin: 0.2rem 0.35rem 0.3rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid rgba(194, 24, 91, 0.2);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #fff 0%, #ffedf3 100%);
+  color: #3b2637;
+  box-shadow: 0 3px 10px rgba(90, 30, 65, 0.09);
+  text-align: left;
+  cursor: pointer;
+
+  > span {
+    color: #c2185b;
+    font-size: 1rem;
+  }
+
+  strong {
+    color: #9e174a;
+    font-size: 0.76rem;
+    white-space: nowrap;
+  }
+
+  small {
+    min-width: 0;
+    overflow: hidden;
+    color: #756974;
+    font-size: 0.63rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  b {
+    color: #c2185b;
+  }
+`;
+
 export const Header = styled.div`
   display: flex;
   align-items: center;

@@ -1,12 +1,12 @@
 {
-  "name": "AstroVishnu - Vedic Astrology",
-  "short_name": "AstroVishnu",
-  "description": "Professional Vedic astrology application with Lahiri Ayanamsa calculations",
+  "name": "AstroRoshni",
+  "short_name": "AstroRoshni",
+  "description": "Professional Vedic astrology — use the mobile app at /mobile/ for the installable experience",
   "start_url": "/",
-  "display": "standalone",
+  "scope": "/",
+  "display": "browser",
   "background_color": "#ffffff",
   "theme_color": "#e91e63",
-  "orientation": "portrait",
   "icons": [
     {
       "src": "/favicon.ico",

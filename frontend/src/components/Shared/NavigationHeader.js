@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCredits } from '../../context/CreditContext';
 import SearchBar from '../Search/SearchBar';
@@ -113,13 +113,43 @@ function FullHamburgerMenuItems({
   );
 }
 
-const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton, onCreditsClick, onHomeClick, onChangeNative, birthData, onAstrologyClick, onCreateBirthChart, onSelectBirthChart }) => {
+const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton = true, onCreditsClick, onHomeClick, onChangeNative, birthData, onAstrologyClick, onCreateBirthChart, onSelectBirthChart }) => {
   const navigate = useNavigate();
   const { credits, loading: creditsLoading } = useCredits();
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const dropdownCloseTimer = useRef(null);
+
+  const clearDropdownCloseTimer = () => {
+    if (dropdownCloseTimer.current) {
+      clearTimeout(dropdownCloseTimer.current);
+      dropdownCloseTimer.current = null;
+    }
+  };
+
+  const openDropdown = (dropdownName, event) => {
+    clearDropdownCloseTimer();
+    const rect = event.currentTarget.getBoundingClientRect();
+    setDropdownPosition({
+      top: rect.bottom + window.scrollY,
+      left: rect.left
+    });
+    setActiveDropdown(dropdownName);
+  };
+
+  const scheduleCloseDropdown = () => {
+    clearDropdownCloseTimer();
+    dropdownCloseTimer.current = setTimeout(() => {
+      setActiveDropdown(null);
+      dropdownCloseTimer.current = null;
+    }, 140);
+  };
+
+  const keepDropdownOpen = () => {
+    clearDropdownCloseTimer();
+  };
 
   const applyBirthChartIntent = (mode) => {
     if (mode === 'create') {
@@ -152,20 +182,6 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
     navigate(`/?birthChart=${mode}`);
   };
 
-  const toggleDropdown = (dropdownName, event) => {
-    if (activeDropdown === dropdownName) {
-      setActiveDropdown(null);
-    } else {
-      const rect = event.currentTarget.getBoundingClientRect();
-      
-      setDropdownPosition({
-        top: rect.bottom + window.scrollY,
-        left: rect.left
-      });
-      setActiveDropdown(dropdownName);
-    }
-  };
-
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (activeDropdown && !event.target.closest('.dropdown') && !event.target.closest('.dropdown-content')) {
@@ -177,13 +193,15 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
     return () => document.removeEventListener('click', handleClickOutside);
   }, [activeDropdown]);
 
+  useEffect(() => () => clearDropdownCloseTimer(), []);
+
 
 
   if (compact) {
     return (
       <header className={`main-header compact${variant === 'chat' ? ' compact--chat' : ''}`}>
         <div className="compact-nav">
-          <div className="container">
+          <div className="compact-nav__inner">
             <div className="compact-nav__brand-row">
               <button
                 type="button"
@@ -216,27 +234,36 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
             </div>
 
             <nav className="compact-menu">
-              <button onClick={onHomeClick || (() => navigate('/'))}>Home</button>
-              <div className={`dropdown ${activeDropdown === 'birthchart' ? 'active' : ''}`}>
-                <a href="#birthchart" className="dropdown-toggle" onClick={(e) => { e.preventDefault(); toggleDropdown('birthchart', e); }}>Birth Chart</a>
+              <button type="button" onClick={onHomeClick || (() => navigate('/'))}>Home</button>
+              <div
+                className={`dropdown ${activeDropdown === 'birthchart' ? 'active' : ''}`}
+                onMouseEnter={(e) => openDropdown('birthchart', e)}
+                onMouseLeave={scheduleCloseDropdown}
+              >
+                <a href="#birthchart" className="dropdown-toggle" onClick={(e) => e.preventDefault()}>Birth Chart</a>
               </div>
-              <div className={`dropdown ${activeDropdown === 'yourlife' ? 'active' : ''}`}>
-                <a href="#yourlife" className="dropdown-toggle" onClick={(e) => { e.preventDefault(); toggleDropdown('yourlife', e); }}>Your Life</a>
+              <div
+                className={`dropdown ${activeDropdown === 'yourlife' ? 'active' : ''}`}
+                onMouseEnter={(e) => openDropdown('yourlife', e)}
+                onMouseLeave={scheduleCloseDropdown}
+              >
+                <a href="#yourlife" className="dropdown-toggle" onClick={(e) => e.preventDefault()}>Your Life</a>
               </div>
               <Link to="/panchang">Panchang</Link>
-              <button onClick={() => navigate('/muhurat-finder')}>Muhurat</button>
-              <button onClick={() => navigate('/festivals')}>Festivals</button>
-              <button onClick={() => navigate('/nakshatras')}>Nakshatras</button>
-              <button type="button" className="compact-menu__item compact-menu__item--wide" onClick={() => navigate('/kundli-matching', user ? undefined : { state: { openLogin: true } })}>Kundli matching</button>
-              <button type="button" className="compact-menu__item compact-menu__item--wide" onClick={() => navigate('/reports', user ? undefined : { state: { openLogin: true } })}>Reports Studio</button>
+              <button type="button" onClick={() => navigate('/muhurat-finder')}>Muhurat Finder</button>
+              <button type="button" onClick={() => navigate('/festivals')}>Festivals</button>
+              <button type="button" onClick={() => navigate('/nakshatras')}>Nakshatras</button>
+              <button type="button" onClick={() => navigate('/kundli-matching', user ? undefined : { state: { openLogin: true } })}>Kundli matching</button>
+              <button type="button" onClick={() => navigate('/reports', user ? undefined : { state: { openLogin: true } })}>Reports Studio</button>
               {onAstrologyClick ? (
-                <button type="button" className="compact-menu__item compact-menu__item--optional" onClick={() => onAstrologyClick()}>Astrology</button>
+                <button type="button" onClick={() => onAstrologyClick()}>Astrology</button>
               ) : (
-                <a href="/#astrology" className="compact-menu__item compact-menu__item--optional">Astrology</a>
+                <a href="/#astrology">Astrology</a>
               )}
-              <button type="button" className="compact-menu__item compact-menu__item--optional" onClick={() => navigate('/ashtakavarga')}>Ashtakavarga</button>
-              <button type="button" className="compact-menu__item compact-menu__item--optional compact-menu__item--low" onClick={() => navigate('/#numerology')}>Numerology</button>
-              <button className="compact-menu__item compact-menu__item--optional compact-menu__item--low" onClick={() => navigate('/blog')}>Blogs</button>
+              <button type="button" onClick={() => navigate('/ashtakavarga')}>Ashtakavarga</button>
+              <button type="button" onClick={() => navigate('/#numerology')}>Numerology</button>
+              <button type="button" onClick={() => navigate('/blog')}>Blogs</button>
+              <button type="button" onClick={() => navigate('/contact')}>Contact us</button>
             </nav>
             
             <div className="compact-actions">
@@ -266,21 +293,31 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
                   )}
                 </>
               ) : showLoginButton ? (
-                <button className="auth-btn" onClick={onLogin}>Sign In</button>
+                <button type="button" className="auth-btn" onClick={onLogin || (() => navigate('/'))}>Sign In</button>
               ) : null}
             </div>
           </div>
         </div>
         
         {activeDropdown === 'birthchart' && (
-          <div className="dropdown-content" style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}>
+          <div
+            className="dropdown-content"
+            style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}
+            onMouseEnter={keepDropdownOpen}
+            onMouseLeave={scheduleCloseDropdown}
+          >
             <button type="button" onClick={() => { applyBirthChartIntent('create'); setActiveDropdown(null); }}>✨ Create birth chart</button>
             <button type="button" onClick={() => { applyBirthChartIntent('select'); setActiveDropdown(null); }}>👤 Select birth chart</button>
           </div>
         )}
 
         {activeDropdown === 'yourlife' && (
-          <div className="dropdown-content" style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}>
+          <div
+            className="dropdown-content"
+            style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}
+            onMouseEnter={keepDropdownOpen}
+            onMouseLeave={scheduleCloseDropdown}
+          >
             <button onClick={() => { navigate('/career-guidance'); setActiveDropdown(null); }}>💼 Your Career</button>
             <button onClick={() => { navigate('/marriage-analysis'); setActiveDropdown(null); }}>💍 Your Marriage</button>
             <button onClick={() => { navigate('/progeny-analysis'); setActiveDropdown(null); }}>👶 Your Progeny</button>
@@ -460,11 +497,19 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
         <div className="container">
           <ul className="nav-menu">
             <li><button onClick={onHomeClick || (() => navigate('/'))}>Home</button></li>
-            <li className={`dropdown ${activeDropdown === 'birthchart' ? 'active' : ''}`}>
-              <a href="#birthchart" className="dropdown-toggle" onClick={(e) => { e.preventDefault(); toggleDropdown('birthchart', e); }}>Birth Chart</a>
+            <li
+              className={`dropdown ${activeDropdown === 'birthchart' ? 'active' : ''}`}
+              onMouseEnter={(e) => openDropdown('birthchart', e)}
+              onMouseLeave={scheduleCloseDropdown}
+            >
+              <a href="#birthchart" className="dropdown-toggle" onClick={(e) => e.preventDefault()}>Birth Chart</a>
             </li>
-            <li className={`dropdown ${activeDropdown === 'yourlife' ? 'active' : ''}`}>
-              <a href="#yourlife" className="dropdown-toggle" onClick={(e) => { e.preventDefault(); toggleDropdown('yourlife', e); }}>Your Life</a>
+            <li
+              className={`dropdown ${activeDropdown === 'yourlife' ? 'active' : ''}`}
+              onMouseEnter={(e) => openDropdown('yourlife', e)}
+              onMouseLeave={scheduleCloseDropdown}
+            >
+              <a href="#yourlife" className="dropdown-toggle" onClick={(e) => e.preventDefault()}>Your Life</a>
             </li>
             <li><Link to="/panchang">Panchang</Link></li>
             <li><button onClick={() => navigate('/muhurat-finder')}>Muhurat Finder</button></li>
@@ -489,14 +534,24 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
 
       {/* Dropdown menus rendered outside navigation */}
       {activeDropdown === 'birthchart' && (
-        <div className="dropdown-content" style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}>
+        <div
+          className="dropdown-content"
+          style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}
+          onMouseEnter={keepDropdownOpen}
+          onMouseLeave={scheduleCloseDropdown}
+        >
           <button type="button" onClick={() => { applyBirthChartIntent('create'); setActiveDropdown(null); }}>✨ Create birth chart</button>
           <button type="button" onClick={() => { applyBirthChartIntent('select'); setActiveDropdown(null); }}>👤 Select birth chart</button>
         </div>
       )}
 
       {activeDropdown === 'yourlife' && (
-        <div className="dropdown-content" style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}>
+        <div
+          className="dropdown-content"
+          style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}
+          onMouseEnter={keepDropdownOpen}
+          onMouseLeave={scheduleCloseDropdown}
+        >
           <button onClick={() => { navigate('/career-guidance'); setActiveDropdown(null); }}>💼 Your Career</button>
           <button onClick={() => { navigate('/marriage-analysis'); setActiveDropdown(null); }}>💍 Your Marriage</button>
           <button onClick={() => { navigate('/progeny-analysis'); setActiveDropdown(null); }}>👶 Your Progeny</button>

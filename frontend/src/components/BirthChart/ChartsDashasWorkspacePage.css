@@ -36,6 +36,79 @@
   margin: 0 auto 1.75rem;
 }
 
+.charts-dashas-activation-entry {
+  max-width: 1180px;
+  margin: 0 auto 1.75rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.4fr) minmax(210px, 0.7fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.05rem 1.15rem;
+  border: 1px solid rgba(194, 24, 91, 0.13);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.97), rgba(255,240,245,0.97));
+  box-shadow: 0 12px 30px rgba(109, 32, 72, 0.09);
+}
+
+.charts-dashas-activation-entry__icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #c2185b, #f97316);
+  color: #fff;
+  font-size: 1.3rem;
+  box-shadow: 0 10px 22px rgba(194, 24, 91, 0.2);
+}
+
+.charts-dashas-activation-entry__copy p {
+  margin: 0 0 0.2rem;
+  color: #c2185b;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.charts-dashas-activation-entry__copy h2 {
+  margin: 0;
+  color: #251b29;
+  font-size: 1.18rem;
+}
+
+.charts-dashas-activation-entry__copy > span,
+.charts-dashas-activation-entry__preview span {
+  display: block;
+  margin-top: 0.25rem;
+  color: #6f6372;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.charts-dashas-activation-entry__preview {
+  padding-left: 1rem;
+  border-left: 1px solid rgba(194, 24, 91, 0.13);
+}
+
+.charts-dashas-activation-entry__preview strong {
+  color: #59223f;
+  font-size: 0.88rem;
+}
+
+.charts-dashas-activation-entry > button {
+  border: 0;
+  border-radius: 11px;
+  padding: 0.72rem 0.9rem;
+  background: #381c32;
+  color: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 .charts-dashas-grid {
   display: grid;
   gap: 1rem;
@@ -281,6 +354,14 @@
     min-width: 0;
     width: 100%;
   }
+
+  .charts-dashas-activation-entry {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .charts-dashas-activation-entry__preview {
+    display: none;
+  }
 }
 
 @media (max-width: 767px) {
@@ -291,6 +372,24 @@
 
   .charts-dashas-section {
     margin-bottom: 1.25rem;
+  }
+
+  .charts-dashas-activation-entry {
+    grid-template-columns: auto minmax(0, 1fr);
+    margin-bottom: 1.25rem;
+    padding: 0.9rem;
+    border-radius: 14px;
+  }
+
+  .charts-dashas-activation-entry__icon {
+    align-self: start;
+    width: 42px;
+    height: 42px;
+  }
+
+  .charts-dashas-activation-entry > button {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .charts-dashas-card {

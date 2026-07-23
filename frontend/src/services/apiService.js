@@ -228,6 +228,18 @@ export const apiService = {
     const response = await apiClient.get(`${getEndpoint('/birth-charts')}?${params}`);
     return response.data;
   },
+
+  getActivationExplorer: async ({ birthChartId, birthData, asOf, horizonDays = 90, trace = true }) => {
+    const response = await apiClient.post(getEndpoint('/prediction-engine/activation-explorer'), {
+      birth_chart_id: birthChartId || null,
+      birth_data: birthChartId ? null : birthData,
+      as_of: asOf,
+      horizon_days: horizonDays,
+      maximum_candidates: 100,
+      trace,
+    });
+    return response.data;
+  },
   
   updateChart: async (chartId, birthData) => {
     const response = await apiClient.put(`${getEndpoint('/birth-charts')}/${chartId}`, birthData);

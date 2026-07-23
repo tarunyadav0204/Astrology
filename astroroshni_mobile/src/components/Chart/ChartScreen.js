@@ -868,6 +868,32 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                 </View>
               </VerticalPageScroll>
 
+              {(chartTypes[currentChartIndex]?.id === 'lagna' || chartTypes[currentChartIndex]?.id === 'navamsa') && (
+                <TouchableOpacity
+                  style={[styles.activationExplorerCta, { borderColor: colors.accent }]}
+                  onPress={() => navigation.navigate('ActivationExplorer', { birthData })}
+                  activeOpacity={0.88}
+                  accessibilityRole="button"
+                  accessibilityLabel="What is activated now?"
+                >
+                  <LinearGradient
+                    colors={theme === 'dark' ? ['#f97316', '#ea580c'] : ['#ea580c', '#c2410c']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.activationExplorerCtaGradient}
+                  >
+                    <View style={styles.activationExplorerCtaIcon}>
+                      <Ionicons name="pulse" size={20} color="#ffffff" />
+                    </View>
+                    <View style={styles.activationExplorerCtaCopy}>
+                      <Text style={styles.activationExplorerCtaTitle}>What is activated now?</Text>
+                      <Text style={styles.activationExplorerCtaSubtitle}>See active houses, reasons, results and timing</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={22} color="#ffffff" />
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+
               <View style={[styles.bottomNavContainer, { 
                 backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 1)' : 'rgba(255, 255, 255, 1)',
                 borderTopColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
@@ -1494,6 +1520,49 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     zIndex: 10000,
     elevation: 20,
+  },
+  activationExplorerCta: {
+    position: 'absolute',
+    bottom: 88,
+    left: 14,
+    right: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: 'hidden',
+    zIndex: 10001,
+    elevation: 22,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  activationExplorerCtaGradient: {
+    minHeight: 62,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  activationExplorerCtaIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  activationExplorerCtaCopy: {
+    flex: 1,
+  },
+  activationExplorerCtaTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  activationExplorerCtaSubtitle: {
+    color: 'rgba(255,255,255,0.84)',
+    fontSize: 11,
+    marginTop: 2,
   },
   navContent: {
     paddingHorizontal: 16,

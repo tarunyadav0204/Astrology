@@ -521,6 +521,16 @@ export const healthAPI = {
 export const chartAPI = {
   getChartGuideVideoUrl: () => api.get(getEndpoint('/credits/settings/chart-guide-video-url')),
   getNakshatraGuideVideos: () => api.get(getEndpoint('/credits/settings/nakshatra-guide-videos')),
+  getActivationExplorer: ({ birthChartId, birthData, asOf, horizonDays = 90, trace = true }) => api.post(
+    getEndpoint('/prediction-engine/activation-explorer'),
+    {
+      ...(birthChartId ? { birth_chart_id: Number(birthChartId) } : { birth_data: birthData }),
+      as_of: asOf,
+      horizon_days: horizonDays,
+      maximum_candidates: 100,
+      trace,
+    }
+  ),
   calculateChart: (birthData) => {
     // console.log('[API] Calling calculateChart');
     const startTime = Date.now();

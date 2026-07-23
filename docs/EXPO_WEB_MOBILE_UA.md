@@ -89,12 +89,14 @@ Without the edge router, `/mobile/` and `/mobile/index.html` still work from the
 
 ## Add to Home Screen / PWA
 
+**Only `/mobile/` is the installable app.** The CRA marketing site at `/` ships `display: "browser"` and `apple-mobile-web-app-capable=no` so browsers do not create a competing home-screen icon that launches `https://astroroshni.com/` (website) instead of `/mobile/`.
+
 | Platform | How users save it | What we ship |
 |----------|-------------------|--------------|
-| **iOS Safari** | Share → **Add to Home Screen** (no one-tap API) | `apple-mobile-web-app-*` meta, `apple-touch-icon`, in-app guide modal |
-| **Android Chrome** | Chrome **⋮ → Install app** or **Add to Home screen** | Web manifest + `/mobile/sw.js` (we do **not** hijack `beforeinstallprompt`, so Chrome keeps its native Install UI) |
+| **iOS Safari** | Share → **Add to Home Screen** from **`/mobile/` only** | Expo shell: `apple-mobile-web-app-*` meta, `apple-touch-icon`, in-app guide modal |
+| **Android Chrome** | Chrome **⋮ → Install app** or **Add to Home screen** on **`/mobile/`** | Web manifest (`id`/`start_url`/`scope`: `/mobile/`) + `/mobile/sw.js` (we do **not** hijack `beforeinstallprompt`) |
 
-Both open full-screen from the home icon. CRA on `/` is unchanged. Play/native builds never load this UI.
+Both open full-screen from the home icon when installed from `/mobile/`. If an old icon still opens the website, delete it and re-add from `https://astroroshni.com/mobile/`.
 
 **Updates after deploy (no reinstall)**  
 Each export writes `/mobile/version.json` + stamps `window.__AR_WEB_BUILD__`. On open/focus, the home-screen app fetches `version.json` with `cache: no-store` and **reloads itself** when the build id changes. Users should **not** need to delete the iOS home-screen icon for normal deploys—just reopen the app (or switch back to it).

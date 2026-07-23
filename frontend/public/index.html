@@ -4,11 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="theme-color" content="#e91e63" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-touch-fullscreen" content="yes" />
+  <!-- Do NOT mark the marketing/CRA site as an installable web app.
+       The only home-screen / PWA entry should be https://astroroshni.com/mobile/
+       (Expo shell). Competing root installs open "/" and look like "the app opened the website". -->
+  <meta name="mobile-web-app-capable" content="no" />
+  <meta name="apple-mobile-web-app-capable" content="no" />
   <style>
-    /* iOS PWA keyboard fix */
+    /* iOS keyboard / input fixes (still useful in mobile Safari browser tabs) */
     input, textarea, select {
       -webkit-user-select: text !important;
       -webkit-touch-callout: default !important;
@@ -19,7 +21,6 @@
       font-size: 16px !important;
     }
   </style>
-  <meta name="apple-mobile-web-app-title" content="AstroClick" />
   <link rel="icon" type="image/png" href="/favicon.png" />
   <link rel="manifest" href="/manifest.json" />
   <!-- Route-level SEO is managed by react-helmet-async and prerender output. Keep the shell head minimal to avoid stale duplicate tags. -->

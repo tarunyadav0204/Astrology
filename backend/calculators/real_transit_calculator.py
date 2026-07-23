@@ -29,23 +29,54 @@ class RealTransitCalculator:
             'Venus': swe.VENUS, 'Saturn': swe.SATURN,
             'Rahu': swe.MEAN_NODE, 'Ketu': swe.MEAN_NODE
         }
+
+    def get_planet_state(self, date: datetime, planet: str) -> Dict:
+        """Return a strict, calculation-backed sidereal transit state.
+
+        Unlike the legacy convenience methods, this method never converts an
+        ephemeris or input error into ``None``/``False``. Prediction engines
+        must be able to distinguish a real non-retrograde planet from a failed
+        calculation.
+        """
+        planet_num = self.planet_numbers.get(planet)
+        if planet_num is None:
+            raise ValueError(f"Unsupported transit planet: {planet}")
+        try:
+            jd = swe.julday(date.year, date.month, date.day, 12.0)
+            result = swe.calc_ut(
+                jd,
+                planet_num,
+                swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH,
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                f"Swiss Ephemeris transit calculation failed for {planet} on {date.date()}"
+            ) from exc
+
+        values = result[0]
+        if not values or len(values) < 4:
+            raise RuntimeError(
+                f"Swiss Ephemeris returned an incomplete transit state for {planet}"
+            )
+        longitude = float(values[0]) % 360.0
+        speed = float(values[3])
+        if planet == 'Ketu':
+            longitude = (longitude + 180.0) % 360.0
+        retrograde = True if planet in ('Rahu', 'Ketu') else speed < 0.0
+        return {
+            'planet': planet,
+            'date': date.strftime('%Y-%m-%d'),
+            'longitude': longitude,
+            'sign': int(longitude / 30.0),
+            'degree': longitude % 30.0,
+            'speed': speed,
+            'retrograde': retrograde,
+        }
     
     def get_planet_position(self, date: datetime, planet: str) -> Optional[float]:
         """Get real planet position for specific date"""
         try:
-            jd = swe.julday(date.year, date.month, date.day, 12.0)
-            planet_num = self.planet_numbers.get(planet)
-            
-            if planet_num is None:
-                return None
-                
-            result = swe.calc_ut(jd, planet_num, swe.FLG_SIDEREAL)
-            longitude = result[0][0]
-            
-            if planet == 'Ketu':
-                longitude = (longitude + 180) % 360
-                
-            return longitude
+            return self.get_planet_state(date, planet)['longitude']
         except:
             return None
     
@@ -69,16 +100,7 @@ class RealTransitCalculator:
     def is_planet_retrograde(self, date: datetime, planet: str) -> bool:
         """Check if planet is retrograde on given date"""
         try:
-            jd = swe.julday(date.year, date.month, date.day, 12.0)
-            planet_num = self.planet_numbers.get(planet)
-            
-            if planet_num is None or planet in ['Rahu', 'Ketu']:  # Nodes always retrograde
-                return True
-                
-            result = swe.calc_ut(jd, planet_num, swe.FLG_SIDEREAL | swe.FLG_SPEED)
-            speed = result[0][3]  # Speed is 4th element
-            
-            return speed < 0
+            return bool(self.get_planet_state(date, planet)['retrograde'])
         except:
             return False
     
