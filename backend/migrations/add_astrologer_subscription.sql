@@ -17,6 +17,10 @@ WHERE subscription_family = 'vip'
   AND COALESCE(discount_percent, 0) > 0
   AND (entitlement_key IS NULL OR TRIM(entitlement_key) = '');
 
+WITH next_plan AS (
+    SELECT COALESCE(MAX(plan_id), 0) + 1 AS plan_id
+    FROM subscription_plans
+)
 INSERT INTO subscription_plans (
     plan_id,
     platform,
@@ -32,7 +36,7 @@ INSERT INTO subscription_plans (
     entitlement_key
 )
 SELECT
-    COALESCE(MAX(plan_id), 0) + 1,
+    next_plan.plan_id,
     'astroroshni',
     'astrologer_license_monthly',
     100.00,
@@ -44,7 +48,7 @@ SELECT
     'astrologer_license_monthly',
     'astrologer',
     'astrologer_tools'
-FROM subscription_plans
+FROM next_plan
 WHERE NOT EXISTS (
     SELECT 1
     FROM subscription_plans
