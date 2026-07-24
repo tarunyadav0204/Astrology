@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { creditAPI } from './creditService';
 import { pricingAPI } from '../services/api';
+import { retryPendingGooglePlaySubscriptions } from './googlePlayPendingSubscriptions';
 
 const CreditContext = createContext();
 
@@ -54,6 +56,7 @@ export const CreditProvider = ({ children }) => {
 
   const pricingFetchedAtRef = useRef(0);
   const pricingInFlightRef = useRef(null);
+  const pendingSubscriptionRecoveryRef = useRef(null);
 
   const applyPricingPayload = useCallback((raw) => {
     const normalized = normalizePricingPayload(raw);
@@ -135,6 +138,22 @@ export const CreditProvider = ({ children }) => {
 
       setIsGuest(false);
       setLoading(true);
+      if (Platform.OS === 'android') {
+        if (!pendingSubscriptionRecoveryRef.current) {
+          pendingSubscriptionRecoveryRef.current = retryPendingGooglePlaySubscriptions(
+            (purchaseToken, productId, orderId) =>
+              creditAPI.syncSubscription(
+                purchaseToken,
+                productId,
+                orderId,
+                { background: true, timeout: 10000 }
+              )
+          ).finally(() => {
+            pendingSubscriptionRecoveryRef.current = null;
+          });
+        }
+        await pendingSubscriptionRecoveryRef.current;
+      }
       const response = await creditAPI.getBalance();
       const data = response?.data;
       const balance = Number(data?.credits ?? data?.balance ?? 0) || 0;

@@ -307,12 +307,30 @@ def _verify_webhook_signature(body: bytes, signature: Optional[str]) -> bool:
 
 def _process_captured_payment(payment: Dict[str, Any]) -> Dict[str, Any]:
     payment_id = (payment.get("id") or "").strip()
+    order_id = (payment.get("order_id") or "").strip()
+
+    def failure(message: str, userid: Optional[int] = None, code: str = "payment_not_applied") -> Dict[str, Any]:
+        from utils.payment_failure_alerts import notify_payment_failure
+
+        notes = payment.get("notes") if isinstance(payment.get("notes"), dict) else {}
+        notify_payment_failure(
+            provider="razorpay",
+            stage="credit_grant",
+            userid=userid,
+            reference_id=payment_id or order_id,
+            product_id=str(notes.get("product_id") or ""),
+            error_code=code,
+            detail=message,
+            metadata={"order_id": order_id},
+        )
+        return {"success": False, "credits_added": 0, "message": message, "userid": userid}
+
     if not payment_id:
-        return {"success": False, "credits_added": 0, "message": "Missing payment id", "userid": None}
+        return failure("Missing payment id", code="missing_payment_id")
 
     status = (payment.get("status") or "").lower()
     if status != "captured":
-        return {"success": False, "credits_added": 0, "message": f"Payment not captured (status={status})", "userid": None}
+        return failure(f"Payment not captured (status={status})", code="payment_not_captured")
 
     notes = payment.get("notes") or {}
     uid_raw = str(notes.get("userid") or "").strip()
@@ -320,26 +338,26 @@ def _process_captured_payment(payment: Dict[str, Any]) -> Dict[str, Any]:
     product_id = str(notes.get("product_id") or "").strip()
 
     if not uid_raw.isdigit():
-        return {"success": False, "credits_added": 0, "message": "Invalid order notes (userid)", "userid": None}
+        return failure("Invalid order notes (userid)", code="invalid_user_notes")
     userid = int(uid_raw)
 
     if not credits_raw.isdigit():
-        return {"success": False, "credits_added": 0, "message": "Invalid order notes (credits)", "userid": None}
+        return failure("Invalid order notes (credits)", userid, "invalid_credit_notes")
     credits = int(credits_raw)
 
     if credits not in ALLOWED_CREDITS:
-        return {"success": False, "credits_added": 0, "message": "Invalid credits in notes", "userid": None}
+        return failure("Invalid credits in notes", userid, "invalid_credit_amount")
 
     if product_id != _product_id(credits):
-        return {"success": False, "credits_added": 0, "message": "product_id mismatch", "userid": None}
+        return failure("product_id mismatch", userid, "product_mismatch")
 
     amount_paise = payment.get("amount")
     if amount_paise is None:
-        return {"success": False, "credits_added": 0, "message": "Missing amount", "userid": None}
+        return failure("Missing amount", userid, "missing_payment_amount")
     try:
         amount_paise = int(amount_paise)
     except (TypeError, ValueError):
-        return {"success": False, "credits_added": 0, "message": "Invalid amount", "userid": None}
+        return failure("Invalid amount", userid, "invalid_payment_amount")
 
     expected = _expected_paise_for_pack(credits)
 
@@ -350,7 +368,7 @@ def _process_captured_payment(payment: Dict[str, Any]) -> Dict[str, Any]:
             expected,
             amount_paise,
         )
-        return {"success": False, "credits_added": 0, "message": "Amount mismatch", "userid": userid}
+        return failure("Amount mismatch", userid, "payment_amount_mismatch")
 
     if credit_service.has_transaction_with_reference(userid, RAZORPAY_SOURCE, payment_id):
         extras = credit_service.apply_purchase_extras(
@@ -393,12 +411,11 @@ def _process_captured_payment(payment: Dict[str, Any]) -> Dict[str, Any]:
     )
     if not ok:
         logger.error("Razorpay: add_credits failed user=%s payment=%s", userid, payment_id)
-        return {
-            "success": False,
-            "credits_added": 0,
-            "message": "Could not apply credits. Contact support with payment id.",
-            "userid": userid,
-        }
+        return failure(
+            "Could not apply credits. Contact support with payment id.",
+            userid,
+            "credits_not_saved",
+        )
 
     extras = credit_service.apply_purchase_extras(
         userid=userid,
@@ -533,15 +550,42 @@ async def razorpay_create_order(body: CreateOrderBody, current_user: User = Depe
         r = requests.post(f"{RAZORPAY_API_BASE}/orders", auth=auth, json=payload, timeout=30)
     except requests.RequestException as e:
         logger.exception("Razorpay create order request failed: %s", e)
+        from utils.payment_failure_alerts import notify_payment_failure
+        notify_payment_failure(
+            provider="razorpay",
+            stage="credit_order_create",
+            userid=current_user.userid,
+            product_id=_product_id(body.credits),
+            error_code=type(e).__name__,
+            detail=str(e),
+        )
         raise HTTPException(status_code=502, detail="Could not reach payment provider")
 
     if r.status_code not in (200, 201):
         logger.warning("Razorpay create order: %s %s", r.status_code, r.text[:500])
+        from utils.payment_failure_alerts import notify_payment_failure
+        notify_payment_failure(
+            provider="razorpay",
+            stage="credit_order_create",
+            userid=current_user.userid,
+            product_id=_product_id(body.credits),
+            error_code=f"http_{r.status_code}",
+            detail=r.text[:500],
+        )
         raise HTTPException(status_code=502, detail="Could not create payment order. Try again later.")
 
     order = r.json()
     oid = order.get("id")
     if not oid:
+        from utils.payment_failure_alerts import notify_payment_failure
+        notify_payment_failure(
+            provider="razorpay",
+            stage="credit_order_create",
+            userid=current_user.userid,
+            product_id=_product_id(body.credits),
+            error_code="missing_order_id",
+            detail="Razorpay returned a success response without an order id",
+        )
         raise HTTPException(status_code=502, detail="Invalid response from payment provider")
 
     return {
@@ -571,11 +615,44 @@ async def razorpay_verify(body: VerifyPaymentBody, current_user: User = Depends(
         body.razorpay_payment_id.strip(),
         body.razorpay_signature,
     ):
+        from utils.payment_failure_alerts import notify_payment_failure
+        notify_payment_failure(
+            provider="razorpay",
+            stage="credit_verify",
+            userid=current_user.userid,
+            reference_id=body.razorpay_payment_id.strip() or body.razorpay_order_id.strip(),
+            error_code="invalid_payment_signature",
+            detail="Client payment verification signature did not match",
+            metadata={"order_id": body.razorpay_order_id.strip()},
+        )
         raise HTTPException(status_code=400, detail="Invalid payment signature")
 
-    payment = _fetch_payment(body.razorpay_payment_id)
+    try:
+        payment = _fetch_payment(body.razorpay_payment_id)
+    except HTTPException as exc:
+        from utils.payment_failure_alerts import notify_payment_failure
+        notify_payment_failure(
+            provider="razorpay",
+            stage="credit_verify",
+            userid=current_user.userid,
+            reference_id=body.razorpay_payment_id.strip() or body.razorpay_order_id.strip(),
+            error_code=f"http_{exc.status_code}",
+            detail=str(exc.detail),
+            metadata={"order_id": body.razorpay_order_id.strip()},
+        )
+        raise
     notes = payment.get("notes") or {}
     if str(notes.get("userid") or "") != str(current_user.userid):
+        from utils.payment_failure_alerts import notify_payment_failure
+        notify_payment_failure(
+            provider="razorpay",
+            stage="credit_verify",
+            userid=current_user.userid,
+            reference_id=body.razorpay_payment_id.strip(),
+            error_code="payment_owner_mismatch",
+            detail="Razorpay payment notes do not match the authenticated user",
+            metadata={"order_id": body.razorpay_order_id.strip()},
+        )
         raise HTTPException(status_code=403, detail="Payment does not belong to this account")
 
     result = _process_captured_payment(payment)

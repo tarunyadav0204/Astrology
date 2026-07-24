@@ -38,6 +38,12 @@ import { openRazorpayCheckout, openRazorpaySubscriptionCheckout } from '../platf
 import { useAuthGate } from '../auth/AuthGateContext';
 import { useFocusEffect } from '@react-navigation/native';
 import AppAlertModal from '../components/Common/AppAlertModal';
+import {
+  getStoredGooglePlayUserId,
+  removePendingGooglePlaySubscription,
+  retryPendingGooglePlaySubscriptions,
+  savePendingGooglePlaySubscription,
+} from './googlePlayPendingSubscriptions';
 
 const { width } = Dimensions.get('window');
 const PENDING_GOOGLE_PLAY_CREDIT_PURCHASES_KEY = 'pendingGooglePlayCreditPurchasesV1';
@@ -580,6 +586,16 @@ const CreditScreen = ({ navigation, route }) => {
       });
     } catch (err) {
       const msg = err.response?.data?.detail || err.message || t('credits.page.failedAddCredits');
+      if (!err.response?.status) {
+        creditAPI.reportPaymentFailure({
+          provider: 'google_play',
+          stage: 'credit_client_verify',
+          reference_id: orderId,
+          product_id: productId,
+          error_code: err.code || 'client_error',
+          detail: typeof msg === 'string' ? msg : 'Google Play credit verification failed',
+        }).catch(() => {});
+      }
       setPurchaseModal({
         visible: true,
         type: 'error',
@@ -596,10 +612,20 @@ const CreditScreen = ({ navigation, route }) => {
 
   /** Call this after a successful Google Play subscription purchase. */
   const handleGooglePlaySubscriptionSuccess = async (purchaseToken, productId, orderId) => {
-    if (!purchaseToken || !productId || !orderId) return;
+    if (!purchaseToken || !productId || !orderId) {
+      throw new Error('Google Play returned an incomplete subscription purchase');
+    }
     setPurchasingSubscriptionId(productId);
+    const userId = await getStoredGooglePlayUserId();
     try {
+      await savePendingGooglePlaySubscription({
+        purchaseToken,
+        productId,
+        orderId,
+        userId,
+      });
       const { data } = await creditAPI.verifyGooglePlaySubscription(purchaseToken, productId, orderId);
+      await removePendingGooglePlaySubscription({ purchaseToken, productId, userId });
       await fetchBalance();
       await fetchSubscriptionDetails();
       const purchasedPlan = subscriptionPlans.find((plan) => plan.google_play_product_id === productId);
@@ -633,6 +659,15 @@ const CreditScreen = ({ navigation, route }) => {
       }
     } catch (err) {
       const msg = err.response?.data?.detail || err.message || t('credits.page.failedActivateSubscription');
+      console.warn('Google Play subscription verification failed; purchase left pending', {
+        productId,
+        orderId,
+        userId,
+        tokenPrefix: purchaseToken ? `${String(purchaseToken).slice(0, 12)}…` : null,
+        status: err.response?.status,
+        detail: err.response?.data?.detail,
+        message: err.message,
+      });
       setPurchaseModal({
         visible: true,
         type: 'error',
@@ -640,6 +675,7 @@ const CreditScreen = ({ navigation, route }) => {
         message: msg,
         creditsAdded: 0,
       });
+      throw err;
     } finally {
       setPurchasingSubscriptionId(null);
     }
@@ -1097,7 +1133,15 @@ const CreditScreen = ({ navigation, route }) => {
             const productId = purchase.productId ?? purchase.productIds?.[0];
             const orderId = purchase.transactionId ?? purchase.transactionIdAndroid ?? purchase.purchaseToken;
             if (!token || !productId || !orderId) return;
-            const isSubscription = subscriptionProductIds.includes(productId);
+            const isSubscription =
+              subscriptionProductIds.includes(productId) ||
+              subscriptionPlans.some((plan) => plan.google_play_product_id === productId);
+            const isCreditPurchase =
+              productIds.includes(productId) ||
+              Boolean(creditsFromGooglePlayProductId(productId));
+            if (!isSubscription && !isCreditPurchase) {
+              throw new Error(`Unknown Google Play product received: ${productId}`);
+            }
             trackAstrologyEvent.addPaymentInfo(true, {
               content_id: productId,
               content_type: isSubscription ? 'subscription' : 'credits',
@@ -1110,7 +1154,11 @@ const CreditScreen = ({ navigation, route }) => {
               await RNIap.finishTransaction({ purchase, isConsumable: true });
             }
           } catch (e) {
-            console.warn('Purchase listener error:', e?.message);
+            console.warn('Purchase listener left transaction unfinished for retry', {
+              message: e?.message,
+              status: e?.response?.status,
+              detail: e?.response?.data?.detail,
+            });
           }
         });
         errorSub = RNIap.purchaseErrorListener?.((error) => {
@@ -1298,6 +1346,17 @@ const CreditScreen = ({ navigation, route }) => {
   const syncSubscriptionWithPlay = async () => {
     if (Platform.OS !== 'android' || !RNIap || subscriptionProductIds.length === 0) return;
     try {
+      const userId = await getStoredGooglePlayUserId();
+      await retryPendingGooglePlaySubscriptions(
+        (purchaseToken, productId, orderId) =>
+          creditAPI.syncSubscription(
+            purchaseToken,
+            productId,
+            orderId,
+            { background: true, timeout: 10000 }
+          ),
+        userId
+      );
       let subscriptionPurchases = [];
       const available = await RNIap.getAvailablePurchases().catch(() => []);
       subscriptionPurchases = (available || []).filter(
@@ -1309,7 +1368,18 @@ const CreditScreen = ({ navigation, route }) => {
         const productId = p.productId ?? p.productIds?.[0];
         if (token && productId) {
           const orderId = p.transactionId ?? p.transactionIdAndroid ?? null;
+          await savePendingGooglePlaySubscription({
+            purchaseToken: token,
+            productId,
+            orderId: orderId || token,
+            userId,
+          });
           await creditAPI.syncSubscription(token, productId, orderId);
+          await removePendingGooglePlaySubscription({
+            purchaseToken: token,
+            productId,
+            userId,
+          });
           synced = true;
         }
       }
@@ -1482,6 +1552,7 @@ const CreditScreen = ({ navigation, route }) => {
     if (Platform.OS !== 'web') return;
     const creditsAmount = Number(pack?.credits);
     if (!Number.isFinite(creditsAmount) || creditsAmount <= 0) return;
+    let razorpayOrderId = null;
     setPurchasingRazorpayCredits(creditsAmount);
     try {
       // Same path as frontend: main API create-order → Checkout.js → verify (no Play / Cloud Run hop).
@@ -1490,6 +1561,7 @@ const CreditScreen = ({ navigation, route }) => {
         {},
         { preferMainApi: true }
       );
+      razorpayOrderId = orderData?.order_id || null;
       const verifyPayload = await openRazorpayCheckout({
         orderData,
         description: pack?.name || `${creditsAmount} credits`,
@@ -1521,6 +1593,16 @@ const CreditScreen = ({ navigation, route }) => {
     } catch (e) {
       if (e?.code === 'USER_CANCELLED') {
         return;
+      }
+      if (!e?.response?.status) {
+        creditAPI.reportPaymentFailure({
+          provider: 'razorpay',
+          stage: 'credit_client_checkout',
+          reference_id: razorpayOrderId,
+          product_id: `credits_${creditsAmount}`,
+          error_code: e?.code || 'client_error',
+          detail: e?.message || 'Razorpay credit checkout failed',
+        }).catch(() => {});
       }
       Alert.alert(
         t('credits.page.purchaseFailed', { defaultValue: 'Purchase failed' }),

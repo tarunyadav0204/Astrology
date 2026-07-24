@@ -2142,12 +2142,14 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             source_mid = None
             if isinstance(qc, dict):
                 source_mid = qc.get("source_message_id") or qc.get("sourceMessageId")
-            record_funnel_event(
-                userid=int(current_user.userid),
-                event_name="card_clicked",
-                message_id=str(source_mid).strip() if source_mid else None,
-                platform=str(request.get("platform") or "web")[:40],
-            )
+            source_mid = str(source_mid).strip() if source_mid else ""
+            if source_mid:
+                record_funnel_event(
+                    userid=int(current_user.userid),
+                    event_name="card_clicked",
+                    message_id=source_mid,
+                    platform=str(request.get("platform") or "web")[:40],
+                )
     except Exception:
         logger.exception("remedy funnel card_clicked failed user=%s", current_user.userid)
     
@@ -4221,26 +4223,44 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         if result.get('success'):
             await _close_wait_side_conversation(message_id)
             try:
+                from credits.remedy_funnel import record_funnel_event
+
+                next_action_payload = result.get("next_action")
+                if (
+                    isinstance(next_action_payload, dict)
+                    and str(next_action_payload.get("type") or "").strip().lower() == "remedy"
+                    and message_id is not None
+                ):
+                    # Authoritative impression: card was attached to the answer the client will render.
+                    record_funnel_event(
+                        userid=int(user_id),
+                        event_name="card_shown",
+                        message_id=str(message_id),
+                        platform="server",
+                    )
+
                 qc = (
                     cached_intent.get("query_context")
                     if isinstance(cached_intent, dict) and isinstance(cached_intent.get("query_context"), dict)
                     else None
                 )
                 from utils.query_context import is_remedy_followup_request
-                from credits.remedy_funnel import record_funnel_event
 
                 if is_remedy_followup_request({"query_context": qc}):
                     source_mid = None
                     if isinstance(qc, dict):
                         source_mid = qc.get("source_message_id") or qc.get("sourceMessageId")
-                    record_funnel_event(
-                        userid=int(user_id),
-                        event_name="remedy_delivered",
-                        message_id=str(source_mid).strip() if source_mid else str(message_id),
-                        platform="server",
-                    )
+                    # Must key off the source (card) message so delivered joins to card_shown/clicked.
+                    source_mid = str(source_mid).strip() if source_mid else ""
+                    if source_mid:
+                        record_funnel_event(
+                            userid=int(user_id),
+                            event_name="remedy_delivered",
+                            message_id=source_mid,
+                            platform="server",
+                        )
             except Exception:
-                logger.exception("remedy funnel remedy_delivered failed message_id=%s", message_id)
+                logger.exception("remedy funnel post-persist events failed message_id=%s", message_id)
         
         # Extract facts AFTER transaction commits to avoid database lock
         if result.get('success') and birth_chart_id:

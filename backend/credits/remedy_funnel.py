@@ -9,6 +9,8 @@ from db import execute, get_conn
 logger = logging.getLogger(__name__)
 
 VALID_EVENTS = frozenset({"card_shown", "card_clicked", "remedy_delivered"})
+# Admin date filters use IST calendar days (product audience is primarily India).
+_ADMIN_TZ = "Asia/Kolkata"
 
 
 def ensure_remedy_funnel_table(conn) -> None:
@@ -100,57 +102,119 @@ def record_funnel_event(
             return True
 
 
+def _date_clause(from_date: Optional[str], to_date: Optional[str], col: str = "created_at"):
+    clauses: List[str] = []
+    params: List[Any] = []
+    if from_date:
+        clauses.append(f"({col} AT TIME ZONE '{_ADMIN_TZ}')::date >= ?::date")
+        params.append(from_date)
+    if to_date:
+        clauses.append(f"({col} AT TIME ZONE '{_ADMIN_TZ}')::date <= ?::date")
+        params.append(to_date)
+    return clauses, params
+
+
 def get_funnel_analytics(
     *,
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
 ) -> Dict[str, Any]:
-    clauses = ["1=1"]
-    params: List[Any] = []
-    if from_date:
-        clauses.append("created_at >= ?::timestamptz")
-        params.append(f"{from_date}T00:00:00+00:00")
-    if to_date:
-        clauses.append("created_at < (?::date + INTERVAL '1 day')")
-        params.append(to_date)
-    where = " AND ".join(clauses)
+    """
+    Cohort funnel keyed by remedy-card impressions.
+
+    Date range filters when the card was *shown* (IST calendar day). Later steps
+    count only matching (userid, message_id) that progressed — so tapped/delivered
+    can never exceed saw. Clicks/deliveries after the range still count for
+    impressions that entered in-range.
+    """
+    shown_clauses, shown_params = _date_clause(from_date, to_date, "s.created_at")
+    shown_where = " AND ".join(["s.event_name = 'card_shown'", *shown_clauses])
 
     with get_conn() as conn:
         ensure_remedy_funnel_table(conn)
-        steps: List[Dict[str, Any]] = []
-        for event_name, label in (
-            ("card_shown", "Saw remedy card"),
-            ("card_clicked", "Tapped remedy CTA"),
-            ("remedy_delivered", "Got remedy-only answer"),
-        ):
-            cur = execute(
-                conn,
-                f"""
-                SELECT COUNT(DISTINCT userid) AS users, COUNT(*) AS events
-                FROM remedy_funnel_events
-                WHERE {where} AND event_name = ?
-                """,
-                (*params, event_name),
-            )
-            row = cur.fetchone() or (0, 0)
-            steps.append(
-                {
-                    "event_name": event_name,
-                    "label": label,
-                    "unique_users": int(row[0] or 0),
-                    "events": int(row[1] or 0),
-                }
-            )
 
-        base = steps[0]["unique_users"] or 0
+        # Impressions in range.
+        cur = execute(
+            conn,
+            f"""
+            SELECT COUNT(DISTINCT s.userid) AS users, COUNT(*) AS events
+            FROM remedy_funnel_events s
+            WHERE {shown_where}
+            """,
+            tuple(shown_params),
+        )
+        shown_row = cur.fetchone() or (0, 0)
+        shown_users = int(shown_row[0] or 0)
+        shown_events = int(shown_row[1] or 0)
+
+        # Among those impressions, how many got a matching click (any time).
+        cur = execute(
+            conn,
+            f"""
+            SELECT
+              COUNT(DISTINCT s.userid) AS users,
+              COUNT(*) AS events
+            FROM remedy_funnel_events s
+            INNER JOIN remedy_funnel_events c
+              ON c.userid = s.userid
+             AND COALESCE(c.message_id, '') = COALESCE(s.message_id, '')
+             AND c.event_name = 'card_clicked'
+            WHERE {shown_where}
+            """,
+            tuple(shown_params),
+        )
+        clicked_row = cur.fetchone() or (0, 0)
+        clicked_users = int(clicked_row[0] or 0)
+        clicked_events = int(clicked_row[1] or 0)
+
+        # Among those impressions, how many got a matching remedy-only answer (any time).
+        cur = execute(
+            conn,
+            f"""
+            SELECT
+              COUNT(DISTINCT s.userid) AS users,
+              COUNT(*) AS events
+            FROM remedy_funnel_events s
+            INNER JOIN remedy_funnel_events d
+              ON d.userid = s.userid
+             AND COALESCE(d.message_id, '') = COALESCE(s.message_id, '')
+             AND d.event_name = 'remedy_delivered'
+            WHERE {shown_where}
+            """,
+            tuple(shown_params),
+        )
+        delivered_row = cur.fetchone() or (0, 0)
+        delivered_users = int(delivered_row[0] or 0)
+        delivered_events = int(delivered_row[1] or 0)
+
+        steps: List[Dict[str, Any]] = [
+            {
+                "event_name": "card_shown",
+                "label": "Saw remedy card",
+                "unique_users": shown_users,
+                "events": shown_events,
+            },
+            {
+                "event_name": "card_clicked",
+                "label": "Tapped remedy CTA",
+                "unique_users": clicked_users,
+                "events": clicked_events,
+            },
+            {
+                "event_name": "remedy_delivered",
+                "label": "Got remedy-only answer",
+                "unique_users": delivered_users,
+                "events": delivered_events,
+            },
+        ]
+
+        base = shown_users or 0
         for step in steps:
             users = step["unique_users"]
             step["conversion_from_card_shown_pct"] = (
                 round(100.0 * users / base, 1) if base > 0 else None
             )
 
-        clicked_users = steps[1]["unique_users"] or 0
-        delivered_users = steps[2]["unique_users"] or 0
         return {
             "from_date": from_date,
             "to_date": to_date,

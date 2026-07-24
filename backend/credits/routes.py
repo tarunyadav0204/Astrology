@@ -229,6 +229,34 @@ def _userid_from_play_obfuscated_account(value: Optional[str]) -> Optional[int]:
     return None
 
 
+def _userid_from_google_play_subscription_purchase(purchase: dict) -> Optional[int]:
+    """Extract our userid from current or legacy Play subscription identity fields."""
+    if not isinstance(purchase, dict):
+        return None
+    containers = [
+        purchase,
+        purchase.get("externalAccountIdentifiers"),
+        purchase.get("expiredExternalAccountIdentifiers"),
+    ]
+    for container in containers:
+        if isinstance(container, list):
+            values = container
+        else:
+            values = [container]
+        for value in values:
+            if not isinstance(value, dict):
+                continue
+            for key in (
+                "obfuscatedExternalAccountId",
+                "obfuscatedAccountId",
+                "obfuscatedExternalProfileId",
+            ):
+                userid = _userid_from_play_obfuscated_account(value.get(key))
+                if userid is not None:
+                    return userid
+    return None
+
+
 def _get_play_service():
     """Build Android Publisher API service with service account credentials (file path or inline JSON)."""
     try:
@@ -386,6 +414,26 @@ def _subscription_period_dates_from_purchase(purchase: dict) -> tuple:
     start_date = datetime.utcfromtimestamp(int(start_ms) / 1000).strftime("%Y-%m-%d")
     end_date = datetime.utcfromtimestamp(int(expiry_ms) / 1000).strftime("%Y-%m-%d")
     return start_date, end_date
+
+
+def _subscription_purchase_is_valid_for_activation(purchase: dict) -> bool:
+    """Support both legacy subscriptions.get and subscriptionsv2 response shapes."""
+    purchase = purchase or {}
+    payment_state = purchase.get("paymentState")
+    if payment_state in (0, 1, 2):
+        return True
+    subscription_state = str(purchase.get("subscriptionState") or "").strip().upper()
+    if subscription_state in {
+        "SUBSCRIPTION_STATE_ACTIVE",
+        "SUBSCRIPTION_STATE_IN_GRACE_PERIOD",
+    }:
+        return True
+    if subscription_state == "SUBSCRIPTION_STATE_CANCELED":
+        try:
+            return int(purchase.get("expiryTimeMillis") or 0) > int(time.time() * 1000)
+        except (TypeError, ValueError):
+            return False
+    return False
 
 
 def _credits_from_product_id(product_id: str) -> Optional[int]:
@@ -695,6 +743,15 @@ class GooglePlaySubscriptionVerifyRequest(BaseModel):
     order_id: Optional[str] = None  # GPA order id from client (Play verify response is authoritative when present)
 
 
+class PaymentFailureReportRequest(BaseModel):
+    provider: str
+    stage: str
+    reference_id: Optional[str] = None
+    product_id: Optional[str] = None
+    error_code: Optional[str] = None
+    detail: Optional[str] = None
+
+
 def _play_payment_service_shared_secret() -> str:
     return (os.getenv("PLAY_PAYMENT_SERVICE_SHARED_SECRET") or "").strip()
 
@@ -820,33 +877,59 @@ def _credit_verified_google_play_purchase(
     localized_price: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Verify one-time Play purchase, then credit user idempotently by order_id."""
+    def alert(stage: str, code: str, detail: str, reference: Optional[str] = None) -> None:
+        from utils.payment_failure_alerts import notify_payment_failure
+
+        notify_payment_failure(
+            provider="google_play",
+            stage=stage,
+            userid=userid,
+            reference_id=reference or order_id_hint,
+            product_id=product_id,
+            error_code=code,
+            detail=detail,
+        )
+
     amount = _credits_from_product_id(product_id)
     if amount is None:
+        alert("credit_verify", "invalid_product", "Unknown or invalid Google Play credit product")
         raise HTTPException(status_code=400, detail=f"Unknown or invalid product_id (expected credits_N): {product_id}")
     token = (purchase_token or "").strip()
     if not token:
+        alert("credit_verify", "missing_purchase_token", "Google Play callback did not include a purchase token")
         raise HTTPException(status_code=400, detail="purchase_token is required")
 
     try:
         purchase = _verify_google_play_purchase(PACKAGE_NAME, product_id, token)
-    except HTTPException:
+    except HTTPException as exc:
+        alert("credit_verify", f"http_{exc.status_code}", str(exc.detail))
         raise
     except Exception as e:
+        alert("credit_verify", type(e).__name__, str(e))
         raise HTTPException(status_code=400, detail=f"Invalid or expired purchase: {str(e)}")
 
     purchase_state = purchase.get("purchaseState")
     if purchase_state != 0:  # 0 = Purchased
+        alert(
+            "credit_verify",
+            "purchase_not_completed",
+            f"Google Play purchaseState={purchase_state}",
+            purchase.get("orderId") or order_id_hint,
+        )
         raise HTTPException(status_code=400, detail="Purchase not in completed state")
 
     order_id = (purchase.get("orderId") or order_id_hint or "").strip()
     if not order_id:
+        alert("credit_verify", "missing_order_id", "Verified purchase did not contain an order id")
         raise HTTPException(status_code=400, detail="order_id is required")
 
     # Keep purchase token ownership map fresh so RTDN can resolve user by token.
     try:
-        credit_service.upsert_play_onetime_token(userid, token, product_id)
-    except Exception:
-        pass
+        mapped = credit_service.upsert_play_onetime_token(userid, token, product_id)
+        if not mapped:
+            alert("credit_token_mapping", "mapping_not_persisted", "Could not persist purchase-token ownership", order_id)
+    except Exception as exc:
+        alert("credit_token_mapping", type(exc).__name__, str(exc), order_id)
 
     if credit_service.has_transaction_with_reference(userid, GOOGLE_PLAY_SOURCE, order_id):
         extras = credit_service.apply_purchase_extras(
@@ -894,6 +977,7 @@ def _credit_verified_google_play_purchase(
             product_id,
             amount,
         )
+        alert("credit_grant", "credits_not_saved", "Purchase verified but credits could not be saved", order_id)
         raise HTTPException(
             status_code=500,
             detail="Purchase verified with Google Play but credits could not be saved. Please contact support with your order id.",
@@ -1044,6 +1128,50 @@ def _resolve_userid_from_google_play_onetime_purchase(
         if userid is not None:
             return userid
     return None
+
+
+def _resolve_userid_from_google_play_subscription(
+    *,
+    purchase_token: str,
+    product_id: str,
+) -> Optional[int]:
+    """Resolve and persist subscription ownership directly from Google Play."""
+    try:
+        purchase = _fetch_google_play_subscription_purchase(
+            PACKAGE_NAME,
+            product_id,
+            purchase_token,
+            prefer_v2=True,
+        )
+    except Exception:
+        logger.exception(
+            "Google Play subscription ownership resolve failed product=%s token_prefix=%s",
+            product_id,
+            (purchase_token or "")[:12],
+        )
+        return None
+    userid = _userid_from_google_play_subscription_purchase(purchase)
+    if userid is None:
+        logger.warning(
+            "Google Play subscription has no resolvable external account product=%s token_prefix=%s",
+            product_id,
+            (purchase_token or "")[:12],
+        )
+        return None
+    order_id = _subscription_order_id_from_purchase(purchase)
+    if not credit_service.upsert_play_subscription_token(
+        userid,
+        purchase_token,
+        product_id,
+        latest_order_id=order_id,
+    ):
+        logger.error(
+            "Failed to persist recovered Google Play subscription owner user=%s product=%s",
+            userid,
+            product_id,
+        )
+        return None
+    return userid
 
 
 @router.get("/google-play/products")
@@ -1283,6 +1411,37 @@ async def verify_google_play_purchase(
     )
 
 
+@router.post("/payment-failure/report")
+async def report_payment_failure(
+    request: PaymentFailureReportRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Best-effort client failure report; never exposes recipients or blocks payment recovery."""
+    provider = (request.provider or "").strip().lower()
+    if provider not in {"google_play", "razorpay"}:
+        raise HTTPException(status_code=400, detail="Unsupported payment provider")
+    stage = (request.stage or "").strip().lower()
+    if stage not in {
+        "credit_client_verify",
+        "credit_client_checkout",
+        "credit_purchase_listener",
+    }:
+        raise HTTPException(status_code=400, detail="Invalid failure stage")
+    from utils.payment_failure_alerts import notify_payment_failure
+
+    notify_payment_failure(
+        provider=provider,
+        stage=stage,
+        userid=current_user.userid,
+        reference_id=(request.reference_id or "").strip() or None,
+        product_id=(request.product_id or "").strip() or None,
+        error_code=(request.error_code or "client_failure").strip()[:120],
+        detail=(request.detail or "").strip()[:500],
+        metadata={"source": "client_report"},
+    )
+    return {"success": True}
+
+
 @router.post("/google-play/subscription/verify")
 async def verify_google_play_subscription(
     request: GooglePlaySubscriptionVerifyRequest,
@@ -1435,10 +1594,17 @@ def _sync_subscription_from_play(
     prior = credit_service.get_latest_subscription_on_platform(userid, platform, family=family)
 
     purchase = _verify_google_play_subscription(PACKAGE_NAME, product_id, purchase_token)
-    if not accept_any_payment_state:
-        payment_state = purchase.get("paymentState")
-        if payment_state not in (0, 1):
-            raise HTTPException(status_code=400, detail="Subscription not in valid payment state")
+    if not accept_any_payment_state and not _subscription_purchase_is_valid_for_activation(purchase):
+        raise HTTPException(status_code=400, detail="Subscription not in valid payment state")
+    play_userid = _userid_from_google_play_subscription_purchase(purchase)
+    if play_userid is not None and int(play_userid) != int(userid):
+        logger.error(
+            "Google Play subscription owner mismatch authenticated_user=%s play_user=%s product=%s",
+            userid,
+            play_userid,
+            product_id,
+        )
+        raise HTTPException(status_code=403, detail="Subscription belongs to another user")
     from datetime import datetime
     expiry_ms = purchase.get("expiryTimeMillis") or purchase.get("startTimeMillis") or 0
     start_ms = purchase.get("startTimeMillis") or expiry_ms
@@ -1448,12 +1614,10 @@ def _sync_subscription_from_play(
     end_date = datetime.utcfromtimestamp(int(expiry_ms) / 1000).strftime("%Y-%m-%d")
     play_order_id = _subscription_order_id_from_purchase(purchase, order_id_hint)
     # Keep token->user mapping fresh so RTDN worker can resolve ownership.
-    try:
-        credit_service.upsert_play_subscription_token(
-            userid, purchase_token, product_id, latest_order_id=play_order_id
-        )
-    except Exception:
-        pass
+    if not credit_service.upsert_play_subscription_token(
+        userid, purchase_token, product_id, latest_order_id=play_order_id
+    ):
+        raise HTTPException(status_code=500, detail="Failed to persist subscription purchase mapping")
     success = credit_service.set_user_subscription(
         userid,
         plan_id,
@@ -1603,12 +1767,20 @@ async def google_play_rtdn_push(body: Dict[str, Any]):
 
         userid = credit_service.get_user_id_by_play_purchase_token(purchase_token)
         if userid is None:
+            userid = _resolve_userid_from_google_play_subscription(
+                purchase_token=purchase_token,
+                product_id=product_id,
+            )
+        if userid is None:
             logger.warning(
-                "RTDN push: unknown subscription token; ignoring (product=%s message_id=%s)",
+                "RTDN push: unresolved subscription token; requesting retry (product=%s message_id=%s)",
                 product_id,
                 message_id or "n/a",
             )
-            return {"success": True, "ignored": "unknown_purchase_token"}
+            raise HTTPException(
+                status_code=503,
+                detail="Subscription owner is not mapped yet; retry required",
+            )
 
         from credits.play_subscription_events import rtdn_kind_for_notification_type
 

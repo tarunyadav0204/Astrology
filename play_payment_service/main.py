@@ -306,13 +306,40 @@ def create_razorpay_order_direct(
         r = requests.post(f"{RAZORPAY_API_BASE}/orders", auth=auth, json=payload, timeout=30)
     except requests.RequestException as exc:
         logger.exception("Razorpay create order request failed: %s", exc)
+        from utils.payment_failure_alerts import notify_payment_failure
+        notify_payment_failure(
+            provider="razorpay",
+            stage="credit_order_create",
+            userid=current_user.userid,
+            product_id=_product_id(body.credits),
+            error_code=type(exc).__name__,
+            detail=str(exc),
+        )
         raise HTTPException(status_code=502, detail="Could not reach payment provider") from exc
     if r.status_code not in (200, 201):
         logger.warning("Razorpay create order: %s %s", r.status_code, r.text[:500])
+        from utils.payment_failure_alerts import notify_payment_failure
+        notify_payment_failure(
+            provider="razorpay",
+            stage="credit_order_create",
+            userid=current_user.userid,
+            product_id=_product_id(body.credits),
+            error_code=f"http_{r.status_code}",
+            detail=r.text[:500],
+        )
         raise HTTPException(status_code=502, detail="Could not create payment order. Try again later.")
     order = r.json()
     oid = order.get("id")
     if not oid:
+        from utils.payment_failure_alerts import notify_payment_failure
+        notify_payment_failure(
+            provider="razorpay",
+            stage="credit_order_create",
+            userid=current_user.userid,
+            product_id=_product_id(body.credits),
+            error_code="missing_order_id",
+            detail="Razorpay returned a success response without an order id",
+        )
         raise HTTPException(status_code=502, detail="Invalid response from payment provider")
     _log_payment_service_result(
         path="/razorpay/create-order",
@@ -378,11 +405,44 @@ def internal_verify_razorpay_payment(
         request.razorpay_payment_id.strip(),
         request.razorpay_signature,
     ):
+        from utils.payment_failure_alerts import notify_payment_failure
+        notify_payment_failure(
+            provider="razorpay",
+            stage="credit_verify",
+            userid=request.userid,
+            reference_id=request.razorpay_payment_id.strip() or request.razorpay_order_id.strip(),
+            error_code="invalid_payment_signature",
+            detail="Client payment verification signature did not match",
+            metadata={"order_id": request.razorpay_order_id.strip()},
+        )
         raise HTTPException(status_code=400, detail="Invalid payment signature")
 
-    payment = _fetch_payment(request.razorpay_payment_id)
+    try:
+        payment = _fetch_payment(request.razorpay_payment_id)
+    except HTTPException as exc:
+        from utils.payment_failure_alerts import notify_payment_failure
+        notify_payment_failure(
+            provider="razorpay",
+            stage="credit_verify",
+            userid=request.userid,
+            reference_id=request.razorpay_payment_id.strip() or request.razorpay_order_id.strip(),
+            error_code=f"http_{exc.status_code}",
+            detail=str(exc.detail),
+            metadata={"order_id": request.razorpay_order_id.strip()},
+        )
+        raise
     notes = payment.get("notes") or {}
     if str(notes.get("userid") or "") != str(request.userid):
+        from utils.payment_failure_alerts import notify_payment_failure
+        notify_payment_failure(
+            provider="razorpay",
+            stage="credit_verify",
+            userid=request.userid,
+            reference_id=request.razorpay_payment_id.strip(),
+            error_code="payment_owner_mismatch",
+            detail="Razorpay payment notes do not match the authenticated user",
+            metadata={"order_id": request.razorpay_order_id.strip()},
+        )
         raise HTTPException(status_code=403, detail="Payment does not belong to this account")
 
     result = _process_captured_payment(payment)

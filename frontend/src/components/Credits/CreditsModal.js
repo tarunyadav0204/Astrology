@@ -223,6 +223,14 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
         }
     };
 
+    const reportPaymentFailure = (payload) => {
+        fetch('/api/credits/payment-failure/report', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify(payload),
+        }).catch(() => {});
+    };
+
     const handleBuyPack = async (creditsAmount) => {
         setPurchaseMessage('');
         if (!isLoggedIn) {
@@ -230,6 +238,7 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
             return;
         }
         setPurchasingCredits(creditsAmount);
+        let orderId = null;
         try {
             const orderBody = { credits: creditsAmount };
             const orderRes = await directPaymentThenFallback(
@@ -244,8 +253,11 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
             );
             const orderData = await orderRes.json().catch(() => ({}));
             if (!orderRes.ok) {
-                throw new Error(orderData.detail || orderData.message || 'Could not start payment');
+                const error = new Error(orderData.detail || orderData.message || 'Could not start payment');
+                error.serverReported = true;
+                throw error;
             }
+            orderId = orderData.order_id || null;
 
             const Razorpay = await loadRazorpayScript();
 
@@ -279,7 +291,9 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
                         );
                         const verifyData = await verifyRes.json().catch(() => ({}));
                         if (!verifyRes.ok) {
-                            throw new Error(verifyData.detail || verifyData.message || 'Verification failed');
+                            const error = new Error(verifyData.detail || verifyData.message || 'Verification failed');
+                            error.serverReported = true;
+                            throw error;
                         }
                         const added = verifyData.credits_added;
                         if (added > 0) {
@@ -290,6 +304,16 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
                         fetchBalance();
                         window.dispatchEvent(new CustomEvent('creditUpdated'));
                     } catch (err) {
+                        if (!err.serverReported) {
+                            reportPaymentFailure({
+                                provider: 'razorpay',
+                                stage: 'credit_client_verify',
+                                reference_id: response.razorpay_payment_id || response.razorpay_order_id,
+                                product_id: `credits_${creditsAmount}`,
+                                error_code: 'client_verify_error',
+                                detail: err.message || 'Razorpay payment confirmation failed',
+                            });
+                        }
                         setPurchaseMessage(
                             `❌ ${err.message || 'Payment succeeded but confirmation failed. If credits are missing, contact support with your payment receipt.'}`
                         );
@@ -302,6 +326,16 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
             const rzp = new Razorpay(options);
             rzp.open();
         } catch (err) {
+            if (!err.serverReported) {
+                reportPaymentFailure({
+                    provider: 'razorpay',
+                    stage: 'credit_client_checkout',
+                    reference_id: orderId,
+                    product_id: `credits_${creditsAmount}`,
+                    error_code: 'client_checkout_error',
+                    detail: err.message || 'Could not open Razorpay payment',
+                });
+            }
             setPurchaseMessage(`❌ ${err.message || 'Could not open payment'}`);
             setPurchasingCredits(null);
         }

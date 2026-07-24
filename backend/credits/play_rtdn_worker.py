@@ -21,6 +21,7 @@ from credits.play_subscription_events import rtdn_kind_for_notification_type
 from credits.routes import (
     _credit_verified_google_play_purchase,
     _resolve_userid_from_google_play_onetime_purchase,
+    _resolve_userid_from_google_play_subscription,
     _sync_subscription_from_play,
 )
 
@@ -126,7 +127,12 @@ def _process_one(
         else credit_service.get_user_id_by_play_onetime_purchase_token(purchase_token)
     )
     if userid is None:
-        if not is_subscription:
+        if is_subscription:
+            userid = _resolve_userid_from_google_play_subscription(
+                purchase_token=purchase_token,
+                product_id=product_id,
+            )
+        else:
             userid = _resolve_userid_from_google_play_onetime_purchase(
                 purchase_token=purchase_token,
                 product_id=product_id,

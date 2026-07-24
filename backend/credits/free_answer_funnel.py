@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 VALID_EVENTS = frozenset({"blur_shown", "reveal_clicked", "converted"})
 CONVERSION_WINDOW = timedelta(days=7)
+# Admin date filters use IST calendar days (product audience is primarily India).
+_ADMIN_TZ = "Asia/Kolkata"
 
 
 def ensure_free_answer_funnel_table(conn) -> None:
@@ -165,57 +167,117 @@ def mark_converted_after_purchase(userid: int) -> int:
     return inserted
 
 
+def _date_clause(from_date: Optional[str], to_date: Optional[str], col: str = "created_at"):
+    clauses: List[str] = []
+    params: List[Any] = []
+    if from_date:
+        clauses.append(f"({col} AT TIME ZONE '{_ADMIN_TZ}')::date >= ?::date")
+        params.append(from_date)
+    if to_date:
+        clauses.append(f"({col} AT TIME ZONE '{_ADMIN_TZ}')::date <= ?::date")
+        params.append(to_date)
+    return clauses, params
+
+
 def get_funnel_analytics(
     *,
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
 ) -> Dict[str, Any]:
-    clauses = ["1=1"]
-    params: List[Any] = []
-    if from_date:
-        clauses.append("created_at >= ?::timestamptz")
-        params.append(f"{from_date}T00:00:00+00:00")
-    if to_date:
-        clauses.append("created_at < (?::date + INTERVAL '1 day')")
-        params.append(to_date)
-    where = " AND ".join(clauses)
+    """
+    Cohort funnel keyed by blur impressions.
+
+    Date range filters when the blur was *shown* (IST calendar day). Later steps
+    count only matching (userid, message_id) that progressed — so reveal/purchase
+    can never exceed blur viewers. Purchases after the range still count for
+    impressions that entered in-range (conversion is already capped at 7 days
+    when recording).
+    """
+    shown_clauses, shown_params = _date_clause(from_date, to_date, "s.created_at")
+    shown_where = " AND ".join(["s.event_name = 'blur_shown'", *shown_clauses])
 
     with get_conn() as conn:
         ensure_free_answer_funnel_table(conn)
-        steps: List[Dict[str, Any]] = []
-        for event_name, label in (
-            ("blur_shown", "Saw blurred detail"),
-            ("reveal_clicked", "Tapped reveal"),
-            ("converted", "Purchased credits"),
-        ):
-            cur = execute(
-                conn,
-                f"""
-                SELECT COUNT(DISTINCT userid) AS users, COUNT(*) AS events
-                FROM free_answer_funnel_events
-                WHERE {where} AND event_name = ?
-                """,
-                (*params, event_name),
-            )
-            row = cur.fetchone() or (0, 0)
-            steps.append(
-                {
-                    "event_name": event_name,
-                    "label": label,
-                    "unique_users": int(row[0] or 0),
-                    "events": int(row[1] or 0),
-                }
-            )
 
-        base = steps[0]["unique_users"] or 0
+        cur = execute(
+            conn,
+            f"""
+            SELECT COUNT(DISTINCT s.userid) AS users, COUNT(*) AS events
+            FROM free_answer_funnel_events s
+            WHERE {shown_where}
+            """,
+            tuple(shown_params),
+        )
+        shown_row = cur.fetchone() or (0, 0)
+        shown_users = int(shown_row[0] or 0)
+        shown_events = int(shown_row[1] or 0)
+
+        cur = execute(
+            conn,
+            f"""
+            SELECT
+              COUNT(DISTINCT s.userid) AS users,
+              COUNT(*) AS events
+            FROM free_answer_funnel_events s
+            INNER JOIN free_answer_funnel_events r
+              ON r.userid = s.userid
+             AND COALESCE(r.message_id, '') = COALESCE(s.message_id, '')
+             AND r.event_name = 'reveal_clicked'
+            WHERE {shown_where}
+            """,
+            tuple(shown_params),
+        )
+        reveal_row = cur.fetchone() or (0, 0)
+        reveal_users = int(reveal_row[0] or 0)
+        reveal_events = int(reveal_row[1] or 0)
+
+        cur = execute(
+            conn,
+            f"""
+            SELECT
+              COUNT(DISTINCT s.userid) AS users,
+              COUNT(*) AS events
+            FROM free_answer_funnel_events s
+            INNER JOIN free_answer_funnel_events c
+              ON c.userid = s.userid
+             AND COALESCE(c.message_id, '') = COALESCE(s.message_id, '')
+             AND c.event_name = 'converted'
+            WHERE {shown_where}
+            """,
+            tuple(shown_params),
+        )
+        converted_row = cur.fetchone() or (0, 0)
+        converted_users = int(converted_row[0] or 0)
+        converted_events = int(converted_row[1] or 0)
+
+        steps: List[Dict[str, Any]] = [
+            {
+                "event_name": "blur_shown",
+                "label": "Saw blurred detail",
+                "unique_users": shown_users,
+                "events": shown_events,
+            },
+            {
+                "event_name": "reveal_clicked",
+                "label": "Tapped reveal",
+                "unique_users": reveal_users,
+                "events": reveal_events,
+            },
+            {
+                "event_name": "converted",
+                "label": "Purchased credits",
+                "unique_users": converted_users,
+                "events": converted_events,
+            },
+        ]
+
+        base = shown_users or 0
         for step in steps:
             users = step["unique_users"]
             step["conversion_from_blur_pct"] = (
                 round(100.0 * users / base, 1) if base > 0 else None
             )
 
-        reveal_users = steps[1]["unique_users"] or 0
-        converted_users = steps[2]["unique_users"] or 0
         return {
             "from_date": from_date,
             "to_date": to_date,

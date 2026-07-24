@@ -12,6 +12,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 MIGRATIONS_DIR = Path(__file__).resolve().parent
 RUNTIME_MIGRATIONS = (
     "add_astrologer_subscription.sql",
+    "add_payment_failure_alerts.sql",
 )
 
 if str(BACKEND_DIR) not in sys.path:

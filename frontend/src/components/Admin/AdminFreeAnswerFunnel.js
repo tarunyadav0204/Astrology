@@ -2,12 +2,18 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { getAdminAuthHeaders } from '../../services/adminService';
 import './AdminFreeAnswerFunnel.css';
 
+function formatLocalDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function defaultRange() {
   const to = new Date();
   const from = new Date();
   from.setDate(from.getDate() - 30);
-  const fmt = (d) => d.toISOString().slice(0, 10);
-  return { from: fmt(from), to: fmt(to) };
+  return { from: formatLocalDate(from), to: formatLocalDate(to) };
 }
 
 export default function AdminFreeAnswerFunnel() {
@@ -54,7 +60,8 @@ export default function AdminFreeAnswerFunnel() {
           <h3>Free answer → reveal → purchase</h3>
           <p>
             Users who got a free standard answer with blurred detail, tapped reveal, then bought credits
-            (within 7 days of reveal).
+            (within 7 days of reveal). Date range filters by when the blur was shown (IST); later steps
+            only count those same impressions.
           </p>
         </div>
         <div className="faf-filters">

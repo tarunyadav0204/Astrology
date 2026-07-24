@@ -890,12 +890,14 @@ export const creditAPI = {
   getSubscriptionPlans: () => api.get(getEndpoint('/credits/google-play/subscription-plans')),
   getRazorpaySubscriptionPlans: () =>
     api.get(getEndpoint('/credits/razorpay/subscription/plans')),
-  syncSubscription: (purchaseToken, productId, orderId = null) =>
+  syncSubscription: (purchaseToken, productId, orderId = null, options = {}) =>
     api.post(getEndpoint('/credits/google-play/subscription/sync'), {
       purchase_token: purchaseToken,
       product_id: productId,
       ...(orderId ? { order_id: orderId } : {}),
-    }, GLOBAL_ERROR_CONFIG),
+    }, options?.background
+      ? { ...BACKGROUND_REQUEST_CONFIG, timeout: options.timeout || 10000 }
+      : GLOBAL_ERROR_CONFIG),
   clearSubscriptionNoPurchase: () =>
     api.post(getEndpoint('/credits/google-play/subscription/clear')),
   verifyGooglePlaySubscription: (purchaseToken, productId, orderId) =>
@@ -904,6 +906,12 @@ export const creditAPI = {
       product_id: productId,
       order_id: orderId,
     }, GLOBAL_ERROR_CONFIG),
+  reportPaymentFailure: (payload) =>
+    api.post(
+      getEndpoint('/credits/payment-failure/report'),
+      payload,
+      { ...BACKGROUND_REQUEST_CONFIG, timeout: 5000 }
+    ),
   /** INR credit packs via Razorpay (same packs as web/backend, including 24-credit starter pack). Requires checkout UI (e.g. WebView or react-native-razorpay). */
   getRazorpayCatalog: (options = {}) => {
     // Expo Web / browsers: hit main API only (CORS-safe, matches frontend CreditsModal).
