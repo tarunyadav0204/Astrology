@@ -154,7 +154,8 @@ jobs:
           echo "frontend_required=${frontend_required}" >> "${GITHUB_OUTPUT}"
           echo "mobile_web_required=${mobile_web_required}" >> "${GITHUB_OUTPUT}"
 
-  backend_and_chat:
+  backend_and_chat_live:
+    name: Backend & Chat — Live Deployment
     if: ${{ (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') && needs.detect_changes.outputs.backend_required == 'true' }}
     needs: [detect_changes]
     runs-on: ubuntu-latest
@@ -323,6 +324,43 @@ jobs:
           echo "🔎 Final public API health check"
           curl -fsS --max-time 20 "https://astroroshni.com/api/health" >/dev/null
           echo "========== GitHub Actions: rolling app deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
+
+      - name: Mark backend ready for testing
+        shell: bash
+        run: |
+          {
+            echo "## ✅ Backend and chat deployment is live"
+            echo
+            echo "- API and chat-worker MIG instances were updated."
+            echo "- Instance-local health checks passed."
+            echo "- Public API health check passed."
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo
+            echo "The backend is ready for testing. Release-image preparation continues in a separate job."
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  backend_rollout_image:
+    name: Backend Image — Future VM Rollouts
+    if: ${{ (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') && needs.detect_changes.outputs.backend_required == 'true' && needs.backend_and_chat_live.result == 'success' }}
+    needs: [detect_changes, backend_and_chat_live]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
 
       - name: Build baked backend release image
         id: baked_image
@@ -781,7 +819,7 @@ jobs:
   finalize_app_deploy:
     if: ${{ always() && (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') }}
     needs:
-      - backend_and_chat
+      - backend_and_chat_live
       - detect_changes
       - payment_service
       - nudge_services

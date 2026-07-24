@@ -22,12 +22,15 @@
 - [x] Restrict Activation Explorer to licensed astrologers, with automatic access for admins.
 - [x] Add Google Play, Android alternative-billing, Razorpay web/PWA purchase flows and family-specific subscription management.
 - [x] Route unlicensed chart users to the focused Astrologer License purchase section and return them to Activation Explorer after activation.
+- [x] Manage Razorpay Astrologer License cancellation inside the authenticated app/PWA instead of opening an unauthenticated web purchase page.
+- [x] Separate the live backend/chat rollout from baked-image preparation so production becomes visibly ready for testing before future-VM artifacts finish.
 
 ### Validation
 
 - [x] Android Expo production bundle completed successfully.
 - [x] PWA production build and SEO post-build completed successfully.
 - [x] Astrologer entitlement and subscription-family backend regression tests passed.
+- [x] Production Astrologer subscription schema applied and entitlement/plan resolution verified.
 - [ ] Physical Android device smoke test.
 - [ ] Installed PWA smoke test.
 - [ ] Release build uploaded to Play Console.

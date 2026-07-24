@@ -37,6 +37,7 @@ import { getCreditPackMeta } from './creditPackCatalog';
 import { openRazorpayCheckout, openRazorpaySubscriptionCheckout } from '../platform/payments';
 import { useAuthGate } from '../auth/AuthGateContext';
 import { useFocusEffect } from '@react-navigation/native';
+import AppAlertModal from '../components/Common/AppAlertModal';
 
 const { width } = Dimensions.get('window');
 const PENDING_GOOGLE_PLAY_CREDIT_PURCHASES_KEY = 'pendingGooglePlayCreditPurchasesV1';
@@ -348,6 +349,8 @@ const CreditScreen = ({ navigation, route }) => {
   const [razorpaySubscriptionPlans, setRazorpaySubscriptionPlans] = useState([]);
   const [razorpaySubscriptionPlansLoading, setRazorpaySubscriptionPlansLoading] = useState(false);
   const [purchasingRazorpaySubscriptionId, setPurchasingRazorpaySubscriptionId] = useState(null);
+  const [showAstrologerCancelModal, setShowAstrologerCancelModal] = useState(false);
+  const [cancellingAstrologerSubscription, setCancellingAstrologerSubscription] = useState(false);
   const [vipPlansExpanded, setVipPlansExpanded] = useState(false);
   const [refreshSubscriptionStatusLoading, setRefreshSubscriptionStatusLoading] = useState(false);
   const [purchaseModal, setPurchaseModal] = useState({ visible: false, type: 'success', title: '', message: '', creditsAdded: 0 });
@@ -1260,6 +1263,37 @@ const CreditScreen = ({ navigation, route }) => {
     }
   };
 
+  const cancelAstrologerRazorpaySubscription = async () => {
+    setShowAstrologerCancelModal(false);
+    setCancellingAstrologerSubscription(true);
+    try {
+      const { data } = await creditAPI.cancelRazorpaySubscription('astrologer');
+      await Promise.all([fetchSubscriptionDetails(), fetchBalance()]);
+      setPurchaseModal({
+        visible: true,
+        type: 'success',
+        title: 'Cancellation scheduled',
+        message: data?.end_date
+          ? `Your Astrologer License remains active until ${formatSubscriptionDate(data.end_date, dateLocale)}. It will not renew after that date.`
+          : data?.message || 'Your Astrologer License will not renew after the current billing period.',
+        creditsAdded: 0,
+      });
+    } catch (error) {
+      const detail = error?.response?.data?.detail;
+      setPurchaseModal({
+        visible: true,
+        type: 'error',
+        title: 'Could not cancel renewal',
+        message: typeof detail === 'string'
+          ? detail
+          : error?.message || 'Please try again or contact support.',
+        creditsAdded: 0,
+      });
+    } finally {
+      setCancellingAstrologerSubscription(false);
+    }
+  };
+
   /** On Android: get current subscription from Play and sync to our backend when a token is available. */
   const syncSubscriptionWithPlay = async () => {
     if (Platform.OS !== 'android' || !RNIap || subscriptionProductIds.length === 0) return;
@@ -2051,19 +2085,39 @@ const CreditScreen = ({ navigation, route }) => {
                           </Text>
                         ) : null}
                       </View>
-                      <TouchableOpacity
-                        style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 12 }]}
-                        onPress={() => {
-                          if (astrologerSubscriptionDetails.manage_in_google_play) {
-                            Linking.openURL('https://play.google.com/store/account/subscriptions');
-                          } else {
-                            Linking.openURL('https://astroroshni.com/subscription?family=astrologer');
-                          }
-                        }}
-                      >
-                        <Ionicons name="open-outline" size={16} color={colors.primary} />
-                        <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>Manage subscription</Text>
-                      </TouchableOpacity>
+                      {astrologerSubscriptionDetails.cancel_at_period_end ? (
+                        <View style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 12 }]}>
+                          <Ionicons name="checkmark-circle-outline" size={16} color={colors.success || '#16a34a'} />
+                          <Text style={[styles.manageSubscriptionLinkText, { color: colors.success || '#16a34a' }]}>
+                            Cancellation scheduled · access remains until the date above
+                          </Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 12 }]}
+                          disabled={cancellingAstrologerSubscription}
+                          onPress={() => {
+                            if (astrologerSubscriptionDetails.manage_in_google_play) {
+                              Linking.openURL('https://play.google.com/store/account/subscriptions');
+                            } else {
+                              setShowAstrologerCancelModal(true);
+                            }
+                          }}
+                        >
+                          <Ionicons
+                            name={astrologerSubscriptionDetails.manage_in_google_play ? 'open-outline' : 'close-circle-outline'}
+                            size={16}
+                            color={colors.primary}
+                          />
+                          <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>
+                            {cancellingAstrologerSubscription
+                              ? 'Cancelling…'
+                              : astrologerSubscriptionDetails.manage_in_google_play
+                                ? 'Manage in Google Play'
+                                : 'Cancel renewal'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </>
                   ) : (
                     <View style={[styles.vipPlanList, { borderTopColor: colors.cardBorder }]}>
@@ -2375,6 +2429,19 @@ const CreditScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      <AppAlertModal
+        visible={showAstrologerCancelModal}
+        variant="warning"
+        icon="calendar-outline"
+        title="Cancel Astrologer License renewal?"
+        message={`Your access will continue until ${formatSubscriptionDate(astrologerSubscriptionDetails?.end_date, dateLocale)}. Razorpay will not charge you again after cancellation.`}
+        primaryText="Cancel renewal"
+        secondaryText="Keep subscription"
+        onPrimaryPress={cancelAstrologerRazorpaySubscription}
+        onSecondaryPress={() => setShowAstrologerCancelModal(false)}
+        onRequestClose={() => setShowAstrologerCancelModal(false)}
+      />
     </View>
   );
 };

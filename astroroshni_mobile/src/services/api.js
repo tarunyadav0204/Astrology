@@ -962,6 +962,12 @@ export const creditAPI = {
     ),
   verifyRazorpaySubscription: (body) =>
     api.post(getEndpoint('/credits/razorpay/subscription/verify'), body, GLOBAL_ERROR_CONFIG),
+  cancelRazorpaySubscription: (family = 'vip') =>
+    api.post(
+      getEndpoint(`/credits/razorpay/subscription/cancel?family=${encodeURIComponent(family)}`),
+      {},
+      GLOBAL_ERROR_CONFIG
+    ),
 };
 
 export const panchangAPI = {

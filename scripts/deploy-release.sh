@@ -335,6 +335,13 @@ else
 fi
 deploy_timing "backend pip (or skip) finished"
 
+# Apply schema changes before restarting either API or chat workers. Every listed
+# runtime migration is idempotent because each MIG instance executes this deploy.
+echo "🗃️ Applying runtime database migrations..."
+"${VENV_PYTHON}" "${APP_ROOT}/backend/migrations/apply_runtime_migrations.py"
+echo "✅ Runtime database migrations complete"
+deploy_timing "runtime database migrations finished"
+
 # Setup encryption (idempotent - safe to run multiple times)
 echo "🔐 Setting up encryption..."
 python3 setup_encryption.py

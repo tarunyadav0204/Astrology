@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import sys
 from contextlib import contextmanager
 from pathlib import Path
@@ -14,6 +15,7 @@ if str(BACKEND) not in sys.path:
 import db
 from auth import User
 from credits import entitlements
+from credits import razorpay_subscription_routes
 from credits.credit_service import CreditService
 
 
@@ -128,3 +130,44 @@ def test_subscription_replacement_is_scoped_to_its_family(monkeypatch):
     assert deactivations
     assert all("COALESCE(subscription_family, 'vip') = ?" in sql for sql, _ in deactivations)
     assert all(params[-1] == "astrologer" for _, params in deactivations)
+
+
+def test_razorpay_cancel_targets_astrologer_family(monkeypatch):
+    calls = {}
+
+    class _CreditService:
+        def get_user_subscription_details(self, userid, family="vip"):
+            calls["details"] = (userid, family)
+            return {
+                "billing_provider": "razorpay",
+                "razorpay_subscription_id": "sub_test",
+                "end_date": "2026-08-24",
+            }
+
+        def mark_razorpay_subscription_cancel_pending(self, userid, subscription_id):
+            calls["marked"] = (userid, subscription_id)
+            return True
+
+    class _Response:
+        status_code = 200
+        text = ""
+
+    monkeypatch.setattr(razorpay_subscription_routes, "credit_service", _CreditService())
+    monkeypatch.setattr(
+        razorpay_subscription_routes.requests,
+        "post",
+        lambda *_args, **_kwargs: _Response(),
+    )
+    monkeypatch.setattr(razorpay_subscription_routes, "_auth", lambda: ("key", "secret"))
+
+    result = asyncio.run(
+        razorpay_subscription_routes.razorpay_subscription_cancel(
+            family="astrologer",
+            current_user=_user(),
+        )
+    )
+
+    assert calls["details"] == (42, "astrologer")
+    assert calls["marked"] == (42, "sub_test")
+    assert result["success"] is True
+    assert result["end_date"] == "2026-08-24"
