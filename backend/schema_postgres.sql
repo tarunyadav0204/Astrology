@@ -106,6 +106,8 @@ CREATE TABLE "subscription_plans" (
     "tier_name" TEXT,
     "discount_percent" INTEGER DEFAULT 0,
     "google_play_product_id" TEXT,
+    "subscription_family" TEXT NOT NULL DEFAULT 'vip',
+    "entitlement_key" TEXT,
     PRIMARY KEY ("plan_id")
 );
 

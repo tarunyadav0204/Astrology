@@ -1316,6 +1316,7 @@ async def verify_google_play_subscription(
             "message": "Subscription active",
             "subscription_tier_name": result["tier_name"],
             "end_date": result["end_date"],
+            "subscription_family": result.get("subscription_family", "vip"),
         },
             path="/google-play/subscription/verify",
             current_user=current_user,
@@ -1420,12 +1421,18 @@ def _sync_subscription_from_play(
     from db import get_conn, execute
 
     platform = "astroroshni"
+    family = "vip"
     with get_conn() as conn:
-        cur = execute(conn, "SELECT platform FROM subscription_plans WHERE plan_id = ?", (plan_id,))
+        cur = execute(
+            conn,
+            "SELECT platform, COALESCE(subscription_family, 'vip') FROM subscription_plans WHERE plan_id = ?",
+            (plan_id,),
+        )
         prow = cur.fetchone()
         if prow and prow[0]:
             platform = prow[0]
-    prior = credit_service.get_latest_subscription_on_platform(userid, platform)
+            family = prow[1] or "vip"
+    prior = credit_service.get_latest_subscription_on_platform(userid, platform, family=family)
 
     purchase = _verify_google_play_subscription(PACKAGE_NAME, product_id, purchase_token)
     if not accept_any_payment_state:
@@ -1457,7 +1464,8 @@ def _sync_subscription_from_play(
     )
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update subscription")
-    tier_name = credit_service.get_subscription_tier_name(userid)
+    plan = credit_service.get_plan_by_internal_id(plan_id) or {}
+    tier_name = plan.get("tier_name") or credit_service.get_subscription_tier_name(userid)
 
     if event_source in ("verify", "sync"):
         kind = _infer_app_subscription_event_kind(prior, plan_id, start_date, end_date)
@@ -1477,6 +1485,7 @@ def _sync_subscription_from_play(
         "end_date": end_date,
         "start_date": start_date,
         "google_play_order_id": play_order_id,
+        "subscription_family": family,
     }
 
 
@@ -1732,13 +1741,15 @@ async def get_google_play_subscription_plans(current_user: User = Depends(get_cu
             cur = execute(
                 conn,
                 f"""
-                SELECT plan_id, tier_name, discount_percent, google_play_product_id, price, features
+                SELECT plan_id, tier_name, discount_percent, google_play_product_id, price, features,
+                       COALESCE(subscription_family, 'vip'), entitlement_key
                 FROM subscription_plans
                 WHERE platform = %s
                   AND {SQL_SUBSCRIPTION_PLAN_ACTIVE}
                   AND google_play_product_id IS NOT NULL
                   AND google_play_product_id != ''
-                ORDER BY COALESCE(discount_percent, 0) ASC
+                ORDER BY CASE WHEN COALESCE(subscription_family, 'vip') = 'astrologer' THEN 0 ELSE 1 END,
+                         COALESCE(discount_percent, 0) ASC
                 """,
                 ("astroroshni",),
             )
@@ -1765,10 +1776,11 @@ async def get_google_play_subscription_plans(current_user: User = Depends(get_cu
                 """,
                 ("astroroshni",),
             )
-            rows = [(r[0], r[1], 0, None, r[4], r[5]) for r in cur.fetchall()]
+            rows = [(r[0], r[1], 0, None, r[4], r[5], "vip", None) for r in cur.fetchall()]
     plans = []
     for r in rows:
         plan_id, name, discount, product_id, price, features_raw = r[0], r[1], r[2] or 0, r[3], float(r[4]) if r[4] is not None else 0, r[5]
+        family, entitlement_key = r[6] or "vip", r[7]
         if not product_id:
             continue
         # Fetch live price from Google Play so app shows same price as Play Store
@@ -1797,6 +1809,8 @@ async def get_google_play_subscription_plans(current_user: User = Depends(get_cu
             "formatted_price": formatted_price,
             "features": features,
             "benefits": benefits,
+            "subscription_family": family,
+            "entitlement_key": entitlement_key,
         })
     return {"plans": plans}
 
@@ -1848,19 +1862,40 @@ async def get_credit_balance(current_user: User = Depends(get_current_user)):
                 result["subscription_tier_name"] = tier
     except Exception:
         pass
+    try:
+        from credits.entitlements import entitlement_summary
+
+        result.update(entitlement_summary(current_user))
+    except Exception:
+        logger.exception("Could not load entitlements for user=%s", current_user.userid)
+        result["entitlements"] = []
+        result["is_astrologer_licensed"] = current_user.role == "admin"
     return result
 
 
 @router.get("/subscription")
-async def get_subscription_details(current_user: User = Depends(get_current_user)):
+async def get_subscription_details(
+    family: str = Query(default="vip", pattern="^(vip|astrologer)$"),
+    current_user: User = Depends(get_current_user),
+):
     """Return full subscription details for the current user: tier_name, discount_percent, start_date, end_date (renewal), features. None if no active subscription."""
     try:
-        details = credit_service.get_user_subscription_details(current_user.userid)
+        details = credit_service.get_user_subscription_details(current_user.userid, family=family)
         if details is None:
             return {"subscription": None}
         return {"subscription": details}
     except Exception:
         return {"subscription": None}
+
+
+@router.get("/entitlements")
+async def get_entitlements(current_user: User = Depends(get_current_user)):
+    from credits.entitlements import entitlement_summary
+
+    return {
+        **entitlement_summary(current_user),
+        "subscriptions": credit_service.get_active_subscription_details(current_user.userid),
+    }
 
 @router.get("/history")
 async def get_credit_history(current_user: User = Depends(get_current_user)):

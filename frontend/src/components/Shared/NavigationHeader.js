@@ -4,6 +4,17 @@ import { useCredits } from '../../context/CreditContext';
 import SearchBar from '../Search/SearchBar';
 import './NavigationHeader.css';
 
+function readStoredUser() {
+  try {
+    const token = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+    if (!token || !savedUser) return null;
+    return JSON.parse(savedUser);
+  } catch {
+    return null;
+  }
+}
+
 /** Logo mark: WebP + small PNG fallback (Lighthouse: avoid 1024² icon for 22–44px display). */
 function BrandLogoIcon({ alt }) {
   return (
@@ -113,14 +124,57 @@ function FullHamburgerMenuItems({
   );
 }
 
-const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton = true, onCreditsClick, onHomeClick, onChangeNative, birthData, onAstrologyClick, onCreateBirthChart, onSelectBirthChart }) => {
+const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user: userProp, onAdminClick, onLogout, onLogin, showLoginButton = true, onCreditsClick, onHomeClick, onChangeNative, birthData, onAstrologyClick, onCreateBirthChart, onSelectBirthChart }) => {
   const navigate = useNavigate();
   const { credits, loading: creditsLoading } = useCredits();
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [storedUser, setStoredUser] = useState(() => readStoredUser());
   const dropdownCloseTimer = useRef(null);
+
+  // Prefer App-provided user (including explicit null); fall back to localStorage when prop omitted.
+  const user = userProp !== undefined ? userProp : storedUser;
+
+  useEffect(() => {
+    if (userProp !== undefined) {
+      setStoredUser(userProp);
+      return;
+    }
+    setStoredUser(readStoredUser());
+  }, [userProp]);
+
+  useEffect(() => {
+    const syncStoredUser = () => {
+      if (userProp === undefined) setStoredUser(readStoredUser());
+    };
+    window.addEventListener('storage', syncStoredUser);
+    window.addEventListener('astroroshni-auth-changed', syncStoredUser);
+    return () => {
+      window.removeEventListener('storage', syncStoredUser);
+      window.removeEventListener('astroroshni-auth-changed', syncStoredUser);
+    };
+  }, [userProp]);
+
+  const handleLogoutClick = () => {
+    if (onLogout) {
+      onLogout();
+      return;
+    }
+    try {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    } catch (_) { /* ignore */ }
+    setStoredUser(null);
+    window.dispatchEvent(new Event('astroroshni-auth-changed'));
+    navigate('/');
+  };
+
+  const handleLoginClick = () => {
+    if (onLogin) onLogin();
+    else navigate('/');
+  };
 
   const clearDropdownCloseTimer = () => {
     if (dropdownCloseTimer.current) {
@@ -293,7 +347,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
                   )}
                 </>
               ) : showLoginButton ? (
-                <button type="button" className="auth-btn" onClick={onLogin || (() => navigate('/'))}>Sign In</button>
+                <button type="button" className="auth-btn" onClick={handleLoginClick}>Sign In</button>
               ) : null}
             </div>
           </div>
@@ -324,7 +378,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
             <button onClick={() => { navigate('/education'); setActiveDropdown(null); }}>🎓 Your Education</button>
             <button onClick={() => { navigate('/health-analysis'); setActiveDropdown(null); }}>🏥 Your Health</button>
             <button onClick={() => { navigate('/wealth-analysis'); setActiveDropdown(null); }}>💰 Your Wealth</button>
-            <button onClick={() => { user ? navigate('/life-events') : onLogin(); setActiveDropdown(null); }}>📅 Life events</button>
+            <button onClick={() => { user ? navigate('/life-events') : handleLoginClick(); setActiveDropdown(null); }}>📅 Life events</button>
             <button type="button" onClick={() => { navigate('/karma-analysis'); setActiveDropdown(null); }}>🕉️ Past life analysis</button>
           </div>
         )}
@@ -358,9 +412,9 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
                   onChangeNative={onChangeNative}
                   birthData={birthData}
                   user={user}
-                  onLogin={onLogin}
+                  onLogin={handleLoginClick}
                   onAdminClick={onAdminClick}
-                  onLogout={onLogout}
+                  onLogout={handleLogoutClick}
                   showLoginButton={showLoginButton}
                   creditsLoading={creditsLoading}
                   credits={credits}
@@ -422,10 +476,10 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
                   <span className="profile-btn__icon" aria-hidden>👤</span>
                   <span className="profile-btn__name">{user.name || user.phone}</span>
                 </button>
-                <button className="auth-btn" onClick={onLogout}>Logout</button>
+                <button className="auth-btn" onClick={handleLogoutClick}>Logout</button>
               </div>
             ) : (
-              <button className="auth-btn" onClick={onLogin}>Sign In / Sign Up</button>
+              <button className="auth-btn" onClick={handleLoginClick}>Sign In / Sign Up</button>
             )}
           </div>
         </div>
@@ -445,7 +499,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
               </span>
             </button>
           </div>
-          <SearchBar user={user} onLogin={onLogin} />
+          <SearchBar user={user} onLogin={handleLoginClick} />
           <div className="mobile-actions-group">
             <button className="mobile-search-btn" onClick={() => setShowMobileSearch(true)}>
               🔍
@@ -558,7 +612,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
           <button onClick={() => { navigate('/education'); setActiveDropdown(null); }}>🎓 Your Education</button>
           <button onClick={() => { navigate('/health-analysis'); setActiveDropdown(null); }}>🏥 Your Health</button>
           <button onClick={() => { navigate('/wealth-analysis'); setActiveDropdown(null); }}>💰 Your Wealth</button>
-          <button onClick={() => { user ? navigate('/life-events') : onLogin(); setActiveDropdown(null); }}>📅 Life events</button>
+          <button onClick={() => { user ? navigate('/life-events') : handleLoginClick(); setActiveDropdown(null); }}>📅 Life events</button>
           <button type="button" onClick={() => { navigate('/karma-analysis'); setActiveDropdown(null); }}>🕉️ Past life analysis</button>
         </div>
       )}
@@ -587,7 +641,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
               <h3>Search</h3>
               <button className="close-search-btn" onClick={() => setShowMobileSearch(false)}>×</button>
             </div>
-            <SearchBar user={user} onLogin={onLogin} />
+            <SearchBar user={user} onLogin={handleLoginClick} />
           </div>
         </div>
       )}
@@ -621,9 +675,9 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
                 onChangeNative={onChangeNative}
                 birthData={birthData}
                 user={user}
-                onLogin={onLogin}
+                onLogin={handleLoginClick}
                 onAdminClick={onAdminClick}
-                onLogout={onLogout}
+                onLogout={handleLogoutClick}
                 showLoginButton={showLoginButton}
                 creditsLoading={creditsLoading}
                 credits={credits}

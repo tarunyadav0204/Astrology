@@ -832,7 +832,9 @@ export const nudgeAPI = {
 export const creditAPI = {
   // Balance is polled on mount; handle 401 locally as guest (do not hard-login).
   getBalance: () => api.get(getEndpoint('/credits/balance'), BACKGROUND_REQUEST_CONFIG),
-  getSubscriptionDetails: () => api.get(getEndpoint('/credits/subscription')),
+  getSubscriptionDetails: (family = 'vip') =>
+    api.get(getEndpoint(`/credits/subscription?family=${encodeURIComponent(family)}`)),
+  getEntitlements: () => api.get(getEndpoint('/credits/entitlements')),
   getHistory: () => api.get(getEndpoint('/credits/history')),
   startSpeechSession: () => api.post(getEndpoint('/credits/speech-session/start'), {}, GLOBAL_ERROR_CONFIG),
   endSpeechSession: (sessionId, reason = 'ended') =>
@@ -886,6 +888,8 @@ export const creditAPI = {
       BACKGROUND_REQUEST_CONFIG,
     ),
   getSubscriptionPlans: () => api.get(getEndpoint('/credits/google-play/subscription-plans')),
+  getRazorpaySubscriptionPlans: () =>
+    api.get(getEndpoint('/credits/razorpay/subscription/plans')),
   syncSubscription: (purchaseToken, productId, orderId = null) =>
     api.post(getEndpoint('/credits/google-play/subscription/sync'), {
       purchase_token: purchaseToken,

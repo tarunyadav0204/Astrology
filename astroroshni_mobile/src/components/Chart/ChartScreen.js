@@ -27,7 +27,7 @@ import * as Sharing from 'expo-sharing';
 
 import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
-import { chartAPI } from '../../services/api';
+import { chartAPI, creditAPI } from '../../services/api';
 import { chartPreloader } from '../../services/chartPreloader';
 import ChartWidget from './ChartWidget';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
@@ -39,12 +39,17 @@ import { getGrahaDrishtiToHouseSign } from '../../utils/grahaDrishti';
 import { calculateGandantaLocal, getGandantaHouseMatches } from '../../utils/gandanta';
 import AppScrollView, { VerticalPageScroll } from '../../platform/AppScrollView';
 import GuideVideoPlayer from '../../platform/GuideVideoPlayer';
+import AppAlertModal from '../Common/AppAlertModal';
+import { useAuthGate } from '../../auth/AuthGateContext';
+import { useCredits } from '../../credits/CreditContext';
 
 const { width, height } = Dimensions.get('window');
 export default function ChartScreen({ navigation, route, onHeaderStateChange }) {
   const { t } = useTranslation();
   useAnalytics('ChartScreen');
   const { theme, colors } = useTheme();
+  const { requireAuthForPaid } = useAuthGate();
+  const { isAstrologerLicensed } = useCredits();
   const insets = useSafeAreaInsets();
   const embedded = !!route?.params?.embedded;
   const [birthData, setBirthData] = useState(null);
@@ -72,6 +77,9 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const [gandantaAnalysis, setGandantaAnalysis] = useState(null);
   const [showGuidePlayer, setShowGuidePlayer] = useState(false);
   const [guidePlayerStatus, setGuidePlayerStatus] = useState('idle');
+  const [showAstrologerLicenseModal, setShowAstrologerLicenseModal] = useState(false);
+  const [astrologerLicensePrice, setAstrologerLicensePrice] = useState('₹100/month');
+  const [checkingAstrologerLicense, setCheckingAstrologerLicense] = useState(false);
   const [chartGuideVideoUrl, setChartGuideVideoUrl] = useState(route.params?.chartGuideVideoUrl || '');
   const drawerAnim = useRef(new Animated.Value(height)).current;
   const houseInsightRequestKeyRef = useRef(null);
@@ -185,6 +193,64 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
     }, 2500);
     return () => clearTimeout(timer);
   }, [showGuidePlayer, guidePlayerStatus]);
+
+  const openActivationExplorer = useCallback(async () => {
+    if (checkingAstrologerLicense) return;
+    const authenticated = await requireAuthForPaid({
+      feature: 'Astrologer tools',
+      message: 'Sign in to access professional chart interpretation tools.',
+      resume: {
+        resumeRoute: 'Chart',
+        resumeParams: route?.params || {},
+      },
+    });
+    if (!authenticated) return;
+
+    setCheckingAstrologerLicense(true);
+    try {
+      const { data } = await creditAPI.getEntitlements();
+      if (data?.is_astrologer_licensed) {
+        navigation.navigate('ActivationExplorer', { birthData });
+        return;
+      }
+      try {
+        const catalog = Platform.OS === 'android'
+          ? await creditAPI.getSubscriptionPlans()
+          : await creditAPI.getRazorpaySubscriptionPlans();
+        const plans = catalog?.data?.plans || [];
+        const plan = plans.find((item) =>
+          item.subscription_family === 'astrologer'
+          || item.entitlement_key === 'astrologer_tools'
+          || item.google_play_product_id === 'astrologer_license_monthly'
+          || item.product_id === 'astrologer_license_monthly'
+        );
+        const livePrice = plan?.formatted_price || plan?.amount_display;
+        setAstrologerLicensePrice(livePrice ? `${livePrice}/month` : '₹100/month');
+      } catch (_) {
+        setAstrologerLicensePrice('₹100/month');
+      }
+      setShowAstrologerLicenseModal(true);
+    } catch (error) {
+      if (error?.response?.status === 403) {
+        setShowAstrologerLicenseModal(true);
+      } else {
+        Alert.alert('Could not check access', 'Please check your connection and try again.');
+      }
+    } finally {
+      setCheckingAstrologerLicense(false);
+    }
+  }, [
+    birthData,
+    checkingAstrologerLicense,
+    navigation,
+    requireAuthForPaid,
+    route?.params,
+  ]);
+
+  useEffect(() => {
+    if (!isAstrologerLicensed) return;
+    setShowAstrologerLicenseModal(false);
+  }, [isAstrologerLicensed]);
 
   const handleSwipe = useCallback((event) => {
     const { translationX, state, velocityX } = event.nativeEvent;
@@ -871,7 +937,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
               {(chartTypes[currentChartIndex]?.id === 'lagna' || chartTypes[currentChartIndex]?.id === 'navamsa') && (
                 <TouchableOpacity
                   style={[styles.activationExplorerCta, { borderColor: colors.accent }]}
-                  onPress={() => navigation.navigate('ActivationExplorer', { birthData })}
+                  onPress={openActivationExplorer}
                   activeOpacity={0.88}
                   accessibilityRole="button"
                   accessibilityLabel="What is activated now?"
@@ -889,10 +955,32 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                       <Text style={styles.activationExplorerCtaTitle}>What is activated now?</Text>
                       <Text style={styles.activationExplorerCtaSubtitle}>See active houses, reasons, results and timing</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={22} color="#ffffff" />
+                    {checkingAstrologerLicense
+                      ? <ActivityIndicator size="small" color="#ffffff" />
+                      : <Ionicons name="chevron-forward" size={22} color="#ffffff" />}
                   </LinearGradient>
                 </TouchableOpacity>
               )}
+
+              <AppAlertModal
+                visible={showAstrologerLicenseModal}
+                variant="info"
+                icon="school-outline"
+                title="Astrologer License required"
+                message={`Unlock professional activation analysis for ${astrologerLicensePrice}. The subscription renews monthly and can be cancelled through your billing provider.`}
+                primaryText="View Astrologer Plan"
+                secondaryText="Not now"
+                onPrimaryPress={() => {
+                  setShowAstrologerLicenseModal(false);
+                  navigation.navigate('Credits', {
+                    focusSubscriptionFamily: 'astrologer',
+                    returnTo: 'ActivationExplorer',
+                    returnParams: { birthData },
+                  });
+                }}
+                onSecondaryPress={() => setShowAstrologerLicenseModal(false)}
+                onRequestClose={() => setShowAstrologerLicenseModal(false)}
+              />
 
               <View style={[styles.bottomNavContainer, { 
                 backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 1)' : 'rgba(255, 255, 255, 1)',

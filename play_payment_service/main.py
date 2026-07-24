@@ -218,6 +218,7 @@ def internal_verify_google_play_subscription(
             "message": "Subscription active",
             "subscription_tier_name": result["tier_name"],
             "end_date": result["end_date"],
+            "subscription_family": result.get("subscription_family", "vip"),
         }
         _log_payment_service_result(
             path="/internal/google-play/subscription/verify",
@@ -257,6 +258,7 @@ def internal_sync_google_play_subscription(
             "message": "Subscription synced",
             "subscription_tier_name": result["tier_name"],
             "end_date": result["end_date"],
+            "subscription_family": result.get("subscription_family", "vip"),
         }
         _log_payment_service_result(
             path="/internal/google-play/subscription/sync",

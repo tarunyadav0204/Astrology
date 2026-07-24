@@ -33,6 +33,7 @@ function SubscriptionPlanCard({
   const benefits = displayBenefits(plan.benefits);
   const accent = tierAccentClass(plan.tier_name);
   const isPlatinum = accent === 'subscription-plan-card--platinum';
+  const isVip = (plan.subscription_family || 'vip') === 'vip';
 
   return (
     <article
@@ -49,7 +50,9 @@ function SubscriptionPlanCard({
 
       <header className="subscription-plan-card__header">
         <h3>{plan.tier_name}</h3>
-        <p className="subscription-plan-card__discount">{plan.discount_percent}% off all credit features</p>
+        <p className="subscription-plan-card__discount">
+          {isVip ? `${plan.discount_percent}% off all credit features` : 'Professional astrology tools'}
+        </p>
       </header>
 
       <div className="subscription-plan-card__price-block">

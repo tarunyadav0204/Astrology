@@ -21,6 +21,8 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const preselectedPlanId = searchParams.get('plan_id');
+  const subscriptionFamily = searchParams.get('family') === 'astrologer' ? 'astrologer' : 'vip';
+  const isAstrologerPlan = subscriptionFamily === 'astrologer';
 
   const [subscription, setSubscription] = useState(null);
   const [plans, setPlans] = useState([]);
@@ -59,11 +61,16 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
       if (!plansRes.ok) {
         throw new Error(plansData.detail || 'Could not load subscription plans');
       }
-      setPlans(plansData.plans || []);
+      setPlans((plansData.plans || []).filter(
+        (plan) => (plan.subscription_family || 'vip') === subscriptionFamily
+      ));
       setKeyId(plansData.key_id || '');
 
       if (isLoggedIn) {
-        const subRes = await fetch('/api/credits/subscription', { headers: authHeaders() });
+        const subRes = await fetch(
+          `/api/credits/subscription?family=${encodeURIComponent(subscriptionFamily)}`,
+          { headers: authHeaders() }
+        );
         const subData = await subRes.json().catch(() => ({}));
         if (subRes.ok) {
           setSubscription(subData.subscription || null);
@@ -77,7 +84,7 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
     } finally {
       setLoading(false);
     }
-  }, [authHeaders, isLoggedIn]);
+  }, [authHeaders, isLoggedIn, subscriptionFamily]);
 
   useEffect(() => {
     loadData();
@@ -106,7 +113,9 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
         key: createData.key_id || keyId,
         subscription_id: createData.subscription_id,
         name: 'AstroRoshni',
-        description: `${plan.tier_name} — monthly VIP`,
+        description: isAstrologerPlan
+          ? `${plan.tier_name} — monthly professional tools`
+          : `${plan.tier_name} — monthly VIP`,
         theme: { color: '#e91e63' },
         modal: {
           ondismiss: () => setBusyPlanId(null),
@@ -180,10 +189,13 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
     setCancelLoading(true);
     setActionMessage('');
     try {
-      const res = await fetch('/api/credits/razorpay/subscription/cancel', {
+      const res = await fetch(
+        `/api/credits/razorpay/subscription/cancel?family=${encodeURIComponent(subscriptionFamily)}`,
+        {
         method: 'POST',
         headers: authHeaders(),
-      });
+        }
+      );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.detail || data.message || 'Cancel failed');
@@ -204,14 +216,14 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
   const showPlans =
     isLoggedIn && !showRazorpayManage && !showGooglePlayManage;
   const upgradePlans =
-    showRazorpayManage && !subscription.cancel_at_period_end
+    !isAstrologerPlan && showRazorpayManage && !subscription.cancel_at_period_end
       ? plans.filter((p) => (p.discount_percent || 0) > (subscription.discount_percent || 0))
       : [];
 
   return (
     <div className="subscription-page">
       <Helmet>
-        <title>VIP Membership — AstroRoshni</title>
+        <title>{isAstrologerPlan ? 'Astrologer License' : 'VIP Membership'} — AstroRoshni</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <NavigationHeader
@@ -227,23 +239,32 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
 
       <main className="subscription-page-main">
         <header className="subscription-page-hero">
-          <h1>VIP membership</h1>
-          <p>
-            VIP lowers what you pay in credits for each feature. Your monthly fee keeps that discount
-            active—you still buy credits separately when you&apos;re ready to use the app.
+          <h1>{isAstrologerPlan ? 'Astrologer License' : 'VIP membership'}</h1>
+          <p>{isAstrologerPlan
+            ? 'Unlock professional chart activation, timing and whole-chart manifestation tools for ₹100 per month.'
+            : 'VIP lowers what you pay in credits for each feature. Your monthly fee keeps that discount active—you still buy credits separately when you’re ready to use the app.'}
           </p>
         </header>
 
         <section className="subscription-card subscription-card--info" aria-label="How membership works">
-          <h2>Membership vs credits</h2>
-          <p>
-            A subscription does <strong>not</strong> add credits to your account. It only unlocks
-            member pricing on chats, analyses, muhurats, and other paid features.
-          </p>
-          <p>
-            Purchase credits anytime in the app or from your account, then spend them as usual—at the
-            lower rates shown on each plan below.
-          </p>
+          <h2>{isAstrologerPlan ? 'What the license unlocks' : 'Membership vs credits'}</h2>
+          {isAstrologerPlan ? (
+            <p>
+              This subscription unlocks professional learning and testing tools from the chart screen.
+              It is separate from VIP and does not add or consume credits.
+            </p>
+          ) : (
+            <>
+              <p>
+                A subscription does <strong>not</strong> add credits to your account. It only unlocks
+                member pricing on chats, analyses, muhurats, and other paid features.
+              </p>
+              <p>
+                Purchase credits anytime in the app or from your account, then spend them as usual—at the
+                lower rates shown on each plan below.
+              </p>
+            </>
+          )}
           <button
             type="button"
             className="subscription-btn subscription-btn--secondary"
@@ -313,8 +334,8 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
                 <dd>{subscription.tier_name}</dd>
               </div>
               <div>
-                <dt>Credit discount</dt>
-                <dd>{subscription.discount_percent}% off</dd>
+                <dt>{isAstrologerPlan ? 'Access' : 'Credit discount'}</dt>
+                <dd>{isAstrologerPlan ? 'Professional chart tools' : `${subscription.discount_percent}% off`}</dd>
               </div>
               <div>
                 <dt>Current period ends</dt>
@@ -404,8 +425,9 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
           <section className="subscription-plans-section">
             <h2>Choose a plan</h2>
             <p className="subscription-hint">
-              Monthly fee for your discount tier. Credit balances are bought separately—not included
-              with membership.
+              {isAstrologerPlan
+                ? '₹100 per month. This license can remain active alongside a VIP membership.'
+                : 'Monthly fee for your discount tier. Credit balances are bought separately—not included with membership.'}
             </p>
             <div className="subscription-plans-grid">
               {plans.map((plan) => (
@@ -422,7 +444,9 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
               ))}
             </div>
             <p className="subscription-razorpay-badge">
-              Secure checkout · member rates apply when you spend credits you&apos;ve purchased
+              {isAstrologerPlan
+                ? 'Secure checkout · access begins after payment verification'
+                : 'Secure checkout · member rates apply when you spend credits you’ve purchased'}
             </p>
           </section>
         )}

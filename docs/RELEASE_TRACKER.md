@@ -18,11 +18,16 @@
 - [x] Add a PN-only campaign policy with no WhatsApp or email fallback.
 - [x] Replace rolling-count guesses in Audience Builder with exact IST today/yesterday and paid-question facts.
 - [x] Add a governed Data Explorer for cross-table business questions using live approved schemas, read-only SQL, sensitive-field blocking, timeouts, and 500-row limits.
+- [x] Add the ₹100/month Astrologer License as a separate entitlement that can coexist with VIP.
+- [x] Restrict Activation Explorer to licensed astrologers, with automatic access for admins.
+- [x] Add Google Play, Android alternative-billing, Razorpay web/PWA purchase flows and family-specific subscription management.
+- [x] Route unlicensed chart users to the focused Astrologer License purchase section and return them to Activation Explorer after activation.
 
 ### Validation
 
 - [x] Android Expo production bundle completed successfully.
 - [x] PWA production build and SEO post-build completed successfully.
+- [x] Astrologer entitlement and subscription-family backend regression tests passed.
 - [ ] Physical Android device smoke test.
 - [ ] Installed PWA smoke test.
 - [ ] Release build uploaded to Play Console.

@@ -385,6 +385,9 @@ function App() {
     // does not inherit stale localStorage birth details in header.
     clearAstrologySessionCache();
     setUser(userData);
+    try {
+      window.dispatchEvent(new Event('astroroshni-auth-changed'));
+    } catch (_) { /* ignore */ }
     
     // Check if user should be redirected after login
     const redirectUrl = getRedirectUrl(userData);
@@ -416,6 +419,9 @@ function App() {
     clearAstrologySessionCache();
     setUser(null);
     setCurrentView('selector');
+    try {
+      window.dispatchEvent(new Event('astroroshni-auth-changed'));
+    } catch (_) { /* ignore */ }
   };
 
   const handleAdminClick = () => {

@@ -84,3 +84,53 @@ export async function openRazorpayCheckout({
     }
   });
 }
+
+export async function openRazorpaySubscriptionCheckout({
+  subscriptionData,
+  verifySubscription,
+  description,
+  themeColor = '#f97316',
+  onDismiss,
+}) {
+  const Razorpay = await loadRazorpayScript();
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      fn(value);
+    };
+    const options = {
+      key: subscriptionData.key_id,
+      subscription_id: subscriptionData.subscription_id,
+      name: 'AstroRoshni',
+      description: description || `${subscriptionData.tier_name || 'Subscription'} — monthly`,
+      theme: { color: themeColor },
+      modal: {
+        ondismiss: () => {
+          onDismiss?.();
+          finish(reject, Object.assign(new Error('Payment cancelled'), { code: 'USER_CANCELLED' }));
+        },
+      },
+      handler: async (response) => {
+        try {
+          const data = await verifySubscription({
+            razorpay_subscription_id: response.razorpay_subscription_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          });
+          finish(resolve, data);
+        } catch (error) {
+          finish(reject, error);
+        }
+      },
+    };
+    try {
+      const checkout = new Razorpay(options);
+      checkout.open();
+    } catch (error) {
+      finish(reject, error);
+    }
+  });
+}

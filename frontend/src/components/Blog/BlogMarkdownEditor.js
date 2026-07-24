@@ -1,56 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-
-/** Lightweight Markdown → HTML for editor preview (mirrors public blog renderer). */
-export function markdownToPreviewHtml(content) {
-  if (!content) return '<p class="md-preview-empty">Nothing to preview yet. Start writing on the left.</p>';
-
-  let html = String(content).replace(/\\n/g, '\n');
-
-  html = html
-    .replace(/^### (.*$)/gim, '<h4>$1</h4>')
-    .replace(/^## (.*$)/gim, '<h3>$1</h3>')
-    .replace(/^# (.*$)/gim, '<h2>$1</h2>')
-    .replace(/\[!\[[^\]]*\]\(https:\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)(?:[&?][^\s]*)*\)\]/g,
-      '<div class="youtube-embed"><iframe width="560" height="315" src="https://www.youtube.com/embed/$1" frameborder="0" allowfullscreen></iframe></div>')
-    .replace(/\[!\[[^\]]*\]\(https:\/\/youtu\.be\/([a-zA-Z0-9_-]+)(?:[?][^\s]*)*\)\]/g,
-      '<div class="youtube-embed"><iframe width="560" height="315" src="https://www.youtube.com/embed/$1" frameborder="0" allowfullscreen></iframe></div>')
-    .replace(/https:\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)(?:[&?][^\s]*)*/g,
-      '<div class="youtube-embed"><iframe width="560" height="315" src="https://www.youtube.com/embed/$1" frameborder="0" allowfullscreen></iframe></div>')
-    .replace(/https:\/\/youtu\.be\/([a-zA-Z0-9_-]+)(?:[?][^\s]*)*/g,
-      '<div class="youtube-embed"><iframe width="560" height="315" src="https://www.youtube.com/embed/$1" frameborder="0" allowfullscreen></iframe></div>')
-    .replace(/\|(.+)\|/g, (match, row) => {
-      if (row.match(/^[\s\-\|]+$/)) return '';
-      const cells = row.split('|').map((cell) => cell.trim());
-      return `<tr>${cells.map((cell) => `<td>${cell}</td>`).join('')}</tr>`;
-    })
-    .replace(/(<tr>.*<\/tr>)/gs, '<table>$1</table>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="content-image" />')
-    .replace(/!\[([^\]]*)\]\(\s*\)/g, '')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-    .replace(/(?:<li>.*?<\/li>\n?)+/g, (match) => `<ul>${match.replace(/\n/g, '')}</ul>`)
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br>');
-
-  html = `<p>${html}</p>`;
-  html = html
-    .replace(/<\/p><p><table/g, '</p><table')
-    .replace(/<\/table><\/p><p>/g, '</table><p>')
-    .replace(/<p>(<br>\s*)*<table/g, '<table')
-    .replace(/(<br>\s*)*<table/g, '<table')
-    .replace(/<p><\/p><table/g, '<table')
-    .replace(/(<br>){2,}/g, '<br>')
-    .replace(/<p>(?:\s|<br\s*\/?>)*<(h[1-6]|ul|ol|div)([^>]*)>/gi, '<$1$2>')
-    .replace(/<\/(h[1-6]|ul|ol|div)>(?:\s|<br\s*\/?>)*<\/p>/gi, '</$1>')
-    .replace(/<p>\s*<table/gi, '<table')
-    .replace(/<\/table>\s*<\/p>/gi, '</table>')
-    .replace(/<p>(?:\s|<br\s*\/?>)*<\/p>/gi, '');
-
-  return html;
-}
+import { markdownToHtml } from '../../utils/blogMarkdown';
 
 function wrapSelection(value, start, end, before, after = before) {
   const selected = value.slice(start, end) || 'text';
@@ -143,7 +92,10 @@ const BlogMarkdownEditor = ({
   const fileInputRef = useRef(null);
   const [mode, setMode] = useState('split'); // write | split | preview
 
-  const previewHtml = useMemo(() => markdownToPreviewHtml(value), [value]);
+  const previewHtml = useMemo(
+    () => markdownToHtml(value, { emptyMessage: '<p class="md-preview-empty">Nothing to preview yet. Start writing on the left.</p>' }),
+    [value]
+  );
 
   const applyEdit = useCallback((result) => {
     onChange(result.value);
@@ -158,9 +110,7 @@ const BlogMarkdownEditor = ({
   const runToolbar = (item) => {
     const el = textareaRef.current;
     if (!el) return;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    applyEdit(item.run(value, start, end));
+    applyEdit(item.run(value, el.selectionStart, el.selectionEnd));
   };
 
   const insertAtCursor = (snippet) => {

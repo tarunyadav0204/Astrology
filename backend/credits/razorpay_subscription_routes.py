@@ -174,10 +174,13 @@ def _apply_razorpay_subscription_entitlement(
     credit_service.upsert_razorpay_subscription_map(
         razorpay_subscription_id, userid, internal_plan_id, product_id
     )
+    plan = credit_service.get_plan_by_internal_id(internal_plan_id) or {}
     return {
         "start_date": start_date,
         "end_date": end_date,
-        "tier_name": credit_service.get_subscription_tier_name(userid),
+        "tier_name": plan.get("tier_name") or product_id,
+        "subscription_family": plan.get("subscription_family") or "vip",
+        "entitlement_key": plan.get("entitlement_key"),
     }
 
 
@@ -283,12 +286,17 @@ async def razorpay_subscription_plans():
     for plan in plans:
         rz_price = _fetch_razorpay_plan_amount_display(plan.get("razorpay_plan_id") or "")
         discount = int(plan.get("discount_percent") or 0)
+        family = plan.get("subscription_family") or "vip"
         enriched.append(
             {
                 **plan,
                 "formatted_price": rz_price,
                 "amount_display": rz_price or plan.get("amount_display"),
-                "feature_pricing": build_feature_pricing_for_tier(credit_service, discount),
+                "feature_pricing": (
+                    build_feature_pricing_for_tier(credit_service, discount)
+                    if family == "vip"
+                    else None
+                ),
             }
         )
     return {
@@ -303,20 +311,23 @@ async def razorpay_subscription_plans():
 @router.post("/razorpay/subscription/create")
 async def razorpay_subscription_create(body: CreateSubscriptionBody, current_user: User = Depends(get_current_user)):
     gp_tok = (body.google_play_external_transaction_token or "").strip()
-    # Web / default: block duplicate Play + Razorpay. Play User Choice (alternative billing): user picked
-    # Razorpay for this purchase — allow create when we have the external transaction token from Billing.
-    if not gp_tok and credit_service.user_has_active_google_play_subscription(current_user.userid):
-        raise HTTPException(
-            status_code=409,
-            detail="You already have an active subscription via Google Play. Manage it in the Play Store.",
-        )
-    existing = credit_service.get_user_subscription_details(current_user.userid)
-    if existing and existing.get("billing_provider") == "razorpay" and not existing.get("cancel_at_period_end"):
-        raise HTTPException(status_code=409, detail="You already have an active Razorpay subscription.")
-
     plan = credit_service.get_plan_by_internal_id(body.plan_id)
     if not plan or not plan.get("razorpay_plan_id"):
         raise HTTPException(status_code=400, detail="Plan not available for web subscription")
+    family = plan.get("subscription_family") or "vip"
+    # Web / default: block duplicate Play + Razorpay. Play User Choice (alternative billing): user picked
+    # Razorpay for this purchase — allow create when we have the external transaction token from Billing.
+    if not gp_tok and credit_service.user_has_active_google_play_subscription(
+        current_user.userid,
+        family=family,
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=f"You already have an active {family} subscription via Google Play. Manage it in the Play Store.",
+        )
+    existing = credit_service.get_user_subscription_details(current_user.userid, family=family)
+    if existing and existing.get("billing_provider") == "razorpay" and not existing.get("cancel_at_period_end"):
+        raise HTTPException(status_code=409, detail=f"You already have an active {family} Razorpay subscription.")
 
     payload = {
         "plan_id": plan["razorpay_plan_id"],
@@ -326,6 +337,7 @@ async def razorpay_subscription_create(body: CreateSubscriptionBody, current_use
             "userid": str(current_user.userid),
             "internal_plan_id": str(plan["plan_id"]),
             "product_id": plan["product_id"] or "",
+            "subscription_family": family,
         },
     }
     if gp_tok:
@@ -354,6 +366,7 @@ async def razorpay_subscription_create(body: CreateSubscriptionBody, current_use
         "key_id": _get_razorpay_keys()[0],
         "tier_name": plan["tier_name"],
         "product_id": plan["product_id"],
+        "subscription_family": family,
     }
 
 
@@ -463,6 +476,8 @@ async def razorpay_subscription_upgrade(
     target = credit_service.get_plan_by_internal_id(body.plan_id)
     if not target or not target.get("razorpay_plan_id"):
         raise HTTPException(status_code=400, detail="Plan not available for web subscription")
+    if (target.get("subscription_family") or "vip") != "vip":
+        raise HTTPException(status_code=400, detail="Only VIP memberships have upgrade tiers")
     if target["plan_id"] == current_plan_id:
         raise HTTPException(status_code=400, detail="You are already on this plan")
     if int(target.get("discount_percent") or 0) <= current_discount:
@@ -502,10 +517,22 @@ async def razorpay_subscription_upgrade(
 
 
 @router.post("/razorpay/subscription/cancel")
-async def razorpay_subscription_cancel(current_user: User = Depends(get_current_user)):
-    details = credit_service.get_user_subscription_details(current_user.userid)
+async def razorpay_subscription_cancel(
+    family: str = "vip",
+    current_user: User = Depends(get_current_user),
+):
+    selected_family = (family or "vip").strip().lower()
+    if selected_family not in {"vip", "astrologer"}:
+        raise HTTPException(status_code=400, detail="Unknown subscription family")
+    details = credit_service.get_user_subscription_details(
+        current_user.userid,
+        family=selected_family,
+    )
     if not details or details.get("billing_provider") != "razorpay":
-        raise HTTPException(status_code=400, detail="No active Razorpay subscription to cancel")
+        raise HTTPException(
+            status_code=400,
+            detail=f"No active {selected_family} Razorpay subscription to cancel",
+        )
     sub_id = (details.get("razorpay_subscription_id") or "").strip()
     if not sub_id:
         raise HTTPException(status_code=400, detail="Subscription id not found")

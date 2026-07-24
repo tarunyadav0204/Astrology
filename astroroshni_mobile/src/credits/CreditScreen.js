@@ -34,7 +34,7 @@ import {
   describeUserChoiceRawProductsForLog,
 } from './androidUserChoiceRazorpay';
 import { getCreditPackMeta } from './creditPackCatalog';
-import { openRazorpayCheckout } from '../platform/payments';
+import { openRazorpayCheckout, openRazorpaySubscriptionCheckout } from '../platform/payments';
 import { useAuthGate } from '../auth/AuthGateContext';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -260,15 +260,18 @@ async function confirmProceedDespiteActiveSubscription({
   t,
   subscriptionDetails: detailsSnapshot,
   subscriptionTierName: tierNameSnapshot,
+  family = 'vip',
 }) {
   let freshSubscription = detailsSnapshot ?? null;
   try {
-    const { data: subDetailsPayload } = await creditApi.getSubscriptionDetails();
+    const { data: subDetailsPayload } = await creditApi.getSubscriptionDetails(family);
     freshSubscription = subDetailsPayload?.subscription ?? null;
   } catch (_) {
     /* keep snapshot */
   }
-  const hasActiveSubscription = Boolean(freshSubscription || tierNameSnapshot);
+  const hasActiveSubscription = Boolean(
+    freshSubscription || (family === 'vip' && tierNameSnapshot)
+  );
   if (!hasActiveSubscription) return true;
   return new Promise((resolve) => {
     Alert.alert(
@@ -289,7 +292,7 @@ async function confirmProceedDespiteActiveSubscription({
   });
 }
 
-const CreditScreen = ({ navigation }) => {
+const CreditScreen = ({ navigation, route }) => {
   useAnalytics('CreditScreen');
   const { t, i18n } = useTranslation();
   const dateLocale = appLocaleForI18n(i18n.language);
@@ -341,6 +344,10 @@ const CreditScreen = ({ navigation }) => {
   const [iapSubscriptions, setIapSubscriptions] = useState([]); // from getSubscriptions (productId + subscriptionOfferDetails for offerToken)
   const [purchasingSubscriptionId, setPurchasingSubscriptionId] = useState(null);
   const [subscriptionDetails, setSubscriptionDetails] = useState(null);
+  const [astrologerSubscriptionDetails, setAstrologerSubscriptionDetails] = useState(null);
+  const [razorpaySubscriptionPlans, setRazorpaySubscriptionPlans] = useState([]);
+  const [razorpaySubscriptionPlansLoading, setRazorpaySubscriptionPlansLoading] = useState(false);
+  const [purchasingRazorpaySubscriptionId, setPurchasingRazorpaySubscriptionId] = useState(null);
   const [vipPlansExpanded, setVipPlansExpanded] = useState(false);
   const [refreshSubscriptionStatusLoading, setRefreshSubscriptionStatusLoading] = useState(false);
   const [purchaseModal, setPurchaseModal] = useState({ visible: false, type: 'success', title: '', message: '', creditsAdded: 0 });
@@ -355,6 +362,7 @@ const CreditScreen = ({ navigation }) => {
   const slideAnim = useRef(new Animated.Value(30)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scrollViewRef = useRef(null);
+  const astrologerSectionYRef = useRef(0);
   const creditHeaderTitle =
     Platform.OS === 'ios' ? 'Study Credits' : t('credits.page.title');
   const creditHeaderSubtitle =
@@ -413,6 +421,20 @@ const CreditScreen = ({ navigation }) => {
     }
   };
 
+  const fetchRazorpaySubscriptionPlans = async ({ silent = false } = {}) => {
+    if (Platform.OS !== 'web') return;
+    if (!silent) setRazorpaySubscriptionPlansLoading(true);
+    try {
+      const { data } = await creditAPI.getRazorpaySubscriptionPlans();
+      setRazorpaySubscriptionPlans(Array.isArray(data?.plans) ? data.plans : []);
+    } catch (error) {
+      setRazorpaySubscriptionPlans([]);
+      console.warn('Failed to load Razorpay subscription plans:', error?.message);
+    } finally {
+      if (!silent) setRazorpaySubscriptionPlansLoading(false);
+    }
+  };
+
   const productIds = useMemo(
     () => googlePlayProducts.map((p) => p.product_id).filter(Boolean),
     [googlePlayProducts]
@@ -429,6 +451,18 @@ const CreditScreen = ({ navigation }) => {
         iapSubscriptions.some((s) => (s.productId || s.product_id) === plan.google_play_product_id)
       ),
     [subscriptionPlans, iapSubscriptions]
+  );
+  const astrologerPlansFromPlay = useMemo(
+    () => subscriptionPlansFromPlay.filter((plan) => plan.subscription_family === 'astrologer'),
+    [subscriptionPlansFromPlay]
+  );
+  const vipPlansFromPlay = useMemo(
+    () => subscriptionPlansFromPlay.filter((plan) => (plan.subscription_family || 'vip') === 'vip'),
+    [subscriptionPlansFromPlay]
+  );
+  const razorpayAstrologerPlans = useMemo(
+    () => razorpaySubscriptionPlans.filter((plan) => plan.subscription_family === 'astrologer'),
+    [razorpaySubscriptionPlans]
   );
   const hasAnyIapProducts = productIds.length > 0 || subscriptionProductIds.length > 0;
 
@@ -565,7 +599,9 @@ const CreditScreen = ({ navigation }) => {
       const { data } = await creditAPI.verifyGooglePlaySubscription(purchaseToken, productId, orderId);
       await fetchBalance();
       await fetchSubscriptionDetails();
-      const tierName = data?.tier_name || t('credits.page.vipFallback');
+      const purchasedPlan = subscriptionPlans.find((plan) => plan.google_play_product_id === productId);
+      const family = data?.subscription_family || purchasedPlan?.subscription_family || 'vip';
+      const tierName = data?.tier_name || purchasedPlan?.tier_name || t('credits.page.vipFallback');
       const subscription = iapSubscriptions.find(
         (s) => (s.productId || s.product_id) === productId
       );
@@ -587,6 +623,11 @@ const CreditScreen = ({ navigation }) => {
         message: t('credits.page.subscribedMessage', { tier: tierName }),
         creditsAdded: 0,
       });
+      if (family === 'astrologer' && route?.params?.returnTo) {
+        setTimeout(() => {
+          navigation.navigate(route.params.returnTo, route.params.returnParams || {});
+        }, 450);
+      }
     } catch (err) {
       const msg = err.response?.data?.detail || err.message || t('credits.page.failedActivateSubscription');
       setPurchaseModal({
@@ -643,6 +684,7 @@ const CreditScreen = ({ navigation }) => {
       fetchBalance();
       if (Platform.OS === 'web') {
         fetchRazorpayCatalog({ silent: true });
+        fetchRazorpaySubscriptionPlans({ silent: true });
         fetchHistory();
         fetchSubscriptionDetails();
         return;
@@ -689,7 +731,19 @@ const CreditScreen = ({ navigation }) => {
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     fetchRazorpayCatalog();
+    fetchRazorpaySubscriptionPlans();
   }, []);
+
+  useEffect(() => {
+    if (route?.params?.focusSubscriptionFamily !== 'astrologer') return;
+    const timer = setTimeout(() => {
+      scrollViewRef.current?.scrollTo?.({
+        y: Math.max(0, astrologerSectionYRef.current - 20),
+        animated: true,
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [route?.params?.focusSubscriptionFamily, subscriptionPlansLoading, razorpaySubscriptionPlansLoading]);
 
   useEffect(() => {
     // Pack relaunch banner is Android Play catalog messaging — skip on web.
@@ -732,6 +786,7 @@ const CreditScreen = ({ navigation }) => {
       productIds,
       subscriptionProductIds,
       subscriptionDetails,
+      astrologerSubscriptionDetails,
       subscriptionTierName,
       creditAPI,
       t,
@@ -742,6 +797,9 @@ const CreditScreen = ({ navigation }) => {
       setPurchasingProductId,
       setPurchasingSubscriptionId,
       trackAstrologyEvent,
+      navigation,
+      returnTo: route?.params?.returnTo,
+      returnParams: route?.params?.returnParams,
     };
   });
 
@@ -864,11 +922,18 @@ const CreditScreen = ({ navigation }) => {
             if (!confirmed) return;
 
             if (subSku) {
+              const selectedPlan = (C.subscriptionPlans || []).find((p) =>
+                String(p.google_play_product_id).toLowerCase() === String(subSku).toLowerCase()
+              );
+              const family = selectedPlan?.subscription_family || 'vip';
               const proceedSub = await confirmProceedDespiteActiveSubscription({
                 creditAPI: C.creditAPI,
                 t: C.t,
-                subscriptionDetails: C.subscriptionDetails,
+                subscriptionDetails: family === 'astrologer'
+                  ? C.astrologerSubscriptionDetails
+                  : C.subscriptionDetails,
                 subscriptionTierName: C.subscriptionTierName,
+                family,
               });
               if (!proceedSub) return;
             }
@@ -931,6 +996,9 @@ const CreditScreen = ({ navigation }) => {
                   message: successMsg,
                   creditsAdded,
                 });
+                if (plan.subscription_family === 'astrologer' && C.returnTo) {
+                  setTimeout(() => C.navigation.navigate(C.returnTo, C.returnParams || {}), 450);
+                }
                 userChoiceIapLog('listener_credit_flow_ok', { creditSku, creditsAdded });
                 return;
               }
@@ -1180,10 +1248,15 @@ const CreditScreen = ({ navigation }) => {
 
   const fetchSubscriptionDetails = async () => {
     try {
-      const { data } = await creditAPI.getSubscriptionDetails();
-      setSubscriptionDetails(data?.subscription ?? null);
+      const [vipResponse, astrologerResponse] = await Promise.all([
+        creditAPI.getSubscriptionDetails('vip'),
+        creditAPI.getSubscriptionDetails('astrologer'),
+      ]);
+      setSubscriptionDetails(vipResponse?.data?.subscription ?? null);
+      setAstrologerSubscriptionDetails(astrologerResponse?.data?.subscription ?? null);
     } catch (e) {
       setSubscriptionDetails(null);
+      setAstrologerSubscriptionDetails(null);
     }
   };
 
@@ -1204,7 +1277,6 @@ const CreditScreen = ({ navigation }) => {
           const orderId = p.transactionId ?? p.transactionIdAndroid ?? null;
           await creditAPI.syncSubscription(token, productId, orderId);
           synced = true;
-          break;
         }
       }
       if (!synced) {
@@ -1355,7 +1427,10 @@ const CreditScreen = ({ navigation }) => {
       ]);
     }
     if (Platform.OS === 'web') {
-      await fetchRazorpayCatalog({ silent: true });
+      await Promise.all([
+        fetchRazorpayCatalog({ silent: true }),
+        fetchRazorpaySubscriptionPlans({ silent: true }),
+      ]);
     }
     if (Platform.OS === 'android' && iapReady && productIds.length > 0 && RNIap) {
       await syncOneTimePurchasesWithPlay();
@@ -1419,6 +1494,48 @@ const CreditScreen = ({ navigation }) => {
       );
     } finally {
       setPurchasingRazorpayCredits(null);
+    }
+  };
+
+  const handleBuyRazorpaySubscription = async (plan) => {
+    if (Platform.OS !== 'web' || !plan?.plan_id) return;
+    setPurchasingRazorpaySubscriptionId(plan.plan_id);
+    try {
+      const { data: subscriptionData } = await creditAPI.createRazorpaySubscription(plan.plan_id);
+      const verifyData = await openRazorpaySubscriptionCheckout({
+        subscriptionData,
+        description: `${plan.tier_name || 'Astrologer License'} — monthly`,
+        themeColor: colors.primary || '#f97316',
+        onDismiss: () => setPurchasingRazorpaySubscriptionId(null),
+        verifySubscription: async (payment) => {
+          const { data } = await creditAPI.verifyRazorpaySubscription(payment);
+          return data;
+        },
+      });
+      await fetchBalance();
+      await fetchSubscriptionDetails();
+      setPurchaseModal({
+        visible: true,
+        type: 'success',
+        title: 'Astrologer License activated',
+        message: 'Professional chart interpretation tools are now available on your account.',
+        creditsAdded: 0,
+      });
+      if ((verifyData?.subscription?.subscription_family || plan.subscription_family) === 'astrologer'
+          && route?.params?.returnTo) {
+        setTimeout(() => {
+          navigation.navigate(route.params.returnTo, route.params.returnParams || {});
+        }, 450);
+      }
+    } catch (error) {
+      if (error?.code === 'USER_CANCELLED') return;
+      const detail = error?.response?.data?.detail;
+      Alert.alert(
+        'Subscription could not be started',
+        typeof detail === 'string' ? detail : error?.message || 'Please try again.'
+      );
+    } finally {
+      setPurchasingRazorpaySubscriptionId(null);
     }
   };
 
@@ -1500,8 +1617,11 @@ const CreditScreen = ({ navigation }) => {
     const proceedDespiteActive = await confirmProceedDespiteActiveSubscription({
       creditAPI,
       t,
-      subscriptionDetails,
+      subscriptionDetails: plan.subscription_family === 'astrologer'
+        ? astrologerSubscriptionDetails
+        : subscriptionDetails,
       subscriptionTierName,
+      family: plan.subscription_family || 'vip',
     });
     if (!proceedDespiteActive) return;
 
@@ -1901,6 +2021,103 @@ const CreditScreen = ({ navigation }) => {
               </View>
             )}
 
+            {(Platform.OS === 'android' || Platform.OS === 'web') && (
+              <View
+                style={styles.buySection}
+                onLayout={(event) => {
+                  astrologerSectionYRef.current = event.nativeEvent.layout.y;
+                }}
+              >
+                <View style={[styles.vipDiscountPanel, androidGlassFixStyle, { backgroundColor: promoCardBg, borderColor: colors.primary }]}>
+                  <View style={styles.vipDiscountHeader}>
+                    <View style={[styles.vipDiscountIcon, { backgroundColor: isDark ? 'rgba(249,115,22,0.18)' : 'rgba(234,88,12,0.1)' }]}>
+                      <Ionicons name="school-outline" size={23} color={colors.primary} />
+                    </View>
+                    <View style={styles.vipDiscountCopy}>
+                      <Text style={[styles.vipDiscountTitle, { color: colors.text }]}>Astrologer License</Text>
+                      <Text style={[styles.vipDiscountText, { color: colors.textSecondary }]}>
+                        Professional house activation, timing and whole-chart manifestation tools.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {astrologerSubscriptionDetails ? (
+                    <>
+                      <View style={[styles.subscriptionCardDates, styles.vipDiscountDates, { borderTopColor: colors.cardBorder }]}>
+                        <Text style={[styles.vipPlanRowTitle, { color: colors.success || '#16a34a' }]}>Active</Text>
+                        {astrologerSubscriptionDetails.end_date ? (
+                          <Text style={[styles.subscriptionCardDateLabel, { color: colors.textTertiary }]}>
+                            Renews or remains available until {formatSubscriptionDate(astrologerSubscriptionDetails.end_date, dateLocale)}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 12 }]}
+                        onPress={() => {
+                          if (astrologerSubscriptionDetails.manage_in_google_play) {
+                            Linking.openURL('https://play.google.com/store/account/subscriptions');
+                          } else {
+                            Linking.openURL('https://astroroshni.com/subscription?family=astrologer');
+                          }
+                        }}
+                      >
+                        <Ionicons name="open-outline" size={16} color={colors.primary} />
+                        <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>Manage subscription</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <View style={[styles.vipPlanList, { borderTopColor: colors.cardBorder }]}>
+                      {(Platform.OS === 'android' ? subscriptionPlansLoading : razorpaySubscriptionPlansLoading) ? (
+                        <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>Loading Astrologer plan…</Text>
+                      ) : (Platform.OS === 'android' ? astrologerPlansFromPlay : razorpayAstrologerPlans).length === 0 ? (
+                        <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>
+                          The ₹100/month Astrologer plan is not available from the billing provider yet.
+                        </Text>
+                      ) : (
+                        (Platform.OS === 'android' ? astrologerPlansFromPlay : razorpayAstrologerPlans).map((plan) => {
+                          const productId = plan.google_play_product_id || plan.product_id;
+                          const displayPrice = Platform.OS === 'android'
+                            ? getSubscriptionDisplayPrice(plan, iapSubscriptions)
+                            : plan.formatted_price || plan.amount_display || '₹100';
+                          const purchasing = Platform.OS === 'android'
+                            ? purchasingSubscriptionId === productId
+                            : purchasingRazorpaySubscriptionId === plan.plan_id;
+                          return (
+                            <View key={plan.plan_id || productId} style={[styles.vipPlanRow, { borderColor: colors.cardBorder }]}>
+                              <View style={styles.vipPlanRowCopy}>
+                                <Text style={[styles.vipPlanRowTitle, { color: colors.text }]}>
+                                  {displayPrice || '₹100'} / month
+                                </Text>
+                                {(plan.benefits?.length ? plan.benefits : [
+                                  'What is activated now?',
+                                  'Professional activation reasoning',
+                                  'Combined chart manifestations',
+                                ]).map((benefit) => (
+                                  <Text key={benefit} style={[styles.vipPlanRowTerms, { color: colors.textSecondary }]}>• {benefit}</Text>
+                                ))}
+                                <Text style={[styles.vipPlanRowTerms, { color: colors.textTertiary }]}>
+                                  Renews monthly until cancelled.
+                                </Text>
+                              </View>
+                              <TouchableOpacity
+                                style={[styles.vipPlanRowButton, { backgroundColor: colors.primary }]}
+                                disabled={purchasing}
+                                onPress={() => Platform.OS === 'android'
+                                  ? handleSubscribePress(plan)
+                                  : handleBuyRazorpaySubscription(plan)}
+                              >
+                                <Text style={styles.vipPlanRowButtonText}>{purchasing ? 'Processing…' : 'Subscribe'}</Text>
+                              </TouchableOpacity>
+                            </View>
+                          );
+                        })
+                      )}
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+
             {/* VIP subscriptions are discounts, not credit packs. Keep them secondary to reduce purchase confusion. */}
             {Platform.OS === 'android' && (
               <View style={styles.buySection}>
@@ -1965,7 +2182,7 @@ const CreditScreen = ({ navigation }) => {
                     <View style={[styles.vipPlanList, { borderTopColor: colors.cardBorder }]}>
                       {subscriptionPlansLoading ? (
                         <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>{t('credits.page.loadingPlans')}</Text>
-                      ) : subscriptionPlansFromPlay.length === 0 ? (
+                      ) : vipPlansFromPlay.length === 0 ? (
                         subscriptionPlans.length > 0 && iapReady ? (
                           <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>{t('credits.page.noSubscriptionPlansStore')}</Text>
                         ) : null
@@ -1974,7 +2191,7 @@ const CreditScreen = ({ navigation }) => {
                           <Text style={[styles.vipPlanComplianceIntro, { color: colors.textSecondary }]}>
                             {t('credits.page.subscriptionOptionalNotice')}
                           </Text>
-                          {subscriptionPlansFromPlay.map((plan) => {
+                          {vipPlansFromPlay.map((plan) => {
                           const productId = plan.google_play_product_id;
                           const isCurrentPlan = subscriptionTierName && plan.tier_name === subscriptionTierName;
                           const isPurchasing = purchasingSubscriptionId === productId;

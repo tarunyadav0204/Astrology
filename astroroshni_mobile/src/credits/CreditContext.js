@@ -44,6 +44,8 @@ export const CreditProvider = ({ children }) => {
   const [freeQuestionRequiresNotifications, setFreeQuestionRequiresNotifications] = useState(false);
   const [subscriptionTierName, setSubscriptionTierName] = useState(null);
   const [subscriptionDiscountPercent, setSubscriptionDiscountPercent] = useState(0);
+  const [entitlements, setEntitlements] = useState([]);
+  const [isAstrologerLicensed, setIsAstrologerLicensed] = useState(false);
   const [isGuruMember, setIsGuruMember] = useState(false);
   const [pricing, setPricing] = useState({});
   const [pricingOriginal, setPricingOriginal] = useState({});
@@ -125,6 +127,8 @@ export const CreditProvider = ({ children }) => {
         setFreeQuestionRequiresNotifications(false);
         setSubscriptionTierName(null);
         setSubscriptionDiscountPercent(0);
+        setEntitlements([]);
+        setIsAstrologerLicensed(false);
         setIsGuruMember(false);
         return 0;
       }
@@ -139,6 +143,8 @@ export const CreditProvider = ({ children }) => {
       setFreeQuestionRequiresNotifications(Boolean(data?.free_question_requires_notifications));
       setSubscriptionTierName(data?.subscription_tier_name ?? null);
       setSubscriptionDiscountPercent(Number(data?.subscription_discount_percent) || 0);
+      setEntitlements(Array.isArray(data?.entitlements) ? data.entitlements : []);
+      setIsAstrologerLicensed(Boolean(data?.is_astrologer_licensed));
       setIsGuruMember(Boolean(data?.is_guru_member));
       return balance;
     } catch (error) {
@@ -159,6 +165,8 @@ export const CreditProvider = ({ children }) => {
         setFreeQuestionRequiresNotifications(false);
         setSubscriptionTierName(null);
         setSubscriptionDiscountPercent(0);
+        setEntitlements([]);
+        setIsAstrologerLicensed(false);
         setIsGuruMember(false);
         return 0;
       }
@@ -225,6 +233,8 @@ export const CreditProvider = ({ children }) => {
         freeQuestionRequiresNotifications,
         subscriptionTierName,
         subscriptionDiscountPercent,
+        entitlements,
+        isAstrologerLicensed,
         isGuruMember,
         pricing,
         pricingOriginal,

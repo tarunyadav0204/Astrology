@@ -48,7 +48,8 @@ const BAND_LABELS = {
 const STATE_ORDER = { fully_reinforced: 5, dasha_transit_activated: 4, dasha_connected: 3, transit_only: 2, dormant: 1 };
 const OUTCOME_COLORS = { supportive: '#16a34a', mixed: '#f59e0b', challenging: '#dc2626', neutral: '#64748b' };
 const SYNTHESIS_STRENGTH_LABELS = { high: 'Strong chart agreement', well_supported: 'Good chart agreement', moderate: 'Developing chart theme' };
-const subjectContextLabel = (subject) => subject === 'self' ? 'For you' : `May involve your ${subject}`;
+const SYNTHESIS_STRENGTH_ORDER = { high: 0, well_supported: 1, moderate: 2 };
+const subjectSectionLabel = (subject) => subject === 'self' ? 'For you' : `Your ${subject}`;
 
 const localDate = (date = new Date()) => {
   const offset = date.getTimezoneOffset() * 60000;
@@ -178,6 +179,7 @@ export default function ActivationExplorerScreen({ navigation, route }) {
   const [selectedWindowStart, setSelectedWindowStart] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [licenseRequired, setLicenseRequired] = useState(false);
   const [showOutcomeReasons, setShowOutcomeReasons] = useState(false);
   const [activeTab, setActiveTab] = useState('houses');
   const [expandedManifestation, setExpandedManifestation] = useState(null);
@@ -191,6 +193,7 @@ export default function ActivationExplorerScreen({ navigation, route }) {
     if (!birthData) return;
     setLoading(true);
     setError('');
+    setLicenseRequired(false);
     try {
       const response = await chartAPI.getActivationExplorer({
         birthChartId: chartIdFrom(birthData), birthData, asOf, horizonDays, trace: false,
@@ -199,7 +202,13 @@ export default function ActivationExplorerScreen({ navigation, route }) {
       setSelectedWindowStart(null);
     } catch (requestError) {
       setResult(null);
-      setError(requestError?.response?.data?.detail || requestError?.message || 'We could not read this chart right now. Please try again.');
+      const detail = requestError?.response?.data?.detail;
+      if (detail?.code === 'ASTROLOGER_LICENSE_REQUIRED') {
+        setLicenseRequired(true);
+        setError(detail.message || 'An active Astrologer License is required for this professional tool.');
+      } else {
+        setError(typeof detail === 'string' ? detail : requestError?.message || 'We could not read this chart right now. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -249,6 +258,32 @@ export default function ActivationExplorerScreen({ navigation, route }) {
     return groups;
   }, []);
   const chartManifestations = result?.chart_manifestations || [];
+  const chartManifestationGroups = useMemo(() => {
+    const firstSubjectPosition = new Map();
+    chartManifestations.forEach((item, index) => {
+      if (!firstSubjectPosition.has(item.subject)) firstSubjectPosition.set(item.subject, index);
+    });
+    const ordered = [...chartManifestations].sort((left, right) => {
+      const leftSubject = left.subject === 'self' ? -1 : firstSubjectPosition.get(left.subject);
+      const rightSubject = right.subject === 'self' ? -1 : firstSubjectPosition.get(right.subject);
+      if (leftSubject !== rightSubject) return leftSubject - rightSubject;
+      const leftCurrent = left.window?.start_date <= asOf && left.window?.end_date >= asOf ? 0 : 1;
+      const rightCurrent = right.window?.start_date <= asOf && right.window?.end_date >= asOf ? 0 : 1;
+      if (leftCurrent !== rightCurrent) return leftCurrent - rightCurrent;
+      const dateOrder = String(left.window?.start_date || '').localeCompare(String(right.window?.start_date || ''));
+      if (dateOrder) return dateOrder;
+      const strengthOrder = (SYNTHESIS_STRENGTH_ORDER[left.synthesis_strength] ?? 9)
+        - (SYNTHESIS_STRENGTH_ORDER[right.synthesis_strength] ?? 9);
+      if (strengthOrder) return strengthOrder;
+      return String(left.label || '').localeCompare(String(right.label || ''));
+    });
+    return ordered.reduce((groups, item) => {
+      const existing = groups.find((group) => group.subject === item.subject);
+      if (existing) existing.items.push(item);
+      else groups.push({ subject: item.subject, items: [item] });
+      return groups;
+    }, []);
+  }, [asOf, chartManifestations]);
   const carriers = selectedHouse?.activation?.carrier_planets || [];
   const levels = selectedHouse?.activation?.active_dasha_levels || [];
   const directDashaConnections = unique((selectedHouse?.natal_connections || []).map((item) => `${item.planet} connects by natal ${String(item.relation || '').replaceAll('_', ' ')} during the ${item.level === 'MD' ? 'major period' : item.level === 'AD' ? 'sub-period' : 'sub-sub-period'}`));
@@ -307,7 +342,23 @@ export default function ActivationExplorerScreen({ navigation, route }) {
         </View>
 
         {loading ? <View style={styles.state}><ActivityIndicator size="large" color={colors.primary} /><Text style={[styles.stateTitle, { color: colors.text }]}>Reading the chart</Text><Text style={[styles.stateText, { color: colors.textSecondary }]}>We’re connecting the birth chart, current planetary period, transits and timing highlights.</Text></View> : null}
-        {!loading && error ? <View style={[card, styles.state]}><Ionicons name="alert-circle-outline" size={34} color={colors.error} /><Text style={[styles.stateTitle, { color: colors.text }]}>Calculation could not be completed</Text><Text style={[styles.stateText, { color: colors.textSecondary }]}>{error}</Text><TouchableOpacity onPress={loadExplorer} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={styles.primaryButtonText}>Try again</Text></TouchableOpacity></View> : null}
+        {!loading && error ? <View style={[card, styles.state]}>
+          <Ionicons name={licenseRequired ? 'school-outline' : 'alert-circle-outline'} size={34} color={licenseRequired ? colors.primary : colors.error} />
+          <Text style={[styles.stateTitle, { color: colors.text }]}>{licenseRequired ? 'Astrologer License required' : 'Calculation could not be completed'}</Text>
+          <Text style={[styles.stateText, { color: colors.textSecondary }]}>{error}</Text>
+          <TouchableOpacity
+            onPress={licenseRequired
+              ? () => navigation.navigate('Credits', {
+                focusSubscriptionFamily: 'astrologer',
+                returnTo: 'ActivationExplorer',
+                returnParams: { birthData },
+              })
+              : loadExplorer}
+            style={[styles.primaryButton, { backgroundColor: colors.primary }]}
+          >
+            <Text style={styles.primaryButtonText}>{licenseRequired ? 'View ₹100 monthly plan' : 'Try again'}</Text>
+          </TouchableOpacity>
+        </View> : null}
 
         {!loading && result ? <>
           <LinearGradient colors={isDark ? ['#3b1d52', '#28143b'] : ['#fff0e4', '#ffffff']} style={[styles.card, styles.dashaCard, { borderColor: ui.border }]}>
@@ -355,11 +406,19 @@ export default function ActivationExplorerScreen({ navigation, route }) {
             <Text style={[styles.eyebrow, { color: colors.primary }]}>YOUR CHART’S BIGGER STORY</Text>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Life themes coming into focus</Text>
             <Text style={[styles.sectionIntro, { color: colors.textSecondary }]}>These themes appear when several active houses point toward the same area of life.</Text>
-            {chartManifestations.length ? chartManifestations.map((item) => {
+            {chartManifestationGroups.length ? chartManifestationGroups.map((group) => <View key={group.subject} style={styles.subjectSection}>
+              <View style={[styles.subjectSectionHeader, { borderColor: ui.border }]}>
+                <View style={[styles.subjectIcon, { backgroundColor: `${colors.primary}18` }]}>
+                  <Ionicons name={group.subject === 'self' ? 'person-outline' : 'people-outline'} size={17} color={colors.primary} />
+                </View>
+                <Text style={[styles.subjectSectionTitle, { color: colors.text }]}>{subjectSectionLabel(group.subject)}</Text>
+                <Text style={[styles.subjectCount, { color: colors.textSecondary }]}>{group.items.length} {group.items.length === 1 ? 'theme' : 'themes'}</Text>
+              </View>
+              {group.items.map((item) => {
               const expanded = expandedManifestation === item.manifestation_id;
               const toneColor = OUTCOME_COLORS[item.outcome_tone] || OUTCOME_COLORS.neutral;
               return <View key={item.manifestation_id} style={[styles.manifestationCard, { backgroundColor: ui.surfaceRaised, borderColor: ui.border, borderLeftColor: toneColor }]}>
-                <View style={styles.manifestationHeading}><View style={{ flex: 1 }}><Text style={[styles.eyebrow, { color: colors.textSecondary }]}>{subjectContextLabel(item.subject)} · {sentence(item.domain)}</Text><Text style={[styles.manifestationTitle, { color: colors.text }]}>{sentence(item.label)}</Text></View><View style={[styles.confidenceBadge, { backgroundColor: `${toneColor}16` }]}><Text style={[styles.confidence, { color: toneColor }]}>{SYNTHESIS_STRENGTH_LABELS[item.synthesis_strength] || 'Evidence available'}</Text></View></View>
+                <View style={styles.manifestationHeading}><View style={{ flex: 1 }}><Text style={[styles.eyebrow, { color: colors.textSecondary }]}>{sentence(item.domain)}</Text><Text style={[styles.manifestationTitle, { color: colors.text }]}>{sentence(item.label)}</Text></View><View style={[styles.confidenceBadge, { backgroundColor: `${toneColor}16` }]}><Text style={[styles.confidence, { color: toneColor }]}>{SYNTHESIS_STRENGTH_LABELS[item.synthesis_strength] || 'Evidence available'}</Text></View></View>
                 <View style={styles.manifestationChips}><Text style={[styles.manifestationChip, { color: toneColor, backgroundColor: `${toneColor}18` }]}>{OUTCOME_LABELS[item.outcome_tone] || sentence(item.outcome_tone)}</Text><Text style={[styles.manifestationChip, { color: colors.textSecondary, backgroundColor: `${toneColor}12` }]}>{item.window?.start_date <= asOf && item.window?.end_date >= asOf ? 'Active now' : 'Upcoming'} · {shortDate(item.window?.start_date)} – {shortDate(item.window?.end_date)}</Text></View>
                 <View style={styles.manifestationHouses}>{(item.house_roles || []).map((role) => <View key={`${role.native_house}-${role.relative_house}`} style={[styles.manifestationHouse, { backgroundColor: ui.surfaceMuted, borderColor: ui.border }]}><Text style={[styles.comboHouses, { color: toneColor }]}>H{role.native_house}{item.subject !== 'self' ? ` · for your ${item.subject}, this is H${role.relative_house}` : ''}</Text><Text style={[styles.reasonBody, { color: colors.textSecondary }]}>{role.role}</Text></View>)}</View>
                 <Text style={[styles.reasonTitle, { color: colors.text, marginTop: 14 }]}>What you may notice</Text>
@@ -383,7 +442,8 @@ export default function ActivationExplorerScreen({ navigation, route }) {
                   </View> : null)}
                 </View> : null}
               </View>;
-            }) : <View style={styles.manifestationEmpty}><Text style={[styles.reasonTitle, { color: colors.text }]}>No combined life theme is clear in this period</Text><Text style={[styles.stateText, { color: colors.textSecondary }]}>Some individual houses may still be active, but they do not yet join into one reliable real-life story.</Text></View>}
+            })}
+            </View>) : <View style={styles.manifestationEmpty}><Text style={[styles.reasonTitle, { color: colors.text }]}>No combined life theme is clear in this period</Text><Text style={[styles.stateText, { color: colors.textSecondary }]}>Some individual houses may still be active, but they do not yet join into one reliable real-life story.</Text></View>}
           </View>}
         </> : null}
 
@@ -536,6 +596,18 @@ const styles = StyleSheet.create({
   combo: { borderTopWidth: 1, paddingVertical: 12 },
   comboHouses: { fontSize: 11, lineHeight: 15, fontWeight: '700', marginBottom: 3, letterSpacing: 0.25 },
   manifestationSection: { gap: 3 },
+  subjectSection: { marginTop: 18 },
+  subjectSectionHeader: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  subjectIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  subjectSectionTitle: { flex: 1, fontSize: 17, lineHeight: 22, fontWeight: '700', letterSpacing: -0.2 },
+  subjectCount: { fontSize: 11, lineHeight: 15, fontWeight: '500' },
   manifestationCard: {
     borderWidth: 1,
     borderLeftWidth: 3,

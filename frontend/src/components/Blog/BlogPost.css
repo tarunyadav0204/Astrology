@@ -248,15 +248,52 @@
 .post-content h2 {
     font-size: 24px;
     font-weight: 600;
-    margin: 25px 0 15px 0;
+    margin: 28px 0 12px 0;
     color: #333;
 }
 
 .post-content h3 {
     font-size: 20px;
     font-weight: 600;
-    margin: 20px 0 10px 0;
+    margin: 24px 0 10px 0;
     color: #444;
+}
+
+.post-content h2:first-child,
+.post-content h3:first-child,
+.post-content h4:first-child {
+    margin-top: 0;
+}
+
+.post-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.post-content table th,
+.post-content table td {
+    padding: 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+    vertical-align: top;
+}
+
+.post-content table th,
+.post-content table tr:first-child td {
+    background: #f8f9fa;
+    font-weight: 600;
+}
+
+.post-content table tr:nth-child(even) {
+    background: #f9f9f9;
+}
+
+.post-content ul,
+.post-content ol {
+    margin: 8px 0 18px;
+    padding-left: 22px;
 }
 
 .post-content ul {
@@ -276,32 +313,6 @@
 .post-content p:has(+ table),
 .post-content p:has(table) {
     margin-bottom: 5px;
-}
-
-.post-content table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 0 0 10px 0 !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.post-content br + table {
-    margin-top: -15px !important;
-}
-
-.post-content table td {
-    padding: 12px;
-    border: 1px solid #ddd;
-    text-align: left;
-}
-
-.post-content table tr:first-child td {
-    background: #f8f9fa;
-    font-weight: 600;
-}
-
-.post-content table tr:nth-child(even) {
-    background: #f9f9f9;
 }
 
 .post-content strong {

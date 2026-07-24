@@ -272,6 +272,14 @@ class CreditService:
             self._safe_ddl(conn, "ALTER TABLE user_subscriptions ADD COLUMN IF NOT EXISTS google_play_order_id TEXT")
             self._safe_ddl(conn, "ALTER TABLE play_subscription_token_map ADD COLUMN IF NOT EXISTS latest_order_id TEXT")
             self._safe_ddl(conn, "ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS razorpay_plan_id TEXT")
+            self._safe_ddl(
+                conn,
+                "ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS subscription_family TEXT NOT NULL DEFAULT 'vip'",
+            )
+            self._safe_ddl(
+                conn,
+                "ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS entitlement_key TEXT",
+            )
             for col_def in (
                 "billing_provider TEXT",
                 "razorpay_subscription_id TEXT",
@@ -489,6 +497,7 @@ class CreditService:
                     FROM user_subscriptions us
                     JOIN subscription_plans sp ON us.plan_id = sp.plan_id
                     WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= {date_expr}
+                      AND COALESCE(sp.subscription_family, 'vip') = 'vip'
                     ORDER BY sp.discount_percent DESC
                     LIMIT 1
                 """, (userid,))
@@ -510,6 +519,7 @@ class CreditService:
                     FROM user_subscriptions us
                     JOIN subscription_plans sp ON us.plan_id = sp.plan_id
                     WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= {date_expr}
+                      AND COALESCE(sp.subscription_family, 'vip') = 'vip'
                     ORDER BY sp.discount_percent DESC
                     LIMIT 1
                 """, (userid,))
@@ -518,7 +528,7 @@ class CreditService:
             row = None
         return (row[0] if row and row[0] else None) or None
 
-    def get_user_subscription_details(self, userid: int) -> Optional[dict]:
+    def get_user_subscription_details(self, userid: int, family: str = "vip") -> Optional[dict]:
         """Return full details of user's active subscription: tier_name, discount_percent, start_date, end_date, features. None if no active subscription."""
         from db import get_conn, execute
         try:
@@ -527,13 +537,15 @@ class CreditService:
                 cursor = execute(conn, f"""
                     SELECT sp.tier_name, sp.discount_percent, us.start_date, us.end_date, sp.features,
                            us.billing_provider, us.razorpay_subscription_id, us.cancel_at_period_end,
-                           sp.plan_id, sp.price, sp.google_play_product_id
+                           sp.plan_id, sp.price, sp.google_play_product_id,
+                           COALESCE(sp.subscription_family, 'vip'), sp.entitlement_key
                     FROM user_subscriptions us
                     JOIN subscription_plans sp ON us.plan_id = sp.plan_id
                     WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= {date_expr}
+                      AND COALESCE(sp.subscription_family, 'vip') = ?
                     ORDER BY sp.discount_percent DESC
                     LIMIT 1
-                """, (userid,))
+                """, (userid, (family or "vip").strip().lower()))
                 row = cursor.fetchone()
         except Exception:
             row = None
@@ -565,9 +577,20 @@ class CreditService:
             "plan_id": internal_plan_id,
             "plan_price_inr": plan_price,
             "google_play_product_id": google_product_id,
+            "subscription_family": row[11] or "vip",
+            "entitlement_key": row[12],
             "manage_in_google_play": billing_provider == "google_play",
             "manage_on_web": billing_provider == "razorpay",
         }
+
+    def get_active_subscription_details(self, userid: int) -> List[dict]:
+        """Return one active subscription per family."""
+        details = []
+        for family in ("vip", "astrologer"):
+            row = self.get_user_subscription_details(userid, family=family)
+            if row:
+                details.append(row)
+        return details
 
     def get_plan_id_by_google_play_product_id(self, product_id: str, platform: str = "astroroshni") -> Optional[int]:
         """Return plan_id for subscription_plans where google_play_product_id = product_id. None if not found."""
@@ -603,7 +626,7 @@ class CreditService:
         return None
 
     def list_razorpay_subscription_plans(self, platform: str = "astroroshni") -> List[dict]:
-        """VIP plans available for Razorpay web subscriptions."""
+        """All paid plans available for Razorpay web subscriptions."""
         from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
 
         with get_conn() as conn:
@@ -611,14 +634,15 @@ class CreditService:
                 conn,
                 f"""
                 SELECT plan_id, tier_name, discount_percent, google_play_product_id,
-                       price, features, razorpay_plan_id
+                       price, features, razorpay_plan_id,
+                       COALESCE(subscription_family, 'vip'), entitlement_key
                 FROM subscription_plans
                 WHERE platform = ?
                   AND {SQL_SUBSCRIPTION_PLAN_ACTIVE}
                   AND google_play_product_id IS NOT NULL
                   AND TRIM(google_play_product_id) <> ''
-                  AND COALESCE(discount_percent, 0) > 0
-                ORDER BY COALESCE(discount_percent, 0) ASC
+                ORDER BY CASE WHEN COALESCE(subscription_family, 'vip') = 'astrologer' THEN 0 ELSE 1 END,
+                         COALESCE(discount_percent, 0) ASC
                 """,
                 (platform,),
             )
@@ -644,6 +668,8 @@ class CreditService:
                     "amount_display": f"₹{int(price)}" if price == int(price) else f"₹{price:.2f}",
                     "razorpay_plan_id": rz_plan,
                     "benefits": parse_plan_benefits(features_raw),
+                    "subscription_family": r[7] or "vip",
+                    "entitlement_key": r[8],
                 }
             )
         return plans
@@ -655,7 +681,8 @@ class CreditService:
             cur = execute(
                 conn,
                 f"""
-                SELECT plan_id, tier_name, discount_percent, google_play_product_id, price, razorpay_plan_id
+                SELECT plan_id, tier_name, discount_percent, google_play_product_id, price, razorpay_plan_id,
+                       COALESCE(subscription_family, 'vip'), entitlement_key
                 FROM subscription_plans
                 WHERE plan_id = ? AND {SQL_SUBSCRIPTION_PLAN_ACTIVE}
                 """,
@@ -673,6 +700,8 @@ class CreditService:
             "product_id": product_id,
             "price_inr": float(row[4]) if row[4] is not None else 0.0,
             "razorpay_plan_id": rz_plan,
+            "subscription_family": row[6] or "vip",
+            "entitlement_key": row[7],
         }
 
     def get_plan_by_razorpay_plan_id(self, razorpay_plan_id: str, platform: str = "astroroshni") -> Optional[dict]:
@@ -686,7 +715,8 @@ class CreditService:
             cur = execute(
                 conn,
                 f"""
-                SELECT plan_id, tier_name, discount_percent, google_play_product_id, price, razorpay_plan_id
+                SELECT plan_id, tier_name, discount_percent, google_play_product_id, price, razorpay_plan_id,
+                       COALESCE(subscription_family, 'vip'), entitlement_key
                 FROM subscription_plans
                 WHERE platform = ? AND {SQL_SUBSCRIPTION_PLAN_ACTIVE}
                   AND TRIM(COALESCE(razorpay_plan_id, '')) = ?
@@ -703,13 +733,20 @@ class CreditService:
                 "product_id": product_id,
                 "price_inr": float(row[4]) if row[4] is not None else 0.0,
                 "razorpay_plan_id": rz,
+                "subscription_family": row[6] or "vip",
+                "entitlement_key": row[7],
             }
         for plan in self.list_razorpay_subscription_plans(platform):
             if plan.get("razorpay_plan_id") == rz:
                 return self.get_plan_by_internal_id(plan["plan_id"])
         return None
 
-    def user_has_active_google_play_subscription(self, userid: int, platform: str = "astroroshni") -> bool:
+    def user_has_active_google_play_subscription(
+        self,
+        userid: int,
+        platform: str = "astroroshni",
+        family: Optional[str] = None,
+    ) -> bool:
         from db import get_conn, execute
 
         with get_conn() as conn:
@@ -724,9 +761,10 @@ class CreditService:
                   AND us.status = 'active'
                   AND us.end_date >= {self._date_today_expr()}
                   AND COALESCE(us.billing_provider, 'google_play') <> 'razorpay'
+                  AND (? IS NULL OR COALESCE(sp.subscription_family, 'vip') = ?)
                 LIMIT 1
                 """,
-                (userid, platform),
+                (userid, platform, family, family),
             )
             return bool(cur.fetchone())
 
@@ -847,11 +885,15 @@ class CreditService:
         rz_sub = (razorpay_subscription_id or "").strip() or None
         try:
             with get_conn() as conn:
-                cursor = execute(conn, "SELECT platform FROM subscription_plans WHERE plan_id = ?", (plan_id,))
+                cursor = execute(
+                    conn,
+                    "SELECT platform, COALESCE(subscription_family, 'vip') FROM subscription_plans WHERE plan_id = ?",
+                    (plan_id,),
+                )
                 row = cursor.fetchone()
                 if not row:
                     return False
-                platform = row[0]
+                platform, family = row[0], row[1] or "vip"
 
                 # Cleanup: rows that are marked active but already lapsed should not stay active.
                 today_expr = self._date_today_expr()
@@ -863,9 +905,12 @@ class CreditService:
                     WHERE userid = ?
                       AND status = 'active'
                       AND end_date < {today_expr}
-                      AND plan_id IN (SELECT plan_id FROM subscription_plans WHERE platform = ?)
+                      AND plan_id IN (
+                          SELECT plan_id FROM subscription_plans
+                          WHERE platform = ? AND COALESCE(subscription_family, 'vip') = ?
+                      )
                     """,
-                    (userid, platform),
+                    (userid, platform, family),
                 )
 
                 # Idempotency key for a single billing cycle entitlement window.
@@ -918,9 +963,12 @@ class CreditService:
                         WHERE userid = ?
                           AND id <> ?
                           AND status = 'active'
-                          AND plan_id IN (SELECT plan_id FROM subscription_plans WHERE platform = ?)
+                          AND plan_id IN (
+                              SELECT plan_id FROM subscription_plans
+                              WHERE platform = ? AND COALESCE(subscription_family, 'vip') = ?
+                          )
                         """,
-                        (userid, keep_id, platform),
+                        (userid, keep_id, platform, family),
                     )
                 else:
                     execute(
@@ -930,9 +978,12 @@ class CreditService:
                         SET status = 'inactive'
                         WHERE userid = ?
                           AND status = 'active'
-                          AND plan_id IN (SELECT plan_id FROM subscription_plans WHERE platform = ?)
+                          AND plan_id IN (
+                              SELECT plan_id FROM subscription_plans
+                              WHERE platform = ? AND COALESCE(subscription_family, 'vip') = ?
+                          )
                         """,
-                        (userid, platform),
+                        (userid, platform, family),
                     )
                     execute(
                         conn,
@@ -1041,7 +1092,12 @@ class CreditService:
         except Exception:
             return False
 
-    def get_latest_subscription_on_platform(self, userid: int, platform: str) -> Optional[dict]:
+    def get_latest_subscription_on_platform(
+        self,
+        userid: int,
+        platform: str,
+        family: Optional[str] = None,
+    ) -> Optional[dict]:
         """Most recent subscription row for user on platform (any status), for renewal inference."""
         from db import get_conn, execute
         try:
@@ -1054,10 +1110,11 @@ class CreditService:
                     JOIN subscription_plans sp ON us.plan_id = sp.plan_id
                     WHERE us.userid = ?
                       AND sp.platform = ?
+                      AND (? IS NULL OR COALESCE(sp.subscription_family, 'vip') = ?)
                     ORDER BY us.end_date DESC NULLS LAST, us.created_at DESC NULLS LAST, us.id DESC
                     LIMIT 1
                     """,
-                    (userid, platform),
+                    (userid, platform, family, family),
                 )
                 row = cur.fetchone()
         except Exception:

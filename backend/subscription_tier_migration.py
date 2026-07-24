@@ -39,6 +39,9 @@ def ensure_subscription_tier_schema(db_path: str = None) -> None:
             ("tier_name", "TEXT"),
             ("discount_percent", "INTEGER DEFAULT 0"),
             ("google_play_product_id", "TEXT"),
+            ("razorpay_plan_id", "TEXT"),
+            ("subscription_family", "TEXT NOT NULL DEFAULT 'vip'"),
+            ("entitlement_key", "TEXT"),
         ]:
             col_name, col_type = col_def
             try:
@@ -108,6 +111,36 @@ def ensure_subscription_tier_schema(db_path: str = None) -> None:
             conn.commit()
         except sqlite3.OperationalError:
             pass
+
+        # 8) Seed the monthly professional-tools entitlement independently of VIP.
+        cursor.execute(
+            """
+            SELECT plan_id
+            FROM subscription_plans
+            WHERE platform = ?
+              AND google_play_product_id = ?
+            """,
+            (PLATFORM_ASTROROSHNI, "astrologer_license_monthly"),
+        )
+        if cursor.fetchone() is None:
+            cursor.execute(
+                """
+                INSERT INTO subscription_plans (
+                    platform, plan_name, price, duration_months, features, is_active,
+                    tier_name, discount_percent, google_play_product_id,
+                    subscription_family, entitlement_key
+                )
+                VALUES (?, ?, 100.00, 1, ?, 1, ?, 0, ?, 'astrologer', 'astrologer_tools')
+                """,
+                (
+                    PLATFORM_ASTROROSHNI,
+                    "astrologer_license_monthly",
+                    '{"benefits":["What is activated now?","Professional house activation reasoning","Combined chart manifestations"],"entitlements":["astrologer_tools"]}',
+                    "Astrologer License",
+                    "astrologer_license_monthly",
+                ),
+            )
+            conn.commit()
     finally:
         conn.close()
 

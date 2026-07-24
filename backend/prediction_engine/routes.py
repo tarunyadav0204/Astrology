@@ -10,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 
 from auth import User, get_current_user
 from birth_charts.routes import _row_to_chart
+from credits.entitlements import ASTROLOGER_TOOLS_ENTITLEMENT, require_entitlement
 from db import execute, get_conn
 from utils.timezone_service import get_iana_timezone
 
@@ -103,6 +104,7 @@ async def get_activation_explorer(
 ):
     """Return a deterministic, traceable activation dossier for one chart."""
     try:
+        require_entitlement(current_user, ASTROLOGER_TOOLS_ENTITLEMENT)
         chart = (
             _load_owned_birth_chart(payload.birth_chart_id, current_user.userid)
             if payload.birth_chart_id is not None
