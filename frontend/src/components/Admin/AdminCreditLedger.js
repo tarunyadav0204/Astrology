@@ -471,9 +471,9 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
               </h2>
               <div className="ledger-summary">
                 <span className="ledger-summary-chip ledger-summary-chip--bought">
-                  Purchased Credits: {Number(searchSummary.purchased_credits || 0).toLocaleString('en-IN')}
+                  Net Purchased Credits: {Number(searchSummary.purchased_credits || 0).toLocaleString('en-IN')}
                   {' · '}
-                  Purchase amount: ₹{Number(searchSummary.purchased_amount_inr || 0).toLocaleString('en-IN')}
+                  Net Purchase amount: ₹{Number(searchSummary.purchased_amount_inr || 0).toLocaleString('en-IN')}
                 </span>
                 <span className="ledger-summary-chip ledger-summary-chip--spent">
                   User Spend: {searchSummary.user_spend_credits}

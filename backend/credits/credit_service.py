@@ -4041,8 +4041,16 @@ class CreditService:
                     AND ct2.source IN ('google_play', 'razorpay')
                     AND ct2.transaction_type IN ('earned', 'refund')
               )
-              AND ct.source IN ('google_play', 'razorpay')
-              AND ct.transaction_type IN ('earned', 'refund')
+              AND (
+                    (
+                        ct.source IN ('google_play', 'razorpay')
+                        AND ct.transaction_type IN ('earned', 'refund')
+                    )
+                    OR (
+                        ct.source IN ('google_play_refund', 'razorpay_refund')
+                        AND ct.transaction_type = 'spent'
+                    )
+                  )
             """
             params.extend([from_date, to_date, from_date, to_date])
 
@@ -4051,12 +4059,34 @@ class CreditService:
                 COALESCE(SUM(CASE
                     WHEN ct.source IN ('google_play', 'razorpay')
                      AND ct.transaction_type IN ('earned', 'refund')
-                    THEN ABS(ct.amount) ELSE 0 END), 0) AS purchased_credits,
+                    THEN ABS(ct.amount)
+                    WHEN ct.source IN ('google_play_refund', 'razorpay_refund')
+                     AND ct.transaction_type = 'spent'
+                    THEN -ABS(ct.amount)
+                    ELSE 0 END), 0) AS purchased_credits,
                 COALESCE(SUM(CASE
                     WHEN ct.source IN ('google_play', 'razorpay')
                      AND ct.transaction_type IN ('earned', 'refund')
                     THEN ABS(ct.amount) * CASE
                         WHEN date(ct.created_at) >= DATE '2026-07-15' THEN 2
+                        ELSE 1
+                    END
+                    WHEN ct.source IN ('google_play_refund', 'razorpay_refund')
+                     AND ct.transaction_type = 'spent'
+                    THEN -ABS(ct.amount) * CASE
+                        -- Use the purchase date for the INR conversion when the
+                        -- reversal points back to its original payment/order.
+                        WHEN date(COALESCE(
+                            (
+                                SELECT MIN(original.created_at)
+                                FROM credit_transactions original
+                                WHERE original.userid = ct.userid
+                                  AND original.reference_id = ct.reference_id
+                                  AND original.source IN ('google_play', 'razorpay')
+                                  AND original.transaction_type IN ('earned', 'refund')
+                            ),
+                            ct.created_at
+                        )) >= DATE '2026-07-15' THEN 2
                         ELSE 1
                     END
                     ELSE 0 END), 0) AS purchased_amount_inr,
