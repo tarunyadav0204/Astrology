@@ -533,7 +533,18 @@
     "clearGenderTitle": "Clear gender?",
     "clearGenderBody": "You can set this again anytime.",
     "clear": "Clear",
-    "sectionDanger": "Danger zone"
+    "sectionDanger": "Danger zone",
+    "deleteChoiceTitle": "Delete account or only chats?",
+    "deleteChoiceBody": "If you only want to remove your conversations, you do not need to delete your account. Choose Delete All Chat History to keep your account, birth charts, subscriptions and credits.\n\nContinue Account Deletion only if you want to permanently remove your entire account and associated data.",
+    "continueAccountDeletion": "Continue Account Deletion",
+    "deleteAllChatHistory": "Delete All Chat History",
+    "deleteChatsConfirmTitle": "Delete all chat history?",
+    "deleteChatsConfirmBody": "Every question and answer in your chat history will be permanently deleted. Your account, birth charts and credits will remain available.",
+    "deleteAllChats": "Delete All Chats",
+    "chatHistoryDeletedTitle": "Chat history deleted",
+    "chatHistoryDeletedCount": "{{count}} chat messages have been permanently deleted. Your account, charts and credits are unchanged.",
+    "chatHistoryAlreadyEmpty": "Your chat history is already empty. Your account, charts and credits are unchanged.",
+    "chatHistoryDeleteFailedTitle": "Could not delete chat history"
   },
   "about": {
     "title": "About AstroRoshni",

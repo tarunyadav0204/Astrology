@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
-import { authAPI } from '../../services/api';
+import { authAPI, chatAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import AppAlertModal from '../Common/AppAlertModal';
 
@@ -39,6 +39,7 @@ export default function AccountSecurityScreen({ navigation }) {
   const [savingPw, setSavingPw] = useState(false);
   const [savingEmail, setSavingEmail] = useState(false);
   const [savingGender, setSavingGender] = useState(false);
+  const [deletingChatHistory, setDeletingChatHistory] = useState(false);
   const [errorBanner, setErrorBanner] = useState('');
   const [appAlert, setAppAlert] = useState(null);
 
@@ -290,7 +291,7 @@ export default function AccountSecurityScreen({ navigation }) {
     });
   };
 
-  const onDeleteAccount = () => {
+  const confirmAccountDeletion = () => {
     setAppAlert({
       variant: 'warning',
       title: t('profile.deleteAccountTitle', 'Delete Account'),
@@ -318,8 +319,84 @@ export default function AccountSecurityScreen({ navigation }) {
     });
   };
 
+  const deleteAllChatHistory = async () => {
+    setDeletingChatHistory(true);
+    try {
+      const { data } = await chatAPI.clearHistory();
+      await storage.clearChatHistory();
+      const deletedMessages = Number(data?.deleted_messages || 0);
+      setAppAlert({
+        variant: 'success',
+        title: t('accountSecurity.chatHistoryDeletedTitle', 'Chat history deleted'),
+        message:
+          deletedMessages > 0
+            ? t(
+                'accountSecurity.chatHistoryDeletedCount',
+                {
+                  count: deletedMessages,
+                  defaultValue:
+                    '{{count}} chat messages have been permanently deleted. Your account, charts and credits are unchanged.',
+                }
+              )
+            : t(
+                'accountSecurity.chatHistoryAlreadyEmpty',
+                'Your chat history is already empty. Your account, charts and credits are unchanged.'
+              ),
+        primaryText: t('common.ok', 'OK'),
+      });
+    } catch (e) {
+      setAppAlert({
+        variant: 'error',
+        title: t('accountSecurity.chatHistoryDeleteFailedTitle', 'Could not delete chat history'),
+        message: formatApiError(e, t),
+        primaryText: t('common.ok', 'OK'),
+      });
+    } finally {
+      setDeletingChatHistory(false);
+    }
+  };
+
+  const confirmChatHistoryDeletion = () => {
+    setAppAlert({
+      variant: 'warning',
+      title: t('accountSecurity.deleteChatsConfirmTitle', 'Delete all chat history?'),
+      message: t(
+        'accountSecurity.deleteChatsConfirmBody',
+        'Every question and answer in your chat history will be permanently deleted. Your account, birth charts and credits will remain available.'
+      ),
+      secondaryText: t('common.cancel', 'Cancel'),
+      primaryText: t('accountSecurity.deleteAllChats', 'Delete All Chats'),
+      onPrimaryPress: deleteAllChatHistory,
+    });
+  };
+
+  const onDeleteAccount = () => {
+    setAppAlert({
+      variant: 'info',
+      title: t('accountSecurity.deleteChoiceTitle', 'Delete account or only chats?'),
+      message: t(
+        'accountSecurity.deleteChoiceBody',
+        'If you only want to remove your conversations, you do not need to delete your account. Choose Delete All Chat History to keep your account, birth charts, subscriptions and credits.\n\nContinue Account Deletion only if you want to permanently remove your entire account and associated data.'
+      ),
+      secondaryText: t('accountSecurity.continueAccountDeletion', 'Continue Account Deletion'),
+      primaryText: t('accountSecurity.deleteAllChatHistory', 'Delete All Chat History'),
+      stackButtons: true,
+      showCloseButton: true,
+      onSecondaryPress: confirmAccountDeletion,
+      onPrimaryPress: confirmChatHistoryDeletion,
+    });
+  };
+
   const handleAppAlertPrimary = () => {
     const fn = appAlert?.onPrimaryPress;
+    dismissAppAlert();
+    if (typeof fn === 'function') {
+      void Promise.resolve(fn()).catch(() => {});
+    }
+  };
+
+  const handleAppAlertSecondary = () => {
+    const fn = appAlert?.onSecondaryPress;
     dismissAppAlert();
     if (typeof fn === 'function') {
       void Promise.resolve(fn()).catch(() => {});
@@ -498,10 +575,18 @@ export default function AccountSecurityScreen({ navigation }) {
             {t('accountSecurity.sectionDanger', 'Danger zone')}
           </Text>
           <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
-            <TouchableOpacity style={styles.dangerBtn} onPress={onDeleteAccount}>
+            <TouchableOpacity
+              style={[styles.dangerBtn, { opacity: deletingChatHistory ? 0.6 : 1 }]}
+              onPress={onDeleteAccount}
+              disabled={deletingChatHistory}
+            >
+              {deletingChatHistory ? (
+                <ActivityIndicator color={colors.error} />
+              ) : (
               <Text style={[styles.dangerBtnText, { color: theme === 'dark' ? '#fff' : colors.error }]}>
                 {t('profile.deleteAccountAndData', 'Delete Account & Data')}
               </Text>
+              )}
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -514,7 +599,10 @@ export default function AccountSecurityScreen({ navigation }) {
         message={appAlert?.message}
         primaryText={appAlert?.primaryText ?? t('common.ok', 'OK')}
         secondaryText={appAlert?.secondaryText}
+        stackButtons={appAlert?.stackButtons === true}
+        showCloseButton={appAlert?.showCloseButton === true}
         onPrimaryPress={handleAppAlertPrimary}
+        onSecondaryPress={handleAppAlertSecondary}
         onRequestClose={dismissAppAlert}
       />
     </SafeAreaView>

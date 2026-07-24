@@ -2,15 +2,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from db import execute, get_conn
 
 logger = logging.getLogger(__name__)
 
 VALID_EVENTS = frozenset({"card_shown", "card_clicked", "remedy_delivered"})
-# Admin date filters use IST calendar days (product audience is primarily India).
-_ADMIN_TZ = "Asia/Kolkata"
 
 
 def ensure_remedy_funnel_table(conn) -> None:
@@ -102,14 +100,19 @@ def record_funnel_event(
             return True
 
 
-def _date_clause(from_date: Optional[str], to_date: Optional[str], col: str = "created_at"):
+def _inclusive_date_clause(
+    from_date: Optional[str],
+    to_date: Optional[str],
+    col: str,
+) -> Tuple[List[str], List[Any]]:
+    """Same inclusive date(col) pattern as working admin credit dashboards."""
     clauses: List[str] = []
     params: List[Any] = []
     if from_date:
-        clauses.append(f"({col} AT TIME ZONE '{_ADMIN_TZ}')::date >= ?::date")
+        clauses.append(f"date({col}) >= ?")
         params.append(from_date)
     if to_date:
-        clauses.append(f"({col} AT TIME ZONE '{_ADMIN_TZ}')::date <= ?::date")
+        clauses.append(f"date({col}) <= ?")
         params.append(to_date)
     return clauses, params
 
@@ -120,72 +123,81 @@ def get_funnel_analytics(
     to_date: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Cohort funnel keyed by remedy-card impressions.
+    Cohort funnel keyed by remedy cards persisted on chat answers.
 
-    Date range filters when the card was *shown* (IST calendar day). Later steps
-    count only matching (userid, message_id) that progressed — so tapped/delivered
-    can never exceed saw. Clicks/deliveries after the range still count for
-    impressions that entered in-range.
+    Impressions come from chat_messages.next_action (type=remedy), not sparse
+    client card_shown beacons. Date range filters answer completed_at.
+    Clicks/deliveries count only for those same message ids (any later time).
     """
-    shown_clauses, shown_params = _date_clause(from_date, to_date, "s.created_at")
-    shown_where = " AND ".join(["s.event_name = 'card_shown'", *shown_clauses])
+    date_clauses, date_params = _inclusive_date_clause(
+        from_date, to_date, "COALESCE(cm.completed_at, cm.started_at, cm.timestamp)"
+    )
+    date_sql = (" AND " + " AND ".join(date_clauses)) if date_clauses else ""
+
+    # next_action is TEXT JSON. Prefer jsonb; fall back handled via try/except below.
+    impression_sql = f"""
+        SELECT
+          COUNT(DISTINCT cs.user_id) AS users,
+          COUNT(*) AS events
+        FROM chat_messages cm
+        INNER JOIN chat_sessions cs ON cs.session_id = cm.session_id
+        WHERE cm.sender = 'assistant'
+          AND cm.status = 'completed'
+          AND cm.next_action IS NOT NULL
+          AND TRIM(cm.next_action) <> ''
+          AND LOWER(COALESCE(cm.next_action::jsonb ->> 'type', '')) = 'remedy'
+          {date_sql}
+    """
 
     with get_conn() as conn:
         ensure_remedy_funnel_table(conn)
 
-        # Impressions in range.
-        cur = execute(
-            conn,
-            f"""
-            SELECT COUNT(DISTINCT s.userid) AS users, COUNT(*) AS events
-            FROM remedy_funnel_events s
-            WHERE {shown_where}
-            """,
-            tuple(shown_params),
-        )
-        shown_row = cur.fetchone() or (0, 0)
+        try:
+            cur = execute(conn, impression_sql, tuple(date_params))
+            shown_row = cur.fetchone() or (0, 0)
+        except Exception:
+            logger.exception("remedy funnel impression query failed; retrying with json cast")
+            conn.rollback()
+            impression_sql_json = impression_sql.replace("::jsonb", "::json")
+            cur = execute(conn, impression_sql_json, tuple(date_params))
+            shown_row = cur.fetchone() or (0, 0)
+
         shown_users = int(shown_row[0] or 0)
         shown_events = int(shown_row[1] or 0)
 
-        # Among those impressions, how many got a matching click (any time).
-        cur = execute(
-            conn,
-            f"""
+        # Among those impression message ids, how many have a matching click / delivery.
+        progress_sql = f"""
             SELECT
-              COUNT(DISTINCT s.userid) AS users,
+              COUNT(DISTINCT cs.user_id) AS users,
               COUNT(*) AS events
-            FROM remedy_funnel_events s
-            INNER JOIN remedy_funnel_events c
-              ON c.userid = s.userid
-             AND COALESCE(c.message_id, '') = COALESCE(s.message_id, '')
-             AND c.event_name = 'card_clicked'
-            WHERE {shown_where}
-            """,
-            tuple(shown_params),
-        )
-        clicked_row = cur.fetchone() or (0, 0)
-        clicked_users = int(clicked_row[0] or 0)
-        clicked_events = int(clicked_row[1] or 0)
+            FROM chat_messages cm
+            INNER JOIN chat_sessions cs ON cs.session_id = cm.session_id
+            INNER JOIN remedy_funnel_events e
+              ON e.userid = cs.user_id
+             AND e.message_id = cm.message_id::text
+             AND e.event_name = ?
+            WHERE cm.sender = 'assistant'
+              AND cm.status = 'completed'
+              AND cm.next_action IS NOT NULL
+              AND TRIM(cm.next_action) <> ''
+              AND LOWER(COALESCE(cm.next_action::jsonb ->> 'type', '')) = 'remedy'
+              {date_sql}
+        """
 
-        # Among those impressions, how many got a matching remedy-only answer (any time).
-        cur = execute(
-            conn,
-            f"""
-            SELECT
-              COUNT(DISTINCT s.userid) AS users,
-              COUNT(*) AS events
-            FROM remedy_funnel_events s
-            INNER JOIN remedy_funnel_events d
-              ON d.userid = s.userid
-             AND COALESCE(d.message_id, '') = COALESCE(s.message_id, '')
-             AND d.event_name = 'remedy_delivered'
-            WHERE {shown_where}
-            """,
-            tuple(shown_params),
-        )
-        delivered_row = cur.fetchone() or (0, 0)
-        delivered_users = int(delivered_row[0] or 0)
-        delivered_events = int(delivered_row[1] or 0)
+        def _progress(event_name: str) -> Tuple[int, int]:
+            try:
+                cur2 = execute(conn, progress_sql, (event_name, *date_params))
+                row = cur2.fetchone() or (0, 0)
+            except Exception:
+                logger.exception("remedy funnel progress query failed event=%s", event_name)
+                conn.rollback()
+                sql_json = progress_sql.replace("::jsonb", "::json")
+                cur2 = execute(conn, sql_json, (event_name, *date_params))
+                row = cur2.fetchone() or (0, 0)
+            return int(row[0] or 0), int(row[1] or 0)
+
+        clicked_users, clicked_events = _progress("card_clicked")
+        delivered_users, delivered_events = _progress("remedy_delivered")
 
         steps: List[Dict[str, Any]] = [
             {
@@ -218,6 +230,7 @@ def get_funnel_analytics(
         return {
             "from_date": from_date,
             "to_date": to_date,
+            "impression_source": "chat_messages.next_action",
             "steps": steps,
             "click_to_delivered_pct": (
                 round(100.0 * delivered_users / clicked_users, 1) if clicked_users > 0 else None

@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   Animated,
   Alert,
-  Modal,
   Platform,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -29,6 +28,7 @@ import { pricingAPI } from '../../services/api';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { trackAstrologyEvent, trackEvent } from '../../utils/analytics';
 import { useAuthGate } from '../../auth/AuthGateContext';
+import AnalysisCreditModal from '../Analysis/AnalysisCreditModal';
 
 /** Map AI/backend section heading to karmaAnalysis.sectionTitles.<slug> */
 function karmaSectionTitleSlug(title) {
@@ -265,17 +265,6 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
       resume: { resumeRoute: 'KarmaAnalysis', resumeParams: { chartId: selectedChartId } },
     });
     if (!authOk) return;
-    if (credits < karmaCost) {
-      Alert.alert(
-        t('karmaAnalysis.insufficientCreditsTitle'),
-        t('karmaAnalysis.insufficientCreditsBody', { cost: karmaCost }),
-        [
-          { text: t('karmaAnalysis.getCredits'), onPress: () => navigation.navigate('Credits') },
-          { text: t('karmaAnalysis.cancel'), style: 'cancel' },
-        ]
-      );
-      return;
-    }
     setShowStartModal(true);
   };
 
@@ -293,17 +282,6 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   };
 
   const handleRegenerate = () => {
-    if (credits < karmaCost) {
-      Alert.alert(
-        t('karmaAnalysis.insufficientCreditsTitle'),
-        t('karmaAnalysis.insufficientCreditsBody', { cost: karmaCost }),
-        [
-          { text: t('karmaAnalysis.getCredits'), onPress: () => navigation.navigate('Credits') },
-          { text: t('karmaAnalysis.cancel'), style: 'cancel' },
-        ]
-      );
-      return;
-    }
     setShowRegenerateModal(true);
   };
 
@@ -768,15 +746,25 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-        <CreditModal
+        <AnalysisCreditModal
           visible={showStartModal}
           onClose={() => setShowStartModal(false)}
           onConfirm={confirmStartAnalysis}
+          onGetCredits={() => {
+            setShowStartModal(false);
+            navigation.navigate('Credits');
+          }}
           credits={credits}
           cost={karmaCost}
           title={uiText.confirmStartTitle}
-          colors={colors}
-          isDark={isDark}
+          canAfford={credits >= karmaCost}
+          description={credits >= karmaCost
+            ? t('karmaAnalysis.creditsModalWillUse', { cost: karmaCost })
+            : t('karmaAnalysis.insufficientCreditsBody', { cost: karmaCost })}
+          confirmLabel={t('karmaAnalysis.creditsModalConfirm')}
+          getCreditsLabel={t('karmaAnalysis.getCredits')}
+          cancelLabel={t('karmaAnalysis.creditsModalCancel')}
+          confirmGradientColors={[colors.primary, colors.secondary]}
         />
       </View>
     );
@@ -822,15 +810,25 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
             </>
           ),
         })}
-        <CreditModal
+        <AnalysisCreditModal
           visible={showRegenerateModal}
           onClose={() => setShowRegenerateModal(false)}
           onConfirm={confirmRegenerate}
+          onGetCredits={() => {
+            setShowRegenerateModal(false);
+            navigation.navigate('Credits');
+          }}
           credits={credits}
           cost={karmaCost}
           title={uiText.confirmRegenerateTitle}
-          colors={colors}
-          isDark={isDark}
+          canAfford={credits >= karmaCost}
+          description={credits >= karmaCost
+            ? t('karmaAnalysis.creditsModalWillUse', { cost: karmaCost })
+            : t('karmaAnalysis.insufficientCreditsBody', { cost: karmaCost })}
+          confirmLabel={t('karmaAnalysis.creditsModalConfirm')}
+          getCreditsLabel={t('karmaAnalysis.getCredits')}
+          cancelLabel={t('karmaAnalysis.creditsModalCancel')}
+          confirmGradientColors={[colors.primary, colors.secondary]}
         />
         <ScrollView 
           showsVerticalScrollIndicator={false} 
@@ -870,33 +868,6 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
         </ScrollView>
       </LinearGradient>
     </View>
-  );
-};
-
-const CreditModal = ({ visible, onClose, onConfirm, credits, cost, title, colors = {}, isDark = true }) => {
-  const { t } = useTranslation();
-  return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={[styles.modalOverlay, { backgroundColor: '#000000' }]}>
-        <View style={[styles.modalContent, { backgroundColor: colors.surface || '#2d1b4e', borderColor: colors.cardBorder || 'rgba(255,215,0,0.3)' }]}>
-          <Text style={[styles.modalTitle, { color: colors.accent || '#FFD700' }]}>{title}</Text>
-          <Text style={[styles.modalText, { color: colors.text || '#fff' }]}>
-            {t('karmaAnalysis.creditsModalWillUse', { cost })}
-          </Text>
-          <Text style={[styles.modalBalance, { color: colors.textSecondary || '#ccc' }]}>
-            {t('karmaAnalysis.creditsModalBalance', { credits })}
-          </Text>
-          <View style={styles.modalButtons}>
-            <TouchableOpacity style={[styles.modalButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.backgroundSecondary, borderColor: colors.cardBorder }]} onPress={onClose}>
-              <Text style={[styles.modalButtonText, { color: colors.text }]}>{t('karmaAnalysis.creditsModalCancel')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: colors.primary }]} onPress={onConfirm}>
-              <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary, { color: '#fff' }]}>{t('karmaAnalysis.creditsModalConfirm')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
   );
 };
 
@@ -1407,65 +1378,6 @@ const styles = StyleSheet.create({
   startButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1a0033',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#2d1b4e',
-    borderRadius: 20,
-    padding: 30,
-    width: '85%',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.3)',
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#FFD700',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  modalText: {
-    fontSize: 16,
-    color: '#fff',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  modalBalance: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: 25,
-    textAlign: 'center',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 15,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  modalButtonPrimary: {
-    backgroundColor: '#FFD700',
-    borderColor: '#FFD700',
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-    textAlign: 'center',
-  },
-  modalButtonTextPrimary: {
     color: '#1a0033',
   },
 });

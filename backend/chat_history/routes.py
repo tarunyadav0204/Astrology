@@ -4223,7 +4223,16 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         if result.get('success'):
             await _close_wait_side_conversation(message_id)
             try:
-                from credits.remedy_funnel import record_funnel_event
+                from credits.remedy_funnel import record_funnel_event as record_remedy_funnel_event
+                from credits.free_answer_funnel import record_funnel_event as record_free_answer_funnel_event
+
+                if using_free_question and message_id is not None:
+                    record_free_answer_funnel_event(
+                        userid=int(user_id),
+                        event_name="blur_shown",
+                        message_id=str(message_id),
+                        platform="server",
+                    )
 
                 next_action_payload = result.get("next_action")
                 if (
@@ -4232,7 +4241,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     and message_id is not None
                 ):
                     # Authoritative impression: card was attached to the answer the client will render.
-                    record_funnel_event(
+                    record_remedy_funnel_event(
                         userid=int(user_id),
                         event_name="card_shown",
                         message_id=str(message_id),
@@ -4253,14 +4262,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     # Must key off the source (card) message so delivered joins to card_shown/clicked.
                     source_mid = str(source_mid).strip() if source_mid else ""
                     if source_mid:
-                        record_funnel_event(
+                        record_remedy_funnel_event(
                             userid=int(user_id),
                             event_name="remedy_delivered",
                             message_id=source_mid,
                             platform="server",
                         )
             except Exception:
-                logger.exception("remedy funnel post-persist events failed message_id=%s", message_id)
+                logger.exception("funnel post-persist events failed message_id=%s", message_id)
         
         # Extract facts AFTER transaction commits to avoid database lock
         if result.get('success') and birth_chart_id:
@@ -4385,6 +4394,161 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             error_type=type(e).__name__,
             error=str(e)[:240],
         )
+
+def _delete_optional_chat_history_rows(conn, savepoint: str, sql: str, params: tuple) -> int:
+    """Delete auxiliary chat data when its optional table is available."""
+    execute(conn, f"SAVEPOINT {savepoint}")
+    try:
+        cur = execute(conn, sql, params)
+        deleted = int(cur.rowcount or 0)
+        execute(conn, f"RELEASE SAVEPOINT {savepoint}")
+        return deleted
+    except Exception as exc:
+        execute(conn, f"ROLLBACK TO SAVEPOINT {savepoint}")
+        logger.warning("Optional chat-history cleanup %s skipped: %s", savepoint, exc)
+        return 0
+
+
+def _delete_all_chat_history_tx(conn, user_id: int) -> dict:
+    """Delete every persisted conversation owned by one user, within the caller transaction."""
+    session_subquery = "SELECT session_id FROM chat_sessions WHERE user_id = %s"
+
+    deleted_podcasts = _delete_optional_chat_history_rows(
+        conn,
+        "sp_clear_chat_podcasts",
+        "DELETE FROM podcast_history WHERE userid = %s",
+        (user_id,),
+    )
+    deleted_wait_messages = _delete_optional_chat_history_rows(
+        conn,
+        "sp_clear_chat_wait_messages",
+        """
+            DELETE FROM chat_wait_conversation_messages
+            WHERE conversation_id IN (
+                SELECT conversation_id
+                FROM chat_wait_conversations
+                WHERE user_id = %s
+            )
+        """,
+        (user_id,),
+    )
+    deleted_wait_conversations = _delete_optional_chat_history_rows(
+        conn,
+        "sp_clear_chat_wait_conversations",
+        "DELETE FROM chat_wait_conversations WHERE user_id = %s",
+        (user_id,),
+    )
+    deleted_local_tasks = _delete_optional_chat_history_rows(
+        conn,
+        "sp_clear_chat_local_tasks",
+        f"""
+            DELETE FROM local_chat_task_queue
+            WHERE message_id IN (
+                SELECT message_id
+                FROM chat_messages
+                WHERE session_id IN ({session_subquery})
+            )
+        """,
+        (user_id,),
+    )
+    deleted_conversation_states = _delete_optional_chat_history_rows(
+        conn,
+        "sp_clear_chat_conversation_state",
+        f"DELETE FROM conversation_state WHERE session_id IN ({session_subquery})",
+        (user_id,),
+    )
+
+    # Older production schemas may not have ON DELETE CASCADE on message_feedback.
+    deleted_feedback = _delete_optional_chat_history_rows(
+        conn,
+        "sp_clear_chat_feedback",
+        f"""
+            DELETE FROM message_feedback
+            WHERE message_id IN (
+                SELECT message_id
+                FROM chat_messages
+                WHERE session_id IN ({session_subquery})
+            )
+        """,
+        (user_id,),
+    )
+    deleted_qa_reports = _delete_optional_chat_history_rows(
+        conn,
+        "sp_clear_chat_qa_reports",
+        "DELETE FROM admin_response_qa_reports WHERE user_id = %s",
+        (user_id,),
+    )
+    deleted_error_logs = _delete_optional_chat_history_rows(
+        conn,
+        "sp_clear_chat_error_logs",
+        "DELETE FROM chat_error_logs WHERE user_id = %s",
+        (user_id,),
+    )
+
+    # Preserve campaign funnel counts while removing the copied question text.
+    execute(conn, "SAVEPOINT sp_clear_chat_nudge_questions")
+    try:
+        cur = execute(
+            conn,
+            """
+                UPDATE nudge_conversions
+                SET question = NULL
+                WHERE userid = %s
+                  AND question IS NOT NULL
+            """,
+            (user_id,),
+        )
+        scrubbed_nudge_questions = int(cur.rowcount or 0)
+        execute(conn, "RELEASE SAVEPOINT sp_clear_chat_nudge_questions")
+    except Exception as exc:
+        execute(conn, "ROLLBACK TO SAVEPOINT sp_clear_chat_nudge_questions")
+        logger.warning("Optional chat-history cleanup sp_clear_chat_nudge_questions skipped: %s", exc)
+        scrubbed_nudge_questions = 0
+
+    cur = execute(
+        conn,
+        f"DELETE FROM chat_messages WHERE session_id IN ({session_subquery})",
+        (user_id,),
+    )
+    deleted_messages = int(cur.rowcount or 0)
+    cur = execute(conn, "DELETE FROM chat_sessions WHERE user_id = %s", (user_id,))
+    deleted_sessions = int(cur.rowcount or 0)
+
+    return {
+        "deleted_messages": deleted_messages,
+        "deleted_sessions": deleted_sessions,
+        "deleted_conversation_states": deleted_conversation_states,
+        "deleted_feedback": deleted_feedback,
+        "deleted_podcast_history": deleted_podcasts,
+        "deleted_wait_messages": deleted_wait_messages,
+        "deleted_wait_conversations": deleted_wait_conversations,
+        "deleted_local_tasks": deleted_local_tasks,
+        "deleted_qa_reports": deleted_qa_reports,
+        "deleted_error_logs": deleted_error_logs,
+        "scrubbed_nudge_questions": scrubbed_nudge_questions,
+    }
+
+
+@router.delete("/history")
+async def delete_all_chat_history(current_user=Depends(get_current_user)):
+    """Permanently delete all chat history belonging to the authenticated user."""
+    user_id = int(current_user.userid)
+    _chat_log_event("chat_history_delete_all_requested", user_id=user_id)
+    try:
+        with get_conn() as conn:
+            result = _delete_all_chat_history_tx(conn, user_id)
+            conn.commit()
+    except Exception as exc:
+        logger.exception("Failed to delete all chat history for user_id=%s", user_id)
+        raise HTTPException(status_code=500, detail="Could not delete chat history. Please try again.") from exc
+
+    _chat_log_event("chat_history_delete_all_completed", user_id=user_id, **result)
+    return {
+        "status": "success",
+        "message": "All chat history deleted",
+        **result,
+    }
+
 
 @router.delete("/message/{message_id}")
 async def delete_message(message_id: int, current_user = Depends(get_current_user)):

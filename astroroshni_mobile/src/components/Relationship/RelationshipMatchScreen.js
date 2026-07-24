@@ -368,10 +368,6 @@ export default function RelationshipMatchScreen({ navigation, route }) {
   };
 
   const openMarriageAnalysis = async () => {
-    if (marriageCost > 0 && credits < marriageCost) {
-      navigation.navigate('Credits');
-      return;
-    }
     if (personOne) {
       await storage.setBirthDetails(personOne);
     }

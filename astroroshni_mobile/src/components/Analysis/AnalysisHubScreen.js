@@ -21,7 +21,6 @@ import { storage } from '../../services/storage';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
-import { useAuthGate } from '../../auth/AuthGateContext';
 
 const { width } = Dimensions.get('window');
 
@@ -31,7 +30,6 @@ export default function AnalysisHubScreen({ navigation }) {
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
   const { credits } = useCredits();
-  const { requireAuthForPaid } = useAuthGate();
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(50));
   const [logoGlow] = useState(new Animated.Value(0));
@@ -210,7 +208,7 @@ export default function AnalysisHubScreen({ navigation }) {
     }));
   };
 
-  const handleAnalysisSelect = async (analysisType) => {
+  const handleAnalysisSelect = (analysisType) => {
     if (analysisType.id === 'reports') {
       navigation.navigate('ReportsStudio');
       return;
@@ -220,17 +218,6 @@ export default function AnalysisHubScreen({ navigation }) {
       return;
     }
 
-    if (credits < analysisType.cost) {
-      const authOk = await requireAuthForPaid({
-        feature: 'credits',
-        message: 'Sign in to buy credits and unlock paid insights.',
-        resume: { resumeRoute: 'Credits', resumeParams: {} },
-      });
-      if (!authOk) return;
-      navigation.navigate('Credits');
-      return;
-    }
-    
     navigation.navigate('AnalysisDetail', { 
       analysisType: analysisType.id,
       title: analysisType.title,

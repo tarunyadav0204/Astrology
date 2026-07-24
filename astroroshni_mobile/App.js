@@ -88,6 +88,7 @@ import { initFacebookAnalytics } from './src/services/facebookAnalytics';
 import { trackNavigationRoute } from './src/services/navigationAnalytics';
 import { trackGA4EventOnly } from './src/utils/analytics';
 import AddToHomeScreenPrompt from './src/platform/AddToHomeScreenPrompt';
+import WebAlertProvider from './src/platform/WebAlertProvider';
 // Push notifications: imported lazily in useEffect to avoid touching native module at launch (reduces iOS device crash risk).
 
 const Stack = createStackNavigator();
@@ -673,6 +674,7 @@ export default function App() {
         }
       >
         <ThemeProvider initialTheme={initialTheme}>
+        <WebAlertProvider>
         <Animated.View
           style={{
             flex: 1,
@@ -1020,6 +1022,7 @@ export default function App() {
       </CreditProvider>
       </ErrorProvider>
         </Animated.View>
+        </WebAlertProvider>
       </ThemeProvider>
     </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { getAdminAuthHeaders } from '../../services/adminService';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { getAdminAuthHeaders, getAdminEndpoint } from '../../services/adminService';
 import './AdminFreeAnswerFunnel.css';
 
 function formatLocalDate(d) {
@@ -23,27 +23,37 @@ export default function AdminFreeAnswerFunnel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
     try {
       const qs = new URLSearchParams();
       if (fromDate) qs.set('from_date', fromDate);
       if (toDate) qs.set('to_date', toDate);
-      const res = await fetch(`/api/credits/admin/free-answer-funnel?${qs}`, {
-        headers: getAdminAuthHeaders(),
+      qs.set('_ts', String(Date.now()));
+      const res = await fetch(`${getAdminEndpoint('/credits/admin/free-answer-funnel')}?${qs}`, {
+        headers: {
+          ...getAdminAuthHeaders(),
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+        cache: 'no-store',
       });
       const body = await res.json().catch(() => ({}));
+      if (requestId !== requestIdRef.current) return;
       if (!res.ok) {
         throw new Error(body.detail || body.message || 'Failed to load funnel');
       }
       setData(body);
     } catch (e) {
+      if (requestId !== requestIdRef.current) return;
       setError(e.message || 'Failed to load');
       setData(null);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [fromDate, toDate]);
 
@@ -52,6 +62,8 @@ export default function AdminFreeAnswerFunnel() {
   }, [load]);
 
   const steps = data?.steps || [];
+  const appliedFrom = data?.from_date || fromDate;
+  const appliedTo = data?.to_date || toDate;
 
   return (
     <div className="admin-free-answer-funnel">
@@ -59,9 +71,8 @@ export default function AdminFreeAnswerFunnel() {
         <div>
           <h3>Free answer → reveal → purchase</h3>
           <p>
-            Users who got a free standard answer with blurred detail, tapped reveal, then bought credits
-            (within 7 days of reveal). Date range filters by when the blur was shown (IST); later steps
-            only count those same impressions.
+            Counts free answers that show blurred detail, then reveal taps and credit purchases for
+            those same messages. Date range filters by answer completion date.
           </p>
         </div>
         <div className="faf-filters">
@@ -77,6 +88,11 @@ export default function AdminFreeAnswerFunnel() {
             {loading ? 'Loading…' : 'Refresh'}
           </button>
         </div>
+      </div>
+
+      <div className="faf-summary" style={{ marginBottom: 12 }}>
+        Applied range: <strong>{appliedFrom || '—'}</strong> → <strong>{appliedTo || '—'}</strong>
+        {data?.impression_source ? ` · source: ${data.impression_source}` : ''}
       </div>
 
       {error && <div className="faf-error">{error}</div>}

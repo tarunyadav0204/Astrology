@@ -2676,9 +2676,8 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             setShowNumerologyModal(true);
           } else if (birthFormContext === 'chart') {
             setShowChartModal(true);
-          } else if (birthFormContext === 'changeNative' && setCurrentView) {
-            setCurrentView('dashboard');
           }
+          // changeNative: stay on homepage; chip/header refresh from updated birth context
         }}
         title={birthFormContext === 'numerology' ? 'Numerology - Enter Details' : 'Birth Chart - Enter Details'}
         description={birthFormContext === 'numerology' ? 'Please provide birth information for numerology analysis' : 'Please provide your birth information to generate your Vedic birth chart'}

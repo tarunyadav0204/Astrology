@@ -50,6 +50,32 @@ export const storage = {
     const data = await AsyncStorage.getItem('chatHistory');
     return data ? JSON.parse(data) : [];
   },
+  clearChatHistory: async () => {
+    const keysToRemove = ['chatHistory'];
+    try {
+      const allKeys = await AsyncStorage.getAllKeys();
+      (allKeys || []).forEach((key) => {
+        if (
+          key?.startsWith('chatMessages_') ||
+          key?.startsWith('chatSessions_') ||
+          key?.startsWith('pendingChatMessages_') ||
+          key?.startsWith('pendingFeedback_') ||
+          key?.startsWith('chatRating') ||
+          key?.startsWith('chat-entry:')
+        ) {
+          keysToRemove.push(key);
+        }
+      });
+    } catch (_) {
+      /* Remove the known global cache even if key enumeration is unavailable. */
+    }
+    const uniqueKeys = [...new Set(keysToRemove)];
+    try {
+      await AsyncStorage.multiRemove(uniqueKeys);
+    } catch (_) {
+      await Promise.all(uniqueKeys.map((key) => AsyncStorage.removeItem(key).catch(() => {})));
+    }
+  },
   
   // Chart data
   setChartData: (chartData) => AsyncStorage.setItem('chartData', JSON.stringify(chartData)),

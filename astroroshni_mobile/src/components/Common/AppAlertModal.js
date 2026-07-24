@@ -47,6 +47,8 @@ export default function AppAlertModal({
   onPrimaryPress,
   onSecondaryPress,
   onRequestClose,
+  stackButtons = false,
+  showCloseButton = false,
 }) {
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
@@ -69,6 +71,17 @@ export default function AppAlertModal({
       <View style={styles.overlay}>
         <View style={styles.cardShadow}>
           <LinearGradient colors={modalGradient} style={[styles.card, { borderColor: colors.cardBorder }]}>
+            {showCloseButton && (
+              <TouchableOpacity
+                style={[styles.closeButton, { backgroundColor: colors.backgroundSecondary }]}
+                activeOpacity={0.8}
+                onPress={handleClose}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
             <View style={[styles.iconHalo, { backgroundColor: config.glow, borderColor: accent }]}>
               <Ionicons name={icon || config.icon} size={42} color={accent} />
             </View>
@@ -78,10 +91,14 @@ export default function AppAlertModal({
               <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text>
             )}
 
-            <View style={styles.buttonRow}>
+            <View style={[styles.buttonRow, stackButtons && styles.buttonRowStacked]}>
               {!!secondaryText && (
                 <TouchableOpacity
-                  style={[styles.secondaryButton, { borderColor: colors.cardBorder }]}
+                  style={[
+                    styles.secondaryButton,
+                    stackButtons && styles.stackedButton,
+                    { borderColor: colors.cardBorder },
+                  ]}
                   activeOpacity={0.85}
                   onPress={onSecondaryPress || handleClose}
                 >
@@ -89,7 +106,11 @@ export default function AppAlertModal({
                 </TouchableOpacity>
               )}
 
-              <TouchableOpacity style={styles.primaryButton} activeOpacity={0.9} onPress={onPrimaryPress || handleClose}>
+              <TouchableOpacity
+                style={[styles.primaryButton, stackButtons && styles.stackedButton]}
+                activeOpacity={0.9}
+                onPress={onPrimaryPress || handleClose}
+              >
                 <LinearGradient colors={[accent, '#ff8c5a']} style={styles.primaryGradient}>
                   <Text style={styles.primaryText}>{primaryText}</Text>
                 </LinearGradient>
@@ -128,6 +149,17 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     overflow: 'hidden',
   },
+  closeButton: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
   iconHalo: {
     width: 86,
     height: 86,
@@ -153,6 +185,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     width: '100%',
     gap: 12,
+  },
+  buttonRowStacked: {
+    flexDirection: 'column',
+  },
+  stackedButton: {
+    flex: 0,
+    width: '100%',
   },
   secondaryButton: {
     flex: 1,

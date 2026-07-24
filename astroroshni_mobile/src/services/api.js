@@ -354,7 +354,7 @@ export const chatAPI = {
     api.post(getEndpoint('/chat-v2/ask'), { ...requestBody, query_context: requestBody?.query_context || buildQueryContext() }, GLOBAL_ERROR_CONFIG),
   getMessageStatus: (messageId) =>
     api.get(getEndpoint(`/chat-v2/status/${messageId}`)),
-  clearHistory: () => api.delete(getEndpoint('/chat/history')),
+  clearHistory: () => api.delete(getEndpoint('/chat-v2/history'), GLOBAL_ERROR_CONFIG),
   createSession: () => api.post(getEndpoint('/chat/session'), { query_context: buildQueryContext() }),
   saveMessage: (sessionId, sender, content) => 
     api.post(getEndpoint('/chat/message'), { session_id: sessionId, sender, content }),

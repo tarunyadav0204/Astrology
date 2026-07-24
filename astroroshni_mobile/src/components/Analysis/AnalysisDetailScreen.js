@@ -27,6 +27,7 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 import { trackAstrologyEvent, trackEvent } from '../../utils/analytics';
 import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
 import { useAuthGate } from '../../auth/AuthGateContext';
+import AnalysisCreditModal from './AnalysisCreditModal';
 
 export default function AnalysisDetailScreen({ route, navigation }) {
   const { analysisType, title, cost: costFromParams, originalCost: originalCostFromParams } = route.params;
@@ -46,6 +47,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   const [birthData, setBirthData] = useState(null);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [expandedItems, setExpandedItems] = useState({});
+  const [showStartModal, setShowStartModal] = useState(false);
   const [showRegenerateModal, setShowRegenerateModal] = useState(false);
   const [analysisFocus, setAnalysisFocus] = useState('first_child');
   const [childrenCount, setChildrenCount] = useState(0);
@@ -262,11 +264,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     }
   };
 
-  const startAnalysis = async (forceRegenerate) => {
-    // Ensure forceRegenerate is a boolean
-    const shouldForceRegenerate = forceRegenerate === true;
-    // console.log('🔄 Force regenerate (cleaned):', shouldForceRegenerate);
-
+  const validateAnalysisStart = async () => {
     const authOk = await requireAuthForPaid({
       feature: `${analysisType || 'life'} analysis`,
       message: 'Sign in to run this analysis. Credits are charged only after you confirm.',
@@ -280,7 +278,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         },
       },
     });
-    if (!authOk) return;
+    if (!authOk) return false;
     
     // --- PROGENY VALIDATION BLOCK ---
     if (analysisType === 'progeny') {
@@ -290,21 +288,37 @@ export default function AnalysisDetailScreen({ route, navigation }) {
           uiText.missingChildren,
           [{ text: 'OK' }]
         );
-        return;
+        return false;
       }
     }
     // ----------------------------
     
     if (!birthData) {
       Alert.alert('Error', 'Birth data not available');
-      return;
+      return false;
     }
 
+    return true;
+  };
+
+  const requestStartAnalysis = async () => {
+    if (!(await validateAnalysisStart())) return;
+    setShowStartModal(true);
+  };
+
+  const startAnalysis = async (forceRegenerate, { skipValidation = false } = {}) => {
+    // Ensure forceRegenerate is a boolean
+    const shouldForceRegenerate = forceRegenerate === true;
+    // console.log('🔄 Force regenerate (cleaned):', shouldForceRegenerate);
+
+    if (!skipValidation && !(await validateAnalysisStart())) return;
+
     if (credits < cost) {
-      Alert.alert(uiText.insufficientCreditsTitle, uiText.insufficientCreditsBody, [
-        { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
-        { text: uiText.cancel, style: 'cancel' }
-      ]);
+      if (shouldForceRegenerate) {
+        setShowRegenerateModal(true);
+      } else {
+        setShowStartModal(true);
+      }
       return;
     }
 
@@ -1001,7 +1015,22 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     setShowRegenerateModal(true);
   };
 
+  const confirmStart = () => {
+    if (credits < cost) {
+      setShowStartModal(false);
+      navigation.navigate('Credits');
+      return;
+    }
+    setShowStartModal(false);
+    startAnalysis(false, { skipValidation: true });
+  };
+
   const confirmRegenerate = async () => {
+    if (credits < cost) {
+      setShowRegenerateModal(false);
+      navigation.navigate('Credits');
+      return;
+    }
     setShowRegenerateModal(false);
     
     // Track regeneration
@@ -1024,7 +1053,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     setAnalysisResult(null);
     // Use setTimeout to ensure state updates before calling
     setTimeout(() => {
-      startAnalysis(true);
+      startAnalysis(true, { skipValidation: true });
     }, 100);
   };
 
@@ -1372,8 +1401,8 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                 ) : (
                   <TouchableOpacity
                     style={styles.startButton}
-                    onPress={startAnalysis}
-                    disabled={loading || credits < cost}
+                    onPress={requestStartAnalysis}
+                    disabled={loading}
                   >
                     <LinearGradient
                       colors={getAnalysisGradient()}
@@ -1383,15 +1412,6 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                         {uiText.startAnalysis} ({cost} credits)
                       </Text>
                     </LinearGradient>
-                  </TouchableOpacity>
-                )}
-
-                {credits < cost && (
-                  <TouchableOpacity 
-                    style={[styles.lowCreditBanner, { backgroundColor: isDark ? 'rgba(255, 107, 53, 0.2)' : colors.surface, borderColor: isDark ? 'rgba(255, 107, 53, 0.3)' : colors.cardBorder }]}
-                    onPress={() => navigation.navigate('Credits')}
-                  >
-                    <Text style={[styles.lowCreditText, { color: colors.text }]}>💳 {isIosStudyMode ? 'Get more study credits to continue' : 'Get more credits to continue'}</Text>
                   </TouchableOpacity>
                 )}
               </ScrollView>
@@ -1496,6 +1516,22 @@ export default function AnalysisDetailScreen({ route, navigation }) {
             )}
           </Animated.View>
 
+          <AnalysisCreditModal
+            visible={showStartModal}
+            onClose={() => setShowStartModal(false)}
+            onConfirm={confirmStart}
+            onGetCredits={confirmStart}
+            title={uiText.startAnalysis}
+            description={credits >= cost
+              ? `This will use ${cost} credits to generate your ${String(displayTitle || analysisType || 'analysis').toLowerCase()}.`
+              : uiText.insufficientCreditsBody}
+            cost={cost}
+            credits={credits}
+            confirmLabel={uiText.startAnalysis}
+            cancelLabel={uiText.cancel}
+            confirmGradientColors={getAnalysisGradient()}
+          />
+
           {/* Regenerate Modal */}
           {showRegenerateModal && (
             <View style={styles.modalOverlay}>
@@ -1507,7 +1543,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                   >
                     <Text style={[styles.modalTitle, { color: colors.text }]}>{uiText.regenerateTitle}</Text>
                     <Text style={[styles.modalText, { color: colors.textSecondary }]}>
-                      {uiText.regenerateBody}
+                      {credits >= cost ? uiText.regenerateBody : uiText.insufficientCreditsBody}
                     </Text>
                     
                     {/* Progeny Focus Selector in Modal */}
@@ -1594,7 +1630,9 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                           colors={getAnalysisGradient()}
                           style={styles.modalConfirmGradient}
                         >
-                          <Text style={[styles.modalConfirmText, { color: '#fff' }]}>{uiText.regenerateButton}</Text>
+                          <Text style={[styles.modalConfirmText, { color: '#fff' }]}>
+                            {credits >= cost ? uiText.regenerateButton : 'Get Credits'}
+                          </Text>
                         </LinearGradient>
                       </TouchableOpacity>
                     </View>
@@ -1847,21 +1885,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#ffd700',
   },
-  lowCreditBanner: {
-    marginHorizontal: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(255, 107, 53, 0.2)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.3)',
-  },
-  lowCreditText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
   quickAnswerSection: { paddingHorizontal: 20, paddingVertical: 20 },
   quickAnswerCard: {
     padding: 20,
@@ -2007,6 +2030,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    zIndex: 1000,
+    elevation: 20,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
