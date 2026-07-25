@@ -10,6 +10,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Set
+from urllib.parse import unquote, urlparse
 from zoneinfo import ZoneInfo
 
 from db import execute
@@ -48,11 +49,30 @@ LANDING_SCREEN_TO_CTA: Dict[str, str] = {
     "wealth": "astroroshni://analysis",
     "progeny": "astroroshni://analysis",
     "education": "astroroshni://analysis",
+    "blog": "astroroshni://blog",
 }
 
 
 def campaign_trigger_id(campaign_id: int) -> str:
     return f"campaign_{int(campaign_id)}"
+
+
+def _blog_push_data(campaign: Dict[str, Any]) -> Dict[str, str]:
+    blog_url = str(campaign.get("landing_url") or "").strip()
+    data = {"blog_url": blog_url}
+    try:
+        parsed = urlparse(blog_url)
+        hostname = str(parsed.hostname or "").lower()
+        if hostname.startswith("www."):
+            hostname = hostname[4:]
+        path_parts = [part for part in parsed.path.split("/") if part]
+        if hostname == "astroroshni.com" and len(path_parts) == 2 and path_parts[0].lower() == "blog":
+            slug = unquote(path_parts[1]).strip()
+            if slug:
+                data["slug"] = slug
+    except (TypeError, ValueError):
+        pass
+    return data
 
 
 def _chunked(items: List[Any], size: int) -> List[List[Any]]:
@@ -547,6 +567,8 @@ def process_campaign_batch(*, campaign_id: int, user_ids: List[int]) -> Dict[str
         data_extra: Dict[str, Any] = {"landing_screen": landing, "campaign_id": str(int(campaign_id))}
         if landing in {"career", "marriage", "health", "wealth", "progeny", "education"}:
             data_extra["analysis_type"] = landing
+        if landing == "blog":
+            data_extra.update(_blog_push_data(campaign))
 
         for uid in targets:
             try:
@@ -817,7 +839,14 @@ def send_campaign_test(conn, campaign: Dict[str, Any], target_userid: int) -> Di
         event_params=json.dumps(
             {"campaign_id": campaign.get("id"), "test": True}, ensure_ascii=False
         ),
-        data_extra={"landing_screen": landing},
+        data_extra={
+            "landing_screen": landing,
+            **(
+                _blog_push_data(campaign)
+                if landing == "blog"
+                else {}
+            ),
+        },
         cta_deep_link=LANDING_SCREEN_TO_CTA.get(landing, "astroroshni://chat"),
     )
     return {"copy": copy, "delivery": result}

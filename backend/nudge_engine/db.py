@@ -295,6 +295,7 @@ def init_nudge_tables(conn) -> None:
                 ai_base_prompt TEXT,
                 audience_filter_json TEXT NOT NULL DEFAULT '{"type":"all"}',
                 landing_screen TEXT NOT NULL DEFAULT 'chat',
+                landing_url TEXT,
                 scheduled_at TIMESTAMPTZ,
                 dispatched_at TIMESTAMPTZ,
                 total_targeted INTEGER NOT NULL DEFAULT 0,
@@ -303,6 +304,10 @@ def init_nudge_tables(conn) -> None:
                 updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
             )
             """,
+        )
+        _safe_execute_nudge_ddl(
+            conn,
+            "ALTER TABLE nudge_campaigns ADD COLUMN IF NOT EXISTS landing_url TEXT",
         )
         _safe_execute_nudge_ddl(
             conn,
@@ -1350,7 +1355,7 @@ def insert_cron_run(conn, job_key: str, status: str, summary_json: str) -> Optio
 _CAMPAIGN_COLUMNS = (
     "id", "name", "status", "title_template", "body_template", "question_template",
     "channel_policy", "channels_json", "ai_personalize", "ai_base_prompt",
-    "audience_filter_json", "landing_screen", "scheduled_at", "dispatched_at",
+    "audience_filter_json", "landing_screen", "landing_url", "scheduled_at", "dispatched_at",
     "total_targeted", "created_by", "created_at", "updated_at",
 )
 
@@ -1385,6 +1390,7 @@ def create_campaign(
     ai_base_prompt: str,
     audience_filter_json: str,
     landing_screen: str,
+    landing_url: Optional[str],
     scheduled_at: Optional[Any],
     status: str,
     created_by: Optional[int],
@@ -1395,14 +1401,14 @@ def create_campaign(
         INSERT INTO nudge_campaigns
             (name, status, title_template, body_template, question_template,
              channel_policy, channels_json, ai_personalize, ai_base_prompt,
-             audience_filter_json, landing_screen, scheduled_at, created_by)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             audience_filter_json, landing_screen, landing_url, scheduled_at, created_by)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
         (
             name, status, title_template, body_template, question_template or None,
             channel_policy, channels_json, bool(ai_personalize), ai_base_prompt or None,
-            audience_filter_json, landing_screen, scheduled_at, created_by,
+            audience_filter_json, landing_screen, landing_url, scheduled_at, created_by,
         ),
     )
     row = cur.fetchone()
@@ -1413,7 +1419,7 @@ def update_campaign(conn, campaign_id: int, **fields: Any) -> int:
     allowed = {
         "name", "status", "title_template", "body_template", "question_template",
         "channel_policy", "channels_json", "ai_personalize", "ai_base_prompt",
-        "audience_filter_json", "landing_screen", "scheduled_at", "dispatched_at",
+        "audience_filter_json", "landing_screen", "landing_url", "scheduled_at", "dispatched_at",
         "total_targeted",
     }
     updates = []

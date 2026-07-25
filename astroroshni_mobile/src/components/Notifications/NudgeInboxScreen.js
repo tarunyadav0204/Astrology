@@ -72,14 +72,24 @@ export default function NudgeInboxScreen({ navigation }) {
 
     const d = item.data || {};
     const slug = d.slug != null ? String(d.slug).trim() : '';
+    const blogUrl = d.blog_url != null ? String(d.blog_url).trim() : '';
     const cta = d.cta != null ? String(d.cta).trim() : '';
     const landingScreenRaw =
       d.landing_screen != null ? String(d.landing_screen).trim().toLowerCase() : '';
     const landingScreen = landingScreenRaw.replace(/[-\s]+/g, '_');
 
-    if (cta === 'astroroshni://blog' && slug) {
-      navigation.navigate('BlogPostDetail', { slug });
-      return;
+    if (cta === 'astroroshni://blog' || landingScreen === 'blog') {
+      const { astroRoshniBlogSlug, normalizeHttpsUrl } = require('../../utils/blogLinks');
+      const resolvedSlug = slug || astroRoshniBlogSlug(blogUrl);
+      if (resolvedSlug) {
+        navigation.navigate('BlogPostDetail', { slug: resolvedSlug });
+        return;
+      }
+      const normalizedBlogUrl = normalizeHttpsUrl(blogUrl);
+      if (normalizedBlogUrl) {
+        navigation.navigate('BlogLink', { url: normalizedBlogUrl });
+        return;
+      }
     }
     if (landingScreen === 'information' || cta === 'astroroshni://information') {
       navigation.navigate('Home', {

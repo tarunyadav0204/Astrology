@@ -11,6 +11,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Optional, List, Any, Dict
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Header, BackgroundTasks
 from fastapi.responses import RedirectResponse
@@ -189,6 +190,7 @@ class CampaignUpsertRequest(BaseModel):
     ai_base_prompt: str = ""
     audience_filter: Dict[str, Any] = Field(default_factory=lambda: {"type": "all"})
     landing_screen: str = "chat"
+    landing_url: Optional[str] = None
     scheduled_at: Optional[str] = None  # ISO datetime (IST assumed when no offset)
     status: str = "draft"  # "draft", "scheduled", or "paused"
 
@@ -2372,6 +2374,26 @@ def _validate_campaign_payload(body: CampaignUpsertRequest) -> Dict[str, Any]:
     landing = str(body.landing_screen or "chat").strip().lower().replace("-", "_").replace(" ", "_")
     if landing not in LANDING_SCREEN_TO_CTA:
         raise HTTPException(status_code=400, detail="Invalid landing_screen")
+    landing_url = None
+    if landing == "blog":
+        landing_url = str(body.landing_url or "").strip()
+        if not landing_url:
+            raise HTTPException(status_code=400, detail="Blog link is required")
+        if len(landing_url) > 2048:
+            raise HTTPException(status_code=400, detail="Blog link is too long")
+        try:
+            parsed_landing_url = urlparse(landing_url)
+            valid_landing_url = (
+                parsed_landing_url.scheme.lower() == "https"
+                and bool(parsed_landing_url.hostname)
+                and not parsed_landing_url.username
+                and not parsed_landing_url.password
+                and not any(char.isspace() for char in parsed_landing_url.netloc)
+            )
+        except ValueError:
+            valid_landing_url = False
+        if not valid_landing_url:
+            raise HTTPException(status_code=400, detail="Blog link must be a valid HTTPS URL")
 
     audience = body.audience_filter or {"type": "all"}
     atype = str(audience.get("type") or "all").strip().lower()
@@ -2436,6 +2458,7 @@ def _validate_campaign_payload(body: CampaignUpsertRequest) -> Dict[str, Any]:
         "ai_base_prompt": (body.ai_base_prompt or "").strip()[:2000],
         "audience_filter_json": json.dumps(audience, ensure_ascii=False)[:20000],
         "landing_screen": landing,
+        "landing_url": landing_url,
         "scheduled_at": scheduled_at,
         "status": status,
     }

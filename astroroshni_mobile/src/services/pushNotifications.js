@@ -188,6 +188,7 @@ async function processNotificationResponse(response, navigationRef) {
   const landingScreenRaw = data?.landing_screen != null ? String(data.landing_screen).trim().toLowerCase() : '';
   const landingScreen = landingScreenRaw.replace(/[-\s]+/g, '_');
   const slug = data?.slug != null ? String(data.slug).trim() : null;
+  const blogUrl = data?.blog_url != null ? String(data.blog_url).trim() : '';
   const question = data?.question && String(data.question).trim() ? String(data.question).trim() : undefined;
   const nativeId = data?.native_id != null ? String(data.native_id).trim() : null;
   // Delivery group id for nudge → question conversion attribution.
@@ -197,10 +198,20 @@ async function processNotificationResponse(response, navigationRef) {
   const { storage } = require('./storage');
   const { chartAPI } = require('./api');
   try {
-    // Blog notification: open BlogPostDetail with slug
-    if ((cta === 'astroroshni://blog' || data?.trigger_id === 'blog') && slug && navigationRef?.current) {
-      navigationRef.current.navigate('BlogPostDetail', { slug });
-      return;
+    // Blog notification: internal AstroRoshni links use the native reader;
+    // other HTTPS links remain inside the app in an embedded web view.
+    if ((cta === 'astroroshni://blog' || data?.trigger_id === 'blog' || landingScreen === 'blog') && navigationRef?.current) {
+      const { astroRoshniBlogSlug, normalizeHttpsUrl } = require('../utils/blogLinks');
+      const resolvedSlug = slug || astroRoshniBlogSlug(blogUrl);
+      if (resolvedSlug) {
+        navigationRef.current.navigate('BlogPostDetail', { slug: resolvedSlug });
+        return;
+      }
+      const normalizedBlogUrl = normalizeHttpsUrl(blogUrl);
+      if (normalizedBlogUrl) {
+        navigationRef.current.navigate('BlogLink', { url: normalizedBlogUrl });
+        return;
+      }
     }
     // Support ticket: open Support screen on the thread
     const supportTicketId =

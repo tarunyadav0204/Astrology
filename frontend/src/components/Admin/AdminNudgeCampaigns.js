@@ -13,7 +13,7 @@ const AUDIENCE_OPTIONS = [
 ];
 const LANDING_OPTIONS = [
   'chat', 'information', 'event_screen', 'past_life_karma',
-  'career', 'marriage', 'health', 'wealth', 'progeny', 'education',
+  'career', 'marriage', 'health', 'wealth', 'progeny', 'education', 'blog',
 ];
 const LIFECYCLE_STEPS = [
   {
@@ -71,6 +71,7 @@ const emptyForm = {
   antardashas: '',
   current_dasha_contains: '',
   landing_screen: 'chat',
+  landing_url: '',
   scheduled_at: '',
   audience_nl_prompt: '',
   audience_nl_sql: '',
@@ -166,6 +167,7 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
       body_template: prefillDraft.body_template || '',
       question_template: prefillDraft.question_template || '',
       landing_screen: prefillDraft.landing_screen || 'chat',
+      landing_url: prefillDraft.landing_url || '',
       audience_type: audienceType,
       audience_segment_key: prefillDraft.audience_segment_key || '',
       audience_from_date: prefillDraft.audience_from_date || '',
@@ -247,6 +249,7 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
       ai_base_prompt: form.ai_base_prompt.trim(),
       audience_filter: audience,
       landing_screen: form.landing_screen,
+      landing_url: form.landing_screen === 'blog' ? form.landing_url.trim() : null,
       scheduled_at: form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
       status: form.scheduled_at ? 'scheduled' : 'draft',
     };
@@ -332,6 +335,18 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
     if (!form.channels.length) {
       showResult(false, 'Select at least one channel.');
       return;
+    }
+    if (form.landing_screen === 'blog') {
+      let parsedBlogUrl;
+      try {
+        parsedBlogUrl = new URL(form.landing_url.trim());
+      } catch (_) {
+        parsedBlogUrl = null;
+      }
+      if (!parsedBlogUrl || parsedBlogUrl.protocol !== 'https:') {
+        showResult(false, 'Enter a valid HTTPS blog link.');
+        return;
+      }
     }
 
     setSaving(true);
@@ -432,6 +447,7 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
       antardashas: (criteria.antardashas || []).join(', '),
       current_dasha_contains: criteria.current_dasha_contains || '',
       landing_screen: campaign.landing_screen || 'chat',
+      landing_url: campaign.landing_url || '',
       scheduled_at: campaign.scheduled_at ? campaign.scheduled_at.slice(0, 16) : '',
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -624,6 +640,24 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
               </select>
             </div>
           </div>
+
+          {form.landing_screen === 'blog' ? (
+            <div className="form-field">
+              <label>Blog link</label>
+              <input
+                type="url"
+                inputMode="url"
+                maxLength={2048}
+                placeholder="https://astroroshni.com/blog/article-slug"
+                value={form.landing_url}
+                onChange={(e) => setField('landing_url', e.target.value)}
+                required
+              />
+              <small>
+                Tapping the push notification opens this article inside AstroRoshni.
+              </small>
+            </div>
+          ) : null}
 
           <div className="form-field">
             <label>Channel order</label>

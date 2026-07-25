@@ -510,6 +510,7 @@ CREATE TABLE "nudge_campaigns" (
     "ai_base_prompt" TEXT,
     "audience_filter_json" TEXT NOT NULL DEFAULT '{"type":"all"}',
     "landing_screen" TEXT NOT NULL DEFAULT 'chat',
+    "landing_url" TEXT,
     "scheduled_at" TIMESTAMPTZ,
     "dispatched_at" TIMESTAMPTZ,
     "total_targeted" INTEGER NOT NULL DEFAULT 0,
