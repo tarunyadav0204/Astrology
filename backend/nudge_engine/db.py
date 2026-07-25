@@ -1630,15 +1630,25 @@ def insert_conversion(
     return bool(cur.rowcount)
 
 
-def mark_delivery_clicked(conn, delivery_group_id: str) -> int:
+def mark_delivery_clicked(
+    conn,
+    delivery_group_id: str,
+    *,
+    userid: Optional[int] = None,
+) -> int:
+    user_filter = " AND userid = %s" if userid is not None else ""
+    params: Tuple[Any, ...] = (str(delivery_group_id).strip(),)
+    if userid is not None:
+        params += (int(userid),)
     cur = execute(
         conn,
-        """
+        f"""
         UPDATE nudge_deliveries
         SET clicked_at = COALESCE(clicked_at, CURRENT_TIMESTAMP)
         WHERE delivery_group_id = %s
+        {user_filter}
         """,
-        (str(delivery_group_id).strip(),),
+        params,
     )
     return int(cur.rowcount or 0)
 

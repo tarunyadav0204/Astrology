@@ -198,6 +198,11 @@ async function processNotificationResponse(response, navigationRef) {
   const { storage } = require('./storage');
   const { chartAPI } = require('./api');
   try {
+    if (nudgeId) {
+      nudgeAPI.recordClick(nudgeId).catch((e) => {
+        if (__DEV__) console.warn('[Push] nudge click tracking failed:', e?.message);
+      });
+    }
     // Blog notification: internal AstroRoshni links use the native reader;
     // other HTTPS links remain inside the app in an embedded web view.
     if ((cta === 'astroroshni://blog' || data?.trigger_id === 'blog' || landingScreen === 'blog') && navigationRef?.current) {

@@ -73,10 +73,16 @@ export default function NudgeInboxScreen({ navigation }) {
     const d = item.data || {};
     const slug = d.slug != null ? String(d.slug).trim() : '';
     const blogUrl = d.blog_url != null ? String(d.blog_url).trim() : '';
+    const nudgeId = d.nudge_id != null ? String(d.nudge_id).trim() : '';
     const cta = d.cta != null ? String(d.cta).trim() : '';
     const landingScreenRaw =
       d.landing_screen != null ? String(d.landing_screen).trim().toLowerCase() : '';
     const landingScreen = landingScreenRaw.replace(/[-\s]+/g, '_');
+    if (nudgeId) {
+      nudgeAPI.recordClick(nudgeId).catch((e) => {
+        if (__DEV__) console.warn('Nudge click tracking:', e?.message);
+      });
+    }
 
     if (cta === 'astroroshni://blog' || landingScreen === 'blog') {
       const { astroRoshniBlogSlug, normalizeHttpsUrl } = require('../../utils/blogLinks');
@@ -136,7 +142,6 @@ export default function NudgeInboxScreen({ navigation }) {
     }
     if (cta === 'astroroshni://chat' || landingScreen === 'chat' || String(item.trigger_id || '') === 'admin') {
       const q = d.question != null ? String(d.question).trim() : '';
-      const nudgeId = d.nudge_id != null ? String(d.nudge_id).trim() : '';
       navigation.navigate('Home', {
         startChat: true,
         ...(q ? { initialMessage: q } : {}),

@@ -38,6 +38,10 @@ def record_nudge_conversion(
             group_id, delivery["userid"], userid,
         )
         return False
+    # Carrying the delivery-group ID proves the user entered chat through the
+    # nudge. Keep click analytics correct even for older clients that do not
+    # call the dedicated /nudge/click endpoint yet.
+    db.mark_delivery_clicked(conn, group_id, userid=int(userid))
     seconds: Optional[int] = None
     created_at = delivery.get("created_at")
     if created_at is not None:

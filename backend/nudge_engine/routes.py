@@ -177,6 +177,10 @@ class MarkNudgesReadRequest(BaseModel):
     ids: Optional[List[int]] = None
 
 
+class NudgeClickRequest(BaseModel):
+    nudge_id: str
+
+
 class CampaignUpsertRequest(BaseModel):
     """Admin-defined multi-channel nudge campaign."""
 
@@ -2819,6 +2823,35 @@ async def internal_campaign_batch_task(
 # ---------------------------------------------------------------------------
 # Attribution: email CTA redirect + analytics endpoints
 # ---------------------------------------------------------------------------
+
+@router.post("/click")
+async def record_nudge_click(
+    body: NudgeClickRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Record an authenticated push or inbox tap against its delivery group."""
+    gid = str(body.nudge_id or "").strip()
+    if not gid or len(gid) > 64 or not gid.isalnum():
+        raise HTTPException(status_code=400, detail="Invalid nudge_id")
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            updated = db.mark_delivery_clicked(
+                conn,
+                gid,
+                userid=current_user.userid,
+            )
+            conn.commit()
+        return {"ok": True, "recorded": updated > 0}
+    except Exception as e:
+        logger.warning(
+            "authenticated nudge click log failed group=%s user=%s: %s",
+            gid,
+            current_user.userid,
+            e,
+        )
+        raise HTTPException(status_code=500, detail="Failed to record nudge click") from e
+
 
 @router.get("/r/{delivery_group_id}")
 async def nudge_cta_redirect(delivery_group_id: str):

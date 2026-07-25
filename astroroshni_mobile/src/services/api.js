@@ -827,6 +827,12 @@ export const nudgeAPI = {
   getUnreadCount: () => api.get(getEndpoint('/nudge/inbox/unread-count'), BACKGROUND_REQUEST_CONFIG),
   /** ids omitted or empty array = mark all read */
   markRead: (body = {}) => api.post(getEndpoint('/nudge/inbox/mark-read'), body),
+  recordClick: (nudgeId) =>
+    api.post(
+      getEndpoint('/nudge/click'),
+      { nudge_id: String(nudgeId || '').trim() },
+      BACKGROUND_REQUEST_CONFIG,
+    ),
 };
 
 export const creditAPI = {
