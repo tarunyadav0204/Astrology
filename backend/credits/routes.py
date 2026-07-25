@@ -291,7 +291,12 @@ def _verify_google_play_purchase(package_name: str, product_id: str, purchase_to
         logger.info("Google Play: product verify response keys=%s", list(result.keys()) if isinstance(result, dict) else type(result))
         return result
     except Exception as e:
-        logger.error("Google Play: product verify error: %s", e, exc_info=True)
+        from utils.payment_failure_alerts import redact_payment_secrets
+
+        logger.error(
+            "Google Play: product verify error: %s",
+            redact_payment_secrets(e),
+        )
         raise
 
 
@@ -877,6 +882,8 @@ def _credit_verified_google_play_purchase(
     localized_price: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Verify one-time Play purchase, then credit user idempotently by order_id."""
+    from utils.payment_failure_alerts import redact_payment_secrets
+
     def alert(stage: str, code: str, detail: str, reference: Optional[str] = None) -> None:
         from utils.payment_failure_alerts import notify_payment_failure
 
@@ -887,8 +894,28 @@ def _credit_verified_google_play_purchase(
             reference_id=reference or order_id_hint,
             product_id=product_id,
             error_code=code,
-            detail=detail,
+            detail=redact_payment_secrets(detail),
         )
+
+    def already_credited(order_id: str) -> Dict[str, Any]:
+        extras = credit_service.apply_purchase_extras(
+            userid=userid,
+            purchased_credits=amount,
+            purchase_source=GOOGLE_PLAY_SOURCE,
+            purchase_reference_id=order_id,
+            product_id=product_id,
+        )
+        return {
+            "success": True,
+            "message": "Already credited",
+            "credits_added": 0,
+            "order_id": order_id,
+            "first_purchase_bonus": extras.get("first_purchase_bonus"),
+            "purchase_discount": extras.get("purchase_discount"),
+            "bonus_credits_added": int(extras.get("bonus_credits_added") or 0),
+            "first_purchase_bonus_credits_added": int(extras.get("first_purchase_bonus_credits_added") or 0),
+            "discount_credits_added": int(extras.get("discount_credits_added") or 0),
+        }
 
     amount = _credits_from_product_id(product_id)
     if amount is None:
@@ -899,14 +926,50 @@ def _credit_verified_google_play_purchase(
         alert("credit_verify", "missing_purchase_token", "Google Play callback did not include a purchase token")
         raise HTTPException(status_code=400, detail="purchase_token is required")
 
+    # Restored purchases can be delivered again by Play until the client finishes
+    # the transaction. If our ledger already contains this exact token/order, return
+    # success so the client can finish it without depending on Google's API again.
+    credited_order_id = None
+    try:
+        credited_order_id = credit_service.get_credited_google_play_order_for_token(
+            userid,
+            token,
+            product_id,
+        )
+        if not credited_order_id:
+            hinted_order_id = (order_id_hint or "").strip()
+            if hinted_order_id and credit_service.has_transaction_with_reference(
+                userid,
+                GOOGLE_PLAY_SOURCE,
+                hinted_order_id,
+            ):
+                credited_order_id = hinted_order_id
+    except Exception:
+        # This optimization must never prevent verification of a new purchase.
+        logger.warning(
+            "Google Play: already-credited precheck unavailable user=%s product=%s",
+            userid,
+            product_id,
+            exc_info=True,
+        )
+    if credited_order_id:
+        logger.info(
+            "Google Play: restored purchase already credited user=%s order_id=%s product=%s",
+            userid,
+            credited_order_id,
+            product_id,
+        )
+        return already_credited(credited_order_id)
+
     try:
         purchase = _verify_google_play_purchase(PACKAGE_NAME, product_id, token)
     except HTTPException as exc:
         alert("credit_verify", f"http_{exc.status_code}", str(exc.detail))
         raise
     except Exception as e:
-        alert("credit_verify", type(e).__name__, str(e))
-        raise HTTPException(status_code=400, detail=f"Invalid or expired purchase: {str(e)}")
+        safe_error = redact_payment_secrets(e)
+        alert("credit_verify", type(e).__name__, safe_error)
+        raise HTTPException(status_code=400, detail=f"Invalid or expired purchase: {safe_error}")
 
     purchase_state = purchase.get("purchaseState")
     if purchase_state != 0:  # 0 = Purchased
@@ -932,24 +995,7 @@ def _credit_verified_google_play_purchase(
         alert("credit_token_mapping", type(exc).__name__, str(exc), order_id)
 
     if credit_service.has_transaction_with_reference(userid, GOOGLE_PLAY_SOURCE, order_id):
-        extras = credit_service.apply_purchase_extras(
-            userid=userid,
-            purchased_credits=amount,
-            purchase_source=GOOGLE_PLAY_SOURCE,
-            purchase_reference_id=order_id,
-            product_id=product_id,
-        )
-        return {
-            "success": True,
-            "message": "Already credited",
-            "credits_added": 0,
-            "order_id": order_id,
-            "first_purchase_bonus": extras.get("first_purchase_bonus"),
-            "purchase_discount": extras.get("purchase_discount"),
-            "bonus_credits_added": int(extras.get("bonus_credits_added") or 0),
-            "first_purchase_bonus_credits_added": int(extras.get("first_purchase_bonus_credits_added") or 0),
-            "discount_credits_added": int(extras.get("discount_credits_added") or 0),
-        }
+        return already_credited(order_id)
 
     purchase_metadata = json.dumps({
         "purchase_token": purchase.get("purchaseToken") or token,

@@ -16,6 +16,18 @@ function defaultRange() {
   return { from: formatLocalDate(from), to: formatLocalDate(to) };
 }
 
+function formatTrackingStart(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'Asia/Kolkata',
+  }).format(date);
+}
+
 export default function AdminRemedyFunnel() {
   const initial = defaultRange();
   const [fromDate, setFromDate] = useState(initial.from);
@@ -64,6 +76,7 @@ export default function AdminRemedyFunnel() {
   const steps = data?.steps || [];
   const appliedFrom = data?.from_date || fromDate;
   const appliedTo = data?.to_date || toDate;
+  const trackingStart = formatTrackingStart(data?.tracking_started_at);
 
   return (
     <div className="admin-free-answer-funnel">
@@ -71,9 +84,9 @@ export default function AdminRemedyFunnel() {
         <div>
           <h3>Remedy card → tap → remedy answer</h3>
           <p>
-            Counts answers that included a remedy CTA (next_action type = remedy), then taps and
-            remedy-only follow-ups for those same messages. Date range filters by answer completion
-            date.
+            Counts recorded remedy-card impressions, then taps and remedy-only answers tied to the
+            same card. The selected IST dates define when users entered the funnel; later progress
+            is still attributed to that card.
           </p>
         </div>
         <div className="faf-filters">
@@ -92,8 +105,9 @@ export default function AdminRemedyFunnel() {
       </div>
 
       <div className="faf-summary" style={{ marginBottom: 12 }}>
-        Applied range: <strong>{appliedFrom || '—'}</strong> → <strong>{appliedTo || '—'}</strong>
-        {data?.impression_source ? ` · source: ${data.impression_source}` : ''}
+        Applied IST range: <strong>{appliedFrom || '—'}</strong> →{' '}
+        <strong>{appliedTo || '—'}</strong>
+        {trackingStart ? ` · tracking available since ${trackingStart}` : ''}
       </div>
 
       {error && <div className="faf-error">{error}</div>}

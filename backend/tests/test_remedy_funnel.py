@@ -15,7 +15,10 @@ def test_remedy_funnel_record_invalid_event():
 
 def test_inclusive_date_clause():
     clauses, params = _inclusive_date_clause("2026-06-24", "2026-07-24", "cm.completed_at")
-    assert clauses == ["date(cm.completed_at) >= ?", "date(cm.completed_at) <= ?"]
+    assert clauses == [
+        "(cm.completed_at AT TIME ZONE 'Asia/Kolkata')::date >= ?::date",
+        "(cm.completed_at AT TIME ZONE 'Asia/Kolkata')::date <= ?::date",
+    ]
     assert params == ["2026-06-24", "2026-07-24"]
 
 
@@ -35,7 +38,7 @@ def test_get_funnel_analytics_shape_without_db(monkeypatch):
             return None
 
     def fake_execute(conn, sql, params=None):
-        assert "chat_messages" in sql
+        assert "remedy_funnel_events" in sql
         assert "from_date" not in sql  # params, not interpolated
         if params:
             assert "2026-07-24" in params or "card_clicked" in params or "remedy_delivered" in params
@@ -48,7 +51,8 @@ def test_get_funnel_analytics_shape_without_db(monkeypatch):
     out = get_funnel_analytics(from_date="2026-07-24", to_date="2026-07-24")
     assert out["from_date"] == "2026-07-24"
     assert out["to_date"] == "2026-07-24"
-    assert out["impression_source"] == "chat_messages.next_action"
+    assert out["timezone"] == "Asia/Kolkata"
+    assert out["impression_source"] == "remedy_funnel_events.card_shown"
     assert [s["event_name"] for s in out["steps"]] == [
         "card_shown",
         "card_clicked",

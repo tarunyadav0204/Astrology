@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 VALID_EVENTS = frozenset({"blur_shown", "reveal_clicked", "converted"})
 CONVERSION_WINDOW = timedelta(days=7)
+_ADMIN_TZ = "Asia/Kolkata"
 
 
 def ensure_free_answer_funnel_table(conn) -> None:
@@ -56,7 +57,9 @@ def record_funnel_event(
         raise ValueError(f"invalid event_name={event_name!r}")
     uid = int(userid)
     mid = (str(message_id or "").strip() or None)
-    plat = (str(platform or "").strip() or None)[:40]
+    plat = str(platform or "").strip() or None
+    if plat:
+        plat = plat[:40]
     with get_conn() as conn:
         ensure_free_answer_funnel_table(conn)
         try:
@@ -103,8 +106,10 @@ def record_funnel_event(
 
 def mark_converted_after_purchase(userid: int) -> int:
     """
-    If the user clicked reveal recently, record a converted event (once per recent message).
-    Returns number of new conversion rows.
+    Attribute a purchase to the user's most recent reveal click within seven days.
+
+    One purchase is one conversion; it must not convert every blurred answer the
+    user happened to open during the attribution window.
     """
     uid = int(userid)
     since = datetime.now(timezone.utc) - CONVERSION_WINDOW
@@ -114,53 +119,43 @@ def mark_converted_after_purchase(userid: int) -> int:
         cur = execute(
             conn,
             """
-            SELECT DISTINCT message_id
+            SELECT message_id
             FROM free_answer_funnel_events
             WHERE userid = ?
               AND event_name = 'reveal_clicked'
               AND created_at >= ?
+            ORDER BY created_at DESC
+            LIMIT 1
             """,
             (uid, since),
         )
-        message_ids = [r[0] for r in (cur.fetchall() or [])]
-        if not message_ids:
-            # Still allow a user-level conversion with null message_id if they clicked reveal.
-            cur = execute(
-                conn,
-                """
-                SELECT 1 FROM free_answer_funnel_events
-                WHERE userid = ? AND event_name = 'reveal_clicked' AND created_at >= ?
-                LIMIT 1
-                """,
-                (uid, since),
-            )
-            if not cur.fetchone():
-                return 0
-            message_ids = [None]
+        row = cur.fetchone()
+        if not row:
+            return 0
+        mid = row[0]
 
-        for mid in message_ids:
-            cur = execute(
-                conn,
-                """
-                SELECT 1 FROM free_answer_funnel_events
-                WHERE userid = ?
-                  AND COALESCE(message_id, '') = COALESCE(?, '')
-                  AND event_name = 'converted'
-                LIMIT 1
-                """,
-                (uid, mid),
-            )
-            if cur.fetchone():
-                continue
-            execute(
-                conn,
-                """
-                INSERT INTO free_answer_funnel_events (userid, message_id, event_name, platform)
-                VALUES (?, ?, 'converted', 'purchase')
-                """,
-                (uid, mid),
-            )
-            inserted += 1
+        cur = execute(
+            conn,
+            """
+            SELECT 1 FROM free_answer_funnel_events
+            WHERE userid = ?
+              AND COALESCE(message_id, '') = COALESCE(?, '')
+              AND event_name = 'converted'
+            LIMIT 1
+            """,
+            (uid, mid),
+        )
+        if cur.fetchone():
+            return 0
+        execute(
+            conn,
+            """
+            INSERT INTO free_answer_funnel_events (userid, message_id, event_name, platform)
+            VALUES (?, ?, 'converted', 'purchase')
+            """,
+            (uid, mid),
+        )
+        inserted = 1
         conn.commit()
     return inserted
 
@@ -170,14 +165,14 @@ def _inclusive_date_clause(
     to_date: Optional[str],
     col: str,
 ) -> Tuple[List[str], List[Any]]:
-    """Same inclusive date(col) pattern as working admin credit dashboards."""
+    """Inclusive IST calendar-day filter for a TIMESTAMPTZ event column."""
     clauses: List[str] = []
     params: List[Any] = []
     if from_date:
-        clauses.append(f"date({col}) >= ?")
+        clauses.append(f"({col} AT TIME ZONE '{_ADMIN_TZ}')::date >= ?::date")
         params.append(from_date)
     if to_date:
-        clauses.append(f"date({col}) <= ?")
+        clauses.append(f"({col} AT TIME ZONE '{_ADMIN_TZ}')::date <= ?::date")
         params.append(to_date)
     return clauses, params
 
@@ -188,81 +183,49 @@ def get_funnel_analytics(
     to_date: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Cohort funnel keyed by free answers persisted on chat messages.
+    Cohort funnel keyed by recorded blurred-detail impressions.
 
-    Impressions come from chat_messages.gate_metadata.free_question_completed
-    (answers that show the free-detail blur UX), not sparse client blur_shown
-    beacons. Date range filters answer completed_at. Reveal/purchase count only
-    for those same message ids.
+    Date range filters when the blur impression was recorded (IST calendar day).
+    Reveal and purchase count only when they match the same user and source
+    message; they may occur after the selected range.
     """
     date_clauses, date_params = _inclusive_date_clause(
-        from_date, to_date, "COALESCE(cm.completed_at, cm.started_at, cm.timestamp)"
+        from_date, to_date, "s.created_at"
     )
-    date_sql = (" AND " + " AND ".join(date_clauses)) if date_clauses else ""
-
-    # Free answers that can show a blurred detail block (quick-answer structure).
-    impression_predicate = """
-        cm.sender = 'assistant'
-        AND cm.status = 'completed'
-        AND cm.gate_metadata IS NOT NULL
-        AND TRIM(cm.gate_metadata) <> ''
-        AND LOWER(COALESCE(cm.gate_metadata::jsonb ->> 'free_question_completed', '')) IN ('true', '1')
-        AND (
-          LOWER(cm.content) LIKE '%quick-answer-card%'
-          OR cm.content ~* '###\\s*(Quick Answer|Direct Answer|Short Answer|Bottom Line|Answer)\\b'
-        )
-    """
-
-    impression_sql = f"""
-        SELECT
-          COUNT(DISTINCT cs.user_id) AS users,
-          COUNT(*) AS events
-        FROM chat_messages cm
-        INNER JOIN chat_sessions cs ON cs.session_id = cm.session_id
-        WHERE {impression_predicate}
-          {date_sql}
-    """
+    cohort_where = " AND ".join(["s.event_name = 'blur_shown'", *date_clauses])
 
     with get_conn() as conn:
         ensure_free_answer_funnel_table(conn)
 
-        try:
-            cur = execute(conn, impression_sql, tuple(date_params))
-            shown_row = cur.fetchone() or (0, 0)
-        except Exception:
-            logger.exception("free-answer funnel impression query failed; retrying with json cast")
-            conn.rollback()
-            sql_json = impression_sql.replace("::jsonb", "::json")
-            cur = execute(conn, sql_json, tuple(date_params))
-            shown_row = cur.fetchone() or (0, 0)
+        cur = execute(
+            conn,
+            f"""
+            SELECT COUNT(DISTINCT s.userid) AS users, COUNT(*) AS events
+            FROM free_answer_funnel_events s
+            WHERE {cohort_where}
+            """,
+            tuple(date_params),
+        )
+        shown_row = cur.fetchone() or (0, 0)
 
         shown_users = int(shown_row[0] or 0)
         shown_events = int(shown_row[1] or 0)
 
-        progress_sql = f"""
-            SELECT
-              COUNT(DISTINCT cs.user_id) AS users,
-              COUNT(*) AS events
-            FROM chat_messages cm
-            INNER JOIN chat_sessions cs ON cs.session_id = cm.session_id
-            INNER JOIN free_answer_funnel_events e
-              ON e.userid = cs.user_id
-             AND e.message_id = cm.message_id::text
-             AND e.event_name = ?
-            WHERE {impression_predicate}
-              {date_sql}
-        """
-
         def _progress(event_name: str) -> Tuple[int, int]:
-            try:
-                cur2 = execute(conn, progress_sql, (event_name, *date_params))
-                row = cur2.fetchone() or (0, 0)
-            except Exception:
-                logger.exception("free-answer funnel progress query failed event=%s", event_name)
-                conn.rollback()
-                sql_json = progress_sql.replace("::jsonb", "::json")
-                cur2 = execute(conn, sql_json, (event_name, *date_params))
-                row = cur2.fetchone() or (0, 0)
+            cur2 = execute(
+                conn,
+                f"""
+                SELECT COUNT(DISTINCT s.userid) AS users, COUNT(*) AS events
+                FROM free_answer_funnel_events s
+                INNER JOIN free_answer_funnel_events e
+                  ON e.userid = s.userid
+                 AND COALESCE(e.message_id, '') = COALESCE(s.message_id, '')
+                 AND e.event_name = ?
+                WHERE {cohort_where}
+                """,
+                (event_name, *date_params),
+            )
+            row = cur2.fetchone() or (0, 0)
             return int(row[0] or 0), int(row[1] or 0)
 
         reveal_users, reveal_events = _progress("reveal_clicked")
@@ -296,10 +259,23 @@ def get_funnel_analytics(
                 round(100.0 * users / base, 1) if base > 0 else None
             )
 
+        cur = execute(
+            conn,
+            """
+            SELECT MIN(created_at)
+            FROM free_answer_funnel_events
+            WHERE event_name = 'blur_shown'
+            """,
+        )
+        tracking_row = cur.fetchone()
+        tracking_started_at = tracking_row[0] if tracking_row else None
+
         return {
             "from_date": from_date,
             "to_date": to_date,
-            "impression_source": "chat_messages.gate_metadata.free_question_completed",
+            "timezone": _ADMIN_TZ,
+            "tracking_started_at": tracking_started_at,
+            "impression_source": "free_answer_funnel_events.blur_shown",
             "steps": steps,
             "reveal_to_purchase_pct": (
                 round(100.0 * converted_users / reveal_users, 1) if reveal_users > 0 else None

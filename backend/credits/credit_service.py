@@ -2401,6 +2401,47 @@ class CreditService:
             )
             return cursor.fetchone() is not None
 
+    def get_credited_google_play_order_for_token(
+        self,
+        userid: int,
+        purchase_token: str,
+        product_id: Optional[str] = None,
+    ) -> Optional[str]:
+        """Resolve an already-credited Play order without calling Google again."""
+        token = (purchase_token or "").strip()
+        expected_product = (product_id or "").strip()
+        if not token:
+            return None
+
+        from db import get_conn, execute
+
+        with get_conn() as conn:
+            cursor = execute(
+                conn,
+                """
+                SELECT reference_id, metadata
+                FROM credit_transactions
+                WHERE userid = ?
+                  AND source = 'google_play'
+                  AND reference_id IS NOT NULL
+                  AND metadata LIKE ?
+                ORDER BY created_at DESC
+                """,
+                (userid, f"%{token}%"),
+            )
+            for reference_id, metadata_json in cursor.fetchall():
+                try:
+                    metadata = json.loads(metadata_json or "{}")
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    continue
+                if str(metadata.get("purchase_token") or "").strip() != token:
+                    continue
+                recorded_product = str(metadata.get("product_id") or "").strip()
+                if expected_product and recorded_product and recorded_product != expected_product:
+                    continue
+                return str(reference_id or "").strip() or None
+        return None
+
     @staticmethod
     def calculate_first_purchase_bonus_credits(
         purchased_credits: int,

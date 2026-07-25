@@ -19,6 +19,18 @@ DEFAULT_RECIPIENTS = (
 )
 _EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="payment-alert")
 _SAFE_VALUE_RE = re.compile(r"[^A-Za-z0-9@._:+/ -]")
+_PLAY_TOKEN_URL_RE = re.compile(
+    r"(?P<prefix>/tokens/)(?P<token>[^?\s\"'<>]+)",
+    re.IGNORECASE,
+)
+_NAMED_TOKEN_RE = re.compile(
+    r"(?P<prefix>\b(?:purchase[_ ]?token|token)\b\s*[:=]\s*)"
+    r"(?P<quote>[\"']?)(?P<token>[A-Za-z0-9._-]{20,})(?P=quote)",
+    re.IGNORECASE,
+)
+_PLAY_TOKEN_VALUE_RE = re.compile(
+    r"\b[A-Za-z0-9_-]{8,}\.[A-Za-z0-9._-]{40,}\b",
+)
 
 
 def _recipients() -> list[str]:
@@ -30,6 +42,14 @@ def _recipients() -> list[str]:
 def _safe(value: Any, limit: int = 300) -> str:
     text = str(value or "").replace("\n", " ").replace("\r", " ").strip()
     return _SAFE_VALUE_RE.sub("?", text)[:limit] or "n/a"
+
+
+def redact_payment_secrets(value: Any) -> str:
+    """Remove purchase tokens from provider errors before email, logs, or API responses."""
+    text = str(value or "")
+    text = _PLAY_TOKEN_URL_RE.sub(r"\g<prefix>[REDACTED]", text)
+    text = _NAMED_TOKEN_RE.sub(r"\g<prefix>[REDACTED]", text)
+    return _PLAY_TOKEN_VALUE_RE.sub("[REDACTED]", text)
 
 
 def _dedupe_key(
@@ -151,12 +171,14 @@ def _deliver_payment_failure_alert(payload: Dict[str, Any]) -> bool:
         f"Reference: {reference_id}",
         f"Product: {_safe(payload.get('product_id'), 120)}",
         f"Error: {error_code}",
-        f"Detail: {_safe(payload.get('detail'), 500)}",
+        f"Detail: {_safe(redact_payment_secrets(payload.get('detail')), 500)}",
     ]
     for key, value in sorted(metadata.items()):
         if "token" in str(key).lower() or "secret" in str(key).lower() or "signature" in str(key).lower():
             continue
-        lines.append(f"{_safe(key, 80)}: {_safe(value, 300)}")
+        lines.append(
+            f"{_safe(key, 80)}: {_safe(redact_payment_secrets(value), 300)}"
+        )
     body = "\n".join(lines)
     subject = f"[AstroRoshni Payment Failure] {provider} · {stage}"
     sent = send_plain_text_email(_recipients(), subject, body)
