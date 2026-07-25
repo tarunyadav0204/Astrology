@@ -32,6 +32,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCredits } from '../../credits/CreditContext';
 import { useAuthGate } from '../../auth/AuthGateContext';
+import { extractFirstHttpsUrl } from '../../utils/blogLinks';
 
 const { width, height: windowHeight } = Dimensions.get('window');
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -329,7 +330,11 @@ export default function HomeScreen({
   const [showMultiChartTipModal, setShowMultiChartTipModal] = useState(false);
   const [showKnowYourselfPrompt, setShowKnowYourselfPrompt] = useState(false);
   const [showInfoOnlyModal, setShowInfoOnlyModal] = useState(false);
-  const [infoOnlyModalContent, setInfoOnlyModalContent] = useState({ title: '', body: '' });
+  const [infoOnlyModalContent, setInfoOnlyModalContent] = useState({
+    title: '',
+    body: '',
+    url: '',
+  });
   const [homeBanner, setHomeBanner] = useState(null);
   const knowYourselfAnim = useRef(new Animated.Value(0)).current;
   /** One promotional home prompt per Home focus visit (info modal counts as the visit slot). */
@@ -388,9 +393,11 @@ export default function HomeScreen({
     setShowMonthlyWelcomeModal(false);
     setShowMultiChartTipModal(false);
     setShowKnowYourselfPrompt(false);
+    const parsedInfoBody = extractFirstHttpsUrl(infoModalPayload.body);
     setInfoOnlyModalContent({
       title: String(infoModalPayload.title || '').trim(),
-      body: String(infoModalPayload.body || '').trim(),
+      body: parsedInfoBody.body.trim(),
+      url: parsedInfoBody.url,
     });
     setShowInfoOnlyModal(true);
   }, [infoModalPayload]);
@@ -1906,15 +1913,57 @@ const loadHomeData = async (nativeData = null) => {
                 <Text style={[styles.infoOnlyModalBody, { color: colors.textSecondary }]}>
                   {infoOnlyModalContent.body || t('home.infoModal.defaultBody', 'We have an important update for you.')}
                 </Text>
-                <TouchableOpacity
-                  style={[styles.infoOnlyModalCloseBtn, { backgroundColor: colors.primary }]}
-                  onPress={() => {
-                    setShowInfoOnlyModal(false);
-                    onInfoModalConsumed && onInfoModalConsumed();
-                  }}
-                >
-                  <Text style={styles.infoOnlyModalCloseText}>{t('languageModal.close', 'Close')}</Text>
-                </TouchableOpacity>
+                <View style={styles.infoOnlyModalActions}>
+                  <TouchableOpacity
+                    style={[
+                      styles.infoOnlyModalCloseBtn,
+                      {
+                        backgroundColor: infoOnlyModalContent.url
+                          ? colors.surface
+                          : colors.primary,
+                        borderColor: infoOnlyModalContent.url
+                          ? colors.cardBorder
+                          : colors.primary,
+                      },
+                    ]}
+                    onPress={() => {
+                      setShowInfoOnlyModal(false);
+                      onInfoModalConsumed && onInfoModalConsumed();
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.infoOnlyModalCloseText,
+                        infoOnlyModalContent.url ? { color: colors.text } : null,
+                      ]}
+                    >
+                      {t('languageModal.close', 'Close')}
+                    </Text>
+                  </TouchableOpacity>
+                  {infoOnlyModalContent.url ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.infoOnlyModalOpenBtn,
+                        { backgroundColor: colors.primary },
+                      ]}
+                      onPress={() => {
+                        const targetUrl = infoOnlyModalContent.url;
+                        const targetTitle =
+                          infoOnlyModalContent.title ||
+                          t('home.infoModal.defaultTitle', 'Information');
+                        setShowInfoOnlyModal(false);
+                        onInfoModalConsumed && onInfoModalConsumed();
+                        navigation.navigate('BlogLink', {
+                          url: targetUrl,
+                          title: targetTitle,
+                        });
+                      }}
+                    >
+                      <Text style={styles.infoOnlyModalCloseText}>Open</Text>
+                      <Icon name="arrow-forward" size={17} color="#fff" />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               </TouchableOpacity>
             </TouchableOpacity>
           </Modal>
@@ -4142,9 +4191,23 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   infoOnlyModalCloseBtn: {
-    alignSelf: 'flex-end',
     paddingHorizontal: 16,
     paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  infoOnlyModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 10,
+  },
+  infoOnlyModalOpenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
     borderRadius: 10,
   },
   infoOnlyModalCloseText: {

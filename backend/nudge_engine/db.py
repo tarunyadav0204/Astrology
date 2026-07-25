@@ -1997,14 +1997,18 @@ def overview_stats(conn, start_date: str, end_date: str) -> Dict[str, Any]:
         """
         SELECT d.trigger_id,
                d.campaign_id,
+               c.name AS campaign_name,
+               c.title_template AS campaign_title,
+               c.body_template AS campaign_body,
                COUNT(DISTINCT COALESCE(d.delivery_group_id, d.id::text)) AS targeted,
                COUNT(*) FILTER (WHERE d.channel = 'push' AND COALESCE(d.send_status, 'sent') = 'sent') AS push,
                COUNT(*) FILTER (WHERE d.channel IN ('whatsapp','whatsapp_template') AND COALESCE(d.send_status, 'sent') = 'sent') AS whatsapp,
                COUNT(*) FILTER (WHERE d.channel = 'email' AND COALESCE(d.send_status, 'sent') = 'sent') AS email
         FROM nudge_deliveries d
+        LEFT JOIN nudge_campaigns c ON c.id = d.campaign_id
         WHERE d.sent_at >= %s AND d.sent_at <= %s
-        GROUP BY 1, 2
-        ORDER BY 3 DESC
+        GROUP BY d.trigger_id, d.campaign_id, c.name, c.title_template, c.body_template
+        ORDER BY targeted DESC
         LIMIT 100
         """,
         (start_date, end_date),
@@ -2013,10 +2017,13 @@ def overview_stats(conn, start_date: str, end_date: str) -> Dict[str, Any]:
         {
             "trigger_id": r[0] or "",
             "campaign_id": int(r[1]) if r[1] is not None else None,
-            "targeted": int(r[2] or 0),
-            "push": int(r[3] or 0),
-            "whatsapp": int(r[4] or 0),
-            "email": int(r[5] or 0),
+            "campaign_name": str(r[2] or "") or None,
+            "campaign_title": str(r[3] or "") or None,
+            "campaign_body": str(r[4] or "") or None,
+            "targeted": int(r[5] or 0),
+            "push": int(r[6] or 0),
+            "whatsapp": int(r[7] or 0),
+            "email": int(r[8] or 0),
         }
         for r in (cur.fetchall() or [])
     ]

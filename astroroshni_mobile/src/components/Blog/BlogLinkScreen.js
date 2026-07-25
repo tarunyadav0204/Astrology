@@ -15,6 +15,7 @@ import { normalizeHttpsUrl } from '../../utils/blogLinks';
 export default function BlogLinkScreen({ route, navigation }) {
   const { colors } = useTheme();
   const url = useMemo(() => normalizeHttpsUrl(route.params?.url), [route.params?.url]);
+  const screenTitle = String(route.params?.title || 'AstroRoshni').trim() || 'AstroRoshni';
   const [loading, setLoading] = useState(!!url);
   const [failed, setFailed] = useState(false);
 
@@ -30,7 +31,7 @@ export default function BlogLinkScreen({ route, navigation }) {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
-          AstroRoshni Blog
+          {screenTitle}
         </Text>
         <View style={styles.headerSpacer} />
       </View>

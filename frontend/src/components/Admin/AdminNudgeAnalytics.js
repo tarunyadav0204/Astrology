@@ -255,6 +255,8 @@ export default function AdminNudgeAnalytics() {
               <thead>
                 <tr>
                   <th>Source (trigger / campaign)</th>
+                  <th style={{ minWidth: 180 }}>Title</th>
+                  <th style={{ minWidth: 260 }}>Body</th>
                   <th style={{ width: 80 }}>Sent</th>
                   <th style={{ width: 70 }}>Push</th>
                   <th style={{ width: 90 }}>WhatsApp</th>
@@ -267,14 +269,25 @@ export default function AdminNudgeAnalytics() {
               <tbody>
                 {(overview.by_source || []).length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="notif-td-name">No nudges sent in this range.</td>
+                    <td colSpan={10} className="notif-td-name">No nudges sent in this range.</td>
                   </tr>
                 ) : (
                   (overview.by_source || []).map((row) => (
                     <tr key={`${row.trigger_id}-${row.campaign_id || ''}`}>
                       <td>
                         <strong>{row.trigger_id || '(unknown)'}</strong>
-                        {row.campaign_id ? <div className="notif-td-phone">campaign #{row.campaign_id}</div> : null}
+                        {row.campaign_id ? (
+                          <div className="notif-td-phone">
+                            Campaign #{row.campaign_id}
+                            {row.campaign_name ? ` · ${row.campaign_name}` : ''}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td style={{ maxWidth: 240, whiteSpace: 'normal' }}>
+                        {row.campaign_title || '—'}
+                      </td>
+                      <td style={{ maxWidth: 360, whiteSpace: 'normal', lineHeight: 1.4 }}>
+                        {row.campaign_body || '—'}
                       </td>
                       <td>{row.targeted}</td>
                       <td>{row.push}</td>

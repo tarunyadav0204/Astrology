@@ -53,7 +53,21 @@ def test_overview_stats_shapes_today_results(monkeypatch):
     monkeypatch.setattr(db, "_conversions_by_channel", lambda *_args: {"push": 1})
     cursors = iter(
         [
-            _Cursor(all_rows=[("campaign_12", 12, 3, 3, 0, 0)]),
+            _Cursor(
+                all_rows=[
+                    (
+                        "campaign_12",
+                        12,
+                        "Saturn guidance",
+                        "A major Saturn shift is approaching",
+                        "See what this Saturn movement can mean for you.",
+                        3,
+                        3,
+                        0,
+                        0,
+                    )
+                ]
+            ),
             _Cursor(all_rows=[("campaign_12", 12, 1)]),
         ]
     )
@@ -66,6 +80,9 @@ def test_overview_stats_shapes_today_results(monkeypatch):
         {
             "trigger_id": "campaign_12",
             "campaign_id": 12,
+            "campaign_name": "Saturn guidance",
+            "campaign_title": "A major Saturn shift is approaching",
+            "campaign_body": "See what this Saturn movement can mean for you.",
             "targeted": 3,
             "push": 3,
             "whatsapp": 0,
