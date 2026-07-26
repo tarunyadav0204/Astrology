@@ -125,7 +125,7 @@ def test_real_service_generates_traceable_deterministic_result():
     first = service.generate(request)
     second = service.generate(request)
 
-    assert first.schema_version == "prediction_engine.v17"
+    assert first.schema_version == "prediction_engine.v18"
     assert first.profile == "parashari_fomo_v1"
     assert first.evidence_signature == second.evidence_signature
     assert [row.manifestation_id for row in first.chart_manifestations] == [

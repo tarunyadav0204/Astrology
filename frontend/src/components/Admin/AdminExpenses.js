@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { adminService, getDeviceId } from '../../services/adminService';
+import AdminGcpExpenseImport from './AdminGcpExpenseImport';
 
 function formatInr(amountStr, currency) {
   const n = Number(amountStr);
@@ -40,6 +41,8 @@ const AdminExpenses = () => {
   const [vendorFilter, setVendorFilter] = useState('');
   const [paidByFilter, setPaidByFilter] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [gcpDetail, setGcpDetail] = useState(null);
+  const [gcpDetailLoading, setGcpDetailLoading] = useState(false);
 
   const [vendors, setVendors] = useState([]);
   const [paidByList, setPaidByList] = useState([]);
@@ -211,6 +214,20 @@ const AdminExpenses = () => {
     }
   };
 
+  const loadGcpDetail = async (row) => {
+    setGcpDetailLoading(true);
+    setError('');
+    try {
+      const invoiceMonth = String(row.source_period || '').replace('-', '');
+      const data = await adminService.getGcpExpenseMonthDetail(row.source_account_id, invoiceMonth);
+      setGcpDetail({ ...data, expenseId: row.id });
+    } catch (e) {
+      setError(e?.message || 'Could not load GCP cost detail');
+    } finally {
+      setGcpDetailLoading(false);
+    }
+  };
+
   const downloadInvoice = async (id, filename) => {
     try {
       const token = localStorage.getItem('token');
@@ -329,7 +346,25 @@ const AdminExpenses = () => {
         >
           Vendors &amp; paid by
         </button>
+        <button
+          type="button"
+          className={`subtab ${expenseView === 'gcp' ? 'active' : ''}`}
+          onClick={() => setExpenseView('gcp')}
+        >
+          GCP import
+        </button>
       </div>
+
+      {expenseView === 'gcp' && (
+        <AdminGcpExpenseImport
+          vendors={vendors}
+          paidByList={paidByList}
+          onSynced={async () => {
+            setPage(1);
+            await load(1);
+          }}
+        />
+      )}
 
       {expenseView === 'masters' && (
         <div style={{ marginBottom: 24 }}>
@@ -751,6 +786,7 @@ const AdminExpenses = () => {
                       <th>Paid by</th>
                       <th>Category</th>
                       <th>Amount</th>
+                      <th>Source</th>
                       <th>Notes (preview)</th>
                       <th>Invoice</th>
                       <th>Created</th>
@@ -760,7 +796,7 @@ const AdminExpenses = () => {
                   <tbody>
                     {items.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="users-table-empty">
+                        <td colSpan={10} className="users-table-empty">
                           No expenses yet.
                         </td>
                       </tr>
@@ -772,6 +808,39 @@ const AdminExpenses = () => {
                           <td>{row.paid_by || '—'}</td>
                           <td>{row.category || '—'}</td>
                           <td>{formatInr(row.amount, row.currency)}</td>
+                          <td>
+                            {row.source_provider === 'gcp' ? (
+                              <div>
+                                <span
+                                  style={{
+                                    display: 'inline-block',
+                                    padding: '2px 7px',
+                                    borderRadius: 999,
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    color: row.import_status === 'provisional' ? '#92400e' : '#166534',
+                                    background: row.import_status === 'provisional' ? '#fef3c7' : '#dcfce7',
+                                  }}
+                                >
+                                  GCP · {row.import_status || 'imported'}
+                                </span>
+                                <div style={{ color: '#777', fontSize: 11, marginTop: 3 }}>
+                                  {row.source_period || ''}{row.source_account_id ? ` · ${row.source_account_id}` : ''}
+                                </div>
+                                <button
+                                  type="button"
+                                  className="users-pagination-btn"
+                                  style={{ padding: '2px 7px', fontSize: 11, marginTop: 4 }}
+                                  disabled={gcpDetailLoading}
+                                  onClick={() => loadGcpDetail(row)}
+                                >
+                                  Cost detail
+                                </button>
+                              </div>
+                            ) : (
+                              'Manual'
+                            )}
+                          </td>
                           <td style={{ maxWidth: 200, wordBreak: 'break-word' }}>{row.notes_preview || '—'}</td>
                           <td>
                             {row.has_invoice ? (
@@ -800,14 +869,16 @@ const AdminExpenses = () => {
                               >
                                 Edit
                               </button>
-                              <button
-                                type="button"
-                                className="users-pagination-btn"
-                                style={{ padding: '4px 10px', fontSize: 12, background: '#666' }}
-                                onClick={() => handleDelete(row.id)}
-                              >
-                                Delete
-                              </button>
+                              {row.source_provider === 'gcp' ? null : (
+                                <button
+                                  type="button"
+                                  className="users-pagination-btn"
+                                  style={{ padding: '4px 10px', fontSize: 12, background: '#666' }}
+                                  onClick={() => handleDelete(row.id)}
+                                >
+                                  Delete
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -816,6 +887,53 @@ const AdminExpenses = () => {
                   </tbody>
                 </table>
               </div>
+              {gcpDetail ? (
+                <div
+                  style={{
+                    border: '1px solid #bfdbfe',
+                    borderRadius: 8,
+                    padding: 14,
+                    marginTop: 14,
+                    background: '#eff6ff',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                    <div>
+                      <strong>GCP daily detail · {gcpDetail.invoice_month}</strong>
+                      <div style={{ color: '#555', fontSize: 12 }}>{gcpDetail.billing_account_id}</div>
+                    </div>
+                    <button type="button" className="users-pagination-btn" onClick={() => setGcpDetail(null)}>
+                      Close
+                    </button>
+                  </div>
+                  <div className="users-table" style={{ marginTop: 10, maxHeight: 420, overflow: 'auto' }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Usage date</th>
+                          <th>Net cost</th>
+                          <th>Largest project/service lines</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(gcpDetail.days || []).map((day) => (
+                          <tr key={`${day.usage_date}-${day.currency}`}>
+                            <td>{day.usage_date}</td>
+                            <td>{formatInr(day.amount, day.currency)}</td>
+                            <td style={{ fontSize: 12 }}>
+                              {(day.breakdown || []).slice(0, 5).map((entry, index) => (
+                                <div key={`${entry.project_id}-${entry.service}-${index}`}>
+                                  {entry.project_id} · {entry.service}: {formatInr(entry.amount, day.currency)}
+                                </div>
+                              ))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : null}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
                 <span className="users-pagination-info">
                   Page {page} of {totalPages} · {total} total

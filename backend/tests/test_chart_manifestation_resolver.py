@@ -179,6 +179,61 @@ def test_symmetric_self_and_relative_readings_do_not_duplicate_one_event():
     result = ChartManifestationResolver().resolve(
         _request(subjects=("self", "spouse")), rows
     )
-    shared = [item for item in result if item.signature_key == "shared_finances"]
-    assert len(shared) == 1
-    assert shared[0].subject == "self"
+    overlapping = [
+        item for item in result
+        if {role.native_house for role in item.house_roles}.issubset({2, 7, 8})
+    ]
+    assert len(overlapping) == 1
+    assert overlapping[0].subject == "self"
+    assert overlapping[0].rule_id == "semantic_event_signature_graph_cluster"
+
+
+def test_h8_and_h11_form_a_grounded_shared_resource_result_cluster():
+    rows = (_activation(8, "Saturn"), _activation(11, "Saturn"))
+
+    result = ChartManifestationResolver().resolve(_request(), rows)
+
+    cluster = next(
+        item for item in result
+        if item.rule_id == "semantic_event_signature_graph_cluster"
+    )
+    assert [role.native_house for role in cluster.house_roles] == [8, 11]
+    assert {
+        theme["key"] for theme in cluster.constituent_themes
+    } == {"eighth_house_shared_resources"}
+    assert cluster.constituent_themes[0]["required_varga"] == "D9"
+
+
+def test_overlapping_signatures_synthesize_all_coherent_active_houses():
+    rows = tuple(
+        _activation(house, "Saturn")
+        for house in (2, 4, 7, 8, 11)
+    )
+
+    result = ChartManifestationResolver().resolve(_request(), rows)
+
+    cluster = next(
+        item for item in result
+        if item.rule_id == "semantic_event_signature_graph_cluster"
+        and {role.native_house for role in item.house_roles} == {2, 4, 7, 8, 11}
+    )
+    theme_keys = {theme["key"] for theme in cluster.constituent_themes}
+    assert {
+        "property_asset",
+        "relationship_commitment",
+        "eighth_house_shared_resources",
+        "financial_pressure_or_obligation",
+    }.issubset(theme_keys)
+    assert cluster.domain == "combined"
+    assert len(cluster.house_roles) == 5
+
+
+def test_active_houses_are_not_merged_without_a_registered_semantic_edge():
+    rows = (_activation(1, "Saturn"), _activation(2, "Saturn"))
+
+    result = ChartManifestationResolver().resolve(_request(), rows)
+
+    assert not any(
+        item.rule_id == "semantic_event_signature_graph_cluster"
+        for item in result
+    )

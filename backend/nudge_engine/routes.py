@@ -2460,7 +2460,10 @@ def _validate_campaign_payload(body: CampaignUpsertRequest) -> Dict[str, Any]:
         "channels_json": json.dumps(channels, ensure_ascii=False),
         "ai_personalize": bool(body.ai_personalize),
         "ai_base_prompt": (body.ai_base_prompt or "").strip()[:2000],
-        "audience_filter_json": json.dumps(audience, ensure_ascii=False)[:20000],
+        # This is a TEXT column and may legitimately contain a large explicit
+        # audience selected across paginated Audience Builder results. Never
+        # slice serialized JSON because doing so stores an invalid document.
+        "audience_filter_json": json.dumps(audience, ensure_ascii=False),
         "landing_screen": landing,
         "landing_url": landing_url,
         "scheduled_at": scheduled_at,
@@ -2983,6 +2986,7 @@ class AudienceNlExecuteBody(BaseModel):
     page: int = 1
     page_size: int = 50
     push_only: bool = False
+    include_all_user_ids: bool = False
 
 
 class AudienceNlGenerateAndRunBody(BaseModel):
@@ -2990,6 +2994,7 @@ class AudienceNlGenerateAndRunBody(BaseModel):
     page: int = 1
     page_size: int = 50
     push_only: bool = False
+    include_all_user_ids: bool = False
 
 
 class AnalyticsNlExecuteBody(BaseModel):
@@ -3048,6 +3053,7 @@ async def admin_audience_nl_execute(
                 page=body.page,
                 page_size=body.page_size,
                 push_only=body.push_only,
+                include_all_user_ids=body.include_all_user_ids,
             )
 
         out = await run_in_threadpool(_work)
@@ -3082,6 +3088,7 @@ async def admin_audience_nl_generate_and_run(
                 page=body.page,
                 page_size=body.page_size,
                 push_only=body.push_only,
+                include_all_user_ids=body.include_all_user_ids,
             )
 
         out = await run_in_threadpool(_work)

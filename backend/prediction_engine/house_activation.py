@@ -28,10 +28,16 @@ from .contracts import (
     Polarity,
     PredictionWindow,
 )
+from .nakshatra_transit import (
+    nakshatra_lord_house_relevance,
+    nakshatra_lord_expression,
+    nakshatra_lord_natal_condition,
+    nakshatra_transit_relation,
+)
 from .primitives import CLASSICAL_PLANETS, aspected_houses, ruled_houses
 
 
-HOUSE_ACTIVATION_POLICY_VERSION = "4.0.0"
+HOUSE_ACTIVATION_POLICY_VERSION = "4.1.0"
 
 # Slow transits are allowed to reinforce timing even when the planet is not a
 # dasha lord.  Faster planets are retained as short triggers only when they are
@@ -575,6 +581,69 @@ class HouseActivationEngine:
             transit_connections: List[Dict[str, Any]] = []
             trigger_planets: Set[str] = set()
             self_natal_reinforcement_planets: Set[str] = set()
+            nakshatra_return_planets: Set[str] = set()
+            levels_by_planet: Dict[str, Set[str]] = {}
+            for level, planet in levels:
+                levels_by_planet.setdefault(planet, set()).add(level)
+            if deliverable:
+                for planet, planet_levels in levels_by_planet.items():
+                    if planet not in connected_planets:
+                        continue
+                    natal = chart["planets"].get(planet)
+                    transit = transit_states.get(planet)
+                    if natal is None or transit is None:
+                        continue
+                    resonance = nakshatra_transit_relation(
+                        float(natal["longitude"]),
+                        float(transit["longitude"]),
+                    )
+                    if resonance is None:
+                        continue
+                    lord = str(resonance["common_nakshatra_lord"])
+                    relevant, relevance_reasons = nakshatra_lord_house_relevance(
+                        chart, lord, house, dasha_planets
+                    )
+                    is_exact_return = (
+                        resonance["relation"] == "exact_natal_nakshatra_return"
+                    )
+                    if is_exact_return:
+                        nakshatra_return_planets.add(planet)
+                    lord_condition = nakshatra_lord_natal_condition(
+                        chart, calculation.natal_dignities, lord
+                    )
+                    evidence.append(_evidence(
+                        window=window,
+                        provider="transit_nakshatra_ledger",
+                        rule_id=(
+                            "dasha_planet_exact_natal_nakshatra_return"
+                            if is_exact_return
+                            else "dasha_planet_nakshatra_dispositor_resonance"
+                        ),
+                        planet=planet,
+                        house=house,
+                        importance=Importance.CONFIRMATORY,
+                        facts={
+                            "dasha_levels": tuple(sorted(
+                                planet_levels, key=DASHA_LEVEL_ORDER.get
+                            )),
+                            **resonance,
+                            "nakshatra_lord_relevant": relevant,
+                            "nakshatra_lord_relevance_reasons": relevance_reasons,
+                            "nakshatra_lord_natal_condition": lord_condition,
+                            "nakshatra_lord_expression": (
+                                nakshatra_lord_expression(lord_condition)
+                            ),
+                            "creates_house_promise": False,
+                            "qualifies_as_direct_natal_contact": False,
+                            "qualifies_as_strong_natal_return_confirmation": (
+                                is_exact_return
+                            ),
+                        },
+                        key=(
+                            f"transit-nakshatra:{planet}:{resonance['relation']}:"
+                            f"{resonance['transit_nakshatra']['index']}"
+                        ),
+                    ))
             for planet in CLASSICAL_PLANETS:
                 transit = transit_states.get(planet)
                 if transit is None:
@@ -652,7 +721,10 @@ class HouseActivationEngine:
             full_reinforcement_planets = (
                 dasha_planets
                 & trigger_planets
-                & self_natal_reinforcement_planets
+                & (
+                    self_natal_reinforcement_planets
+                    | nakshatra_return_planets
+                )
             )
             natal_relation_reinforcement = bool(full_reinforcement_planets)
             if deliverable and has_timing_transit and natal_relation_reinforcement:

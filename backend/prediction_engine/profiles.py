@@ -42,13 +42,14 @@ class PredictionProfile:
 PROFILES: Dict[str, PredictionProfile] = {
     "parashari_fomo_v1": PredictionProfile(
         key="parashari_fomo_v1",
-        version="3.1.0",
+        version="3.2.0",
         provider_ids=(
             "dasha_house_activation",
             "dasha_planet_relationship",
             "dispositor_activation",
             "transit_house",
             "transit_natal_relation",
+            "transit_nakshatra_resonance",
             "planet_condition",
             "functional_nature",
             "friendship",
@@ -65,6 +66,7 @@ PROFILES: Dict[str, PredictionProfile] = {
             ("dispositor_activation", "1.0.0"),
             ("transit_house", "1.0.0"),
             ("transit_natal_relation", "1.0.0"),
+            ("transit_nakshatra_resonance", "1.0.0"),
             ("planet_condition", "1.1.0"),
             ("functional_nature", "1.0.0"),
             ("friendship", "1.2.0"),

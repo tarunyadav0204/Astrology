@@ -508,6 +508,71 @@ export const adminService = {
     return { ok: true, filename };
   },
 
+  async getGcpExpenseIntegrationStatus() {
+    const response = await fetch(getAdminEndpoint('/admin/expense-integrations/gcp/status'), {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to load GCP billing integration');
+    }
+    return response.json();
+  },
+
+  async discoverGcpBillingAccounts() {
+    const response = await fetch(getAdminEndpoint('/admin/expense-integrations/gcp/accounts'), {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to discover GCP billing accounts');
+    }
+    return response.json();
+  },
+
+  async configureGcpBillingAccount(billingAccountId, body) {
+    const response = await fetch(
+      getAdminEndpoint(`/admin/expense-integrations/gcp/accounts/${encodeURIComponent(billingAccountId)}`),
+      {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(body),
+      },
+    );
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to configure GCP billing account');
+    }
+    return response.json();
+  },
+
+  async syncGcpExpenses(billingAccountId = '') {
+    const response = await fetch(getAdminEndpoint('/admin/expense-integrations/gcp/sync'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ billing_account_id: billingAccountId || null }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'GCP billing sync failed');
+    }
+    return response.json();
+  },
+
+  async getGcpExpenseMonthDetail(billingAccountId, invoiceMonth) {
+    const response = await fetch(
+      getAdminEndpoint(
+        `/admin/expense-integrations/gcp/accounts/${encodeURIComponent(billingAccountId)}/detail/${encodeURIComponent(invoiceMonth)}`,
+      ),
+      { headers: getAuthHeaders() },
+    );
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to load GCP expense detail');
+    }
+    return response.json();
+  },
+
   async deleteAdminExpense(expenseId) {
     const response = await fetch(getAdminEndpoint(`/admin/expenses/${expenseId}`), {
       method: 'DELETE',

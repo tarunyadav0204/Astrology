@@ -299,6 +299,27 @@ export default function ActivationExplorerScreen({ navigation, route }) {
     }).join(' and ');
     return `Transit ${item.planet} is in H${item.transit_house} and connects by ${relations}`;
   });
+  const nakshatraTransitConnections = (selectedHouse?.evidence || []).filter((item) => item.provider === 'transit_nakshatra_ledger').map((item) => {
+    const natal = item.facts?.natal_nakshatra || {};
+    const transit = item.facts?.transit_nakshatra || {};
+    if (item.rule_id === 'dasha_planet_exact_natal_nakshatra_return') {
+      return `Transit ${item.planet} is returning to its natal nakshatra ${natal.name}, giving strong timing confirmation`;
+    }
+    const relevant = item.facts?.nakshatra_lord_relevant
+      ? `; ${item.facts?.common_nakshatra_lord} is also connected to this house`
+      : '';
+    const expression = item.facts?.nakshatra_lord_expression === 'strained'
+      ? '; the natal condition of that lord is strained'
+      : item.facts?.nakshatra_lord_expression === 'clear'
+        ? '; the natal condition of that lord is clear'
+        : '';
+    return `Transit ${item.planet} in ${transit.name} repeats its natal nakshatra lord ${item.facts?.common_nakshatra_lord} from ${natal.name}${relevant}${expression}. This is secondary confirmation, not a direct conjunction or aspect`;
+  });
+  const transitTriggerExplanation = timingTransitConnections.length
+    ? `${timingTransitConnections.join('; ')}.${nakshatraTransitConnections.length ? ` ${nakshatraTransitConnections.join('; ')}.` : ''}${selectedHouse.activation?.natal_position_reinforced ? ` ${repeatedDashaPlanets.join(', ') || 'An active period planet'} also makes a validated natal return/contact, strengthening the timing.` : ' The active period planet is not also making a direct natal-position contact.'}`
+    : nakshatraTransitConnections.length
+      ? `${nakshatraTransitConnections.join('; ')}. This supports timing only; it does not activate the house without its natal and dasha promise.`
+      : 'No strong transit trigger or nakshatra resonance was found.';
   const triggers = selectedHouse?.timing_triggers || [];
 
   const shiftDate = (days) => {
@@ -392,7 +413,7 @@ export default function ActivationExplorerScreen({ navigation, route }) {
             {[
               ['1', 'Birth-chart foundation', promise ? `${promise.lord} rules this house; planets placed here: ${promise.occupants?.join(', ') || 'none'}; planets aspecting it: ${promise.aspecting_planets?.join(', ') || 'none'}.` : 'Birth-chart foundation is unavailable.'],
               ['2', 'Connection to your current period', levels.length ? `${directDashaConnections.join('; ') || 'No direct connection'}.${cooperativeCarriers.length ? ` ${cooperativeCarriers.join(', ')} also participates because it has a natal relationship with the directly connected period planet.` : ''}` : 'The current major and sub-period planets do not have a strong natal connection to this house, so it remains background context.'],
-              ['3', 'What is triggering it now', timingTransitConnections.length ? selectedHouse.activation?.natal_position_reinforced ? `${timingTransitConnections.join('; ')}. ${repeatedDashaPlanets.join(', ') || 'The active period planet'} also returns to its natal position, strengthening the timing.` : `${timingTransitConnections.join('; ')}. These transits bring attention here, although the active period planet is not also repeating its natal position.` : 'No strong transit trigger was found.'],
+              ['3', 'What is triggering it now', transitTriggerExplanation],
             ].map(([number, title, body]) => <View key={number} style={[styles.reasonRow, { backgroundColor: ui.surfaceMuted }]}><View style={[styles.reasonNumber, { backgroundColor: `${colors.primary}1f` }]}><Text style={[styles.reasonNumberText, { color: colors.primary }]}>{number}</Text></View><View style={{ flex: 1 }}><Text style={[styles.reasonTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.reasonBody, { color: colors.textSecondary }]}>{body}</Text></View></View>)}
             <View style={[styles.facts, { borderColor: ui.border, backgroundColor: ui.surfaceMuted }]}><Text style={[styles.fact, { color: colors.textSecondary }]}>House lord  <Text style={{ color: colors.text, fontWeight: '600' }}>{selectedHouse.house_lord || promise?.lord || '—'}</Text></Text><Text style={[styles.fact, { color: colors.textSecondary }]}>Overall direction  <Text style={{ color: colors.text, fontWeight: '600' }}>{OUTCOME_LABELS[selectedHouse.outcome?.tone] || 'Unclear'}</Text></Text><TouchableOpacity onPress={() => setShowOutcomeReasons(true)} accessibilityRole="button" accessibilityLabel="See what helps or adds pressure"><Text style={[styles.fact, { color: colors.textSecondary }]}>Planetary influences  <Text style={{ color: colors.text, fontWeight: '600' }}>{selectedHouse.outcome?.supportive_factors || 0} helpful · {selectedHouse.outcome?.mixed_factors || 0} mixed · {selectedHouse.outcome?.challenging_factors || 0} pressure</Text></Text><Text style={[styles.factorLink, { color: colors.primary }]}>See what helps or adds pressure  →</Text></TouchableOpacity><Text style={[styles.fact, { color: colors.textSecondary }]}>Planets connecting this house to the current period  <Text style={{ color: colors.text, fontWeight: '600' }}>{carriers.join(', ') || 'None'}</Text></Text></View>
             <Text style={[styles.subheading, { color: colors.text }]}>What you may notice in life</Text>
@@ -405,7 +426,7 @@ export default function ActivationExplorerScreen({ navigation, route }) {
           </> : <View style={[card, styles.manifestationSection]}>
             <Text style={[styles.eyebrow, { color: colors.primary }]}>YOUR CHART’S BIGGER STORY</Text>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Life themes coming into focus</Text>
-            <Text style={[styles.sectionIntro, { color: colors.textSecondary }]}>These themes appear when several active houses point toward the same area of life.</Text>
+            <Text style={[styles.sectionIntro, { color: colors.textSecondary }]}>Houses are grouped only when they overlap in time, share a coherent planetary delivery chain and form a recognised event relationship.</Text>
             {chartManifestationGroups.length ? chartManifestationGroups.map((group) => <View key={group.subject} style={styles.subjectSection}>
               <View style={[styles.subjectSectionHeader, { borderColor: ui.border }]}>
                 <View style={[styles.subjectIcon, { backgroundColor: `${colors.primary}18` }]}>
@@ -420,12 +441,38 @@ export default function ActivationExplorerScreen({ navigation, route }) {
               return <View key={item.manifestation_id} style={[styles.manifestationCard, { backgroundColor: ui.surfaceRaised, borderColor: ui.border, borderLeftColor: toneColor }]}>
                 <View style={styles.manifestationHeading}><View style={{ flex: 1 }}><Text style={[styles.eyebrow, { color: colors.textSecondary }]}>{sentence(item.domain)}</Text><Text style={[styles.manifestationTitle, { color: colors.text }]}>{sentence(item.label)}</Text></View><View style={[styles.confidenceBadge, { backgroundColor: `${toneColor}16` }]}><Text style={[styles.confidence, { color: toneColor }]}>{SYNTHESIS_STRENGTH_LABELS[item.synthesis_strength] || 'Evidence available'}</Text></View></View>
                 <View style={styles.manifestationChips}><Text style={[styles.manifestationChip, { color: toneColor, backgroundColor: `${toneColor}18` }]}>{OUTCOME_LABELS[item.outcome_tone] || sentence(item.outcome_tone)}</Text><Text style={[styles.manifestationChip, { color: colors.textSecondary, backgroundColor: `${toneColor}12` }]}>{item.window?.start_date <= asOf && item.window?.end_date >= asOf ? 'Active now' : 'Upcoming'} · {shortDate(item.window?.start_date)} – {shortDate(item.window?.end_date)}</Text></View>
-                <View style={styles.manifestationHouses}>{(item.house_roles || []).map((role) => <View key={`${role.native_house}-${role.relative_house}`} style={[styles.manifestationHouse, { backgroundColor: ui.surfaceMuted, borderColor: ui.border }]}><Text style={[styles.comboHouses, { color: toneColor }]}>H{role.native_house}{item.subject !== 'self' ? ` · for your ${item.subject}, this is H${role.relative_house}` : ''}</Text><Text style={[styles.reasonBody, { color: colors.textSecondary }]}>{role.role}</Text></View>)}</View>
-                <Text style={[styles.reasonTitle, { color: colors.text, marginTop: 14 }]}>What you may notice</Text>
-                <Text style={[styles.reasonBody, { color: colors.text }]}>{item.summary}</Text>
-                {(item.possibilities || []).map((possibility) => <Text key={possibility} style={[styles.bullet, { color: colors.textSecondary }]}>• {possibility}</Text>)}
+                <View style={[styles.manifestationOutcome, { backgroundColor: `${toneColor}0d`, borderColor: `${toneColor}45` }]}>
+                  <Text style={[styles.outcomeEyebrow, { color: toneColor }]}>WHAT MAY UNFOLD</Text>
+                  {(item.possibilities || []).map((possibility) => <View key={possibility} style={styles.possibilityRow}>
+                    <View style={[styles.possibilityIcon, { backgroundColor: `${toneColor}1f` }]}>
+                      <Ionicons name="sparkles-outline" size={14} color={toneColor} />
+                    </View>
+                    <Text style={[styles.possibilityText, { color: colors.text }]}>{possibility}</Text>
+                  </View>)}
+                </View>
+                <Text style={[styles.manifestationContext, { color: colors.textSecondary }]}>{item.summary}</Text>
                 <TouchableOpacity onPress={() => setExpandedManifestation(expanded ? null : item.manifestation_id)} style={styles.explainButton}><Text style={[styles.factorLink, { color: colors.primary }]}>{expanded ? 'Hide chart explanation' : 'Why your chart points to this'}</Text><Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.primary} /></TouchableOpacity>
                 {expanded ? <View style={[styles.explanation, { borderColor: colors.cardBorder }]}>
+                  {(item.constituent_themes || []).length ? <View style={styles.technicalSection}>
+                    <Text style={[styles.explanationTitle, { color: colors.text }]}>Why these houses are grouped</Text>
+                    {(item.constituent_themes || []).map((theme) => {
+                      const required = theme.required_native_houses || [];
+                      const supporting = theme.supporting_native_houses || [];
+                      const modifying = theme.modifying_native_houses || [];
+                      return <View key={theme.key} style={[styles.themeConnection, { borderTopColor: ui.border }]}>
+                        <Text style={[styles.reasonTitle, { color: colors.text }]}>{sentence(theme.label)}</Text>
+                        <Text style={[styles.reasonBody, { color: colors.textSecondary }]}>
+                          Main {required.map((house) => `H${house}`).join(', ')}
+                          {supporting.length ? ` · connected by ${supporting.map((house) => `H${house}`).join(', ')}` : ''}
+                          {modifying.length ? ` · modified or counterbalanced by ${modifying.map((house) => `H${house}`).join(', ')}` : ''}
+                        </Text>
+                      </View>;
+                    })}
+                  </View> : null}
+                  <View style={styles.technicalSection}>
+                    <Text style={[styles.explanationTitle, { color: colors.text }]}>How each house contributes</Text>
+                    <View style={styles.manifestationHouses}>{(item.house_roles || []).map((role) => <View key={`${role.native_house}-${role.relative_house}`} style={[styles.manifestationHouse, { borderColor: ui.border }]}><View style={[styles.houseRoleBadge, { backgroundColor: `${toneColor}18` }]}><Text style={[styles.comboHouses, { color: toneColor }]}>H{role.native_house}</Text></View><View style={{ flex: 1 }}><Text style={[styles.houseRoleRelative, { color: colors.text }]}>{item.subject !== 'self' ? `For your ${item.subject}, this is H${role.relative_house}` : HOUSE_LABELS[role.native_house]}</Text><Text style={[styles.reasonBody, { color: colors.textSecondary }]}>{role.role}</Text></View></View>)}</View>
+                  </View>
                   {(item.house_roles || []).map((role) => <View key={`reason-${role.native_house}-${role.relative_house}`} style={[styles.manifestationFactors, { borderColor: colors.cardBorder }]}>
                     <Text style={[styles.reasonTitle, { color: colors.text }]}>House {role.native_house}: {role.role}</Text>
                     {(role.dasha_connections || []).map((reason) => <Text key={reason} style={[styles.reasonBody, { color: colors.textSecondary }]}>{reason}.</Text>)}
@@ -621,10 +668,21 @@ const styles = StyleSheet.create({
   confidence: { fontSize: 11, lineHeight: 15, fontWeight: '600' },
   manifestationChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 12 },
   manifestationChip: { fontSize: 11, lineHeight: 15, fontWeight: '600', paddingHorizontal: 9, paddingVertical: 7, borderRadius: 999 },
+  manifestationOutcome: { borderWidth: 1, borderRadius: 17, padding: 15, marginTop: 15, gap: 12 },
+  outcomeEyebrow: { fontSize: 11, lineHeight: 15, fontWeight: '800', letterSpacing: 0.8 },
+  possibilityRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  possibilityIcon: { width: 27, height: 27, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  possibilityText: { flex: 1, fontSize: 15, lineHeight: 22, fontWeight: '600' },
+  manifestationContext: { fontSize: 12, lineHeight: 18, marginTop: 11 },
+  technicalSection: { marginTop: 16 },
+  explanationTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  themeConnection: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, marginTop: 10 },
   manifestationHouses: { gap: 8, marginTop: 14 },
-  manifestationHouse: { borderWidth: 1, borderRadius: 14, padding: 12 },
+  manifestationHouse: { flexDirection: 'row', alignItems: 'flex-start', gap: 11, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 11 },
+  houseRoleBadge: { minWidth: 38, minHeight: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 7 },
+  houseRoleRelative: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
   explainButton: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
-  explanation: { borderTopWidth: 1, marginTop: 8, paddingTop: 2 },
+  explanation: { borderTopWidth: 1, marginTop: 8, paddingTop: 4 },
   manifestationFactors: { borderTopWidth: 1, paddingTop: 12, marginTop: 14 },
   manifestationFactor: { marginTop: 11 },
   manifestationEmpty: { alignItems: 'center', gap: 8, paddingVertical: 30, paddingHorizontal: 12 },

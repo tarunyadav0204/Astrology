@@ -10,6 +10,7 @@ from .functional_nature import FunctionalNatureProvider
 from .gandanta import GandantaProvider
 from .planet_condition import PlanetConditionProvider
 from .transit_house import TransitHouseProvider
+from .transit_nakshatra import TransitNakshatraResonanceProvider
 from .transit_natal import TransitNatalRelationProvider
 from .yogi_avayogi import YogiAvayogiProvider
 
@@ -26,6 +27,7 @@ __all__ = [
     "GandantaProvider",
     "PlanetConditionProvider",
     "TransitHouseProvider",
+    "TransitNakshatraResonanceProvider",
     "TransitNatalRelationProvider",
     "YogiAvayogiProvider",
 ]

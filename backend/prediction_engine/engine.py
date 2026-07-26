@@ -45,12 +45,13 @@ from .subjects import SUBJECTS, SUBJECT_REGISTRY_VERSION, native_houses_for_subj
 from .taxonomy import EVENT_FAMILIES, TAXONOMY_VERSION, EventFamily
 
 
-ENGINE_VERSION = "5.2.0"
+ENGINE_VERSION = "5.4.0"
 _ACTIVATION_PROVIDERS = {
     "dasha_house_activation",
     "dispositor_activation",
     "transit_house",
     "transit_natal_relation",
+    "transit_nakshatra_resonance",
     "dasha_planet_relationship",
 }
 
@@ -126,11 +127,20 @@ def _activation_assessment(
         if row.provider == "transit_natal_relation"
         and row.planet in carrier_planets
     }
+    nakshatra_return_carriers = {
+        row.planet
+        for row in activation
+        if row.provider == "transit_nakshatra_resonance"
+        and row.rule_id == "dasha_planet_exact_natal_nakshatra_return"
+        and row.planet in carrier_planets
+    }
     full_reinforcement_carriers = transit_event_carriers.intersection(
-        natal_relation_carriers
+        natal_relation_carriers | nakshatra_return_carriers
     )
     transit_reinforced = bool(transit_event_carriers)
-    natal_position_reinforced = bool(natal_relation_carriers)
+    natal_position_reinforced = bool(
+        natal_relation_carriers or nakshatra_return_carriers
+    )
     karaka_carriers = {
         row.planet
         for row in evidence

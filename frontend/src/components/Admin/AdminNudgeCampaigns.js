@@ -99,6 +99,7 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
   const [error, setError] = useState('');
   const [resultMsg, setResultMsg] = useState('');
   const [resultOk, setResultOk] = useState(true);
+  const [saveResult, setSaveResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [preview, setPreview] = useState(null);
@@ -111,7 +112,10 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
   const [form, setForm] = useState(emptyForm);
   const [busyCampaignId, setBusyCampaignId] = useState(null);
 
-  const setField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+  const setField = (key, value) => {
+    setSaveResult(null);
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
   const showResult = (ok, msg) => {
     setResultOk(ok);
     setResultMsg(msg);
@@ -328,12 +332,17 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
   };
 
   const handleSave = async () => {
+    const reportSaveResult = (ok, message) => {
+      setSaveResult({ ok, message });
+      showResult(ok, message);
+    };
+
     if (!form.name.trim() || !form.title_template.trim() || !form.body_template.trim()) {
-      showResult(false, 'Name, title and body are required.');
+      reportSaveResult(false, 'Name, title and body are required.');
       return;
     }
-    if (!form.channels.length) {
-      showResult(false, 'Select at least one channel.');
+    if (form.channel_policy !== 'push_only' && !form.channels.length) {
+      reportSaveResult(false, 'Select at least one channel.');
       return;
     }
     if (form.landing_screen === 'blog') {
@@ -344,12 +353,13 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
         parsedBlogUrl = null;
       }
       if (!parsedBlogUrl || parsedBlogUrl.protocol !== 'https:') {
-        showResult(false, 'Enter a valid HTTPS blog link.');
+        reportSaveResult(false, 'Enter a valid HTTPS blog link.');
         return;
       }
     }
 
     setSaving(true);
+    setSaveResult(null);
     showResult(true, '');
     try {
       if (editingId) {
@@ -357,18 +367,18 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
           method: 'PUT',
           body: JSON.stringify(buildPayload()),
         });
-        showResult(true, 'Campaign updated.');
+        reportSaveResult(true, 'Campaign updated.');
       } else {
         await apiFetch('/api/nudge/admin/campaigns', {
           method: 'POST',
           body: JSON.stringify(buildPayload()),
         });
-        showResult(true, form.scheduled_at ? 'Campaign scheduled.' : 'Campaign saved as draft.');
+        reportSaveResult(true, form.scheduled_at ? 'Campaign scheduled.' : 'Campaign saved as draft.');
       }
       resetEditor();
       await load();
     } catch (e) {
-      showResult(false, e.message || 'Save failed');
+      reportSaveResult(false, e.message || 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -1065,6 +1075,14 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
               </button>
             )}
           </div>
+          {saveResult ? (
+            <div
+              className={`notif-result ${saveResult.ok ? 'success' : 'error'}`}
+              role={saveResult.ok ? 'status' : 'alert'}
+            >
+              {saveResult.message}
+            </div>
+          ) : null}
         </section>
       </div>
 

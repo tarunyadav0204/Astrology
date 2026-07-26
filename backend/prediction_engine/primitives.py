@@ -169,6 +169,8 @@ def _transit_states_for_day(
     day: date,
     planets: Iterable[str],
 ) -> Dict[str, Dict[str, Any]]:
+    from .nakshatra_transit import nakshatra_position
+
     dt = _as_datetime(day)
     # Calculate the complete classical transit field once.  Event selection is
     # downstream; restricting facts to dasha planets made non-dasha Saturn,
@@ -181,6 +183,14 @@ def _transit_states_for_day(
             state["house"] = calculator.calculate_house_from_longitude(
                 state["longitude"], chart["ascendant"]
             )
+            nakshatra = nakshatra_position(state["longitude"])
+            state.update({
+                "nakshatra_index": nakshatra["index"],
+                "nakshatra_number": nakshatra["number"],
+                "nakshatra": nakshatra["name"],
+                "nakshatra_lord": nakshatra["lord"],
+                "nakshatra_pada": nakshatra["pada"],
+            })
             states[planet] = state
     except Exception as exc:
         raise PredictionCalculationError(
@@ -205,10 +215,13 @@ def _transit_states_for_day(
 def _transit_signature(
     dasha_row: Dict[str, str], states: Dict[str, Dict[str, Any]]
 ) -> str:
-    planets = tuple(sorted(set((
+    dasha_planets = {
         dasha_row["mahadasha"],
         dasha_row["antardasha"],
         dasha_row["pratyantardasha"],
+    }
+    planets = tuple(sorted(set((
+        *dasha_planets,
         "Sun", "Jupiter", "Saturn", "Rahu", "Ketu",
     ))))
     payload = {
@@ -220,6 +233,10 @@ def _transit_signature(
         "transits": {
             planet: {
                 "sign": states[planet]["sign"],
+                **(
+                    {"nakshatra_index": states[planet]["nakshatra_index"]}
+                    if planet in dasha_planets else {}
+                ),
                 "retrograde": states[planet]["retrograde"],
                 "combustion": states[planet]["combustion"],
             }

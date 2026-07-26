@@ -323,6 +323,10 @@ def _build_expenses_xlsx(rows: list[tuple[Any, ...]], summary: dict[str, Any]) -
             "Currency",
             "Notes",
             "Invoice filename",
+            "Source",
+            "Source account",
+            "Source period",
+            "Import status",
             "Created at",
         ],
         header=True,
@@ -339,6 +343,10 @@ def _build_expenses_xlsx(rows: list[tuple[Any, ...]], summary: dict[str, Any]) -
                 row[3] or "INR",
                 row[14] or "",
                 row[7] or "",
+                row[15] if len(row) > 15 else "manual",
+                row[16] if len(row) > 16 else "",
+                row[17] if len(row) > 17 else "",
+                row[18] if len(row) > 18 else "",
                 row[9].isoformat() if row[9] else "",
             ],
             numeric_columns={1},
@@ -348,16 +356,16 @@ def _build_expenses_xlsx(rows: list[tuple[Any, ...]], summary: dict[str, Any]) -
     last_row = len(sheet_rows)
     sheet_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <dimension ref="A1:J{last_row}"/>
+  <dimension ref="A1:N{last_row}"/>
   <sheetViews><sheetView workbookViewId="0"><pane ySplit="{header_row}" topLeftCell="A{header_row + 1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
   <cols>
     <col min="1" max="1" width="10" customWidth="1"/><col min="2" max="2" width="14" customWidth="1"/>
     <col min="3" max="4" width="24" customWidth="1"/><col min="5" max="5" width="20" customWidth="1"/>
     <col min="6" max="7" width="14" customWidth="1"/><col min="8" max="8" width="42" customWidth="1"/>
-    <col min="9" max="10" width="24" customWidth="1"/>
+    <col min="9" max="13" width="20" customWidth="1"/><col min="14" max="14" width="24" customWidth="1"/>
   </cols>
   <sheetData>{"".join(sheet_rows)}</sheetData>
-  <autoFilter ref="A{header_row}:J{last_row}"/>
+  <autoFilter ref="A{header_row}:N{last_row}"/>
 </worksheet>"""
     content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -543,7 +551,12 @@ async def admin_list_expenses(
                 COALESCE(pb.label, '') AS paid_by_label,
                 e.vendor_id,
                 e.paid_by_id,
-                COALESCE(e.notes, '') AS notes
+                COALESCE(e.notes, '') AS notes,
+                COALESCE(e.source_provider, 'manual') AS source_provider,
+                COALESCE(e.source_account_id, '') AS source_account_id,
+                COALESCE(e.source_period, '') AS source_period,
+                COALESCE(e.import_status, '') AS import_status,
+                e.source_last_synced_at
             FROM admin_company_expenses e
             LEFT JOIN admin_expense_vendors v ON v.id = e.vendor_id
             LEFT JOIN admin_expense_paid_by pb ON pb.id = e.paid_by_id
@@ -574,6 +587,11 @@ async def admin_list_expenses(
                 "vendor_id": r[12],
                 "paid_by_id": r[13],
                 "notes": r[14],
+                "source_provider": r[15],
+                "source_account_id": r[16],
+                "source_period": r[17],
+                "import_status": r[18],
+                "source_last_synced_at": r[19].isoformat() if r[19] else None,
             }
         )
 
@@ -616,7 +634,12 @@ async def admin_export_expenses(
                 COALESCE(pb.label, '') AS paid_by_label,
                 e.vendor_id,
                 e.paid_by_id,
-                COALESCE(e.notes, '') AS notes
+                COALESCE(e.notes, '') AS notes,
+                COALESCE(e.source_provider, 'manual') AS source_provider,
+                COALESCE(e.source_account_id, '') AS source_account_id,
+                COALESCE(e.source_period, '') AS source_period,
+                COALESCE(e.import_status, '') AS import_status,
+                e.source_last_synced_at
             FROM admin_company_expenses e
             LEFT JOIN admin_expense_vendors v ON v.id = e.vendor_id
             LEFT JOIN admin_expense_paid_by pb ON pb.id = e.paid_by_id
@@ -672,7 +695,8 @@ async def admin_update_expense(
             existing_cur = execute(
                 conn,
                 """
-                SELECT invoice_original_name, invoice_storage_path, invoice_mime, invoice_size_bytes
+                SELECT invoice_original_name, invoice_storage_path, invoice_mime, invoice_size_bytes,
+                       COALESCE(source_provider, 'manual'), source_amount
                 FROM admin_company_expenses
                 WHERE id = ?
                 """,
@@ -723,6 +747,13 @@ async def admin_update_expense(
                 invoice_values = (None, None, None, 0)
             else:
                 invoice_values = (existing[0], existing[1], existing[2], int(existing[3] or 0))
+            source_provider = existing[4] if len(existing) > 4 else "manual"
+            source_amount = Decimal(str(existing[5])) if len(existing) > 5 and existing[5] is not None else None
+            manual_adjustment = (
+                amt - source_amount
+                if source_provider != "manual" and source_amount is not None
+                else Decimal("0")
+            )
 
             execute(
                 conn,
@@ -740,6 +771,7 @@ async def admin_update_expense(
                     invoice_storage_path = ?,
                     invoice_mime = ?,
                     invoice_size_bytes = ?,
+                    manual_adjustment = ?,
                     updated_at = NOW()
                 WHERE id = ?
                 """,
@@ -753,6 +785,7 @@ async def admin_update_expense(
                     cat,
                     note,
                     *invoice_values,
+                    str(manual_adjustment),
                     expense_id,
                 ),
             )
@@ -822,12 +855,17 @@ async def admin_delete_expense(expense_id: int, current_user: User = Depends(_re
     with get_conn() as conn:
         cur = execute(
             conn,
-            "SELECT invoice_storage_path FROM admin_company_expenses WHERE id = ?",
+            "SELECT invoice_storage_path, COALESCE(source_provider, 'manual') FROM admin_company_expenses WHERE id = ?",
             (expense_id,),
         )
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Expense not found")
+        if row[1] != "manual":
+            raise HTTPException(
+                status_code=409,
+                detail="Imported expenses cannot be deleted; deactivate the provider account instead.",
+            )
         storage_path = row[0]
         execute(conn, "DELETE FROM admin_company_expenses WHERE id = ?", (expense_id,))
         conn.commit()

@@ -19,6 +19,7 @@ from .providers import (
     GandantaProvider,
     PlanetConditionProvider,
     TransitHouseProvider,
+    TransitNakshatraResonanceProvider,
     TransitNatalRelationProvider,
     YogiAvayogiProvider,
 )
@@ -33,6 +34,7 @@ def build_default_registry() -> EvidenceProviderRegistry:
             DispositorActivationProvider(),
             TransitHouseProvider(),
             TransitNatalRelationProvider(),
+            TransitNakshatraResonanceProvider(),
             PlanetConditionProvider(),
             FunctionalNatureProvider(),
             FriendshipProvider(),

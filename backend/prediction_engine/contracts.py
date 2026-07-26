@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from .errors import PredictionInputError
 
 
-SCHEMA_VERSION = "prediction_engine.v17"
+SCHEMA_VERSION = "prediction_engine.v18"
 
 
 class EvidenceStatus(str, Enum):
@@ -368,6 +368,7 @@ class ChartManifestation:
     mixed_reasons: Sequence[Dict[str, Any]]
     rationale: Sequence[str]
     rule_id: str
+    constituent_themes: Sequence[Dict[str, Any]] = ()
 
     def to_dict(self) -> Dict[str, Any]:
         value = asdict(self)

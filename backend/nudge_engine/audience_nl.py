@@ -16,8 +16,6 @@ from .audience_nl_schema import DISPLAY_COLUMNS, VIEW_NAME, schema_prompt_block
 
 logger = logging.getLogger(__name__)
 
-MAX_LIMIT = 2000
-DEFAULT_LIMIT = 500
 STATEMENT_TIMEOUT_MS = 8000
 
 _FORBIDDEN = re.compile(
@@ -136,23 +134,6 @@ def validate_audience_sql(sql: str) -> Tuple[str, List[str]]:
         name = match.group(1).lower().split(".")[-1]
         if name != VIEW_NAME and name not in {"lateral"}:
             raise ValueError(f"Only {VIEW_NAME} may be queried (found {name})")
-
-    # Force/clamp LIMIT
-    limit_match = re.search(r"\blimit\s+(\d+)\b", cleaned, re.IGNORECASE)
-    if limit_match:
-        lim = int(limit_match.group(1))
-        if lim > MAX_LIMIT:
-            cleaned = re.sub(
-                r"\blimit\s+\d+\b",
-                f"LIMIT {MAX_LIMIT}",
-                cleaned,
-                count=1,
-                flags=re.IGNORECASE,
-            )
-            warnings.append(f"LIMIT clamped to {MAX_LIMIT}")
-    else:
-        cleaned = f"{cleaned}\nLIMIT {DEFAULT_LIMIT}"
-        warnings.append(f"Added LIMIT {DEFAULT_LIMIT}")
 
     return cleaned, warnings
 
@@ -296,7 +277,7 @@ Rules:
 4. Do not invent columns. Do not use other tables.
 5. Use UTC-aware comparisons with NOW() AT TIME ZONE 'UTC' when needed.
 6. Add a reasonable ORDER BY (e.g. last_purchase_at DESC NULLS LAST) when helpful.
-7. You may omit LIMIT; the server will add one.
+7. Do not add LIMIT; the server paginates the result.
 8. For exact calendar days, use the exact *_today / *_yesterday columns. Never subtract rolling counts.
 9. "Paid question" means a credit-charged question; use paid_questions_today, paid_questions_yesterday, or last_paid_question_at.
 10. "Question" without "paid" uses questions_asked_today / questions_asked_yesterday for calendar-day requests.
@@ -380,6 +361,7 @@ def execute_audience_sql(
     page: int = 1,
     page_size: int = 50,
     push_only: bool = False,
+    include_all_user_ids: bool = False,
 ) -> Dict[str, Any]:
     """
     Run validated filter SQL, then return DISPLAY_COLUMNS rows for matching userids.
@@ -399,17 +381,16 @@ def execute_audience_sql(
 
         try:
             try:
-                cur = execute(conn, wrap_sql)
+                cur = execute(
+                    conn,
+                    f"SELECT COUNT(*) FROM ({wrap_sql}) AS audience_count",
+                )
+                total = int((cur.fetchone() or (0,))[0] or 0)
             except Exception as e:
                 logger.warning("audience_nl execute failed: %s | sql=%s", e, normalized[:500])
                 raise ValueError(f"Query failed: {e}") from e
 
-            id_rows = cur.fetchall() or []
-            user_ids = [int(r[0]) for r in id_rows if r and r[0] is not None]
-            total = len(user_ids)
-            truncated = total >= MAX_LIMIT
-
-            if not user_ids:
+            if total == 0:
                 return {
                     "columns": DISPLAY_COLUMNS,
                     "rows": [],
@@ -420,11 +401,37 @@ def execute_audience_sql(
                     "warnings": warnings,
                     "sql": normalized,
                     "user_ids": [],
+                    "all_user_ids": [] if include_all_user_ids else None,
                     "push_only": bool(push_only),
                 }
 
             offset = (page - 1) * page_size
-            page_ids = user_ids[offset : offset + page_size]
+            cur = execute(
+                conn,
+                f"""
+                SELECT userid
+                FROM ({wrap_sql}) AS audience_page
+                ORDER BY userid
+                LIMIT %s OFFSET %s
+                """,
+                (page_size, offset),
+            )
+            page_ids = [int(r[0]) for r in (cur.fetchall() or []) if r and r[0] is not None]
+
+            all_user_ids = None
+            if include_all_user_ids:
+                cur = execute(
+                    conn,
+                    f"""
+                    SELECT userid
+                    FROM ({wrap_sql}) AS complete_audience
+                    ORDER BY userid
+                    """,
+                )
+                all_user_ids = [
+                    int(r[0]) for r in (cur.fetchall() or []) if r and r[0] is not None
+                ]
+
             cols_sql = ", ".join(DISPLAY_COLUMNS)
             cur = execute(
                 conn,
@@ -442,7 +449,7 @@ def execute_audience_sql(
                 item = {colnames[i]: _serialize_cell(row[i]) for i in range(len(colnames))}
                 by_id[int(item["userid"])] = item
 
-            # Preserve filter order
+            # Preserve the stable userid order used by the page query.
             ordered = [by_id[uid] for uid in page_ids if uid in by_id]
         finally:
             try:
@@ -456,10 +463,11 @@ def execute_audience_sql(
         "total": total,
         "page": page,
         "page_size": page_size,
-        "truncated": bool(truncated and total >= MAX_LIMIT),
+        "truncated": False,
         "warnings": warnings,
         "sql": normalized,
-        "user_ids": user_ids,
+        "user_ids": page_ids,
+        "all_user_ids": all_user_ids,
         "push_only": bool(push_only),
     }
 
@@ -470,6 +478,7 @@ def generate_and_run(
     page: int = 1,
     page_size: int = 50,
     push_only: bool = False,
+    include_all_user_ids: bool = False,
 ) -> Dict[str, Any]:
     generated = generate_audience_sql(prompt)
     executed = execute_audience_sql(
@@ -477,6 +486,7 @@ def generate_and_run(
         page=page,
         page_size=page_size,
         push_only=push_only,
+        include_all_user_ids=include_all_user_ids,
     )
     return {
         **executed,

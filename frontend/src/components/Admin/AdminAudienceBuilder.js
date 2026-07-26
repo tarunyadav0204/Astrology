@@ -81,7 +81,7 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
   const [allUserIds, setAllUserIds] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(50);
   const [truncated, setTruncated] = useState(false);
   const [warnings, setWarnings] = useState([]);
   const [selected, setSelected] = useState(() => new Set());
@@ -95,6 +95,7 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
   const [explorerUserIds, setExplorerUserIds] = useState([]);
   const [explorerRelations, setExplorerRelations] = useState([]);
   const [pushOnly, setPushOnly] = useState(false);
+  const [selectingAll, setSelectingAll] = useState(false);
 
   const pageIds = useMemo(() => rows.map((r) => Number(r.userid)).filter(Boolean), [rows]);
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
@@ -103,7 +104,11 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
     setExplanation(body.explanation || '');
     setSql(body.sql || '');
     setRows(Array.isArray(body.rows) ? body.rows : []);
-    setAllUserIds(Array.isArray(body.user_ids) ? body.user_ids.map(Number) : []);
+    if (Array.isArray(body.all_user_ids)) {
+      setAllUserIds(body.all_user_ids.map(Number).filter(Boolean));
+    } else if (!keepSelection) {
+      setAllUserIds([]);
+    }
     setTotal(Number(body.total) || 0);
     setPage(Number(body.page) || 1);
     setTruncated(Boolean(body.truncated));
@@ -197,7 +202,13 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
     }
   };
 
-  const runExecute = async (nextPage = page, pushOnlyOverride = pushOnly, keepSelection = true) => {
+  const runExecute = async (
+    nextPage = page,
+    pushOnlyOverride = pushOnly,
+    keepSelection = true,
+    includeAllUserIds = false,
+    pageSizeOverride = pageSize
+  ) => {
     if (!sql.trim()) {
       setError('Generate or paste SQL first');
       return;
@@ -215,7 +226,15 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
       const body = await apiFetch(endpoint, {
         method: 'POST',
         body: JSON.stringify(
-          mode === 'audience' ? { sql, page: nextPage, page_size: pageSize, push_only: pushOnlyOverride } : { sql }
+          mode === 'audience'
+            ? {
+                sql,
+                page: nextPage,
+                page_size: pageSizeOverride,
+                push_only: pushOnlyOverride,
+                include_all_user_ids: includeAllUserIds,
+              }
+            : { sql }
         ),
       });
       if (mode === 'analytics') {
@@ -229,9 +248,11 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
         setPage(nextPage);
         setStatus(`Found ${body.total || 0}${pushOnlyOverride ? ' push-enabled' : ''} users`);
       }
+      return body;
     } catch (err) {
       setError(err.message || 'Failed');
       setStatus('');
+      return null;
     } finally {
       setBusy(false);
     }
@@ -259,8 +280,21 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
     });
   };
 
-  const selectAllMatching = () => {
-    setSelected(new Set(allUserIds));
+  const selectAllMatching = async () => {
+    if (allUserIds.length === total && total > 0) {
+      setSelected(new Set(allUserIds));
+      return;
+    }
+    setSelectingAll(true);
+    try {
+      const body = await runExecute(page, pushOnly, true, true);
+      const ids = Array.isArray(body?.all_user_ids)
+        ? body.all_user_ids.map(Number).filter(Boolean)
+        : [];
+      setSelected(new Set(ids));
+    } finally {
+      setSelectingAll(false);
+    }
   };
 
   const clearSelection = () => setSelected(new Set());
@@ -312,6 +346,8 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
   };
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
+  const firstRow = total > 0 ? (page - 1) * pageSize + 1 : 0;
+  const lastRow = Math.min(page * pageSize, total);
 
   return (
     <div className="audience-builder">
@@ -520,9 +556,9 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
             type="button"
             className="audience-builder__secondary"
             onClick={selectAllMatching}
-            disabled={!allUserIds.length}
+            disabled={busy || selectingAll || total === 0}
           >
-            Select all matching
+            {selectingAll ? 'Selecting all…' : `Select all ${total || ''} matching`}
           </button>
           <button type="button" className="audience-builder__secondary" onClick={clearSelection} disabled={!selected.size}>
             Clear
@@ -616,8 +652,36 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
         </div>
       ) : null}
 
-      {mode === 'audience' && total > pageSize ? (
+      {mode === 'audience' && total > 0 ? (
         <div className="audience-builder__pager">
+          <div className="audience-builder__page-size">
+            <label htmlFor="audience-page-size">Rows per page</label>
+            <select
+              id="audience-page-size"
+              value={pageSize}
+              disabled={busy}
+              onChange={(event) => {
+                const nextSize = Number(event.target.value);
+                setPageSize(nextSize);
+                runExecute(1, pushOnly, true, false, nextSize);
+              }}
+            >
+              {[25, 50, 100, 200].map((size) => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+          </div>
+          <span className="audience-builder__page-range">
+            Showing {firstRow.toLocaleString()}–{lastRow.toLocaleString()} of {total.toLocaleString()}
+          </span>
+          <button
+            type="button"
+            className="audience-builder__secondary"
+            disabled={busy || page <= 1}
+            onClick={() => runExecute(1)}
+          >
+            First
+          </button>
           <button
             type="button"
             className="audience-builder__secondary"
@@ -636,6 +700,14 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
             onClick={() => runExecute(page + 1)}
           >
             Next
+          </button>
+          <button
+            type="button"
+            className="audience-builder__secondary"
+            disabled={busy || page >= totalPages}
+            onClick={() => runExecute(totalPages)}
+          >
+            Last
           </button>
         </div>
       ) : null}

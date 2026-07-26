@@ -4,7 +4,7 @@ import hashlib
 from dataclasses import dataclass
 from datetime import date
 from itertools import product
-from typing import Dict, Iterable, List, Mapping, Sequence, Set, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 from .contracts import (
     ActivationBand,
@@ -17,11 +17,12 @@ from .contracts import (
     PredictionWindow,
 )
 from .house_significations import COMBINATION_TONE_READINGS, HOUSE_COMBINATIONS
+from .event_signatures import EVENT_SIGNATURES, EventSignature
 from .subjects import SUBJECTS, native_houses_for_subject
 
 
-CHART_MANIFESTATION_RESOLVER_VERSION = "1.2.0"
-CHART_MANIFESTATION_REGISTRY_VERSION = "1.2.0"
+CHART_MANIFESTATION_RESOLVER_VERSION = "2.0.0"
+CHART_MANIFESTATION_REGISTRY_VERSION = "2.0.0"
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,22 @@ class ManifestationSignature:
     label: str
     alternatives: Sequence[str]
     priority: int
+
+
+@dataclass(frozen=True)
+class _SemanticMatch:
+    signature: EventSignature
+    subject: str
+    rows: Tuple[HouseActivation, ...]
+    required_native_houses: Tuple[int, ...]
+    supporting_native_houses: Tuple[int, ...]
+    conflict_native_houses: Tuple[int, ...]
+    subject_confirmation: Dict[str, object]
+    overlap: Tuple[date, date]
+    coherence: str
+    carriers: Tuple[str, ...]
+    relationships: Tuple[Dict[str, object], ...]
+    score: int
 
 
 _DOMAINS = {
@@ -397,6 +414,38 @@ def _transit_text(row: HouseActivation) -> Tuple[str, ...]:
             descriptions.append(
                 f"Transit {planet} from House {source} {relation_text}"
             )
+    for evidence in row.evidence:
+        if evidence.provider != "transit_nakshatra_ledger":
+            continue
+        natal = evidence.facts.get("natal_nakshatra") or {}
+        transit = evidence.facts.get("transit_nakshatra") or {}
+        lord = evidence.facts.get("common_nakshatra_lord")
+        if evidence.rule_id == "dasha_planet_exact_natal_nakshatra_return":
+            descriptions.append(
+                f"Transit {evidence.planet} returns to its natal nakshatra "
+                f"{natal.get('name')}, giving strong timing confirmation"
+            )
+        elif evidence.rule_id == "dasha_planet_nakshatra_dispositor_resonance":
+            relevance = (
+                " and its common lord is relevant to this house"
+                if evidence.facts.get("nakshatra_lord_relevant")
+                else ""
+            )
+            expression = evidence.facts.get("nakshatra_lord_expression")
+            qualification = (
+                "; the natal condition of that lord is strained"
+                if expression == "strained"
+                else (
+                    "; the natal condition of that lord is clear"
+                    if expression == "clear" else ""
+                )
+            )
+            descriptions.append(
+                f"Transit {evidence.planet} in {transit.get('name')} repeats "
+                f"its natal nakshatra lord {lord} from {natal.get('name')}"
+                f"{relevance}{qualification}; this is secondary confirmation, "
+                "not direct contact"
+            )
     return tuple(dict.fromkeys(descriptions))
 
 
@@ -492,12 +541,559 @@ def _window(rows: Sequence[HouseActivation], overlap: Tuple[date, date]) -> Pred
     )
 
 
+_EVENT_DOMAIN: Dict[str, str] = {
+    "career_authority": "career",
+    "money_gains": "finance",
+    "financial_pressure": "finance",
+    "partnership_commitment": "relationship",
+    "home_property": "property",
+    "children_education": "education",
+    "travel_change": "travel",
+    "workload_health": "health",
+    "shared_resources_change": "finance",
+    "family_responsibility": "family",
+    "decision_communication": "decisions",
+}
+
+_DOMAIN_LABELS: Dict[str, str] = {
+    "career": "career",
+    "finance": "finances",
+    "relationship": "partnership",
+    "property": "property",
+    "education": "education or children",
+    "travel": "travel",
+    "health": "health and obligations",
+    "family": "family responsibilities",
+    "decisions": "decisions and agreements",
+}
+
+_CLUSTER_HOUSE_ROLES: Dict[int, str] = {
+    1: "the person, body, vitality and capacity to act",
+    2: "savings, family resources, speech and what can fund or absorb the development",
+    3: "initiative, communication, documents and movement",
+    4: "home, residence, property, mother and emotional foundation",
+    5: "children, learning, judgment, creativity and considered risk",
+    6: "health, workload, debt, service, competition or an obstacle to manage",
+    7: "spouse, partner, agreement, counterparty or public dealing",
+    8: "joint resources, tax, insurance, inheritance, vulnerability or consequential adjustment",
+    9: "father, guidance, higher learning, fortune or long-distance opportunity",
+    10: "career, authority, status and visible responsibility",
+    11: "income, gain, recognition, network and the result being pursued",
+    12: "expense, distance, foreign connection, release or withdrawal",
+}
+
+
+def _event_signature_allowed(
+    signature: EventSignature,
+    request: PredictionRequest,
+) -> bool:
+    life = request.life_context
+    if signature.eligibility_rule == "business_owner":
+        return life is None or life.business_owner is not False
+    if signature.eligibility_rule == "has_children":
+        return life is None or life.has_children is not False
+    return True
+
+
+def _row_identity(row: HouseActivation) -> Tuple[object, ...]:
+    return (
+        row.house,
+        row.window.start_date,
+        row.window.end_date,
+        row.window.mahadasha,
+        row.window.antardasha,
+        row.window.pratyantardasha,
+        row.window.transit_signature,
+    )
+
+
+def _unique_rows(rows: Iterable[HouseActivation]) -> Tuple[HouseActivation, ...]:
+    unique: Dict[Tuple[object, ...], HouseActivation] = {}
+    for row in rows:
+        unique.setdefault(_row_identity(row), row)
+    return tuple(unique.values())
+
+
+def _timing_coherent_selections(
+    houses: Sequence[int],
+    by_house: Mapping[int, Sequence[HouseActivation]],
+) -> Iterable[Tuple[HouseActivation, ...]]:
+    """Avoid the cross-window Cartesian product for required houses.
+
+    Nakshatra-accurate timing can create many short windows. Anchor every
+    selection to one row, then admit only rows in the same dasha chain with a
+    real timing overlap before taking the much smaller product.
+    """
+
+    if not houses:
+        return
+    anchor_house, *other_houses = houses
+    for anchor in by_house.get(anchor_house, ()):
+        compatible: List[Tuple[HouseActivation, ...]] = []
+        for house in other_houses:
+            rows = tuple(
+                row for row in by_house.get(house, ())
+                if _same_dasha(anchor, row)
+                and _overlap((anchor, row)) is not None
+            )
+            if not rows:
+                break
+            compatible.append(rows)
+        else:
+            if compatible:
+                yield from (
+                    (anchor, *selection)
+                    for selection in product(*compatible)
+                )
+            else:
+                yield (anchor,)
+
+
+def _semantic_matches(
+    request: PredictionRequest,
+    by_house: Mapping[int, Sequence[HouseActivation]],
+) -> Tuple[_SemanticMatch, ...]:
+    matches: List[_SemanticMatch] = []
+    for signature in EVENT_SIGNATURES.values():
+        if not signature.safety_allowed or not _event_signature_allowed(signature, request):
+            continue
+        domain = _EVENT_DOMAIN.get(signature.parent_family, signature.parent_family)
+        if request.domains and domain not in set(request.domains):
+            if not (domain == "finance" and "wealth" in set(request.domains)):
+                continue
+        for subject in request.subjects:
+            required = tuple(native_houses_for_subject(
+                subject, signature.required_relative_houses
+            ))
+            if any(house not in by_house for house in required):
+                continue
+            supporting_map = dict(zip(
+                native_houses_for_subject(subject, signature.supporting_relative_houses),
+                signature.supporting_relative_houses,
+            ))
+            conflict_map = dict(zip(
+                native_houses_for_subject(subject, signature.conflict_relative_houses),
+                signature.conflict_relative_houses,
+            ))
+            optional_houses = tuple(dict.fromkeys(
+                house
+                for house in (*supporting_map, *conflict_map)
+                if house not in required and house in by_house
+            ))
+            for required_selected in _timing_coherent_selections(
+                required, by_house
+            ):
+                base_rows = _unique_rows(required_selected)
+                if not base_rows or not all(
+                    _same_dasha(base_rows[0], row) for row in base_rows[1:]
+                ):
+                    continue
+                if _overlap(base_rows) is None:
+                    continue
+                optional_choices: List[Sequence[Optional[HouseActivation]]] = []
+                for house in optional_houses:
+                    compatible_rows = tuple(
+                        row for row in by_house[house]
+                        if _same_dasha(base_rows[0], row)
+                        and _overlap((*base_rows, row)) is not None
+                    )
+                    optional_choices.append((None, *compatible_rows))
+                selections = (
+                    product(*optional_choices)
+                    if optional_choices
+                    else ((),)
+                )
+                for optional_selected in selections:
+                    rows = _unique_rows((
+                        *base_rows,
+                        *(row for row in optional_selected if row is not None),
+                    ))
+                    selected_houses = {row.house for row in rows}
+                    supporting = tuple(sorted(
+                        selected_houses.intersection(supporting_map)
+                    ))
+                    if len(supporting) < signature.minimum_supporting_houses:
+                        continue
+                    subject_lock = _subject_lock(subject, rows, by_house)
+                    if subject_lock is None:
+                        continue
+                    coherence_rows, subject_confirmation = subject_lock
+                    overlap = _overlap(coherence_rows)
+                    coherent = _carrier_coherence(coherence_rows)
+                    if overlap is None or coherent is None:
+                        continue
+                    coherence, carriers, relationships = coherent
+                    score = _strength_score(rows, coherence, request.as_of, overlap)
+                    matches.append(_SemanticMatch(
+                        signature=signature,
+                        subject=subject,
+                        rows=rows,
+                        required_native_houses=tuple(sorted(required)),
+                        supporting_native_houses=supporting,
+                        conflict_native_houses=tuple(sorted(
+                            selected_houses.intersection(conflict_map)
+                        )),
+                        subject_confirmation=subject_confirmation,
+                        overlap=overlap,
+                        coherence=coherence,
+                        carriers=carriers,
+                        relationships=relationships,
+                        score=score,
+                    ))
+
+    # Optional houses refine a theme. For the same signature and timing chain,
+    # retain the widest coherent reading rather than emitting every subset.
+    best: Dict[Tuple[object, ...], _SemanticMatch] = {}
+    for match in matches:
+        first = match.rows[0]
+        required_row_key = tuple(sorted(
+            _row_identity(row)
+            for row in match.rows
+            if row.house in set(match.required_native_houses)
+        ))
+        key = (
+            match.signature.key,
+            match.subject,
+            first.window.mahadasha,
+            first.window.antardasha,
+            first.window.pratyantardasha,
+            required_row_key,
+        )
+        current = best.get(key)
+        candidate_rank = (
+            len(match.rows),
+            match.score,
+            len(match.supporting_native_houses),
+            -len(match.conflict_native_houses),
+        )
+        current_rank = (
+            len(current.rows),
+            current.score,
+            len(current.supporting_native_houses),
+            -len(current.conflict_native_houses),
+        ) if current else None
+        if current is None or candidate_rank > current_rank:
+            best[key] = match
+    return tuple(best.values())
+
+
+def _cluster_is_valid(
+    subject: str,
+    matches: Sequence[_SemanticMatch],
+    by_house: Mapping[int, Sequence[HouseActivation]],
+) -> bool:
+    rows = _unique_rows(row for match in matches for row in match.rows)
+    if not rows or not all(_same_dasha(rows[0], row) for row in rows[1:]):
+        return False
+    subject_lock = _subject_lock(subject, rows, by_house)
+    if subject_lock is None:
+        return False
+    coherence_rows, _ = subject_lock
+    return _overlap(coherence_rows) is not None and _carrier_coherence(coherence_rows) is not None
+
+
+def _semantic_clusters(
+    matches: Sequence[_SemanticMatch],
+    by_house: Mapping[int, Sequence[HouseActivation]],
+) -> Tuple[Tuple[_SemanticMatch, ...], ...]:
+    # House activations are emitted on common deterministic timing windows.
+    # Themes from different windows can never form one simultaneous event, so
+    # cluster within a timing bucket instead of repeatedly comparing every
+    # future match with every other future match.
+    buckets: Dict[Tuple[object, ...], List[_SemanticMatch]] = {}
+    for match in matches:
+        first = match.rows[0]
+        key = (
+            match.subject,
+            first.window.mahadasha,
+            first.window.antardasha,
+            first.window.pratyantardasha,
+            match.overlap,
+        )
+        buckets.setdefault(key, []).append(match)
+
+    all_clusters: List[List[_SemanticMatch]] = []
+    for bucket_matches in buckets.values():
+        clusters: List[List[_SemanticMatch]] = [
+            [match] for match in bucket_matches
+        ]
+        while True:
+            merge_options = []
+            for left_index in range(len(clusters)):
+                for right_index in range(left_index + 1, len(clusters)):
+                    left = clusters[left_index]
+                    right = clusters[right_index]
+                    left_houses = {
+                        row.house for item in left for row in item.rows
+                    }
+                    right_houses = {
+                        row.house for item in right for row in item.rows
+                    }
+                    shared = left_houses.intersection(right_houses)
+                    if not shared:
+                        continue
+                    combined_rows: List[_SemanticMatch] = []
+                    combined_seen = set()
+                    for item in (*left, *right):
+                        item_key = (
+                            item.signature.key,
+                            item.subject,
+                            tuple(_row_identity(row) for row in item.rows),
+                        )
+                        if item_key not in combined_seen:
+                            combined_seen.add(item_key)
+                            combined_rows.append(item)
+                    combined = tuple(combined_rows)
+                    if not _cluster_is_valid(
+                        left[0].subject, combined, by_house
+                    ):
+                        continue
+                    merge_options.append((
+                        len(left_houses.union(right_houses)),
+                        len(shared),
+                        len(combined),
+                        -left_index,
+                        -right_index,
+                        left_index,
+                        right_index,
+                        combined,
+                    ))
+            if not merge_options:
+                break
+            *_, left_index, right_index, combined = max(merge_options)
+            clusters[left_index] = list(combined)
+            del clusters[right_index]
+        all_clusters.extend(clusters)
+
+    output = []
+    seen = set()
+    for cluster in all_clusters:
+        houses = tuple(sorted({row.house for item in cluster for row in item.rows}))
+        if len(houses) < 2:
+            continue
+        key = (
+            cluster[0].subject,
+            houses,
+            tuple(sorted({item.signature.key for item in cluster})),
+            min(item.overlap[0] for item in cluster),
+            max(item.overlap[1] for item in cluster),
+        )
+        if key not in seen:
+            seen.add(key)
+            output.append(tuple(cluster))
+    return tuple(output)
+
+
+def _cluster_label(matches: Sequence[_SemanticMatch]) -> str:
+    domains = tuple(dict.fromkeys(
+        _DOMAIN_LABELS.get(
+            _EVENT_DOMAIN.get(match.signature.parent_family, match.signature.parent_family),
+            match.signature.parent_family.replace("_", " "),
+        )
+        for match in matches
+    ))
+    if len(domains) == 1:
+        return f"{domains[0]} matters become interconnected"
+    if len(domains) == 2:
+        joined = f"{domains[0]} and {domains[1]}"
+    else:
+        joined = f"{', '.join(domains[:-1])} and {domains[-1]}"
+    return f"{joined} become interconnected"
+
+
+def _semantic_cluster_manifestation(
+    request: PredictionRequest,
+    matches: Sequence[_SemanticMatch],
+    by_house: Mapping[int, Sequence[HouseActivation]],
+) -> Tuple[Tuple[int, int, int], ChartManifestation] | None:
+    subject = matches[0].subject
+    rows = _unique_rows(row for match in matches for row in match.rows)
+    subject_lock = _subject_lock(subject, rows, by_house)
+    if subject_lock is None:
+        return None
+    coherence_rows, subject_confirmation = subject_lock
+    overlap = _overlap(coherence_rows)
+    coherent = _carrier_coherence(coherence_rows)
+    if overlap is None or coherent is None:
+        return None
+    coherence, carriers, relationships = coherent
+    representative_by_house: Dict[int, HouseActivation] = {}
+    for row in rows:
+        current = representative_by_house.get(row.house)
+        row_rank = (
+            1 if row.state == HouseActivationState.FULLY_REINFORCED else 0,
+            1 if row.activation.band == ActivationBand.STRONG else 0,
+            row.activation.independent_confirmations,
+        )
+        current_rank = (
+            1 if current.state == HouseActivationState.FULLY_REINFORCED else 0,
+            1 if current.activation.band == ActivationBand.STRONG else 0,
+            current.activation.independent_confirmations,
+        ) if current else None
+        if current is None or row_rank > current_rank:
+            representative_by_house[row.house] = row
+    display_rows = tuple(
+        representative_by_house[house]
+        for house in sorted(representative_by_house)
+    )
+    required_native = {
+        house for match in matches for house in match.required_native_houses
+    }
+    supporting_native = {
+        house for match in matches for house in match.supporting_native_houses
+    }
+    conflict_native = {
+        house for match in matches for house in match.conflict_native_houses
+    }
+    tone = _combined_tone(rows, required_native)
+    score = _strength_score(rows, coherence, request.as_of, overlap)
+    timing = _window(rows, overlap)
+    anchor = SUBJECTS[subject].anchor_house
+    roles = []
+    for row in display_rows:
+        relative_house = ((row.house - anchor) % 12) + 1
+        role = _CLUSTER_HOUSE_ROLES[relative_house]
+        if row.house in conflict_native and row.house not in required_native:
+            role = (
+                f"{role}; here it modifies or counterbalances one of the "
+                "possible themes, according to its own outcome condition"
+            )
+        roles.append(ManifestationHouseRole(
+            native_house=row.house,
+            relative_house=relative_house,
+            role=role,
+            activation_state=row.state,
+            activation_band=row.activation.band,
+            outcome_tone=row.outcome.tone,
+            direct_carriers=tuple(sorted(_direct_carriers(row))),
+            dasha_connections=_connection_text(row),
+            transit_connections=_transit_text(row),
+        ))
+
+    theme_rows = []
+    possibilities_by_theme: List[Tuple[str, ...]] = []
+    for match in sorted(matches, key=lambda item: (item.signature.priority, item.signature.key)):
+        native_houses = tuple(sorted({row.house for row in match.rows}))
+        theme_rows.append({
+            "key": match.signature.key,
+            "label": match.signature.label,
+            "domain": _EVENT_DOMAIN.get(
+                match.signature.parent_family, match.signature.parent_family
+            ),
+            "native_houses": native_houses,
+            "required_native_houses": match.required_native_houses,
+            "supporting_native_houses": match.supporting_native_houses,
+            "modifying_native_houses": match.conflict_native_houses,
+            "required_varga": match.signature.required_varga,
+        })
+        possibilities_by_theme.append(tuple(match.signature.manifestations))
+    theme_rows = list({
+        row["key"]: row for row in theme_rows
+    }.values())
+    possibility_topics = []
+    max_theme_possibilities = max(
+        (len(topics) for topics in possibilities_by_theme),
+        default=0,
+    )
+    for index in range(max_theme_possibilities):
+        for topics in possibilities_by_theme:
+            if index < len(topics) and topics[index] not in possibility_topics:
+                possibility_topics.append(topics[index])
+    possibilities = tuple(
+        f"{topic[:1].upper()}{topic[1:]}."
+        for topic in possibility_topics[:8]
+    )
+    domains = tuple(dict.fromkeys(row["domain"] for row in theme_rows))
+    house_text = ", ".join(f"House {row.house}" for row in display_rows)
+    cycle = (
+        f"{timing.mahadasha}–{timing.antardasha}–{timing.pratyantardasha}"
+    )
+    direction = {
+        Polarity.SUPPORTIVE: "The connected houses lean constructive overall.",
+        Polarity.MIXED: "Some parts can progress while others require adjustment, expense or patience.",
+        Polarity.CHALLENGING: "Pressure or consequential adjustment dominates the connected matters.",
+        Polarity.NEUTRAL: "The direction remains open, although the connected matters are active.",
+    }[tone]
+    summary = (
+        f"The same {cycle} delivery connects {house_text}. {direction} "
+        "The chart identifies a connected field of possibilities, not one guaranteed event."
+    )
+    signature_keys = tuple(sorted(row["key"] for row in theme_rows))
+    signature_key = "cluster:" + "+".join(signature_keys)
+    manifestation_id = hashlib.sha256(
+        (
+            f"{signature_key}|{subject}|{timing.start_date}|{timing.end_date}|"
+            f"{','.join(str(row.house) for row in display_rows)}|"
+            f"{','.join(carriers)}|{CHART_MANIFESTATION_RESOLVER_VERSION}"
+        ).encode("utf-8")
+    ).hexdigest()[:32]
+    theme_labels = ", ".join(row["label"] for row in theme_rows)
+    rationale = (
+        (
+            f"{house_text} overlap from {timing.start_date} to {timing.end_date} "
+            f"in the same {cycle} period."
+        ),
+        (
+            f"The registered Parashari themes that connect them are: {theme_labels}."
+        ),
+        (
+            f"{', '.join(carriers)} connects the complete house cluster directly."
+            if coherence == "shared_direct_carrier"
+            else (
+                f"The delivering planets—{', '.join(carriers)}—form one connected "
+                "natal relationship chain across the cluster."
+            )
+        ),
+        _tone_reason(rows, required_native, tone),
+    )
+    result = ChartManifestation(
+        manifestation_id=manifestation_id,
+        signature_key=signature_key,
+        subject=subject,
+        domain=domains[0] if len(domains) == 1 else "combined",
+        label=_cluster_label(matches),
+        window=timing,
+        house_roles=tuple(roles),
+        subject_confirmation=subject_confirmation,
+        carrier_planets=carriers,
+        carrier_coherence=coherence,
+        carrier_relationships=relationships,
+        activation_band=(
+            ActivationBand.STRONG
+            if all(row.activation.band == ActivationBand.STRONG for row in display_rows)
+            else ActivationBand.MODERATE
+        ),
+        outcome_tone=tone,
+        synthesis_strength=(
+            "high" if score >= 85
+            else "well_supported" if score >= 70
+            else "moderate"
+        ),
+        summary=summary,
+        possibilities=possibilities,
+        helpful_reasons=_merge_reasons(rows, "supportive_reasons"),
+        pressure_reasons=_merge_reasons(rows, "challenging_reasons"),
+        mixed_reasons=_merge_reasons(rows, "mixed_reasons"),
+        rationale=rationale,
+        rule_id="semantic_event_signature_graph_cluster",
+        constituent_themes=tuple(theme_rows),
+    )
+    rank = (
+        0 if overlap[0] <= request.as_of <= overlap[1] else 1,
+        -score,
+        -len(display_rows),
+    )
+    return rank, result
+
+
 class ChartManifestationResolver:
     """Resolve coherent chart-level manifestations from delivered houses.
 
-    This layer never invents event vocabulary. It matches a versioned registry,
-    requires timing overlap and direct-carrier coherence, and preserves bounded
-    alternatives where a house combination cannot select one concrete event.
+    This layer never invents event vocabulary. It matches versioned Parashari
+    event signatures, requires timing overlap and direct-carrier coherence,
+    then joins overlapping signatures into a connected house graph. Bounded
+    alternatives are preserved because a coherent house cluster still cannot
+    select one guaranteed concrete event.
     """
 
     version = CHART_MANIFESTATION_RESOLVER_VERSION
@@ -532,7 +1128,9 @@ class ChartManifestationResolver:
                 )
                 if any(house not in by_house for house in native_houses):
                     continue
-                for selected in product(*(by_house[house] for house in native_houses)):
+                for selected in _timing_coherent_selections(
+                    native_houses, by_house
+                ):
                     rows = tuple(selected)
                     if not all(_same_dasha(rows[0], row) for row in rows[1:]):
                         continue
@@ -642,6 +1240,30 @@ class ChartManifestationResolver:
                     )
                     resolved.append((rank, result))
 
+        semantic_matches = _semantic_matches(request, by_house)
+        semantic_clusters = _semantic_clusters(semantic_matches, by_house)
+        cluster_results = []
+        for cluster in semantic_clusters:
+            built = _semantic_cluster_manifestation(request, cluster, by_house)
+            if built is not None:
+                _, cluster_item = built
+                cluster_houses = {
+                    role.native_house for role in cluster_item.house_roles
+                }
+                duplicates_atomic_pair = (
+                    len(cluster_houses) == 2
+                    and any(
+                        existing.subject == cluster_item.subject
+                        and {
+                            role.native_house for role in existing.house_roles
+                        } == cluster_houses
+                        for _, existing in resolved
+                    )
+                )
+                if not duplicates_atomic_pair:
+                    cluster_results.append(built)
+        resolved.extend(cluster_results)
+
         # A merged activation can create identical cards through adjacent source
         # windows. Keep the strongest semantic result per subject and period.
         best: Dict[Tuple[str, str], Tuple[Tuple[int, int, int], ChartManifestation]] = {}
@@ -650,6 +1272,35 @@ class ChartManifestationResolver:
             if key not in best or rank < best[key][0]:
                 best[key] = (rank, item)
         ordered = sorted(best.values(), key=lambda pair: pair[0])
+        cluster_items = [
+            item for _, item in ordered
+            if item.rule_id == "semantic_event_signature_graph_cluster"
+            and len(item.house_roles) >= 3
+        ]
+        ordered = [
+            (rank, item)
+            for rank, item in ordered
+            if item.rule_id == "semantic_event_signature_graph_cluster"
+            or not any(
+                (
+                    cluster.subject == item.subject
+                    or (
+                        cluster.subject == "self"
+                        and item.subject != "self"
+                        and SUBJECTS[item.subject].anchor_house
+                            in {role.native_house for role in cluster.house_roles}
+                    )
+                )
+                and {role.native_house for role in item.house_roles}.issubset(
+                    {role.native_house for role in cluster.house_roles}
+                )
+                and date.fromisoformat(cluster.window.start_date)
+                    <= date.fromisoformat(item.window.end_date)
+                and date.fromisoformat(item.window.start_date)
+                    <= date.fromisoformat(cluster.window.end_date)
+                for cluster in cluster_items
+            )
+        ]
         diverse: List[ChartManifestation] = []
         semantic_frames = set()
         for _, item in ordered:

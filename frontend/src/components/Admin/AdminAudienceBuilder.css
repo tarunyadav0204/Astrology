@@ -341,10 +341,30 @@
 
 .audience-builder__pager {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   margin-top: 12px;
   font-size: 14px;
+}
+
+.audience-builder__page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.audience-builder__page-size label,
+.audience-builder__page-range {
+  color: #475569;
+}
+
+.audience-builder__page-size select {
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  background: #fff;
+  padding: 7px 9px;
+  color: #212529;
 }
 
 @media (max-width: 600px) {
