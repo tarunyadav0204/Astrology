@@ -835,6 +835,58 @@ export const nudgeAPI = {
     ),
 };
 
+export const predictionAPI = {
+  getHomepageFomo: (
+    language = 'en',
+    { forceDisplay = false, birthChartId = null, includeIneligible = false } = {},
+  ) =>
+    api.get(
+      getEndpoint('/prediction-engine/homepage-fomo'),
+      {
+        params: {
+          language,
+          limit: 24,
+          ...(birthChartId ? { birth_chart_id: birthChartId } : {}),
+          ...(forceDisplay ? { force_display: true } : {}),
+          ...(includeIneligible ? { include_ineligible: true } : {}),
+        },
+        ...BACKGROUND_REQUEST_CONFIG,
+        timeout: 35000,
+      },
+    ),
+  getHomepagePromptState: () =>
+    api.get(
+      getEndpoint('/prediction-engine/homepage-prompts/state'),
+      BACKGROUND_REQUEST_CONFIG,
+    ),
+  recordHomepagePromptShown: (promptKey, sessionId) =>
+    api.post(
+      getEndpoint('/prediction-engine/homepage-prompts/shown'),
+      { prompt_key: promptKey, session_id: sessionId || null },
+      BACKGROUND_REQUEST_CONFIG,
+    ),
+  getHomepageFomoPresentation: (snapshotId, presentationId) =>
+    api.get(
+      getEndpoint(`/prediction-engine/homepage-fomo/${encodeURIComponent(presentationId)}`),
+      {
+        params: { snapshot_id: snapshotId },
+        ...BACKGROUND_REQUEST_CONFIG,
+      },
+    ),
+  recordHomepageFomoEvent: (body) =>
+    api.post(
+      getEndpoint('/prediction-engine/homepage-fomo/events'),
+      body,
+      BACKGROUND_REQUEST_CONFIG,
+    ),
+  recordHomepageFomoEvents: (body) =>
+    api.post(
+      getEndpoint('/prediction-engine/homepage-fomo/events/batch'),
+      body,
+      BACKGROUND_REQUEST_CONFIG,
+    ),
+};
+
 export const creditAPI = {
   // Balance is polled on mount; handle 401 locally as guest (do not hard-login).
   getBalance: () => api.get(getEndpoint('/credits/balance'), BACKGROUND_REQUEST_CONFIG),

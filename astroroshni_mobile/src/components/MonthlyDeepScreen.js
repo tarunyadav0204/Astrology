@@ -20,7 +20,7 @@ import { useCredits } from '../credits/CreditContext';
 import { useAuthGate } from '../auth/AuthGateContext';
 import MonthlyAccordion from './MonthlyAccordion';
 import ConfirmCreditsModal from './ConfirmCreditsModal';
-import { generateEventTimelinePDF, sharePDFOnWhatsApp, getLogoDataUriForModule } from '../utils/pdfGenerator';
+import { generateEventTimelinePDF, sharePDFOnWhatsApp, getLogoDataUriForModule, userFacingPdfExportError } from '../utils/pdfGenerator';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { trackEvent } from '../utils/analytics';
@@ -668,7 +668,7 @@ export default function MonthlyDeepScreen() {
       await sharePDFOnWhatsApp(pdfUri);
     } catch (error) {
       console.error('Monthly deep export PDF error:', error);
-      Alert.alert('Export failed', error?.message || 'Could not generate or share PDF.');
+      Alert.alert('Export failed', userFacingPdfExportError(error));
     } finally {
       setIsExportingPdf(false);
     }

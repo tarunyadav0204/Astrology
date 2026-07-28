@@ -91,6 +91,16 @@ const getApiUrl = () => {
 
 export const API_BASE_URL = getApiUrl();
 
+/**
+ * Local/lower-environment presentation override. This is intentionally opt-in:
+ * production builds do not show chart FOMO repeatedly unless their build
+ * environment explicitly enables it.
+ */
+export const FOMO_ALWAYS_VISIBLE = (
+  String(process.env?.EXPO_PUBLIC_FOMO_ALWAYS_VISIBLE || '').trim().toLowerCase() === '1' ||
+  String(process.env?.EXPO_PUBLIC_FOMO_ALWAYS_VISIBLE || '').trim().toLowerCase() === 'true'
+);
+
 /** Set true temporarily to log each API call (method, URL, whether token was loaded — never the token value). Watch Metro or Xcode console. Turn off before release. */
 export const DEBUG_API_REQUESTS = (
   __DEV__ ||

@@ -529,6 +529,14 @@ def normalize_query_context(query_context: Optional[Dict[str, Any]]) -> Dict[str
         "remedy_next_action_title",
         "source_message_id",
         "sourceMessageId",
+        "source",
+        "chat_mode",
+        "category",
+        "suppress_mode_intro",
+        "fomo_snapshot_id",
+        "fomo_presentation_id",
+        "fomo_manifestation_id",
+        "fomo_evidence_signature",
     ):
         if key in query_context and key not in out and query_context.get(key) is not None:
             out[key] = query_context.get(key)

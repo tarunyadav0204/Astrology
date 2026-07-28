@@ -13,6 +13,10 @@ MIGRATIONS_DIR = Path(__file__).resolve().parent
 RUNTIME_MIGRATIONS = (
     "add_astrologer_subscription.sql",
     "add_payment_failure_alerts.sql",
+    "add_remedy_funnel_events.sql",
+    "add_parashari_fomo_snapshots.sql",
+    "add_homepage_prompt_exposures.sql",
+    "add_parashari_fomo_generation_claims.sql",
 )
 
 if str(BACKEND_DIR) not in sys.path:

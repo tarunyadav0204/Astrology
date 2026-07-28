@@ -20,9 +20,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Text as SvgText, Path, Line, Rect, Polygon } from 'react-native-svg';
-import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
+import {
+  COLORS,
+  API_BASE_URL,
+  FOMO_ALWAYS_VISIBLE,
+  getEndpoint,
+} from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
-import { chartAPI, panchangAPI } from '../../services/api';
+import { chartAPI, panchangAPI, predictionAPI } from '../../services/api';
 import { BiometricTeaserCard } from '../BiometricTeaserCard';
 import { PhysicalTraitsModal } from '../PhysicalTraitsModal';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
@@ -33,6 +38,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCredits } from '../../credits/CreditContext';
 import { useAuthGate } from '../../auth/AuthGateContext';
 import { extractFirstHttpsUrl } from '../../utils/blogLinks';
+import FomoHomeSheet from './FomoHomeSheet';
+import FomoHomeEntryCard from './FomoHomeEntryCard';
 
 const { width, height: windowHeight } = Dimensions.get('window');
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -45,6 +52,10 @@ const MULTI_CHART_TIP_NEVER_KEY = 'home_multi_chart_tip_never';
 const MULTI_CHART_TIP_SNOOZE_KEY = 'home_multi_chart_tip_snooze_until';
 const KNOW_YOURSELF_DISMISS_KEY = 'home_know_yourself_dismissed_date';
 const HOME_BANNER_DISMISS_PREFIX = 'home_admin_banner_dismiss:';
+const HOME_APP_SESSION_ID = `home:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
+const FREE_PROMPT_HANDOFF_QUIET_MS = 12 * 60 * 60 * 1000;
+const MONTHLY_PROMPT_INTERVAL_MS = 15 * 24 * 60 * 60 * 1000;
+const FOMO_FEATURE_RECHECK_MS = 60 * 1000;
 const homeBannerDismissKey = (bannerId) => `${HOME_BANNER_DISMISS_PREFIX}${bannerId}`;
 const todayDateKey = () => new Date().toISOString().slice(0, 10);
 const roundPanchangCoord = (value) => Math.round(parseFloat(value) * 100) / 100;
@@ -313,6 +324,8 @@ export default function HomeScreen({
   setShowDashaBrowser,
   infoModalPayload,
   onInfoModalConsumed,
+  onFomoVisibilityChange,
+  onFomoDismissed,
 }) {
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -329,6 +342,15 @@ export default function HomeScreen({
   const [showMonthlyWelcomeModal, setShowMonthlyWelcomeModal] = useState(false);
   const [showMultiChartTipModal, setShowMultiChartTipModal] = useState(false);
   const [showKnowYourselfPrompt, setShowKnowYourselfPrompt] = useState(false);
+  const [showFomoHomeSheet, setShowFomoHomeSheet] = useState(false);
+  const [fomoHomeData, setFomoHomeData] = useState(null);
+  const fomoHomeDataRef = useRef(null);
+  const fomoDataKeyRef = useRef('');
+  const fomoLoadedAtRef = useRef(0);
+  const fomoLoadPromiseRef = useRef(null);
+  const fomoLoadKeyRef = useRef('');
+  const homepagePromptStateRef = useRef(null);
+  const homepagePromptLoadRef = useRef(null);
   const [showInfoOnlyModal, setShowInfoOnlyModal] = useState(false);
   const [infoOnlyModalContent, setInfoOnlyModalContent] = useState({
     title: '',
@@ -492,7 +514,184 @@ export default function HomeScreen({
     setShowMonthlyWelcomeModal(false);
     setShowMultiChartTipModal(false);
     setShowKnowYourselfPrompt(false);
+    setShowFomoHomeSheet(false);
   }, []);
+
+  const loadHomepagePromptState = useCallback(async () => {
+    if (homepagePromptStateRef.current) return homepagePromptStateRef.current;
+    if (homepagePromptLoadRef.current) return homepagePromptLoadRef.current;
+    homepagePromptLoadRef.current = predictionAPI.getHomepagePromptState()
+      .then((response) => {
+        const prompts = response?.data?.prompts || null;
+        homepagePromptStateRef.current = prompts;
+        return prompts;
+      })
+      .catch(() => null)
+      .finally(() => {
+        homepagePromptLoadRef.current = null;
+      });
+    return homepagePromptLoadRef.current;
+  }, []);
+
+  const recordHomepagePromptShown = useCallback(async (promptKey) => {
+    const now = new Date().toISOString();
+    const previous = homepagePromptStateRef.current || {};
+    const existing = previous[promptKey] || {};
+    homepagePromptStateRef.current = {
+      ...previous,
+      [promptKey]: {
+        ...existing,
+        first_shown_at: existing.first_shown_at || now,
+        last_shown_at: now,
+        shown_count: Number(existing.shown_count || 0) + 1,
+        last_session_id: HOME_APP_SESSION_ID,
+      },
+    };
+    try {
+      const response = await predictionAPI.recordHomepagePromptShown(
+        promptKey,
+        HOME_APP_SESSION_ID,
+      );
+      if (response?.data?.state) {
+        homepagePromptStateRef.current = {
+          ...(homepagePromptStateRef.current || {}),
+          [promptKey]: response.data.state,
+        };
+      }
+    } catch (_) {
+      // The prompt is already visible; never interrupt the user for analytics state.
+    }
+  }, []);
+
+  const loadHomepageFomo = useCallback(async () => {
+    let activeRequest = null;
+    try {
+      const { storage } = require('../../services/storage');
+      const token = await storage.getAuthToken();
+      if (!token) return null;
+      const selectedChartId = (
+        currentNativeData?.id ||
+        currentNativeData?.birth_chart_id ||
+        birthData?.id ||
+        birthData?.birth_chart_id ||
+        null
+      );
+      const languageCode = String(i18n.language || '').toLowerCase().split('-', 1)[0];
+      const locale = {
+        en: 'en',
+        english: 'en',
+        hi: 'hi',
+        hindi: 'hi',
+      }[languageCode];
+      if (!locale) return null;
+      const requestKey = `${selectedChartId || 'default'}:${locale}`;
+      if (
+        fomoDataKeyRef.current === requestKey
+        && fomoHomeDataRef.current
+        && Date.now() - fomoLoadedAtRef.current < FOMO_FEATURE_RECHECK_MS
+      ) {
+        return fomoHomeDataRef.current;
+      }
+      if (fomoLoadKeyRef.current === requestKey && fomoLoadPromiseRef.current) {
+        const pendingResponse = await fomoLoadPromiseRef.current;
+        const pendingData = pendingResponse?.data;
+        return (
+          pendingData?.status === 'ready'
+          && Array.isArray(pendingData.teasers)
+          && pendingData.teasers.length
+        ) ? pendingData : null;
+      }
+      if (fomoDataKeyRef.current && fomoDataKeyRef.current !== requestKey) {
+        fomoDataKeyRef.current = '';
+        fomoHomeDataRef.current = null;
+        setFomoHomeData(null);
+      }
+      fomoLoadKeyRef.current = requestKey;
+      const requestPromise = predictionAPI.getHomepageFomo(locale, {
+        forceDisplay: FOMO_ALWAYS_VISIBLE,
+        birthChartId: selectedChartId,
+        includeIneligible: true,
+      });
+      activeRequest = requestPromise;
+      fomoLoadPromiseRef.current = requestPromise;
+      const response = await requestPromise;
+      if (fomoLoadKeyRef.current !== requestKey) return null;
+      const data = response?.data;
+      if (data?.status === 'ready' && Array.isArray(data.teasers) && data.teasers.length) {
+        fomoDataKeyRef.current = requestKey;
+        fomoLoadedAtRef.current = Date.now();
+        fomoHomeDataRef.current = data;
+        setFomoHomeData(data);
+        return data;
+      }
+      if (fomoLoadKeyRef.current === requestKey) {
+        fomoDataKeyRef.current = '';
+        fomoLoadedAtRef.current = 0;
+        fomoHomeDataRef.current = null;
+        setFomoHomeData(null);
+      }
+      if (FOMO_ALWAYS_VISIBLE) {
+        console.warn('[Homepage FOMO] Not ready', {
+          status: data?.status || 'missing_status',
+          teaserCount: Array.isArray(data?.teasers) ? data.teasers.length : 0,
+        });
+      }
+    } catch (error) {
+      if (FOMO_ALWAYS_VISIBLE) {
+        console.warn('[Homepage FOMO] Request failed', {
+          status: error?.response?.status,
+          detail: error?.response?.data?.detail || error?.message,
+        });
+      }
+      // Homepage remains fully usable when calculation or network access is unavailable.
+    } finally {
+      if (activeRequest && fomoLoadPromiseRef.current === activeRequest) {
+        fomoLoadPromiseRef.current = null;
+      }
+    }
+    return null;
+  }, [
+    birthData?.id,
+    birthData?.birth_chart_id,
+    currentNativeData?.id,
+    currentNativeData?.birth_chart_id,
+    i18n.language,
+  ]);
+
+  useEffect(() => {
+    loadHomepageFomo();
+  }, [loadHomepageFomo]);
+
+  // Explicit local testing mode must not depend on React Navigation's focus
+  // lifecycle or the one-prompt slot. HomeScreen is nested inside ChatScreen,
+  // and an already-focused parent or pending informational payload can reserve
+  // that slot before this child mounts. Load and present FOMO directly whenever
+  // this HomeScreen instance (or its selected chart) changes.
+  useEffect(() => {
+    if (!FOMO_ALWAYS_VISIBLE) return undefined;
+
+    let cancelled = false;
+    setShowFomoHomeSheet(false);
+    const timer = setTimeout(async () => {
+      const fomo = await loadHomepageFomo();
+      if (cancelled || !fomo) return;
+      clearHomePrompts();
+      setShowInfoOnlyModal(false);
+      setShowFomoHomeSheet(true);
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    birthData?.id,
+    birthData?.birth_chart_id,
+    currentNativeData?.id,
+    currentNativeData?.birth_chart_id,
+    clearHomePrompts,
+    loadHomepageFomo,
+  ]);
 
   // Target month for monthly modal: after 10th of current month we promote next month.
   const getMonthlyWelcomeTarget = useCallback(() => {
@@ -511,20 +710,43 @@ export default function HomeScreen({
   }, [getMonthlyWelcomeTarget, t]);
 
   const pickHomePromptForVisit = useCallback(async () => {
-    // Priority: first-question free → monthly welcome → multi-chart tip → Know Yourself
-    if (freeQuestionAvailable) return 'first_question_free';
+    // Priority: first-question free → chart FOMO → monthly welcome → multi-chart tip → Know Yourself
+    // The explicit testing override moves FOMO to the front so every eligible
+    // local Home visit exercises the new presentation and funnel.
+    if (FOMO_ALWAYS_VISIBLE) return null;
+    const promptState = await loadHomepagePromptState();
+    if (!promptState) return null;
+    const freeExposure = promptState.first_free_question;
+    if (freeQuestionAvailable && !freeExposure?.first_shown_at) {
+      return 'first_question_free';
+    }
+    if (freeQuestionAvailable && freeExposure?.last_shown_at) {
+      const lastShownMs = new Date(freeExposure.last_shown_at).getTime();
+      const stillSameSession = freeExposure.last_session_id === HOME_APP_SESSION_ID;
+      if (
+        stillSameSession
+        && Number.isFinite(lastShownMs)
+        && Date.now() - lastShownMs < FREE_PROMPT_HANDOFF_QUIET_MS
+      ) {
+        return null;
+      }
+    }
 
-    if (birthData?.id) {
-      try {
-        const { year, month } = getMonthlyWelcomeTarget();
-        const key = `monthly_welcome:${birthData.id}:${year}:${month}`;
-        const lastShown = await AsyncStorage.getItem(key);
-        if (!lastShown) return 'monthly_welcome';
-        const last = new Date(lastShown);
-        const diffDays = (new Date().getTime() - last.getTime()) / (1000 * 60 * 60 * 24);
-        if (diffDays >= 7) return 'monthly_welcome';
-      } catch (e) {
-        /* ignore and continue */
+    // Do not gate this request on the PWA's local chart cache. A returning user
+    // can have a saved backend chart before birthData/currentNativeData has been
+    // hydrated locally; the authenticated backend is the source of truth and
+    // returns `no_chart` when the user genuinely has no usable chart.
+    const fomo = await loadHomepageFomo();
+    if (fomo?.auto_eligible !== false) return 'chart_fomo';
+
+    if (birthData?.id || birthData?.birth_chart_id || currentNativeData?.id || currentNativeData?.birth_chart_id) {
+      const monthlyExposure = promptState.monthly_events;
+      const monthlyShownMs = new Date(monthlyExposure?.last_shown_at || '').getTime();
+      if (
+        !monthlyExposure?.last_shown_at
+        || (Number.isFinite(monthlyShownMs) && Date.now() - monthlyShownMs >= MONTHLY_PROMPT_INTERVAL_MS)
+      ) {
+        return 'monthly_welcome';
       }
 
       try {
@@ -556,7 +778,16 @@ export default function HomeScreen({
     }
 
     return null;
-  }, [freeQuestionAvailable, birthData?.id, getMonthlyWelcomeTarget]);
+  }, [
+    freeQuestionAvailable,
+    birthData?.id,
+    birthData?.birth_chart_id,
+    currentNativeData?.id,
+    currentNativeData?.birth_chart_id,
+    getMonthlyWelcomeTarget,
+    loadHomepagePromptState,
+    loadHomepageFomo,
+  ]);
 
   // Focus boundary: reset the one-prompt-per-visit slot only on enter/leave.
   useFocusEffect(
@@ -588,8 +819,15 @@ export default function HomeScreen({
 
         homePromptShownThisVisitRef.current = true;
         clearHomePrompts();
-        if (prompt === 'first_question_free') setShowFirstQuestionFreeModal(true);
-        else if (prompt === 'monthly_welcome') setShowMonthlyWelcomeModal(true);
+        if (prompt === 'first_question_free') {
+          setShowFirstQuestionFreeModal(true);
+          recordHomepagePromptShown('first_free_question');
+        }
+        else if (prompt === 'chart_fomo') setShowFomoHomeSheet(true);
+        else if (prompt === 'monthly_welcome') {
+          setShowMonthlyWelcomeModal(true);
+          recordHomepagePromptShown('monthly_events');
+        }
         else if (prompt === 'multi_chart_tip') setShowMultiChartTipModal(true);
         else if (prompt === 'know_yourself') setShowKnowYourselfPrompt(true);
       } catch (e) {
@@ -601,21 +839,118 @@ export default function HomeScreen({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [homeFocusEpoch, pickHomePromptForVisit, clearHomePrompts]);
+  }, [
+    homeFocusEpoch,
+    pickHomePromptForVisit,
+    clearHomePrompts,
+    recordHomepagePromptShown,
+  ]);
 
-  // Whenever the modal is dismissed (any way), persist cooldown so it won't show again for 7 days.
-  const closeMonthlyWelcomeModal = useCallback(async () => {
+  const recordFomoEvent = useCallback(async (
+    eventType,
+    presentationId = null,
+    metadata = {},
+  ) => {
+    const snapshotId = fomoHomeData?.snapshot_id;
+    if (!snapshotId) return;
+    const stableSuffix = presentationId || 'sheet';
+    const eventId = ['shown', 'dismissed'].includes(eventType)
+      ? `fomo:${snapshotId}:${stableSuffix}:${eventType}`
+      : `fomo:${snapshotId}:${stableSuffix}:${eventType}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
     try {
-      if (birthData?.id) {
-        const { year, month } = getMonthlyWelcomeTarget();
-        const key = `monthly_welcome:${birthData.id}:${year}:${month}`;
-        await AsyncStorage.setItem(key, new Date().toISOString());
-      }
-    } catch (e) {
-      // ignore
+      await predictionAPI.recordHomepageFomoEvent({
+        event_id: eventId,
+        snapshot_id: snapshotId,
+        presentation_id: presentationId,
+        event_type: eventType,
+        metadata,
+      });
+    } catch (_) {
+      /* analytics must never block the home or chat flow */
     }
+  }, [fomoHomeData?.snapshot_id]);
+
+  useEffect(() => {
+    if (!showFomoHomeSheet || !fomoHomeData?.teasers?.length) return;
+    const snapshotId = fomoHomeData.snapshot_id;
+    const surface = Platform.OS === 'web' ? 'pwa_home' : 'app_home';
+    predictionAPI.recordHomepageFomoEvents({
+      snapshot_id: snapshotId,
+      events: fomoHomeData.teasers.map((teaser) => ({
+        event_id: `fomo:${snapshotId}:${teaser.presentation_id}:shown`,
+        presentation_id: teaser.presentation_id,
+        event_type: 'shown',
+        metadata: { surface },
+      })),
+    }).catch(() => {
+      /* analytics must never block the home or chat flow */
+    });
+  }, [showFomoHomeSheet, fomoHomeData]);
+
+  const dismissFomoHome = useCallback(async () => {
+    setShowFomoHomeSheet(false);
+    onFomoDismissed?.();
+    await recordFomoEvent('dismissed', null, {
+      action: 'not_now',
+      surface: Platform.OS === 'web' ? 'pwa_home' : 'app_home',
+    });
+  }, [onFomoDismissed, recordFomoEvent]);
+
+  useEffect(() => {
+    onFomoVisibilityChange?.(showFomoHomeSheet);
+    return () => {
+      if (showFomoHomeSheet) onFomoVisibilityChange?.(false);
+    };
+  }, [onFomoVisibilityChange, showFomoHomeSheet]);
+
+  const askFomoQuestion = useCallback(async (teaser, question) => {
+    const cleanQuestion = String(question || '').trim();
+    if (!cleanQuestion) return;
+    try {
+      const response = await predictionAPI.getHomepageFomoPresentation(
+        fomoHomeData?.snapshot_id,
+        teaser.presentation_id,
+      );
+      const verified = response?.data;
+      if (!verified?.snapshot_id || !verified?.manifestation_id) {
+        throw new Error('Chart theme expired');
+      }
+      await Promise.all([
+        recordFomoEvent('opened', teaser.presentation_id, {
+          surface: Platform.OS === 'web' ? 'pwa_home' : 'app_home',
+        }),
+        recordFomoEvent('question_prefilled', teaser.presentation_id, {
+          edited: cleanQuestion !== String(teaser.suggested_question || '').trim(),
+          surface: Platform.OS === 'web' ? 'pwa_home' : 'app_home',
+        }),
+      ]);
+      setShowFomoHomeSheet(false);
+      onOptionSelect?.({
+        action: 'question',
+        initialMessage: cleanQuestion,
+        queryContext: {
+          fomo_snapshot_id: verified.snapshot_id,
+          fomo_presentation_id: verified.presentation_id,
+          fomo_manifestation_id: verified.manifestation_id,
+          fomo_evidence_signature: verified.evidence_signature,
+          source: 'homepage_fomo',
+          chat_mode: 'fomo_manifestation',
+          category: 'fomo_manifestation',
+          answer_mode: 'fomo_detail',
+          suppress_mode_intro: true,
+        },
+      });
+    } catch (_) {
+      Alert.alert(
+        t('fomoHome.unavailableTitle'),
+        t('fomoHome.unavailableBody'),
+      );
+    }
+  }, [fomoHomeData?.snapshot_id, onOptionSelect, recordFomoEvent, t]);
+
+  const closeMonthlyWelcomeModal = useCallback(() => {
     setShowMonthlyWelcomeModal(false);
-  }, [birthData?.id, getMonthlyWelcomeTarget]);
+  }, []);
 
   const dismissMultiChartTipPermanent = useCallback(async () => {
     try {
@@ -1670,6 +2005,15 @@ const loadHomeData = async (nativeData = null) => {
             )}
           </AppScrollView>
         </View>
+
+        <FomoHomeEntryCard
+          data={fomoHomeData}
+          onPress={() => {
+            homePromptShownThisVisitRef.current = true;
+            clearHomePrompts();
+            setShowFomoHomeSheet(true);
+          }}
+        />
 
         <ReportStudioCard
           navigation={navigation}
@@ -2738,6 +3082,13 @@ const loadHomeData = async (nativeData = null) => {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      <FomoHomeSheet
+        visible={showFomoHomeSheet}
+        data={fomoHomeData}
+        onDismiss={dismissFomoHome}
+        onAsk={askFomoQuestion}
+      />
       
       {/* Physical Traits Modal */}
       <PhysicalTraitsModal

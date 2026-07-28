@@ -21,8 +21,7 @@ import { pricingAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cleanupStorage } from '../../services/storageCleanup';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
+import { exportHtmlAsPdf, sharePDFOnWhatsApp, PDF_PRINT_STYLES, userFacingPdfExportError } from '../../utils/pdfGenerator';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { trackAstrologyEvent, trackEvent } from '../../utils/analytics';
 import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
@@ -1097,6 +1096,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
               .final-thoughts { background: linear-gradient(135deg, #fff3e0, #ffe0b2); padding: 20px; border-radius: 10px; border: 2px solid #ff6b35; }
               .bold { font-weight: bold; color: #4a2c6d; }
               .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px; }
+              ${PDF_PRINT_STYLES}
             </style>
           </head>
           <body>
@@ -1141,11 +1141,11 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         </html>
       `;
 
-      const { uri } = await Print.printToFileAsync({ html: htmlContent });
-      await Sharing.shareAsync(uri);
+      const pdfUri = await exportHtmlAsPdf(htmlContent);
+      await sharePDFOnWhatsApp(pdfUri, { dialogTitle: `${displayTitle} Analysis` });
     } catch (error) {
-
-      Alert.alert('Error', 'Failed to generate PDF. Please try again.');
+      console.error('Analysis PDF export error:', error);
+      Alert.alert('Export failed', userFacingPdfExportError(error));
     }
   };
 

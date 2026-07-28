@@ -28,7 +28,12 @@ import { API_BASE_URL } from '../utils/constants';
 import { useTheme } from '../context/ThemeContext';
 import ConfirmCreditsModal from './ConfirmCreditsModal';
 import { useTranslation } from 'react-i18next';
-import { generateEventTimelinePDF, sharePDFOnWhatsApp, getLogoDataUriForModule } from '../utils/pdfGenerator';
+import {
+  generateEventTimelinePDF,
+  sharePDFOnWhatsApp,
+  getLogoDataUriForModule,
+  userFacingPdfExportError,
+} from '../utils/pdfGenerator';
 import { trackEvent } from '../utils/analytics';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { userFacingTimelineError } from '../utils/timelineUserErrors';
@@ -1220,7 +1225,7 @@ export default function EventScreen({ route }) {
       await sharePDFOnWhatsApp(pdfUri);
     } catch (error) {
       console.error('Export PDF error:', error);
-      Alert.alert('Export failed', error?.message || 'Could not generate or share PDF.');
+      Alert.alert('Export failed', userFacingPdfExportError(error));
     } finally {
       setIsExportingPdf(false);
     }

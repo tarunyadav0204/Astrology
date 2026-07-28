@@ -2942,6 +2942,8 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             is_instant_chat_enabled,
             is_chat_subject_gate_enabled,
             get_chat_subject_gate_user_allowlist,
+            is_homepage_fomo_enabled,
+            get_homepage_fomo_user_allowlist,
             get_first_purchase_bonus_config,
             get_first_purchase_bonus_user_allowlist,
             get_purchase_discount_config,
@@ -2965,11 +2967,9 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             is_purchase_discount_enabled,
             is_parallel_branch_planner_enabled,
             get_setting,
+            get_admin_settings_rows,
         )
-        with get_conn() as conn:
-            _ensure_admin_settings_table(conn)
-            cur = execute(conn, "SELECT key, value, description FROM admin_settings", ())
-            settings = [{"key": row[0], "value": row[1], "description": row[2]} for row in (cur.fetchall() or [])]
+        settings = get_admin_settings_rows(refresh=True)
         _raw_premium = (get_setting("chat_llm_provider_premium") or "").strip().lower()
         _premium_ui = (
             _raw_premium
@@ -3030,6 +3030,10 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "chat_subject_gate_enabled": is_chat_subject_gate_enabled(),
             "chat_subject_gate_user_allowlist": ",".join(
                 str(uid) for uid in sorted(get_chat_subject_gate_user_allowlist())
+            ),
+            "homepage_fomo_enabled": is_homepage_fomo_enabled(),
+            "homepage_fomo_user_allowlist": ",".join(
+                str(uid) for uid in sorted(get_homepage_fomo_user_allowlist())
             ),
             "first_purchase_bonus_enabled": is_first_purchase_bonus_enabled(),
             "first_purchase_bonus_user_allowlist": ",".join(
@@ -3225,11 +3229,13 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
     try:
         from utils.admin_settings import (
             _ensure_admin_settings_table,
+            bump_admin_settings_version,
             bump_credits_settings_version,
-            invalidate_setting_cache,
-            invalidate_credits_settings_cache,
             is_credits_setting_key,
+            update_setting_cache,
         )
+        settings_version = None
+        credits_version = None
         with get_conn() as conn:
             _ensure_admin_settings_table(conn)
             execute(
@@ -3244,11 +3250,21 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
                 """,
                 (key, setting.value, setting.description),
             )
+            settings_version = bump_admin_settings_version(conn)
+            if is_credits_setting_key(key):
+                credits_version = bump_credits_settings_version(conn)
             conn.commit()
-        invalidate_setting_cache(key)
-        if is_credits_setting_key(key):
-            invalidate_credits_settings_cache()
-            bump_credits_settings_version()
+        update_setting_cache(
+            key,
+            setting.value,
+            settings_version=settings_version,
+        )
+        if credits_version is not None:
+            update_setting_cache(
+                "credits_settings_version",
+                credits_version,
+                settings_version=settings_version,
+            )
         return {"message": "Setting updated", "key": key, "value": setting.value}
     except Exception as e:
         err_name = type(e).__name__

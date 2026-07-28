@@ -25,7 +25,7 @@ import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
-import { generatePDF, sharePDFOnWhatsApp, getLogoDataUriForModule } from '../../utils/pdfGenerator';
+import { generatePDF, sharePDFOnWhatsApp, getLogoDataUriForModule, userFacingPdfExportError } from '../../utils/pdfGenerator';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
 import { chatAPI } from '../../services/api';
 import { useTranslation } from 'react-i18next';
@@ -43,6 +43,42 @@ import {
 
 /** Avoid replaying slide-in when a tall bubble remounts (Android clipping / recycle). */
 const messageBubbleEntryPlayedIds = new Set();
+const remedyScreenImpressionClaims = new Set();
+
+const localCalendarDay = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const recordRemedyScreenImpressionOnce = async ({ sessionId, message }) => {
+  const sessionScope = String(
+    sessionId
+      || message?.session_id
+      || message?.sessionId
+      || 'current',
+  );
+  const impressionId = `chat_screen:${sessionScope}:${localCalendarDay()}`;
+  if (remedyScreenImpressionClaims.has(impressionId)) return;
+  remedyScreenImpressionClaims.add(impressionId);
+
+  const storageKey = `remedy_funnel_card_shown:${impressionId}`;
+  try {
+    if (await AsyncStorage.getItem(storageKey)) return;
+    // Claim before networking so remounts/reloads cannot create a retry storm.
+    await AsyncStorage.setItem(storageKey, '1');
+  } catch (_) {
+    // The in-memory claim still guarantees one request for this app process.
+  }
+
+  await creditAPI.recordRemedyFunnelEvent(
+    'card_shown',
+    impressionId,
+    Platform.OS === 'web' ? 'web' : 'app',
+  );
+};
 
 function MessageBubble({
   message,
@@ -70,7 +106,6 @@ function MessageBubble({
   const [detailUnlocked, setDetailUnlocked] = useState(false);
   const [showRevealCreditsModal, setShowRevealCreditsModal] = useState(false);
   const blurShownTrackedRef = useRef(false);
-  const remedyShownTrackedRef = useRef(false);
   // Init from the played-ids set so FlatList remounts do not flash translateY:50 for one frame
   // (that looked like the long answer bouncing between sections while reading).
   const entryIdForAnim = String(message?.messageId || message?.id || message?.clientRequestId || '');
@@ -475,7 +510,7 @@ function MessageBubble({
       console.log('✅ PDF shared');
     } catch (error) {
       console.error('❌ PDF generation error:', error);
-      Alert.alert('Error', `Failed to generate PDF: ${error.message}`);
+      Alert.alert('Export failed', userFacingPdfExportError(error));
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -1396,12 +1431,9 @@ function MessageBubble({
   }, [canBlurFreeDetail, detailUnlocked, message.messageId, message.id]);
 
   useEffect(() => {
-    if (!hasRemedyCard || remedyShownTrackedRef.current) return;
-    const mid = message.messageId || message.id;
-    if (!mid) return;
-    remedyShownTrackedRef.current = true;
-    creditAPI.recordRemedyFunnelEvent('card_shown', String(mid)).catch(() => {});
-  }, [hasRemedyCard, message.messageId, message.id]);
+    if (!hasRemedyCard) return;
+    recordRemedyScreenImpressionOnce({ sessionId, message }).catch(() => {});
+  }, [hasRemedyCard, sessionId, message]);
 
   useFocusEffect(
     useCallback(() => {

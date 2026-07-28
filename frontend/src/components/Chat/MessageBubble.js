@@ -220,6 +220,52 @@ const getGlossaryDefinition = (glossary, termId) => {
     return undefined;
 };
 
+const remedyScreenImpressionClaims = new Set();
+
+const localCalendarDay = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const recordRemedyScreenImpressionOnce = async ({ sessionId, message }) => {
+    const sessionScope = String(
+        sessionId
+        || message?.session_id
+        || message?.sessionId
+        || 'current'
+    );
+    const impressionId = `chat_screen:${sessionScope}:${localCalendarDay()}`;
+    if (remedyScreenImpressionClaims.has(impressionId)) return;
+    remedyScreenImpressionClaims.add(impressionId);
+
+    const storageKey = `remedy_funnel_card_shown:${impressionId}`;
+    try {
+        if (localStorage.getItem(storageKey)) return;
+        // Claim before networking so React remounts and page reloads cannot fan out.
+        localStorage.setItem(storageKey, '1');
+    } catch (_) {
+        // The in-memory claim still protects this page lifecycle.
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    await fetch('/api/credits/remedy-funnel/event', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+            event: 'card_shown',
+            message_id: impressionId,
+            platform: 'web',
+        }),
+    });
+};
+
 const MessageBubble = ({
     message,
     language = 'english',
@@ -242,7 +288,6 @@ const MessageBubble = ({
     const standardChatCost = Math.max(1, Number(chatCost) || 1);
     const [detailUnlocked, setDetailUnlocked] = useState(false);
     const blurShownTrackedRef = useRef(false);
-    const remedyShownTrackedRef = useRef(false);
     const [showActions, setShowActions] = useState(false);
     const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
     const messageRef = useRef(null);
@@ -428,29 +473,9 @@ const MessageBubble = ({
     }, [canBlurFreeDetail, detailUnlocked, credits, message.messageId, message.id]);
 
     useEffect(() => {
-        if (!showNextActionCard || !isRemedyNextAction || remedyShownTrackedRef.current) return;
-        const mid = message.messageId || message.id;
-        if (!mid) return;
-        remedyShownTrackedRef.current = true;
-        try {
-            const token = localStorage.getItem('token');
-            if (!token) return;
-            fetch('/api/credits/remedy-funnel/event', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    event: 'card_shown',
-                    message_id: String(mid),
-                    platform: 'web',
-                }),
-            }).catch(() => {});
-        } catch (_) {
-            /* ignore */
-        }
-    }, [showNextActionCard, isRemedyNextAction, message.messageId, message.id]);
+        if (!showNextActionCard || !isRemedyNextAction) return;
+        recordRemedyScreenImpressionOnce({ sessionId, message }).catch(() => {});
+    }, [showNextActionCard, isRemedyNextAction, sessionId, message]);
 
     const handleRevealDetailedAnswer = useCallback(() => {
         const mid = message.messageId || message.id;

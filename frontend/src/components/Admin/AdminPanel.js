@@ -351,6 +351,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [chatSubjectGateEnabled, setChatSubjectGateEnabled] = useState(false);
   const [chatSubjectGateUserAllowlist, setChatSubjectGateUserAllowlist] = useState('');
   const [chatSubjectGateSaving, setChatSubjectGateSaving] = useState(false);
+  const [homepageFomoEnabled, setHomepageFomoEnabled] = useState(false);
+  const [homepageFomoUserAllowlist, setHomepageFomoUserAllowlist] = useState('');
+  const [homepageFomoSaving, setHomepageFomoSaving] = useState(false);
   const [chatWorkerModeEnabled, setChatWorkerModeEnabled] = useState(false);
   const [chatWorkerUserAllowlist, setChatWorkerUserAllowlist] = useState('');
   const [chatWorkerModeSaving, setChatWorkerModeSaving] = useState(false);
@@ -799,6 +802,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setEventTimelineModel(data.event_timeline_model || data.gemini_premium_model || '');
       setChatSubjectGateEnabled(Boolean(data.chat_subject_gate_enabled));
       setChatSubjectGateUserAllowlist(data.chat_subject_gate_user_allowlist || '');
+      setHomepageFomoEnabled(Boolean(data.homepage_fomo_enabled));
+      setHomepageFomoUserAllowlist(data.homepage_fomo_user_allowlist || '');
       setChatWorkerModeEnabled(Boolean(data.chat_worker_mode_enabled));
       setChatWorkerUserAllowlist(data.chat_worker_user_allowlist || '');
       setFreeQuestionEnabled(data.free_question_enabled !== false);
@@ -1228,6 +1233,52 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert('Failed to save chat worker settings.');
     } finally {
       setChatWorkerModeSaving(false);
+    }
+  };
+
+  const handleSaveHomepageFomoSettings = async () => {
+    setHomepageFomoSaving(true);
+    try {
+      const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+      const [enabledRes, allowlistRes] = await Promise.all([
+        fetch('/api/admin/settings/homepage_fomo_enabled', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'homepage_fomo_enabled',
+            value: homepageFomoEnabled ? 'true' : 'false',
+            description: 'Feature flag for the homepage chart-theme card and FOMO bottom sheet',
+          }),
+        }),
+        fetch('/api/admin/settings/homepage_fomo_user_allowlist', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'homepage_fomo_user_allowlist',
+            value: homepageFomoUserAllowlist,
+            description: 'Optional CSV user allowlist for homepage FOMO. Empty = all users when enabled.',
+          }),
+        }),
+      ]);
+      if (!enabledRes.ok || !allowlistRes.ok) {
+        const enabledErr = await enabledRes.json().catch(() => ({}));
+        const allowlistErr = await allowlistRes.json().catch(() => ({}));
+        alert(
+          'Failed to save homepage FOMO setting: '
+          + (enabledErr.detail || allowlistErr.detail || 'check console')
+        );
+        return;
+      }
+      alert(
+        `Homepage FOMO ${homepageFomoEnabled ? 'enabled' : 'disabled'}. `
+        + 'The app applies it on the next Home load; an already-open Home screen rechecks on its next visit.'
+      );
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving homepage FOMO setting:', error);
+      alert('Failed to save homepage FOMO setting.');
+    } finally {
+      setHomepageFomoSaving(false);
     }
   };
 
@@ -5594,6 +5645,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 Chat
               </button>
               <button
+                className={`subtab ${settingsSubTab === 'featureFlags' ? 'active' : ''}`}
+                onClick={() => setSettingsSubTab('featureFlags')}
+              >
+                Feature Flags
+              </button>
+              <button
                 className={`subtab ${settingsSubTab === 'guideVideos' ? 'active' : ''}`}
                 onClick={() => setSettingsSubTab('guideVideos')}
               >
@@ -5618,6 +5675,55 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 Operations
               </button>
             </div>
+
+            {settingsSubTab === 'featureFlags' && (
+              <div className="settings-subtab-group">
+                <div className="settings-section">
+                  <h3>Homepage chart themes (FOMO)</h3>
+                  <p className="settings-hint">
+                    Controls both the permanent “What&apos;s active in your chart?” home card and its chart-theme bottom sheet.
+                    Disabled users do not run the homepage prediction calculation.
+                  </p>
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <strong>Enable homepage chart themes</strong>
+                      <p>When off, the home card and automatic bottom sheet are hidden for everyone.</p>
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={homepageFomoEnabled}
+                        onChange={(e) => setHomepageFomoEnabled(e.target.checked)}
+                      />
+                      <span className="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div className="setting-info">
+                      <strong>Eligible user IDs</strong>
+                      <p>Comma or space separated. Leave blank to enable the feature for all users when the switch is on.</p>
+                    </div>
+                    <textarea
+                      value={homepageFomoUserAllowlist}
+                      onChange={(e) => setHomepageFomoUserAllowlist(e.target.value)}
+                      placeholder="e.g. 18, 73, 1755"
+                      rows={3}
+                      style={{ width: '100%', maxWidth: '420px', minHeight: '88px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                    />
+                  </div>
+                  <div className="form-buttons" style={{ marginTop: '12px' }}>
+                    <button
+                      type="button"
+                      className="create-btn"
+                      onClick={handleSaveHomepageFomoSettings}
+                      disabled={homepageFomoSaving}
+                    >
+                      {homepageFomoSaving ? 'Saving…' : 'Save homepage FOMO flag'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {settingsSubTab === 'chat' && (
               <div className="settings-subtab-group">

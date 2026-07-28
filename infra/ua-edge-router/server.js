@@ -111,9 +111,6 @@ const server = http.createServer(async (req, res) => {
 
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
     let pathname = url.pathname || '/';
-    if (pathname.length > 1 && pathname.endsWith('/')) {
-      pathname = pathname.slice(0, -1);
-    }
 
     if (pathname === '/api' || pathname.startsWith('/api/')) {
       res.writeHead(404, { 'content-type': 'text/plain' });
@@ -127,8 +124,8 @@ const server = http.createServer(async (req, res) => {
     const forceApp =
       url.searchParams.get('force_app') === '1' || cookies.force_app === '1';
 
-    // Canonicalize /mobile → /mobile/ so the document URL stays inside PWA scope `/mobile/`.
-    // (Scope prefix matching does NOT treat `/mobile` as inside `/mobile/`.)
+    // Canonicalize /mobile → /mobile/ BEFORE stripping trailing slashes.
+    // Stripping first caused /mobile/ → /mobile → 301 /mobile/ loops and flaky PWA opens.
     if (pathname === '/mobile') {
       const qs = url.search ? url.search : '';
       res.writeHead(301, {
@@ -137,6 +134,11 @@ const server = http.createServer(async (req, res) => {
       });
       res.end();
       return;
+    }
+
+    // Keep /mobile/ intact for PWA scope; strip trailing slash on other paths only.
+    if (pathname.length > 1 && pathname.endsWith('/') && pathname !== '/mobile/') {
+      pathname = pathname.slice(0, -1);
     }
 
     // Bookmark / old escape hatch → canonical Expo entry

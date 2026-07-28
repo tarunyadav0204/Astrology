@@ -18,6 +18,7 @@ import {
   recordReminderDeclinedForever,
 } from '../../services/notificationReminder';
 import { useCredits } from '../../credits/CreditContext';
+import { useTranslation } from 'react-i18next';
 
 const OPEN_DELAY_MS = 1600;
 
@@ -25,12 +26,18 @@ const OPEN_DELAY_MS = 1600;
  * Full-screen style reminder on the home dashboard (props.homeActive) for users
  * without notification permission. Android only (iOS push is skipped in App.js).
  */
-export default function NotificationEnableReminderModal({ homeActive }) {
+export default function NotificationEnableReminderModal({
+  homeActive,
+  fomoTriggerNonce = 0,
+}) {
+  const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const { fetchBalance } = useCredits();
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [variant, setVariant] = useState('general');
   const timerRef = useRef(null);
+  const handledFomoTriggerRef = useRef(0);
 
   useEffect(() => {
     if (!homeActive || Platform.OS === 'ios' || !Device.isDevice) {
@@ -56,6 +63,39 @@ export default function NotificationEnableReminderModal({ homeActive }) {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [homeActive]);
+
+  useEffect(() => {
+    if (
+      !fomoTriggerNonce
+      || handledFomoTriggerRef.current === fomoTriggerNonce
+      || Platform.OS === 'ios'
+      || Platform.OS === 'web'
+      || !Device.isDevice
+    ) {
+      return;
+    }
+    handledFomoTriggerRef.current = fomoTriggerNonce;
+    let cancelled = false;
+    const checkAndOpen = async () => {
+      try {
+        const { getPushPermissionStatusAsync } = require('../../services/pushNotifications');
+        const status = await getPushPermissionStatusAsync();
+        if (cancelled || status === 'granted') return;
+        // This explicit contextual prompt owns the reminder slot, preventing the
+        // generic delayed home reminder from appearing immediately afterwards.
+        await recordReminderShown();
+        if (cancelled) return;
+        setVariant('fomo');
+        setVisible(true);
+      } catch (_) {
+        /* A notification prompt must never interrupt navigation. */
+      }
+    };
+    checkAndOpen();
+    return () => {
+      cancelled = true;
+    };
+  }, [fomoTriggerNonce]);
 
   const close = () => setVisible(false);
 
@@ -106,9 +146,15 @@ export default function NotificationEnableReminderModal({ homeActive }) {
           <View style={styles.iconWrap}>
             <Ionicons name="notifications" size={36} color="#ff6b35" />
           </View>
-          <Text style={[styles.title, { color: colors.text }]}>Never miss what matters</Text>
+          <Text style={[styles.title, { color: colors.text }]}>
+            {variant === 'fomo'
+              ? t('fomoHome.notificationTitle')
+              : 'Never miss what matters'}
+          </Text>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            Turn on notifications to hear when your chart reviews, chat updates, or special offers are ready.
+            {variant === 'fomo'
+              ? t('fomoHome.notificationBody')
+              : 'Turn on notifications to hear when your chart reviews, chat updates, or special offers are ready.'}
           </Text>
           <TouchableOpacity
             style={[styles.primaryBtn, busy && styles.btnDisabled]}
@@ -119,15 +165,23 @@ export default function NotificationEnableReminderModal({ homeActive }) {
             {busy ? (
               <ActivityIndicator color="#0f172a" />
             ) : (
-              <Text style={styles.primaryBtnText}>Turn on notifications</Text>
+              <Text style={styles.primaryBtnText}>
+                {variant === 'fomo'
+                  ? t('fomoHome.notificationEnable')
+                  : 'Turn on notifications'}
+              </Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} onPress={onNotNow} disabled={busy}>
-            <Text style={[styles.secondaryBtnText, { color: colors.textSecondary }]}>Not now</Text>
+            <Text style={[styles.secondaryBtnText, { color: colors.textSecondary }]}>
+              {variant === 'fomo' ? t('fomoHome.notificationLater') : 'Not now'}
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.neverBtn} onPress={onNeverAgain} disabled={busy}>
-            <Text style={[styles.neverBtnText, { color: colors.textSecondary }]}>Don't ask again</Text>
-          </TouchableOpacity>
+          {variant !== 'fomo' ? (
+            <TouchableOpacity style={styles.neverBtn} onPress={onNeverAgain} disabled={busy}>
+              <Text style={[styles.neverBtnText, { color: colors.textSecondary }]}>Don't ask again</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
     </Modal>

@@ -32,6 +32,7 @@ from .chart_manifestations import (
 )
 from .event_resolution import EVENT_RESOLUTION_VERSION, EventResolutionEngine
 from .event_signatures import EVENT_SIGNATURE_REGISTRY_VERSION
+from .fomo_presentation import FomoPresentationAdapter
 from .house_significations import (
     HOUSE_COMBINATIONS,
     HOUSE_SIGNIFICATION_REGISTRY_VERSION,
@@ -45,7 +46,7 @@ from .subjects import SUBJECTS, SUBJECT_REGISTRY_VERSION, native_houses_for_subj
 from .taxonomy import EVENT_FAMILIES, TAXONOMY_VERSION, EventFamily
 
 
-ENGINE_VERSION = "5.4.0"
+ENGINE_VERSION = "5.5.0"
 _ACTIVATION_PROVIDERS = {
     "dasha_house_activation",
     "dispositor_activation",
@@ -978,6 +979,7 @@ class PredictionEngine:
         self.event_resolver = EventResolutionEngine()
         self.house_activation_engine = HouseActivationEngine()
         self.chart_manifestation_resolver = ChartManifestationResolver()
+        self.fomo_presentation_adapter = FomoPresentationAdapter()
 
     def generate(
         self,
@@ -1052,6 +1054,10 @@ class PredictionEngine:
             house_activations,
             maximum_results=min(12, requested_limit),
         )
+        fomo_presentations = self.fomo_presentation_adapter.present(
+            chart_manifestations,
+            locale=request.language,
+        )
 
         signature_payload = {
             "engine": ENGINE_VERSION,
@@ -1065,6 +1071,7 @@ class PredictionEngine:
             "house_activation_policy_version": self.house_activation_engine.version,
             "chart_manifestation_resolver_version": self.chart_manifestation_resolver.version,
             "chart_manifestation_registry_version": CHART_MANIFESTATION_REGISTRY_VERSION,
+            "fomo_presentation_version": self.fomo_presentation_adapter.version,
             "natal_promise_policy_versions": sorted({
                 str(row.get("policy_version")) for row in calculation.natal_promises
             }),
@@ -1096,6 +1103,7 @@ class PredictionEngine:
             candidates=final_candidates,
             house_activations=house_activations,
             chart_manifestations=chart_manifestations,
+            fomo_presentations=fomo_presentations,
             natal_promises=tuple(calculation.natal_promises),
             diagnostics=(
                 {
@@ -1109,6 +1117,8 @@ class PredictionEngine:
                     "house_activation_policy_version": self.house_activation_engine.version,
                     "chart_manifestation_resolver_version": self.chart_manifestation_resolver.version,
                     "chart_manifestations": len(chart_manifestations),
+                    "fomo_presentation_version": self.fomo_presentation_adapter.version,
+                    "fomo_presentations": len(fomo_presentations),
                     "house_state_counts": {
                         state.value: sum(
                             1 for row in house_activations if row.state == state

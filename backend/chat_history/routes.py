@@ -1428,12 +1428,42 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         raise HTTPException(status_code=422, detail="Missing required fields: session_id, question, and birth_details")
 
     birth_details = coerce_chat_birth_details(birth_details)
+    raw_query_context = request.get("query_context") or request.get("queryContext")
+    raw_query_context = raw_query_context if isinstance(raw_query_context, dict) else {}
+    trusted_fomo_chat_context = None
+    from prediction_engine.fomo_chat import (
+        FomoChatContextError,
+        is_fomo_chat_request,
+        resolve_fomo_chat_context,
+    )
+
+    fomo_chat_requested = is_fomo_chat_request(raw_query_context)
+    if fomo_chat_requested:
+        try:
+            trusted_fomo_chat_context = resolve_fomo_chat_context(
+                userid=int(current_user.userid),
+                birth_chart_id=_birth_chart_id_from_birth_details(birth_details),
+                query_context=raw_query_context,
+            )
+        except FomoChatContextError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        raw_query_context = {
+            **raw_query_context,
+            "source": "homepage_fomo",
+            "chat_mode": "fomo_manifestation",
+            "category": "fomo_manifestation",
+            "answer_mode": "fomo_detail",
+            "suppress_mode_intro": True,
+        }
     
     # Optional fields with defaults
     language = request.get("language", "english")
     response_style = request.get("response_style", "detailed")
     premium_analysis = request.get("premium_analysis", False)
     requested_chat_tier = str(request.get("chat_tier") or request.get("chatTier") or "standard").strip().lower()
+    if fomo_chat_requested and requested_chat_tier not in {"standard", "premium"}:
+        requested_chat_tier = "standard"
+        premium_analysis = False
     partnership_mode = request.get("partnership_mode", False) or request.get("partnershipMode", False)
     partner_birth_details = request.get("partner_birth_details") or {
         'name': request.get('partner_name') or request.get('partnerName'),
@@ -1491,7 +1521,9 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     speech_chat_billing = bool(speech_chat_requested and instant_chat_active and speech_billing_requested is not False)
     effective_chat_tier = "instant" if instant_chat_active else "standard"
     chat_worker_mode_active = chat_worker_mode_enabled_for_user(current_user.userid)
-    skip_subject_gate_for_fast_chat = bool(instant_chat_active or speech_chat_requested)
+    skip_subject_gate_for_fast_chat = bool(
+        instant_chat_active or speech_chat_requested or fomo_chat_requested
+    )
     if speech_chat_requested or requested_chat_tier == "instant":
         logger.info(
             "SPEECH_DEBUG chat_v2_ask user_id=%s session_id=%s requested_tier=%s effective_tier=%s speech_requested=%s speech_billing=%s question=%r birth_chart_id=%s",
@@ -1587,7 +1619,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             "selected_chart_only",
             "single_chart_only",
             "relationship_context_provided",
-        } or partnership_mode:
+        } or partnership_mode or fomo_chat_requested:
             _clear_pending_native_gate(conn, session_id)
             conn.commit()
 
@@ -1994,8 +2026,10 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         from ai.fetal_sex_query_classifier import FETAL_SEX_REFUSAL_MESSAGE, should_refuse_fetal_sex_determination
         from utils.query_context import is_remedy_followup_request
 
-        ask_query_context = request.get("query_context") or request.get("queryContext")
-        skip_fetal_sex_gate = is_remedy_followup_request({"query_context": ask_query_context})
+        skip_fetal_sex_gate = bool(
+            fomo_chat_requested
+            or is_remedy_followup_request({"query_context": raw_query_context})
+        )
         if not skip_fetal_sex_gate:
             try:
                 with get_conn() as conn:
@@ -2110,8 +2144,10 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     )
 
     worker_intent_metadata = {
-        "query_context": request.get("query_context") or request.get("queryContext"),
+        "query_context": raw_query_context,
     }
+    if trusted_fomo_chat_context:
+        worker_intent_metadata["fomo_chat_context"] = trusted_fomo_chat_context
     logger.info(
         "chat_task_intent_metadata message_id=%s session_id=%s intent=%s",
         assistant_message_id,
@@ -3184,6 +3220,15 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         intent = {'status': 'READY', 'mode': 'birth', 'category': 'general', 'extracted_context': {}}  # Default
         # Merged clarification chain (e.g. "eating habits" + "in general"); used for all generation below.
         combined_question = question
+        trusted_fomo_context = (
+            cached_intent.get("fomo_chat_context")
+            if isinstance(cached_intent, dict)
+            and isinstance(cached_intent.get("fomo_chat_context"), dict)
+            else None
+        )
+        from prediction_engine.fomo_chat import is_supported_fomo_chat_context
+
+        fomo_chat_active = is_supported_fomo_chat_context(trusted_fomo_context)
 
         if not partnership_mode:
             intent_router = IntentRouter()
@@ -3214,11 +3259,15 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             )
             from utils.query_context import resolve_remedy_followup_active
 
-            force_ready = question.startswith('@All_Events') or is_whatsapp_plain_text
+            force_ready = (
+                question.startswith('@All_Events')
+                or is_whatsapp_plain_text
+                or fomo_chat_active
+            )
             
             # Check if this is a clarification response and combine with original question
             combined_question = question
-            if clarification_count > 0:
+            if clarification_count > 0 and not fomo_chat_active:
                 with get_conn() as conn:
                     chain_parts = get_user_question_chain_for_clarification(session_id, message_id, conn)
                     original_question = get_original_question_for_clarification(session_id, message_id, conn)
@@ -3251,10 +3300,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             if remedy_followup_active:
                 force_ready = True
 
-            max_clarifications = 0 if is_whatsapp_plain_text else (
+            max_clarifications = 0 if (is_whatsapp_plain_text or fomo_chat_active) else (
                 INSTANT_MAX_CLARIFICATIONS if is_instant_chat else STANDARD_MAX_CLARIFICATIONS
             )
-            if is_instant_chat:
+            if fomo_chat_active:
+                from prediction_engine.fomo_chat import build_fomo_chat_intent
+
+                intent = build_fomo_chat_intent(trusted_fomo_context)
+            elif is_instant_chat:
                 intent = await intent_router.classify_instant_intent(
                     combined_question,
                     history,
@@ -3537,6 +3590,11 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 divisional_charts=intent.get('divisional_charts') or [],
             )
 
+        if fomo_chat_active and isinstance(context, dict):
+            context["fomo_manifestation_context"] = trusted_fomo_context
+            context["analysis_type"] = "fomo_manifestation"
+            context["intent"] = intent
+
         _chat_log_event(
             "chat_processing_phase",
             message_id=message_id,
@@ -3658,6 +3716,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 and not partnership_mode
                 and not partner_birth_details
                 and not is_all_events_question
+                and not fomo_chat_active
             ):
                 _store_engagement_updates_now(
                     message_id,
@@ -3690,6 +3749,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 and not partnership_mode
                 and not partner_birth_details
                 and not is_all_events_question
+                and not fomo_chat_active
             ):
                 asyncio.create_task(
                     _start_wait_side_conversation(
@@ -4268,11 +4328,35 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             message_id=source_mid,
                             platform="server",
                         )
+                if (
+                    isinstance(qc, dict)
+                    and qc.get("source") == "homepage_fomo"
+                    and qc.get("fomo_snapshot_id")
+                    and qc.get("fomo_presentation_id")
+                ):
+                    from prediction_engine.fomo_repository import FomoSnapshotRepository
+
+                    FomoSnapshotRepository().record_event(
+                        userid=int(user_id),
+                        event_id=(
+                            f"fomo:{qc['fomo_snapshot_id']}:{qc['fomo_presentation_id']}"
+                            f":answer_completed:{message_id}"
+                        ),
+                        snapshot_id=str(qc["fomo_snapshot_id"]),
+                        presentation_id=str(qc["fomo_presentation_id"]),
+                        event_type="answer_completed",
+                        metadata={
+                            "message_id": int(message_id),
+                            "chat_tier": effective_chat_tier,
+                            "premium_analysis": bool(premium_analysis),
+                            "source": "homepage_fomo",
+                        },
+                    )
             except Exception:
                 logger.exception("funnel post-persist events failed message_id=%s", message_id)
         
         # Extract facts AFTER transaction commits to avoid database lock
-        if result.get('success') and birth_chart_id:
+        if result.get('success') and birth_chart_id and not fomo_chat_active:
             try:
                 fact_extractor = FactExtractor()
                 await fact_extractor.extract_facts(question, result['response'], birth_chart_id)

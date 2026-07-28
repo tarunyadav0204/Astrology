@@ -98,6 +98,14 @@ Without the edge router, `/mobile/` and `/mobile/index.html` still work from the
 
 Both open full-screen from the home icon when installed from `/mobile/`. If an old icon still opens the website, delete it and re-add from `https://astroroshni.com/mobile/`.
 
+**Why the PWA sometimes opened the website**  
+React Navigation linking included the bare site origin while running under `/mobile/`, so the Home route rewrote the address bar to `https://astroroshni.com/`. iOS/Android home-screen apps often restore that last URL on the next launch → CRA marketing site. Fixes:
+
+1. Keep linking prefixes / `getPathFromState` under `/mobile/` for the Expo shell.
+2. HTML boot guard rewrites dropped prefixes back under `/mobile/`.
+3. CRA `index.html` redirects **standalone** opens of `/` to `/mobile/` (recovers already-installed icons without reinstall).
+4. Edge router no longer strips `/mobile/` before canonicalizing (avoids flaky redirects).
+
 **Updates after deploy (no reinstall)**  
 Each export writes `/mobile/version.json` + stamps `window.__AR_WEB_BUILD__`. On open/focus, the home-screen app fetches `version.json` with `cache: no-store` and **reloads itself** when the build id changes. Users should **not** need to delete the iOS home-screen icon for normal deploys—just reopen the app (or switch back to it).
 

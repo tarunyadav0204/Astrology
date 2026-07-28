@@ -257,39 +257,42 @@ The checklist deliberately separates astrological facts, prediction policy, pres
 
 ## Phase 7 — Deterministic teaser presentation
 
-- [ ] Create a presentation adapter separate from calculation and policy.
-- [ ] Define deterministic templates by subject, event family, tone band, and time band.
-- [ ] Generate a title, teaser, date band, and suggested editable question without an LLM.
-- [ ] Keep the unrevealed outcome out of the teaser.
-- [ ] Avoid exact promises and certainty language.
-- [ ] Avoid fear, threats, coercion, and loss-framed conversion tactics.
-- [ ] Support localization without changing prediction evidence.
-- [ ] Return fallback copy when a translation is unavailable.
-- [ ] Add snapshot tests for every template family and supported language.
-- [ ] Review copy for clarity, repetition, and inappropriate specificity.
+- [x] Create a presentation adapter separate from calculation and policy.
+- [x] Define deterministic templates by subject, broad manifestation domain, and tone band.
+- [x] Generate a FOMO-safe title, curiosity teaser, and suggested editable question without an LLM.
+- [x] Always name the broad activated life areas in combined teasers for every subject; conceal the exact manifestation, not the topic itself.
+- [x] Derive relative-card teaser areas from the manifestation's actual subject-relative houses, so the same native house is correctly read differently for Self, Spouse, Mother, and Father.
+- [x] Omit the date band from the FOMO presentation by product decision.
+- [x] Keep the unrevealed manifestation, houses, planets, dashas, and dates out of the teaser.
+- [x] Avoid exact promises and certainty language.
+- [x] Avoid fear, threats, coercion, and loss-framed conversion tactics.
+- [x] Support explicit English and Hindi localization without changing prediction evidence.
+- [x] Fail closed when a locale, subject, or domain template is unavailable; do not return fallback copy.
+- [x] Add exhaustive tests for every subject, domain, tone, and supported language.
+- [x] Review copy for clarity, repetition, and inappropriate specificity.
 
 ### Phase 7 exit gate
 
-- [ ] Every eligible candidate produces safe, deterministic, localized teaser content with no LLM call.
+- [x] Every resolved chart manifestation produces safe, deterministic, localized teaser content with no LLM call.
 
 ## Phase 8 — Persistence, caching, and APIs
 
-- [ ] Add a `parashari_prediction_snapshots` migration.
-- [ ] Store user, chart, calculation/profile versions, horizon, evidence signature, candidates, creation time, and expiry.
-- [ ] Add ownership-preserving birth-chart deletion behavior.
-- [ ] Add retention rules for expired snapshots and large evidence payloads.
-- [ ] Add a `parashari_prediction_funnel_events` migration.
-- [ ] Support idempotent `shown`, `opened`, `dismissed`, `question_prefilled`, `question_sent`, and `answer_completed` events.
+- [x] Add a `parashari_prediction_snapshots` migration.
+- [x] Store user, chart, calculation/profile versions, horizon, evidence signature, candidates, creation time, and expiry.
+- [x] Cascade snapshot deletion when its owning user or birth chart is deleted.
+- [x] Retain snapshots for 14 days and opportunistically delete expired payloads.
+- [x] Add a `parashari_prediction_funnel_events` migration.
+- [x] Accept idempotent `shown`, `opened`, `dismissed`, `question_prefilled`, `question_sent`, and `answer_completed` events.
 - [ ] Add `credits_purchased` attribution only if product policy later requires it.
-- [ ] Add repository implementations using the existing database abstraction.
-- [ ] Add an authenticated endpoint to fetch eligible homepage teasers.
-- [ ] Add authenticated impression, open, dismiss, and question-send endpoints.
-- [ ] Verify user and birth-chart ownership on every endpoint.
-- [ ] Never return the complete private evidence ledger to the homepage client.
-- [ ] Cache by chart hash, as-of date, horizon, profile version, provider versions, and ephemeris settings.
-- [ ] Invalidate cache when birth data, calculation version, profile, or relevant timing boundary changes.
-- [ ] Add request timeouts, payload limits, structured logs, and metrics.
-- [ ] Make the API return quickly from cache and support background generation on a miss.
+- [x] Add repository implementations using the existing database abstraction.
+- [x] Add an authenticated endpoint to fetch eligible homepage teasers.
+- [x] Add authenticated impression, open, dismiss, opt-out, and question-send endpoints.
+- [x] Verify user, birth-chart, snapshot, and teaser ownership on every endpoint.
+- [x] Never return the complete private evidence ledger to the homepage client.
+- [x] Cache by chart hash, as-of date, horizon, profile version, provider versions, ephemeris settings, locale, and presentation policy.
+- [x] Invalidate cache when birth data, calculation version, profile, locale, presentation policy, or relevant timing date changes.
+- [x] Add a 30-second request timeout, event payload limit, and structured failure logs.
+- [ ] Move cold-cache generation to a durable background job; cache hits already return directly.
 
 ### Phase 8 exit gate
 
@@ -297,38 +300,60 @@ The checklist deliberately separates astrological facts, prediction policy, pres
 
 ## Phase 9 — Trusted click-to-chat explanation
 
-- [ ] Extend normalized `query_context` to preserve a server-issued teaser/candidate ID.
-- [ ] Open chat with the candidate's suggested question prefilled and editable.
-- [ ] Keep the selected candidate ID until that question is sent or abandoned.
-- [ ] Resolve the candidate ID server-side and verify user/chart ownership and expiry.
-- [ ] Load the original deterministic evidence snapshot on the backend.
-- [ ] Feed the verified evidence into the existing Parashari chat pipeline.
-- [ ] Instruct the LLM to explain the supplied candidate rather than invent a new event.
-- [ ] Prevent the LLM from naming unsupported dasha chains, aspects, houses, or dates.
-- [ ] Handle an expired or invalid candidate by recalculating or giving a clear recoverable response.
-- [ ] Record question-sent and answer-completed funnel events idempotently.
+- [x] Extend normalized `query_context` to preserve server-issued snapshot, presentation, and manifestation IDs.
+- [x] Open chat with the manifestation's suggested question prefilled and editable.
+- [x] Keep the selected manifestation context until that question is successfully sent.
+- [x] Resolve snapshot and presentation IDs server-side and verify user/chart ownership and expiry before opening chat.
+- [x] Load the original deterministic evidence snapshot on the backend.
+- [x] Feed the verified evidence into the existing Parashari chat pipeline.
+- [x] Use deterministic evidence to bound the selected subject, themes, active houses, timing, and outcome conditions.
+- [x] Let the FOMO LLM synthesize ranked concrete events from coherent pairs, triples, and the full same-window active-house cluster instead of treating deterministic candidate copy as exhaustive.
+- [x] Keep event scenarios traceable to multiple supplied houses or the declared delivery chain, and rank full-cluster/shared-carrier scenarios first.
+- [x] Prevent the LLM from naming unsupported dasha chains, aspects, houses, or dates.
+- [x] Route clicked teasers through a dedicated no-clarification FOMO manifestation mode.
+- [x] Reuse the selected Premium/Standard chat mode, default to Standard, and suppress the mode-entry sheet.
+- [x] Keep the normal ChatContextBuilder methodology and guardrails, while making the selected FOMO evidence authoritative for answer focus.
+- [x] Ground all FOMO answer tense in today's date and the snapshot as-of date.
+- [x] Distinguish an event-delivery window from MD/AD/PD boundaries and prohibit invented dasha transitions or durations.
+- [x] Keep temporal and evidence-scope enforcement language-neutral in the structured context and LLM contract; do not rewrite generated prose with language-specific keyword rules.
+- [x] Ask what may manifest in the next few months and when, rather than asking for a general chart lesson.
+- [x] Use a FOMO-only response schema instead of the normal broad multi-school schema.
+- [x] Make concrete possible developments the dominant FOMO answer section and keep astrological method compact and subordinate.
+- [x] Require the complete selected MD–AD–PD chain and a distinct explanation of PD as the immediate delivery layer.
+- [x] Keep normal-chat schema and system-instruction assembly unchanged; isolate all prompt changes behind `FOMO_MANIFESTATION_DETAIL`.
+- [x] Give a clear recoverable response when the selected presentation is expired or invalid.
+- [x] Record question-sent from the client after accepted submission and answer-completed authoritatively from the server.
 - [ ] Add tests for altered client context, another user's candidate ID, deleted charts, expired snapshots, retries, and duplicate sends.
 
 ### Phase 9 exit gate
 
-- [ ] A clicked teaser always resolves to the same server-owned evidence and produces an evidence-grounded chat request.
+- [x] A clicked teaser always resolves to the same server-owned evidence and produces an evidence-grounded chat request.
 
 ## Phase 10 — Homepage app/PWA experience
 
-- [ ] Add the event teaser to the existing one-prompt-per-home-visit arbiter.
-- [ ] Confirm priority after critical notices and the first-free-question prompt.
-- [ ] Do not independently open a modal that competes with existing home prompts.
-- [ ] Add a bottom sheet with up to three ranked, non-duplicative tiles.
-- [ ] Show loading only when useful; never block homepage interaction while calculating.
-- [ ] Add empty, unavailable, stale, and calculation-error states.
-- [ ] Add “Not now” and “Don't show these” controls.
-- [ ] Apply a configurable 5–7 day display cooldown.
-- [ ] Allow an earlier display only when the evidence signature changes materially.
-- [ ] Record an impression only when the sheet/tile was actually visible.
-- [ ] Open standard chat and prefill the suggested question when a tile is selected.
-- [ ] Preserve first-free-question Standard-mode behavior.
-- [ ] Verify responsive layout, scrolling, safe areas, dark mode, accessibility labels, and keyboard navigation.
-- [ ] Add localization keys for every visible string.
+- [x] Add the event teaser to the existing one-prompt-per-home-visit arbiter.
+- [x] Place it after critical informational notices and the first-free-question prompt.
+- [x] Do not independently open a modal that competes with existing home prompts.
+- [x] Add an opaque, scrollable bottom sheet of non-overlapping resolved themes, grouped by subject with explicit Self/Spouse/Mother/Father labels; collapse both identical copy and repeated life-area domains while retaining the highest-ranked evidence.
+- [x] Batch FOMO impression events into one request/transaction and serialize legacy analytics writes so this best-effort path can consume at most one API DB connection.
+- [x] Keep homepage interaction available while the teaser request is running; do not open a loading modal.
+- [x] Keep empty, disabled, cooldown, unsupported-language, and calculation-error states silent on the homepage.
+- [x] Keep a safe “Not now” dismissal; remove the permanent “Don't show these again” action and ignore historic accidental opt-outs.
+- [x] Apply a seven-day server-side cooldown when the ranked FOMO set is unchanged.
+- [x] Allow a materially changed ranked set after a global 48-hour quiet period.
+- [x] Persist first-free-question and monthly-events prompt exposure per account so cadence is consistent across devices.
+- [x] Show the first-free-question prompt only once and the monthly-events prompt at most once every 15 days.
+- [x] After the first-free prompt, defer FOMO until a new app session or 12 hours have elapsed.
+- [x] Add a permanent localized homepage entry below the ticker so chart themes remain discoverable during automatic-popup cooldown.
+- [x] On supported Android devices, follow FOMO dismissal with a localized notification opt-in only when OS permission is not already granted; do not interrupt the click-to-chat path.
+- [x] Bound homepage FOMO concurrency outside the shared AnyIO worker pool, serialize auxiliary prompt/funnel DB work, cap the feature at three of four pooled connections, and fail quietly before optional work can consume critical capacity.
+- [x] Use expiring distributed generation leases so only one worker/VM computes a missing cache key.
+- [x] Keep timed-out work inside the bounded FOMO executor until it really completes, throttle retention cleanup, and bulk-persist teaser rows.
+- [x] Record impressions only after the sheet and tiles become visible.
+- [x] Open standard chat and prefill the editable suggested question when a tile is selected.
+- [x] Preserve first-free-question Standard-mode behavior by giving that prompt higher priority.
+- [x] Add responsive scrolling, safe-area spacing, opaque light/dark surfaces, accessibility labels, and keyboard handling.
+- [x] Add explicit English and Hindi localization; do not show the feature under an unsupported locale.
 - [ ] Test Android app and installed PWA separately.
 
 ### Phase 10 exit gate
@@ -395,7 +420,7 @@ The checklist deliberately separates astrological facts, prediction policy, pres
 
 ## Phase 14 — Rollout
 
-- [ ] Add backend and frontend feature flags.
+- [x] Add a backend-enforced homepage FOMO feature flag and admin controls for enabled/disabled plus an optional user-ID allowlist.
 - [ ] Enable only for internal users first.
 - [ ] Run internal app/PWA smoke tests with several charts and languages.
 - [ ] Review traces for every internally opened teaser.
@@ -453,6 +478,6 @@ The checklist deliberately separates astrological facts, prediction policy, pres
 - [ ] Every candidate explains its houses, planets, timing window, activation strength, and outcome tone.
 - [ ] New providers can be added without modifying engine orchestration.
 - [ ] Homepage teasers reveal curiosity-oriented copy but not unsupported outcomes.
-- [ ] Chat explanations use the exact trusted evidence behind the clicked teaser.
+- [x] Chat explanations use the exact trusted evidence behind the clicked teaser.
 - [ ] App/PWA funnel, opt-out, safety, performance, and operational controls are live.
 - [ ] Documentation, tests, migrations, monitoring, rollout record, and rollback procedure are complete.

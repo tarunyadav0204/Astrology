@@ -18,7 +18,7 @@ import { useCredits } from '../../credits/CreditContext';
 import { chartAPI, pricingAPI, relationshipAPI } from '../../services/api';
 import { useAuthGate } from '../../auth/AuthGateContext';
 import { storage } from '../../services/storage';
-import { generateRelationshipReportPDF, getLogoDataUriForModule, sharePDFOnWhatsApp } from '../../utils/pdfGenerator';
+import { generateRelationshipReportPDF, getLogoDataUriForModule, sharePDFOnWhatsApp, userFacingPdfExportError } from '../../utils/pdfGenerator';
 
 const CLIMATE_COLORS = {
   highly_favorable: '#16a34a',
@@ -341,7 +341,7 @@ export default function RelationshipMatchScreen({ navigation, route }) {
       await sharePDFOnWhatsApp(pdfUri);
     } catch (error) {
       console.error('Relationship report export failed:', error);
-      Alert.alert(t('relationshipMatch.downloadErrorTitle'), error?.message || t('relationshipMatch.downloadErrorBody'));
+      Alert.alert(t('relationshipMatch.downloadErrorTitle'), userFacingPdfExportError(error));
     } finally {
       setIsExportingPdf(false);
     }

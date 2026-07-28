@@ -11,7 +11,10 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from calculators.real_transit_calculator import RealTransitCalculator
-from prediction_engine.contracts import BirthChartInput, PredictionRequest
+from prediction_engine.contracts import (
+    BirthChartInput,
+    PredictionRequest,
+)
 from prediction_engine.errors import PredictionConfigurationError, PredictionInputError
 from prediction_engine.providers.base import EvidenceProvider
 from prediction_engine.registry import EvidenceProviderRegistry
@@ -125,7 +128,7 @@ def test_real_service_generates_traceable_deterministic_result():
     first = service.generate(request)
     second = service.generate(request)
 
-    assert first.schema_version == "prediction_engine.v18"
+    assert first.schema_version == "prediction_engine.v19"
     assert first.profile == "parashari_fomo_v1"
     assert first.evidence_signature == second.evidence_signature
     assert [row.manifestation_id for row in first.chart_manifestations] == [
@@ -134,6 +137,11 @@ def test_real_service_generates_traceable_deterministic_result():
     assert [c.candidate_id for c in first.candidates] == [
         c.candidate_id for c in second.candidates
     ]
+    assert [row.manifestation_id for row in first.fomo_presentations] == [
+        manifestation.manifestation_id
+        for manifestation in first.chart_manifestations
+    ]
+    assert first.fomo_presentations == second.fomo_presentations
     assert first.diagnostics["windows"] >= 1
     assert first.house_activations
     assert all({row.house for row in first.house_activations} == set(range(1, 13)) for _ in (0,))

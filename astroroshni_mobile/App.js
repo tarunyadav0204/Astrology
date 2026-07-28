@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
-import { NavigationContainer, getStateFromPath } from '@react-navigation/native';
+import { NavigationContainer, getPathFromState, getStateFromPath } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar, View, ActivityIndicator, Animated, Text, TouchableOpacity, Linking, ScrollView } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -94,26 +94,81 @@ import WebAlertProvider from './src/platform/WebAlertProvider';
 
 const Stack = createStackNavigator();
 
-/** Production Expo Web lives at /mobile; local `expo start --web` stays at /. */
+/** Production Expo Web lives at /mobile/; local `expo start --web` stays at /. */
+function isMobileWebShell() {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+  try {
+    if (typeof document !== 'undefined') {
+      const shell = document.documentElement?.getAttribute?.('data-ar-shell');
+      if (shell === 'expo-web') return true;
+    }
+    return /^\/mobile(\/|$)/.test(String(window.location?.pathname || ''));
+  } catch (_) {
+    return false;
+  }
+}
+
 function getWebLinkingPrefixes() {
   if (typeof window === 'undefined' || !window.location?.origin) {
     return [];
   }
   const origin = window.location.origin;
-  const underMobile =
-    Platform.OS === 'web' &&
-    /^\/mobile(\/|$)/.test(String(window.location.pathname || ''));
-  return underMobile ? [`${origin}/mobile`, origin] : [origin, `${origin}/mobile`];
+  // Never include bare origin while inside /mobile/ — React Navigation would rewrite
+  // Home ('') to `/`, and the next PWA launch can restore the CRA website.
+  if (isMobileWebShell()) {
+    return [`${origin}/mobile`];
+  }
+  return [origin];
+}
+
+function ensureMobileWebPath(path) {
+  const clean = String(path || '').replace(/^\/+/, '');
+  return clean ? `/mobile/${clean}` : '/mobile/';
+}
+
+/** Keep history URL under /mobile/ if navigation ever drops the prefix. */
+function guardMobileWebHistoryUrl() {
+  if (!isMobileWebShell() || typeof window === 'undefined' || !window.history?.replaceState) {
+    return;
+  }
+  try {
+    const path = String(window.location?.pathname || '');
+    if (path === '/mobile' || path === '/mobile/') return;
+    if (path === '/' || path === '') {
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `/mobile/${window.location.search || ''}${window.location.hash || ''}`,
+      );
+      return;
+    }
+    if (
+      path.startsWith('/') &&
+      !path.startsWith('/mobile/') &&
+      !path.startsWith('/_expo') &&
+      !path.startsWith('/api')
+    ) {
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `/mobile${path}${window.location.search || ''}${window.location.hash || ''}`,
+      );
+    }
+  } catch (_) {
+    /* ignore */
+  }
 }
 
 const linking = {
   prefixes: [
     'https://astroroshni.com/mobile',
     'https://www.astroroshni.com/mobile',
-    'https://astroroshni.com',
-    'https://www.astroroshni.com',
     'astroroshni://',
     ...getWebLinkingPrefixes(),
+    // Keep site-root prefixes last and only for native / local web deep links.
+    ...(isMobileWebShell()
+      ? []
+      : ['https://astroroshni.com', 'https://www.astroroshni.com']),
   ],
   config: {
     screens: {
@@ -157,6 +212,13 @@ const linking = {
       '/policy': '/about',
     };
     return getStateFromPath(pathAliases[normalizedPath] || raw, options);
+  },
+  getPathFromState(state, options) {
+    const path = getPathFromState(state, options);
+    if (isMobileWebShell()) {
+      return ensureMobileWebPath(path);
+    }
+    return path;
   },
 };
 const APP_CONFIG_FETCH_TIMEOUT_MS = 6000;
@@ -259,6 +321,19 @@ export default function App() {
     bootstrap();
 
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return undefined;
+    guardMobileWebHistoryUrl();
+    const onNav = () => guardMobileWebHistoryUrl();
+    window.addEventListener('popstate', onNav);
+    // Catch delayed history writes from React Navigation after first paint.
+    const timer = setInterval(guardMobileWebHistoryUrl, 1500);
+    return () => {
+      window.removeEventListener('popstate', onNav);
+      clearInterval(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -688,8 +763,12 @@ export default function App() {
               <ErrorBoundary>
               <NavigationContainer
                 linking={linking}
-                onStateChange={trackNavigationRoute}
+                onStateChange={(state) => {
+                  trackNavigationRoute(state);
+                  guardMobileWebHistoryUrl();
+                }}
                 onReady={() => {
+                  guardMobileWebHistoryUrl();
                   if (navigationRef.current) {
                     trackNavigationRoute(navigationRef.current.getRootState());
                   }

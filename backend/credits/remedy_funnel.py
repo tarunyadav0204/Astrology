@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo
 
 from db import execute, get_conn
 
@@ -42,6 +44,13 @@ def ensure_remedy_funnel_table(conn) -> None:
     )
 
 
+def ensure_remedy_funnel_schema() -> None:
+    """Startup/deployment fallback; never call this from an analytics request."""
+    with get_conn() as conn:
+        ensure_remedy_funnel_table(conn)
+        conn.commit()
+
+
 def record_funnel_event(
     *,
     userid: int,
@@ -55,11 +64,15 @@ def record_funnel_event(
         raise ValueError(f"invalid event_name={event_name!r}")
     uid = int(userid)
     mid = (str(message_id or "").strip() or None)
+    if name == "card_shown":
+        # One exposure per user/day, regardless of how many historical answers
+        # with remedy cards are mounted by this or an older client.
+        local_day = datetime.now(ZoneInfo(_ADMIN_TZ)).date().isoformat()
+        mid = f"chat_screen:{local_day}"
     plat = (str(platform or "").strip() or None)
     if plat:
         plat = plat[:40]
     with get_conn() as conn:
-        ensure_remedy_funnel_table(conn)
         try:
             cur = execute(
                 conn,
@@ -127,8 +140,9 @@ def get_funnel_analytics(
     Cohort funnel keyed by recorded remedy-card impressions.
 
     Date range filters when the card impression was recorded (IST calendar day).
-    Clicks and deliveries count only when they match the same user and source
-    message; they may occur after the selected range.
+    A card impression is recorded once per chat session/day. Clicks and remedy
+    delivery are therefore matched to the exposed user after that exposure,
+    rather than to every remedy-bearing answer message.
     """
     date_clauses, date_params = _inclusive_date_clause(
         from_date, to_date, "s.created_at"
@@ -136,12 +150,17 @@ def get_funnel_analytics(
     cohort_where = " AND ".join(["s.event_name = 'card_shown'", *date_clauses])
 
     with get_conn() as conn:
-        ensure_remedy_funnel_table(conn)
-
         cur = execute(
             conn,
             f"""
-            SELECT COUNT(DISTINCT s.userid) AS users, COUNT(*) AS events
+            SELECT
+                COUNT(DISTINCT s.userid) AS users,
+                COUNT(
+                    DISTINCT (
+                        s.userid,
+                        (s.created_at AT TIME ZONE '{_ADMIN_TZ}')::date
+                    )
+                ) AS events
             FROM remedy_funnel_events s
             WHERE {cohort_where}
             """,
@@ -156,15 +175,22 @@ def get_funnel_analytics(
             cur2 = execute(
                 conn,
                 f"""
-                SELECT COUNT(DISTINCT s.userid) AS users, COUNT(*) AS events
-                FROM remedy_funnel_events s
+                WITH shown_cohort AS (
+                    SELECT s.userid, MIN(s.created_at) AS first_shown_at
+                    FROM remedy_funnel_events s
+                    WHERE {cohort_where}
+                    GROUP BY s.userid
+                )
+                SELECT
+                    COUNT(DISTINCT c.userid) AS users,
+                    COUNT(DISTINCT e.id) AS events
+                FROM shown_cohort c
                 INNER JOIN remedy_funnel_events e
-                  ON e.userid = s.userid
-                 AND COALESCE(e.message_id, '') = COALESCE(s.message_id, '')
+                  ON e.userid = c.userid
                  AND e.event_name = ?
-                WHERE {cohort_where}
+                 AND e.created_at >= c.first_shown_at
                 """,
-                (event_name, *date_params),
+                (*date_params, event_name),
             )
             row = cur2.fetchone() or (0, 0)
             return int(row[0] or 0), int(row[1] or 0)

@@ -17,8 +17,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
+import { userFacingPdfExportError } from '../../utils/pdfExportMessages';
 import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
@@ -188,15 +187,27 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
     if (selectedChartId && !loading && !isChangingChart) {
       checkExistingAnalysis();
     }
+  }, [selectedChartId, isChangingChart]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (Platform.OS === 'web') {
+      fadeAnim.setValue(1);
+      return;
+    }
+    fadeAnim.setValue(0);
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 1000,
+      duration: 500,
       useNativeDriver: true,
     }).start();
+  }, [loading, analysis, error]);
+
+  useEffect(() => {
     return () => {
       if (pollingInterval) clearInterval(pollingInterval);
     };
-  }, [selectedChartId, isChangingChart]);
+  }, [pollingInterval]);
 
   useEffect(() => {
     if (!analysis) return;
@@ -571,33 +582,22 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           </body>
         </html>
       `;
-      
-      console.log('[PDF] HTML generated, calling printToFileAsync...');
-      const { uri } = await Promise.race([
-        Print.printToFileAsync({ html }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error(i18n.t('karmaAnalysis.pdfTimeoutError'))), 30000)
-        )
-      ]);
-      
-      console.log('[PDF] Generated successfully:', uri);
-      console.log('[PDF] Sharing...');
-      
-      await Sharing.shareAsync(uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: uiText.pdfShareTitle,
-        UTI: 'com.adobe.pdf',
-      });
-      
-      console.log('[PDF] Share completed');
-      setGeneratingPDF(false);
+
+      console.log('[PDF] HTML generated, exporting...');
+      const { exportHtmlAsPdf, sharePDFOnWhatsApp, PDF_PRINT_STYLES } = await import('../../utils/pdfGenerator');
+      const htmlWithPrintStyles = html.replace('</style>', `${PDF_PRINT_STYLES}\n            </style>`);
+      const pdfUri = await exportHtmlAsPdf(htmlWithPrintStyles, { timeoutMs: 30000 });
+
+      console.log('[PDF] Generated successfully:', pdfUri || '(web print dialog)');
+      await sharePDFOnWhatsApp(pdfUri, { dialogTitle: uiText.pdfShareTitle });
     } catch (error) {
       console.error('[PDF] Error:', error);
-      setGeneratingPDF(false);
       Alert.alert(
         t('karmaAnalysis.pdfErrorTitle'),
-        t('karmaAnalysis.pdfErrorBody', { message: error.message })
+        userFacingPdfExportError(error)
       );
+    } finally {
+      setGeneratingPDF(false);
     }
   };
 
@@ -672,7 +672,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <LinearGradient colors={screenGradient} style={StyleSheet.absoluteFill} />
         {renderKarmaTopBar({ rightSlot: <View style={styles.headerRightSpacer} /> })}
-        <Animated.View style={[styles.loadingContainer, { opacity: fadeAnim }]}>
+        <Animated.View style={[styles.loadingContainer, { opacity: Platform.OS === 'web' ? 1 : fadeAnim }]}>
           <View style={[styles.cosmicLoader, { backgroundColor: isDark ? 'rgba(255,215,0,0.1)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.3)' : colors.cardBorder }]}>
             <Text style={styles.omSymbol}>🕉️</Text>
           </View>
@@ -835,7 +835,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           contentContainerStyle={styles.scrollContent}
           bounces={true}
         >
-          <Animated.View style={{ opacity: fadeAnim }}>
+          <Animated.View style={{ opacity: Platform.OS === 'web' ? 1 : fadeAnim }}>
             <View style={[styles.headerContainer, { backgroundColor: isDark ? 'rgba(255,215,0,0.08)' : colors.surface }]}>
               <View style={[styles.headerGlow, { backgroundColor: isDark ? 'rgba(255,215,0,0.15)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.3)' : colors.cardBorder }]}>
                 <Text style={styles.omHeader}>🕉️</Text>

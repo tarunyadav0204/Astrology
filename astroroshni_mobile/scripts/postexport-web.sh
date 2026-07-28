@@ -163,6 +163,37 @@ if '/mobile/manifest.webmanifest' not in html:
 elif 'apple-mobile-web-app-title' not in html:
     html = html.replace('</head>', head_bits + '</head>', 1)
 
+# Keep Expo shell URLs under /mobile/ even before React mounts.
+# React Navigation used to rewrite Home to `/`, and the next PWA launch restored CRA.
+boot_guard = '''
+<script>
+(function () {
+  try {
+    var path = location.pathname || '';
+    var suffix = (location.search || '') + (location.hash || '');
+    if (path === '/mobile') {
+      location.replace('/mobile/' + suffix);
+      return;
+    }
+    if (document.documentElement && document.documentElement.getAttribute('data-ar-shell') === 'expo-web') {
+      if (path === '/' || path === '') {
+        history.replaceState(history.state, '', '/mobile/' + suffix);
+      } else if (
+        path.charAt(0) === '/' &&
+        path.indexOf('/mobile/') !== 0 &&
+        path.indexOf('/_expo') !== 0 &&
+        path.indexOf('/api') !== 0
+      ) {
+        history.replaceState(history.state, '', '/mobile' + path + suffix);
+      }
+    }
+  } catch (e) {}
+})();
+</script>
+'''
+if "getAttribute('data-ar-shell')" not in html:
+    html = html.replace('</head>', boot_guard + '</head>', 1)
+
 # Stamp build id for client update checks (works on iOS A2HS without deleting the icon).
 if 'window.__AR_WEB_BUILD__' not in html:
     html = html.replace(

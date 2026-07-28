@@ -13,6 +13,47 @@ def test_remedy_funnel_record_invalid_event():
         pass
 
 
+def test_card_shown_is_normalized_to_one_user_day_and_runs_no_ddl(monkeypatch):
+    statements = []
+    inserted_params = []
+
+    class FakeCur:
+        def fetchone(self):
+            return (123,)
+
+    class FakeConn:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def commit(self):
+            return None
+
+        def rollback(self):
+            return None
+
+    def fake_execute(_conn, sql, params=None):
+        statements.append(sql)
+        inserted_params.append(tuple(params or ()))
+        return FakeCur()
+
+    monkeypatch.setattr("credits.remedy_funnel.get_conn", FakeConn)
+    monkeypatch.setattr("credits.remedy_funnel.execute", fake_execute)
+
+    assert record_funnel_event(
+        userid=18,
+        event_name="card_shown",
+        message_id="answer-1",
+        platform="web",
+    )
+    assert len(statements) == 1
+    assert "CREATE TABLE" not in statements[0]
+    assert "CREATE INDEX" not in statements[0]
+    assert inserted_params[0][1].startswith("chat_screen:")
+
+
 def test_inclusive_date_clause():
     clauses, params = _inclusive_date_clause("2026-06-24", "2026-07-24", "cm.completed_at")
     assert clauses == [

@@ -654,7 +654,7 @@ def ensure_users_userid_default() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle (replaces on_event)."""
-    credits_settings_poll_task = None
+    admin_settings_poll_task = None
     logger.debug("startup_begin")
 
     def _startup_step(name: str, fn, success_message: str):
@@ -711,13 +711,23 @@ async def lifespan(app: FastAPI):
                 lambda: __import__("subscription_tier_migration", fromlist=["ensure_subscription_tier_schema"]).ensure_subscription_tier_schema(),
                 "subscription tier schema ready",
             )
+            _startup_step(
+                "ensure_remedy_funnel_schema",
+                lambda: __import__(
+                    "credits.remedy_funnel",
+                    fromlist=["ensure_remedy_funnel_table"],
+                ).ensure_remedy_funnel_schema(),
+                "remedy funnel schema ready",
+            )
             try:
                 from utils.admin_settings import migrate_deprecated_gemini_model_ids_on_startup
-                from utils.admin_settings import poll_credits_settings_version_forever
+                from utils.admin_settings import poll_admin_settings_version_forever
+                from utils.admin_settings import refresh_admin_settings_cache
 
                 migrate_deprecated_gemini_model_ids_on_startup()
-                credits_settings_poll_task = asyncio.create_task(poll_credits_settings_version_forever())
-                logger.debug("startup_step_ok step=admin_settings_migration_and_poll message=admin settings migrations complete")
+                refresh_admin_settings_cache(force=True)
+                admin_settings_poll_task = asyncio.create_task(poll_admin_settings_version_forever())
+                logger.debug("startup_step_ok step=admin_settings_migration_and_poll message=admin settings cache primed and polling started")
             except Exception as e:
                 log_lifecycle_event(
                     "startup_step_failed",
@@ -756,10 +766,10 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         logger.debug("shutdown_lifespan_begin")
-        if credits_settings_poll_task is not None:
-            credits_settings_poll_task.cancel()
+        if admin_settings_poll_task is not None:
+            admin_settings_poll_task.cancel()
             try:
-                await credits_settings_poll_task
+                await admin_settings_poll_task
             except asyncio.CancelledError:
                 pass
         logger.debug("shutdown_lifespan_complete")

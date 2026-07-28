@@ -12,7 +12,7 @@ import uuid
 import requests
 from collections import OrderedDict
 from threading import Lock
-from auth import get_current_user, User
+from auth import get_best_effort_analytics_user_id, get_current_user, User
 from .credit_service import CreditService
 from .admin.promo_manager import PromoCodeManager
 from utils.env_json import parse_json_from_env
@@ -1372,14 +1372,20 @@ class RemedyFunnelEventBody(BaseModel):
 @router.post("/remedy-funnel/event")
 async def record_remedy_funnel_event(
     body: RemedyFunnelEventBody,
-    current_user: User = Depends(get_current_user),
+    analytics_user_id: Optional[int] = Depends(get_best_effort_analytics_user_id),
 ):
     """Client breadcrumb: card_shown | card_clicked (remedy_delivered is recorded server-side)."""
     from credits.remedy_funnel import record_funnel_event
 
+    if analytics_user_id is None:
+        return {
+            "ok": False,
+            "inserted": False,
+            "skipped": "database_busy",
+        }
     try:
         inserted = record_funnel_event(
-            userid=int(current_user.userid),
+            userid=int(analytics_user_id),
             event_name=body.event,
             message_id=body.message_id,
             platform=body.platform,
@@ -1387,8 +1393,16 @@ async def record_remedy_funnel_event(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.exception("remedy_funnel event failed user=%s", current_user.userid)
-        raise HTTPException(status_code=500, detail="Failed to record funnel event") from e
+        logger.warning(
+            "remedy_funnel event skipped user=%s error=%s",
+            analytics_user_id,
+            type(e).__name__,
+        )
+        return {
+            "ok": False,
+            "inserted": False,
+            "skipped": "temporarily_unavailable",
+        }
     return {"ok": True, "inserted": inserted}
 
 

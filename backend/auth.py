@@ -104,6 +104,45 @@ def get_optional_user(
         return None
 
 
+def get_best_effort_analytics_user_id(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Optional[int]:
+    """
+    Authenticate low-priority analytics without requiring a user-table lookup.
+
+    Modern signed login tokens already contain ``userid``. Legacy tokens fall
+    back to the normal user lookup, but return ``None`` when the database pool
+    is momentarily busy so analytics can be skipped without failing the app.
+    """
+    token = _extract_bearer_token(request, credentials)
+    if not token:
+        raise HTTPException(status_code=403, detail="Not authenticated")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        userid = int(payload.get("userid"))
+    except (TypeError, ValueError):
+        userid = 0
+    if userid > 0:
+        return userid
+
+    try:
+        user = get_current_user(request, credentials)
+        return int(user.userid)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        from psycopg2.pool import PoolError
+
+        if isinstance(exc, PoolError):
+            return None
+        raise
+
+
 def create_access_token_for_phone(phone: str, expire_minutes: int = 180) -> str:
     """
     Mint a JWT with `sub` = user phone (same shape as login) for server-side callers

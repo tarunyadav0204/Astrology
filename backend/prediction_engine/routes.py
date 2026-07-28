@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import logging
+import asyncio
+import time
+import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, model_validator
+from psycopg2.pool import PoolError
 from starlette.concurrency import run_in_threadpool
 
 from auth import User, get_current_user
@@ -13,14 +18,54 @@ from birth_charts.routes import _row_to_chart
 from credits.entitlements import ASTROLOGER_TOOLS_ENTITLEMENT, require_entitlement
 from db import execute, get_conn
 from utils.timezone_service import get_iana_timezone
+from utils.admin_settings import homepage_fomo_enabled_for_user
 
-from .contracts import BirthChartInput, PredictionRequest
+from .contracts import BirthChartInput, PredictionRequest, SCHEMA_VERSION
+from .engine import ENGINE_VERSION
 from .errors import PredictionEngineError
+from .fomo_presentation import normalize_fomo_locale
+from .fomo_presentation import FOMO_PRESENTATION_VERSION
+from .fomo_repository import (
+    FOMO_EVENT_TYPES,
+    HOMEPAGE_SELECTION_VERSION,
+    FomoSnapshotRepository,
+    birth_chart_hash,
+    snapshot_cache_key,
+)
+from .homepage_prompts import HOMEPAGE_PROMPT_KEYS, HomepagePromptRepository
+from .profiles import get_profile
 from .service import PredictionService
 
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/prediction-engine", tags=["prediction-engine"])
+fomo_repository = FomoSnapshotRepository()
+homepage_prompt_repository = HomepagePromptRepository()
+HOMEPAGE_FOMO_HORIZON_DAYS = 90
+HOMEPAGE_FOMO_MAXIMUM_RESULTS = 24
+# Prompt state, presentation reads, and analytics share one auxiliary DB slot.
+# Together with the two admitted homepage requests below, this feature can use
+# at most three of the API worker's four pooled connections.
+_FOMO_AUX_DB_SEMAPHORE = asyncio.Semaphore(1)
+_FOMO_AUX_DB_TIMEOUT_SECONDS = 0.1
+# FOMO is optional homepage work. Keep it in a dedicated executor and admit at
+# most two operations per API worker so the four-connection API pool retains
+# capacity for chat, credits, and other critical requests.
+_FOMO_REQUEST_SEMAPHORE = asyncio.Semaphore(2)
+_FOMO_EXECUTOR = ThreadPoolExecutor(
+    max_workers=2,
+    thread_name_prefix="homepage-fomo",
+)
+_FOMO_ADMISSION_TIMEOUT_SECONDS = 0.05
+_FOMO_CALCULATION_TIMEOUT_SECONDS = 30
+_FOMO_CLEANUP_INTERVAL_SECONDS = 60 * 60
+_FOMO_CLEANUP_RETRY_SECONDS = 5 * 60
+_FOMO_CLEANUP_LOCK = asyncio.Lock()
+_fomo_cleanup_next_at = 0.0
+
+
+class FomoGenerationInProgress(RuntimeError):
+    """Another worker currently owns generation for the same cache key."""
 
 
 class ActivationExplorerRequest(BaseModel):
@@ -30,12 +75,38 @@ class ActivationExplorerRequest(BaseModel):
     horizon_days: int = Field(default=90, ge=1, le=366)
     maximum_candidates: int = Field(default=100, ge=1, le=100)
     trace: bool = True
+    language: str = "en"
 
     @model_validator(mode="after")
     def require_chart_source(self):
         if self.birth_chart_id is None and not self.birth_data:
             raise ValueError("birth_chart_id or birth_data is required")
         return self
+
+
+class FomoEventItem(BaseModel):
+    event_id: str = Field(min_length=8, max_length=120)
+    presentation_id: Optional[str] = Field(default=None, max_length=120)
+    event_type: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class FomoEventRequest(FomoEventItem):
+    snapshot_id: str = Field(min_length=8, max_length=120)
+
+
+class FomoEventBatchRequest(BaseModel):
+    snapshot_id: str = Field(min_length=8, max_length=120)
+    events: List[FomoEventItem] = Field(min_length=1, max_length=50)
+
+
+class FomoPreferenceRequest(BaseModel):
+    homepage_disabled: bool
+
+
+class HomepagePromptShownRequest(BaseModel):
+    prompt_key: str
+    session_id: Optional[str] = Field(default=None, max_length=120)
 
 
 def _load_owned_birth_chart(chart_id: int, user_id: int) -> Dict[str, Any]:
@@ -55,6 +126,27 @@ def _load_owned_birth_chart(chart_id: int, user_id: int) -> Dict[str, Any]:
     if not row:
         raise HTTPException(status_code=404, detail="Birth chart not found")
     return _row_to_chart(row)
+
+
+def _load_homepage_birth_chart(user_id: int) -> Optional[Dict[str, Any]]:
+    with get_conn() as conn:
+        cursor = execute(
+            conn,
+            """
+            SELECT id, userid, name, date, time, latitude, longitude, timezone,
+                   created_at, place, gender, relation, relation_order,
+                   relation_side, relation_label, is_family_member
+            FROM birth_charts
+            WHERE userid = %s
+            ORDER BY
+                CASE WHEN LOWER(COALESCE(relation, '')) = 'self' THEN 0 ELSE 1 END,
+                created_at DESC
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        row = cursor.fetchone()
+    return _row_to_chart(row) if row else None
 
 
 def _normalise_birth_data(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -84,6 +176,7 @@ def _generate_activation_dossier(payload: ActivationExplorerRequest, chart: Dict
             maximum_candidates=payload.maximum_candidates,
             trace=payload.trace,
             exploration_mode=True,
+            language=payload.language,
         )
     )
     response = result.to_dict(include_evidence=payload.trace)
@@ -127,3 +220,423 @@ async def get_activation_explorer(
             status_code=500,
             detail="Activation calculation failed. No fallback result was generated.",
         ) from exc
+
+
+def _generate_homepage_fomo(
+    *,
+    userid: int,
+    chart: Dict[str, Any],
+    locale: str,
+    limit: int,
+    force_display: bool = False,
+    include_ineligible: bool = False,
+) -> Dict[str, Any]:
+    birth = BirthChartInput.from_mapping(_normalise_birth_data(chart))
+    profile = get_profile("parashari_fomo_v1")
+    chart_hash = birth_chart_hash(chart)
+    as_of = date.today()
+    cache_key = snapshot_cache_key(
+        userid=userid,
+        birth_chart_id=int(chart["id"]),
+        chart_hash=chart_hash,
+        as_of=as_of,
+        horizon_days=HOMEPAGE_FOMO_HORIZON_DAYS,
+        profile=profile.key,
+        profile_version=profile.version,
+        engine_version=ENGINE_VERSION,
+        schema_version=SCHEMA_VERSION,
+        locale=locale,
+        provider_versions=profile.provider_versions,
+        ephemeris_settings=profile.conventions.__dict__,
+        presentation_version=(
+            f"{FOMO_PRESENTATION_VERSION}:{HOMEPAGE_SELECTION_VERSION}"
+        ),
+    )
+    stored = fomo_repository.load_cached(
+        userid=userid,
+        cache_key=cache_key,
+        chart_name=str(chart.get("name") or ""),
+        limit=limit,
+    )
+    if stored is None:
+        generation_owner = uuid.uuid4().hex
+        claimed = fomo_repository.try_claim_generation(
+            cache_key=cache_key,
+            owner_token=generation_owner,
+        )
+        if not claimed:
+            raise FomoGenerationInProgress(
+                "Chart themes are already being generated"
+            )
+        try:
+            # A competing worker may have completed between the initial cache
+            # read and this lease acquisition.
+            stored = fomo_repository.load_cached(
+                userid=userid,
+                cache_key=cache_key,
+                chart_name=str(chart.get("name") or ""),
+                limit=limit,
+            )
+            if stored is None:
+                result = PredictionService().generate(
+                    PredictionRequest(
+                        birth=birth,
+                        as_of=as_of,
+                        horizon_days=HOMEPAGE_FOMO_HORIZON_DAYS,
+                        subjects=("self", "spouse", "mother", "father"),
+                        maximum_candidates=HOMEPAGE_FOMO_MAXIMUM_RESULTS,
+                        trace=True,
+                        exploration_mode=True,
+                        language=locale,
+                    )
+                )
+                stored = fomo_repository.save(
+                    userid=userid,
+                    birth_chart_id=int(chart["id"]),
+                    chart_name=str(chart.get("name") or ""),
+                    cache_key=cache_key,
+                    chart_hash=chart_hash,
+                    as_of=as_of,
+                    horizon_days=HOMEPAGE_FOMO_HORIZON_DAYS,
+                    locale=locale,
+                    result=result,
+                    limit=limit,
+                )
+        finally:
+            try:
+                fomo_repository.release_generation_claim(
+                    cache_key=cache_key,
+                    owner_token=generation_owner,
+                )
+            except Exception:
+                logger.warning(
+                    "Could not release FOMO generation lease cache=%s",
+                    cache_key[:12],
+                    exc_info=True,
+                )
+    if not stored.teasers:
+        return {"status": "empty", "teasers": []}
+    auto_eligible = bool(force_display or fomo_repository.eligible_for_display(
+        userid=userid,
+        display_signature=stored.display_signature,
+    ))
+    if not auto_eligible and not include_ineligible:
+        return {"status": "cooldown", "teasers": []}
+    return {
+        "status": "ready",
+        "auto_eligible": auto_eligible,
+        **stored.to_public_dict(),
+    }
+
+
+async def _admit_homepage_fomo() -> None:
+    try:
+        await asyncio.wait_for(
+            _FOMO_REQUEST_SEMAPHORE.acquire(),
+            timeout=_FOMO_ADMISSION_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Chart themes are busy. Please try again shortly.",
+        ) from exc
+
+
+async def _cleanup_expired_fomo_if_due() -> None:
+    global _fomo_cleanup_next_at
+    now = time.monotonic()
+    if now < _fomo_cleanup_next_at:
+        return
+    async with _FOMO_CLEANUP_LOCK:
+        now = time.monotonic()
+        if now < _fomo_cleanup_next_at:
+            return
+        # Advance before the DB call so concurrent requests never fan out
+        # cleanup writes. On failure, use a shorter bounded retry interval.
+        _fomo_cleanup_next_at = now + _FOMO_CLEANUP_INTERVAL_SECONDS
+        try:
+            await run_in_threadpool(fomo_repository.delete_expired)
+        except Exception:
+            _fomo_cleanup_next_at = time.monotonic() + _FOMO_CLEANUP_RETRY_SECONDS
+            logger.warning("Deferred FOMO cleanup failed", exc_info=True)
+
+
+async def _run_fomo_aux_db(func, /, *args, **kwargs):
+    try:
+        await asyncio.wait_for(
+            _FOMO_AUX_DB_SEMAPHORE.acquire(),
+            timeout=_FOMO_AUX_DB_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError as exc:
+        raise PoolError("FOMO auxiliary DB capacity is busy") from exc
+    try:
+        return await run_in_threadpool(func, *args, **kwargs)
+    finally:
+        _FOMO_AUX_DB_SEMAPHORE.release()
+
+
+@router.get("/homepage-fomo")
+async def get_homepage_fomo(
+    request: Request,
+    language: str = Query(default="en", min_length=2, max_length=16),
+    limit: int = Query(default=24, ge=1, le=24),
+    birth_chart_id: Optional[int] = Query(default=None, ge=1),
+    force_display: bool = Query(default=False),
+    include_ineligible: bool = Query(default=False),
+    current_user: User = Depends(get_current_user),
+):
+    """Return safe teaser copy only; the evidence snapshot remains server-side."""
+    capacity_owned_by_request = False
+    try:
+        if not homepage_fomo_enabled_for_user(current_user.userid):
+            return {"status": "disabled", "teasers": []}
+        locale = normalize_fomo_locale(language)
+        await _admit_homepage_fomo()
+        capacity_owned_by_request = True
+        await _cleanup_expired_fomo_if_due()
+        if birth_chart_id is not None:
+            chart = await run_in_threadpool(
+                _load_owned_birth_chart,
+                birth_chart_id,
+                current_user.userid,
+            )
+        else:
+            chart = await run_in_threadpool(
+                _load_homepage_birth_chart,
+                current_user.userid,
+            )
+        if not chart:
+            return {"status": "no_chart", "teasers": []}
+        client_host = str(request.client.host if request.client else "").strip()
+        local_force_display = bool(
+            force_display and client_host in {"127.0.0.1", "::1", "localhost"}
+        )
+        loop = asyncio.get_running_loop()
+        calculation = loop.run_in_executor(
+            _FOMO_EXECUTOR,
+            lambda: _generate_homepage_fomo(
+                userid=current_user.userid,
+                chart=chart,
+                locale=locale,
+                limit=limit,
+                force_display=local_force_display,
+                include_ineligible=include_ineligible,
+            ),
+        )
+        # Capacity follows the actual synchronous work, not the HTTP request.
+        # If the client disconnects or times out, the slot remains occupied until
+        # the bounded executor job really finishes.
+        calculation.add_done_callback(
+            lambda _future: _FOMO_REQUEST_SEMAPHORE.release()
+        )
+        capacity_owned_by_request = False
+        return await asyncio.wait_for(
+            asyncio.shield(calculation),
+            timeout=_FOMO_CALCULATION_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError as exc:
+        logger.warning(
+            "Homepage FOMO calculation timed out user=%s",
+            current_user.userid,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Chart themes are still being prepared. Please try again later.",
+        ) from exc
+    except FomoGenerationInProgress as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Chart themes are already being prepared. Please try again shortly.",
+        ) from exc
+    except PoolError as exc:
+        logger.warning(
+            "Homepage FOMO skipped because DB pool is busy user=%s",
+            current_user.userid,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Chart themes are temporarily unavailable.",
+        ) from exc
+    except HTTPException:
+        raise
+    except PredictionEngineError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception(
+            "Homepage FOMO failed user=%s",
+            current_user.userid,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not prepare chart themes.",
+        ) from exc
+    finally:
+        if capacity_owned_by_request:
+            _FOMO_REQUEST_SEMAPHORE.release()
+
+
+@router.get("/homepage-prompts/state")
+async def get_homepage_prompt_state(
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        prompts = await _run_fomo_aux_db(
+            homepage_prompt_repository.state,
+            current_user.userid,
+        )
+    except PoolError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Homepage prompt state is temporarily unavailable.",
+        ) from exc
+    return {"prompts": prompts}
+
+
+@router.post("/homepage-prompts/shown")
+async def record_homepage_prompt_shown(
+    payload: HomepagePromptShownRequest,
+    current_user: User = Depends(get_current_user),
+):
+    if payload.prompt_key not in HOMEPAGE_PROMPT_KEYS:
+        raise HTTPException(status_code=422, detail="Unsupported homepage prompt")
+    try:
+        state = await _run_fomo_aux_db(
+            homepage_prompt_repository.record_shown,
+            userid=current_user.userid,
+            prompt_key=payload.prompt_key,
+            session_id=payload.session_id,
+        )
+    except PoolError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Could not record homepage prompt exposure.",
+        ) from exc
+    return {"prompt_key": payload.prompt_key, "state": state}
+
+
+@router.get("/homepage-fomo/{presentation_id}")
+async def open_homepage_fomo(
+    presentation_id: str,
+    snapshot_id: str = Query(min_length=8, max_length=120),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        presentation = await _run_fomo_aux_db(
+            fomo_repository.load_owned_presentation,
+            userid=current_user.userid,
+            snapshot_id=snapshot_id,
+            presentation_id=presentation_id,
+        )
+    except PoolError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Chart theme is temporarily unavailable.",
+        ) from exc
+    if not presentation:
+        raise HTTPException(status_code=404, detail="Chart theme not found or expired")
+    return presentation
+
+
+@router.post("/homepage-fomo/events")
+async def record_homepage_fomo_event(
+    payload: FomoEventRequest,
+    current_user: User = Depends(get_current_user),
+):
+    if payload.event_type not in FOMO_EVENT_TYPES:
+        raise HTTPException(status_code=422, detail="Unsupported event type")
+    if len(_canonical_event_metadata(payload.metadata)) > 2000:
+        raise HTTPException(status_code=422, detail="Event metadata is too large")
+    try:
+        inserted = await _run_fomo_aux_db(
+            fomo_repository.record_event,
+            userid=current_user.userid,
+            event_id=payload.event_id,
+            snapshot_id=payload.snapshot_id,
+            presentation_id=payload.presentation_id,
+            event_type=payload.event_type,
+            metadata=payload.metadata,
+        )
+    except PoolError:
+        logger.warning(
+            "Dropped FOMO analytics event because DB pool is busy user=%s event=%s",
+            current_user.userid,
+            payload.event_type,
+        )
+        return {"recorded": False, "dropped": True, "reason": "database_busy"}
+    if not inserted:
+        try:
+            owned = await _run_fomo_aux_db(
+                fomo_repository.load_owned_presentation,
+                userid=current_user.userid,
+                snapshot_id=payload.snapshot_id,
+                presentation_id=payload.presentation_id or "",
+            ) if payload.presentation_id else True
+        except PoolError:
+            return {"recorded": False, "dropped": True, "reason": "database_busy"}
+        if not owned:
+            raise HTTPException(status_code=404, detail="Chart theme not found or expired")
+    return {"recorded": inserted}
+
+
+@router.post("/homepage-fomo/events/batch")
+async def record_homepage_fomo_events(
+    payload: FomoEventBatchRequest,
+    current_user: User = Depends(get_current_user),
+):
+    event_rows = []
+    for event in payload.events:
+        if event.event_type not in FOMO_EVENT_TYPES:
+            raise HTTPException(status_code=422, detail="Unsupported event type")
+        if len(_canonical_event_metadata(event.metadata)) > 2000:
+            raise HTTPException(status_code=422, detail="Event metadata is too large")
+        event_rows.append(event.model_dump())
+    if sum(len(_canonical_event_metadata(row["metadata"])) for row in event_rows) > 20000:
+        raise HTTPException(status_code=422, detail="Event batch metadata is too large")
+    try:
+        inserted = await _run_fomo_aux_db(
+            fomo_repository.record_events,
+            userid=current_user.userid,
+            snapshot_id=payload.snapshot_id,
+            events=event_rows,
+        )
+    except PoolError:
+        logger.warning(
+            "Dropped FOMO analytics batch because DB pool is busy user=%s count=%s",
+            current_user.userid,
+            len(event_rows),
+        )
+        return {
+            "recorded": 0,
+            "dropped": len(event_rows),
+            "reason": "database_busy",
+        }
+    if inserted is None:
+        raise HTTPException(status_code=404, detail="Chart themes not found or expired")
+    return {"recorded": inserted, "received": len(event_rows)}
+
+
+def _canonical_event_metadata(value: Dict[str, Any]) -> str:
+    import json
+
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+
+
+@router.put("/homepage-fomo/preferences")
+async def update_homepage_fomo_preferences(
+    payload: FomoPreferenceRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        await _run_fomo_aux_db(
+            fomo_repository.set_homepage_disabled,
+            current_user.userid,
+            payload.homepage_disabled,
+        )
+    except PoolError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Could not update chart-theme preferences.",
+        ) from exc
+    return {"homepage_disabled": payload.homepage_disabled}

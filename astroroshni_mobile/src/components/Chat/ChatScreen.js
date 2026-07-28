@@ -40,7 +40,7 @@ import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import PodcastPromoModal from './PodcastPromoModal';
 import ChatRatingPromptModal from './ChatRatingPromptModal';
 import { storage } from '../../services/storage';
-import { chatAPI, creditAPI, mundaneAPI } from '../../services/api';
+import { chatAPI, creditAPI, mundaneAPI, predictionAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { buildQueryContext } from '../../utils/queryContext';
@@ -761,6 +761,8 @@ export default function ChatScreen({ navigation, route }) {
   const [showEventPeriods, setShowEventPeriods] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
   const [showGreeting, setShowGreeting] = useState(true);
+  const [fomoHomeOpen, setFomoHomeOpen] = useState(false);
+  const [fomoNotificationPromptNonce, setFomoNotificationPromptNonce] = useState(0);
   const [homeInfoModalPayload, setHomeInfoModalPayload] = useState(null);
   const [nudgeUnreadCount, setNudgeUnreadCount] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
@@ -795,6 +797,7 @@ export default function ChatScreen({ navigation, route }) {
   const nativeSwitchInProgressRef = useRef(false);
   const keepChatOpenAfterNativeSelectRef = useRef(false);
   const startFreshSessionAfterNativeSelectRef = useRef(false);
+  const pendingFomoQueryContextRef = useRef(null);
   /** Set synchronously when applying route prefill so birthData/focus effects do not force greeting in the same tick. */
   const partnershipPrefillInProgressRef = useRef(false);
   const [forceGreeting, setForceGreeting] = useState(false);
@@ -2794,12 +2797,31 @@ export default function ChatScreen({ navigation, route }) {
     } else {
       
       keepChatOpenAfterAskEntryRef.current = true;
+      const isFomoChatEntry =
+        option.queryContext &&
+        typeof option.queryContext === 'object' &&
+        option.queryContext.source === 'homepage_fomo';
+      if (option.queryContext && typeof option.queryContext === 'object') {
+        pendingFomoQueryContextRef.current = { ...option.queryContext };
+      } else {
+        pendingFomoQueryContextRef.current = null;
+      }
+      if (isFomoChatEntry) {
+        const introKey = `chat-entry:${currentPersonId || birthData?.id || birthData?.name || 'native'}`;
+        chatModeIntroShownKeyRef.current = introKey;
+        modeIntroSuppressOpenUntilRef.current = Date.now() + 5000;
+        setShowChatModeIntro(false);
+        setShowModeSelector(false);
+      }
 
       // First load any existing chat history
       await loadChatHistory();
       
       // Switch to chat mode immediately
       setShowGreeting(false);
+      if (typeof option.initialMessage === 'string' && option.initialMessage.trim()) {
+        setInputText(option.initialMessage.trim());
+      }
       
       // Reset special modes when starting standard chat
       if (partnershipMode) {
@@ -2818,7 +2840,13 @@ export default function ChatScreen({ navigation, route }) {
       setShowModeSelector(false);
 
       if (!partnershipMode && !isMundane) {
-        await restoreSelectedChatModeFromStorage(currentPersonId);
+        if (isFomoChatEntry) {
+          const storedMode = await loadSelectedChatMode(currentPersonId);
+          applyChatModeFromTier(storedMode === 'premium' ? 'premium' : 'standard');
+          chatModeHydratedRef.current = true;
+        } else {
+          await restoreSelectedChatModeFromStorage(currentPersonId);
+        }
       }
       
       // Set flag to scroll when content renders
@@ -4203,6 +4231,7 @@ export default function ChatScreen({ navigation, route }) {
       !showGreeting &&
       birthData &&
       !freeQuestionAvailable &&
+      pendingFomoQueryContextRef.current?.source !== 'homepage_fomo' &&
       !partnershipMode &&
       !isMundane &&
       !loading &&
@@ -4445,10 +4474,15 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const sendMessage = async (messageText = inputText, sendOptions = {}) => {
+    const pendingFomoContext =
+      pendingFomoQueryContextRef.current &&
+      typeof pendingFomoQueryContextRef.current === 'object'
+        ? pendingFomoQueryContextRef.current
+        : null;
     const queryContextOverride =
       sendOptions && typeof sendOptions.queryContext === 'object'
         ? sendOptions.queryContext
-        : null;
+        : pendingFomoContext;
     console.log('[Mobile ChatScreen] sendMessage called', {
       messageText,
       queryContextOverride,
@@ -4676,6 +4710,20 @@ export default function ChatScreen({ navigation, route }) {
         subjectGateOverride,
         queryContextOverride,
       });
+      if (queryContextOverride?.fomo_snapshot_id && queryContextOverride?.fomo_presentation_id) {
+        pendingFomoQueryContextRef.current = null;
+        predictionAPI.recordHomepageFomoEvent({
+          event_id: `fomo:${queryContextOverride.fomo_snapshot_id}:${queryContextOverride.fomo_presentation_id}:question_sent:${clientRequestId}`,
+          snapshot_id: queryContextOverride.fomo_snapshot_id,
+          presentation_id: queryContextOverride.fomo_presentation_id,
+          event_type: 'question_sent',
+          metadata: {
+            client_request_id: clientRequestId,
+            chat_tier: outgoingTier,
+            source: 'homepage_fomo',
+          },
+        }).catch(() => {});
+      }
 
     } catch (error) {
       console.error('❌ Error sending message:', error);
@@ -5216,6 +5264,8 @@ export default function ChatScreen({ navigation, route }) {
               setShowDashaBrowser={setShowDashaBrowser}
               infoModalPayload={homeInfoModalPayload}
               onInfoModalConsumed={() => setHomeInfoModalPayload(null)}
+              onFomoVisibilityChange={setFomoHomeOpen}
+              onFomoDismissed={() => setFomoNotificationPromptNonce((value) => value + 1)}
             />
           </View>
         ) : (
@@ -7160,7 +7210,10 @@ export default function ChatScreen({ navigation, route }) {
         </View>
       </SafeAreaView>
 
-      <NotificationEnableReminderModal homeActive={showGreeting} />
+      <NotificationEnableReminderModal
+        homeActive={showGreeting && !fomoHomeOpen}
+        fomoTriggerNonce={fomoNotificationPromptNonce}
+      />
 
       <AppAlertModal
         visible={showInsufficientCreditsAlert}

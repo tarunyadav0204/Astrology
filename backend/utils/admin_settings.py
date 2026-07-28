@@ -1,16 +1,24 @@
-from typing import Optional, Any, Set, Dict
+from typing import Optional, Any, Set, Dict, List
 from threading import Lock
 import os
 import time
 import asyncio
 import json
+import logging
 
 ADMIN_SETTINGS_CACHE_TTL_SECONDS = int(os.getenv("ADMIN_SETTINGS_CACHE_TTL_SECONDS", "60"))
-_ADMIN_SETTINGS_CACHE: Dict[str, tuple[float, Optional[str]]] = {}
+ADMIN_SETTINGS_CACHE_RETRY_SECONDS = int(os.getenv("ADMIN_SETTINGS_CACHE_RETRY_SECONDS", "5"))
+_ADMIN_SETTINGS_CACHE: Dict[str, Optional[str]] = {}
+_ADMIN_SETTINGS_CACHE_EXPIRES_AT = 0.0
+_ADMIN_SETTINGS_CACHE_LOADED = False
 _ADMIN_SETTINGS_CACHE_LOCK = Lock()
+_ADMIN_SETTINGS_REFRESH_LOCK = Lock()
 ADMIN_SETTINGS_VERSION_POLL_SECONDS = int(os.getenv("ADMIN_SETTINGS_VERSION_POLL_SECONDS", "10"))
+ADMIN_SETTINGS_VERSION_KEY = "admin_settings_version"
 CREDITS_SETTINGS_VERSION_KEY = "credits_settings_version"
+_LAST_ADMIN_SETTINGS_VERSION: Optional[str] = None
 _LAST_CREDITS_SETTINGS_VERSION: Optional[str] = None
+logger = logging.getLogger(__name__)
 
 
 def is_credits_setting_key(key: str) -> bool:
@@ -19,19 +27,24 @@ def is_credits_setting_key(key: str) -> bool:
 
 
 def invalidate_setting_cache(key: Optional[str] = None) -> None:
-    """Clear one cached admin setting or the entire cache."""
-    with _ADMIN_SETTINGS_CACHE_LOCK:
-        if key is None:
-            _ADMIN_SETTINGS_CACHE.clear()
-        else:
-            _ADMIN_SETTINGS_CACHE.pop(str(key), None)
+    """
+    Expire the atomic settings snapshot.
+
+    The ``key`` argument is retained for compatibility with existing callers.
+    A snapshot is refreshed as one unit, so a single-key invalidation expires
+    the complete snapshot while retaining its values for stale-on-error reads.
+    """
+    del key
+    global _ADMIN_SETTINGS_CACHE_EXPIRES_AT
+    with _ADMIN_SETTINGS_REFRESH_LOCK:
+        with _ADMIN_SETTINGS_CACHE_LOCK:
+            _ADMIN_SETTINGS_CACHE_EXPIRES_AT = 0.0
 
 
 def invalidate_credits_settings_cache() -> None:
-    with _ADMIN_SETTINGS_CACHE_LOCK:
-        for key in list(_ADMIN_SETTINGS_CACHE.keys()):
-            if is_credits_setting_key(key):
-                _ADMIN_SETTINGS_CACHE.pop(key, None)
+    # The cache is an atomic snapshot; partial expiry could combine settings
+    # from different database versions.
+    invalidate_setting_cache()
 
 # Allowed Gemini model IDs (with models/ prefix for API). Used by admin UI and as fallbacks.
 GEMINI_MODEL_OPTIONS = [
@@ -182,96 +195,279 @@ def migrate_deprecated_gemini_model_ids_on_startup() -> None:
         logger.warning("admin_settings Gemini preview→GA migration skipped: %s", e, exc_info=True)
 
 
-def get_setting(key: str) -> Optional[str]:
-    """Get admin setting value"""
-    normalized_key = str(key)
-    now = time.monotonic()
-    with _ADMIN_SETTINGS_CACHE_LOCK:
-        if normalized_key in _ADMIN_SETTINGS_CACHE:
-            expires_at, cached_value = _ADMIN_SETTINGS_CACHE[normalized_key]
-            if expires_at > now:
-                return cached_value
-            _ADMIN_SETTINGS_CACHE.pop(normalized_key, None)
-    try:
-        from db import get_conn, execute
-
-        with get_conn() as conn:
-            _ensure_admin_settings_table(conn)
-            cursor = execute(conn, 'SELECT value FROM admin_settings WHERE "key" = ?', (key,))
-            result = cursor.fetchone()
-            value = result[0] if result else None
-            with _ADMIN_SETTINGS_CACHE_LOCK:
-                _ADMIN_SETTINGS_CACHE[normalized_key] = (
-                    now + max(1, ADMIN_SETTINGS_CACHE_TTL_SECONDS),
-                    value,
-                )
-            return value
-    except Exception:
-        return None
-
-
-def get_raw_setting_no_cache(key: str) -> Optional[str]:
-    try:
-        from db import get_conn, execute
-
-        with get_conn() as conn:
-            _ensure_admin_settings_table(conn)
-            cursor = execute(conn, 'SELECT value FROM admin_settings WHERE "key" = ?', (key,))
-            result = cursor.fetchone()
-            return result[0] if result else None
-    except Exception:
-        return None
-
-
-def bump_credits_settings_version() -> None:
+def _read_admin_settings_rows_from_db() -> List[tuple]:
+    """Read the small settings table in one query; schema creation is startup work."""
     from db import get_conn, execute
 
     with get_conn() as conn:
-        _ensure_admin_settings_table(conn)
-        execute(
+        cursor = execute(
             conn,
-            """
-            INSERT INTO admin_settings (key, value, description, updated_at)
-            VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
-            ON CONFLICT ("key") DO UPDATE SET
-                value = CAST(COALESCE(NULLIF(admin_settings.value, ''), '0') AS BIGINT)::text,
-                description = EXCLUDED.description,
-                updated_at = CURRENT_TIMESTAMP
-            """,
-            (
-                CREDITS_SETTINGS_VERSION_KEY,
-                "0",
-                "Monotonic version for cross-worker invalidation of cached credit bonus settings",
-            ),
+            'SELECT "key", value, description FROM admin_settings',
+            (),
         )
-        execute(
-            conn,
-            """
-            UPDATE admin_settings
-            SET value = (CAST(COALESCE(NULLIF(value, ''), '0') AS BIGINT) + 1)::text,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE key = %s
-            """,
-            (CREDITS_SETTINGS_VERSION_KEY,),
-        )
-        conn.commit()
+        return list(cursor.fetchall() or [])
 
 
-async def poll_credits_settings_version_forever() -> None:
-    global _LAST_CREDITS_SETTINGS_VERSION
+def _replace_admin_settings_snapshot(
+    rows: List[tuple],
+    *,
+    now: Optional[float] = None,
+) -> None:
+    global _ADMIN_SETTINGS_CACHE_EXPIRES_AT, _ADMIN_SETTINGS_CACHE_LOADED
+    loaded_at = time.monotonic() if now is None else float(now)
+    values = {str(row[0]): row[1] for row in rows}
+    with _ADMIN_SETTINGS_CACHE_LOCK:
+        _ADMIN_SETTINGS_CACHE.clear()
+        _ADMIN_SETTINGS_CACHE.update(values)
+        _ADMIN_SETTINGS_CACHE_LOADED = True
+        _ADMIN_SETTINGS_CACHE_EXPIRES_AT = (
+            loaded_at + max(1, ADMIN_SETTINGS_CACHE_TTL_SECONDS)
+        )
+
+
+def refresh_admin_settings_cache(*, force: bool = False) -> bool:
+    """
+    Refresh all settings with one database read.
+
+    Only one thread per process may perform the refresh. When PostgreSQL is
+    temporarily unavailable, an already-loaded snapshot remains available and
+    is retried after a short interval instead of reverting runtime behaviour to
+    defaults.
+    """
+    global _ADMIN_SETTINGS_CACHE_EXPIRES_AT
+    now = time.monotonic()
+    with _ADMIN_SETTINGS_CACHE_LOCK:
+        if not force and _ADMIN_SETTINGS_CACHE_EXPIRES_AT > now:
+            return _ADMIN_SETTINGS_CACHE_LOADED
+
+    with _ADMIN_SETTINGS_REFRESH_LOCK:
+        now = time.monotonic()
+        with _ADMIN_SETTINGS_CACHE_LOCK:
+            if not force and _ADMIN_SETTINGS_CACHE_EXPIRES_AT > now:
+                return _ADMIN_SETTINGS_CACHE_LOADED
+        try:
+            rows = _read_admin_settings_rows_from_db()
+        except Exception as exc:
+            with _ADMIN_SETTINGS_CACHE_LOCK:
+                has_stale_snapshot = _ADMIN_SETTINGS_CACHE_LOADED
+                _ADMIN_SETTINGS_CACHE_EXPIRES_AT = (
+                    now + max(1, ADMIN_SETTINGS_CACHE_RETRY_SECONDS)
+                )
+            logger.warning(
+                "Could not refresh admin settings snapshot; using %s: %s",
+                "stale values" if has_stale_snapshot else "defaults",
+                exc,
+            )
+            return has_stale_snapshot
+
+        _replace_admin_settings_snapshot(rows, now=now)
+        return True
+
+
+def get_setting(key: str) -> Optional[str]:
+    """Return one value from the process-local atomic settings snapshot."""
+    normalized_key = str(key)
+    refresh_admin_settings_cache()
+    with _ADMIN_SETTINGS_CACHE_LOCK:
+        return _ADMIN_SETTINGS_CACHE.get(normalized_key)
+
+
+def get_admin_settings_rows(*, refresh: bool = True) -> List[Dict[str, Optional[str]]]:
+    """
+    Return settings metadata for the admin UI and prime the runtime snapshot.
+
+    The admin page intentionally performs a fresh read; all typed getters used
+    to build the same response then reuse that snapshot rather than issuing
+    individual SELECTs.
+    """
+    if refresh:
+        with _ADMIN_SETTINGS_REFRESH_LOCK:
+            try:
+                rows = _read_admin_settings_rows_from_db()
+            except Exception:
+                # Preserve the previous failure semantics for the admin API,
+                # which should report a load error rather than show stale data.
+                raise
+            _replace_admin_settings_snapshot(rows)
+    else:
+        refresh_admin_settings_cache()
+        with _ADMIN_SETTINGS_CACHE_LOCK:
+            rows = [
+                (key, value, None)
+                for key, value in _ADMIN_SETTINGS_CACHE.items()
+            ]
+    return [
+        {"key": str(row[0]), "value": row[1], "description": row[2]}
+        for row in rows
+    ]
+
+
+def update_setting_cache(
+    key: str,
+    value: Optional[str],
+    *,
+    settings_version: Optional[str] = None,
+) -> None:
+    """Apply a committed admin write to this process without a DB reread."""
+    global _LAST_ADMIN_SETTINGS_VERSION, _LAST_CREDITS_SETTINGS_VERSION
+    with _ADMIN_SETTINGS_REFRESH_LOCK:
+        with _ADMIN_SETTINGS_CACHE_LOCK:
+            if _ADMIN_SETTINGS_CACHE_LOADED:
+                _ADMIN_SETTINGS_CACHE[str(key)] = value
+                if settings_version is not None:
+                    _ADMIN_SETTINGS_CACHE[ADMIN_SETTINGS_VERSION_KEY] = str(
+                        settings_version
+                    )
+        if settings_version is not None:
+            _LAST_ADMIN_SETTINGS_VERSION = str(settings_version)
+        if str(key) == CREDITS_SETTINGS_VERSION_KEY and value is not None:
+            _LAST_CREDITS_SETTINGS_VERSION = str(value)
+
+
+def get_raw_settings_no_cache(keys: List[str]) -> Dict[str, Optional[str]]:
+    normalized_keys = [str(key) for key in keys if str(key)]
+    if not normalized_keys:
+        return {}
+    try:
+        from db import get_conn, execute
+
+        with get_conn() as conn:
+            placeholders = ", ".join(["?"] * len(normalized_keys))
+            cursor = execute(
+                conn,
+                f'SELECT "key", value FROM admin_settings WHERE "key" IN ({placeholders})',
+                tuple(normalized_keys),
+            )
+            values = {str(row[0]): row[1] for row in (cursor.fetchall() or [])}
+            return {key: values.get(key) for key in normalized_keys}
+    except Exception:
+        return {key: None for key in normalized_keys}
+
+
+def get_raw_setting_no_cache(key: str) -> Optional[str]:
+    return get_raw_settings_no_cache([key]).get(str(key))
+
+
+def _bump_settings_version(
+    conn: Any,
+    *,
+    key: str,
+    description: str,
+) -> str:
+    from db import execute
+
+    execute(
+        conn,
+        """
+        INSERT INTO admin_settings (key, value, description, updated_at)
+        VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+        ON CONFLICT ("key") DO NOTHING
+        """,
+        (key, "0", description),
+    )
+    cursor = execute(
+        conn,
+        """
+        UPDATE admin_settings
+        SET value = (CAST(COALESCE(NULLIF(value, ''), '0') AS BIGINT) + 1)::text,
+            description = %s,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE key = %s
+        RETURNING value
+        """,
+        (description, key),
+    )
+    result = cursor.fetchone()
+    return str(result[0] if result else "0")
+
+
+def bump_admin_settings_version(conn: Optional[Any] = None) -> str:
+    """Increment the global cross-worker settings version."""
+    description = "Monotonic version for cross-worker admin-settings invalidation"
+    if conn is not None:
+        return _bump_settings_version(
+            conn,
+            key=ADMIN_SETTINGS_VERSION_KEY,
+            description=description,
+        )
+
+    from db import get_conn
+
+    with get_conn() as owned_conn:
+        _ensure_admin_settings_table(owned_conn)
+        version = _bump_settings_version(
+            owned_conn,
+            key=ADMIN_SETTINGS_VERSION_KEY,
+            description=description,
+        )
+        owned_conn.commit()
+        return version
+
+
+def bump_credits_settings_version(conn: Optional[Any] = None) -> str:
+    """Retain the credit-specific version for backward compatibility."""
+    description = "Monotonic version for cross-worker invalidation of cached credit bonus settings"
+    if conn is not None:
+        return _bump_settings_version(
+            conn,
+            key=CREDITS_SETTINGS_VERSION_KEY,
+            description=description,
+        )
+
+    from db import get_conn
+
+    with get_conn() as owned_conn:
+        _ensure_admin_settings_table(owned_conn)
+        version = _bump_settings_version(
+            owned_conn,
+            key=CREDITS_SETTINGS_VERSION_KEY,
+            description=description,
+        )
+        owned_conn.commit()
+        return version
+
+
+def poll_admin_settings_version_once() -> None:
+    """Invalidate this process when another worker commits a settings update."""
+    global _LAST_ADMIN_SETTINGS_VERSION, _LAST_CREDITS_SETTINGS_VERSION
+    versions = get_raw_settings_no_cache(
+        [ADMIN_SETTINGS_VERSION_KEY, CREDITS_SETTINGS_VERSION_KEY]
+    )
+    current = versions.get(ADMIN_SETTINGS_VERSION_KEY) or "0"
+    credits_current = versions.get(CREDITS_SETTINGS_VERSION_KEY) or "0"
+    must_invalidate = False
+    if _LAST_ADMIN_SETTINGS_VERSION is None:
+        _LAST_ADMIN_SETTINGS_VERSION = current
+    elif current != _LAST_ADMIN_SETTINGS_VERSION:
+        must_invalidate = True
+        _LAST_ADMIN_SETTINGS_VERSION = current
+
+    # Preserve observation of the legacy credit version for mixed-version
+    # deployments during rolling upgrades.
+    if (
+        _LAST_CREDITS_SETTINGS_VERSION is not None
+        and credits_current != _LAST_CREDITS_SETTINGS_VERSION
+    ):
+        must_invalidate = True
+    _LAST_CREDITS_SETTINGS_VERSION = credits_current
+    if must_invalidate:
+        invalidate_setting_cache()
+
+
+async def poll_admin_settings_version_forever() -> None:
     while True:
         try:
-            current = get_raw_setting_no_cache(CREDITS_SETTINGS_VERSION_KEY) or "0"
-            if _LAST_CREDITS_SETTINGS_VERSION is None:
-                _LAST_CREDITS_SETTINGS_VERSION = current
-            elif current != _LAST_CREDITS_SETTINGS_VERSION:
-                invalidate_credits_settings_cache()
-                _LAST_CREDITS_SETTINGS_VERSION = current
+            poll_admin_settings_version_once()
         except asyncio.CancelledError:
             raise
         except Exception:
             pass
         await asyncio.sleep(max(1, ADMIN_SETTINGS_VERSION_POLL_SECONDS))
+
+
+async def poll_credits_settings_version_forever() -> None:
+    """Backward-compatible alias for older process entrypoints."""
+    await poll_admin_settings_version_forever()
 
 
 def _parse_bool_setting(value: Optional[str], default: bool = False) -> bool:
@@ -562,6 +758,46 @@ def chat_subject_gate_enabled_for_user(user_id: Optional[int]) -> bool:
     if not is_chat_subject_gate_enabled():
         return False
     allowlist = get_chat_subject_gate_user_allowlist()
+    if not allowlist:
+        return True
+    try:
+        return int(user_id) in allowlist
+    except (TypeError, ValueError):
+        return False
+
+
+def is_homepage_fomo_enabled() -> bool:
+    """Master switch for the homepage chart-theme card and bottom sheet."""
+    return _parse_bool_setting(
+        get_setting("homepage_fomo_enabled"),
+        default=False,
+    )
+
+
+def get_homepage_fomo_user_allowlist() -> Set[int]:
+    """Optional user IDs. Empty means all users when the master switch is on."""
+    raw = (get_setting("homepage_fomo_user_allowlist") or "").strip()
+    if not raw:
+        return set()
+    user_ids: Set[int] = set()
+    for token in raw.replace("\n", ",").replace("\t", ",").replace(" ", ",").split(","):
+        cleaned = token.strip()
+        if not cleaned:
+            continue
+        try:
+            parsed = int(cleaned)
+        except (TypeError, ValueError):
+            continue
+        if parsed > 0:
+            user_ids.add(parsed)
+    return user_ids
+
+
+def homepage_fomo_enabled_for_user(user_id: Optional[int]) -> bool:
+    """Enabled globally, then optionally restricted to the configured IDs."""
+    if not is_homepage_fomo_enabled():
+        return False
+    allowlist = get_homepage_fomo_user_allowlist()
     if not allowlist:
         return True
     try:

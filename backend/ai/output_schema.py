@@ -103,6 +103,32 @@ VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION = """
 You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.
 """
 
+FOMO_PARASHARI_SYSTEM_INSTRUCTION = """
+FOMO MANIFESTATION ASTROLOGY METHOD:
+- Use the normal ChatContextBuilder facts and chronology checks, but answer this
+  selected manifestation through Parashari reasoning only.
+- The deterministic `fomo_manifestation_context` controls the subject, activated
+  houses, allowed themes, outcome conditions, evidence, and delivery window.
+- The deterministic summary, possibilities, and prediction candidates are
+  boundary evidence and starting clues, not a finished or exhaustive event list.
+- Your specific job in this mode is to synthesize concrete, human life-event
+  scenarios from coherent combinations of the impacted house significations.
+  Consider supported pairs, triples, and the full active-house cluster. Do not
+  mechanically enumerate every permutation.
+- Rank scenarios supported by the full cluster or a shared dasha carrier first.
+  Keep alternatives distinct and within the selected subject and theme domains.
+- Every scenario must be traceable to multiple supplied houses or to the supplied
+  delivery chain plus a house role. Do not invent an unsupported life area.
+- Read the complete Vimshottari MD–AD–PD chain. MD supplies the background,
+  AD shapes the active sub-period, and PD is the immediate delivery level.
+- Use only the selected manifestation's declared natal promise, house roles,
+  carriers, relationships, transit reinforcement, and outcome factors.
+- Do not add Jaimini, KP, Nadi, Ashtakavarga, Shadbala, divisional charts, yogas,
+  doshas, or another predictive school merely because broader chart data exists.
+- Apply the normal chronology and calculation guardrails. Never describe a past
+  dasha boundary as newly beginning at the snapshot as-of date.
+"""
+
 SYNASTRY_SYSTEM_INSTRUCTION = """
 You are analyzing COMPATIBILITY between TWO birth charts for partnership/relationship analysis.
 
@@ -232,6 +258,54 @@ Your response MUST follow this exact sequence. The subsection headers under "Ast
 ### 🚨 FORMATTING RULES
 - [HEADERS]: Use ### for main headers, #### for subsections.
 - [NO INLINE REMEDIES]: Do not include remedy layers, upayas, gemstones, mantras, charity/seva lists, OR practical wellness plans (diet/exercise/yoga/pranayama/dosha routines) in this normal reading. Timing & Guidance = phases and chart themes only.
+"""
+
+TEMPLATE_FOMO_MANIFESTATION_DETAIL = """
+### SELECTED FOMO MANIFESTATION RESPONSE (MANDATORY)
+This is a focused event-synthesis answer for one deterministic manifestation
+selected before chat opened. It is not a general natal or technical astrology
+reading. The event possibilities are the answer; astrology is compact supporting
+evidence.
+
+Follow this exact sequence:
+1. <div class="quick-answer-card">**Quick Answer**: In 2–3 short paragraphs,
+   explain the most likely real-life development field, for whom, and in which
+   selected life areas. Lead with what the person may actually encounter—not
+   planets, houses, dashas, or methodology. State whether the supplied window is
+   active now or upcoming, without guaranteeing one literal event.</div>
+2. ### Possible Developments
+   Cover every materially distinct supported event family, normally as 6–12
+   ranked, concrete scenarios. If the evidence supports fewer, do not pad the
+   answer with duplicates or unsupported possibilities.
+   For each scenario use exactly:
+   - **[Short human event title]**
+   - **What could happen:** [A specific observable development, decision,
+     obligation, conversation, transaction, agreement, change, or consequence.]
+   - **Why it fits:** [One compact plain-language line naming the combination of
+     supplied houses/themes that supports it.]
+   Synthesize coherent pairs, triples, and the full impacted-house cluster.
+   Prioritize scenarios supported by the full cluster or shared dasha carriers.
+   Do not merely paraphrase the deterministic summary or repeat the same event
+   with different wording. Do not mechanically list every house permutation.
+3. ### Most Likely Timing
+   State the selected window first. Then give the complete supplied MD–AD–PD
+   chain in one compact explanation: MD = background, AD = active sub-period,
+   PD = immediate delivery layer. Never omit PD. Distinguish when each layer
+   began from when the selected event window becomes active.
+4. ### What Changes the Outcome
+   In plain language, summarize only the supplied helpful, mixed, and pressure
+   factors that make the scenarios easier, harder, delayed, modified, or more
+   likely. Keep this shorter than `Possible Developments`.
+5. ### How To Prepare
+   Give practical, proportionate preparation for the scenario field. Do not
+   prescribe fear, certainty, or unsupported remedies.
+
+Do not provide a general personality, lifetime, whole-chart, or multi-school
+reading. Do not introduce a different event window or unrelated prediction.
+Do not add extra sections such as `Why This Period Is Active`, `Chart Indicators
+Behind It`, `Nakshatra Insights`, `Kota Chakra`, `Ashtakavarga`, `Jaimini`, `KP`,
+`Nadi`, remedies, or divisional charts. Astrological explanation must not occupy
+more space than the concrete event scenarios.
 """
 
 # Template B: Event Prediction Timeline
@@ -514,6 +588,7 @@ SCHEMA_MAPPING = {
     'DEV_EVENT_LOG': TEMPLATE_DEV_EVENT_LOG,
     'LIFESPAN_EVENT_TIMING': TEMPLATE_LIFESPAN_TIMELINE,
     'LIFE_TERMINATION_RESEARCH': TEMPLATE_LIFE_TERMINATION_RESEARCH,
+    'FOMO_MANIFESTATION_DETAIL': TEMPLATE_FOMO_MANIFESTATION_DETAIL,
     'DEFAULT': TEMPLATE_DEEP_DIVE,
 }
 
@@ -739,7 +814,19 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
     _, language_instruction, final_check = build_output_language_blocks(_lang, user_question)
     delivery_format_instruction = build_delivery_format_instruction(intent_block)
     
-    if str(intent_mode or "").upper() == "PREDICT_DAILY":
+    if str(intent_mode or "").upper() == "FOMO_MANIFESTATION_DETAIL":
+        elaborate_instruction = """
+CRITICAL - SELECTED CHART THEME ANSWER SCOPE (NON-NEGOTIABLE):
+- Answer what may manifest in the exact current/upcoming chart window the user
+  opened—not what the natal chart generally means across life.
+- Standard answers should be clear and sufficiently reasoned; Premium answers should go deeper indicator by indicator.
+- Do not turn this into a generic whole-chart reading or introduce unrelated predictions.
+- Do not ask a clarification question. The selected manifestation and its evidence already define the question.
+- Explain possibilities as bounded outcomes, not as one guaranteed event.
+- State and interpret the complete selected MD–AD–PD chain. PD is mandatory
+  because it is the immediate delivery layer for this manifestation window.
+"""
+    elif str(intent_mode or "").upper() == "PREDICT_DAILY":
         elaborate_instruction = """
 CRITICAL - DAILY ANSWER SCOPE (NON-NEGOTIABLE):
 The user asked about one specific day. Keep the answer day-specific and practical.
@@ -831,6 +918,111 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
             "- Use it only when its evidence makes it relevant; do not force it into the answer if stronger chart/dasha/transit evidence points elsewhere."
         )
 
+    if str(intent_mode or "").upper() == "FOMO_MANIFESTATION_DETAIL":
+        fomo_context = (
+            static_context.get("fomo_manifestation_context")
+            if isinstance(static_context.get("fomo_manifestation_context"), dict)
+            else {}
+        )
+        temporal_grounding = (
+            fomo_context.get("temporal_grounding")
+            if isinstance(fomo_context.get("temporal_grounding"), dict)
+            else {}
+        )
+        snapshot_as_of = str(
+            temporal_grounding.get("as_of_date") or current_date.date().isoformat()
+        )
+        prompt_parts.append(
+            f"""
+AUTHORITATIVE SELECTED FOMO MANIFESTATION CONTRACT:
+`fomo_manifestation_context` is trusted, server-resolved evidence for the exact teaser the user opened.
+It is more authoritative for this answer than generic intent inference or unrelated conversation history.
+
+TEMPORAL REFERENCE — NON-NEGOTIABLE:
+- Today is {current_date_str}.
+- The deterministic FOMO snapshot is evaluated as of {snapshot_as_of}.
+- Compare every stated start and end date with these dates before choosing tense.
+- Any dasha that began before {snapshot_as_of} is already running. Say "has been
+  running since [date]" or its natural equivalent in the requested response
+  language; never present that past boundary as a new or future entry.
+- The normal ChatContextBuilder data and guardrails remain available and MUST be
+  used to validate dasha chronology, chart interpretation, and astrological method.
+- The selected FOMO evidence controls WHAT this answer focuses on. The normal
+  chart context controls HOW it is interpreted and checked. It is not permission
+  to introduce additional predictive evidence. Do not replace the selected
+  manifestation with an unrelated broad-chart prediction.
+- `event_synthesis_brief` is the event-generation brief. Its theme domains,
+  selected subject, complete same-window house activations, house roles, natal
+  promises, carriers, and outcome factors define the allowed synthesis space.
+- The deterministic `selected_manifestation.summary`, `possibilities`, and
+  `theme_source_candidates` are seeds and boundaries, not a final or exhaustive
+  list. Do not simply restate them.
+- Use the LLM's synthesis capability to turn the supplied house significations
+  into concrete human events. Explore coherent supported pairs, triples, and the
+  full same-window active-house cluster. Do not mechanically enumerate all
+  mathematical permutations.
+- Do not cite Ashtakavarga scores, Shadbala, divisional-chart confirmation, or
+  another predictive layer unless that layer is explicitly present inside
+  `fomo_manifestation_context` for this selected manifestation.
+
+You MUST:
+1. Begin by directly explaining what `presentation_shown_to_user.title` and
+   `presentation_shown_to_user.teaser` referred to.
+2. Stay focused on `selected_manifestation`; do not substitute another event,
+   domain, relative, date window, or generic chart topic.
+3. Lead with every materially distinct supported event family, normally as 6–12
+   ranked, concrete and observably different scenarios within the selected
+   subject and theme domains. Do not pad weak variants. The scenarios—not the
+   astrology lecture—are the main answer.
+4. Synthesize those scenarios from coherent combinations of the supplied
+   impacted houses. Prioritize full-cluster and shared-carrier scenarios, then
+   narrower alternatives. Each scenario must have support from multiple houses,
+   or from the supplied delivery chain plus a declared house role.
+5. Translate the relevant native houses and their roles into one compact
+   plain-language support line per scenario. Do not create a prominent repeated
+   catalogue of static house significations.
+6. In the timing section, state the complete MD–AD–PD chain from
+   `temporal_grounding.delivery_chain_during_selected_window`. Explain MD as
+   background, AD as the active sub-period, and PD as the immediate delivery
+   layer. PD MUST NOT be omitted.
+7. Explain the actual carriers, natal promise, transit reinforcement, and
+   helpful/mixed/pressure factors present in the supplied manifestation, house
+   activations, natal promises, and synthesis brief—but keep this supporting
+   explanation shorter than the event scenarios.
+8. Resolve apparently mixed evidence explicitly: say what supports progress, what
+   creates pressure, and how that changes the expression of the scenarios.
+9. End with practical preparation, choices, or observations relevant to this
+   manifestation.
+10. Treat `temporal_grounding.as_of_date` as the date from which every tense is
+   evaluated. Use `selected_window_status` exactly:
+   - `active_now`: say the selected window is active/currently running;
+   - `upcoming`: say it is upcoming;
+   - `concluded`: describe it only as past.
+11. Distinguish the selected manifestation window from the beginning of its MD,
+   AD, or PD. A window carrying Saturn–Rahu–Mercury, for example, does not prove
+   that Saturn–Rahu begins on the window's start date.
+12. If AD began before the as-of date, describe it as an ongoing background.
+    Explain what the PD and the selected window are activating now/next; never
+    frame the already-running AD itself as the new development.
+
+You MUST NOT:
+- ask the user which topic, person, or period they mean;
+- reclassify the question into an unrelated astrology mode;
+- expose internal IDs, JSON field names, scoring machinery, template names, or
+  implementation rules;
+- invent an indicator that is absent from `fomo_manifestation_context`;
+- present a dasha as newly starting, upcoming, or being entered when its supplied
+  start date is earlier than the as-of date, regardless of the response language;
+- invent a dasha start, duration, or multi-year forecast outside the supplied
+  manifestation evidence;
+- add extra technical sections such as Nakshatra Insights, Kota Chakra,
+  Ashtakavarga, Jaimini, KP, Nadi, divisional charts, or a general natal reading;
+- let astrological explanation become longer or more prominent than the concrete
+  possible developments;
+- promise that one concrete event will certainly occur.
+""".strip()
+        )
+
     time_context = f"IMPORTANT CURRENT DATE INFORMATION:\n- Today's Date: {current_date_str}\n- Current Time: {current_time_str}\n- Current Year: {current_date.year}\n\nCRITICAL CHART INFORMATION:\n{ascendant_summary}"
     prompt_parts.append(time_context)
     
@@ -842,7 +1034,7 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
         f"{response_format_instruction}"
         f"{user_context_instruction}"
         f"{_single_native_format_guard(analysis_type)}"
-        f"{VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION}"
+        f"{FOMO_PARASHARI_SYSTEM_INSTRUCTION if str(intent_mode or '').upper() == 'FOMO_MANIFESTATION_DETAIL' else VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION}"
     )
     
     prompt_parts.append(build_multi_question_focus_instruction(_lang))

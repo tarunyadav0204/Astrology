@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from .errors import PredictionInputError
 
 
-SCHEMA_VERSION = "prediction_engine.v18"
+SCHEMA_VERSION = "prediction_engine.v19"
 
 
 class EvidenceStatus(str, Enum):
@@ -140,6 +140,7 @@ class PredictionRequest:
     trace: bool = False
     life_context: Optional[LifeContext] = None
     exploration_mode: bool = False
+    language: str = "en"
 
     def __post_init__(self) -> None:
         if not 1 <= self.horizon_days <= 366:
@@ -148,6 +149,8 @@ class PredictionRequest:
             raise PredictionInputError("maximum_candidates must be between 1 and 100")
         if not self.subjects:
             raise PredictionInputError("At least one subject is required")
+        if not str(self.language or "").strip():
+            raise PredictionInputError("Prediction language is required")
 
 
 @dataclass(frozen=True)
@@ -379,6 +382,27 @@ class ChartManifestation:
 
 
 @dataclass(frozen=True)
+class FomoPresentation:
+    presentation_id: str
+    manifestation_id: str
+    locale: str
+    subject: str
+    domain: str
+    area_label: str
+    tone: Polarity
+    title: str
+    teaser: str
+    suggested_question: str
+    rule_id: str
+    template_version: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        value = asdict(self)
+        value["tone"] = self.tone.value
+        return value
+
+
+@dataclass(frozen=True)
 class PredictionResult:
     engine_version: str
     schema_version: str
@@ -390,6 +414,7 @@ class PredictionResult:
     candidates: Sequence[PredictionCandidate]
     house_activations: Sequence[HouseActivation] = ()
     chart_manifestations: Sequence[ChartManifestation] = ()
+    fomo_presentations: Sequence[FomoPresentation] = ()
     natal_promises: Sequence[Dict[str, Any]] = ()
     diagnostics: Dict[str, Any] = field(default_factory=dict)
 
@@ -413,6 +438,10 @@ class PredictionResult:
             "chart_manifestations": [
                 manifestation.to_dict()
                 for manifestation in self.chart_manifestations
+            ],
+            "fomo_presentations": [
+                presentation.to_dict()
+                for presentation in self.fomo_presentations
             ],
             "natal_promises": list(self.natal_promises),
             "diagnostics": self.diagnostics,

@@ -23,6 +23,23 @@
   </style>
   <link rel="icon" type="image/png" href="/favicon.png" />
   <link rel="manifest" href="/manifest.json" />
+  <!-- If an old/broken home-screen icon restores `/` (CRA), bounce standalone launches to the Expo PWA. -->
+  <script>
+    (function () {
+      try {
+        var path = location.pathname || '/';
+        if (path.indexOf('/mobile') === 0) return;
+        var standalone =
+          (window.navigator && window.navigator.standalone === true) ||
+          (window.matchMedia &&
+            (window.matchMedia('(display-mode: standalone)').matches ||
+              window.matchMedia('(display-mode: fullscreen)').matches));
+        if (!standalone) return;
+        var dest = '/mobile/' + (location.search || '') + (location.hash || '');
+        location.replace(dest);
+      } catch (e) {}
+    })();
+  </script>
   <!-- Route-level SEO is managed by react-helmet-async and prerender output. Keep the shell head minimal to avoid stale duplicate tags. -->
   <title>AstroRoshni</title>
   <!-- Google tag (gtag.js): load after first paint / idle to reduce main-thread contention with React -->

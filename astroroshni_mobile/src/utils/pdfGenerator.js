@@ -7,6 +7,124 @@ import { COLORS } from './constants';
 
 const logoCacheByModuleId = new Map();
 
+export { userFacingPdfExportError } from './pdfExportMessages';
+
+/** Shared print CSS — avoids page-break gaps and screen-capture layout on web. */
+export const PDF_PRINT_STYLES = `
+  @media print {
+    body { background: #fff !important; padding: 0 !important; }
+    .container, .page { box-shadow: none !important; border-radius: 0 !important; max-width: none !important; }
+    .section, .karma-section, .accordion-section, .event-block, .manifestation-item,
+    .content, .quick-answer, .final-thoughts, .key-points, .quick-answer-card, .final-thoughts-card {
+      break-inside: auto;
+      page-break-inside: auto;
+    }
+    .section-title, .accordion-month, .event-type, .manifestations-title,
+    .macro-title, .section-label, h1, h2, h3, .title {
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+  }
+`;
+
+/**
+ * Render custom HTML to PDF (native file URI) or browser print/save dialog (web/PWA).
+ */
+export async function exportHtmlAsPdf(html, { timeoutMs = 45000 } = {}) {
+  return printHtmlToPdfFile({ html, base64: false, timeoutMs });
+}
+
+/**
+ * Render HTML to a PDF file URI (native) or open the browser print/save dialog (web).
+ * On web, expo-print ignores HTML and prints the current page — use an isolated iframe instead.
+ */
+async function printHtmlDocumentOnWeb(html, timeoutMs = 45000) {
+  if (typeof document === 'undefined' || typeof window === 'undefined') {
+    throw new Error('PDF export is only available in a browser');
+  }
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.position = 'fixed';
+    iframe.style.left = '-12000px';
+    iframe.style.top = '0';
+    iframe.style.width = '820px';
+    iframe.style.height = '100vh';
+    iframe.style.border = '0';
+    iframe.style.visibility = 'hidden';
+
+    const finish = (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      window.removeEventListener('afterprint', onAfterPrint);
+      if (iframe.parentNode) {
+        iframe.parentNode.removeChild(iframe);
+      }
+      if (err) reject(err);
+      else resolve(null);
+    };
+
+    const timer = setTimeout(() => finish(new Error('PDF generation timeout')), timeoutMs);
+
+    const onAfterPrint = () => finish();
+
+    const triggerPrint = () => {
+      try {
+        const win = iframe.contentWindow;
+        if (!win) {
+          finish(new Error('Could not prepare PDF export'));
+          return;
+        }
+        window.addEventListener('afterprint', onAfterPrint);
+        win.focus();
+        win.print();
+        // Some browsers never fire afterprint for iframe jobs.
+        setTimeout(() => finish(), 2500);
+      } catch (err) {
+        finish(err);
+      }
+    };
+
+    iframe.onload = () => {
+      // Allow layout/fonts to settle before print preview opens.
+      setTimeout(triggerPrint, 250);
+    };
+
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) {
+      finish(new Error('Could not prepare PDF export'));
+      return;
+    }
+    doc.open();
+    doc.write(html);
+    doc.close();
+  });
+}
+
+async function printHtmlToPdfFile({ html, base64 = false, timeoutMs = 45000 }) {
+  if (Platform.OS === 'web') {
+    await printHtmlDocumentOnWeb(html, timeoutMs);
+    return null;
+  }
+
+  const result = await Promise.race([
+    Print.printToFileAsync({ html, base64 }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('PDF generation timeout')), timeoutMs)
+    ),
+  ]);
+
+  const uri = result?.uri;
+  if (!uri) {
+    throw new Error('PDF file was not created');
+  }
+  return uri;
+}
+
 /**
  * Load logo as data URI from a required asset (e.g. require('../../assets/logo.png')).
  * Call from a component so the require path resolves correctly; pass result to generatePDF / generateEventTimelinePDF.
@@ -300,6 +418,7 @@ export const generatePDF = async (message, options = {}) => {
               color: #6b7280;
               font-size: 18px;
             }
+            ${PDF_PRINT_STYLES}
           </style>
         </head>
         <body>
@@ -328,18 +447,9 @@ export const generatePDF = async (message, options = {}) => {
     console.log('📄 [PDF] HTML generated, length:', html.length);
     console.log('📄 [PDF] Calling Print.printToFileAsync...');
 
-    // Generate PDF with image included
-    const { uri } = await Promise.race([
-      Print.printToFileAsync({ 
-        html,
-        base64: false
-      }),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('PDF generation timeout')), 45000)
-      )
-    ]);
-    
-    console.log('✅ [PDF] Generated successfully:', uri);
+    const uri = await printHtmlToPdfFile({ html, base64: false });
+
+    console.log('✅ [PDF] Generated successfully:', uri || '(web print dialog)');
     return uri;
   } catch (error) {
     console.error('❌ [PDF] Generation error:', error);
@@ -582,6 +692,7 @@ export const generateEventTimelinePDF = async ({ year, nativeName, monthlyData, 
             .footer { margin-top: 32px; padding-top: 20px; border-top: 2px solid #f0f0f0; text-align: center; color: #6b7280; font-size: 20px; }
             .disclaimer-title { font-weight: 700; margin-bottom: 6px; }
             .disclaimer-text { font-size: 17px; line-height: 1.5; }
+            ${PDF_PRINT_STYLES}
           </style>
         </head>
         <body>
@@ -608,11 +719,7 @@ export const generateEventTimelinePDF = async ({ year, nativeName, monthlyData, 
         </body>
       </html>`;
 
-    const { uri } = await Promise.race([
-      Print.printToFileAsync({ html, base64: false }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('PDF generation timeout')), 45000)),
-    ]);
-    return uri;
+    return printHtmlToPdfFile({ html, base64: false });
   } catch (error) {
     console.error('Event timeline PDF error:', error);
     throw error;
@@ -685,6 +792,7 @@ export const generateRelationshipReportPDF = async ({
             p { color: #3f2a56; line-height: 1.58; margin: 8px 0; }
             ul { margin: 8px 0 0 20px; padding: 0; color: #3f2a56; line-height: 1.55; }
             .footer { margin-top: 30px; color: #7c2d12; font-size: 12px; line-height: 1.5; border-top: 1px solid #fed7aa; padding-top: 14px; }
+            ${PDF_PRINT_STYLES}
           </style>
         </head>
         <body>
@@ -730,19 +838,20 @@ export const generateRelationshipReportPDF = async ({
       </html>
     `;
 
-    const { uri } = await Promise.race([
-      Print.printToFileAsync({ html, base64: false }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('PDF generation timeout')), timeoutMs)),
-    ]);
-    return uri;
+    return printHtmlToPdfFile({ html, base64: false, timeoutMs });
   } catch (error) {
     console.error('Relationship report PDF error:', error);
     throw error;
   }
 };
 
-export const sharePDFOnWhatsApp = async (pdfUri) => {
+export const sharePDFOnWhatsApp = async (pdfUri, options = {}) => {
   try {
+    if (!pdfUri) {
+      // Web/PWA: browser print/save dialog already handled export.
+      return;
+    }
+
     const isAvailable = await Sharing.isAvailableAsync();
     if (!isAvailable) {
       throw new Error('Sharing is not available on this device');
@@ -750,7 +859,7 @@ export const sharePDFOnWhatsApp = async (pdfUri) => {
 
     await Sharing.shareAsync(pdfUri, {
       mimeType: 'application/pdf',
-      dialogTitle: 'Share AstroRoshni Prediction',
+      dialogTitle: options.dialogTitle || 'Share AstroRoshni Prediction',
       UTI: 'com.adobe.pdf',
     });
   } catch (error) {

@@ -593,6 +593,24 @@ def build_system_instruction(analysis_type=None, intent_category=None, include_a
         # Do NOT add COMPLIANCE_RULES / DASHA_DATES_SOVEREIGNTY / HOLISTIC_SYNTHESIS_RULE here to de‑emphasize prediction templates
         instruction += "\n" + DATA_SOVEREIGNTY
         return instruction
+
+    # FOMO MANIFESTATION MODE: keep the normal calculation/date/data guardrails,
+    # but do not inject the broad normal-chat multi-school mandates. The selected
+    # deterministic manifestation and its Parashari response contract are added
+    # by output_schema.py. This branch is isolated to FOMO mode; normal chat uses
+    # the unchanged instruction assembly below.
+    if mode and str(mode).upper() == "FOMO_MANIFESTATION_DETAIL":
+        return "\n".join(
+            (
+                CORE_PERSONA,
+                death_ethics_block(death_analysis_unlocked),
+                FETAL_SEX_ETHICS,
+                DASHA_DATES_SOVEREIGNTY,
+                TRANSIT_DATES_SOVEREIGNTY,
+                DATA_SOVEREIGNTY,
+                PERSONAL_CONSULTATION_RULES,
+            )
+        )
     
     # Normalize category aliases used by intent router / lifespan fail-safe.
     cat = str(intent_category or "general").strip().lower()

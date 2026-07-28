@@ -1,10 +1,13 @@
 import os
 import socket
+import time
+import logging
 from contextlib import contextmanager
 from typing import Dict, Iterable, Tuple
 
 
 _POOLS: Dict[Tuple[int, bool], object] = {}
+logger = logging.getLogger(__name__)
 
 
 def _postgres_dsn() -> str:
@@ -69,6 +72,26 @@ def _connect_timeout() -> int:
         return max(1, int(os.getenv("DB_CONNECT_TIMEOUT_S", "5") or "5"))
     except Exception:
         return 5
+
+
+def _pool_acquire_timeout_seconds() -> float:
+    try:
+        return max(
+            0.0,
+            float(os.getenv("DB_POOL_ACQUIRE_TIMEOUT_MS", "250") or "250") / 1000.0,
+        )
+    except Exception:
+        return 0.25
+
+
+def _pool_acquire_poll_seconds() -> float:
+    try:
+        return max(
+            0.001,
+            float(os.getenv("DB_POOL_ACQUIRE_POLL_MS", "10") or "10") / 1000.0,
+        )
+    except Exception:
+        return 0.01
 
 
 def _detect_application_name() -> str:
@@ -156,7 +179,50 @@ def _connect_postgres():
     pool = _get_pool(dict_rows=False)
     if pool is None:
         return _new_connection(dict_rows=False)
-    return pool.getconn()
+    return _acquire_from_pool(pool, dict_rows=False)
+
+
+def _pool_occupancy(pool) -> Dict[str, int]:
+    """Best-effort ThreadedConnectionPool occupancy for diagnostics."""
+    try:
+        used = len(getattr(pool, "_used", {}) or {})
+    except Exception:
+        used = -1
+    try:
+        free = len(getattr(pool, "_pool", []) or [])
+    except Exception:
+        free = -1
+    return {"used": used, "free": free}
+
+
+def _acquire_from_pool(pool, *, dict_rows: bool):
+    """
+    Wait briefly for a returned connection instead of failing on a transient
+    fifth checkout. The wait is deliberately bounded so request threads cannot
+    pile up indefinitely when the database is genuinely saturated.
+    """
+    from psycopg2.pool import PoolError
+
+    timeout = _pool_acquire_timeout_seconds()
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            return pool.getconn()
+        except PoolError:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                occupancy = _pool_occupancy(pool)
+                logger.warning(
+                    "db_pool_acquire_timeout application=%s pool=%s used=%s free=%s max=%s wait_ms=%s",
+                    _detect_application_name(),
+                    "dict" if dict_rows else "plain",
+                    occupancy["used"],
+                    occupancy["free"],
+                    _pool_max_conn(),
+                    int(timeout * 1000),
+                )
+                raise
+            time.sleep(min(_pool_acquire_poll_seconds(), remaining))
 
 
 def _adapt_query_for_postgres(sql: str) -> str:
@@ -223,7 +289,11 @@ def get_conn_dict():
     Postgres connection whose cursors return dict-like rows (RealDictCursor-compatible).
     """
     pool = _get_pool(dict_rows=True)
-    conn = pool.getconn() if pool is not None else _new_connection(dict_rows=True)
+    conn = (
+        _acquire_from_pool(pool, dict_rows=True)
+        if pool is not None
+        else _new_connection(dict_rows=True)
+    )
     try:
         yield conn
     finally:
@@ -244,6 +314,11 @@ def get_pool_debug_snapshot() -> Dict[str, object]:
         "max_conn": _pool_max_conn(),
         "pid": os.getpid(),
         "pool_keys": [f"{pid}:{'dict' if dict_rows else 'plain'}" for pid, dict_rows in _POOLS.keys()],
+        "pools": {
+            ("dict" if dict_rows else "plain"): _pool_occupancy(pool)
+            for (pid, dict_rows), pool in _POOLS.items()
+            if pid == os.getpid()
+        },
     }
     return snapshot
 
