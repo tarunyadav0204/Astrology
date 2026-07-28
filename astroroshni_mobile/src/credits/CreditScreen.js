@@ -1553,6 +1553,14 @@ const CreditScreen = ({ navigation, route }) => {
     const creditsAmount = Number(pack?.credits);
     if (!Number.isFinite(creditsAmount) || creditsAmount <= 0) return;
     let razorpayOrderId = null;
+    const packValue = Number(pack?.price_inr || pack?.amount_inr || pack?.price || 0);
+    const contentId = pack?.product_id || `credits_${creditsAmount}`;
+    trackAstrologyEvent.initiateCheckout({
+      content_id: contentId,
+      content_type: 'credits',
+      currency: 'INR',
+      value: packValue,
+    });
     setPurchasingRazorpayCredits(creditsAmount);
     try {
       // Same path as frontend: main API create-order → Checkout.js → verify (no Play / Cloud Run hop).
@@ -1575,6 +1583,19 @@ const CreditScreen = ({ navigation, route }) => {
         },
       });
       const added = Number(verifyPayload?.credits_added) || 0;
+      const purchaseValue =
+        Number(verifyPayload?.amount_inr) ||
+        Number(orderData?.amount_inr) ||
+        packValue ||
+        0;
+      trackAstrologyEvent.creditPurchased(purchaseValue, {
+        currency: 'INR',
+        content_id: contentId,
+        content_type: 'credits',
+        credits: creditsAmount,
+        credits_added: added,
+        order_id: razorpayOrderId || undefined,
+      });
       setPurchaseModal({
         visible: true,
         type: 'success',
@@ -1616,6 +1637,13 @@ const CreditScreen = ({ navigation, route }) => {
   const handleBuyRazorpaySubscription = async (plan) => {
     if (Platform.OS !== 'web' || !plan?.plan_id) return;
     setPurchasingRazorpaySubscriptionId(plan.plan_id);
+    const subValue = Number(plan?.price_inr || plan?.amount_inr || plan?.price || 0);
+    trackAstrologyEvent.initiateCheckout({
+      content_id: plan.plan_id,
+      content_type: 'subscription',
+      currency: 'INR',
+      value: subValue,
+    });
     try {
       const { data: subscriptionData } = await creditAPI.createRazorpaySubscription(plan.plan_id);
       const verifyData = await openRazorpaySubscriptionCheckout({
@@ -1627,6 +1655,13 @@ const CreditScreen = ({ navigation, route }) => {
           const { data } = await creditAPI.verifyRazorpaySubscription(payment);
           return data;
         },
+      });
+      trackAstrologyEvent.subscribe({
+        content_id: plan.plan_id,
+        content_type: 'subscription',
+        currency: 'INR',
+        value: subValue,
+        tier_name: plan.tier_name || verifyData?.subscription?.tier_name,
       });
       await fetchBalance();
       await fetchSubscriptionDetails();

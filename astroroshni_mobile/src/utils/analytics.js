@@ -8,6 +8,11 @@ import {
   setFacebookUserId,
   clearFacebookUserId,
 } from '../services/facebookAnalytics';
+import {
+  initMetaPixel,
+  trackMetaPixelEvent,
+  trackMetaPixelFromStandardKey,
+} from '../services/metaPixel';
 
 export { MetaStandardEvent, logMetaAppEvent };
 
@@ -30,6 +35,13 @@ if (Platform.OS === 'web') {
     gtag('config', '${GA_MEASUREMENT_ID}');
   `;
   document.head.appendChild(script2);
+
+  // Meta Pixel for /mobile/ PWA (PageView + conversion events).
+  try {
+    initMetaPixel();
+  } catch (_) {
+    /* non-fatal */
+  }
 }
 
 const gtag = (...args) => {
@@ -153,6 +165,15 @@ export const trackEvent = (eventName, params = {}) => {
   console.log('📊 Event:', eventName, params);
   if (Platform.OS === 'web') {
     gtag('event', eventName, params);
+    // Meta Pixel custom / mapped events for PWA.
+    if (eventName === 'login') {
+      trackMetaPixelEvent('Login', { method: params.method || 'mobile', ...params });
+    } else if (eventName === 'chat_message_sent') {
+      trackMetaPixelEvent('ChatMessage', {
+        message_type: params.message_type || 'user_question',
+        ...params,
+      });
+    }
   } else {
     sendToGA4(eventName, params);
     // Meta standard events are dispatched via trackMetaStandard / logMetaAppEvent; avoid duplicate custom logs.
@@ -186,6 +207,7 @@ export const trackMetaStandard = (eventKey, params = {}) => {
   console.log('📊 Meta standard:', eventKey, params);
   if (Platform.OS === 'web') {
     gtag('event', gaEventName, params);
+    trackMetaPixelFromStandardKey(eventKey, params);
   } else {
     sendToGA4(gaEventName, params);
     trackMobileJourneyEvent('mobile_action', {

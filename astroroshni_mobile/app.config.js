@@ -41,6 +41,7 @@ const facebookDisplayName = env('EXPO_PUBLIC_FACEBOOK_DISPLAY_NAME') || 'AstroRo
 const facebookDebugLog = ['1', 'true', 'yes'].includes(
   String(env('EXPO_PUBLIC_FACEBOOK_DEBUG_LOG') || '').toLowerCase()
 );
+const metaPixelId = env('EXPO_PUBLIC_META_PIXEL_ID') || '1900398174159684';
 
 const plugins = [...(appJson.expo.plugins || [])];
 
@@ -72,6 +73,7 @@ module.exports = {
       facebookClientToken,
       facebookDisplayName,
       facebookDebugLog,
+      metaPixelId,
     },
   },
 };
