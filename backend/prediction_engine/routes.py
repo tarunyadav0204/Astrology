@@ -275,6 +275,18 @@ def _generate_homepage_fomo(
         chart_name=str(chart.get("name") or ""),
         limit=limit,
     )
+    # Heal partial snapshots: more LLM themes may have been cached since the
+    # first write (shared theme cache / Activation Explorer / later synthesis).
+    if stored is not None:
+        refreshed = fomo_repository.refresh_teasers_from_llm_cache(
+            userid=userid,
+            cache_key=cache_key,
+            chart_name=str(chart.get("name") or ""),
+            locale=locale,
+            limit=limit,
+        )
+        if refreshed is not None:
+            stored = refreshed
     llm_wording_pending = False
     if stored is None or not stored.teasers:
         generation_owner = uuid.uuid4().hex
@@ -340,12 +352,10 @@ def _generate_homepage_fomo(
                     cache_key[:12],
                     exc_info=True,
                 )
+    if llm_wording_pending:
+        return {"status": "analyzing", "teasers": []}
     if not stored.teasers:
-        return (
-            {"status": "analyzing", "teasers": []}
-            if llm_wording_pending
-            else {"status": "empty", "teasers": []}
-        )
+        return {"status": "empty", "teasers": []}
     auto_eligible = bool(force_display or fomo_repository.eligible_for_display(
         userid=userid,
         display_signature=stored.display_signature,
@@ -466,26 +476,57 @@ async def get_homepage_fomo(
             asyncio.shield(calculation),
             timeout=_FOMO_CALCULATION_TIMEOUT_SECONDS,
         )
-        # If fresh data was generated but LLM cache wasn't ready, run
-        # async synthesis now (on the main event loop, avoiding gRPC
-        # conflicts) and re-save the snapshot with LLM wording.
-        if pending_synthesis and fomo_result.get("status") in ("analyzing", "empty"):
+        # Always synthesize after a fresh engine run. A partial shared-cache hit
+        # used to return status=ready with 1 tile and skip this step, locking
+        # production FOMO at a single card.
+        if pending_synthesis:
             try:
                 await synthesize_manifestations(
                     deterministic=pending_synthesis,
                     locale=locale,
                 )
-                # Re-run the save to pick up the now-cached LLM wording.
-                fomo_result = await run_in_threadpool(
-                    lambda: _generate_homepage_fomo(
-                        userid=current_user.userid,
-                        chart=chart,
-                        locale=locale,
-                        limit=limit,
-                        force_display=local_force_display,
-                        include_ineligible=include_ineligible,
+                profile = get_profile("parashari_fomo_v1")
+                refresh_key = snapshot_cache_key(
+                    userid=current_user.userid,
+                    birth_chart_id=int(chart["id"]),
+                    chart_hash=birth_chart_hash(chart),
+                    as_of=date.today(),
+                    horizon_days=HOMEPAGE_FOMO_HORIZON_DAYS,
+                    profile=profile.key,
+                    profile_version=profile.version,
+                    engine_version=ENGINE_VERSION,
+                    schema_version=SCHEMA_VERSION,
+                    locale=locale,
+                    provider_versions=profile.provider_versions,
+                    ephemeris_settings=profile.conventions.__dict__,
+                    presentation_version=(
+                        f"{FOMO_PRESENTATION_VERSION}:{HOMEPAGE_SELECTION_VERSION}"
                     ),
                 )
+                refreshed = await run_in_threadpool(
+                    fomo_repository.refresh_teasers_from_llm_cache,
+                    userid=current_user.userid,
+                    cache_key=refresh_key,
+                    chart_name=str(chart.get("name") or ""),
+                    locale=locale,
+                    limit=limit,
+                )
+                if refreshed is not None and refreshed.teasers:
+                    auto_eligible = bool(
+                        local_force_display
+                        or fomo_repository.eligible_for_display(
+                            userid=current_user.userid,
+                            display_signature=refreshed.display_signature,
+                        )
+                    )
+                    if not auto_eligible and not include_ineligible:
+                        fomo_result = {"status": "cooldown", "teasers": []}
+                    else:
+                        fomo_result = {
+                            "status": "ready",
+                            "auto_eligible": auto_eligible,
+                            **refreshed.to_public_dict(),
+                        }
             except Exception:
                 logger.warning(
                     "FOMO post-synthesis re-save failed; card will appear on next poll",

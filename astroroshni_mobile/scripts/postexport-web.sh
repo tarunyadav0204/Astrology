@@ -85,6 +85,28 @@ window.__ASTROROSHNI_SENTRY_ENV__ = window.__ASTROROSHNI_SENTRY_ENV__ || 'mobile
 </script>
 '''
     html = html.replace('</head>', snippet + '</head>', 1)
+
+# Meta Pixel base code in static HTML so Meta Pixel Helper / Events Manager
+# can detect it before the JS bundle loads (runtime init in metaPixel.js is backup).
+meta_pixel_id = (__import__('os').environ.get('EXPO_PUBLIC_META_PIXEL_ID') or '1900398174159684').strip()
+if meta_pixel_id and 'fbq(' not in html and 'fbevents.js' not in html:
+    meta_snippet = f'''
+<!-- Meta Pixel (PWA /mobile/) -->
+<script>
+!function(f,b,e,v,n,t,s){{if(f.fbq)return;n=f.fbq=function(){{n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)}};if(!f._fbq)f._fbq=n;
+n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}}(window,
+document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '{meta_pixel_id}');
+fbq('track', 'PageView');
+window.__AR_META_PIXEL_INIT__ = true;
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id={meta_pixel_id}&ev=PageView&noscript=1"
+/></noscript>
+'''
+    html = html.replace('</head>', meta_snippet + '</head>', 1)
 path.write_text(html, encoding='utf-8')
 print(f'Wrote {path}')
 PY

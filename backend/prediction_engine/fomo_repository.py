@@ -10,7 +10,7 @@ from typing import Any, Dict, Mapping, Optional, Sequence, Tuple
 from db import execute, get_conn
 from psycopg2.extras import execute_values
 
-from .contracts import FomoPresentation, PredictionResult
+from .contracts import FomoPresentation, Polarity, PredictionResult
 from .manifestation_synthesis import build_minimal_synthesis_context, load_cached_theme_item
 
 
@@ -18,7 +18,7 @@ SNAPSHOT_RETENTION_DAYS = 14
 HOMEPAGE_DISPLAY_COOLDOWN_DAYS = 7
 HOMEPAGE_CHANGED_SET_QUIET_HOURS = 48
 FOMO_GENERATION_LEASE_SECONDS = 600
-HOMEPAGE_SELECTION_VERSION = "1.4.2"
+HOMEPAGE_SELECTION_VERSION = "1.4.3"
 FOMO_EVENT_TYPES = frozenset({
     "shown",
     "opened",
@@ -129,6 +129,88 @@ def homepage_fomo_auto_eligible(
     ):
         return False
     return True
+
+
+def _presentation_from_dict(row: Mapping[str, Any]) -> FomoPresentation:
+    tone = row.get("tone")
+    if isinstance(tone, str):
+        tone = Polarity(tone)
+    elif not isinstance(tone, Polarity):
+        tone = Polarity.NEUTRAL
+    return FomoPresentation(
+        presentation_id=str(row.get("presentation_id") or ""),
+        manifestation_id=str(row.get("manifestation_id") or ""),
+        locale=str(row.get("locale") or "en"),
+        subject=str(row.get("subject") or "self"),
+        domain=str(row.get("domain") or "other"),
+        area_label=str(row.get("area_label") or ""),
+        tone=tone,
+        title=str(row.get("title") or ""),
+        teaser=str(row.get("teaser") or ""),
+        suggested_question=str(row.get("suggested_question") or ""),
+        rule_id=str(row.get("rule_id") or ""),
+        template_version=str(row.get("template_version") or ""),
+    )
+
+
+def _ready_presentations_from_engine_rows(
+    *,
+    presentations: Sequence[FomoPresentation],
+    manifestation_rows: Sequence[Mapping[str, Any]],
+    locale: str,
+    limit: int,
+) -> Tuple[Tuple[FomoPresentation, ...], Dict[str, Dict[str, Any]], int]:
+    """
+    Rank FOMO candidates, then keep only those whose LLM theme wording is cached.
+
+    Returns (ready_presentations, theme_cache_by_presentation_id, candidate_count).
+    """
+    manifestation_domains = {
+        str(row.get("manifestation_id") or ""): tuple(dict.fromkeys(
+            str(theme.get("domain") or "").strip()
+            for theme in (row.get("constituent_themes") or ())
+            if str(theme.get("domain") or "").strip()
+        )) or (str(row.get("domain") or "other"),)
+        for row in manifestation_rows
+        if row.get("manifestation_id")
+    }
+    homepage_presentations = rank_homepage_presentations(
+        presentations,
+        maximum=max(3, limit),
+        manifestation_domains=manifestation_domains,
+    )
+    candidate_manifestation_ids = {
+        str(p.manifestation_id) for p in homepage_presentations
+    }
+    deterministic_for_cache = [
+        dict(row)
+        for row in manifestation_rows
+        if str(row.get("manifestation_id") or "") in candidate_manifestation_ids
+    ]
+    context, theme_by_manifestation_id = build_minimal_synthesis_context(
+        deterministic_for_cache
+    )
+    cached_themes_by_key: Dict[str, Dict[str, Any]] = {}
+    for theme in context.get("themes") or []:
+        theme_key = str(theme.get("theme_key") or "")
+        if not theme_key:
+            continue
+        cached_item = load_cached_theme_item(theme, locale=locale)
+        if cached_item:
+            cached_themes_by_key[theme_key] = cached_item
+
+    ready: list[FomoPresentation] = []
+    theme_cache_by_presentation_id: Dict[str, Dict[str, Any]] = {}
+    for presentation in homepage_presentations:
+        theme_key = theme_by_manifestation_id.get(str(presentation.manifestation_id))
+        cached_theme = (
+            cached_themes_by_key.get(str(theme_key)) if theme_key else None
+        )
+        if not cached_theme:
+            continue
+        ready.append(presentation)
+        theme_cache_by_presentation_id[presentation.presentation_id] = cached_theme
+    return tuple(ready), theme_cache_by_presentation_id, len(homepage_presentations)
 
 
 def rank_homepage_presentations(
@@ -390,64 +472,19 @@ class FomoSnapshotRepository:
             days=SNAPSHOT_RETENTION_DAYS
         )
         payload = _canonical_json(result.to_dict(include_evidence=True))
-        manifestation_domains = {
-            manifestation.manifestation_id: tuple(dict.fromkeys(
-                str(theme.get("domain") or "").strip()
-                for theme in manifestation.constituent_themes
-                if str(theme.get("domain") or "").strip()
-            )) or (manifestation.domain,)
-            for manifestation in result.chart_manifestations
-        }
-        homepage_presentations = rank_homepage_presentations(
-            result.fomo_presentations,
-            maximum=max(3, limit),
-            manifestation_domains=manifestation_domains,
-        )
-
-        # Cache-only gating:
-        # We only show homepage FOMO tiles when the per-combination LLM synthesis
-        # is already present in `prediction_manifestation_syntheses`.
-        # This prevents the UI from appearing while LLM wording is still missing.
-        candidate_manifestation_ids = {
-            str(p.manifestation_id) for p in homepage_presentations
-        }
-        deterministic_for_cache = [
-            m.to_dict()
-            for m in result.chart_manifestations
-            if str(m.manifestation_id) in candidate_manifestation_ids
-        ]
-        context, theme_by_manifestation_id = build_minimal_synthesis_context(
-            deterministic_for_cache
-        )
-        cached_themes_by_key: Dict[str, Dict[str, Any]] = {}
-        for theme in context.get("themes") or []:
-            theme_key = str(theme.get("theme_key") or "")
-            if not theme_key:
-                continue
-            cached_item = load_cached_theme_item(theme, locale=locale)
-            if cached_item:
-                cached_themes_by_key[theme_key] = cached_item
-
-        homepage_presentations_ready: list[FomoPresentation] = []
-        theme_cache_by_presentation_id: Dict[str, Dict[str, Any]] = {}
-        for presentation in homepage_presentations:
-            theme_key = theme_by_manifestation_id.get(
-                str(presentation.manifestation_id)
+        homepage_presentations_ready, theme_cache_by_presentation_id, candidate_count = (
+            _ready_presentations_from_engine_rows(
+                presentations=result.fomo_presentations,
+                manifestation_rows=[m.to_dict() for m in result.chart_manifestations],
+                locale=locale,
+                limit=limit,
             )
-            cached_theme = (
-                cached_themes_by_key.get(str(theme_key))
-                if theme_key
-                else None
-            )
-            if not cached_theme:
-                continue
-            homepage_presentations_ready.append(presentation)
-            theme_cache_by_presentation_id[
-                presentation.presentation_id
-            ] = cached_theme
-
-        llm_wording_pending = bool(homepage_presentations) and not bool(
-            homepage_presentations_ready
+        )
+        # Pending when any ranked candidate still lacks LLM wording — including
+        # partial hits (1 of N). Otherwise prod locks a one-card snapshot and
+        # never refreshes after the remaining themes are synthesized.
+        llm_wording_pending = candidate_count > 0 and (
+            len(homepage_presentations_ready) < candidate_count
         )
 
         display_signature = hashlib.sha256(
@@ -573,6 +610,159 @@ class FomoSnapshotRepository:
         if stored is None:
             raise RuntimeError("Persisted FOMO snapshot could not be reloaded")
         return stored, llm_wording_pending
+
+    def refresh_teasers_from_llm_cache(
+        self,
+        *,
+        userid: int,
+        cache_key: str,
+        chart_name: str,
+        locale: str,
+        limit: int,
+    ) -> Optional[StoredHomepageFomo]:
+        """
+        Rebuild teasers for an existing snapshot from the current LLM theme cache.
+
+        Used after synthesis completes, and on subsequent polls when more themes
+        become ready than were saved on a partial first write.
+        """
+        with get_conn() as conn:
+            snapshot = execute(
+                conn,
+                """
+                SELECT snapshot_id, result_payload
+                FROM parashari_prediction_snapshots
+                WHERE userid = %s
+                  AND cache_key = %s
+                  AND expires_at > CURRENT_TIMESTAMP
+                """,
+                (userid, cache_key),
+            ).fetchone()
+        if not snapshot:
+            return None
+        snapshot_id = str(snapshot[0])
+        payload = snapshot[1]
+        if isinstance(payload, str):
+            payload = json.loads(payload)
+        if not isinstance(payload, Mapping):
+            return None
+
+        presentation_rows = [
+            _presentation_from_dict(row)
+            for row in (payload.get("fomo_presentations") or [])
+            if isinstance(row, Mapping)
+        ]
+        manifestation_rows = [
+            row
+            for row in (payload.get("chart_manifestations") or [])
+            if isinstance(row, Mapping)
+        ]
+        if not presentation_rows:
+            return self.load_cached(
+                userid=userid,
+                cache_key=cache_key,
+                chart_name=chart_name,
+                limit=limit,
+            )
+
+        ready, theme_cache_by_presentation_id, _candidate_count = (
+            _ready_presentations_from_engine_rows(
+                presentations=presentation_rows,
+                manifestation_rows=manifestation_rows,
+                locale=locale,
+                limit=limit,
+            )
+        )
+        display_signature = hashlib.sha256(
+            "|".join(presentation.presentation_id for presentation in ready).encode(
+                "utf-8"
+            )
+        ).hexdigest()
+
+        with get_conn() as conn:
+            execute(
+                conn,
+                """
+                UPDATE parashari_prediction_snapshots
+                SET display_signature = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE snapshot_id = %s
+                """,
+                (display_signature, snapshot_id),
+            )
+            execute(
+                conn,
+                "DELETE FROM parashari_prediction_teasers WHERE snapshot_id = %s",
+                (snapshot_id,),
+            )
+            teaser_rows = [
+                (
+                    presentation.presentation_id,
+                    snapshot_id,
+                    presentation.manifestation_id,
+                    rank,
+                    presentation.locale,
+                    presentation.subject,
+                    presentation.domain,
+                    str(
+                        (
+                            (theme_cache_by_presentation_id.get(
+                                presentation.presentation_id
+                            ) or {}).get("label")
+                            or presentation.area_label
+                        )
+                    ),
+                    presentation.tone.value,
+                    str(
+                        (
+                            (theme_cache_by_presentation_id.get(
+                                presentation.presentation_id
+                            ) or {}).get("label")
+                            or presentation.title
+                        )
+                    ),
+                    _format_cached_fomo_teaser(
+                        theme_cache_by_presentation_id.get(presentation.presentation_id)
+                        or {},
+                        fallback_teaser=presentation.teaser,
+                    ),
+                    presentation.suggested_question,
+                    presentation.rule_id,
+                    presentation.template_version,
+                )
+                for rank, presentation in enumerate(ready)
+            ]
+            if teaser_rows:
+                cursor = conn.cursor()
+                try:
+                    execute_values(
+                        cursor,
+                        """
+                        INSERT INTO parashari_prediction_teasers (
+                            presentation_id, snapshot_id, manifestation_id,
+                            display_rank, locale, subject, domain, area_label,
+                            tone, title, teaser, suggested_question, rule_id,
+                            template_version
+                        )
+                        VALUES %s
+                        """,
+                        teaser_rows,
+                        template=(
+                            "(%s, %s, %s, %s, %s, %s, %s, %s, "
+                            "%s, %s, %s, %s, %s, %s)"
+                        ),
+                        page_size=50,
+                    )
+                finally:
+                    cursor.close()
+            conn.commit()
+
+        return self.load_cached(
+            userid=userid,
+            cache_key=cache_key,
+            chart_name=chart_name,
+            limit=limit,
+        )
 
     def load_owned_presentation(
         self,

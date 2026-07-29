@@ -35,7 +35,12 @@ function getFbq() {
  * Inject Meta Pixel base code once and fire PageView (Opening the URL).
  */
 export function initMetaPixel() {
-  if (!shouldTrackMetaPixel() || initStarted) return;
+  if (!shouldTrackMetaPixel()) return;
+  // Static HTML from postexport-web.sh may have already booted fbq + PageView.
+  if (initStarted || (typeof window !== 'undefined' && window.__AR_META_PIXEL_INIT__)) {
+    initStarted = true;
+    return;
+  }
   initStarted = true;
 
   try {
@@ -62,6 +67,9 @@ export function initMetaPixel() {
 
     window.fbq('init', META_PIXEL_ID);
     window.fbq('track', 'PageView');
+    if (typeof window !== 'undefined') {
+      window.__AR_META_PIXEL_INIT__ = true;
+    }
     if (__DEV__) {
       console.log('[MetaPixel] init + PageView', META_PIXEL_ID);
     }
