@@ -17,6 +17,7 @@ RUNTIME_MIGRATIONS = (
     "add_parashari_fomo_snapshots.sql",
     "add_homepage_prompt_exposures.sql",
     "add_parashari_fomo_generation_claims.sql",
+    "add_manifestation_syntheses.sql",
 )
 
 if str(BACKEND_DIR) not in sys.path:

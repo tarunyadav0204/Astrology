@@ -7,14 +7,16 @@ from .contracts import InterpretationAlternative, OutcomeAssessment, Polarity
 from .subjects import SUBJECTS
 
 
-HOUSE_SIGNIFICATION_REGISTRY_VERSION = "1.2.0"
+HOUSE_SIGNIFICATION_REGISTRY_VERSION = "1.4.0"
 
 
 @dataclass(frozen=True)
 class HouseSignification:
     house: int
     label: str
+    significations: Sequence[str]
     manifestations: Sequence[str]
+    body_significations: Sequence[str] = ()
 
 
 @dataclass(frozen=True)
@@ -28,55 +30,101 @@ class HouseCombination:
 
 HOUSE_SIGNIFICATIONS: Dict[int, HouseSignification] = {
     1: HouseSignification(1, "identity, vitality and new direction", (
+        "identity", "vitality", "new direction", "body", "appearance", "independence",
+        "self-definition", "personal beginnings",
+    ), (
         "a personal beginning or change of direction", "attention to vitality or appearance",
         "greater independence or self-definition", "attention to the head, brain or overall physical constitution",
-    )),
-    2: HouseSignification(2, "savings, accumulated resources, family and speech", (
+    ), ("head", "brain", "physical constitution")),
+    2: HouseSignification(2, "savings, family, speech and values", (
+        "savings", "accumulated resources", "family", "family resources", "speech",
+        "food habits", "values",
+    ), (
         "a savings or accumulated-resource matter", "a family responsibility or development",
         "an important conversation, food habit or question of values",
         "attention to the face, mouth, teeth, tongue, throat or food intake",
-    )),
-    3: HouseSignification(3, "effort, skills, communication and siblings", (
-        "a communication, document or skills matter", "a new personal effort or initiative",
+    ), ("face", "mouth", "teeth", "tongue", "throat")),
+    3: HouseSignification(3, "effort, skills, communication, siblings and change", (
+        "effort", "skills", "communication", "siblings", "change", "documents",
+        "short journeys", "courage", "initiative",
+    ), (
+        "a communication, document or skills matter", "a new personal effort, initiative or change",
         "a sibling-related development or short journey", "attention to the shoulders, arms, hands, ears or breathing",
-    )),
-    4: HouseSignification(4, "home, property, education and inner stability", (
+    ), ("shoulders", "arms", "hands", "ears", "breathing")),
+    4: HouseSignification(4, "home, property, mother and inner stability", (
+        "home", "property", "residence", "mother", "education", "inner stability",
+        "comfort", "emotional security",
+    ), (
         "a home, residence or property matter", "education or foundational learning",
         "a matter involving mother, comfort or emotional security", "attention to the chest, breasts, lungs or emotional wellbeing",
-    )),
-    5: HouseSignification(5, "children, intelligence, creativity and learning", (
+    ), ("chest", "breasts", "lungs")),
+    5: HouseSignification(5, "children, learning, creativity and judgment", (
+        "children", "intelligence", "creativity", "learning", "exams", "study",
+        "speculation", "risk", "counsel", "judgment", "romance",
+    ), (
         "a child-related or creative development", "study, examination or application of intelligence",
-        "a considered risk, counsel or speculative decision", "attention to the heart, upper abdomen, spine or digestion",
-    )),
-    6: HouseSignification(6, "health, service, workload, debt and disputes", (
-        "a health, treatment or routine matter", "workload, service or employment pressure",
-        "a debt, repayment, competition or dispute", "attention to the intestines, digestion, illness, treatment or recovery",
-    )),
-    7: HouseSignification(7, "partnerships, agreements and public dealings", (
+        "a considered risk, counsel, romance or speculative decision",
+        "attention to the heart, upper abdomen, spine or digestion",
+    ), ("heart", "digestion")),
+    6: HouseSignification(6, "health, service, debt and disputes", (
+        "health", "illness", "treatment", "recovery", "service", "employment", "workload",
+        "debt", "repayment", "disputes", "competition", "enemies",
+    ), (
+        "a health, treatment, illness or recovery matter", "workload, service or employment pressure",
+        "a debt, repayment, competition, enemy or dispute",
+        "attention to the intestines, digestion, illness, treatment or recovery",
+    ), ("intestines", "digestion")),
+    7: HouseSignification(7, "spouse, partnerships and agreements", (
+        "spouse", "partnerships", "agreements", "contracts", "negotiation",
+        "business partner", "public dealings", "one-to-one dealings", "open enemies",
+    ), (
         "a spouse or relationship development", "a contract, negotiation or business partnership",
-        "an important one-to-one or public interaction", "attention to the kidneys, lower abdomen or reproductive balance",
-    )),
-    8: HouseSignification(8, "shared resources, vulnerability and consequential change", (
+        "an important one-to-one or public interaction",
+        "attention to the kidneys, lower abdomen or reproductive balance",
+    ), ("kidneys", "lower abdomen", "reproductive balance")),
+    8: HouseSignification(8, "shared resources, tax, inheritance and consequential change", (
+        "shared resources", "joint finances", "tax", "insurance", "inheritance",
+        "vulnerability", "consequential change", "sudden change", "research", "investigation",
+        "chronic issues",
+    ), (
         "a joint-finance, tax, insurance or inheritance matter", "a private issue requiring adjustment",
-        "a consequential change, research or deeper investigation", "attention to the reproductive organs, elimination or chronic vulnerability",
-    )),
-    9: HouseSignification(9, "father, guidance, fortune and long journeys", (
-        "a matter involving father, mentor or adviser", "higher learning, belief or legal guidance",
-        "a long-distance journey or expansion of opportunity", "attention to the hips, thighs or mobility",
-    )),
-    10: HouseSignification(10, "career, authority, status and responsibility", (
-        "a professional responsibility or role change", "recognition, authority or public standing",
-        "an important action with visible consequences", "attention to the knees, joints, bones or skeletal strain",
-    )),
-    11: HouseSignification(11, "gains, goals, recognition and networks", (
-        "income or material gains", "an objective or desired result",
+        "a consequential or sudden change, research or deeper investigation",
+        "attention to the reproductive organs, elimination or chronic vulnerability",
+    ), ("reproductive organs", "elimination")),
+    9: HouseSignification(9, "father, dharma, fortune and long journeys", (
+        "father", "guidance", "fortune", "luck", "long journeys", "dharma", "belief",
+        "higher learning", "legal guidance", "mentor", "guru",
+    ), (
+        "a matter involving father, mentor, guru or adviser", "higher learning, belief, dharma or legal guidance",
+        "a long-distance journey, fortune or expansion of opportunity",
+        "attention to the hips, thighs or mobility",
+    ), ("hips", "thighs", "mobility")),
+    10: HouseSignification(10, "career, authority, status and public duty", (
+        "career", "authority", "status", "responsibility", "public standing", "public duty",
+        "promotion", "role change", "government", "visible actions",
+    ), (
+        "a professional responsibility, promotion or role change",
+        "recognition, authority, government or public standing",
+        "an important action with visible consequences",
+        "attention to the knees, joints, bones or skeletal strain",
+    ), ("knees", "joints", "bones")),
+    11: HouseSignification(11, "income, gains, networks and fulfilment", (
+        "income", "gains", "goals", "recognition", "networks", "friends", "contacts",
+        "fulfilment of desires", "elder sibling",
+    ), (
+        "income or material gains", "an objective, desire or desired result",
         "recognition, contacts, friends or network activity", "an elder-sibling matter",
         "attention to the calves, ankles or circulation",
-    )),
-    12: HouseSignification(12, "expenses, foreign connections, retreat and release", (
-        "an expense or use of reserves", "foreign travel, distant residence or overseas connection",
-        "rest, withdrawal, private work or spiritual practice", "attention to the feet, sleep, immunity or lymphatic drainage",
-    )),
+    ), ("calves", "ankles", "circulation")),
+    12: HouseSignification(12, "expenses, foreign stay, retreat and release", (
+        "expenses", "loss", "foreign connections", "foreign travel", "foreign residence",
+        "retreat", "release", "sleep", "hospitals", "isolation", "spiritual practice",
+        "private work", "secret work",
+    ), (
+        "an expense, loss or use of reserves", "foreign travel, distant residence or overseas connection",
+        "rest, withdrawal, hospital stay, private work or spiritual practice",
+        "attention to the feet, sleep, immunity or lymphatic drainage",
+    ), ("feet", "immunity")),
 }
 
 

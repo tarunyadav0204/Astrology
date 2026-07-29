@@ -9,6 +9,20 @@ const AnimatedLine = Animated.createAnimatedComponent(Line);
 const AnimatedPolygon = Animated.createAnimatedComponent(Polygon);
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 const AnimatedG = Animated.createAnimatedComponent(G);
+const HOUSE_DOT_POINTS = {
+  // Keep markers in the open outer part of each house, away from sign
+  // numbers and the central planet-label area.
+  1: { x: 250, y: 55 }, 2: { x: 150, y: 20 }, 3: { x: 25, y: 70 },
+  4: { x: 70, y: 190 }, 5: { x: 25, y: 330 }, 6: { x: 150, y: 380 },
+  7: { x: 250, y: 345 }, 8: { x: 350, y: 380 }, 9: { x: 375, y: 330 },
+  10: { x: 350, y: 190 }, 11: { x: 375, y: 70 }, 12: { x: 350, y: 20 },
+};
+const HOUSE_DOT_POINTS_ALT = {
+  1: { x: 180, y: 145 }, 2: { x: 75, y: 67 }, 3: { x: 50, y: 97 },
+  4: { x: 125, y: 197 }, 5: { x: 50, y: 302 }, 6: { x: 75, y: 332 },
+  7: { x: 180, y: 252 }, 8: { x: 300, y: 332 }, 9: { x: 375, y: 282 },
+  10: { x: 250, y: 197 }, 11: { x: 375, y: 97 }, 12: { x: 300, y: 62 },
+};
 
 const NorthIndianChart = ({ 
   chartData, 
@@ -24,6 +38,7 @@ const NorthIndianChart = ({
   glowAnimation = null, 
   hideInstructions = false,
   onHousePress, // New prop for drawer
+  houseActivation = null,
   size = null, // PWA/web: explicit pixel square (avoids % SVG collapse)
 }) => {
   const { theme, colors } = useTheme();
@@ -353,6 +368,34 @@ const NorthIndianChart = ({
           
           return (
             <G key={houseNumber}>
+              {highlightHouse === houseNumber ? (
+                <Path
+                  d={houseData.path}
+                  fill="rgba(255,215,0,0.18)"
+                  stroke="#ffd700"
+                  strokeWidth="4"
+                  pointerEvents="none"
+                />
+              ) : null}
+              {houseActivation?.[houseNumber] ? (
+                <Path
+                  d={houseData.path}
+                  fill={houseActivation[houseNumber].fill}
+                  opacity={houseActivation[houseNumber].state === 'dormant' ? 0 : 0.42}
+                  pointerEvents="none"
+                />
+              ) : null}
+              {houseActivation?.[houseNumber] ? (
+                <Circle
+                  cx={HOUSE_DOT_POINTS[houseNumber].x}
+                  cy={HOUSE_DOT_POINTS[houseNumber].y}
+                  r="6"
+                  fill={houseActivation[houseNumber].dot}
+                  stroke="#ffffff"
+                  strokeWidth="1.5"
+                  pointerEvents="none"
+                />
+              ) : null}
               {highlightHouse === houseNumber && glowAnimation && (
                 <Circle cx={houseData.center.x} cy={houseData.center.y} r="60" fill={getHouseGlowColor(houseNumber)} opacity={glowAnimation} />
               )}
@@ -573,7 +616,9 @@ const NorthIndianChart = ({
       {!hideInstructions && (
         <Text style={[
           styles.instructionText,
+          cosmicTheme && styles.instructionTextCosmic,
           Platform.OS === 'web' && styles.instructionTextWeb,
+          cosmicTheme && Platform.OS === 'web' && styles.instructionTextCosmicWeb,
           { color: theme === 'dark' ? (cosmicTheme ? 'rgba(255, 255, 255, 0.7)' : '#666') : (cosmicTheme ? 'rgba(0, 0, 0, 0.6)' : '#666') },
         ]}>
           Touch any house for deep insights
@@ -596,7 +641,11 @@ const styles = StyleSheet.create({
   tooltip: { position: 'absolute', top: 20, left: 20, right: 20, padding: 12, borderRadius: 12, alignItems: 'center', zIndex: 100 },
   tooltipText: { color: 'white', fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
   instructionText: { textAlign: 'center', fontSize: 12, fontStyle: 'italic', marginTop: 12, marginBottom: 18 },
+  // Keep the hint outside the square chart instead of letting the fixed-size
+  // SVG container overlap it when the chart is rendered in the cosmic layout.
+  instructionTextCosmic: { position: 'absolute', left: 0, right: 0, bottom: -24, marginTop: 0, marginBottom: 0 },
   instructionTextWeb: { position: 'absolute', left: 0, right: 0, bottom: 8, marginTop: 0, marginBottom: 0 },
+  instructionTextCosmicWeb: { bottom: -24 },
 });
 
 export default NorthIndianChart;

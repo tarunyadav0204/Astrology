@@ -35,6 +35,7 @@ from .fomo_repository import (
 from .homepage_prompts import HOMEPAGE_PROMPT_KEYS, HomepagePromptRepository
 from .profiles import get_profile
 from .service import PredictionService
+from .manifestation_synthesis import synthesize_manifestations
 
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ _FOMO_EXECUTOR = ThreadPoolExecutor(
     thread_name_prefix="homepage-fomo",
 )
 _FOMO_ADMISSION_TIMEOUT_SECONDS = 0.05
-_FOMO_CALCULATION_TIMEOUT_SECONDS = 30
+_FOMO_CALCULATION_TIMEOUT_SECONDS = 90
 _FOMO_CLEANUP_INTERVAL_SECONDS = 60 * 60
 _FOMO_CLEANUP_RETRY_SECONDS = 5 * 60
 _FOMO_CLEANUP_LOCK = asyncio.Lock()
@@ -203,7 +204,22 @@ async def get_activation_explorer(
             if payload.birth_chart_id is not None
             else dict(payload.birth_data or {})
         )
-        return await run_in_threadpool(_generate_activation_dossier, payload, chart)
+        response = await run_in_threadpool(_generate_activation_dossier, payload, chart)
+        deterministic = response.get("chart_manifestations") or []
+        if deterministic:
+            # LLM receives only subject + activated house significations + tone.
+            # Timing, dasha, evidence and reasons stay on the deterministic rows.
+            synthesis = await synthesize_manifestations(
+                deterministic=deterministic,
+                locale=payload.language or "en",
+            )
+            response["chart_manifestations_deterministic"] = deterministic
+            response["chart_manifestations"] = synthesis.get("manifestations") or deterministic
+            response["manifestation_synthesis"] = {
+                "version": synthesis.get("synthesis_version"),
+                "cached_or_generated": not bool(synthesis.get("synthesis_error")),
+            }
+        return response
     except HTTPException:
         raise
     except PredictionEngineError as exc:
@@ -230,6 +246,7 @@ def _generate_homepage_fomo(
     limit: int,
     force_display: bool = False,
     include_ineligible: bool = False,
+    _pending_synthesis: Optional[List] = None,
 ) -> Dict[str, Any]:
     birth = BirthChartInput.from_mapping(_normalise_birth_data(chart))
     profile = get_profile("parashari_fomo_v1")
@@ -258,16 +275,19 @@ def _generate_homepage_fomo(
         chart_name=str(chart.get("name") or ""),
         limit=limit,
     )
-    if stored is None:
+    llm_wording_pending = False
+    if stored is None or not stored.teasers:
         generation_owner = uuid.uuid4().hex
         claimed = fomo_repository.try_claim_generation(
             cache_key=cache_key,
             owner_token=generation_owner,
         )
         if not claimed:
-            raise FomoGenerationInProgress(
-                "Chart themes are already being generated"
-            )
+            # If we already have an empty snapshot, do not throw an error:
+            # just keep the card hidden until LLM wording cache is ready.
+            if stored is not None:
+                return {"status": "analyzing", "teasers": []}
+            raise FomoGenerationInProgress("Chart themes are already being generated")
         try:
             # A competing worker may have completed between the initial cache
             # read and this lease acquisition.
@@ -277,7 +297,7 @@ def _generate_homepage_fomo(
                 chart_name=str(chart.get("name") or ""),
                 limit=limit,
             )
-            if stored is None:
+            if stored is None or not stored.teasers:
                 result = PredictionService().generate(
                     PredictionRequest(
                         birth=birth,
@@ -290,7 +310,13 @@ def _generate_homepage_fomo(
                         language=locale,
                     )
                 )
-                stored = fomo_repository.save(
+                # Collect deterministic data for async LLM synthesis later
+                # (cannot run async LLM calls from this sync thread without
+                # gRPC event loop conflicts).
+                deterministic = [m.to_dict() for m in result.chart_manifestations]
+                if deterministic and _pending_synthesis is not None:
+                    _pending_synthesis.extend(deterministic)
+                stored, llm_wording_pending = fomo_repository.save(
                     userid=userid,
                     birth_chart_id=int(chart["id"]),
                     chart_name=str(chart.get("name") or ""),
@@ -315,7 +341,11 @@ def _generate_homepage_fomo(
                     exc_info=True,
                 )
     if not stored.teasers:
-        return {"status": "empty", "teasers": []}
+        return (
+            {"status": "analyzing", "teasers": []}
+            if llm_wording_pending
+            else {"status": "empty", "teasers": []}
+        )
     auto_eligible = bool(force_display or fomo_repository.eligible_for_display(
         userid=userid,
         display_signature=stored.display_signature,
@@ -411,6 +441,7 @@ async def get_homepage_fomo(
         local_force_display = bool(
             force_display and client_host in {"127.0.0.1", "::1", "localhost"}
         )
+        pending_synthesis: List[Dict[str, Any]] = []
         loop = asyncio.get_running_loop()
         calculation = loop.run_in_executor(
             _FOMO_EXECUTOR,
@@ -421,6 +452,7 @@ async def get_homepage_fomo(
                 limit=limit,
                 force_display=local_force_display,
                 include_ineligible=include_ineligible,
+                _pending_synthesis=pending_synthesis,
             ),
         )
         # Capacity follows the actual synchronous work, not the HTTP request.
@@ -430,10 +462,36 @@ async def get_homepage_fomo(
             lambda _future: _FOMO_REQUEST_SEMAPHORE.release()
         )
         capacity_owned_by_request = False
-        return await asyncio.wait_for(
+        fomo_result = await asyncio.wait_for(
             asyncio.shield(calculation),
             timeout=_FOMO_CALCULATION_TIMEOUT_SECONDS,
         )
+        # If fresh data was generated but LLM cache wasn't ready, run
+        # async synthesis now (on the main event loop, avoiding gRPC
+        # conflicts) and re-save the snapshot with LLM wording.
+        if pending_synthesis and fomo_result.get("status") in ("analyzing", "empty"):
+            try:
+                await synthesize_manifestations(
+                    deterministic=pending_synthesis,
+                    locale=locale,
+                )
+                # Re-run the save to pick up the now-cached LLM wording.
+                fomo_result = await run_in_threadpool(
+                    lambda: _generate_homepage_fomo(
+                        userid=current_user.userid,
+                        chart=chart,
+                        locale=locale,
+                        limit=limit,
+                        force_display=local_force_display,
+                        include_ineligible=include_ineligible,
+                    ),
+                )
+            except Exception:
+                logger.warning(
+                    "FOMO post-synthesis re-save failed; card will appear on next poll",
+                    exc_info=True,
+                )
+        return fomo_result
     except asyncio.TimeoutError as exc:
         logger.warning(
             "Homepage FOMO calculation timed out user=%s",

@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../context/ThemeContext';
 import { chartAPI } from '../../services/api';
 import { storage } from '../../services/storage';
+import NorthIndianChart from './NorthIndianChart';
 
 const HOUSE_LABELS = {
   1: 'Self, body and direction', 2: 'Savings, family, speech and face/mouth',
@@ -172,6 +173,7 @@ export default function ActivationExplorerScreen({ navigation, route }) {
     dormant: isDark ? 'rgba(255,255,255,0.42)' : '#a8a29e',
   };
   const [birthData, setBirthData] = useState(route?.params?.birthData || null);
+  const [d1ChartData, setD1ChartData] = useState(route?.params?.chartData || null);
   const [asOf, setAsOf] = useState(localDate);
   const [horizonDays, setHorizonDays] = useState(90);
   const [result, setResult] = useState(null);
@@ -182,12 +184,24 @@ export default function ActivationExplorerScreen({ navigation, route }) {
   const [licenseRequired, setLicenseRequired] = useState(false);
   const [showOutcomeReasons, setShowOutcomeReasons] = useState(false);
   const [activeTab, setActiveTab] = useState('houses');
+  const [selectedManifestationWindow, setSelectedManifestationWindow] = useState('all');
   const [expandedManifestation, setExpandedManifestation] = useState(null);
 
   useEffect(() => {
     if (birthData) return;
     storage.getBirthDetails().then(setBirthData).catch(() => setBirthData(null));
   }, [birthData]);
+
+  useEffect(() => {
+    if (d1ChartData || !birthData) return;
+    chartAPI.calculateChartOnly({
+      ...birthData,
+      date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
+      time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
+      latitude: parseFloat(birthData.latitude),
+      longitude: parseFloat(birthData.longitude),
+    }).then((response) => setD1ChartData(response?.data || null)).catch(() => {});
+  }, [birthData, d1ChartData]);
 
   const loadExplorer = useCallback(async () => {
     if (!birthData) return;
@@ -240,6 +254,14 @@ export default function ActivationExplorerScreen({ navigation, route }) {
   const displayedHouseRows = selectedWindowStart
     ? (result?.house_activations || []).filter((row) => row.window?.start_date <= gridReferenceDate && row.window?.end_date >= gridReferenceDate)
     : currentRows;
+  const chartHouseActivation = useMemo(() => displayedHouseRows.reduce((map, row) => {
+    map[row.house] = {
+      fill: activationColors[row.state] || activationColors.dormant,
+      dot: OUTCOME_COLORS[row.outcome?.tone || 'neutral'],
+      state: row.state,
+    };
+    return map;
+  }, {}), [displayedHouseRows, activationColors]);
   const promise = (result?.natal_promises || []).find((row) => row.house === selectedHouse?.house);
   const currentWindow = selectedHouse?.window || currentRows[0]?.window;
   const currentCandidates = (result?.candidates || []).filter((candidate) =>
@@ -258,6 +280,20 @@ export default function ActivationExplorerScreen({ navigation, route }) {
     return groups;
   }, []);
   const chartManifestations = result?.chart_manifestations || [];
+  const manifestationWindows = useMemo(() => {
+    const windows = new Map();
+    chartManifestations.forEach((item) => {
+      const start = item.window?.start_date;
+      const end = item.window?.end_date;
+      if (start && end) windows.set(`${start}:${end}`, { start, end });
+    });
+    return [...windows.values()].sort((left, right) => left.start.localeCompare(right.start));
+  }, [chartManifestations]);
+  useEffect(() => {
+    if (selectedManifestationWindow !== 'all' && !manifestationWindows.some((window) => `${window.start}:${window.end}` === selectedManifestationWindow)) {
+      setSelectedManifestationWindow('all');
+    }
+  }, [manifestationWindows, selectedManifestationWindow]);
   const chartManifestationGroups = useMemo(() => {
     const firstSubjectPosition = new Map();
     chartManifestations.forEach((item, index) => {
@@ -284,6 +320,13 @@ export default function ActivationExplorerScreen({ navigation, route }) {
       return groups;
     }, []);
   }, [asOf, chartManifestations]);
+  const visibleChartManifestationGroups = useMemo(() => {
+    if (selectedManifestationWindow === 'all') return chartManifestationGroups;
+    const [start, end] = selectedManifestationWindow.split(':');
+    return chartManifestationGroups
+      .map((group) => ({ ...group, items: group.items.filter((item) => item.window?.start_date === start && item.window?.end_date === end) }))
+      .filter((group) => group.items.length);
+  }, [chartManifestationGroups, selectedManifestationWindow]);
   const carriers = selectedHouse?.activation?.carrier_planets || [];
   const levels = selectedHouse?.activation?.active_dasha_levels || [];
   const directDashaConnections = unique((selectedHouse?.natal_connections || []).map((item) => `${item.planet} connects by natal ${String(item.relation || '').replaceAll('_', ' ')} during the ${item.level === 'MD' ? 'major period' : item.level === 'AD' ? 'sub-period' : 'sub-sub-period'}`));
@@ -396,13 +439,21 @@ export default function ActivationExplorerScreen({ navigation, route }) {
           <View style={card}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Where life is drawing your attention</Text>
             <Text style={[styles.sectionIntro, { color: colors.textSecondary }]}>Tap any house to understand why it matters now and what you may notice.</Text>
-            <View style={styles.houseGrid}>{Array.from({ length: 12 }, (_, index) => index + 1).map((houseNumber) => {
-              const house = displayedHouseRows.find((row) => row.house === houseNumber);
-              const selected = selectedHouse?.house === houseNumber;
-              const stateColor = activationColors[house?.state || 'dormant'];
-              const stateTextColor = activationTextColors[house?.state || 'dormant'];
-              return <TouchableOpacity key={houseNumber} onPress={() => { setSelectedHouseNumber(houseNumber); setSelectedWindowStart(null); }} style={[styles.houseTile, { borderColor: selected ? colors.primary : ui.border, borderWidth: selected ? 2 : 1, backgroundColor: stateColor }]}><View style={[styles.outcomeDot, { backgroundColor: OUTCOME_COLORS[house?.outcome?.tone || 'neutral'] }]} /><Text style={[styles.houseNumber, { color: stateTextColor }]}>H{houseNumber}</Text><Text style={[styles.houseState, { color: stateTextColor }]} numberOfLines={2}>{STATE_LABELS[house?.state] || 'Not active'}</Text></TouchableOpacity>;
-            })}</View>
+            {d1ChartData ? (
+              <View style={[styles.activationChart, { borderColor: ui.border, backgroundColor: ui.surfaceMuted }]}>
+                <NorthIndianChart
+                  chartData={d1ChartData}
+                  birthData={birthData}
+                  cosmicTheme
+                  hideInstructions
+                  highlightHouse={selectedHouse?.house}
+                  onHousePress={(selection) => { setSelectedHouseNumber(selection?.houseNum); setSelectedWindowStart(null); }}
+                  houseActivation={chartHouseActivation}
+                />
+              </View>
+            ) : (
+              <View style={styles.chartLoading}><ActivityIndicator color={colors.primary} /><Text style={[styles.stateText, { color: colors.textSecondary }]}>Loading the D1 chart…</Text></View>
+            )}
             <View style={[styles.legendBlock, { backgroundColor: ui.surfaceMuted }]}><Text style={[styles.legendTitle, { color: colors.text }]}>Activation</Text><View style={styles.legendWrap}>{[['fully_reinforced', 'Strong'], ['dasha_transit_activated', 'Active'], ['dasha_connected', 'Period'], ['transit_only', 'Background']].map(([state, label]) => <View key={state} style={styles.legendItem}><View style={[styles.legendSwatch, { backgroundColor: activationColors[state] }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>{label}</Text></View>)}</View><Text style={[styles.legendTitle, { color: colors.text }]}>Likely experience</Text><View style={styles.legendWrap}>{[['supportive', 'Constructive'], ['mixed', 'Mixed'], ['challenging', 'Pressure'], ['neutral', 'Unclear']].map(([tone, label]) => <View key={tone} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: OUTCOME_COLORS[tone] }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>{label}</Text></View>)}</View></View>
           </View>
 
@@ -427,7 +478,20 @@ export default function ActivationExplorerScreen({ navigation, route }) {
             <Text style={[styles.eyebrow, { color: colors.primary }]}>YOUR CHART’S BIGGER STORY</Text>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Life themes coming into focus</Text>
             <Text style={[styles.sectionIntro, { color: colors.textSecondary }]}>Houses are grouped only when they overlap in time, share a coherent planetary delivery chain and form a recognised event relationship.</Text>
-            {chartManifestationGroups.length ? chartManifestationGroups.map((group) => <View key={group.subject} style={styles.subjectSection}>
+            {manifestationWindows.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.manifestationWindowPickerRow}>
+              <TouchableOpacity onPress={() => setSelectedManifestationWindow('all')} style={[styles.windowChip, { borderColor: selectedManifestationWindow === 'all' ? colors.primary : colors.cardBorder, backgroundColor: selectedManifestationWindow === 'all' ? colors.primary : colors.cardBackground }]}>
+                <Text style={[styles.windowChipText, { color: selectedManifestationWindow === 'all' ? '#fff' : colors.textSecondary }]}>All windows</Text>
+              </TouchableOpacity>
+              {manifestationWindows.map((window) => {
+                const key = `${window.start}:${window.end}`;
+                const active = selectedManifestationWindow === key;
+                const isCurrent = window.start <= asOf && window.end >= asOf;
+                return <TouchableOpacity key={key} onPress={() => setSelectedManifestationWindow(key)} style={[styles.windowChip, { borderColor: active ? colors.primary : colors.cardBorder, backgroundColor: active ? colors.primary : colors.cardBackground }]}>
+                  <Text style={[styles.windowChipText, { color: active ? '#fff' : colors.textSecondary }]}>{isCurrent ? 'Active now · ' : ''}{shortDate(window.start)} – {shortDate(window.end)}</Text>
+                </TouchableOpacity>;
+              })}
+            </ScrollView> : null}
+            {visibleChartManifestationGroups.length ? visibleChartManifestationGroups.map((group) => <View key={group.subject} style={styles.subjectSection}>
               <View style={[styles.subjectSectionHeader, { borderColor: ui.border }]}>
                 <View style={[styles.subjectIcon, { backgroundColor: `${colors.primary}18` }]}>
                   <Ionicons name={group.subject === 'self' ? 'person-outline' : 'people-outline'} size={17} color={colors.primary} />
@@ -592,6 +656,8 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 21, lineHeight: 27, fontWeight: '700', letterSpacing: -0.35 },
   sectionIntro: { fontSize: 14, lineHeight: 21, marginTop: 5, marginBottom: 17 },
   houseGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  activationChart: { width: '100%', borderRadius: 16, borderWidth: 1, padding: 6, overflow: 'visible' },
+  chartLoading: { minHeight: 220, alignItems: 'center', justifyContent: 'center', gap: 10 },
   houseTile: {
     position: 'relative',
     width: '31.5%',
@@ -624,6 +690,7 @@ const styles = StyleSheet.create({
   band: { alignSelf: 'flex-start', maxWidth: 210, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 999 },
   windowPicker: { marginTop: 18, gap: 9 },
   windowPickerRow: { gap: 8, paddingRight: 8 },
+  manifestationWindowPickerRow: { gap: 8, paddingVertical: 8, paddingRight: 8 },
   windowChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9 },
   windowChipText: { fontSize: 12, lineHeight: 16, fontWeight: '600' },
   subheading: { fontSize: 17, lineHeight: 22, fontWeight: '700', marginTop: 26, marginBottom: 12, letterSpacing: -0.2 },

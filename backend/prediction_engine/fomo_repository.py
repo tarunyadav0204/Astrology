@@ -11,13 +11,14 @@ from db import execute, get_conn
 from psycopg2.extras import execute_values
 
 from .contracts import FomoPresentation, PredictionResult
+from .manifestation_synthesis import build_minimal_synthesis_context, load_cached_theme_item
 
 
 SNAPSHOT_RETENTION_DAYS = 14
 HOMEPAGE_DISPLAY_COOLDOWN_DAYS = 7
 HOMEPAGE_CHANGED_SET_QUIET_HOURS = 48
 FOMO_GENERATION_LEASE_SECONDS = 600
-HOMEPAGE_SELECTION_VERSION = "1.4.0"
+HOMEPAGE_SELECTION_VERSION = "1.4.2"
 FOMO_EVENT_TYPES = frozenset({
     "shown",
     "opened",
@@ -42,6 +43,22 @@ def _canonical_json(value: Any) -> str:
         separators=(",", ":"),
         default=str,
     )
+
+
+def _format_cached_fomo_teaser(
+    cached_theme: Mapping[str, Any],
+    *,
+    fallback_teaser: str,
+) -> str:
+    """Short intriguing hook only — never reveal the full possibilities list."""
+    summary = str(cached_theme.get("summary") or "").strip()
+    if not summary:
+        return fallback_teaser
+    # Cap at ~120 chars so the tile stays compact and curiosity-driven.
+    if len(summary) > 120:
+        truncated = summary[:117].rsplit(" ", 1)[0]
+        return truncated + "..."
+    return summary
 
 
 def birth_chart_hash(chart: Mapping[str, Any]) -> str:
@@ -367,7 +384,7 @@ class FomoSnapshotRepository:
         locale: str,
         result: PredictionResult,
         limit: int,
-    ) -> StoredHomepageFomo:
+    ) -> tuple[StoredHomepageFomo, bool]:
         snapshot_id = uuid.uuid4().hex
         expires_at = datetime.now(timezone.utc) + timedelta(
             days=SNAPSHOT_RETENTION_DAYS
@@ -386,10 +403,57 @@ class FomoSnapshotRepository:
             maximum=max(3, limit),
             manifestation_domains=manifestation_domains,
         )
+
+        # Cache-only gating:
+        # We only show homepage FOMO tiles when the per-combination LLM synthesis
+        # is already present in `prediction_manifestation_syntheses`.
+        # This prevents the UI from appearing while LLM wording is still missing.
+        candidate_manifestation_ids = {
+            str(p.manifestation_id) for p in homepage_presentations
+        }
+        deterministic_for_cache = [
+            m.to_dict()
+            for m in result.chart_manifestations
+            if str(m.manifestation_id) in candidate_manifestation_ids
+        ]
+        context, theme_by_manifestation_id = build_minimal_synthesis_context(
+            deterministic_for_cache
+        )
+        cached_themes_by_key: Dict[str, Dict[str, Any]] = {}
+        for theme in context.get("themes") or []:
+            theme_key = str(theme.get("theme_key") or "")
+            if not theme_key:
+                continue
+            cached_item = load_cached_theme_item(theme, locale=locale)
+            if cached_item:
+                cached_themes_by_key[theme_key] = cached_item
+
+        homepage_presentations_ready: list[FomoPresentation] = []
+        theme_cache_by_presentation_id: Dict[str, Dict[str, Any]] = {}
+        for presentation in homepage_presentations:
+            theme_key = theme_by_manifestation_id.get(
+                str(presentation.manifestation_id)
+            )
+            cached_theme = (
+                cached_themes_by_key.get(str(theme_key))
+                if theme_key
+                else None
+            )
+            if not cached_theme:
+                continue
+            homepage_presentations_ready.append(presentation)
+            theme_cache_by_presentation_id[
+                presentation.presentation_id
+            ] = cached_theme
+
+        llm_wording_pending = bool(homepage_presentations) and not bool(
+            homepage_presentations_ready
+        )
+
         display_signature = hashlib.sha256(
             "|".join(
                 presentation.presentation_id
-                for presentation in homepage_presentations
+                for presentation in homepage_presentations_ready
             ).encode("utf-8")
         ).hexdigest()
         with get_conn() as conn:
@@ -448,15 +512,33 @@ class FomoSnapshotRepository:
                     presentation.locale,
                     presentation.subject,
                     presentation.domain,
-                    presentation.area_label,
+                    str(
+                        (
+                            (theme_cache_by_presentation_id.get(
+                                presentation.presentation_id
+                            ) or {}).get("label")
+                            or presentation.area_label
+                        )
+                    ),
                     presentation.tone.value,
-                    presentation.title,
-                    presentation.teaser,
+                    str(
+                        (
+                            (theme_cache_by_presentation_id.get(
+                                presentation.presentation_id
+                            ) or {}).get("label")
+                            or presentation.title
+                        )
+                    ),
+                    _format_cached_fomo_teaser(
+                        theme_cache_by_presentation_id.get(presentation.presentation_id)
+                        or {},
+                        fallback_teaser=presentation.teaser,
+                    ),
                     presentation.suggested_question,
                     presentation.rule_id,
                     presentation.template_version,
                 )
-                for rank, presentation in enumerate(homepage_presentations)
+                for rank, presentation in enumerate(homepage_presentations_ready)
             ]
             if teaser_rows:
                 cursor = conn.cursor()
@@ -490,7 +572,7 @@ class FomoSnapshotRepository:
         )
         if stored is None:
             raise RuntimeError("Persisted FOMO snapshot could not be reloaded")
-        return stored
+        return stored, llm_wording_pending
 
     def load_owned_presentation(
         self,

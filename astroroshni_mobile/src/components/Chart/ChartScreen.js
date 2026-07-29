@@ -210,7 +210,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
     try {
       const { data } = await creditAPI.getEntitlements();
       if (data?.is_astrologer_licensed) {
-        navigation.navigate('ActivationExplorer', { birthData });
+        navigation.navigate('ActivationExplorer', { birthData, chartData });
         return;
       }
       try {
@@ -746,27 +746,46 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   };
 
   const webFlexFix = Platform.OS === 'web' ? { minHeight: 0 } : null;
-  const webIntrinsic = Platform.OS === 'web' ? { flexGrow: 0, flexBasis: 'auto' } : null;
+  // The chart body is a vertically scrolling web document.  Do not leave the
+  // native `flex: 1` shorthand on any of these nested wrappers: Safari can
+  // resolve that shorthand against the viewport and create a large empty
+  // flex region before the chart toolbar (Android's native layout does not).
+  // Explicitly reset all flex components so the web body sizes to its content.
+  const webIntrinsic = Platform.OS === 'web'
+    ? { flex: 0, flexGrow: 0, flexShrink: 0, flexBasis: 'auto', height: 'auto' }
+    : null;
+  const activationEligible = chartTypes[currentChartIndex]?.id === 'lagna' || chartTypes[currentChartIndex]?.id === 'navamsa';
+  // When the CTA is part of the chart flow, the chart body must end at its
+  // footer on native as well; otherwise the old flex:1 wrapper consumes the
+  // remaining viewport and leaves a large blank area before the CTA.
+  const chartFlowIntrinsic = activationEligible
+    ? { flex: 0, flexGrow: 0, flexShrink: 0, flexBasis: 'auto', height: 'auto' }
+    : null;
 
   const chartCaptureBody = (
     <View
       ref={captureViewRef}
       collapsable={false}
-      style={[styles.captureArea, webIntrinsic]}
+      style={[styles.captureArea, webIntrinsic, chartFlowIntrinsic]}
     >
       <LinearGradient
         colors={theme === 'dark' ? ['#1a0033', '#2d1b4e'] : ['#ffffff', '#fff5f0']}
         style={[
           styles.captureGradient,
-          { paddingBottom: (insets.bottom || 16) + 80 },
+          // The activation CTA now follows the chart in normal flow, so the
+          // old overlay-safe-area reservation would create a large blank gap
+          // and place the CTA underneath the bottom navigation.
+          { paddingBottom: activationEligible ? 12 : (insets.bottom || 16) + 80 },
           webIntrinsic,
+          chartFlowIntrinsic,
         ]}
       >
-        <View style={[styles.chartArea, webIntrinsic]}>
+        <View style={[styles.chartArea, webIntrinsic, chartFlowIntrinsic]}>
           <View
             style={[
               styles.chartWrapper,
               webIntrinsic,
+              chartFlowIntrinsic,
               // Web: do not force the whole ChartWidget (toolbar + chart) into a square —
               // that made floating icons overlap the enlarged chart.
               Platform.OS === 'web'
@@ -882,8 +901,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                 style={{ flex: 1 }}
                 contentContainerStyle={
                   Platform.OS === 'web'
-                    ? { paddingBottom: 12 }
-                    : { flexGrow: 1 }
+                    ? { paddingBottom: activationEligible ? 128 : 12 }
+                    : { flexGrow: 1, paddingBottom: activationEligible ? 128 : 0 }
                 }
                 showsVerticalScrollIndicator={false}
               >
@@ -893,12 +912,13 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     theme === 'dark' 
                       ? { backgroundColor: '#1a0033' } 
                       : { backgroundColor: '#fff5f0' },
-                    Platform.OS === 'web' ? { flexGrow: 0, flexBasis: 'auto' } : null,
+                    Platform.OS === 'web' ? webIntrinsic : null,
                   ]}
                 >
                   <View style={[
                     styles.chartAndNavContainer,
                     webIntrinsic,
+                    chartFlowIntrinsic,
                   ]}>
                     {Platform.OS === 'web' ? (
                       <Animated.View
@@ -922,7 +942,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                       >
                         <Animated.View
                           style={{
-                            flex: 1,
+                            flex: activationEligible ? 0 : 1,
+                            ...(activationEligible ? chartFlowIntrinsic : null),
                             transform: [{ translateX: chartTranslateX }],
                           }}
                         >
@@ -930,37 +951,39 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                         </Animated.View>
                       </PanGestureHandler>
                     )}
-                  </View>
-                </View>
-              </VerticalPageScroll>
 
-              {(chartTypes[currentChartIndex]?.id === 'lagna' || chartTypes[currentChartIndex]?.id === 'navamsa') && (
-                <TouchableOpacity
-                  style={[styles.activationExplorerCta, { borderColor: colors.accent }]}
-                  onPress={openActivationExplorer}
-                  activeOpacity={0.88}
-                  accessibilityRole="button"
-                  accessibilityLabel="What is activated now?"
-                >
-                  <LinearGradient
-                    colors={theme === 'dark' ? ['#f97316', '#ea580c'] : ['#ea580c', '#c2410c']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.activationExplorerCtaGradient}
-                  >
-                    <View style={styles.activationExplorerCtaIcon}>
-                      <Ionicons name="pulse" size={20} color="#ffffff" />
-                    </View>
-                    <View style={styles.activationExplorerCtaCopy}>
-                      <Text style={styles.activationExplorerCtaTitle}>What is activated now?</Text>
-                      <Text style={styles.activationExplorerCtaSubtitle}>See active houses, reasons, results and timing</Text>
-                    </View>
-                    {checkingAstrologerLicense
-                      ? <ActivityIndicator size="small" color="#ffffff" />
-                      : <Ionicons name="chevron-forward" size={22} color="#ffffff" />}
-                  </LinearGradient>
-                </TouchableOpacity>
-              )}
+                  </View>
+
+                  {activationEligible && (
+                    <TouchableOpacity
+                      style={[styles.activationExplorerCta, { borderColor: colors.accent }]}
+                      onPress={openActivationExplorer}
+                      activeOpacity={0.88}
+                      accessibilityRole="button"
+                      accessibilityLabel="What is activated now?"
+                    >
+                      <LinearGradient
+                        colors={theme === 'dark' ? ['#c2410c', '#9a3412'] : ['#ea580c', '#c2410c']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.activationExplorerCtaGradient}
+                      >
+                        <View style={styles.activationExplorerCtaIcon}>
+                          <Ionicons name="pulse" size={20} color="#ffffff" />
+                        </View>
+                        <View style={styles.activationExplorerCtaCopy}>
+                          <Text style={styles.activationExplorerCtaTitle}>What is activated now?</Text>
+                          <Text style={styles.activationExplorerCtaSubtitle}>See active houses, reasons, results and timing</Text>
+                        </View>
+                        {checkingAstrologerLicense
+                          ? <ActivityIndicator size="small" color="#ffffff" />
+                          : <Ionicons name="chevron-forward" size={22} color="#ffffff" />}
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+              </VerticalPageScroll>
 
               <AppAlertModal
                 visible={showAstrologerLicenseModal}
@@ -1610,46 +1633,45 @@ const styles = StyleSheet.create({
     elevation: 20,
   },
   activationExplorerCta: {
-    position: 'absolute',
-    bottom: 88,
-    left: 14,
-    right: 14,
-    borderRadius: 18,
+    marginHorizontal: 14,
+    marginTop: 12,
+    marginBottom: 24,
+    borderRadius: 14,
     borderWidth: 1,
     overflow: 'hidden',
-    zIndex: 10001,
-    elevation: 22,
+    zIndex: 2,
+    elevation: 4,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
   },
   activationExplorerCtaGradient: {
-    minHeight: 62,
-    paddingHorizontal: 16,
+    minHeight: 52,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
   },
   activationExplorerCtaIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   activationExplorerCtaCopy: {
     flex: 1,
   },
   activationExplorerCtaTitle: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '800',
   },
   activationExplorerCtaSubtitle: {
     color: 'rgba(255,255,255,0.84)',
-    fontSize: 11,
+    fontSize: 10,
     marginTop: 2,
   },
   navContent: {

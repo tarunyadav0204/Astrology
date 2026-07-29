@@ -56,6 +56,8 @@ const HOME_APP_SESSION_ID = `home:${Date.now()}:${Math.random().toString(36).sli
 const FREE_PROMPT_HANDOFF_QUIET_MS = 12 * 60 * 60 * 1000;
 const MONTHLY_PROMPT_INTERVAL_MS = 15 * 24 * 60 * 60 * 1000;
 const FOMO_FEATURE_RECHECK_MS = 60 * 1000;
+const FOMO_ANALYZING_POLL_MS = 30 * 1000;
+const FOMO_ANALYZING_MAX_POLLS = 6;
 const homeBannerDismissKey = (bannerId) => `${HOME_BANNER_DISMISS_PREFIX}${bannerId}`;
 const todayDateKey = () => new Date().toISOString().slice(0, 10);
 const roundPanchangCoord = (value) => Math.round(parseFloat(value) * 100) / 100;
@@ -344,6 +346,7 @@ export default function HomeScreen({
   const [showKnowYourselfPrompt, setShowKnowYourselfPrompt] = useState(false);
   const [showFomoHomeSheet, setShowFomoHomeSheet] = useState(false);
   const [fomoHomeData, setFomoHomeData] = useState(null);
+  const [fomoStatus, setFomoStatus] = useState(null);
   const fomoHomeDataRef = useRef(null);
   const fomoDataKeyRef = useRef('');
   const fomoLoadedAtRef = useRef(0);
@@ -595,16 +598,33 @@ export default function HomeScreen({
       if (fomoLoadKeyRef.current === requestKey && fomoLoadPromiseRef.current) {
         const pendingResponse = await fomoLoadPromiseRef.current;
         const pendingData = pendingResponse?.data;
-        return (
+        if (
           pendingData?.status === 'ready'
           && Array.isArray(pendingData.teasers)
           && pendingData.teasers.length
-        ) ? pendingData : null;
+        ) {
+          fomoDataKeyRef.current = requestKey;
+          fomoLoadedAtRef.current = Date.now();
+          fomoHomeDataRef.current = pendingData;
+          setFomoHomeData(pendingData);
+          setFomoStatus(null);
+          return pendingData;
+        }
+        if (pendingData?.status === 'analyzing') {
+          setFomoStatus('analyzing');
+          fomoDataKeyRef.current = '';
+          fomoLoadedAtRef.current = 0;
+          fomoHomeDataRef.current = null;
+          setFomoHomeData(null);
+          return null;
+        }
+        return null;
       }
       if (fomoDataKeyRef.current && fomoDataKeyRef.current !== requestKey) {
         fomoDataKeyRef.current = '';
         fomoHomeDataRef.current = null;
         setFomoHomeData(null);
+        setFomoStatus(null);
       }
       fomoLoadKeyRef.current = requestKey;
       const requestPromise = predictionAPI.getHomepageFomo(locale, {
@@ -622,13 +642,25 @@ export default function HomeScreen({
         fomoLoadedAtRef.current = Date.now();
         fomoHomeDataRef.current = data;
         setFomoHomeData(data);
+        setFomoStatus(null);
         return data;
+      }
+      if (data?.status === 'analyzing') {
+        if (fomoLoadKeyRef.current === requestKey) {
+          fomoDataKeyRef.current = '';
+          fomoLoadedAtRef.current = 0;
+          fomoHomeDataRef.current = null;
+          setFomoHomeData(null);
+        }
+        setFomoStatus('analyzing');
+        return null;
       }
       if (fomoLoadKeyRef.current === requestKey) {
         fomoDataKeyRef.current = '';
         fomoLoadedAtRef.current = 0;
         fomoHomeDataRef.current = null;
         setFomoHomeData(null);
+        setFomoStatus(null);
       }
       if (FOMO_ALWAYS_VISIBLE) {
         console.warn('[Homepage FOMO] Not ready', {
@@ -661,6 +693,35 @@ export default function HomeScreen({
   useEffect(() => {
     loadHomepageFomo();
   }, [loadHomepageFomo]);
+
+  // Silent background poll: when LLM wording is still being prepared, retry
+  // periodically and auto-show the FOMO card once the backend returns "ready".
+  useEffect(() => {
+    if (fomoStatus !== 'analyzing') return undefined;
+    let cancelled = false;
+    let pollCount = 0;
+    const timer = setInterval(async () => {
+      if (cancelled) return;
+      pollCount += 1;
+      if (pollCount > FOMO_ANALYZING_MAX_POLLS) {
+        setFomoStatus(null);
+        clearInterval(timer);
+        return;
+      }
+      // Force a fresh network call by clearing the cached-data guard.
+      fomoDataKeyRef.current = '';
+      fomoLoadedAtRef.current = 0;
+      const result = await loadHomepageFomo();
+      if (cancelled) return;
+      if (result) {
+        clearInterval(timer);
+      }
+    }, FOMO_ANALYZING_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [fomoStatus, loadHomepageFomo]);
 
   // Explicit local testing mode must not depend on React Navigation's focus
   // lifecycle or the one-prompt slot. HomeScreen is nested inside ChatScreen,
