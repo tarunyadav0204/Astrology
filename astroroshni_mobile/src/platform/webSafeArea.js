@@ -2,11 +2,13 @@
  * iOS PWA home-indicator + viewport helpers.
  *
  * Safari tab vs Add-to-Home-Screen (standalone) behave differently:
- * - Safari: 100dvh ≈ visible area, insets.bottom often ~0 → looks fine
- * - Standalone: 100dvh can be shorter than the real app chrome → purple strip
- *   under bottom tabs, while RN safe-area insets still pad the tab bar.
+ * - Safari: usually fine with 100dvh / innerHeight
+ * - Standalone: visualViewport.height is often *shorter* than the full window,
+ *   so locking html/body/#root to it leaves a dead purple strip under bottom tabs.
+ *   RN safe-area insets still pad the tab bar → fat orange padding.
  *
- * Fix: pin shell height to visualViewport/innerHeight, and cap bottom inset.
+ * Fix: never size the shell from visualViewport; prefer innerHeight/clientHeight
+ * (or inset:0 fill on standalone). Cap bottom inset for home indicator.
  */
 import { Platform } from 'react-native';
 
@@ -56,7 +58,18 @@ export function getWebBottomInset(rnInsetsBottom = 0) {
 }
 
 /**
- * Lock html/body/#root to the real visible height (critical for iOS standalone PWA).
+ * Visible layout height for the app shell.
+ * Never use visualViewport.height — on iOS standalone it under-reports and
+ * leaves a dead strip under #root when height/max-height are locked to it.
+ */
+function resolveShellHeight() {
+  const inner = Math.round(window.innerHeight || 0);
+  const client = Math.round(document.documentElement?.clientHeight || 0);
+  return Math.max(inner, client);
+}
+
+/**
+ * Lock html/body/#root to the real window height (critical for iOS standalone PWA).
  * Call once at web startup.
  */
 export function installWebViewportHeightLock() {
@@ -67,26 +80,38 @@ export function installWebViewportHeightLock() {
   const root = document.documentElement;
 
   const apply = () => {
-    const vv = window.visualViewport;
-    // Prefer visualViewport when it matches the visible frame; fall back to innerHeight.
-    const height = Math.round(
-      (vv && vv.height > 0 ? vv.height + (vv.offsetTop || 0) : 0) ||
-        window.innerHeight ||
-        root.clientHeight ||
-        0
-    );
-    if (height > 0) {
-      root.style.setProperty('--ar-app-height', `${height}px`);
-      // Also set on body/#root directly for stubborn iOS standalone WebKit.
+    const height = resolveShellHeight();
+    if (height <= 0) return;
+
+    // Standalone: rely on CSS position:fixed + inset:0. Clearing a short
+    // --ar-app-height / inline height is what removes the purple strip.
+    if (isIosStandalonePwa()) {
+      root.style.removeProperty('--ar-app-height');
       if (document.body) {
-        document.body.style.height = `${height}px`;
-        document.body.style.minHeight = `${height}px`;
+        document.body.style.height = '';
+        document.body.style.minHeight = '';
+        document.body.style.maxHeight = '';
       }
       const appRoot = document.getElementById('root');
       if (appRoot) {
-        appRoot.style.height = `${height}px`;
-        appRoot.style.minHeight = `${height}px`;
+        appRoot.style.height = '';
+        appRoot.style.minHeight = '';
+        appRoot.style.maxHeight = '';
       }
+      return;
+    }
+
+    root.style.setProperty('--ar-app-height', `${height}px`);
+    if (document.body) {
+      document.body.style.height = `${height}px`;
+      document.body.style.minHeight = `${height}px`;
+      document.body.style.maxHeight = '';
+    }
+    const appRoot = document.getElementById('root');
+    if (appRoot) {
+      appRoot.style.height = `${height}px`;
+      appRoot.style.minHeight = `${height}px`;
+      appRoot.style.maxHeight = '';
     }
   };
 
@@ -101,6 +126,8 @@ export function installWebViewportHeightLock() {
   window.addEventListener('orientationchange', apply);
   window.addEventListener('pageshow', apply);
   document.addEventListener('visibilitychange', apply);
+  // Keep listening to visualViewport for keyboard / URL-bar changes, but apply()
+  // never sizes the shell from visualViewport.height.
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', apply);
     window.visualViewport.addEventListener('scroll', apply);

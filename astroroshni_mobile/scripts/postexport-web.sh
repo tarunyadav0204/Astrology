@@ -211,35 +211,60 @@ boot_guard = '''
     }
   } catch (e) {}
 
-  /* iOS standalone PWA: lock shell height before React loads */
+  /* Shell height before React loads.
+   * Never size from visualViewport — on iOS standalone it under-reports and
+   * leaves a purple strip under #root when height is locked to it. */
   try {
+    function arIsStandalone() {
+      try {
+        return (window.navigator && window.navigator.standalone === true) ||
+          (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+      } catch (e) { return false; }
+    }
     function arLockHeight() {
-      var vv = window.visualViewport;
-      var h = Math.round(
-        (vv && vv.height > 0 ? vv.height + (vv.offsetTop || 0) : 0) ||
-        window.innerHeight ||
-        0
-      );
+      var inner = Math.round(window.innerHeight || 0);
+      var client = Math.round((document.documentElement && document.documentElement.clientHeight) || 0);
+      var h = Math.max(inner, client);
       if (!h) return;
+      /* Standalone: clear pixel lock; CSS fixed+inset:0 fills the real window. */
+      if (arIsStandalone()) {
+        document.documentElement.style.removeProperty('--ar-app-height');
+        if (document.body) {
+          document.body.style.height = '';
+          document.body.style.minHeight = '';
+          document.body.style.maxHeight = '';
+        }
+        var rootSa = document.getElementById('root');
+        if (rootSa) {
+          rootSa.style.height = '';
+          rootSa.style.minHeight = '';
+          rootSa.style.maxHeight = '';
+        }
+        return;
+      }
       document.documentElement.style.setProperty('--ar-app-height', h + 'px');
       if (document.body) {
         document.body.style.height = h + 'px';
         document.body.style.minHeight = h + 'px';
+        document.body.style.maxHeight = '';
       }
       var root = document.getElementById('root');
       if (root) {
         root.style.height = h + 'px';
         root.style.minHeight = h + 'px';
+        root.style.maxHeight = '';
       }
     }
     arLockHeight();
     window.addEventListener('resize', arLockHeight);
     window.addEventListener('orientationchange', arLockHeight);
+    window.addEventListener('pageshow', arLockHeight);
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', arLockHeight);
     }
     setTimeout(arLockHeight, 50);
     setTimeout(arLockHeight, 300);
+    setTimeout(arLockHeight, 1000);
   } catch (e2) {}
 })();
 </script>

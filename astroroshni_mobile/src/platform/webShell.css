@@ -4,10 +4,9 @@
  * Fixed app shell: viewport is locked; screens scroll internally.
  * Required so Home bottom tabs stay pinned (position:absolute) while feed scrolls.
  *
- * Real iPhone PWA: do NOT end with height:-webkit-fill-available alone — on
- * standalone Safari that often sizes the shell *above* the home indicator,
- * leaving a dead purple strip under absolute bottom tabs. Pin to the visual
- * viewport with position:fixed + inset:0 instead.
+ * iOS standalone PWA: do NOT lock height/max-height to visualViewport (or a short
+ * --ar-app-height). That leaves a dead purple strip under absolute bottom tabs.
+ * Fill with position:fixed + inset:0; let the box stretch to the real window.
  */
 html,
 body {
@@ -17,10 +16,10 @@ body {
   right: 0;
   bottom: 0;
   width: 100%;
-  /* --ar-app-height is set by installWebViewportHeightLock() for iOS standalone PWA */
-  height: var(--ar-app-height, 100dvh);
-  min-height: var(--ar-app-height, 100dvh);
-  max-height: var(--ar-app-height, 100dvh);
+  /* Prefer inset fill; --ar-app-height is a Safari-tab fallback only (never max-height). */
+  height: var(--ar-app-height, 100%);
+  min-height: var(--ar-app-height, 100%);
+  max-height: none;
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -50,9 +49,9 @@ body {
   right: 0;
   bottom: 0;
   width: 100%;
-  height: var(--ar-app-height, 100dvh);
-  min-height: var(--ar-app-height, 100dvh);
-  max-height: var(--ar-app-height, 100dvh);
+  height: var(--ar-app-height, 100%);
+  min-height: var(--ar-app-height, 100%);
+  max-height: none;
   overflow: hidden;
   background-color: #1a0033;
 }
