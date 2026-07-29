@@ -40,6 +40,7 @@ import { useAuthGate } from '../../auth/AuthGateContext';
 import { extractFirstHttpsUrl } from '../../utils/blogLinks';
 import FomoHomeSheet from './FomoHomeSheet';
 import FomoHomeEntryCard from './FomoHomeEntryCard';
+import { getWebBottomInset } from '../../platform/webSafeArea';
 
 const { width, height: windowHeight } = Dimensions.get('window');
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -333,7 +334,14 @@ export default function HomeScreen({
   const insets = useSafeAreaInsets();
   // iOS native: keep a tight fixed inset. Web/Android: use real home-indicator inset so the
   // tab bar background can extend edge-to-edge without a dead strip under the bar.
-  const tabSafeBottom = Platform.OS === 'ios' ? 10 : Math.max(0, insets.bottom || 0);
+  // Web iPhone PWA: cap via getWebBottomInset — Mac Safari device mode often under-reports
+  // insets while real iPhones can over-report and also shrink -webkit-fill-available.
+  const tabSafeBottom =
+    Platform.OS === 'ios'
+      ? 10
+      : Platform.OS === 'web'
+        ? getWebBottomInset(insets.bottom)
+        : Math.max(0, insets.bottom || 0);
   useAnalytics('HomeScreen');
   const { theme, colors, androidLightCardFixStyle } = useTheme();
   const isDark = theme === 'dark';

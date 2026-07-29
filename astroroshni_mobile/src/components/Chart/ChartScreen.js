@@ -28,6 +28,7 @@ import * as Sharing from 'expo-sharing';
 import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
 import { chartAPI, creditAPI } from '../../services/api';
+import { getWebBottomInset } from '../../platform/webSafeArea';
 import { chartPreloader } from '../../services/chartPreloader';
 import ChartWidget from './ChartWidget';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
@@ -51,6 +52,10 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const { requireAuthForPaid } = useAuthGate();
   const { isAstrologerLicensed } = useCredits();
   const insets = useSafeAreaInsets();
+  const bottomInset =
+    Platform.OS === 'web'
+      ? getWebBottomInset(insets.bottom)
+      : Math.max(0, insets.bottom || 0);
   const embedded = !!route?.params?.embedded;
   const [birthData, setBirthData] = useState(null);
   const [chartData, setChartData] = useState(null);
@@ -775,7 +780,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
           // The activation CTA now follows the chart in normal flow, so the
           // old overlay-safe-area reservation would create a large blank gap
           // and place the CTA underneath the bottom navigation.
-          { paddingBottom: activationEligible ? 12 : (insets.bottom || 16) + 80 },
+          { paddingBottom: activationEligible ? 12 : bottomInset + 80 },
           webIntrinsic,
           chartFlowIntrinsic,
         ]}
@@ -1008,7 +1013,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
               <View style={[styles.bottomNavContainer, { 
                 backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 1)' : 'rgba(255, 255, 255, 1)',
                 borderTopColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                paddingBottom: insets.bottom || 15
+                height: 64 + Math.max(bottomInset, Platform.OS === 'web' ? 0 : 15),
+                paddingBottom: Math.max(bottomInset, Platform.OS === 'web' ? 0 : 15),
               }]}>
                 {Platform.OS === 'ios' && (
                   <BlurView intensity={theme === 'dark' ? 40 : 60} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />
@@ -1627,7 +1633,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 80,
     borderTopWidth: 1,
     zIndex: 10000,
     elevation: 20,

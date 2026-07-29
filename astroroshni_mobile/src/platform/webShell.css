@@ -3,12 +3,22 @@
 /*
  * Fixed app shell: viewport is locked; screens scroll internally.
  * Required so Home bottom tabs stay pinned (position:absolute) while feed scrolls.
+ *
+ * Real iPhone PWA: do NOT end with height:-webkit-fill-available alone — on
+ * standalone Safari that often sizes the shell *above* the home indicator,
+ * leaving a dead purple strip under absolute bottom tabs. Pin to the visual
+ * viewport with position:fixed + inset:0 instead.
  */
 html,
 body {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
   height: 100%;
   height: 100dvh;
-  height: -webkit-fill-available;
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -32,10 +42,14 @@ body {
 #root {
   display: flex;
   flex-direction: column;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
   height: 100%;
   height: 100dvh;
-  height: -webkit-fill-available;
   overflow: hidden;
   background-color: #1a0033;
 }
@@ -55,8 +69,11 @@ body {
 /* Phone column on wide desktop (not device-mode). */
 @media (min-width: 768px) {
   #root {
+    left: 50%;
+    right: auto;
+    width: 100%;
     max-width: 480px;
-    margin: 0 auto;
+    transform: translateX(-50%);
     box-shadow: 0 0 40px rgba(0, 0, 0, 0.35);
   }
 }
