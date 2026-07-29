@@ -9,6 +9,10 @@ if (Platform.OS === 'web') {
   // Phone-shell CSS for Expo Web (mobile browsers on astroroshni.com).
   // eslint-disable-next-line global-require
   require('./src/platform/webShell.css');
+  // Lock shell height to visualViewport/innerHeight — required for iOS A2HS PWA.
+  // eslint-disable-next-line global-require
+  const { installWebViewportHeightLock } = require('./src/platform/webSafeArea');
+  installWebViewportHeightLock();
   if (typeof document !== 'undefined') {
     const ensureViewport = () => {
       let meta = document.querySelector('meta[name="viewport"]');

@@ -31,8 +31,8 @@ function prefixLines(value, start, end, prefix) {
 }
 
 const TOOLBAR = [
-  { id: 'h2', label: 'H2', title: 'Heading 2', run: (v, s, e) => prefixLines(v, s, e, '## ') },
-  { id: 'h3', label: 'H3', title: 'Heading 3', run: (v, s, e) => prefixLines(v, s, e, '### ') },
+  { id: 'h2', label: 'H2', title: 'Heading 2', run: (v, s, e) => prefixLines(v, s, e, '# ') },
+  { id: 'h3', label: 'H3', title: 'Heading 3', run: (v, s, e) => prefixLines(v, s, e, '## ') },
   { id: 'bold', label: 'B', title: 'Bold', run: (v, s, e) => wrapSelection(v, s, e, '**') },
   { id: 'italic', label: 'I', title: 'Italic', run: (v, s, e) => wrapSelection(v, s, e, '*') },
   { id: 'ul', label: '• List', title: 'Bullet list', run: (v, s, e) => prefixLines(v, s, e, '- ') },
@@ -181,6 +181,9 @@ const BlogMarkdownEditor = ({
           <button type="button" className={mode === 'preview' ? 'active' : ''} onClick={() => setMode('preview')}>Preview</button>
         </div>
       </div>
+      <p className="blog-md-hint">
+        Write = raw Markdown source (looks flat). Click <strong>Split</strong> or <strong>Preview</strong> to see headings, bold, lists, and tables.
+      </p>
 
       <div className="blog-md-panes">
         {mode !== 'preview' && (

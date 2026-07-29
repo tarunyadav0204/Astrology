@@ -17,8 +17,10 @@ body {
   right: 0;
   bottom: 0;
   width: 100%;
-  height: 100%;
-  height: 100dvh;
+  /* --ar-app-height is set by installWebViewportHeightLock() for iOS standalone PWA */
+  height: var(--ar-app-height, 100dvh);
+  min-height: var(--ar-app-height, 100dvh);
+  max-height: var(--ar-app-height, 100dvh);
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -48,8 +50,9 @@ body {
   right: 0;
   bottom: 0;
   width: 100%;
-  height: 100%;
-  height: 100dvh;
+  height: var(--ar-app-height, 100dvh);
+  min-height: var(--ar-app-height, 100dvh);
+  max-height: var(--ar-app-height, 100dvh);
   overflow: hidden;
   background-color: #1a0033;
 }

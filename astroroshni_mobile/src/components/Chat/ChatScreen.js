@@ -25,6 +25,7 @@ import { ScrollView as GHScrollView, FlatList as GHFlatList } from 'react-native
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getWebBottomInset } from '../../platform/webSafeArea';
 import { useFocusEffect } from '@react-navigation/native';
 
 import MessageBubble from './MessageBubble';
@@ -467,6 +468,8 @@ export default function ChatScreen({ navigation, route }) {
   } = useCredits();
   const { requireAuthForPaid, isGuest, refreshAuthState } = useAuthGate();
   const insets = useSafeAreaInsets();
+  const webBottomInset =
+    Platform.OS === 'web' ? getWebBottomInset(insets.bottom) : Math.max(0, insets.bottom || 0);
   
   // Mundane mode state
   const [isMundane, setIsMundane] = useState(false);
@@ -5602,7 +5605,10 @@ export default function ChatScreen({ navigation, route }) {
           paddingTop: 4,
           marginHorizontal: -12,
           paddingHorizontal: 12,
-          paddingBottom: keyboardBottomInset > 0 ? keyboardBottomInset + 20 : 0,
+          paddingBottom:
+            keyboardBottomInset > 0
+              ? keyboardBottomInset + 20
+              : (Platform.OS === 'web' ? webBottomInset : 0),
         }}
         >
         {/* Topic idea chips — opt-in so the message list keeps most of the screen */}
@@ -6009,7 +6015,7 @@ export default function ChatScreen({ navigation, route }) {
 
         {/* Quick Actions Bar - hide while keyboard is open so input isn't sandwiched above system keyboard */}
         {!showGreeting && !isKeyboardVisible && (
-          <View style={[styles.quickActionsBar, { paddingBottom: Math.max(8, insets.bottom) }]}>
+          <View style={[styles.quickActionsBar, { paddingBottom: Math.max(8, webBottomInset) }]}>
             <TouchableOpacity 
               style={styles.quickActionButton}
               onPress={() => setShowLanguageModal(true)}

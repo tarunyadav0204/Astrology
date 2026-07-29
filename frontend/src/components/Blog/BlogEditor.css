@@ -123,6 +123,16 @@
     border-bottom: 1px solid #e6e8f0;
 }
 
+.blog-md-hint {
+    margin: 0;
+    padding: 8px 12px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #5b6475;
+    background: #fafbff;
+    border-bottom: 1px solid #e6e8f0;
+}
+
 .blog-md-toolbar-group,
 .blog-md-mode-toggle {
     display: flex;

@@ -210,6 +210,37 @@ boot_guard = '''
       }
     }
   } catch (e) {}
+
+  /* iOS standalone PWA: lock shell height before React loads */
+  try {
+    function arLockHeight() {
+      var vv = window.visualViewport;
+      var h = Math.round(
+        (vv && vv.height > 0 ? vv.height + (vv.offsetTop || 0) : 0) ||
+        window.innerHeight ||
+        0
+      );
+      if (!h) return;
+      document.documentElement.style.setProperty('--ar-app-height', h + 'px');
+      if (document.body) {
+        document.body.style.height = h + 'px';
+        document.body.style.minHeight = h + 'px';
+      }
+      var root = document.getElementById('root');
+      if (root) {
+        root.style.height = h + 'px';
+        root.style.minHeight = h + 'px';
+      }
+    }
+    arLockHeight();
+    window.addEventListener('resize', arLockHeight);
+    window.addEventListener('orientationchange', arLockHeight);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', arLockHeight);
+    }
+    setTimeout(arLockHeight, 50);
+    setTimeout(arLockHeight, 300);
+  } catch (e2) {}
 })();
 </script>
 '''
