@@ -1532,7 +1532,15 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
     <View style={styles.container}>
       <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
       <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]} style={styles.gradient}>
-        <SafeAreaView style={styles.safeArea} edges={embedded ? [] : undefined}>
+        {/* Embedded in ChartsHub: plain View — SafeAreaView can still pad top on web
+            even with edges={[]} and stacks a second gap under the hub tabs. */}
+        {(() => {
+          const Root = embedded ? View : SafeAreaView;
+          const rootProps = embedded
+            ? { style: [styles.safeArea, Platform.OS === 'web' ? { paddingTop: 0 } : null] }
+            : { style: styles.safeArea };
+          return (
+        <Root {...rootProps}>
           {!embedded ? (
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -1555,7 +1563,7 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
           </View>
           ) : null}
 
-          <View style={styles.tabNavigation}>
+          <View style={[styles.tabNavigation, embedded && styles.tabNavigationEmbedded]}>
             {ASHTAKVARGA_TABS.map((tab, index) => {
               const isActive = activeTab === index;
               return (
@@ -1979,7 +1987,9 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
               </View>
             </View>
           </Modal>
-        </SafeAreaView>
+        </Root>
+          );
+        })()}
       </LinearGradient>
 
       <Modal
@@ -2100,6 +2110,11 @@ const styles = {
     flexDirection: 'row',
     paddingHorizontal: 20,
     marginBottom: 20,
+  },
+  tabNavigationEmbedded: {
+    marginTop: 0,
+    marginBottom: 10,
+    paddingTop: 0,
   },
   tab: {
     flex: 1,

@@ -36,12 +36,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const [showKarakas, setShowKarakas] = useState(false);
   const [karakas, setKarakas] = useState(null);
   const [showInfoModal, setShowInfoModal] = useState(false);
-  // PWA/web: % SVG height often collapses to 0. Measure parent and pass pixel size.
-  const [webChartSize, setWebChartSize] = useState(() => {
-    if (!isWeb) return null;
-    const w = Math.floor(Dimensions.get('window').width);
-    return w > 0 ? w : 320;
-  });
+  // PWA/web: measure parent width before locking SVG pixels (window width can be
+  // wider than the chart column and clipped the diamond + toolbar).
+  const [webChartSize, setWebChartSize] = useState(null);
 
   const onWebChartLayout = useCallback((event) => {
     if (!isWeb) return;
@@ -55,8 +52,11 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     const syncSize = ({ window: nextWindow } = {}) => {
       const nextWidth = Math.floor((nextWindow || Dimensions.get('window')).width);
       if (nextWidth < 80) return;
-      // Only seed from window before onLayout; don't fight a tighter parent measure.
-      setWebChartSize((prev) => (prev && prev <= nextWidth ? prev : nextWidth));
+      // Cap to window; prefer onLayout measurement when already smaller.
+      setWebChartSize((prev) => {
+        if (prev && prev > 0 && prev <= nextWidth) return prev;
+        return nextWidth;
+      });
     };
     syncSize();
     const subscription = Dimensions.addEventListener('change', syncSize);
@@ -542,6 +542,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         </View>
       )}
 
+      {/* Web: toolbar row above the diamond (not overlaid on it). */}
       {cosmicTheme && isWeb ? (
         <View style={styles.webToolbar}>
           <View style={styles.webToolbarLeft}>
@@ -588,19 +589,20 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           </TouchableOpacity>
         </View>
       ) : null}
-      
+
       <View
         onLayout={onWebChartLayout}
         style={[
           styles.chartContainer,
           cosmicTheme && styles.cosmicChartContainer,
           currentChartType === 'transit' && cosmicTheme && styles.chartContainerTransit,
-          isWeb && webChartSize
+          isWeb
             ? {
                 width: '100%',
-                height: webChartSize,
+                aspectRatio: 1,
                 maxWidth: '100%',
                 alignSelf: 'stretch',
+                overflow: 'visible',
               }
             : null,
         ]}
@@ -617,20 +619,20 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
               <TouchableOpacity onPress={toggleStyle} style={styles.floatingButton}>
                 <Text style={styles.floatingButtonText}>{chartStyle === 'north' ? 'S' : 'N'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={() => navigation?.navigate('AshtakvargaOracle')} 
+              <TouchableOpacity
+                onPress={() => navigation?.navigate('AshtakvargaOracle')}
                 style={styles.floatingButton}
               >
                 <Ionicons name="grid-outline" size={18} color="#fff" />
               </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={() => navigation?.navigate('KPSystem', { birthDetails: birthData })} 
+              <TouchableOpacity
+                onPress={() => navigation?.navigate('KPSystem', { birthDetails: birthData })}
                 style={styles.floatingButton}
               >
                 <Ionicons name="compass-outline" size={18} color="#fff" />
               </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={() => navigation?.navigate('KotaChakra', { birthChartId: birthData?.id })} 
+              <TouchableOpacity
+                onPress={() => navigation?.navigate('KotaChakra', { birthChartId: birthData?.id })}
                 style={styles.floatingButton}
               >
                 <Ionicons name="shield-outline" size={18} color="#fff" />
@@ -653,13 +655,15 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             </View>
           </>
         )}
-        
-        <Animated.View 
+
+        <Animated.View
           {...(disableSwipe ? {} : panResponder.panHandlers)}
           style={[
             styles.swipeArea,
             isWeb && styles.swipeAreaWeb,
-            isWeb && webChartSize ? { width: webChartSize, height: webChartSize } : null,
+            isWeb
+              ? { width: '100%', aspectRatio: 1, overflow: 'visible' }
+              : null,
             { transform: [{ translateX: slideAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: [-20, 0, 20], extrapolate: 'clamp' }) }] },
           ]}
         >
@@ -807,12 +811,13 @@ const styles = StyleSheet.create({
   chartContainer: Platform.select({
     web: {
       width: '100%',
-      // Fallback before onLayout; % SVG height alone collapses to 0 on RN Web.
       aspectRatio: 1,
       position: 'relative',
       alignItems: 'center',
       justifyContent: 'center',
       padding: 0,
+      marginTop: 0,
+      overflow: 'visible',
     },
     default: {
       width: '100%',
@@ -829,7 +834,9 @@ const styles = StyleSheet.create({
       width: '100%',
       aspectRatio: 1,
       padding: 0,
+      marginTop: 0,
       marginBottom: 12,
+      overflow: 'visible',
     },
     default: {
       width: '100%',
@@ -840,18 +847,26 @@ const styles = StyleSheet.create({
     },
   }),
   swipeArea: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
-  swipeAreaWeb: { flex: 0, alignSelf: 'center' },
+  swipeAreaWeb: { flex: 0, width: '100%', alignSelf: 'center', overflow: 'visible' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: 16, color: COLORS.textSecondary },
   floatingControls: { position: 'absolute', top: 10, left: 30, flexDirection: 'row', gap: 8, zIndex: 10 },
   floatingControlsTransit: { top: 10 },
+  chartContainerTransit: { marginTop: 12 },
+  floatingButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
+  floatingButtonActive: { backgroundColor: 'rgba(255, 107, 53, 0.8)', borderColor: 'rgba(255, 107, 53, 1)' },
+  floatingButtonText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  infoButtonContainer: { position: 'absolute', top: 10, right: 30, zIndex: 10 },
+  infoButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
   webToolbar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    paddingHorizontal: 12,
-    paddingBottom: 10,
+    paddingHorizontal: 10,
+    paddingTop: 2,
+    paddingBottom: 6,
+    marginTop: 0,
     zIndex: 2,
   },
   webToolbarLeft: {
@@ -862,12 +877,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: 8,
   },
-  chartContainerTransit: { marginTop: 20 },
-  floatingButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
-  floatingButtonActive: { backgroundColor: 'rgba(255, 107, 53, 0.8)', borderColor: 'rgba(255, 107, 53, 1)' },
-  floatingButtonText: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  infoButtonContainer: { position: 'absolute', top: 10, right: 30, zIndex: 10 },
-  infoButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
   quickActionsGrid: { marginTop: 24, paddingHorizontal: 36, gap: 12 },
   quickActionsRow: { flexDirection: 'row', gap: 12 },
   quickActionButton: { 

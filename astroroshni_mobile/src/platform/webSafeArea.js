@@ -69,6 +69,57 @@ function resolveShellHeight() {
 }
 
 /**
+ * Re-apply shell sizing after keyboard / stack navigation.
+ * iOS PWA often leaves a short layout (purple gap under tabs) after BirthForm.
+ */
+export function refreshWebShellHeight() {
+  if (Platform.OS !== 'web' || typeof window === 'undefined' || typeof document === 'undefined') {
+    return;
+  }
+
+  try {
+    window.scrollTo(0, 0);
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  } catch (_) {}
+
+  const root = document.documentElement;
+  const appRoot = document.getElementById('root');
+
+  if (isIosStandalonePwa()) {
+    // Fill the real window via inset — clear any leftover pixel heights from the keyboard.
+    root.style.removeProperty('--ar-app-height');
+    root.style.height = '100%';
+    root.style.minHeight = '100%';
+    for (const el of [document.body, appRoot]) {
+      if (!el) continue;
+      el.style.top = '0';
+      el.style.left = '0';
+      el.style.right = '0';
+      el.style.bottom = '0';
+      el.style.height = '';
+      el.style.minHeight = '';
+      el.style.maxHeight = '';
+    }
+    return;
+  }
+
+  const height = resolveShellHeight();
+  if (height <= 0) return;
+  root.style.setProperty('--ar-app-height', `${height}px`);
+  if (document.body) {
+    document.body.style.height = `${height}px`;
+    document.body.style.minHeight = `${height}px`;
+    document.body.style.maxHeight = '';
+  }
+  if (appRoot) {
+    appRoot.style.height = `${height}px`;
+    appRoot.style.minHeight = `${height}px`;
+    appRoot.style.maxHeight = '';
+  }
+}
+
+/**
  * Lock html/body/#root to the real window height (critical for iOS standalone PWA).
  * Call once at web startup.
  */
@@ -77,43 +128,7 @@ export function installWebViewportHeightLock() {
     return () => {};
   }
 
-  const root = document.documentElement;
-
-  const apply = () => {
-    const height = resolveShellHeight();
-    if (height <= 0) return;
-
-    // Standalone: rely on CSS position:fixed + inset:0. Clearing a short
-    // --ar-app-height / inline height is what removes the purple strip.
-    if (isIosStandalonePwa()) {
-      root.style.removeProperty('--ar-app-height');
-      if (document.body) {
-        document.body.style.height = '';
-        document.body.style.minHeight = '';
-        document.body.style.maxHeight = '';
-      }
-      const appRoot = document.getElementById('root');
-      if (appRoot) {
-        appRoot.style.height = '';
-        appRoot.style.minHeight = '';
-        appRoot.style.maxHeight = '';
-      }
-      return;
-    }
-
-    root.style.setProperty('--ar-app-height', `${height}px`);
-    if (document.body) {
-      document.body.style.height = `${height}px`;
-      document.body.style.minHeight = `${height}px`;
-      document.body.style.maxHeight = '';
-    }
-    const appRoot = document.getElementById('root');
-    if (appRoot) {
-      appRoot.style.height = `${height}px`;
-      appRoot.style.minHeight = `${height}px`;
-      appRoot.style.maxHeight = '';
-    }
-  };
+  const apply = () => refreshWebShellHeight();
 
   apply();
   // Re-apply after first paint — iOS often reports a wrong height before chrome settles.
@@ -127,7 +142,7 @@ export function installWebViewportHeightLock() {
   window.addEventListener('pageshow', apply);
   document.addEventListener('visibilitychange', apply);
   // Keep listening to visualViewport for keyboard / URL-bar changes, but apply()
-  // never sizes the shell from visualViewport.height.
+  // never sizes the shell from visualViewport.height alone.
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', apply);
     window.visualViewport.addEventListener('scroll', apply);

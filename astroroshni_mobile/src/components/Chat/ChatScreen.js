@@ -5065,7 +5065,11 @@ export default function ChatScreen({ navigation, route }) {
       <LinearGradient
         colors={
           theme === 'dark'
-            ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, '#ea580c']
+            ? // Home tabs are orange; ending this screen gradient in orange makes a second
+              // orange strip when anything peeks under the tab bar. Keep orange only in chat.
+              showGreeting
+                ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientEnd]
+                : [colors.gradientStart, colors.gradientMid, colors.gradientEnd, '#ea580c']
             : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]
         }
         style={styles.gradientBg}

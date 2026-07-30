@@ -45,6 +45,7 @@
     "expo-speech": "~14.0.8",
     "expo-store-review": "^8.0.8",
     "expo-tracking-transparency": "~6.0.8",
+    "html-to-image": "^1.11.13",
     "i18next": "^25.8.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",

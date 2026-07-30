@@ -15,6 +15,7 @@ import {
   Modal,
   PanResponder,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BlurView } from 'expo-blur';
 import { Audio } from 'expo-av';
@@ -22,17 +23,26 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { captureRef } from 'react-native-view-shot';
-import * as Sharing from 'expo-sharing';
+import { shareCapturedChart, alertShareFailure } from '../../platform/shareChart';
 
 import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
 import { chartAPI, creditAPI } from '../../services/api';
-import { getWebBottomInset } from '../../platform/webSafeArea';
+import { getWebBottomInset, refreshWebShellHeight } from '../../platform/webSafeArea';
 import { chartPreloader } from '../../services/chartPreloader';
 import ChartWidget from './ChartWidget';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
+
+let createPortal = null;
+if (Platform.OS === 'web') {
+  try {
+    // eslint-disable-next-line global-require
+    createPortal = require('react-dom').createPortal;
+  } catch (_) {
+    createPortal = null;
+  }
+}
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { useAnalytics } from '../../hooks/useAnalytics';
@@ -52,11 +62,14 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const { requireAuthForPaid } = useAuthGate();
   const { isAstrologerLicensed } = useCredits();
   const insets = useSafeAreaInsets();
+  // Web: modest pad under labels (same as Home). Full ~34px painted a thick purple band.
   const bottomInset =
     Platform.OS === 'web'
-      ? getWebBottomInset(insets.bottom)
+      ? Math.min(getWebBottomInset(insets.bottom), 16)
       : Math.max(0, insets.bottom || 0);
+  const navContentHeight = Platform.OS === 'web' ? 56 : 64;
   const embedded = !!route?.params?.embedded;
+  const [chartNavVisible, setChartNavVisible] = useState(true);
   const [birthData, setBirthData] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -647,22 +660,11 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const handleShare = useCallback(async () => {
     try {
       setIsSharing(true);
-      // Wait for state update and potential re-renders
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      const uri = await captureRef(captureViewRef, {
-        format: 'png',
-        quality: 0.8,
-      });
-
-      await Sharing.shareAsync(uri, {
-        mimeType: 'image/png',
-        dialogTitle: 'Share your Cosmic Blueprint',
-        UTI: 'public.png',
-      });
+      // Wait a frame so layout settles before capture.
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await shareCapturedChart(captureViewRef);
     } catch (error) {
-      console.error('Error sharing chart:', error);
-      Alert.alert('Error', 'Failed to share chart. Please try again.');
+      alertShareFailure(error);
     } finally {
       setIsSharing(false);
     }
@@ -690,6 +692,23 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   useEffect(() => {
     loadBirthData();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setChartNavVisible(true);
+      if (Platform.OS === 'web') {
+        refreshWebShellHeight();
+        const t1 = setTimeout(refreshWebShellHeight, 50);
+        const t2 = setTimeout(refreshWebShellHeight, 300);
+        return () => {
+          setChartNavVisible(false);
+          clearTimeout(t1);
+          clearTimeout(t2);
+        };
+      }
+      return () => setChartNavVisible(false);
+    }, [])
+  );
   
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -771,6 +790,9 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
     <View
       ref={captureViewRef}
       collapsable={false}
+      nativeID="ar-chart-capture"
+      // Web share capture looks this node up if the RN ref is not a DOM element.
+      {...(Platform.OS === 'web' ? { dataSet: { arChartCapture: '1' } } : null)}
       style={[styles.captureArea, webIntrinsic, chartFlowIntrinsic]}
     >
       <LinearGradient
@@ -785,7 +807,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
           chartFlowIntrinsic,
         ]}
       >
-        <View style={[styles.chartArea, webIntrinsic, chartFlowIntrinsic]}>
+        <View style={[styles.chartArea, webIntrinsic, chartFlowIntrinsic, embedded && Platform.OS === 'web' ? { paddingTop: 0 } : null]}>
           <View
             style={[
               styles.chartWrapper,
@@ -794,7 +816,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
               // Web: do not force the whole ChartWidget (toolbar + chart) into a square —
               // that made floating icons overlap the enlarged chart.
               Platform.OS === 'web'
-                ? { width: '100%', alignSelf: 'stretch' }
+                ? { width: '100%', alignSelf: 'stretch', flex: 0 }
                 : null,
             ]}
           >
@@ -856,7 +878,15 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
           style={StyleSheet.absoluteFill} 
         />
         
-        <SafeAreaView style={[styles.safeArea, webFlexFix]} edges={embedded ? [] : ['top']}>
+        {/* Embedded in ChartsHub: plain View — SafeAreaView can still pad top on web
+            even with edges={[]} and stacks a second gap under the hub tabs. */}
+        {(() => {
+          const Root = embedded ? View : SafeAreaView;
+          const rootProps = embedded
+            ? { style: [styles.safeArea, webFlexFix, Platform.OS === 'web' ? { paddingTop: 0 } : null] }
+            : { style: [styles.safeArea, webFlexFix], edges: ['top'] };
+          return (
+        <Root {...rootProps}>
           {!embedded ? (
           <View style={styles.compactHeader}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.closeButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}>
@@ -906,7 +936,13 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                 style={{ flex: 1 }}
                 contentContainerStyle={
                   Platform.OS === 'web'
-                    ? { paddingBottom: activationEligible ? 128 : 12 }
+                    ? {
+                        flexGrow: 0,
+                        justifyContent: 'flex-start',
+                        paddingTop: 0,
+                        marginTop: 0,
+                        paddingBottom: activationEligible ? 128 : 12,
+                      }
                     : { flexGrow: 1, paddingBottom: activationEligible ? 128 : 0 }
                 }
                 showsVerticalScrollIndicator={false}
@@ -1010,11 +1046,16 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                 onRequestClose={() => setShowAstrologerLicenseModal(false)}
               />
 
-              <View style={[styles.bottomNavContainer, { 
+              {(() => {
+                const bottomNav = (
+              <View style={[styles.bottomNavContainer, {
                 backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 1)' : 'rgba(255, 255, 255, 1)',
                 borderTopColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                height: 64 + Math.max(bottomInset, Platform.OS === 'web' ? 0 : 15),
-                paddingBottom: Math.max(bottomInset, Platform.OS === 'web' ? 0 : 15),
+                height: navContentHeight + (Platform.OS === 'web' ? bottomInset : Math.max(bottomInset, 15)),
+                paddingBottom: Platform.OS === 'web' ? bottomInset : Math.max(bottomInset, 15),
+                ...(Platform.OS === 'web'
+                  ? { position: 'fixed', left: 0, right: 0, bottom: 0 }
+                  : null),
               }]}>
                 {Platform.OS === 'ios' && (
                   <BlurView intensity={theme === 'dark' ? 40 : 60} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />
@@ -1042,6 +1083,16 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                   ))}
                 </AppScrollView>
               </View>
+                );
+
+                if (Platform.OS === 'web') {
+                  if (!chartNavVisible || !createPortal || typeof document === 'undefined') {
+                    return null;
+                  }
+                  return createPortal(bottomNav, document.body);
+                }
+                return bottomNav;
+              })()}
             </View>
           ) : (
             <View style={styles.emptyContainer}>
@@ -1050,7 +1101,9 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
               <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('chartScreen.emptyText')}</Text>
             </View>
           )}
-        </SafeAreaView>
+        </Root>
+          );
+        })()}
         
         <CascadingDashaBrowser visible={showDashaBrowser} onClose={() => setShowDashaBrowser(false)} birthData={birthData} onRequireBirthData={() => navigation.replace('BirthProfileIntro', { returnTo: 'Chart' })} selectNativeReturnTo="Chart" />
 
@@ -1568,16 +1621,28 @@ const styles = StyleSheet.create({
   mainContent: {
     flex: 1,
     paddingHorizontal: 0,
+    ...(Platform.OS === 'web'
+      ? { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', height: 'auto' }
+      : null),
   },
   chartAndNavContainer: {
     flex: 1,
+    ...(Platform.OS === 'web'
+      ? { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', height: 'auto' }
+      : null),
   },
   captureArea: {
     flex: 1,
+    ...(Platform.OS === 'web'
+      ? { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', height: 'auto' }
+      : null),
   },
   captureGradient: {
     flex: 1,
     padding: 0,
+    ...(Platform.OS === 'web'
+      ? { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', height: 'auto' }
+      : null),
   },
   chartContentStack: {
     flex: 1,
@@ -1604,18 +1669,34 @@ const styles = StyleSheet.create({
   },
   chartArea: {
     flex: 1,
-    paddingTop: 20,
+    paddingTop: Platform.OS === 'web' ? 0 : 20,
     paddingHorizontal: 0,
     // Native: counteract legacy parent padding. Web/PWA: stay edge-to-edge for full-width charts.
     marginHorizontal: Platform.OS === 'web' ? 0 : -20,
     ...(Platform.OS === 'web'
-      ? { width: '100%', alignSelf: 'stretch', overflow: 'visible' }
+      ? {
+          flexGrow: 0,
+          flexShrink: 0,
+          flexBasis: 'auto',
+          height: 'auto',
+          width: '100%',
+          alignSelf: 'stretch',
+          overflow: 'visible',
+        }
       : {}),
   },
   chartWrapper: {
     flex: 1,
     ...(Platform.OS === 'web'
-      ? { width: '100%', alignSelf: 'stretch' }
+      ? {
+          flexGrow: 0,
+          flexShrink: 0,
+          flexBasis: 'auto',
+          height: 'auto',
+          width: '100%',
+          alignSelf: 'stretch',
+          overflow: 'visible',
+        }
       : {}),
   },
   captureFooter: {

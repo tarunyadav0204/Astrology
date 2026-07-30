@@ -311,7 +311,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingTop: 4,
+    paddingBottom: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 8,
   },
@@ -370,16 +371,16 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
-    marginHorizontal: 12,
-    marginTop: 8,
-    marginBottom: 8,
-    padding: 4,
+    marginHorizontal: 10,
+    marginTop: 2,
+    marginBottom: 0,
+    padding: 2,
     borderRadius: 12,
   },
   tabChip: {
     flex: 1,
-    paddingVertical: 9,
-    paddingHorizontal: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -392,6 +393,7 @@ const styles = StyleSheet.create({
   },
   contentWeb: {
     minHeight: 0,
-    overflow: 'hidden',
+    // hidden was clipping the chart toolbar + diamond top on iOS PWA.
+    overflow: 'auto',
   },
 });

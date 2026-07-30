@@ -40,7 +40,17 @@ import { useAuthGate } from '../../auth/AuthGateContext';
 import { extractFirstHttpsUrl } from '../../utils/blogLinks';
 import FomoHomeSheet from './FomoHomeSheet';
 import FomoHomeEntryCard from './FomoHomeEntryCard';
-import { getWebBottomInset } from '../../platform/webSafeArea';
+import { getWebBottomInset, refreshWebShellHeight } from '../../platform/webSafeArea';
+
+let createPortal = null;
+if (Platform.OS === 'web') {
+  try {
+    // eslint-disable-next-line global-require
+    createPortal = require('react-dom').createPortal;
+  } catch (_) {
+    createPortal = null;
+  }
+}
 
 const { width, height: windowHeight } = Dimensions.get('window');
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -332,16 +342,18 @@ export default function HomeScreen({
 }) {
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
-  // iOS native: keep a tight fixed inset. Web/Android: use real home-indicator inset so the
-  // tab bar background can extend edge-to-edge without a dead strip under the bar.
-  // Web iPhone PWA: cap via getWebBottomInset — Mac Safari device mode often under-reports
-  // insets while real iPhones can over-report and also shrink -webkit-fill-available.
+  // Web: keep a short content row + modest home-indicator pad.
+  // Full ~34px pad made a thick empty orange band under the labels; ~16 is enough
+  // for label clearance while position:fixed still paints to the screen edge.
+  const tabContentHeight = Platform.OS === 'ios' ? 80 : Platform.OS === 'web' ? 56 : 70;
   const tabSafeBottom =
     Platform.OS === 'ios'
       ? 10
       : Platform.OS === 'web'
-        ? getWebBottomInset(insets.bottom)
+        ? Math.min(getWebBottomInset(insets.bottom), 16)
         : Math.max(0, insets.bottom || 0);
+  /** Web: portaled tabs only while Home is focused (hidden on BirthForm etc.). */
+  const [homeTabsVisible, setHomeTabsVisible] = useState(true);
   useAnalytics('HomeScreen');
   const { theme, colors, androidLightCardFixStyle } = useTheme();
   const isDark = theme === 'dark';
@@ -468,6 +480,24 @@ export default function HomeScreen({
     return insights[type];
   };
   
+  useFocusEffect(
+    React.useCallback(() => {
+      setHomeTabsVisible(true);
+      // After BirthForm (keyboard + stack transition), iOS web often leaves a short shell.
+      if (Platform.OS === 'web') {
+        refreshWebShellHeight();
+        const t1 = setTimeout(refreshWebShellHeight, 50);
+        const t2 = setTimeout(refreshWebShellHeight, 300);
+        return () => {
+          setHomeTabsVisible(false);
+          clearTimeout(t1);
+          clearTimeout(t2);
+        };
+      }
+      return () => setHomeTabsVisible(false);
+    }, [])
+  );
+
   useFocusEffect(
     React.useCallback(() => {
       let cancelled = false;
@@ -3253,13 +3283,19 @@ const loadHomeData = async (nativeData = null) => {
         </Animated.View>
       ) : null}
 
-      {/* Bottom Tabs — bar paints to the physical bottom; icons clear the home indicator via padding. */}
+      {/* Bottom Tabs — on web, portal to document.body with position:fixed so stack
+          transforms after BirthForm cannot leave a purple gap under the bar. */}
+      {(() => {
+        const bottomTabs = (
       <View style={[
         styles.bottomTabs,
         {
           bottom: 0,
-          height: (Platform.OS === 'ios' ? 80 : 70) + tabSafeBottom,
+          height: tabContentHeight + tabSafeBottom,
           paddingBottom: tabSafeBottom,
+          ...(Platform.OS === 'web'
+            ? { position: 'fixed', left: 0, right: 0 }
+            : null),
         },
       ]}>
         <LinearGradient
@@ -3377,6 +3413,16 @@ const loadHomeData = async (nativeData = null) => {
           </Text>
         </TouchableOpacity>
       </View>
+        );
+
+        if (Platform.OS === 'web') {
+          if (!homeTabsVisible || !createPortal || typeof document === 'undefined') {
+            return null;
+          }
+          return createPortal(bottomTabs, document.body);
+        }
+        return bottomTabs;
+      })()}
     </View>
   );
 }
@@ -6184,8 +6230,9 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: Platform.OS === 'web' ? 'flex-start' : 'center',
     alignItems: 'center',
+    paddingTop: Platform.OS === 'web' ? 8 : 0,
   },
   tabIconContainer: {
     width: 42,
