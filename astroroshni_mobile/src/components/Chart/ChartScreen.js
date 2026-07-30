@@ -62,10 +62,10 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const { requireAuthForPaid } = useAuthGate();
   const { isAstrologerLicensed } = useCredits();
   const insets = useSafeAreaInsets();
-  // Web: modest pad under labels (same as Home). Full ~34px painted a thick purple band.
+  // Web: cover home-indicator with nav background (env() often 0 on iOS PWA).
   const bottomInset =
     Platform.OS === 'web'
-      ? Math.min(getWebBottomInset(insets.bottom), 16)
+      ? getWebBottomInset(insets.bottom)
       : Math.max(0, insets.bottom || 0);
   const navContentHeight = Platform.OS === 'web' ? 56 : 64;
   const embedded = !!route?.params?.embedded;
@@ -1048,13 +1048,23 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
 
               {(() => {
                 const bottomNav = (
-              <View style={[styles.bottomNavContainer, {
+              <View
+                {...(Platform.OS === 'web' ? { dataSet: { arChartBottomNav: '1' }, nativeID: 'ar-chart-bottom-nav' } : null)}
+                style={[styles.bottomNavContainer, {
                 backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 1)' : 'rgba(255, 255, 255, 1)',
                 borderTopColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
                 height: navContentHeight + (Platform.OS === 'web' ? bottomInset : Math.max(bottomInset, 15)),
                 paddingBottom: Platform.OS === 'web' ? bottomInset : Math.max(bottomInset, 15),
                 ...(Platform.OS === 'web'
-                  ? { position: 'fixed', left: 0, right: 0, bottom: 0 }
+                  ? {
+                      position: 'fixed',
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      boxSizing: 'border-box',
+                      paddingTop: 0,
+                      marginBottom: 0,
+                    }
                   : null),
               }]}>
                 {Platform.OS === 'ios' && (

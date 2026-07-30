@@ -1,39 +1,48 @@
 /* Expo Web phone-shell — loaded only when Platform.OS === 'web' (index.js). Never on Play/iOS. */
 
 /*
- * Fixed app shell: viewport is locked; screens scroll internally.
- * Required so Home bottom tabs stay pinned (position:absolute) while feed scrolls.
- *
- * iOS standalone PWA: do NOT lock height/max-height to visualViewport (or a short
- * --ar-app-height). That leaves a dead purple strip under absolute bottom tabs.
- * Fill with position:fixed + inset:0; let the box stretch to the real window.
+ * App shell fills the viewport. Scroll locking lives on #root only —
+ * html/body must NOT use overflow:hidden or home-indicator paints
+ * (translateY / negative bottom) get clipped and the purple strip remains.
  */
-html,
-body {
-  position: fixed;
+html {
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   width: 100%;
-  /* Prefer inset fill; --ar-app-height is a Safari-tab fallback only (never max-height). */
-  height: var(--ar-app-height, 100%);
-  min-height: var(--ar-app-height, 100%);
+  height: 100%;
+  height: 100dvh;
+  min-height: 100%;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
   max-height: none;
   margin: 0;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
   overscroll-behavior: none;
   background-color: #1a0033;
 }
 
 body {
-  /*
-   * Do not pad body with env(safe-area-inset-*). That inset sits *outside* #root, so
-   * absolute Home bottom tabs (bottom: 0) leave a dead strip under the bar on phones.
-   * Safe areas are applied by react-native-safe-area-context inside the app (tab padding, etc.).
-   */
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  min-height: 100%;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+  max-height: none;
+  margin: 0;
   padding: 0;
+  overflow: visible;
+  overscroll-behavior: none;
+  background-color: #1a0033;
   box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   -webkit-tap-highlight-color: transparent;
@@ -49,8 +58,8 @@ body {
   right: 0;
   bottom: 0;
   width: 100%;
-  height: var(--ar-app-height, 100%);
-  min-height: var(--ar-app-height, 100%);
+  height: 100%;
+  min-height: 100%;
   max-height: none;
   overflow: hidden;
   background-color: #1a0033;
@@ -84,7 +93,6 @@ input,
 textarea,
 select {
   font-size: 16px;
-  /* Kill browser default blue focus rectangle on PWA (Chrome/Safari). */
   outline: none !important;
   outline-width: 0 !important;
   outline-style: none !important;

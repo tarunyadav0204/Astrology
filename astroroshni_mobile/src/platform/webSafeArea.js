@@ -12,8 +12,14 @@
  */
 import { Platform } from 'react-native';
 
-/** Typical iPhone home-indicator inset; never pad more than this on web. */
+/** Typical iPhone home-indicator inset reported by CSS env(). */
 export const WEB_MAX_BOTTOM_INSET = 34;
+
+/**
+ * Modest pad under labels when a bar should NOT extend into the home-indicator.
+ * Home/Chart tab bars use getWebBottomInset so their background paints that zone.
+ */
+export const WEB_TAB_BOTTOM_PAD = 10;
 
 export function isIosStandalonePwa() {
   if (typeof window === 'undefined') return false;
@@ -45,6 +51,8 @@ function readCssSafeAreaBottom() {
 /**
  * Bottom inset for pinning tab / chart / chat bars on Expo Web.
  * Prefers CSS env() when available; always capped for home indicator.
+ * iOS standalone often reports 0 from env() — fall back to a typical
+ * home-indicator height so the tab chrome can cover the purple strip.
  */
 export function getWebBottomInset(rnInsetsBottom = 0) {
   if (Platform.OS !== 'web') {
@@ -54,7 +62,22 @@ export function getWebBottomInset(rnInsetsBottom = 0) {
   const fromCss = readCssSafeAreaBottom();
   // Prefer CSS env — more reliable than RN insets on iOS standalone WebKit.
   const raw = fromCss > 0 ? fromCss : fromRn;
-  return Math.min(Math.max(raw, 0), WEB_MAX_BOTTOM_INSET);
+  const capped = Math.min(Math.max(raw, 0), WEB_MAX_BOTTOM_INSET);
+  if (capped > 0) return capped;
+  // env() / RN often return 0 in Add-to-Home-Screen even though the home
+  // indicator zone still shows the shell purple under fixed footers.
+  if (isIosStandalonePwa()) return WEB_MAX_BOTTOM_INSET;
+  return 0;
+}
+
+/** Modest pad under tab / chart / chat chrome labels (not full home-indicator). */
+export function getWebTabBottomPad(rnInsetsBottom = 0) {
+  if (Platform.OS !== 'web') {
+    return Math.max(0, Number(rnInsetsBottom) || 0);
+  }
+  const inset = getWebBottomInset(rnInsetsBottom);
+  if (inset <= 0) return 8;
+  return Math.min(inset, WEB_TAB_BOTTOM_PAD);
 }
 
 /**
@@ -86,37 +109,29 @@ export function refreshWebShellHeight() {
   const root = document.documentElement;
   const appRoot = document.getElementById('root');
 
-  if (isIosStandalonePwa()) {
-    // Fill the real window via inset — clear any leftover pixel heights from the keyboard.
-    root.style.removeProperty('--ar-app-height');
-    root.style.height = '100%';
-    root.style.minHeight = '100%';
-    for (const el of [document.body, appRoot]) {
-      if (!el) continue;
-      el.style.top = '0';
-      el.style.left = '0';
-      el.style.right = '0';
-      el.style.bottom = '0';
-      el.style.height = '';
-      el.style.minHeight = '';
-      el.style.maxHeight = '';
-    }
-    return;
+  // Always prefer filling the real window — never leave a short box with purple under tabs.
+  root.style.removeProperty('--ar-app-height');
+  root.style.height = '';
+  root.style.minHeight = '';
+  for (const el of [document.body, appRoot]) {
+    if (!el) continue;
+    el.style.top = '0';
+    el.style.left = '0';
+    el.style.right = '0';
+    el.style.bottom = '0';
+    el.style.height = '';
+    el.style.minHeight = '';
+    el.style.maxHeight = '';
   }
 
-  const height = resolveShellHeight();
-  if (height <= 0) return;
-  root.style.setProperty('--ar-app-height', `${height}px`);
-  if (document.body) {
-    document.body.style.height = `${height}px`;
-    document.body.style.minHeight = `${height}px`;
-    document.body.style.maxHeight = '';
-  }
-  if (appRoot) {
-    appRoot.style.height = `${height}px`;
-    appRoot.style.minHeight = `${height}px`;
-    appRoot.style.maxHeight = '';
-  }
+  // Re-measure / refresh orange cover if Home has it active.
+  try {
+    const fill = document.getElementById('ar-home-safe-fill-dom');
+    const color = root.style.getPropertyValue('--ar-bottom-safe-color')?.trim();
+    if (fill && color) {
+      setWebBottomSafeColor(color);
+    }
+  } catch (_) {}
 }
 
 /**
@@ -158,4 +173,97 @@ export function installWebViewportHeightLock() {
       window.visualViewport.removeEventListener('scroll', apply);
     }
   };
+}
+
+/**
+ * Paint the iPhone home-indicator zone orange while Home tabs are visible.
+ * Uses a <style> tag (body::after) so it is not clipped by RN Views and does
+ * not change tab bar height/padding. iOS bottom:0 is the safe edge — we
+ * translate the paint into the unsafe strip below the tab bar.
+ */
+export function setWebBottomSafeColor(color) {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  const STYLE_ID = 'ar-home-indicator-style';
+  const existingFill = document.getElementById('ar-home-safe-fill-dom');
+  if (existingFill) existingFill.remove();
+
+  let styleEl = document.getElementById(STYLE_ID);
+
+  if (!color) {
+    if (styleEl) styleEl.remove();
+    document.documentElement.style.removeProperty('--ar-bottom-safe-color');
+    const meta = document.querySelector('meta[name="theme-color"]:not([media])');
+    if (meta && meta.dataset.arPrevThemeColor != null) {
+      meta.setAttribute('content', meta.dataset.arPrevThemeColor);
+      delete meta.dataset.arPrevThemeColor;
+    }
+    document.querySelectorAll('meta[name="theme-color"][media]').forEach((m) => {
+      if (m.dataset.arPrevThemeColor != null) {
+        m.setAttribute('content', m.dataset.arPrevThemeColor);
+        delete m.dataset.arPrevThemeColor;
+      }
+    });
+    return;
+  }
+
+  document.documentElement.style.setProperty('--ar-bottom-safe-color', color);
+
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = STYLE_ID;
+    document.head.appendChild(styleEl);
+  }
+
+  styleEl.textContent = `
+    html {
+      background-color: #1a0033 !important;
+      background-image: linear-gradient(
+        to bottom,
+        #1a0033 0%,
+        #1a0033 calc(100% - 34px),
+        ${color} calc(100% - 34px),
+        ${color} 100%
+      ) !important;
+    }
+    /* Let html's orange bottom show; opaque body/#root were covering it. */
+    body {
+      background-color: transparent !important;
+      background-image: none !important;
+      overflow: visible !important;
+    }
+    #root {
+      background-color: #1a0033 !important;
+    }
+    /* Strip below safe bottom:0 (= under the tab bar on iOS). */
+    body::after {
+      content: '';
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 34px;
+      height: constant(safe-area-inset-bottom);
+      height: env(safe-area-inset-bottom, 34px);
+      min-height: 34px;
+      background: ${color};
+      transform: translateY(100%);
+      z-index: 9999;
+      pointer-events: none;
+    }
+  `;
+
+  const meta = document.querySelector('meta[name="theme-color"]:not([media])');
+  if (meta) {
+    if (meta.dataset.arPrevThemeColor == null) {
+      meta.dataset.arPrevThemeColor = meta.getAttribute('content') || '#1a0033';
+    }
+    meta.setAttribute('content', color);
+  }
+  document.querySelectorAll('meta[name="theme-color"][media]').forEach((m) => {
+    if (m.dataset.arPrevThemeColor == null) {
+      m.dataset.arPrevThemeColor = m.getAttribute('content') || '#1a0033';
+    }
+    m.setAttribute('content', color);
+  });
 }

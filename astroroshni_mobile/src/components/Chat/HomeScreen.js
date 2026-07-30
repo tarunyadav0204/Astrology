@@ -40,7 +40,7 @@ import { useAuthGate } from '../../auth/AuthGateContext';
 import { extractFirstHttpsUrl } from '../../utils/blogLinks';
 import FomoHomeSheet from './FomoHomeSheet';
 import FomoHomeEntryCard from './FomoHomeEntryCard';
-import { getWebBottomInset, refreshWebShellHeight } from '../../platform/webSafeArea';
+import { getWebBottomInset, refreshWebShellHeight, setWebBottomSafeColor } from '../../platform/webSafeArea';
 
 let createPortal = null;
 if (Platform.OS === 'web') {
@@ -342,20 +342,20 @@ export default function HomeScreen({
 }) {
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
-  // Web: keep a short content row + modest home-indicator pad.
-  // Full ~34px pad made a thick empty orange band under the labels; ~16 is enough
-  // for label clearance while position:fixed still paints to the screen edge.
+  // Web: keep tab bar size normal. Home-indicator orange is applied via
+  // setWebBottomSafeColor (CSS body::after below the safe edge) — not tab padding.
   const tabContentHeight = Platform.OS === 'ios' ? 80 : Platform.OS === 'web' ? 56 : 70;
   const tabSafeBottom =
     Platform.OS === 'ios'
       ? 10
       : Platform.OS === 'web'
-        ? Math.min(getWebBottomInset(insets.bottom), 16)
+        ? Math.min(getWebBottomInset(insets.bottom), 12)
         : Math.max(0, insets.bottom || 0);
   /** Web: portaled tabs only while Home is focused (hidden on BirthForm etc.). */
   const [homeTabsVisible, setHomeTabsVisible] = useState(true);
   useAnalytics('HomeScreen');
   const { theme, colors, androidLightCardFixStyle } = useTheme();
+  const tabSafeColor = theme === 'dark' ? '#ea580c' : '#ffffff';
   const isDark = theme === 'dark';
   const isIOS = Platform.OS === 'ios';
   const { freeQuestionAvailable, pricing, pricingOriginal, fetchPricing } = useCredits();
@@ -497,6 +497,17 @@ export default function HomeScreen({
       return () => setHomeTabsVisible(false);
     }, [])
   );
+
+  // Sync theme-color / html bottom tint only — do not inject an overlay bar.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return undefined;
+    if (homeTabsVisible) {
+      setWebBottomSafeColor(tabSafeColor);
+    } else {
+      setWebBottomSafeColor(null);
+    }
+    return () => setWebBottomSafeColor(null);
+  }, [homeTabsVisible, tabSafeColor]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -3294,7 +3305,13 @@ const loadHomeData = async (nativeData = null) => {
           height: tabContentHeight + tabSafeBottom,
           paddingBottom: tabSafeBottom,
           ...(Platform.OS === 'web'
-            ? { position: 'fixed', left: 0, right: 0 }
+            ? {
+                position: 'fixed',
+                left: 0,
+                right: 0,
+                zIndex: 10000,
+                backgroundColor: tabSafeColor,
+              }
             : null),
         },
       ]}>
@@ -6208,7 +6225,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10000,
-    overflow: 'hidden',
+    overflow: Platform.OS === 'web' ? 'visible' : 'hidden',
     ...Platform.select({
       ios: {
         height: 80,
@@ -6220,9 +6237,8 @@ const styles = StyleSheet.create({
         paddingTop: 0,
         paddingBottom: 0,
       },
-      // Web: same absolute pin; parent shell is viewport-height locked (webShell.css).
       web: {
-        height: 70,
+        height: undefined,
         paddingTop: 0,
         paddingBottom: 0,
       },
@@ -6230,9 +6246,9 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     flex: 1,
-    justifyContent: Platform.OS === 'web' ? 'flex-start' : 'center',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: Platform.OS === 'web' ? 8 : 0,
+    paddingTop: 0,
   },
   tabIconContainer: {
     width: 42,

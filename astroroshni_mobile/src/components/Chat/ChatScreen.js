@@ -25,7 +25,7 @@ import { ScrollView as GHScrollView, FlatList as GHFlatList } from 'react-native
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getWebBottomInset } from '../../platform/webSafeArea';
+import { getWebTabBottomPad } from '../../platform/webSafeArea';
 import { useFocusEffect } from '@react-navigation/native';
 
 import MessageBubble from './MessageBubble';
@@ -469,7 +469,7 @@ export default function ChatScreen({ navigation, route }) {
   const { requireAuthForPaid, isGuest, refreshAuthState } = useAuthGate();
   const insets = useSafeAreaInsets();
   const webBottomInset =
-    Platform.OS === 'web' ? getWebBottomInset(insets.bottom) : Math.max(0, insets.bottom || 0);
+    Platform.OS === 'web' ? getWebTabBottomPad(insets.bottom) : Math.max(0, insets.bottom || 0);
   
   // Mundane mode state
   const [isMundane, setIsMundane] = useState(false);

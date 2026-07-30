@@ -60,17 +60,23 @@ export const THEMES = {
 function syncWebChromeTheme(themeName) {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return;
   const palette = THEMES[themeName] || THEMES.dark;
-  const bg = palette.background;
+  const shellBg = palette.background;
+  // Home may set --ar-bottom-safe-color for the thin home-indicator strip only —
+  // never paint html/body/#root with that orange (it looked like a huge safe area).
+  const bottomSafe = (
+    document.documentElement.style.getPropertyValue('--ar-bottom-safe-color') || ''
+  ).trim();
+  const chromeBg = bottomSafe || shellBg;
   let meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) {
     meta = document.createElement('meta');
     meta.setAttribute('name', 'theme-color');
     document.head.appendChild(meta);
   }
-  meta.setAttribute('content', bg);
+  meta.setAttribute('content', chromeBg);
   // media-specific tags (Expo sometimes emits light/dark variants)
   document.querySelectorAll('meta[name="theme-color"][media]').forEach((el) => {
-    el.setAttribute('content', bg);
+    el.setAttribute('content', chromeBg);
   });
   let appleBar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
   if (!appleBar) {
@@ -80,13 +86,13 @@ function syncWebChromeTheme(themeName) {
   }
   // dark: blend into purple shell; light: default so icons stay dark on cream
   appleBar.setAttribute('content', themeName === 'dark' ? 'black-translucent' : 'default');
-  document.documentElement.style.backgroundColor = bg;
+  document.documentElement.style.backgroundColor = shellBg;
   document.documentElement.style.colorScheme = themeName === 'dark' ? 'dark' : 'light';
   if (document.body) {
-    document.body.style.backgroundColor = bg;
+    document.body.style.backgroundColor = shellBg;
   }
   const root = document.getElementById('root');
-  if (root) root.style.backgroundColor = bg;
+  if (root) root.style.backgroundColor = shellBg;
 }
 
 /** Global StatusBar that matches active theme (fixes hardcoded orange in App.js). */
