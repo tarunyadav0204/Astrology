@@ -12,6 +12,9 @@ export const META_PIXEL_ID =
     : '') ||
   '1900398174159684';
 
+/** Distinguishes /mobile PWA from marketing website in the same Pixel. */
+export const META_SURFACE = 'pwa';
+
 let initStarted = false;
 
 function isWebPwa() {
@@ -66,7 +69,9 @@ export function initMetaPixel() {
     }
 
     window.fbq('init', META_PIXEL_ID);
-    window.fbq('track', 'PageView');
+    // Standard PageView (ads) + PWA_PageView custom (shows as its own Events Manager row).
+    window.fbq('track', 'PageView', { ar_surface: META_SURFACE, content_name: 'pwa_shell' });
+    window.fbq('trackCustom', 'PWA_PageView', { ar_surface: META_SURFACE, content_name: 'pwa_shell' });
     if (typeof window !== 'undefined') {
       window.__AR_META_PIXEL_INIT__ = true;
     }
@@ -91,6 +96,18 @@ function sanitizePixelParams(params = {}) {
   return out;
 }
 
+function withSurface(params = {}) {
+  return {
+    ar_surface: META_SURFACE,
+    ...params,
+  };
+}
+
+/** Events Manager has no URL filter — surface-prefixed custom names show as separate rows. */
+function surfaceEventName(eventName) {
+  return `PWA_${eventName}`;
+}
+
 /**
  * Fire a standard or custom Pixel event.
  * @param {string} eventName Meta event name (Purchase, CompleteRegistration, Login, ChatMessage, …)
@@ -103,10 +120,12 @@ export function trackMetaPixelEvent(eventName, params = {}, options = {}) {
   const fbq = getFbq();
   if (!fbq || !eventName) return;
 
-  const payload = sanitizePixelParams(params);
+  const payload = sanitizePixelParams(withSurface(params));
+  const labeled = surfaceEventName(eventName);
   try {
     if (options.eventID) {
       fbq('trackCustom', eventName, payload, { eventID: options.eventID });
+      fbq('trackCustom', labeled, payload, { eventID: `${options.eventID}_pwa` });
     } else if (
       [
         'PageView',
@@ -130,10 +149,14 @@ export function trackMetaPixelEvent(eventName, params = {}, options = {}) {
       ].includes(eventName)
     ) {
       fbq('track', eventName, payload);
+      fbq('trackCustom', labeled, payload);
     } else {
       fbq('trackCustom', eventName, payload);
+      if (eventName !== labeled) {
+        fbq('trackCustom', labeled, payload);
+      }
     }
-    if (__DEV__) console.log('[MetaPixel]', eventName, payload);
+    if (__DEV__) console.log('[MetaPixel]', eventName, labeled, payload);
   } catch (e) {
     if (__DEV__) console.warn('[MetaPixel] track failed', eventName, e?.message || e);
   }
