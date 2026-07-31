@@ -185,7 +185,7 @@ For every user query, structure your response exactly as follows:
         ashtakavarga_calc = AshtakavargaCalculator(birth_data, chart_data)
         
         # Initialize Panchang calculator
-        from calculators.panchang_calculator import PanchangCalculator
+        from panchang.panchang_calculator import PanchangCalculator
         panchang_calc = PanchangCalculator()
         panchang_calc.birth_data = birth_data
         

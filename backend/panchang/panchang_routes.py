@@ -4,7 +4,7 @@ from typing import Optional
 from datetime import datetime, timedelta
 import swisseph as swe
 import math
-from calculators.panchang_calculator import PanchangCalculator
+from .panchang_calculator import PanchangCalculator
 from .monthly_panchang_calculator import MonthlyPanchangCalculator
 
 router = APIRouter()
@@ -60,10 +60,10 @@ async def calculate_panchang(request: PanchangRequest):
         # Calculate basic panchang data
         basic_panchang = panchang_calc.calculate_panchang(
             request.transit_date,
-            "12:00:00",
             float(latitude),
             float(longitude),
-            str(timezone)
+            str(timezone),
+            reference="sunrise",
         )
         
         # Get sunrise/sunset data
@@ -81,9 +81,9 @@ async def calculate_panchang(request: PanchangRequest):
                 'name': basic_panchang['tithi']['name'],
                 'paksha': basic_panchang['tithi']['paksha'],
                 'lord': 'Moon',  # Tithi lord is always Moon
-                'start_time': sunrise_sunset_data.get('sunrise'),
-                'end_time': sunrise_sunset_data.get('sunset'),
-                'elapsed': basic_panchang['tithi']['degrees_traversed'],
+                'start_time': basic_panchang['tithi'].get('start_time'),
+                'end_time': basic_panchang['tithi'].get('end_time'),
+                'elapsed': basic_panchang['tithi'].get('elapsed_degrees', 0),
                 'duration': 12.0  # Tithi duration in degrees
             },
             'vara': {
@@ -96,35 +96,35 @@ async def calculate_panchang(request: PanchangRequest):
             'nakshatra': {
                 'number': basic_panchang['nakshatra']['number'],
                 'name': basic_panchang['nakshatra']['name'],
-                'lord': 'Various',  # Simplified
-                'deity': 'Various',
-                'nature': 'Balanced',
-                'pada': 1,  # Simplified
-                'career_focus': 'General',
+                'lord': basic_panchang['nakshatra'].get('lord'),
+                'deity': basic_panchang['nakshatra'].get('deity'),
+                'nature': basic_panchang['nakshatra'].get('nature'),
+                'pada': basic_panchang['nakshatra'].get('pada'),
+                'career_focus': basic_panchang['nakshatra'].get('career_focus'),
                 'symbol': '⭐',
                 'guna': 'Sattva',
                 'compatible_nakshatras': [],
-                'start_time': sunrise_sunset_data.get('sunrise'),
-                'end_time': sunrise_sunset_data.get('sunset')
+                'start_time': basic_panchang['nakshatra'].get('start_time'),
+                'end_time': basic_panchang['nakshatra'].get('end_time')
             },
             'yoga': {
                 'number': basic_panchang['yoga']['number'],
                 'name': basic_panchang['yoga']['name'],
-                'effect': 'Balanced',
-                'quality': 'Good',
-                'recommended_activities': ['Spiritual practices'],
-                'spiritual_practice': 'Meditation',
-                'start_time': sunrise_sunset_data.get('sunrise'),
-                'end_time': sunrise_sunset_data.get('sunset')
+                'effect': basic_panchang['yoga'].get('effect'),
+                'quality': basic_panchang['yoga'].get('quality'),
+                'recommended_activities': basic_panchang['yoga'].get('recommended_activities'),
+                'spiritual_practice': basic_panchang['yoga'].get('spiritual_practice'),
+                'start_time': basic_panchang['yoga'].get('start_time'),
+                'end_time': basic_panchang['yoga'].get('end_time')
             },
             'karana': {
                 'number': basic_panchang['karana']['number'],
                 'name': basic_panchang['karana']['name'],
-                'nature': 'Balanced',
-                'effect': 'Neutral',
-                'duration': 6.0,  # Karana duration in hours
-                'suitable_activities': ['General work'],
-                'business_suitable': True
+                'nature': basic_panchang['karana'].get('nature'),
+                'effect': basic_panchang['karana'].get('effect'),
+                'duration': basic_panchang['karana'].get('duration'),
+                'suitable_activities': basic_panchang['karana'].get('suitable_activities'),
+                'business_suitable': basic_panchang['karana'].get('business_suitable')
             }
         }
         

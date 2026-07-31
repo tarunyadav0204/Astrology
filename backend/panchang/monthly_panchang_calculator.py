@@ -87,7 +87,7 @@ class MonthlyPanchangCalculator:
     
     def _calculate_sunrise_sunset(self, date_str: str, latitude: float, longitude: float, timezone: str = None) -> Dict[str, Any]:
         """Delegate sun/moon rise-set to shared Swiss Ephemeris calculator (Drik-aligned moon day)."""
-        from calculators.panchang_calculator import PanchangCalculator as RiseCalc
+        from .panchang_calculator import PanchangCalculator as RiseCalc
 
         try:
             raw = RiseCalc().get_local_sunrise_sunset(

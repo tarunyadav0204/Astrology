@@ -341,6 +341,24 @@
   font-weight: 700;
 }
 
+.panchak-alert {
+  display: grid;
+  gap: 5px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(180, 73, 24, 0.3);
+  border-radius: 12px;
+  background: rgba(185, 71, 23, 0.08);
+  color: var(--muhurat-muted);
+  line-height: 1.45;
+}
+
+.panchak-alert strong,
+.panchak-badge,
+.panchak-warning { color: var(--muhurat-red); }
+
+.panchak-alert small { margin-top: 2px; font-weight: 700; }
+
 .current-muhurat-alert {
   margin: 18px 28px 0;
   padding: 18px;
@@ -396,6 +414,51 @@
   box-shadow: 0 12px 26px rgba(80, 48, 26, 0.08);
 }
 
+.muhurat-day-status {
+  display: grid;
+  gap: 0.35rem;
+  margin: 1rem 0;
+  padding: 1rem 1.1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.18);
+}
+.muhurat-day-status.accepted { background: rgba(46, 125, 50, 0.12); border-color: rgba(76, 175, 80, 0.45); }
+.muhurat-day-status.rejected { background: rgba(183, 28, 28, 0.10); border-color: rgba(239, 83, 80, 0.45); }
+.muhurat-day-status.fallback { background: rgba(188, 116, 24, 0.12); border-color: rgba(214, 145, 45, 0.55); }
+.muhurat-day-status span { color: var(--muhurat-muted); }
+.muhurat-day-status details, .slot-reasons { color: var(--muhurat-muted); }
+.muhurat-day-status ul, .slot-reasons ul { margin: 0.45rem 0 0 1.1rem; padding: 0; }
+.muhurat-day-status li, .slot-reasons li { white-space: pre-line; margin-bottom: 0.45rem; }
+.slot-reasons { margin-top: 0.65rem; font-size: 0.88rem; }
+.nearest-muhurats { margin-top: 1.5rem; }
+.date-audit-grid { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1rem 0; }
+.date-audit-chip { display: grid; gap: 0.25rem; text-align: left; border-radius: 10px; padding: 0.65rem 0.8rem; color: inherit; cursor: pointer; }
+.date-audit-chip.accepted { background: rgba(46, 125, 50, 0.12); border: 1px solid rgba(76, 175, 80, 0.45); }
+.date-audit-chip.rejected { background: rgba(183, 28, 28, 0.10); border: 1px solid rgba(239, 83, 80, 0.45); }
+.date-audit-chip.fallback { background: rgba(188, 116, 24, 0.12); border: 1px solid rgba(214, 145, 45, 0.55); }
+.date-audit-chip span { color: var(--muhurat-muted); font-size: 0.82rem; }
+.nearest-muhurats h3 { margin-bottom: 0.25rem; }
+.nearest-muhurats p { color: var(--muhurat-muted); margin-top: 0; }
+.nearest-muhurat-list { display: flex; flex-wrap: wrap; gap: 0.65rem; }
+.nearest-muhurat-list button {
+  display: grid;
+  gap: 0.25rem;
+  text-align: left;
+  border: 1px solid rgba(233, 30, 99, 0.35);
+  border-radius: 12px;
+  padding: 0.7rem 0.85rem;
+  background: rgba(233, 30, 99, 0.08);
+  color: inherit;
+  cursor: pointer;
+}
+.nearest-muhurat-list button span { color: var(--muhurat-muted); font-size: 0.85rem; }
+.fallback-muhurats { border-color: rgba(214, 145, 45, 0.45); }
+
+.muhurat-card.panchak {
+  border-color: rgba(180, 73, 24, 0.32);
+  background: rgba(185, 71, 23, 0.035);
+}
+
 .muhurat-card.active {
   background: rgba(47, 125, 102, 0.06);
   border-color: rgba(47, 125, 102, 0.26);
@@ -407,6 +470,13 @@
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.muhurat-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .muhurat-number {
@@ -422,6 +492,21 @@
   color: #fff;
   font-size: 0.72rem;
   font-weight: 900;
+}
+
+.panchak-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(180, 73, 24, 0.1);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.panchak-warning {
+  margin-top: 12px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.4;
 }
 
 .muhurat-timing {
@@ -520,6 +605,34 @@
 
 .muhurat-copy-grid p {
   margin: 10px 0 0;
+}
+
+.rejection-reason-card {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0;
+  padding: 13px 15px;
+  list-style: none;
+  border: 1px solid rgba(190, 91, 44, 0.24);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 244, 232, 0.9), rgba(255, 250, 244, 0.96));
+  color: #3d2b25;
+}
+
+.rejection-reason-card strong {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #f5dfcd;
+  color: #8e3d1e;
+  font-size: 0.93rem;
+}
+
+.rejection-reason-card span {
+  color: #66534b;
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .muhurat-faq-grid {

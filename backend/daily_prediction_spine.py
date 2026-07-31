@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from calculators.panchang_calculator import PanchangCalculator
+from panchang.panchang_calculator import PanchangCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
 from calculators.vedic_graha_drishti import DEFAULT_ASPECTS, GRAHA_HOUSE_ASPECTS
 from context_agents.compact_vedic import SIGN_NAMES, house_lordships_from_ascendant
@@ -1059,10 +1059,10 @@ def build_daily_prediction_spine(
     tz = birth_data.get("timezone")
     panchang = PanchangCalculator().calculate_panchang(
         target_dt.strftime("%Y-%m-%d"),
-        "12:00:00",
         lat,
         lon,
         timezone=str(tz) if tz is not None else None,
+        reference="sunrise",
     )
 
     moon_transit = _planet_transit_row("Moon", target_dt, ascendant, rtc)

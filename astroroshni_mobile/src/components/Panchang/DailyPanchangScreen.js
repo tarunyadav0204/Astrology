@@ -14,6 +14,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { panchangAPI } from '../../services/api';
 import { storage } from '../../services/storage';
+import DateNavigator from '../Common/DateNavigator';
+
+const toDateKey = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+const parseDateKey = (value) => {
+  if (!value || typeof value !== 'string') return new Date();
+  const [y, m, d] = value.split('-').map(Number);
+  if (!y || !m || !d) return new Date();
+  return new Date(y, m - 1, d);
+};
 
 const formatClock = (value) => {
   if (!value) return '—';
@@ -68,16 +83,20 @@ export default function DailyPanchangScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [payload, setPayload] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(() =>
+    parseDateKey(route?.params?.date)
+  );
 
   const coords = useMemo(() => {
     const p = route?.params || {};
     return {
       latitude: Number(p.latitude) || 28.6139,
       longitude: Number(p.longitude) || 77.2090,
-      date: p.date || new Date().toISOString().slice(0, 10),
       placeLabel: p.placeLabel || 'New Delhi',
     };
   }, [route?.params]);
+
+  const dateKey = useMemo(() => toDateKey(selectedDate), [selectedDate]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -96,7 +115,7 @@ export default function DailyPanchangScreen({ navigation, route }) {
         /* keep defaults */
       }
 
-      const date = coords.date;
+      const date = dateKey;
       const [daily, chog, hora, special, ina] = await Promise.all([
         panchangAPI.calculateDailyPanchang(date, lat, lon),
         panchangAPI.calculateChoghadiya(date, lat, lon),
@@ -120,11 +139,16 @@ export default function DailyPanchangScreen({ navigation, route }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [coords]);
+  }, [coords, dateKey]);
 
   useEffect(() => {
+    setLoading(true);
     load();
   }, [load]);
+
+  const handleDateChange = useCallback((nextDate) => {
+    setSelectedDate(nextDate);
+  }, []);
 
   const basic = payload?.daily?.basic_panchang;
   const sun = payload?.daily?.sunrise_sunset;
@@ -134,6 +158,27 @@ export default function DailyPanchangScreen({ navigation, route }) {
   const nightChog = payload?.choghadiya?.night_choghadiya || [];
   const dayHora = payload?.hora?.day_horas || [];
   const amrit = payload?.inauspicious?.amrit_kalam || specialTimes.amrit_kalam || [];
+  const specialMuhurtas = (() => {
+    const s = payload?.special;
+    if (!s) return [];
+    if (Array.isArray(s.muhurtas) && s.muhurtas.length) return s.muhurtas;
+    const out = [];
+    if (s.brahma_muhurta) {
+      out.push({
+        name: 'Brahma Muhurta',
+        start_time: s.brahma_muhurta.start_time,
+        end_time: s.brahma_muhurta.end_time,
+      });
+    }
+    if (s.abhijit_muhurta) {
+      out.push({
+        name: 'Abhijit Muhurta',
+        start_time: s.abhijit_muhurta.start_time,
+        end_time: s.abhijit_muhurta.end_time,
+      });
+    }
+    return out;
+  })();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -149,10 +194,19 @@ export default function DailyPanchangScreen({ navigation, route }) {
           <View style={styles.headerCenter}>
             <Text style={[styles.title, { color: colors.text }]}>Daily Panchang</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]} numberOfLines={1}>
-              {payload?.placeLabel || coords.placeLabel} · {payload?.date || coords.date}
+              {payload?.placeLabel || coords.placeLabel}
             </Text>
           </View>
           <View style={styles.headerSpacer} />
+        </View>
+
+        <View style={styles.dateNavWrap}>
+          <DateNavigator
+            date={selectedDate}
+            onDateChange={handleDateChange}
+            cosmicTheme={isDark}
+            resetDate={new Date()}
+          />
         </View>
 
         {loading ? (
@@ -224,7 +278,7 @@ export default function DailyPanchangScreen({ navigation, route }) {
                 isDark={isDark}
               />
             ) : null}
-            {(payload?.special?.muhurtas || []).map((m, i) => (
+            {(specialMuhurtas || []).map((m, i) => (
               <PeriodRow
                 key={`muh-${i}`}
                 label={m.name}
@@ -342,6 +396,7 @@ const styles = StyleSheet.create({
   },
   headerCenter: { flex: 1, minWidth: 0, alignItems: 'center' },
   headerSpacer: { width: 36 },
+  dateNavWrap: { paddingHorizontal: 12, paddingTop: 8 },
   title: { fontSize: 16, fontWeight: '800' },
   subtitle: { fontSize: 11, marginTop: 2 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },

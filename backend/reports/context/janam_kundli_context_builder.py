@@ -14,7 +14,7 @@ from calculators.color_calculator import ColorCalculator
 from calculators.friendship_calculator import FriendshipCalculator
 from calculators.nakshatra_remedy_calculator import NakshatraRemedyCalculator
 from calculators.navatara_calculator import NavataraCalculator
-from calculators.panchang_calculator import PanchangCalculator
+from panchang.panchang_calculator import PanchangCalculator
 from calculators.planet_analyzer import PlanetAnalyzer
 from calculators.remedy_engine import RemedyEngine
 from calculators.yoga_calculator import YogaCalculator

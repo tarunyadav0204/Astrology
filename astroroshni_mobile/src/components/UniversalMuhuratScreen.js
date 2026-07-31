@@ -11,6 +11,9 @@ import LocationPicker from './LocationPicker';
 import { useCredits } from '../credits/CreditContext';
 import { useAuthGate } from '../auth/AuthGateContext';
 import { pricingAPI } from '../services/api';
+import WebDatePickerModal from './Common/WebDatePickerModal';
+
+const isWeb = Platform.OS === 'web';
 
 export default function UniversalMuhuratScreen({ route, navigation }) {
   const { config } = route.params; 
@@ -135,9 +138,16 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
     try {
       const token = await storage.getAuthToken();
       
+      const toLocalDateKey = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+
       const payload = {
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
+        start_date: toLocalDateKey(startDate),
+        end_date: toLocalDateKey(endDate),
         latitude: parseFloat(location.latitude),
         longitude: parseFloat(location.longitude),
         
@@ -176,6 +186,10 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
       setLoading(false);
     }
   };
+
+  const visibleRecommendations = results?.recommendations?.length
+    ? results.recommendations
+    : (results?.best_available_recommendations || []);
 
   return (
     <View style={styles.container}>
@@ -254,34 +268,106 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
             {results && (
               <View style={styles.results}>
                 <Text style={styles.resHeader}>Recommended Slots</Text>
-                {results.recommendations.length === 0 ? (
+                <Text style={styles.auditHint}>Every date in your selected range is shown below. Tap a rejected date to see why.</Text>
+                <View style={styles.dateAuditGrid}>
+                  {[...(results.recommendations || []).map((item) => ({ ...item, accepted: true })), ...(results.best_available_recommendations || []).map((item) => ({ ...item, accepted: false, fallback: true })), ...(results.rejected_dates || []).map((item) => ({ ...item, accepted: false }))]
+                    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+                    .map((item) => (
+                      <TouchableOpacity
+                        key={item.date}
+                        style={[styles.dateChip, item.accepted ? styles.dateChipAccepted : (item.fallback ? styles.dateChipFallback : styles.dateChipRejected)]}
+                        onPress={() => item.accepted
+                          ? Alert.alert('Suitable date', `${item.date}\n${(item.slots || []).map((slot) => `${slot.time} · ${slot.lagna} · ${slot.score}/100`).join('\n')}`)
+                          : item.fallback
+                            ? Alert.alert('Best available with cautions', `${item.date}\n${(item.date_warnings || []).join('\n')}`)
+                            : Alert.alert('Why this date was rejected', `${item.date}\n${(item.reasons || []).join('\n')}`)}
+                      >
+                        <Text style={styles.dateChipDate}>{item.date.slice(5)}</Text>
+                        <Text style={styles.dateChipState}>{item.accepted ? 'Suitable' : (item.fallback ? 'Caution' : 'Rejected')}</Text>
+                      </TouchableOpacity>
+                    ))}
+                </View>
+                {results.recommendations.length === 0 && visibleRecommendations.length === 0 ? (
                   <View style={styles.noDataContainer}>
-                    <Text style={styles.noData}>No auspicious dates found in this period</Text>
-                    <Text style={styles.noDataSub}>Vedic astrology has strict rules for auspicious timing. Try:</Text>
-                    <Text style={styles.noDataTip}>• Extending the date range to 60-90 days</Text>
-                    <Text style={styles.noDataTip}>• Avoiding eclipse periods and inauspicious months</Text>
+                    <Text style={styles.noData}>No suitable vehicle Muhurat found</Text>
+                    <Text style={styles.noDataSub}>Traditional timing rules did not leave a recommended date in this range.</Text>
+                    {(results.rejected_dates || []).slice(0, 4).map((item) => (
+                      <Text key={item.date} style={styles.noDataTip}>• {item.date}: {(item.reasons || []).join(' ')}</Text>
+                    ))}
+                    <Text style={styles.noDataTip}>Try extending the date range or choosing a different location.</Text>
                   </View>
                 ) : (
-                  results.recommendations.map((day, idx) => (
+                  <>
+                  {!results.recommendations.length && (
+                    <View style={styles.fallbackNotice}>
+                      <Text style={styles.fallbackTitle}>Best available dates with cautions</Text>
+                      <Text style={styles.fallbackText}>{results.best_available_notice || 'These dates are shown only when you must proceed. They are not strict recommendations.'}</Text>
+                    </View>
+                  )}
+                  {visibleRecommendations.map((day, idx) => (
                     <View key={idx} style={styles.resultItem}>
                       <Text style={styles.resultDate}>{new Date(day.date).toDateString()}</Text>
+                      {day.panchak?.is_panchak && (
+                        <View style={styles.panchakAlert}>
+                          <Text style={styles.panchakTitle}>⚠ Panchak is active</Text>
+                          <Text style={styles.panchakReason}>{day.panchak.reason}</Text>
+                          {(day.panchak.intervals || []).map((interval, intervalIndex) => (
+                            <Text key={`${interval.start}-${interval.end}-${intervalIndex}`} style={styles.panchakInterval}>
+                              Active from {interval.start} to {interval.end}
+                            </Text>
+                          ))}
+                          <Text style={styles.panchakNote}>Confirm a Panchak window with a qualified priest before use.</Text>
+                        </View>
+                      )}
                       <View style={styles.slotGrid}>
                         {day.slots.map((slot, sIdx) => (
-                          <View key={sIdx} style={styles.slot}>
+                          <View key={sIdx} style={[styles.slot, day.panchak?.is_panchak && styles.panchakSlot]}>
                             <Text style={styles.slotTime}>{slot.time}</Text>
                             <Text style={styles.slotLagna}>{slot.lagna}</Text>
+                            <Text style={styles.slotScore}>{slot.quality} · {slot.score}/100</Text>
+                            <Text style={styles.slotRationale}>{slot.rationale}</Text>
+                            {slot.panchak && <Text style={styles.slotCaution}>⚠ Panchak active — confirm this slot with a qualified priest.</Text>}
+                            {(slot.positives?.length > 0 || slot.cautions?.length > 0) && (
+                              <View style={styles.slotFactors}>
+                                {slot.positives?.map((reason) => <Text key={`p-${reason}`} style={styles.slotPositive}>✓ {reason}</Text>)}
+                                {slot.cautions?.map((reason) => <Text key={`c-${reason}`} style={styles.slotCaution}>! {reason}</Text>)}
+                              </View>
+                            )}
                           </View>
                         ))}
                       </View>
                     </View>
-                  ))
+                  ))}
+                  </>
                 )}
               </View>
             )}
 
           </ScrollView>
 
-          {Platform.OS === 'ios' ? (
+          {isWeb ? (
+            <>
+              <WebDatePickerModal
+                visible={showStartPicker}
+                value={startDate}
+                title="From date"
+                minimumDate={new Date()}
+                onClose={() => setShowStartPicker(false)}
+                onChange={(next) => {
+                  setStartDate(next);
+                  if (next > endDate) setEndDate(next);
+                }}
+              />
+              <WebDatePickerModal
+                visible={showEndPicker}
+                value={endDate}
+                title="To date"
+                minimumDate={startDate}
+                onClose={() => setShowEndPicker(false)}
+                onChange={setEndDate}
+              />
+            </>
+          ) : Platform.OS === 'ios' ? (
             <>
               <Modal visible={showStartPicker} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
@@ -411,16 +497,38 @@ const styles = StyleSheet.create({
   disabledButton: { opacity: 0.6 },
   results: { marginTop: 20 },
   resHeader: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
+  auditHint: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginBottom: 10 },
+  dateAuditGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 15 },
+  dateChip: { borderRadius: 8, paddingVertical: 7, paddingHorizontal: 9, minWidth: 66, borderWidth: 1 },
+  dateChipAccepted: { backgroundColor: 'rgba(0, 200, 83, 0.18)', borderColor: 'rgba(129, 255, 169, 0.75)' },
+  dateChipRejected: { backgroundColor: 'rgba(198, 40, 40, 0.18)', borderColor: 'rgba(255, 128, 128, 0.75)' },
+  dateChipFallback: { backgroundColor: 'rgba(188, 116, 24, 0.18)', borderColor: 'rgba(245, 180, 70, 0.8)' },
+  dateChipDate: { color: '#fff', fontSize: 12, fontWeight: 'bold', textAlign: 'center' },
+  dateChipState: { color: 'rgba(255,255,255,0.7)', fontSize: 9, textAlign: 'center', marginTop: 2 },
   noDataContainer: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 20, alignItems: 'center' },
   noData: { color: 'rgba(255,255,255,0.8)', fontSize: 16, marginBottom: 8, textAlign: 'center' },
   noDataSub: { color: 'rgba(255,255,255,0.6)', fontSize: 14, marginBottom: 10, textAlign: 'center' },
   noDataTip: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 5 },
+  fallbackNotice: { marginTop: 12, padding: 14, borderRadius: 12, backgroundColor: 'rgba(188, 116, 24, 0.14)', borderWidth: 1, borderColor: 'rgba(245, 180, 70, 0.55)' },
+  fallbackTitle: { color: '#FFD080', fontSize: 16, fontWeight: '700', marginBottom: 5 },
+  fallbackText: { color: 'rgba(255,255,255,0.72)', fontSize: 13, lineHeight: 19 },
   resultItem: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 15, marginBottom: 15 },
   resultDate: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
   slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  slot: { backgroundColor: 'rgba(0, 200, 83, 0.15)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, alignItems: 'center', minWidth: 70 },
+  slot: { backgroundColor: 'rgba(0, 200, 83, 0.15)', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, alignItems: 'center', width: '100%' },
   slotTime: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
   slotLagna: { color: '#FFD700', fontSize: 10 },
+  slotScore: { color: 'rgba(255,255,255,0.65)', fontSize: 9, marginTop: 2 },
+  slotRationale: { color: 'rgba(255,255,255,0.75)', fontSize: 9, marginTop: 4, textAlign: 'center' },
+  slotFactors: { marginTop: 5, width: '100%' },
+  slotPositive: { color: '#B9F6CA', fontSize: 9, marginTop: 2 },
+  slotCaution: { color: '#FFE082', fontSize: 9, marginTop: 2 },
+  panchakAlert: { backgroundColor: 'rgba(255, 87, 34, 0.14)', borderWidth: 1, borderColor: 'rgba(255, 152, 0, 0.55)', borderRadius: 10, padding: 10, marginBottom: 12 },
+  panchakTitle: { color: '#FFB74D', fontSize: 14, fontWeight: 'bold', marginBottom: 4 },
+  panchakReason: { color: 'rgba(255,255,255,0.78)', fontSize: 12, lineHeight: 17 },
+  panchakInterval: { color: '#FFD180', fontSize: 12, fontWeight: '600', marginTop: 4 },
+  panchakNote: { color: 'rgba(255,255,255,0.7)', fontSize: 11, lineHeight: 15, marginTop: 6 },
+  panchakSlot: { backgroundColor: 'rgba(255, 87, 34, 0.18)', borderWidth: 1, borderColor: 'rgba(255, 152, 0, 0.35)' },
   modalOverlay: { 
     flex: 1, 
     backgroundColor: 'rgba(0, 0, 0, 0.5)', 

@@ -20,7 +20,7 @@ from calculators.mundane.nation_chart_service import (
     resolve_nation_chart_key,
 )
 from calculators.chart_calculator import ChartCalculator
-from calculators.panchang_calculator import PanchangCalculator
+from panchang.panchang_calculator import PanchangCalculator
 
 class MundaneContextBuilder:
     """

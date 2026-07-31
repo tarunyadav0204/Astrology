@@ -10,7 +10,7 @@ from .badhaka_calculator import BadhakaCalculator
 from .divisional_chart_calculator import DivisionalChartCalculator
 from .chart_calculator import ChartCalculator
 from .transit_calculator import TransitCalculator
-from .panchang_calculator import PanchangCalculator
+from panchang.panchang_calculator import PanchangCalculator
 from .friendship_calculator import FriendshipCalculator
 from .mudakku_calculator import MudakkuCalculator
 from .remedy_engine import RemedyEngine

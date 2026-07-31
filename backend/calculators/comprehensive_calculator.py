@@ -5,7 +5,7 @@ Provides a unified interface to all calculation modules
 
 from .chart_calculator import ChartCalculator
 from .transit_calculator import TransitCalculator
-from .panchang_calculator import PanchangCalculator
+from panchang.panchang_calculator import PanchangCalculator
 from .friendship_calculator import FriendshipCalculator
 from .divisional_chart_calculator import DivisionalChartCalculator
 from .shadbala_calculator import ShadbalaCalculator
@@ -67,7 +67,10 @@ class ComprehensiveCalculator:
     
     def calculate_panchang(self, date):
         """Calculate panchang for date"""
-        return self.panchang_calc.calculate_panchang(date)
+        timezone = self.birth_data.get('timezone') if isinstance(self.birth_data, dict) else None
+        latitude = self.birth_data.get('latitude', 0.0) if isinstance(self.birth_data, dict) else 0.0
+        longitude = self.birth_data.get('longitude', 0.0) if isinstance(self.birth_data, dict) else 0.0
+        return self.panchang_calc.calculate_panchang(date, float(latitude or 0.0), float(longitude or 0.0), timezone)
     
     def calculate_friendship_matrix(self):
         """Calculate planetary friendship relationships"""

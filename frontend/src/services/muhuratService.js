@@ -23,9 +23,9 @@ export const muhuratService = {
     }
   },
 
-  async getVehicleMuhurat(date, latitude, longitude) {
+  async getVehicleMuhurat(date, latitude, longitude, birthData = null) {
     try {
-      return await apiService.getVehicleMuhurat(date, latitude, longitude);
+      return await apiService.getVehicleMuhurat(date, latitude, longitude, birthData);
     } catch (error) {
       throw formatMuhuratError('vehicle muhurat', error);
     }

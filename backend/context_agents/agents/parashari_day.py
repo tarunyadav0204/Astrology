@@ -18,7 +18,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from calculators.panchang_calculator import PanchangCalculator
+from panchang.panchang_calculator import PanchangCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
 from chat.chat_context_builder import ChatContextBuilder
 from context_agents.base import AgentContext, ContextAgent
@@ -116,10 +116,10 @@ class ParashariDayAgent(ContextAgent):
 
         panchang = PanchangCalculator().calculate_panchang(
             target_dt.strftime("%Y-%m-%d"),
-            "12:00:00",
             lat,
             lon,
             timezone=tz_s,
+            reference="sunrise",
         )
 
         rtc = RealTransitCalculator()

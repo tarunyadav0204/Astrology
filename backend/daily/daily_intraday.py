@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from calculators.panchang_calculator import PanchangCalculator
+from panchang.panchang_calculator import PanchangCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
 from panchang.monthly_panchang_calculator import MonthlyPanchangCalculator
 from utils.timezone_service import parse_timezone_offset

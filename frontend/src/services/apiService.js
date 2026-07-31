@@ -539,8 +539,16 @@ export const apiService = {
     return response.data;
   },
   
-  getVehicleMuhurat: async (date, latitude, longitude) => {
-    const response = await apiClient.get(`${getEndpoint('/panchang/vehicle-muhurat')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+  getVehicleMuhurat: async (date, latitude, longitude, birthData = null) => {
+    const params = new URLSearchParams({ date, latitude, longitude });
+    if (birthData?.date && birthData?.time) {
+      params.set('birth_date', String(birthData.date).split('T')[0]);
+      params.set('birth_time', birthData.time);
+      if (birthData.latitude != null) params.set('birth_latitude', birthData.latitude);
+      if (birthData.longitude != null) params.set('birth_longitude', birthData.longitude);
+      if (birthData.timezone) params.set('birth_timezone', birthData.timezone);
+    }
+    const response = await apiClient.get(`${getEndpoint('/panchang/vehicle-muhurat')}?${params.toString()}`);
     return response.data;
   },
   

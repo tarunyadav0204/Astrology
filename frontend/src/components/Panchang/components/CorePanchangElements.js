@@ -224,12 +224,12 @@ const CorePanchangElements = ({ panchangData }) => {
         <div className="panchang-element karana-element">
           <div className="element-header">
             <h3>⚡ Karana</h3>
-            <span className="element-number">{panchangData.karana.number}/11</span>
+            <span className="element-number">{panchangData.karana.number}/60</span>
           </div>
           
           <div className="element-content">
             <div className="main-value">
-              {KARANA_NAMES[panchangData.karana.number - 1]}
+              {panchangData.karana.name || KARANA_NAMES[(panchangData.karana.number - 1) % KARANA_NAMES.length]}
             </div>
             
             <div className="timing-info">

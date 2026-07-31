@@ -89,13 +89,42 @@ async def _process_muhurat(request, current_user, feature_name, calc_method):
         lon = getattr(request, 'delivery_longitude', getattr(request, 'longitude', 0.0))
         tz = getattr(request, 'delivery_timezone', getattr(request, 'timezone', None))
 
+        calc_kwargs = {}
+        if feature_name == 'vehicle_purchase':
+            calc_kwargs['birth_data'] = {
+                'date': dob,
+                'time': time,
+                'latitude': getattr(request, 'user_lat', getattr(request, 'mother_lat', lat)),
+                'longitude': getattr(request, 'user_lon', getattr(request, 'mother_lon', lon)),
+                'timezone': getattr(request, 'user_timezone', getattr(request, 'mother_timezone', None)),
+            }
         result = calc_method(
             request.start_date,
             request.end_date,
             lat, lon,
             user_nak_id,
-            tz
+            tz,
+            **calc_kwargs,
         )
+        if feature_name == 'vehicle_purchase' and result:
+            fallback_kwargs = dict(calc_kwargs)
+            fallback_kwargs['allow_caution_dates'] = True
+            fallback = calc_method(
+                request.start_date,
+                request.end_date,
+                lat, lon,
+                user_nak_id,
+                tz,
+                **fallback_kwargs,
+            )
+            result['best_available_recommendations'] = [
+                item for item in (fallback.get('recommendations') or [])
+                if item.get('fallback')
+            ]
+            result['best_available_notice'] = (
+                'These dates have one or more cautions and are shown only when you must proceed. '
+                'They are not strict recommendations.'
+            )
         
         # 4. Only deduct credits if recommendations found
         if result and result.get('recommendations') and len(result['recommendations']) > 0:

@@ -493,7 +493,7 @@ class ChatContextBuilder:
         ashtakavarga_calc = AshtakavargaCalculator(birth_data, chart_data)
         
         # Initialize Panchang calculator
-        from calculators.panchang_calculator import PanchangCalculator
+        from panchang.panchang_calculator import PanchangCalculator
         panchang_calc = PanchangCalculator()
         panchang_calc.birth_data = birth_data
         

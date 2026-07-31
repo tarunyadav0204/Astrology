@@ -11,6 +11,9 @@ import LocationPicker from './LocationPicker';
 import { useCredits } from '../credits/CreditContext';
 import { useAuthGate } from '../auth/AuthGateContext';
 import { pricingAPI } from '../services/api';
+import WebDatePickerModal from './Common/WebDatePickerModal';
+
+const isWeb = Platform.OS === 'web';
 
 
 export default function ChildbirthPlannerScreen({ navigation }) {
@@ -150,8 +153,14 @@ export default function ChildbirthPlannerScreen({ navigation }) {
       const token = await storage.getAuthToken();
       
       const payload = {
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
+        start_date: (() => {
+          const d = startDate;
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        })(),
+        end_date: (() => {
+          const d = endDate;
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        })(),
         delivery_latitude: parseFloat(deliveryLocation.latitude),
         delivery_longitude: parseFloat(deliveryLocation.longitude),
         
@@ -314,10 +323,22 @@ export default function ChildbirthPlannerScreen({ navigation }) {
                           <Text style={styles.tagText}>{day.nakshatra}</Text>
                         </View>
                       </View>
+                      {day.panchak?.is_panchak && (
+                        <View style={styles.panchakAlert}>
+                          <Text style={styles.panchakTitle}>⚠ Panchak is active</Text>
+                          <Text style={styles.panchakReason}>{day.panchak.reason}</Text>
+                          {(day.panchak.intervals || []).map((interval, intervalIndex) => (
+                            <Text key={`${interval.start}-${interval.end}-${intervalIndex}`} style={styles.panchakInterval}>
+                              Active from {interval.start} to {interval.end}
+                            </Text>
+                          ))}
+                          <Text style={styles.panchakNote}>Confirm a Panchak window with a qualified priest before use.</Text>
+                        </View>
+                      )}
                       
                       <View style={styles.slotGrid}>
                         {day.slots.map((slot, sIdx) => (
-                          <View key={sIdx} style={styles.slot}>
+                          <View key={sIdx} style={[styles.slot, day.panchak?.is_panchak && styles.panchakSlot]}>
                             <Text style={styles.slotTime}>{slot.time}</Text>
                             <Text style={styles.slotLagna}>{slot.lagna}</Text>
                           </View>
@@ -332,7 +353,36 @@ export default function ChildbirthPlannerScreen({ navigation }) {
           </ScrollView>
 
           {/* Date Pickers */}
-          {Platform.OS === 'ios' ? (
+          {isWeb ? (
+            <>
+              <WebDatePickerModal
+                visible={showStartPicker}
+                value={startDate}
+                title="From date"
+                minimumDate={new Date()}
+                onClose={() => setShowStartPicker(false)}
+                onChange={(next) => {
+                  setStartDate(next);
+                  if (next > endDate) setEndDate(next);
+                }}
+              />
+              <WebDatePickerModal
+                visible={showEndPicker}
+                value={endDate}
+                title="To date"
+                minimumDate={startDate}
+                onClose={() => setShowEndPicker(false)}
+                onChange={(d) => {
+                  const daysDiff = Math.ceil((d - startDate) / (1000 * 60 * 60 * 24));
+                  if (daysDiff > 30) {
+                    Alert.alert("Date Range Limit", "Please select a date within 30 days of start date.");
+                    return;
+                  }
+                  setEndDate(d);
+                }}
+              />
+            </>
+          ) : Platform.OS === 'ios' ? (
             <>
               <Modal visible={showStartPicker} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
@@ -636,6 +686,12 @@ const styles = StyleSheet.create({
     color: '#FFD700', 
     fontSize: 10 
   },
+  panchakAlert: { backgroundColor: 'rgba(255, 87, 34, 0.14)', borderWidth: 1, borderColor: 'rgba(255, 152, 0, 0.55)', borderRadius: 10, padding: 10, marginBottom: 12 },
+  panchakTitle: { color: '#FFB74D', fontSize: 14, fontWeight: 'bold', marginBottom: 4 },
+  panchakReason: { color: 'rgba(255,255,255,0.78)', fontSize: 12, lineHeight: 17 },
+  panchakInterval: { color: '#FFD180', fontSize: 12, fontWeight: '600', marginTop: 4 },
+  panchakNote: { color: 'rgba(255,255,255,0.7)', fontSize: 11, lineHeight: 15, marginTop: 6 },
+  panchakSlot: { backgroundColor: 'rgba(255, 87, 34, 0.18)', borderWidth: 1, borderColor: 'rgba(255, 152, 0, 0.35)' },
   noDataCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,

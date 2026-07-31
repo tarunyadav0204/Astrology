@@ -2,6 +2,7 @@ import swisseph as swe
 from datetime import datetime, timedelta
 import math
 from utils.timezone_service import parse_timezone_offset
+from utils.timezone_service import get_timezone_from_coordinates
 
 
 class PanchangCalculator:
@@ -10,7 +11,7 @@ class PanchangCalculator:
         swe.set_sid_mode(swe.SIDM_LAHIRI)
         self._tz_offset_hours = 0.0
 
-    def calculate_panchang(self, date_str, latitude, longitude, timezone, time_str=None, reference="sunrise"):
+    def calculate_panchang(self, date_str, latitude=0.0, longitude=0.0, timezone=None, time_str=None, reference="sunrise"):
         """
         Calculate complete Panchang for given date and location.
 
@@ -19,6 +20,17 @@ class PanchangCalculator:
           - "noon": civil noon local (legacy / approximate)
           - explicit time_str "HH:MM[:SS]": evaluate at that local civil time
         """
+        # Accept the deprecated positional signature as well:
+        # (date, time_str, latitude, longitude, timezone).
+        legacy_positional = isinstance(latitude, str)
+        if legacy_positional:
+            legacy_time, legacy_lat, legacy_lon, legacy_timezone = latitude, longitude, timezone, time_str
+            latitude, longitude, timezone, time_str = legacy_lat, legacy_lon, legacy_timezone, legacy_time
+            if reference == "sunrise":
+                reference = "moment"
+
+        if not timezone:
+            timezone = get_timezone_from_coordinates(float(latitude), float(longitude), for_date=date_str)
         self._tz_offset_hours = parse_timezone_offset(timezone, latitude, longitude, for_date=date_str)
         date_obj = datetime.strptime(date_str, '%Y-%m-%d')
 
@@ -72,6 +84,85 @@ class PanchangCalculator:
             'reference_jd': jd,
             'timezone_offset_hours': self._tz_offset_hours,
         }
+
+    @staticmethod
+    def _parse_timezone(tz_str):
+        """Legacy helper retained for callers that used the old calculator directly."""
+        return parse_timezone_offset(tz_str or 'UTC+0', 0, 0)
+
+    def calculate_birth_panchang(self, birth_data):
+        """Compatibility API for birth-time Panchang consumers."""
+        def value(name, default=None):
+            if isinstance(birth_data, dict):
+                return birth_data.get(name, default)
+            return getattr(birth_data, name, default)
+
+        date = value('date')
+        if hasattr(date, 'strftime'):
+            date = date.strftime('%Y-%m-%d')
+        time = value('time', '12:00:00') or '12:00:00'
+        lat = float(value('latitude', 0.0) or 0.0)
+        lon = float(value('longitude', 0.0) or 0.0)
+        timezone = value('timezone')
+        return PanchangCalculator.calculate_panchang(
+            self, date, lat, lon, timezone, time_str=time, reference='moment'
+        )
+
+    def get_local_sunrise_sunset(self, date_str, latitude, longitude, timezone=None):
+        """Return location-aware solar/lunar rise-set and standard daily windows."""
+        if not timezone:
+            timezone = get_timezone_from_coordinates(float(latitude), float(longitude), for_date=date_str)
+        self._tz_offset_hours = parse_timezone_offset(timezone, latitude, longitude, for_date=date_str)
+        year, month, day = map(int, str(date_str).split('T')[0].split('-'))
+        jd = swe.julday(year, month, day, 0.0)
+        geopos = [float(longitude), float(latitude), 0.0]
+        rise = swe.rise_trans(jd, swe.SUN, swe.CALC_RISE, geopos)
+        setting = swe.rise_trans(jd, swe.SUN, swe.CALC_SET, geopos)
+        if rise[0] != 0 or setting[0] != 0:
+            raise ValueError('Could not calculate sunrise/sunset')
+        sunrise_jd, sunset_jd = rise[1][0], setting[1][0]
+        sunrise = self._jd_to_local_time(sunrise_jd)
+        sunset = self._jd_to_local_time(sunset_jd)
+        if sunset <= sunrise:
+            sunset += timedelta(days=1)
+        moonrise = swe.rise_trans(sunrise_jd, swe.MOON, swe.CALC_RISE, geopos)
+        moonset = swe.rise_trans(sunrise_jd, swe.MOON, swe.CALC_SET, geopos)
+        moonrise_dt = self._jd_to_local_time(moonrise[1][0]) if moonrise[0] == 0 else None
+        moonset_dt = self._jd_to_local_time(moonset[1][0]) if moonset[0] == 0 else None
+        day_duration = (sunset - sunrise).total_seconds() / 3600.0
+        night_duration = 24.0 - day_duration
+        muhurta_duration = day_duration / 15.0
+        phase_jd = swe.julday(year, month, day, 12.0 - self._tz_offset_hours)
+        sun_pos = swe.calc_ut(phase_jd, swe.SUN, swe.FLG_SIDEREAL)[0][0]
+        moon_pos = swe.calc_ut(phase_jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
+        phase_angle = (moon_pos - sun_pos) % 360.0
+        illumination = round(swe.pheno_ut(phase_jd, swe.MOON)[1] * 100.0, 1)
+        if phase_angle < 12 or phase_angle > 348:
+            phase_name = 'New Moon'
+        elif 168 < phase_angle < 192:
+            phase_name = 'Full Moon'
+        else:
+            phase_name = ['New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous', 'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent'][int((phase_angle + 22.5) / 45) % 8]
+        return {
+            'sunrise': sunrise.isoformat(), 'sunset': sunset.isoformat(),
+            'moonrise': moonrise_dt.isoformat() if moonrise_dt else None,
+            'moonset': moonset_dt.isoformat() if moonset_dt else None,
+            'day_duration': day_duration, 'night_duration': night_duration,
+            'muhurta_duration': muhurta_duration,
+            'civil_twilight_begin': (sunrise - timedelta(minutes=30)).isoformat(),
+            'civil_twilight_end': (sunset + timedelta(minutes=30)).isoformat(),
+            'nautical_twilight_begin': (sunrise - timedelta(hours=1)).isoformat(),
+            'nautical_twilight_end': (sunset + timedelta(hours=1)).isoformat(),
+            'astronomical_twilight_begin': (sunrise - timedelta(hours=1.5)).isoformat(),
+            'astronomical_twilight_end': (sunset + timedelta(hours=1.5)).isoformat(),
+            'brahma_muhurta_start': (sunrise - timedelta(hours=2 * night_duration / 15.0)).isoformat(),
+            'brahma_muhurta_end': (sunrise - timedelta(hours=night_duration / 15.0)).isoformat(),
+            'abhijit_muhurta_start': (sunrise + timedelta(hours=day_duration / 2.0 - muhurta_duration / 2.0)).isoformat(),
+            'abhijit_muhurta_end': (sunrise + timedelta(hours=day_duration / 2.0 + muhurta_duration / 2.0)).isoformat(),
+            'godhuli_muhurta_start': (sunset - timedelta(minutes=24)).isoformat(),
+            'godhuli_muhurta_end': (sunset + timedelta(minutes=24)).isoformat(),
+            'moon_phase': phase_name, 'moon_illumination': illumination,
+        }
     
     def _calculate_tithi(self, sun_pos, moon_pos, jd):
         """Calculate Tithi details with precise timing"""
@@ -106,9 +197,12 @@ class PanchangCalculator:
         return {
             'number': tithi_num,
             'name': self._get_tithi_name(tithi_num),
+            'paksha': 'Shukla' if tithi_num <= 15 else 'Krishna',
             'start_time': start_time.isoformat(),
             'end_time': end_time.isoformat(),
             'elapsed': elapsed_percent,
+            'elapsed_degrees': elapsed_deg,
+            'degrees_traversed': round(elapsed_deg, 2),
             'duration': 12,
             'lord': lord,
             'significance': self._get_tithi_significance(tithi_num)
@@ -205,6 +299,7 @@ class PanchangCalculator:
             'lord': nakshatra_lords[nakshatra_num - 1],
             'deity': nakshatra_deities[nakshatra_num - 1],
             'pada': pada_num,
+            'degrees_traversed': round(pada_deg, 2),
             'start_time': start_time.isoformat(),
             'end_time': end_time.isoformat(),
             'nature': self._get_nakshatra_nature(nakshatra_num),
@@ -253,6 +348,7 @@ class PanchangCalculator:
         return {
             'number': yoga_num,
             'name': yoga_names[yoga_num - 1],
+            'degrees_traversed': round((yoga_deg - start_boundary) % yoga_slice, 2),
             'start_time': start_time.isoformat(),
             'end_time': end_time.isoformat(),
             'quality': quality,
@@ -383,59 +479,51 @@ class PanchangCalculator:
         return effects[karana_num - 1]
     
     def calculate_choghadiya(self, date_str: str, latitude: float, longitude: float, timezone: str = None) -> dict:
-        """
-        Delegate to the shared calculators.PanchangCalculator (single source of truth).
-        Keeps ISO timestamps expected by trading + web clients.
-        """
-        from utils.timezone_service import get_timezone_from_coordinates
-        from calculators.panchang_calculator import PanchangCalculator as SharedPanchang
-
         tz = timezone or get_timezone_from_coordinates(latitude, longitude, for_date=date_str)
         self._tz_offset_hours = parse_timezone_offset(tz, latitude, longitude, for_date=date_str)
-        shared = SharedPanchang()
-        result = shared.calculate_choghadiya(date_str, latitude, longitude, tz)
-        return {
-            'date': date_str,
-            'location': {'latitude': latitude, 'longitude': longitude},
-            'timezone': tz,
-            'day_choghadiya': result.get('day_choghadiya', []),
-            'night_choghadiya': result.get('night_choghadiya', []),
-        }
+        solar = self.get_local_sunrise_sunset(date_str, latitude, longitude, tz)
+        sunrise = datetime.fromisoformat(solar['sunrise']); sunset = datetime.fromisoformat(solar['sunset'])
+        day_chunk = solar['day_duration'] / 8.0
+        night_chunk = solar['night_duration'] / 8.0
+        names = ['Udvega', 'Amrita', 'Roga', 'Labha', 'Shubha', 'Chara', 'Kala']
+        qualities = ['Bad', 'Good', 'Bad', 'Gain', 'Good', 'Movable', 'Bad']
+        weekday = (sunrise.weekday() + 1) % 7
+        day, current = [], sunrise
+        for i in range(8):
+            end = current + timedelta(hours=day_chunk); idx = (weekday + i) % 7
+            day.append({'name': names[idx], 'quality': qualities[idx], 'start_time': current.isoformat(), 'end_time': end.isoformat(), 'start_clock': current.strftime('%H:%M'), 'end_clock': end.strftime('%H:%M')}); current = end
+        night, current = [], sunset
+        for i in range(8):
+            end = current + timedelta(hours=night_chunk); idx = (weekday + 4 + i) % 7
+            night.append({'name': names[idx], 'quality': qualities[idx], 'start_time': current.isoformat(), 'end_time': end.isoformat(), 'start_clock': current.strftime('%H:%M'), 'end_clock': end.strftime('%H:%M')}); current = end
+        return {'date': date_str, 'location': {'latitude': latitude, 'longitude': longitude}, 'timezone': tz, 'day_choghadiya': day, 'night_choghadiya': night}
 
     def calculate_hora(self, date_str: str, latitude: float, longitude: float, timezone: str = None) -> dict:
-        """Delegate planetary hours to shared calculator."""
-        from utils.timezone_service import get_timezone_from_coordinates
-        from calculators.panchang_calculator import PanchangCalculator as SharedPanchang
-
         tz = timezone or get_timezone_from_coordinates(latitude, longitude, for_date=date_str)
         self._tz_offset_hours = parse_timezone_offset(tz, latitude, longitude, for_date=date_str)
-        shared = SharedPanchang()
-        result = shared.calculate_hora(date_str, latitude, longitude, tz)
-        if isinstance(result, dict) and 'error' in result:
-            raise ValueError(result['error'])
-        return {
-            'date': date_str,
-            'location': {'latitude': latitude, 'longitude': longitude},
-            'timezone': tz,
-            **result,
-        }
+        solar = self.get_local_sunrise_sunset(date_str, latitude, longitude, tz)
+        sunrise = datetime.fromisoformat(solar['sunrise']); sunset = datetime.fromisoformat(solar['sunset'])
+        planets = ['Sun', 'Venus', 'Mercury', 'Moon', 'Saturn', 'Jupiter', 'Mars']
+        lords = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
+        start_index = planets.index(lords[(sunrise.weekday() + 1) % 7])
+        day, current = [], sunrise
+        for i in range(12):
+            end = current + timedelta(hours=solar['day_duration'] / 12.0); day.append({'hora_number': i + 1, 'planet': planets[(start_index + i) % 7], 'start_time': current.isoformat(), 'end_time': end.isoformat()}); current = end
+        night, current = [], sunset
+        for i in range(12):
+            end = current + timedelta(hours=solar['night_duration'] / 12.0); night.append({'hora_number': i + 1, 'planet': planets[(start_index + 12 + i) % 7], 'start_time': current.isoformat(), 'end_time': end.isoformat()}); current = end
+        return {'date': date_str, 'location': {'latitude': latitude, 'longitude': longitude}, 'timezone': tz, 'day_horas': day, 'night_horas': night}
 
     def calculate_special_muhurtas(self, date_str: str, latitude: float, longitude: float, timezone: str = None) -> dict:
-        """Delegate Brahma/Abhijit muhurtas to shared calculator."""
-        from utils.timezone_service import get_timezone_from_coordinates
-        from calculators.panchang_calculator import PanchangCalculator as SharedPanchang
-
         tz = timezone or get_timezone_from_coordinates(latitude, longitude, for_date=date_str)
-        self._tz_offset_hours = parse_timezone_offset(tz, latitude, longitude, for_date=date_str)
-        shared = SharedPanchang()
-        result = shared.calculate_special_muhurtas(date_str, latitude, longitude, tz)
-        if isinstance(result, dict) and 'error' in result:
-            raise ValueError(result['error'])
+        result = self.get_local_sunrise_sunset(date_str, latitude, longitude, tz)
+        sunrise = datetime.fromisoformat(result['sunrise'])
         return {
             'date': date_str,
             'location': {'latitude': latitude, 'longitude': longitude},
             'timezone': tz,
-            **result,
+            'brahma_muhurta': {'start_time': result['brahma_muhurta_start'], 'end_time': result['brahma_muhurta_end'], 'description': 'Most auspicious time for spiritual practices'},
+            'abhijit_muhurta': {'start_time': result['abhijit_muhurta_start'], 'end_time': result['abhijit_muhurta_end'], 'description': 'Victory time, good for important tasks'},
         }
 
     def _find_tithi_moment(self, jd, target_deg, backwards=False):

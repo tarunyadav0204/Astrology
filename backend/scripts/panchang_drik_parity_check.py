@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from utils.timezone_service import get_timezone_from_coordinates
-from calculators.panchang_calculator import PanchangCalculator
+from panchang.panchang_calculator import PanchangCalculator
 from panchang.monthly_panchang_calculator import MonthlyPanchangCalculator
 
 

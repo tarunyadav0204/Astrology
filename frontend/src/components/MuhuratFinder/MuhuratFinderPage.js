@@ -5,6 +5,7 @@ import NavigationHeader from '../Shared/NavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import { generatePageSEO } from '../../config/seo.config';
 import './MuhuratFinderPage.css';
+import { useAstrology } from '../../context/AstrologyContext';
 
 const MUHURAT_TYPES = [
   { id: 'vivah', name: 'Marriage Muhurat', icon: '💒', description: 'Wedding ceremony timing with Panchang support' },
@@ -57,6 +58,7 @@ const MUHURAT_FAQS = [
 
 const MuhuratFinderPage = () => {
   const navigate = useNavigate();
+  const { birthData } = useAstrology();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [location] = useState({ latitude: 28.6139, longitude: 77.2090, name: 'New Delhi' });
   const [selectedMuhurat, setSelectedMuhurat] = useState('vivah');
@@ -93,7 +95,7 @@ const MuhuratFinderPage = () => {
           data = await muhuratService.getPropertyMuhurat(selectedDate, location.latitude, location.longitude);
           break;
         case 'vehicle':
-          data = await muhuratService.getVehicleMuhurat(selectedDate, location.latitude, location.longitude);
+          data = await muhuratService.getVehicleMuhurat(selectedDate, location.latitude, location.longitude, birthData);
           break;
         case 'griha-pravesh':
           data = await muhuratService.getGrihaPraveshMuhurat(selectedDate, location.latitude, location.longitude);
@@ -141,6 +143,10 @@ const MuhuratFinderPage = () => {
   };
 
   const currentMuhurat = getCurrentMuhurat();
+  const isFallbackSelection = !muhuratData?.muhurtas?.length && (muhuratData?.best_available_muhurtas?.length > 0);
+  const displayMuhurtas = muhuratData?.muhurtas?.length
+    ? muhuratData.muhurtas
+    : (muhuratData?.best_available_muhurtas || []);
   const selectedType = MUHURAT_TYPES.find((type) => type.id === selectedMuhurat) || MUHURAT_TYPES[0];
   const seoData = generatePageSEO('muhuratFinder', { path: '/muhurat-finder' });
 
@@ -292,9 +298,21 @@ const MuhuratFinderPage = () => {
             <div className="results-header">
               <span>Results</span>
               <h2>{selectedType.name} for {formatDate(selectedDate)}</h2>
-              <div className="location-info">
-                📍 {location.name} ({location.latitude.toFixed(2)}°, {location.longitude.toFixed(2)}°)
+            <div className="location-info">
+              📍 {location.name} ({location.latitude.toFixed(2)}°, {location.longitude.toFixed(2)}°)
+            </div>
+            {muhuratData.panchak?.is_panchak && (
+              <div className="panchak-alert" role="alert">
+                <strong>⚠ Panchak is active</strong>
+                <span>{muhuratData.panchak.reason}</span>
+                {(muhuratData.panchak.intervals || []).map((interval) => (
+                  <span key={`${interval.start}-${interval.end}`}>
+                    Active from {formatTime(interval.start)} to {formatTime(interval.end)}.
+                  </span>
+                ))}
+                <small>Windows marked Panchak should be confirmed with a qualified priest before use.</small>
               </div>
+            )}
             </div>
 
             {currentMuhurat && (
@@ -313,15 +331,68 @@ const MuhuratFinderPage = () => {
               </div>
             )}
 
+            {!muhuratData.muhurtas?.length && !isFallbackSelection && (
+              <div className="muhurat-day-status rejected" role="status">
+                <strong>No suitable vehicle Muhurat on this date</strong>
+                <span>Traditional timing rules did not leave a recommended slot on this date.</span>
+                {muhuratData.rejections?.length > 0 && (
+                  <details>
+                    <summary>Why this date was rejected</summary>
+                    <ul>{muhuratData.rejections.map((reason) => (
+                      <li key={reason} className="rejection-reason-card">
+                        {String(reason).split('\n').filter(Boolean).map((line, index) => (
+                          index === 0 ? <strong key={line}>{line}</strong> : <span key={line}>{line}</span>
+                        ))}
+                      </li>
+                    ))}</ul>
+                  </details>
+                )}
+              </div>
+            )}
+
+            <div className="date-audit-grid" aria-label="Date audit">
+              <button type="button" className={`date-audit-chip ${muhuratData.muhurtas?.length ? 'accepted' : (isFallbackSelection ? 'fallback' : 'rejected')}`} onClick={() => {
+                if (!muhuratData.muhurtas?.length) {
+                  window.alert(`${formatDate(selectedDate)}\n${(muhuratData.rejections || []).join('\n')}`);
+                }
+              }}>
+                <strong>{formatDate(selectedDate)}</strong>
+                <span>{muhuratData.muhurtas?.length ? 'Suitable' : (isFallbackSelection ? 'Best available with cautions' : 'Rejected — tap for reasons')}</span>
+              </button>
+              {(muhuratData.nearest_recommendations || []).map((day) => (
+                <button key={day.date} type="button" className="date-audit-chip accepted" onClick={() => setSelectedDate(day.date)}>
+                  <strong>{formatDate(day.date)}</strong>
+                  <span>{day.slots?.[0]?.score || '—'}/100 · Suitable</span>
+                </button>
+              ))}
+            </div>
+
+            {muhuratData.muhurtas?.length > 0 && (
+              <div className="muhurat-day-status accepted" role="status">
+                <strong>{muhuratData.muhurtas.length} suitable slot{muhuratData.muhurtas.length === 1 ? '' : 's'} on this date</strong>
+                <span>Personal Tara Bala and Chandra Bala: {muhuratData.personalised_tara_bala ? 'included' : 'not available without birth details'}.</span>
+              </div>
+            )}
+
+            {isFallbackSelection && (
+              <div className="muhurat-day-status fallback" role="status">
+                <strong>Best available on this date — use only if you must proceed</strong>
+                <span>This window did not pass every strict rule. Review the cautions below and confirm that you understand them before booking.</span>
+              </div>
+            )}
+
             <div className="muhurat-grid">
-              {(muhuratData.muhurtas || []).map((muhurat, index) => {
+              {displayMuhurtas.map((muhurat, index) => {
                 const isActive = currentMuhurat && currentMuhurat.muhurta === muhurat.muhurta;
 
                 return (
-                  <article key={index} className={`muhurat-card ${isActive ? 'active' : ''}`}>
+                  <article key={index} className={`muhurat-card ${isActive ? 'active' : ''} ${muhurat.panchak ? 'panchak' : ''}`}>
                     <div className="muhurat-header">
                       <div className="muhurat-number">Muhurta {muhurat.muhurta}</div>
-                      {isActive && <div className="active-badge">Active Now</div>}
+                      <div className="muhurat-badges">
+                        {isActive && <div className="active-badge">Active Now</div>}
+                        {muhurat.panchak && <div className="panchak-badge">Panchak</div>}
+                      </div>
                     </div>
 
                     <div className="muhurat-timing">
@@ -334,12 +405,55 @@ const MuhuratFinderPage = () => {
                     </div>
 
                     <div className="muhurat-suitability">
-                      {muhurat.suitability}
+                      {muhurat.suitability} · {muhurat.quality || 'Reviewed'}{muhurat.score != null ? ` · ${muhurat.score}/100` : ''}
                     </div>
+                    {muhurat.panchak && <div className="panchak-warning">{muhurat.panchak_warning}</div>}
+                    {muhurat.reasons?.length > 0 && (
+                      <details className="slot-reasons">
+                        <summary>Complete rationale</summary>
+                        <strong>Why it is favourable</strong>
+                        <ul>{(muhurat.positives || []).map((reason) => <li key={`p-${reason}`}>{reason}</li>)}</ul>
+                        <strong>Pressure or caution factors</strong>
+                        <ul>{(muhurat.cautions || []).map((reason) => <li key={`c-${reason}`}>{reason}</li>)}</ul>
+                        <strong>Score components</strong>
+                        <ul>{(muhurat.score_breakdown || []).map((item) => <li key={item.factor}>{item.factor}: {item.points > 0 ? '+' : ''}{item.points}</li>)}</ul>
+                        <p>{muhurat.rationale}</p>
+                      </details>
+                    )}
                   </article>
                 );
               })}
             </div>
+
+            {muhuratData.nearest_recommendations?.length > 0 && (
+              <section className="nearest-muhurats" aria-label="Nearest suitable dates">
+                <h3>Nearest suitable dates</h3>
+                <p>These are the closest dates that passed the same strict filters.</p>
+                <div className="nearest-muhurat-list">
+                  {muhuratData.nearest_recommendations.map((day) => (
+                    <button key={day.date} type="button" onClick={() => setSelectedDate(day.date)}>
+                      <strong>{formatDate(day.date)}</strong>
+                      <span>{day.slots?.[0]?.time || 'View slots'} · {day.slots?.[0]?.score || '—'}/100</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {muhuratData.best_available_recommendations?.length > 0 && (
+              <section className="nearest-muhurats fallback-muhurats" aria-label="Best available dates with cautions">
+                <h3>Best available dates with cautions</h3>
+                <p>These dates may be workable if you cannot wait, but they are not strict recommendations. Open each date to review its cautions.</p>
+                <div className="nearest-muhurat-list">
+                  {muhuratData.best_available_recommendations.map((day) => (
+                    <button key={`fallback-${day.date}`} type="button" onClick={() => setSelectedDate(day.date)}>
+                      <strong>{formatDate(day.date)}</strong>
+                      <span>{day.slots?.[0]?.time || 'View slots'} · {day.slots?.[0]?.score || '—'}/100 · {day.date_warnings?.length || 0} caution{day.date_warnings?.length === 1 ? '' : 's'}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
 
