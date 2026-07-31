@@ -37,6 +37,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCredits } from '../../credits/CreditContext';
 import { useAuthGate } from '../../auth/AuthGateContext';
+import { trackAcquisitionFunnelEvent } from '../../services/acquisitionTracking';
 import { extractFirstHttpsUrl } from '../../utils/blogLinks';
 import FomoHomeSheet from './FomoHomeSheet';
 import FomoHomeEntryCard from './FomoHomeEntryCard';
@@ -354,6 +355,15 @@ export default function HomeScreen({
   /** Web: portaled tabs only while Home is focused (hidden on BirthForm etc.). */
   const [homeTabsVisible, setHomeTabsVisible] = useState(true);
   useAnalytics('HomeScreen');
+  // The current product is guest-first: record Home as the first post-install
+  // step so anonymous exploration is not misclassified as auth abandonment.
+  useEffect(() => {
+    trackAcquisitionFunnelEvent(
+      'guest_home_viewed',
+      {},
+      { status: 'viewed', screenName: 'HomeScreen' },
+    ).catch(() => {});
+  }, []);
   const { theme, colors, androidLightCardFixStyle } = useTheme();
   const tabSafeColor = theme === 'dark' ? '#ea580c' : '#ffffff';
   const isDark = theme === 'dark';
@@ -1811,10 +1821,10 @@ const loadHomeData = async (nativeData = null) => {
       originalCost: pricingOriginal.events,
       navigateAction: 'events',
     },
+    { id: 'muhurat', title: t('home.analysis.muhuratIosTitle', 'Timing Windows'), icon: '🕉️', description: t('home.analysis.muhuratIosDescription', 'Review supportive windows for important actions'), gradient: ['#4338CA', '#7C3AED'], cost: 0, originalCost: null },
     { id: 'trading', title: t('home.analysis.tradingIosTitle', 'Market Study'), icon: '📈', description: t('home.analysis.tradingIosDescription', 'Review market cycles and sector context for timing study'), gradient: ['#B45309', '#F97316'], cost: pricing.trading ?? 5, originalCost: pricingOriginal.trading },
     { id: 'financial', title: t('home.analysis.financialIosTitle', 'Market Context'), icon: '💹', description: t('home.analysis.financialIosDescription', 'Study sector rhythm and broader market context'), gradient: ['#047857', '#10B981'], cost: 0, originalCost: null },
     { id: 'childbirth', title: t('home.analysis.childbirthIosTitle', 'Family Timing'), icon: '🤱', description: t('home.analysis.childbirthIosDescription', 'Review supportive timing for family planning and delivery'), gradient: ['#BE185D', '#EC4899'], cost: pricing.childbirth ?? 8, originalCost: pricingOriginal.childbirth },
-    { id: 'muhurat', title: t('home.analysis.muhuratIosTitle', 'Timing Windows'), icon: '🕉️', description: t('home.analysis.muhuratIosDescription', 'Review supportive windows for important actions'), gradient: ['#4338CA', '#7C3AED'], cost: 0, originalCost: null },
   ] : [
     {
       id: 'karma',
@@ -1841,10 +1851,10 @@ const loadHomeData = async (nativeData = null) => {
       originalCost: pricingOriginal.events,
       navigateAction: 'events',
     },
+    { id: 'muhurat', title: t('home.analysis.muhurat.title', 'Muhurat Planner'), icon: '🕉️', description: t('home.analysis.muhurat.description', 'Auspicious timing for all events'), gradient: ['#9C27B0', '#7B1FA2'], cost: 0, originalCost: null },
     { id: 'trading', title: t('home.analysis.trading.title', 'Trading Study'), icon: '📈', description: isIOS ? 'Market timing and sector context' : t('home.analysis.trading.description', 'Market timing and sector context'), gradient: ['#FFD700', '#FF8C00'], cost: pricing.trading ?? 5, originalCost: pricingOriginal.trading },
     { id: 'financial', title: t('home.analysis.financial.title', 'Market Astrology'), icon: '💹', description: isIOS ? 'Sector timing and market context' : t('home.analysis.financial.description', 'Sector forecasts & investment timing'), gradient: ['#10b981', '#059669'], cost: 0, originalCost: null },
     { id: 'childbirth', title: t('home.analysis.childbirth.title', 'Childbirth Planner'), icon: '🤱', description: t('home.analysis.childbirth.description', 'Auspicious dates for delivery'), gradient: ['#FF69B4', '#FF1493'], cost: pricing.childbirth ?? 8, originalCost: pricingOriginal.childbirth },
-    { id: 'muhurat', title: t('home.analysis.muhurat.title', 'Muhurat Planner'), icon: '🕉️', description: t('home.analysis.muhurat.description', 'Auspicious timing for all events'), gradient: ['#9C27B0', '#7B1FA2'], cost: 0, originalCost: null },
   ];
 
   const TickerItem = ({ icon, label, value, color, showInfoIcon }) => (

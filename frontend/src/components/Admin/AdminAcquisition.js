@@ -91,6 +91,8 @@ const AdminAcquisition = () => {
     existing_user_installs: 0,
     new_user_candidate_installs: 0,
     registration_flow_installs: 0,
+    new_user_registered_installs: 0,
+    new_user_unregistered_installs: 0,
     unknown_anonymous_installs: 0,
   });
   const [referrerModal, setReferrerModal] = useState({ visible: false, text: '' });
@@ -151,6 +153,8 @@ const AdminAcquisition = () => {
         existing_user_installs: analyticsRes.existing_user_installs || 0,
         new_user_candidate_installs: analyticsRes.new_user_candidate_installs || 0,
         registration_flow_installs: analyticsRes.registration_flow_installs || 0,
+        new_user_registered_installs: analyticsRes.new_user_registered_installs || 0,
+        new_user_unregistered_installs: analyticsRes.new_user_unregistered_installs || 0,
         unknown_anonymous_installs: analyticsRes.unknown_anonymous_installs || 0,
       });
     } catch (e) {
@@ -393,7 +397,11 @@ const AdminAcquisition = () => {
       {!loading && !error ? (
         <>
           <div style={{ marginBottom: 20 }}>
-            <h3 style={{ margin: '0 0 10px' }}>New-user funnel summary</h3>
+            <h3 style={{ margin: '0 0 10px' }}>Guest-first install funnel</h3>
+            <p style={{ margin: '0 0 12px', color: '#64748b', fontSize: 13 }}>
+              New installs now open Home before authentication. Auth conversion is measured after the auth gate;
+              each step counts installs that reached that step or a later step.
+            </p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
               <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px', background: '#f8fafc' }}>
                 <div style={{ fontSize: 11, color: '#64748b' }}>All first opens</div>
@@ -408,8 +416,16 @@ const AdminAcquisition = () => {
                 <div style={{ fontWeight: 800 }}>{analytics.new_user_candidate_installs || 0}</div>
               </div>
               <div style={{ border: '1px solid #fde68a', borderRadius: 8, padding: '8px 10px', background: '#fffbeb' }}>
-                <div style={{ fontSize: 11, color: '#92400e' }}>No mode yet</div>
+                <div style={{ fontSize: 11, color: '#92400e' }}>No auth step yet</div>
                 <div style={{ fontWeight: 800 }}>{analytics.unknown_anonymous_installs || 0}</div>
+              </div>
+              <div style={{ border: '1px solid #fecaca', borderRadius: 8, padding: '8px 10px', background: '#fef2f2' }}>
+                <div style={{ fontSize: 11, color: '#991b1b' }}>New installs not registered</div>
+                <div style={{ fontWeight: 800 }}>{analytics.new_user_unregistered_installs || 0}</div>
+              </div>
+              <div style={{ border: '1px solid #a7f3d0', borderRadius: 8, padding: '8px 10px', background: '#ecfdf5' }}>
+                <div style={{ fontSize: 11, color: '#047857' }}>New installs registered</div>
+                <div style={{ fontWeight: 800 }}>{analytics.new_user_registered_installs || 0}</div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 8 }}>
@@ -428,7 +444,10 @@ const AdminAcquisition = () => {
                       padding: 12,
                     }}
                   >
-                    <div style={{ fontSize: 12, color: '#475569', marginBottom: 6 }}>{step.label}</div>
+                    <div style={{ fontSize: 12, color: '#475569', marginBottom: 6, fontWeight: 700 }}>{step.label}</div>
+                    <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.35, minHeight: 42, marginBottom: 5 }}>
+                      {step.description || 'Reached this point in the install journey.'}
+                    </div>
                     <div style={{ fontSize: 24, fontWeight: 800 }}>{step.count}</div>
                     <div style={{ fontSize: 12, color: '#475569' }}>
                       {index === 0

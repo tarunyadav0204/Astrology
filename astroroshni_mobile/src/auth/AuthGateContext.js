@@ -25,7 +25,7 @@ import {
   setPendingPaidAction,
 } from './guestAuth';
 import { trackGA4EventOnly } from '../utils/analytics';
-import { trackGuestActivity } from '../services/acquisitionTracking';
+import { trackAcquisitionFunnelEvent, trackGuestActivity } from '../services/acquisitionTracking';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 
@@ -74,6 +74,11 @@ export function AuthGateProvider({ children }) {
       feature: meta.feature || 'unknown',
     }).catch(() => {});
     trackGuestActivity('auth_gate_shown').catch(() => {});
+    trackAcquisitionFunnelEvent(
+      'auth_gate_shown',
+      { feature: meta.feature || 'unknown' },
+      { status: 'shown', screenName: 'AuthGate' },
+    ).catch(() => {});
   }, [t]);
 
   const requireAuthForPaid = useCallback(

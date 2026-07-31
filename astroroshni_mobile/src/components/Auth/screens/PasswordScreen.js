@@ -50,7 +50,9 @@ export default function PasswordScreen({
 
   useEffect(() => {
     trackAcquisitionFunnelEvent(
-      'auth_password_screen_viewed',
+      // Keep the registration funnel denominator separate from users who
+      // opened the login password screen and then abandoned the flow.
+      isLogin ? 'auth_login_password_screen_viewed' : 'auth_password_screen_viewed',
       { mode: isLogin ? 'login' : 'register' },
       { screenName: 'PasswordScreen' },
     ).catch(() => {});

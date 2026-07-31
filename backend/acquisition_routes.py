@@ -37,6 +37,10 @@ _UUID_RE = re.compile(
 
 _FUNNEL_STEPS = [
     ("first_open", "First open"),
+    # The app is guest-first now.  Keep the product-entry step separate from
+    # authentication so anonymous exploration is not reported as auth loss.
+    ("guest_home_viewed", "Home viewed"),
+    ("auth_gate_shown", "Auth gate shown"),
     ("auth_welcome_viewed", "Welcome viewed"),
     ("auth_mode_selected", "Mode selected"),
     ("auth_phone_submitted", "Phone submitted"),
@@ -50,6 +54,24 @@ _FUNNEL_STEPS = [
     ("registration_submitted", "Registration submitted"),
     ("registration_completed", "Registration completed"),
 ]
+
+_FUNNEL_STEP_DESCRIPTIONS = {
+    "first_open": "The app recorded its first launch for this installation.",
+    "guest_home_viewed": "The Home screen rendered before the user needed to sign in.",
+    "auth_gate_shown": "A guest reached a feature that requested authentication.",
+    "auth_welcome_viewed": "The authentication Welcome screen was displayed.",
+    "auth_mode_selected": "The user chose Login or Register.",
+    "auth_phone_submitted": "The user submitted the phone-number form.",
+    "registration_otp_requested": "A verification code was requested for registration.",
+    "registration_otp_screen_viewed": "The verification-code screen was displayed.",
+    "registration_otp_verified": "The submitted verification code was accepted.",
+    "auth_email_screen_viewed": "The email step was displayed.",
+    "auth_email_submitted": "The user submitted the email step.",
+    "registration_name_submitted": "The user submitted their name.",
+    "auth_password_screen_viewed": "The registration password screen was displayed.",
+    "registration_submitted": "A valid registration was submitted to the backend.",
+    "registration_completed": "The backend completed registration successfully.",
+}
 
 
 def _reached_funnel_events(event_name: str) -> list[str]:
@@ -1133,17 +1155,21 @@ def _acquisition_analytics_payload(
             COUNT(*) FILTER (WHERE userid IS NOT NULL)::int AS linked,
             COUNT(*) FILTER (WHERE existing_user_install)::int AS existing_user_installs,
             COUNT(*) FILTER (WHERE NOT existing_user_install)::int AS new_user_candidate_installs,
-            COUNT(*) FILTER (WHERE registration_flow_install)::int AS registration_flow_installs
+            COUNT(*) FILTER (WHERE registration_flow_install)::int AS registration_flow_installs,
+            COUNT(*) FILTER (WHERE NOT existing_user_install AND userid IS NOT NULL)::int AS new_user_registered_installs,
+            COUNT(*) FILTER (WHERE NOT existing_user_install AND userid IS NULL)::int AS new_user_unregistered_installs
         FROM classified
         """,
         params,
     )
-    base = cur.fetchone() or (0, 0, 0, 0, 0)
+    base = cur.fetchone() or (0, 0, 0, 0, 0, 0, 0)
     installs = int(base[0] or 0)
     linked = int(base[1] or 0)
     existing_user_installs = int(base[2] or 0)
     new_user_candidate_installs = int(base[3] or 0)
     registration_flow_installs = int(base[4] or 0)
+    new_user_registered_installs = int(base[5] or 0)
+    new_user_unregistered_installs = int(base[6] or 0)
     unknown_anonymous_installs = max(0, new_user_candidate_installs - registration_flow_installs)
 
     funnel: list[dict[str, Any]] = []
@@ -1170,6 +1196,7 @@ def _acquisition_analytics_payload(
             {
                 "event_name": event_name,
                 "label": label,
+                "description": _FUNNEL_STEP_DESCRIPTIONS.get(event_name, ""),
                 "count": count,
                 "conversion_from_previous": round(count / previous, 4) if previous else 0.0,
                 "conversion_from_install": round(count / new_user_candidate_installs, 4) if new_user_candidate_installs else 0.0,
@@ -1222,6 +1249,8 @@ def _acquisition_analytics_payload(
         "existing_user_installs": existing_user_installs,
         "new_user_candidate_installs": new_user_candidate_installs,
         "registration_flow_installs": registration_flow_installs,
+        "new_user_registered_installs": new_user_registered_installs,
+        "new_user_unregistered_installs": new_user_unregistered_installs,
         "unknown_anonymous_installs": unknown_anonymous_installs,
         "funnel": funnel,
         "dropoff": dropoff,
@@ -1403,4 +1432,3 @@ def _build_acquisition_export_zip(
         zf.writestr("03_dropoff.csv", dropoff_csv)
         zf.writestr("04_installs.csv", installs_csv)
     return zip_buf.getvalue()
-
