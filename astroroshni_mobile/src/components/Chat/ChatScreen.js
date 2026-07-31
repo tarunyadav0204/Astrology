@@ -515,6 +515,8 @@ export default function ChatScreen({ navigation, route }) {
   /** After picking a mode in the bottom sheet, the same touch can fall through to the S/I/P control and reopen the sheet; ignore those opens until this timestamp (ms). */
   const modeIntroSuppressOpenUntilRef = useRef(0);
   const chatModeHydratedRef = useRef(false);
+  const chatModePreferenceLoadedRef = useRef(false);
+  const freeQuestionWasAvailableRef = useRef(false);
   const glowAnim = useRef(new Animated.Value(0)).current;
   const badgeFadeAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -523,11 +525,21 @@ export default function ChatScreen({ navigation, route }) {
   const badgeFadeHandleRef = useRef(null);
 
   // The first free question is always answered in Standard mode. Preserve any
-  // paid-mode selection, but hide choices that cannot affect this free send.
+  // paid-mode selection in storage, but temporarily reset the UI and hide
+  // choices that cannot affect this free send.
   useEffect(() => {
-    if (!freeQuestionAvailable) return;
-    setShowModeSelector(false);
-    setShowChatModeIntro(false);
+    if (freeQuestionAvailable) {
+      freeQuestionWasAvailableRef.current = true;
+      setIsInstantAnalysis(false);
+      setIsPremiumAnalysis(false);
+      setShowModeSelector(false);
+      setShowChatModeIntro(false);
+      return;
+    }
+    if (freeQuestionWasAvailableRef.current && chatModeHydratedRef.current) {
+      freeQuestionWasAvailableRef.current = false;
+      restoreSelectedChatModeFromStorage();
+    }
   }, [freeQuestionAvailable]);
 
   useEffect(() => {
@@ -1061,6 +1073,11 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const applyChatModeFromTier = (tier) => {
+    if (freeQuestionAvailable) {
+      setIsInstantAnalysis(false);
+      setIsPremiumAnalysis(false);
+      return;
+    }
     const normalized = String(tier || '').trim().toLowerCase();
     if (normalized === 'premium') {
       setIsInstantAnalysis(false);
@@ -1088,6 +1105,7 @@ export default function ChatScreen({ navigation, route }) {
       .find(Boolean);
     if (!lastTier) return false;
     applyChatModeFromTier(lastTier);
+    chatModePreferenceLoadedRef.current = true;
     chatModeHydratedRef.current = true;
     return true;
   };
@@ -1095,10 +1113,12 @@ export default function ChatScreen({ navigation, route }) {
   const restoreSelectedChatModeFromStorage = async (personIdOverride = null) => {
     const storedMode = await loadSelectedChatMode(personIdOverride);
     if (!storedMode) {
+      chatModePreferenceLoadedRef.current = false;
       chatModeHydratedRef.current = true;
       return false;
     }
     applyChatModeFromTier(storedMode);
+    chatModePreferenceLoadedRef.current = true;
     chatModeHydratedRef.current = true;
     return true;
   };
@@ -1113,7 +1133,7 @@ export default function ChatScreen({ navigation, route }) {
   const [partnershipMode, setPartnershipMode] = useState(false);
 
   useEffect(() => {
-    if (partnershipMode || isMundane || !birthData || !chatModeHydratedRef.current) return;
+    if (partnershipMode || isMundane || !birthData || freeQuestionAvailable || !chatModeHydratedRef.current) return;
     const modeKey = getSelectedChatModeKey();
     saveSelectedChatMode(modeKey);
   }, [
@@ -1124,6 +1144,7 @@ export default function ChatScreen({ navigation, route }) {
     isMundane,
     isPremiumAnalysis,
     partnershipMode,
+    freeQuestionAvailable,
   ]);
   
   // Calibration state
@@ -1819,6 +1840,7 @@ export default function ChatScreen({ navigation, route }) {
       // Only update if person ID actually changed
       if (currentPersonId !== personId) {
         chatModeHydratedRef.current = false;
+        chatModePreferenceLoadedRef.current = false;
 
         setCurrentPersonId(personId);
         
@@ -4234,6 +4256,7 @@ export default function ChatScreen({ navigation, route }) {
       !showGreeting &&
       birthData &&
       !freeQuestionAvailable &&
+      !chatModePreferenceLoadedRef.current &&
       pendingFomoQueryContextRef.current?.source !== 'homepage_fomo' &&
       !partnershipMode &&
       !isMundane &&

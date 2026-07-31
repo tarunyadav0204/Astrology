@@ -1521,8 +1521,23 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     speech_chat_billing = bool(speech_chat_requested and instant_chat_active and speech_billing_requested is not False)
     effective_chat_tier = "instant" if instant_chat_active else "standard"
     chat_worker_mode_active = chat_worker_mode_enabled_for_user(current_user.userid)
+    # A free question is always a Standard single-chart answer. Do not open
+    # the subject gate at all: free users must not be routed into Partnership
+    # Analysis or asked to create/select another person's chart.
+    free_question_gate_eligible = False
+    if not partnership_mode and not premium_analysis and not instant_chat_active:
+        try:
+            free_birth_hash_for_gate = CreditService.create_free_question_birth_hash(birth_details)
+            free_question_gate_eligible = bool(
+                CreditService().is_free_standard_chat_question_available_for_birth_hash(
+                    current_user.userid,
+                    free_birth_hash_for_gate,
+                )
+            )
+        except Exception as free_gate_exc:
+            logger.warning("free-question subject-gate check skipped: %s", free_gate_exc)
     skip_subject_gate_for_fast_chat = bool(
-        instant_chat_active or speech_chat_requested or fomo_chat_requested
+        instant_chat_active or speech_chat_requested or fomo_chat_requested or free_question_gate_eligible
     )
     if speech_chat_requested or requested_chat_tier == "instant":
         logger.info(
@@ -1623,7 +1638,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             _clear_pending_native_gate(conn, session_id)
             conn.commit()
 
-        pending_gate_state = None if skip_subject_gate_for_fast_chat else _load_pending_native_gate(conn, session_id)
+        pending_gate_state = None if (skip_subject_gate_for_fast_chat or free_question_gate_eligible) else _load_pending_native_gate(conn, session_id)
         if pending_gate_state and subject_gate_override == "":
             from ai.chat_subject_gate import ChatSubjectGate, build_subject_gate_message
 
@@ -1767,6 +1782,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 birth_details=birth_details,
                 language=language,
                 subject_gate_memory=subject_gate_memory,
+                allow_partnership_offer=not free_question_gate_eligible,
             )
             if subject_gate.get("gate_required"):
                 assistant_content = build_subject_gate_message(

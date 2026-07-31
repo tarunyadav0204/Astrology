@@ -35,6 +35,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const [chatMode, setChatMode] = useState('greeting'); // 'greeting', 'question', 'periods'
     const [eventPeriods, setEventPeriods] = useState([]);
     const [isPremiumMode, setIsPremiumMode] = useState(false);
+    const [isInstantMode, setIsInstantMode] = useState(false);
+    const [savedChatMode, setSavedChatMode] = useState(null);
     const [pendingMessages, setPendingMessages] = useState(new Set());
     const [currentPersonId, setCurrentPersonId] = useState(null);
     const [isPartnershipMode, setIsPartnershipMode] = useState(false);
@@ -46,6 +48,47 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const [birthFormDefaultTab, setBirthFormDefaultTab] = useState('saved');
     const subjectGateOverrideRef = useRef(null);
     const subjectGateMemoryRef = useRef([]);
+
+    const getChatModeStorageKey = () => {
+        try {
+            const saved = JSON.parse(localStorage.getItem('user') || 'null');
+            const userId = saved?.userid ?? saved?.user_id ?? saved?.id;
+            return userId != null ? `chatSelectedMode_${userId}` : 'chatSelectedMode_guest';
+        } catch (_) {
+            return 'chatSelectedMode_guest';
+        }
+    };
+
+    useEffect(() => {
+        try {
+            const stored = String(localStorage.getItem(getChatModeStorageKey()) || '').trim().toLowerCase();
+            if (stored === 'premium' || stored === 'instant' || stored === 'standard') {
+                setSavedChatMode(stored);
+                setIsPremiumMode(stored === 'premium');
+                setIsInstantMode(stored === 'instant');
+            }
+        } catch (_) {
+            setSavedChatMode(null);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (freeQuestionAvailable) {
+            setIsPremiumMode(false);
+            setIsInstantMode(false);
+        } else if (savedChatMode) {
+            setIsPremiumMode(savedChatMode === 'premium');
+            setIsInstantMode(savedChatMode === 'instant');
+        }
+    }, [freeQuestionAvailable, savedChatMode]);
+
+    const handleChatModeChange = (mode) => {
+        const normalized = mode === 'premium' || mode === 'instant' ? mode : 'standard';
+        setSavedChatMode(normalized);
+        if (!freeQuestionAvailable) {
+            try { localStorage.setItem(getChatModeStorageKey(), normalized); } catch (_) { /* best effort */ }
+        }
+    };
 
     const openBirthModalEmpty = useCallback(() => {
         setBirthFormGatePrefill(null);
@@ -1257,6 +1300,10 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                         onFollowUpUsed={() => setFollowUpQuestion('')}
                                         onOpenCreditsModal={() => setShowCreditsModal(true)}
                                         onPremiumModeChange={setIsPremiumMode}
+                                        instantMode={isInstantMode}
+                                        onInstantModeChange={setIsInstantMode}
+                                        initialMode={freeQuestionAvailable ? 'standard' : (savedChatMode || 'standard')}
+                                        onModeChange={handleChatModeChange}
                                         onShowEnhancedPopup={() => setShowEnhancedPopup(true)}
                                         isPartnershipMode={isPartnershipMode}
                                     />

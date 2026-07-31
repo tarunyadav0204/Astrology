@@ -139,6 +139,7 @@ class ChatSubjectGate:
         birth_details: Dict[str, Any] | None,
         language: str = "english",
         subject_gate_memory: list[Dict[str, Any]] | None = None,
+        allow_partnership_offer: bool = True,
     ) -> Dict[str, Any]:
         compact_memory = []
         if isinstance(subject_gate_memory, list):
@@ -176,6 +177,7 @@ Previous user choices in this chat:
 {json.dumps(compact_memory, ensure_ascii=False)}
 
 User language preference: {language}
+Partnership Analysis offer available for this question: {str(bool(allow_partnership_offer)).lower()}
 User question:
 {question}
 
@@ -213,6 +215,7 @@ When NOT to gate:
 - The user mentions another person only as background but the focus remains the selected native.
 - The user explicitly says they do not know the other person's birth details or asks to answer from the selected chart only; continue normal chat.
 - The message is casual, non-astrology, or asks what the app can do.
+- When Partnership Analysis offer is unavailable, never return `partnership_offer` and never mention Partnership Analysis in `user_message`. For relationship questions in that case, either return `create_subject_chart` when the other person's own chart is needed, or return `gate_required=false` so the Standard single-chart answer can continue.
 
 Return ONLY valid JSON:
 {{
@@ -251,7 +254,17 @@ Return ONLY valid JSON:
                 timeout=12,
             )
             raw = _extract_json(getattr(response, "text", "") or "")
-            return _normalize_gate_result(raw, question)
+            normalized = _normalize_gate_result(raw, question)
+            # Never expose a paid Partnership Analysis route from a free
+            # Standard question, even if the classifier ignored the prompt.
+            if not allow_partnership_offer and normalized.get("intent_gate") == "partnership_offer":
+                return {
+                    "gate_required": False,
+                    "intent_gate": "none",
+                    "confidence": normalized.get("confidence", "medium"),
+                    "reason": "partnership_offer_disabled_for_free_question",
+                }
+            return normalized
         except Exception as exc:
             logger.warning("chat subject gate failed; continuing normal chat: %s", exc)
             return {"gate_required": False, "intent_gate": "none", "reason": "gate_failed"}

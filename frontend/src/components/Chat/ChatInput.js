@@ -29,6 +29,8 @@ const ChatInput = ({
     onInterruptAssistantSpeech = () => {},
     instantMode = false,
     onInstantModeChange = () => {},
+    initialMode = 'standard',
+    onModeChange = () => {},
 }) => {
     const {
         credits,
@@ -57,6 +59,20 @@ const ChatInput = ({
     const finalTranscriptRef = useRef('');
     const shouldAutoSendSpeechRef = useRef(false);
     const messageRef = useRef('');
+
+    useEffect(() => {
+        const mode = String(initialMode || 'standard').toLowerCase();
+        if (mode === 'premium') {
+            setIsPremiumAnalysis(true);
+            onInstantModeChange(false);
+        } else if (mode === 'instant' && instantChatEnabled) {
+            setIsPremiumAnalysis(false);
+            onInstantModeChange(true);
+        } else {
+            setIsPremiumAnalysis(false);
+            onInstantModeChange(false);
+        }
+    }, [initialMode, instantChatEnabled]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -444,6 +460,7 @@ const ChatInput = ({
                             onClick={() => {
                                 setIsPremiumAnalysis(false);
                                 onInstantModeChange(false);
+                                onModeChange('standard');
                                 setShowModeSelector(false);
                             }}
                         >
@@ -462,6 +479,7 @@ const ChatInput = ({
                                     if (useFreeQuestionEligible) return;
                                     setIsPremiumAnalysis(false);
                                     onInstantModeChange(true);
+                                    onModeChange('instant');
                                     setShowModeSelector(false);
                                 }}
                             >
@@ -480,6 +498,7 @@ const ChatInput = ({
                                 if (useFreeQuestionEligible) return;
                                 onInstantModeChange(false);
                                 setIsPremiumAnalysis(true);
+                                onModeChange('premium');
                                 setShowModeSelector(false);
                             }}
                         >
@@ -512,7 +531,12 @@ const ChatInput = ({
                                         if (useFreeQuestionEligible || isLocked) return;
                                         const on = e.target.checked;
                                         onInstantModeChange(on);
-                                        if (on) setIsPremiumAnalysis(false);
+                                        if (on) {
+                                            setIsPremiumAnalysis(false);
+                                            onModeChange('instant');
+                                        } else if (!isPremiumAnalysis) {
+                                            onModeChange('standard');
+                                        }
                                     }}
                                     style={{ transform: 'scale(1.2)' }}
                                     disabled={isLocked || useFreeQuestionEligible}
@@ -537,8 +561,13 @@ const ChatInput = ({
                                 onChange={(e) => {
                                     if (useFreeQuestionEligible) return;
                                     const v = e.target.checked;
-                                    setIsPremiumAnalysis(v);
-                                    if (v) onInstantModeChange(false);
+                                        setIsPremiumAnalysis(v);
+                                        if (v) {
+                                            onInstantModeChange(false);
+                                            onModeChange('premium');
+                                        } else if (!instantMode) {
+                                            onModeChange('standard');
+                                        }
                                 }}
                                 style={{ transform: 'scale(1.2)' }}
                                 disabled={isLocked || useFreeQuestionEligible}
