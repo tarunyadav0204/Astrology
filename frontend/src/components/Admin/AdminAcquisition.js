@@ -57,6 +57,27 @@ function getTodayISTDateInputValue() {
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
+function formatUtmSourceLabel(source) {
+  const raw = String(source || '').trim();
+  const value = raw.toLowerCase();
+  if (!raw || value === 'unknown') return 'Unknown / direct';
+  if (value.includes('instagram')) return 'Instagram';
+  if (value.includes('facebook') || value === 'fb') return 'Facebook';
+  if (value.includes('google') || value.includes('googleads')) return 'Google';
+  if (value.includes('youtube')) return 'YouTube';
+  if (value.includes('whatsapp')) return 'WhatsApp';
+  if (value.includes('telegram')) return 'Telegram';
+  if (value.includes('play.google') || value.includes('google-play')) return 'Google Play';
+  return raw
+    .replace(/^apps?\./i, '')
+    .replace(/^www\./i, '')
+    .replace(/\.(com|co\.in|in|org|net)$/i, '')
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
 const AdminAcquisition = () => {
   const todayIST = getTodayISTDateInputValue();
   const [dateFrom, setDateFrom] = useState(todayIST);
@@ -94,6 +115,7 @@ const AdminAcquisition = () => {
     new_user_registered_installs: 0,
     new_user_unregistered_installs: 0,
     unknown_anonymous_installs: 0,
+    utm_sources: [],
   });
   const [referrerModal, setReferrerModal] = useState({ visible: false, text: '' });
   const [timelineModal, setTimelineModal] = useState({ visible: false, loading: false, error: '', data: null });
@@ -156,6 +178,7 @@ const AdminAcquisition = () => {
         new_user_registered_installs: analyticsRes.new_user_registered_installs || 0,
         new_user_unregistered_installs: analyticsRes.new_user_unregistered_installs || 0,
         unknown_anonymous_installs: analyticsRes.unknown_anonymous_installs || 0,
+        utm_sources: Array.isArray(analyticsRes.utm_sources) ? analyticsRes.utm_sources : [],
       });
     } catch (e) {
       setError(e?.message || 'Failed to load');
@@ -462,6 +485,36 @@ const AdminAcquisition = () => {
                   </div>
                 );
               })}
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <h4 style={{ margin: '0 0 8px' }}>Installs by UTM source</h4>
+              {analytics.utm_sources.length ? (
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {analytics.utm_sources.map((item) => (
+                    <div
+                      key={`${item.source}:${item.medium}`}
+                      style={{
+                        minWidth: 150,
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 8,
+                        padding: '9px 11px',
+                        background: '#f8fafc',
+                      }}
+                    >
+                      <div style={{ fontWeight: 800, color: '#1e293b' }}>{formatUtmSourceLabel(item.source)}</div>
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                        {[item.source, item.medium].filter(Boolean).join(' · ') || 'No UTM details'}
+                      </div>
+                      <div style={{ marginTop: 6, fontSize: 13, color: '#334155' }}>
+                        <strong>{item.installs}</strong> installs · <strong>{item.registered}</strong> registered
+                      </div>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>{item.not_registered} not registered</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ color: '#64748b', fontSize: 13 }}>No UTM attribution recorded for this range.</div>
+              )}
             </div>
           </div>
 

@@ -1275,7 +1275,7 @@ class UserCreate(BaseModel):
         if isinstance(v, str) and not str(v).strip():
             return None
         s = str(v).strip().lower()
-        return s if s in ("web", "mobile", "whatsapp") else None
+        return s if s in ("web", "mobile", "mobile_pwa", "whatsapp") else None
 
     @field_validator("gender", mode="before")
     @classmethod
@@ -1663,7 +1663,7 @@ class UserRegistrationWithBirth(BaseModel):
         if isinstance(v, str) and not str(v).strip():
             return None
         s = str(v).strip().lower()
-        return s if s in ("web", "mobile", "whatsapp") else None
+        return s if s in ("web", "mobile", "mobile_pwa", "whatsapp") else None
 
     @field_validator("gender", mode="before")
     @classmethod
@@ -5027,7 +5027,7 @@ async def get_admin_users(
     subscription: Optional[str] = Query(None, description="Filter by plan name, or 'none' for no subscription"),
     signup_client: Optional[str] = Query(
         None,
-        description="Filter by signup channel: web, mobile, whatsapp, or unknown",
+        description="Filter by signup channel: web, mobile, mobile_pwa, whatsapp, or unknown",
     ),
     created_from: Optional[str] = Query(None, description="Created on or after (YYYY-MM-DD)"),
     created_to: Optional[str] = Query(None, description="Created on or before (YYYY-MM-DD)"),
@@ -5250,6 +5250,7 @@ async def get_admin_users_summary(
             SELECT
                 COUNT(*)::bigint AS users_count,
                 SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'mobile' THEN 1 ELSE 0 END)::bigint AS mobile_users_count,
+                SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'mobile_pwa' THEN 1 ELSE 0 END)::bigint AS mobile_pwa_users_count,
                 SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'web' THEN 1 ELSE 0 END)::bigint AS web_users_count,
                 SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'whatsapp' THEN 1 ELSE 0 END)::bigint AS whatsapp_users_count,
                 SUM(CASE WHEN COALESCE(NULLIF(TRIM(u.signup_client), ''), '') = '' THEN 1 ELSE 0 END)::bigint AS unknown_signup_count,
@@ -5257,6 +5258,8 @@ async def get_admin_users_summary(
                 COUNT(*) FILTER (WHERE DATE(u.created_at) = CURRENT_DATE)::bigint AS today_users_count,
                 SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'mobile' THEN 1 ELSE 0 END)
                     FILTER (WHERE DATE(u.created_at) = CURRENT_DATE)::bigint AS today_mobile_users_count,
+                SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'mobile_pwa' THEN 1 ELSE 0 END)
+                    FILTER (WHERE DATE(u.created_at) = CURRENT_DATE)::bigint AS today_mobile_pwa_users_count,
                 SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'web' THEN 1 ELSE 0 END)
                     FILTER (WHERE DATE(u.created_at) = CURRENT_DATE)::bigint AS today_web_users_count,
                 SUM(CASE WHEN LOWER(COALESCE(u.signup_client, '')) = 'whatsapp' THEN 1 ELSE 0 END)
@@ -5273,21 +5276,22 @@ async def get_admin_users_summary(
         """
 
         cur = execute(conn, summary_sql, params)
-        row = cur.fetchone() or [0] * 12
+        row = cur.fetchone() or [0] * 14
 
         def _to_block(start):
             return {
                 "users_count": int(row[start] or 0),
                 "mobile_users_count": int(row[start + 1] or 0),
-                "web_users_count": int(row[start + 2] or 0),
-                "whatsapp_users_count": int(row[start + 3] or 0),
-                "unknown_signup_count": int(row[start + 4] or 0),
-                "push_enabled_count": int(row[start + 5] or 0),
+                "mobile_pwa_users_count": int(row[start + 2] or 0),
+                "web_users_count": int(row[start + 3] or 0),
+                "whatsapp_users_count": int(row[start + 4] or 0),
+                "unknown_signup_count": int(row[start + 5] or 0),
+                "push_enabled_count": int(row[start + 6] or 0),
             }
 
         return {
             "total": _to_block(0),
-            "today": _to_block(6),
+            "today": _to_block(7),
         }
 
 

@@ -231,8 +231,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [usersLimit] = useState(25);
   const [usersSummaryLoading, setUsersSummaryLoading] = useState(false);
   const [usersSummary, setUsersSummary] = useState({
-    today: { users_count: 0, mobile_users_count: 0, web_users_count: 0, whatsapp_users_count: 0, unknown_signup_count: 0, push_enabled_count: 0 },
-    total: { users_count: 0, mobile_users_count: 0, web_users_count: 0, whatsapp_users_count: 0, unknown_signup_count: 0, push_enabled_count: 0 },
+    today: { users_count: 0, mobile_users_count: 0, mobile_pwa_users_count: 0, web_users_count: 0, whatsapp_users_count: 0, unknown_signup_count: 0, push_enabled_count: 0 },
+    total: { users_count: 0, mobile_users_count: 0, mobile_pwa_users_count: 0, web_users_count: 0, whatsapp_users_count: 0, unknown_signup_count: 0, push_enabled_count: 0 },
   });
   const todayIso = new Date().toISOString().slice(0, 10);
   const [deletedBackups, setDeletedBackups] = useState([]);
@@ -2027,6 +2027,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       const emptySummaryBlock = {
         users_count: 0,
         mobile_users_count: 0,
+        mobile_pwa_users_count: 0,
         web_users_count: 0,
         whatsapp_users_count: 0,
         unknown_signup_count: 0,
@@ -2052,6 +2053,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         today: {
           users_count: 0,
           mobile_users_count: 0,
+          mobile_pwa_users_count: 0,
           web_users_count: 0,
           whatsapp_users_count: 0,
           unknown_signup_count: 0,
@@ -2060,6 +2062,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         total: {
           users_count: 0,
           mobile_users_count: 0,
+          mobile_pwa_users_count: 0,
           web_users_count: 0,
           whatsapp_users_count: 0,
           unknown_signup_count: 0,
@@ -3536,6 +3539,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                         >
                           <option value="all">All channels</option>
                           <option value="mobile">Mobile</option>
+                          <option value="mobile_pwa">Mobile PWA</option>
                           <option value="web">Web</option>
                           <option value="whatsapp">WhatsApp</option>
                           <option value="unknown">Unknown</option>
@@ -3568,6 +3572,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     <h4>Today</h4>
                     <p># Users: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.users_count ?? 0)}</strong></p>
                     <p>Mobile: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.mobile_users_count ?? 0)}</strong></p>
+                    <p>Mobile PWA: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.mobile_pwa_users_count ?? 0)}</strong></p>
                     <p>Web: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.web_users_count ?? 0)}</strong></p>
                     <p>WhatsApp: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.whatsapp_users_count ?? 0)}</strong></p>
                     <p>Unknown signup: <strong>{usersSummaryLoading ? '...' : (usersSummary.today?.unknown_signup_count ?? 0)}</strong></p>
@@ -3577,6 +3582,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     <h4>Total</h4>
                     <p># Users: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.users_count ?? 0)}</strong></p>
                     <p>Mobile: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.mobile_users_count ?? 0)}</strong></p>
+                    <p>Mobile PWA: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.mobile_pwa_users_count ?? 0)}</strong></p>
                     <p>Web: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.web_users_count ?? 0)}</strong></p>
                     <p>WhatsApp: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.whatsapp_users_count ?? 0)}</strong></p>
                     <p>Unknown signup: <strong>{usersSummaryLoading ? '...' : (usersSummary.total?.unknown_signup_count ?? 0)}</strong></p>

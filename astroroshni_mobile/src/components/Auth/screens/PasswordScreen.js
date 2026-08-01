@@ -37,6 +37,9 @@ export default function PasswordScreen({
   setIsLogin,
   navigation 
 }) {
+  const signupClient = Platform.OS === 'web' && typeof window !== 'undefined' && String(window.location?.pathname || '').startsWith('/mobile')
+    ? 'mobile_pwa'
+    : 'mobile';
   const { refreshCredits } = useCredits();
   const { refreshAuthState } = useAuthGate();
   const [loading, setLoading] = useState(false);
@@ -270,7 +273,7 @@ export default function PasswordScreen({
             ...(emailTrim ? { email: emailTrim } : {}),
             ...(formData.otpToken ? { otp_token: formData.otpToken } : {}),
             role: 'user',
-            signup_client: 'mobile',
+            signup_client: signupClient,
             ...(formData?.birthDetails?.gender ? { gender: formData.birthDetails.gender } : {}),
           });
           

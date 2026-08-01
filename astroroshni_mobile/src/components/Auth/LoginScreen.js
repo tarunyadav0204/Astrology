@@ -33,6 +33,9 @@ import { resetToRoute } from '../../navigation/navHelpers';
 const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen({ navigation }) {
+  const signupClient = Platform.OS === 'web' && typeof window !== 'undefined' && String(window.location?.pathname || '').startsWith('/mobile')
+    ? 'mobile_pwa'
+    : 'mobile';
   useAnalytics('LoginScreen');
   const { refreshCredits } = useCredits();
   const [phone, setPhone] = useState('');
@@ -295,7 +298,7 @@ export default function LoginScreen({ navigation }) {
         response = await authAPI.registerWithBirth({
           ...registrationData,
           birth_details: birthDetails,
-          signup_client: 'mobile',
+          signup_client: signupClient,
         });
       } else {
         trackAcquisitionFunnelEvent(
@@ -304,7 +307,7 @@ export default function LoginScreen({ navigation }) {
           { status: 'started', screenName: 'LoginScreen' },
         ).catch(() => {});
         // Regular registration
-        response = await authAPI.register({ ...registrationData, signup_client: 'mobile' });
+        response = await authAPI.register({ ...registrationData, signup_client: signupClient });
       }
       
       await storage.setAuthToken(response.data.access_token);

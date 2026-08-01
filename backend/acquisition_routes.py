@@ -1242,6 +1242,37 @@ def _acquisition_analytics_payload(
         for r in dropoff_rows
     ]
 
+    # Keep attribution reporting in the same filtered date/source cohort as
+    # the funnel.  Group by the stored UTM source; medium is retained for a
+    # useful raw-detail label in the admin UI.
+    cur = execute(
+        conn,
+        f"""
+        SELECT
+            COALESCE(NULLIF(BTRIM(ai.utm_source), ''), 'unknown') AS source,
+            COALESCE(STRING_AGG(DISTINCT NULLIF(BTRIM(ai.utm_medium), ''), ', ' ORDER BY NULLIF(BTRIM(ai.utm_medium), '')), '') AS medium,
+            COUNT(*)::int AS installs,
+            COUNT(*) FILTER (WHERE ai.userid IS NOT NULL)::int AS registered,
+            COUNT(*) FILTER (WHERE ai.userid IS NULL)::int AS not_registered
+        FROM app_installations ai
+        WHERE {where_sql}
+        GROUP BY 1
+        ORDER BY installs DESC, source ASC
+        LIMIT 50
+        """,
+        params,
+    )
+    utm_sources = [
+        {
+            "source": str(row[0] or "unknown"),
+            "medium": str(row[1] or ""),
+            "installs": int(row[2] or 0),
+            "registered": int(row[3] or 0),
+            "not_registered": int(row[4] or 0),
+        }
+        for row in (cur.fetchall() or [])
+    ]
+
     return {
         "installs": installs,
         "linked": linked,
@@ -1252,6 +1283,7 @@ def _acquisition_analytics_payload(
         "new_user_registered_installs": new_user_registered_installs,
         "new_user_unregistered_installs": new_user_unregistered_installs,
         "unknown_anonymous_installs": unknown_anonymous_installs,
+        "utm_sources": utm_sources,
         "funnel": funnel,
         "dropoff": dropoff,
     }
