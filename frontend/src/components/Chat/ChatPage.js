@@ -10,6 +10,7 @@ import { useAstrology } from '../../context/AstrologyContext';
 import { useCredits } from '../../context/CreditContext';
 import CreditsModal from '../Credits/CreditsModal';
 import PodcastPromoModal from './PodcastPromoModal';
+import FirstPurchaseOffer from './FirstPurchaseOffer';
 import ContextModal from './ContextModal';
 import PartnerChartModal from './PartnerChartModal';
 import { authService } from '../../services/authService';
@@ -232,6 +233,11 @@ const ChatPage = ({ onLogin }) => {
     const [podcastPromoOpen, setPodcastPromoOpen] = useState(false);
     const [podcastPromoMessageId, setPodcastPromoMessageId] = useState(null);
     const [podcastAutoLaunchKey, setPodcastAutoLaunchKey] = useState(0);
+    const [firstPurchaseOffer, setFirstPurchaseOffer] = useState(null);
+    const [firstPurchaseOfferModalOpen, setFirstPurchaseOfferModalOpen] = useState(false);
+    const [firstPurchaseOfferRemainingSeconds, setFirstPurchaseOfferRemainingSeconds] = useState(0);
+    const [creditsOfferMessageId, setCreditsOfferMessageId] = useState(null);
+    const firstPurchaseOfferShownRef = useRef(null);
     const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
     const activeSpeechReplyIdRef = useRef(null);
     const spokenAutoReplyKeysRef = useRef(new Set());
@@ -1268,7 +1274,126 @@ const ChatPage = ({ onLogin }) => {
         });
     };
 
-    const pollChatV2Status = async (assistantMessageId, processingClientId) => {
+    const loadFirstPurchaseOffer = async (messageId, metadata = null) => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        try {
+            const params = new URLSearchParams({ purchased_credits: '50', product_id: 'credits_50' });
+            const response = await fetch(`/api/credits/first-purchase-bonus/status?${params.toString()}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            if (!(data?.offer_eligible ?? data?.eligible)) return;
+            const purchaseDiscount = data.purchase_discount || metadata?.purchase_discount || null;
+            const purchasedCredits = Number(data.purchased_credits || metadata?.purchased_credits || 50);
+            const configuredDiscountBonus = purchaseDiscount?.eligible
+                ? Number(
+                    purchaseDiscount.bonus_credits
+                    ?? (Number(purchaseDiscount.fixed_credits || 0) > 0
+                        ? purchaseDiscount.fixed_credits
+                        : Math.min(
+                            Number(purchaseDiscount.max_bonus_credits || 1000),
+                            Math.floor(purchasedCredits * Number(purchaseDiscount.percent || 0) / 100),
+                        ))
+                )
+                : 0;
+            const offer = {
+                ...data,
+                ...metadata,
+                messageId: String(messageId),
+                purchasedCredits,
+                bonusCredits: Number(data.bonus_credits ?? metadata?.bonus_credits ?? 0) + configuredDiscountBonus,
+                windowMinutes: Number(data.window_minutes || metadata?.window_minutes || purchaseDiscount?.window_minutes || 30),
+                expiresAt: data.expires_at || metadata?.expires_at || purchaseDiscount?.expires_at,
+                purchaseDiscount,
+                price: '₹100',
+            };
+            if (!offer.expiresAt) return;
+            setFirstPurchaseOffer(offer);
+            setFirstPurchaseOfferModalOpen(true);
+            if (firstPurchaseOfferShownRef.current !== offer.messageId) {
+                firstPurchaseOfferShownRef.current = offer.messageId;
+                // Client impression (server also records when eligible). Idempotent.
+                const headers = {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                    'X-AstroRoshni-Authorization': `Bearer ${token}`,
+                };
+                fetch('/api/credits/first-purchase-offer-funnel/event', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ event: 'offer_shown', message_id: offer.messageId, platform: 'web' }),
+                    keepalive: true,
+                }).catch(() => {});
+            }
+        } catch (error) {
+            console.warn('[FirstPurchaseOffer] status lookup failed', error?.message || error);
+        }
+    };
+
+    useEffect(() => {
+        if (!firstPurchaseOffer?.expiresAt) {
+            setFirstPurchaseOfferRemainingSeconds(0);
+            setFirstPurchaseOfferModalOpen(false);
+            return undefined;
+        }
+        const expiryMs = Date.parse(firstPurchaseOffer.expiresAt);
+        if (!Number.isFinite(expiryMs)) return undefined;
+        const tick = () => {
+            const remaining = Math.max(0, Math.ceil((expiryMs - Date.now()) / 1000));
+            setFirstPurchaseOfferRemainingSeconds(remaining);
+            if (remaining <= 0) {
+                const token = localStorage.getItem('token');
+                fetch('/api/credits/first-purchase-offer-funnel/event', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                    body: JSON.stringify({ event: 'offer_expired', message_id: firstPurchaseOffer.messageId, platform: 'web' }),
+                }).catch(() => {});
+                setFirstPurchaseOffer(null);
+                setFirstPurchaseOfferModalOpen(false);
+            }
+        };
+        tick();
+        const timer = window.setInterval(tick, 1000);
+        return () => window.clearInterval(timer);
+    }, [firstPurchaseOffer?.expiresAt, firstPurchaseOffer?.messageId]);
+
+    useEffect(() => {
+        if (!firstPurchaseOfferModalOpen) return undefined;
+        const timer = window.setTimeout(() => setFirstPurchaseOfferModalOpen(false), 10000);
+        return () => window.clearTimeout(timer);
+    }, [firstPurchaseOfferModalOpen]);
+
+    const recordFirstPurchaseOfferFunnelEvent = (event, messageId) => {
+        const mid = messageId != null ? String(messageId).trim() : '';
+        if (!mid) return;
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const headers = {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            'X-AstroRoshni-Authorization': `Bearer ${token}`,
+        };
+        const body = JSON.stringify({ event, message_id: mid, platform: 'web' });
+        // keepalive: claim navigates straight into CreditsModal; don't drop the beacon.
+        fetch('/api/credits/first-purchase-offer-funnel/event', {
+            method: 'POST',
+            headers,
+            body,
+            keepalive: true,
+        }).catch(() => {});
+    };
+
+    const claimFirstPurchaseOffer = () => {
+        const messageId = firstPurchaseOffer?.messageId;
+        recordFirstPurchaseOfferFunnelEvent('offer_clicked', messageId);
+        setCreditsOfferMessageId(messageId ? String(messageId) : null);
+        setFirstPurchaseOfferModalOpen(false);
+        setShowCreditsModal(true);
+    };
+
+    const pollChatV2Status = async (assistantMessageId, processingClientId, wasFreeQuestion = false) => {
         const token = localStorage.getItem('token');
         const maxPolls = 120; // 6 minutes (120 * 3s), aligned with Ashtakavarga life-predictions jobs
         let pollCount = 0;
@@ -1305,6 +1430,10 @@ const ChatPage = ({ onLogin }) => {
 
                     if (!gated) {
                         setPendingFollowUpQueryContext(null);
+                    }
+
+                    if (wasFreeQuestion && !gated) {
+                        loadFirstPurchaseOffer(assistantMessageId, status.gate_metadata?.first_purchase_bonus || status.first_purchase_bonus || null);
                     }
 
                     setMessages((prev) => {
@@ -1694,7 +1823,7 @@ const ChatPage = ({ onLogin }) => {
                 )
             );
 
-            pollChatV2Status(assistantMessageId, processingClientId).catch(() => {
+            pollChatV2Status(assistantMessageId, processingClientId, useFreeQuestion).catch(() => {
                 setIsLoading(false);
             });
         } catch (e) {
@@ -2258,6 +2387,13 @@ const ChatPage = ({ onLogin }) => {
                 }}
                 onLogin={() => (onLogin ? onLogin() : navigate('/login'))}
                 showLoginButton={!headerUser}
+            />
+            <FirstPurchaseOffer
+                offer={firstPurchaseOffer}
+                remainingSeconds={firstPurchaseOfferRemainingSeconds}
+                modalOpen={firstPurchaseOfferModalOpen}
+                onClaim={claimFirstPurchaseOffer}
+                onCloseModal={() => setFirstPurchaseOfferModalOpen(false)}
             />
             <div className={`chat-page${wizardCompleted ? '' : ' chat-page--wizard'}`}>
             <div className={`chat-header${wizardCompleted ? '' : ' chat-header--wizard'}`}>
@@ -2904,9 +3040,13 @@ const ChatPage = ({ onLogin }) => {
             />
 
             {/* Credits Modal */}
-            <CreditsModal 
-                isOpen={showCreditsModal} 
-                onClose={() => setShowCreditsModal(false)} 
+            <CreditsModal
+                isOpen={showCreditsModal}
+                onClose={() => {
+                    setShowCreditsModal(false);
+                    setCreditsOfferMessageId(null);
+                }}
+                firstPurchaseOfferMessageId={creditsOfferMessageId}
             />
             
             {/* Context Modal for Admin */}

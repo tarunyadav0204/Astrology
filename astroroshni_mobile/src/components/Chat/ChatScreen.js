@@ -861,13 +861,17 @@ export default function ChatScreen({ navigation, route }) {
 
   const openCreditsForFirstPurchaseBonus = useCallback(() => {
     setFirstPurchaseBonusModalVisible(false);
-    if (firstPurchaseBonusOffer?.messageId) {
-      creditAPI.recordFirstPurchaseOfferFunnelEvent('offer_clicked', firstPurchaseBonusOffer.messageId).catch((e) => {
+    const messageId = firstPurchaseBonusOffer?.messageId != null
+      ? String(firstPurchaseBonusOffer.messageId).trim()
+      : '';
+    if (messageId) {
+      // Fire before navigate; CreditScreen also records as backup if this is aborted.
+      creditAPI.recordFirstPurchaseOfferFunnelEvent('offer_clicked', messageId).catch((e) => {
         console.log('[FirstPurchaseBonus] click tracking failed', e?.message || e);
       });
     }
     navigation.navigate('Credits', {
-      firstPurchaseOfferMessageId: firstPurchaseBonusOffer?.messageId || undefined,
+      firstPurchaseOfferMessageId: messageId || undefined,
     });
   }, [firstPurchaseBonusOffer?.messageId, navigation]);
 

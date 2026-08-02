@@ -4345,14 +4345,11 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         message_id=str(message_id),
                         platform="server",
                     )
-                    # The offer is attached to this completed free answer.
-                    # Record the impression server-side so the funnel cannot
-                    # lose its first step if the client navigates away before
-                    # its background analytics request finishes.
-                    if isinstance(first_purchase_bonus_payload, dict) and (
-                        first_purchase_bonus_payload.get("offer_eligible")
-                        or first_purchase_bonus_payload.get("eligible")
-                    ):
+                    # Impression for the post-free-question first-purchase bonus
+                    # only (`eligible`). Do not use `offer_eligible` here — that
+                    # flag also covers the separate purchase-discount campaign
+                    # and inflated "Offer shown" while clients had no tappable UI.
+                    if isinstance(first_purchase_bonus_payload, dict) and first_purchase_bonus_payload.get("eligible"):
                         record_first_purchase_offer_funnel_event(
                             userid=int(user_id),
                             event_name="offer_shown",

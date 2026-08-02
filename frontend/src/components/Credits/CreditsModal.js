@@ -27,7 +27,7 @@ function loadRazorpayScript() {
     });
 }
 
-const CreditsModal = ({ isOpen, onClose, onLogin }) => {
+const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = null }) => {
     const {
         credits,
         fetchBalance,
@@ -124,6 +124,26 @@ const CreditsModal = ({ isOpen, onClose, onLogin }) => {
             setPurchasingCredits(null);
         }
     }, [isOpen]);
+
+    // Backup click attribution when opened from the first-purchase offer CTA.
+    useEffect(() => {
+        if (!isOpen || !firstPurchaseOfferMessageId) return undefined;
+        const token = localStorage.getItem('token');
+        if (!token) return undefined;
+        const mid = String(firstPurchaseOfferMessageId).trim();
+        if (!mid) return undefined;
+        fetch('/api/credits/first-purchase-offer-funnel/event', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+                'X-AstroRoshni-Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ event: 'offer_clicked', message_id: mid, platform: 'web' }),
+            keepalive: true,
+        }).catch(() => {});
+        return undefined;
+    }, [isOpen, firstPurchaseOfferMessageId]);
 
     useEffect(() => {
         if (!isOpen) return;

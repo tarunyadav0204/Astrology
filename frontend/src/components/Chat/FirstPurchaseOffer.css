@@ -1,0 +1,128 @@
+.first-purchase-offer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.68);
+}
+
+.first-purchase-offer-modal {
+    position: relative;
+    width: min(440px, 100%);
+    padding: 30px 28px 24px;
+    border: 1px solid rgba(249, 115, 22, 0.65);
+    border-radius: 22px;
+    background: linear-gradient(145deg, #24103d, #3d1e5d);
+    color: #fff;
+    box-shadow: 0 22px 70px rgba(0, 0, 0, 0.42);
+    text-align: center;
+}
+
+.first-purchase-offer-close {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    border: 0;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 28px;
+    cursor: pointer;
+}
+
+.first-purchase-offer-eyebrow {
+    color: #fb923c;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+}
+
+.first-purchase-offer-modal h2 {
+    margin: 10px 0 14px;
+    font-size: clamp(24px, 6vw, 32px);
+    line-height: 1.1;
+}
+
+.first-purchase-offer-body {
+    margin: 0 auto 16px;
+    max-width: 340px;
+    color: rgba(255, 255, 255, 0.84);
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+.first-purchase-offer-price {
+    margin-bottom: 14px;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.first-purchase-offer-countdown {
+    width: fit-content;
+    margin: 0 auto 18px;
+    padding: 7px 14px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-weight: 800;
+}
+
+.first-purchase-offer-countdown--green { color: #86efac; }
+.first-purchase-offer-countdown--yellow { color: #fde047; }
+.first-purchase-offer-countdown--orange { color: #fb923c; }
+.first-purchase-offer-countdown--red { color: #f87171; }
+
+.first-purchase-offer-claim {
+    width: 100%;
+    border: 0;
+    border-radius: 13px;
+    padding: 13px 18px;
+    background: #f97316;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.first-purchase-offer-continue {
+    margin-top: 14px;
+    border: 0;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.68);
+    cursor: pointer;
+}
+
+.first-purchase-offer-chip {
+    position: fixed;
+    top: 74px;
+    left: 50%;
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: min(540px, calc(100vw - 28px));
+    transform: translateX(-50%);
+    padding: 10px 14px;
+    border: 1px solid currentColor;
+    border-radius: 14px;
+    color: #fff;
+    cursor: pointer;
+    text-align: left;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+
+.first-purchase-offer-chip--green { background: #166534; color: #bbf7d0; }
+.first-purchase-offer-chip--yellow { background: #854d0e; color: #fef08a; }
+.first-purchase-offer-chip--orange { background: #c2410c; color: #fed7aa; }
+.first-purchase-offer-chip--red { background: #991b1b; color: #fecaca; }
+
+.first-purchase-offer-chip__gift { font-size: 20px; }
+.first-purchase-offer-chip__copy { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.first-purchase-offer-chip__copy strong { color: #fff; font-size: 12px; letter-spacing: 0.06em; }
+.first-purchase-offer-chip__copy span { overflow: hidden; color: rgba(255, 255, 255, 0.88); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.first-purchase-offer-chip__arrow { color: #fff; font-size: 22px; }
+
+@media (max-width: 640px) {
+    .first-purchase-offer-chip { top: 62px; }
+}
