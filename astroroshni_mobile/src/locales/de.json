@@ -354,6 +354,7 @@
     "insufficientCreditsMessage": "Diese Frage benötigt {{cost}} Credits — du hast {{balance}}. Füge Credits hinzu, um fortzufahren.",
     "insufficientCreditsCta": "Credits holen",
     "insufficientCreditsLater": "Jetzt nicht",
+    "firstPurchaseOffer": {"eyebrow":"ZEITLICH BEGRENZTES ANGEBOT","title":"BONUS-CREDITS FREIGESCHALTET","doubleTitle":"DOPPELTE CREDITS FREIGESCHALTET","body":"Bei deinem ersten Kauf erhältst du {{bonus}} Bonus-Credits, wenn du {{credits}} Credits kaufst. Dieses Angebot gilt noch {{minutes}} Minuten.","priceLine":"Zahle {{price}} und erhalte {{credits}} Credits","bonusLine":"{{bonus}} Bonus-Credits GRATIS","extraCredits":"zusätzliche Credits","bonusCreditsWord":"Bonus-Credits","discountWord":"Rabatt","cta":"Bonus-Credits sichern","ctaWithPack":"{{credits}} Credits für {{price}} sichern →","continueReading":"Weiterlesen","expiresIn":"Noch {{time}}"},
     "betaNotice": "⚠️ BETA: Zeitachsen-Vorhersagen sind experimentell. Nutze Logik und Diskretion.",
     "disclaimerNotice": "⚖️ HAFTUNGSAUSSCHLUSS: Astrologie ist ein probabilistisches Werkzeug zur Orientierung. Kein Ersatz für medizinische, rechtliche, finanzielle oder psychologische Beratung. Konsultiere Fachleute für wichtige Entscheidungen.",
     "verified": "AstroRoshni Verifiziert",

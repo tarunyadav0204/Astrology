@@ -13,6 +13,7 @@ import AdminCreditsIntelligence from './AdminCreditsIntelligence';
 import AdminQuestionCostSummary from './AdminQuestionCostSummary';
 import AdminUserCreditManagement from './AdminUserCreditManagement';
 import AdminFreeAnswerFunnel from './AdminFreeAnswerFunnel';
+import AdminFirstPurchaseOfferFunnel from './AdminFirstPurchaseOfferFunnel';
 import AdminRemedyFunnel from './AdminRemedyFunnel';
 import AdminGooglePlayRefund from './AdminGooglePlayRefund';
 import AdminSubscriptionPurchases from './AdminSubscriptionPurchases';
@@ -3224,6 +3225,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Free answer funnel
           </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'firstPurchaseOfferFunnel' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('firstPurchaseOfferFunnel')}
+          >
+            First-purchase offer
+          </button>
           <button 
             className={`subtab ${activeSubTab === 'daily' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('daily')}
@@ -4557,6 +4565,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'credits' && activeSubTab === 'freeAnswerFunnel' && (
           <AdminFreeAnswerFunnel />
+        )}
+
+        {activeTab === 'credits' && activeSubTab === 'firstPurchaseOfferFunnel' && (
+          <AdminFirstPurchaseOfferFunnel />
         )}
 
         {activeTab === 'credits' && activeSubTab === 'daily' && (

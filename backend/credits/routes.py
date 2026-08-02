@@ -972,7 +972,37 @@ def _credit_verified_google_play_purchase(
         raise HTTPException(status_code=400, detail=f"Invalid or expired purchase: {safe_error}")
 
     purchase_state = purchase.get("purchaseState")
-    if purchase_state != 0:  # 0 = Purchased
+    try:
+        purchase_state = int(purchase_state) if purchase_state is not None else None
+    except (TypeError, ValueError):
+        pass
+    if purchase_state == 1:  # 1 = Canceled (terminal; do not retry or alert)
+        logger.info(
+            "Google Play: purchase was canceled; acknowledging without credit or alert "
+            "user=%s product=%s order_id=%s",
+            userid,
+            product_id,
+            purchase.get("orderId") or order_id_hint or "n/a",
+        )
+        return {
+            "success": False,
+            "terminal": True,
+            "purchase_state": 1,
+            "message": "Google Play purchase was canceled; no credits were added.",
+            "credits_added": 0,
+            "order_id": (purchase.get("orderId") or order_id_hint or "").strip(),
+        }
+    if purchase_state != 0:  # 0 = Purchased; other states are not complete yet
+        # Pending purchases are expected while Google Play finishes payment. Do
+        # not send an operational failure email for this normal intermediate
+        # state; callers may safely retry later.
+        if purchase_state == 2:  # 2 = Pending
+            logger.info(
+                "Google Play: purchase is pending; no credit or alert yet user=%s product=%s",
+                userid,
+                product_id,
+            )
+            raise HTTPException(status_code=409, detail="Google Play purchase is still pending")
         alert(
             "credit_verify",
             "purchase_not_completed",
@@ -1343,6 +1373,49 @@ async def record_free_answer_funnel_event(
         logger.exception("free_answer_funnel event failed user=%s", current_user.userid)
         raise HTTPException(status_code=500, detail="Failed to record funnel event") from e
     return {"ok": True, "inserted": inserted}
+
+
+class FirstPurchaseOfferFunnelEventBody(BaseModel):
+    event: str
+    message_id: Optional[str] = None
+    platform: Optional[str] = None
+
+
+@router.post("/first-purchase-offer-funnel/event")
+async def record_first_purchase_offer_funnel_event(
+    body: FirstPurchaseOfferFunnelEventBody,
+    current_user: User = Depends(get_current_user),
+):
+    from credits.first_purchase_offer_funnel import record_funnel_event
+    try:
+        inserted = record_funnel_event(
+            userid=int(current_user.userid),
+            event_name=body.event,
+            message_id=body.message_id,
+            platform=body.platform,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("first_purchase_offer_funnel event failed user=%s", current_user.userid)
+        raise HTTPException(status_code=500, detail="Failed to record offer funnel event") from e
+    return {"ok": True, "inserted": inserted}
+
+
+@router.get("/admin/first-purchase-offer-funnel")
+async def admin_first_purchase_offer_funnel(
+    from_date: Optional[str] = Query(default=None),
+    to_date: Optional[str] = Query(default=None),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    from credits.first_purchase_offer_funnel import get_funnel_analytics
+    try:
+        return get_funnel_analytics(from_date=from_date, to_date=to_date)
+    except Exception as e:
+        logger.exception("first_purchase_offer_funnel analytics failed")
+        raise HTTPException(status_code=500, detail="Failed to load first-purchase offer funnel") from e
 
 
 @router.get("/admin/free-answer-funnel")
@@ -1737,6 +1810,41 @@ def _extract_rtdn_payload_from_pubsub_push(body: Dict[str, Any]) -> Dict[str, An
         return {}
 
 
+def _record_unresolved_subscription_rtdn(
+    *,
+    service,
+    event_id: str,
+    purchase_token: str,
+    product_id: str,
+    notification_type: Any,
+    event_time_millis: Any,
+    payload: Dict[str, Any],
+) -> bool:
+    """Durably quarantine an RTDN event whose owner cannot be resolved.
+
+    A missing token mapping is not a reason to make Pub/Sub redeliver forever:
+    stale/legacy Play tokens may never contain an external account identifier.
+    Recording the event makes delivery idempotent and leaves an audit trail;
+    the user's normal subscription verify/sync path remains authoritative when
+    the user opens the app.
+    """
+    try:
+        return bool(service.log_play_subscription_event(
+            event_id=event_id,
+            purchase_token=purchase_token,
+            product_id=product_id,
+            notification_type=int(notification_type) if notification_type is not None else None,
+            event_time_millis=int(event_time_millis) if event_time_millis is not None else None,
+            payload_json=json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
+            userid=None,
+            source="rtdn",
+            event_kind="unresolved_owner",
+        ))
+    except Exception:
+        logger.exception("Failed to quarantine unresolved subscription RTDN event_id=%s", event_id)
+        return False
+
+
 @router.post("/google-play/subscription/sync")
 async def sync_google_play_subscription(
     request: GooglePlaySubscriptionVerifyRequest,
@@ -1833,14 +1941,24 @@ async def google_play_rtdn_push(body: Dict[str, Any]):
             )
         if userid is None:
             logger.warning(
-                "RTDN push: unresolved subscription token; requesting retry (product=%s message_id=%s)",
+                "RTDN push: unresolved subscription token; quarantining and acknowledging "
+                "(product=%s message_id=%s)",
                 product_id,
                 message_id or "n/a",
             )
-            raise HTTPException(
-                status_code=503,
-                detail="Subscription owner is not mapped yet; retry required",
-            )
+            if not _record_unresolved_subscription_rtdn(
+                service=credit_service,
+                event_id=event_id,
+                purchase_token=purchase_token,
+                product_id=product_id,
+                notification_type=notification_type,
+                event_time_millis=event_time_millis,
+                payload=payload,
+            ):
+                # Only retry when the quarantine record itself could not be
+                # persisted; otherwise Pub/Sub would redeliver indefinitely.
+                raise HTTPException(status_code=503, detail="Failed to quarantine unresolved subscription RTDN event")
+            return {"success": True, "ignored": "unresolved_subscription_owner"}
 
         from credits.play_subscription_events import rtdn_kind_for_notification_type
 

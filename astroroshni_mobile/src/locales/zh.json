@@ -354,6 +354,7 @@
     "insufficientCreditsMessage": "此问题需要 {{cost}} 积分 — 您目前有 {{balance}}。请充值以继续解读。",
     "insufficientCreditsCta": "获取积分",
     "insufficientCreditsLater": "暂不",
+    "firstPurchaseOffer": {"eyebrow":"限时优惠","title":"赠送积分已解锁","doubleTitle":"双倍积分已解锁","body":"首次购买时，购买{{credits}}积分即可获得{{bonus}}赠送积分。本优惠还剩{{minutes}}分钟有效。","priceLine":"支付{{price}}即可获得{{credits}}积分","bonusLine":"{{bonus}}赠送积分 FREE","extraCredits":"额外积分","bonusCreditsWord":"赠送积分","discountWord":"折扣","cta":"领取赠送积分","ctaWithPack":"以{{price}}领取{{credits}}积分 →","continueReading":"继续阅读","expiresIn":"剩余 {{time}}"},
     "betaNotice": "⚠️ 测试版：时间线预测仅供参考。请运用逻辑和判断。",
     "disclaimerNotice": "⚖️ 免责声明：占星学是一种概率性的引导工具。它不能替代医疗、法律、财务或心理健康建议。重大决定请咨询专业人士。",
     "verified": "AstroRoshni 已认证",

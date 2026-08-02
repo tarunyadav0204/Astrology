@@ -559,6 +559,18 @@ const CreditScreen = ({ navigation, route }) => {
         pricingPayload
       );
       await removePendingGooglePlayCreditPurchase({ purchaseToken, productId, orderId });
+      if (data?.terminal && Number(data?.purchase_state) === 1) {
+        await fetchBalance();
+        await fetchHistory();
+        setPurchaseModal({
+          visible: true,
+          type: 'error',
+          title: t('credits.page.purchaseVerifyFailed'),
+          message: data.message || t('credits.page.failedAddCredits'),
+          creditsAdded: 0,
+        });
+        return;
+      }
       await fetchBalance();
       await fetchHistory();
       const isAlreadyCredited = data.credits_added === 0 && (data.message || '').toLowerCase().includes('already credited');
@@ -749,6 +761,17 @@ const CreditScreen = ({ navigation, route }) => {
       unsubscribe();
     };
   }, [navigation, iapReady, productIds, subscriptionProductIds]);
+
+  // Record the click at the destination as well as at the source. The chat
+  // screen can unmount during navigation before its background request
+  // completes; the funnel insert is idempotent.
+  useEffect(() => {
+    const messageId = route?.params?.firstPurchaseOfferMessageId;
+    if (!messageId) return;
+    creditAPI.recordFirstPurchaseOfferFunnelEvent('offer_clicked', String(messageId)).catch((error) => {
+      console.log('[FirstPurchaseBonus] destination click tracking failed', error?.message || error);
+    });
+  }, [route?.params?.firstPurchaseOfferMessageId]);
 
   // Fetch Google Play products from backend (Android only)
   useEffect(() => {

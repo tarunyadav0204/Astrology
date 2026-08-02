@@ -54,7 +54,7 @@ import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import AppAlertModal from '../Common/AppAlertModal';
 import { useCredits } from '../../credits/CreditContext';
-import { formatCreditsInr } from '../../credits/creditPackCatalog';
+import { formatCreditsInr, LOWEST_CREDIT_PACK_CREDITS } from '../../credits/creditPackCatalog';
 import { useAuthGate } from '../../auth/AuthGateContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
@@ -72,6 +72,8 @@ const CHAT_RATING_PROMPT_STATE_KEY = 'chatRatingPromptState_v1';
 const PARALLEL_CHAT_POLL_BUDGET_SECONDS = 8 * 60;
 const DEFAULT_STANDARD_CHAT_COUNTDOWN_SECONDS = 110;
 const DEFAULT_PREMIUM_CHAT_COUNTDOWN_SECONDS = 210;
+const FIRST_PURCHASE_MODAL_DURATION_MS = 10 * 1000;
+const FIRST_PURCHASE_MODAL_SEEN_PREFIX = 'first_purchase_bonus_modal_seen_v1:';
 const INSTANT_LOADER_LINES = [
   'chat.instantLoader.lineChart',
   'chat.instantLoader.lineDasha',
@@ -470,7 +472,7 @@ export default function ChatScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const webBottomInset =
     Platform.OS === 'web' ? getWebTabBottomPad(insets.bottom) : Math.max(0, insets.bottom || 0);
-  
+
   // Mundane mode state
   const [isMundane, setIsMundane] = useState(false);
   const isMundaneRef = useRef(false);
@@ -512,6 +514,8 @@ export default function ChatScreen({ navigation, route }) {
   /** Delivery group id from a tapped nudge (push/inbox); attached to the next /chat-v2/ask for conversion attribution. */
   const pendingNudgeIdRef = useRef(null);
   const chatModeIntroShownKeyRef = useRef(null);
+  const suppressModeIntroAfterFreeRef = useRef(false);
+  const chatEntryStartedAtRef = useRef(0);
   /** After picking a mode in the bottom sheet, the same touch can fall through to the S/I/P control and reopen the sheet; ignore those opens until this timestamp (ms). */
   const modeIntroSuppressOpenUntilRef = useRef(0);
   const chatModeHydratedRef = useRef(false);
@@ -782,6 +786,21 @@ export default function ChatScreen({ navigation, route }) {
   const [nudgeUnreadCount, setNudgeUnreadCount] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [firstPurchaseBonusOffer, setFirstPurchaseBonusOffer] = useState(null);
+  const [firstPurchaseBonusModalVisible, setFirstPurchaseBonusModalVisible] = useState(false);
+  const [firstPurchaseBonusRemainingSeconds, setFirstPurchaseBonusRemainingSeconds] = useState(0);
+  const firstPurchaseBonusModalTimerRef = useRef(null);
+
+  // Do not replace the free-answer offer with the mode chooser immediately
+  // after the answer arrives. Reset this only when the user returns to the
+  // chat entry screen, so the chooser remains available for the next question.
+  useEffect(() => {
+    if (showGreeting) {
+      suppressModeIntroAfterFreeRef.current = false;
+      chatModeIntroShownKeyRef.current = null;
+    } else {
+      chatEntryStartedAtRef.current = Date.now();
+    }
+  }, [showGreeting]);
   /** Keyboard frame height for bottom inset (iOS + Android; edge-to-edge often breaks adjustResize for RN root). */
   const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
   const [isAppStartup, setIsAppStartup] = useState(true);
@@ -834,32 +853,47 @@ export default function ChatScreen({ navigation, route }) {
     messages.every((msg) => msg?.isWelcome);
 
   const openCreditsForFirstPurchaseBonus = useCallback(() => {
-    navigation.navigate('Credits');
-  }, [navigation]);
+    setFirstPurchaseBonusModalVisible(false);
+    if (firstPurchaseBonusOffer?.messageId) {
+      creditAPI.recordFirstPurchaseOfferFunnelEvent('offer_clicked', firstPurchaseBonusOffer.messageId).catch((e) => {
+        console.log('[FirstPurchaseBonus] click tracking failed', e?.message || e);
+      });
+    }
+    navigation.navigate('Credits', {
+      firstPurchaseOfferMessageId: firstPurchaseBonusOffer?.messageId || undefined,
+    });
+  }, [firstPurchaseBonusOffer?.messageId, navigation]);
 
   const showFirstPurchaseBonusOffer = useCallback((messageId, data) => {
     console.log('[FirstPurchaseBonus] show request', {
       messageId,
       enabled: data?.enabled,
       eligible: data?.eligible,
+      offerEligible: data?.offer_eligible,
       reason: data?.reason,
       bonusCredits: data?.bonus_credits,
       windowMinutes: data?.window_minutes,
     });
-    if (!data?.enabled || !data?.eligible) {
+    if (!data?.enabled || !(data?.offer_eligible ?? data?.eligible)) {
       setFirstPurchaseBonusOffer(null);
       return;
     }
     setFirstPurchaseBonusOffer({
       messageId,
+      // `offer_eligible` can come from the general purchase-discount
+      // campaign. Keep the post-free-question bonus eligibility separate so
+      // its default percentage is not accidentally added to this offer.
+      eligible: Boolean(data.eligible),
       percent: Number(data.percent || 0),
       fixedCredits: Number(data.fixed_credits || 0),
       maxBonusCredits: Number(data.max_bonus_credits || 0),
-      windowMinutes: Number(data.window_minutes || 0),
-      expiresAt: data.expires_at || null,
+      windowMinutes: Number(data.window_minutes || data.purchase_discount?.window_minutes || 0),
+      expiresAt: data.expires_at || data.purchase_discount?.expires_at || null,
       bonusType: String(data.bonus_type || '').toLowerCase(),
       bonusCredits: Number(data.bonus_credits || 0),
+      purchaseDiscount: data.purchase_discount || null,
     });
+    creditAPI.recordFirstPurchaseOfferFunnelEvent('offer_shown', messageId).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -898,16 +932,20 @@ export default function ChatScreen({ navigation, route }) {
     }
     hydratedBonusOfferMessageIdRef.current = candidate.messageId;
     try {
-      const { data } = await creditAPI.getFirstPurchaseBonusStatus();
+      const { data } = await creditAPI.getFirstPurchaseBonusStatus(
+        LOWEST_CREDIT_PACK_CREDITS,
+        `credits_${LOWEST_CREDIT_PACK_CREDITS}`,
+      );
       console.log('[FirstPurchaseBonus] restore status', {
         messageId: candidate.messageId,
         enabled: data?.enabled,
         eligible: data?.eligible,
+        offerEligible: data?.offer_eligible,
         reason: data?.reason,
         bonusCredits: data?.bonus_credits,
         windowMinutes: data?.window_minutes,
       });
-      if (data?.eligible) {
+      if (data?.offer_eligible ?? data?.eligible) {
         showFirstPurchaseBonusOffer(candidate.messageId, data);
       } else {
         setFirstPurchaseBonusOffer(null);
@@ -918,25 +956,115 @@ export default function ChatScreen({ navigation, route }) {
     }
   }, [showFirstPurchaseBonusOffer]);
 
-  const formatFirstPurchaseBonusCopy = useCallback((offer) => {
-    if (!offer) {
-      return 'Buy your first credits now and get extra credits.';
+  const firstPurchaseOfferSummary = useMemo(() => {
+    const purchasedCredits = LOWEST_CREDIT_PACK_CREDITS;
+    // The backend resolves pack overrides and returns the authoritative
+    // amount. Do not recompute from the default percent/fixed fields here.
+    const firstPurchaseBonus = firstPurchaseBonusOffer?.eligible
+      ? Number(firstPurchaseBonusOffer.bonusCredits || 0)
+      : 0;
+    const purchaseDiscount = firstPurchaseBonusOffer?.purchaseDiscount;
+    const purchaseDiscountBonus = purchaseDiscount?.eligible
+      ? Number(purchaseDiscount.bonus_credits || 0)
+      : 0;
+    const bonus = firstPurchaseBonus + purchaseDiscountBonus;
+    const basePrice = Number(formatCreditsInr(purchasedCredits).replace(/[^0-9]/g, '')) || 0;
+    return {
+      purchasedCredits,
+      bonus,
+      price: `₹${basePrice}`,
+      total: purchasedCredits + bonus,
+      double: bonus >= purchasedCredits,
+    };
+  }, [firstPurchaseBonusOffer]);
+
+  // The backend expiry is authoritative. Keep this timer local so the offer
+  // remains accurate while the user navigates around the app.
+  useEffect(() => {
+    if (!firstPurchaseBonusOffer?.expiresAt) {
+      setFirstPurchaseBonusRemainingSeconds(0);
+      setFirstPurchaseBonusModalVisible(false);
+      return undefined;
     }
-    let bonusText = 'extra credits';
-    if (offer.bonusType === 'fixed' && offer.fixedCredits > 0) {
-      bonusText = `${offer.fixedCredits} bonus credits`;
-    } else if (offer.bonusType === 'percent' && offer.percent > 0) {
-      bonusText = `${offer.percent}% extra credits`;
-    } else if (offer.bonusCredits > 0) {
-      bonusText = `${offer.bonusCredits} bonus credits`;
-    }
-    const timeText = offer.windowMinutes > 0 ? ` for the next ${offer.windowMinutes} min` : '';
-    return `Free question unlocked an offer: get ${bonusText}${timeText}.`;
+    const expiryMs = Date.parse(firstPurchaseBonusOffer.expiresAt);
+    if (!Number.isFinite(expiryMs)) return undefined;
+    const update = () => {
+      const remaining = Math.max(0, Math.ceil((expiryMs - Date.now()) / 1000));
+      setFirstPurchaseBonusRemainingSeconds(remaining);
+      if (remaining <= 0) {
+        if (firstPurchaseBonusOffer.messageId) {
+          creditAPI.recordFirstPurchaseOfferFunnelEvent('offer_expired', firstPurchaseBonusOffer.messageId).catch(() => {});
+        }
+        setFirstPurchaseBonusOffer(null);
+        setFirstPurchaseBonusModalVisible(false);
+      }
+    };
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [firstPurchaseBonusOffer?.expiresAt]);
+
+  // Show the modal only once per free-answer offer. AsyncStorage makes that
+  // choice survive a screen remount, while the compact offer card remains
+  // available until the server-provided expiry.
+  useEffect(() => {
+    const messageId = firstPurchaseBonusOffer?.messageId;
+    if (!messageId || !firstPurchaseBonusOffer?.eligible) return undefined;
+    let cancelled = false;
+    const key = `${FIRST_PURCHASE_MODAL_SEEN_PREFIX}${messageId}`;
+    AsyncStorage.getItem(key)
+      .then((seen) => {
+        if (cancelled || seen) return;
+        return AsyncStorage.setItem(key, '1').then(() => {
+          if (!cancelled) {
+            setFirstPurchaseBonusModalVisible(true);
+            if (firstPurchaseBonusModalTimerRef.current) {
+              clearTimeout(firstPurchaseBonusModalTimerRef.current);
+            }
+            firstPurchaseBonusModalTimerRef.current = setTimeout(() => {
+              setFirstPurchaseBonusModalVisible(false);
+            }, FIRST_PURCHASE_MODAL_DURATION_MS);
+          }
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      if (firstPurchaseBonusModalTimerRef.current) {
+        clearTimeout(firstPurchaseBonusModalTimerRef.current);
+        firstPurchaseBonusModalTimerRef.current = null;
+      }
+    };
+  }, [firstPurchaseBonusOffer?.messageId, firstPurchaseBonusOffer?.eligible]);
+
+  const formatBonusCountdown = useCallback((seconds) => {
+    const safe = Math.max(0, Number(seconds) || 0);
+    const minutes = Math.floor(safe / 60);
+    const remainder = safe % 60;
+    return `${minutes}:${String(remainder).padStart(2, '0')}`;
   }, []);
+
+  const firstPurchaseOfferStage = useMemo(() => {
+    const total = Math.max(1, Number(firstPurchaseBonusOffer?.windowMinutes || 0) * 60);
+    const ratio = firstPurchaseBonusRemainingSeconds / total;
+    if (ratio > 0.75) return 'green';
+    if (ratio > 0.5) return 'yellow';
+    if (ratio > 0.25) return 'orange';
+    return 'red';
+  }, [firstPurchaseBonusOffer?.windowMinutes, firstPurchaseBonusRemainingSeconds]);
+  const firstPurchaseOfferStageColor = useMemo(() => ({
+    green: colors.success,
+    yellow: colors.warning,
+    orange: colors.primary,
+    red: colors.error,
+  }[firstPurchaseOfferStage] || colors.primary), [colors, firstPurchaseOfferStage]);
 
   const refreshFirstPurchaseBonusOffer = useCallback((sourceMessageId = null) => {
     if (!firstPurchaseBonusOffer) return;
-    creditAPI.getFirstPurchaseBonusStatus()
+    creditAPI.getFirstPurchaseBonusStatus(
+      LOWEST_CREDIT_PACK_CREDITS,
+      `credits_${LOWEST_CREDIT_PACK_CREDITS}`,
+    )
       .then(({ data }) => {
         console.log('[FirstPurchaseBonus] refresh status', {
           messageId: sourceMessageId,
@@ -946,7 +1074,7 @@ export default function ChatScreen({ navigation, route }) {
           bonusCredits: data?.bonus_credits,
           windowMinutes: data?.window_minutes,
         });
-        if (!data?.eligible) {
+        if (!(data?.offer_eligible ?? data?.eligible)) {
           setFirstPurchaseBonusOffer(null);
         }
       })
@@ -963,7 +1091,7 @@ export default function ChatScreen({ navigation, route }) {
   useEffect(() => {
     setFirstPurchaseBonusOffer(null);
     hydratedBonusOfferMessageIdRef.current = null;
-  }, [currentPersonId, sessionId, showGreeting]);
+  }, [currentPersonId, sessionId]);
 
   useEffect(() => {
     if (showGreeting || !messages.length) return;
@@ -1146,10 +1274,10 @@ export default function ChatScreen({ navigation, route }) {
     partnershipMode,
     freeQuestionAvailable,
   ]);
-  
+
   // Calibration state
   const [calibrationEvent, setCalibrationEvent] = useState(null);
-  
+
   // Partnership mode step state
   const [partnershipStep, setPartnershipStep] = useState(0); // 0: select first, 1: select second, 2: describe relation, 3: done
   const [partnershipSubStep, setPartnershipSubStep] = useState(0);
@@ -1359,7 +1487,7 @@ export default function ChatScreen({ navigation, route }) {
     }
     setPendingMessages(prev => new Set([...prev, messageId]));
   };
-  
+
   const removePendingMessage = async (messageId) => {
     const pid = chatPersonStorageKey(birthData) || currentPersonId;
     if (!pid) return;
@@ -1375,7 +1503,7 @@ export default function ChatScreen({ navigation, route }) {
       return newSet;
     });
   };
-  
+
   const checkPendingResponses = async (personId = null) => {
     const pid = personId || chatPersonStorageKey(birthData) || currentPersonId;
     if (!pid) return;
@@ -1388,7 +1516,7 @@ export default function ChatScreen({ navigation, route }) {
       });
     }
   };
-  
+
   // Load saved charts for partnership mode
   const loadSavedCharts = async () => {
     try {
@@ -1398,7 +1526,7 @@ export default function ChatScreen({ navigation, route }) {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setSavedCharts(data.charts || []);
@@ -1410,27 +1538,27 @@ export default function ChatScreen({ navigation, route }) {
       setSavedCharts([]);
     }
   };
-  
+
   // Reload charts when partnership picker opens (deferred from mount)
   useEffect(() => {
     if (showChartPicker) {
       loadSavedCharts();
     }
   }, [showChartPicker]);
-  
+
   // Fetch calibration event when birth data changes
   useEffect(() => {
     if (birthData?.id && !showGreeting) {
       fetchCalibrationEvent();
     }
   }, [birthData?.id, showGreeting]);
-  
+
   const fetchCalibrationEvent = async () => {
     try {
-      
+
       // Use the proper API service instead of direct fetch
       const { lifeEventsAPI } = require('../../services/api');
-      
+
       const response = await lifeEventsAPI.scanLifeEvents({
         name: birthData.name,
         date: birthData.date,
@@ -1441,14 +1569,14 @@ export default function ChatScreen({ navigation, route }) {
         place: birthData.place || '',
         gender: birthData.gender || ''
       }, 18, 50);
-      
+
       if (response.data && response.data.events && response.data.events.length > 0) {
         setCalibrationEvent(response.data.events[0]);
       }
     } catch (error) {
     }
   };
-  
+
   const handleCalibrationConfirm = async (event) => {
     try {
       const token = await AsyncStorage.getItem('authToken');
@@ -1464,14 +1592,14 @@ export default function ChatScreen({ navigation, route }) {
           verified: true
         })
       });
-      
+
       setCalibrationEvent({ ...event, verified: true });
       Alert.alert('✅ Verified', 'Chart calibrated successfully!');
     } catch (error) {
       console.error('Calibration error:', error);
     }
   };
-  
+
   const handleCalibrationReject = async (event) => {
     try {
       const token = await AsyncStorage.getItem('authToken');
@@ -1487,7 +1615,7 @@ export default function ChatScreen({ navigation, route }) {
           verified: false
         })
       });
-      
+
       setCalibrationEvent(null);
     } catch (error) {
       console.error('Calibration error:', error);
@@ -1545,7 +1673,7 @@ export default function ChatScreen({ navigation, route }) {
         latitude: parseFloat(birth.latitude),
         longitude: parseFloat(birth.longitude)
       };
-      
+
       const { chartAPI } = require('../../services/api');
       const response = await chartAPI.calculateChartOnly(formattedData);
       setChartData(response.data);
@@ -1563,7 +1691,7 @@ export default function ChatScreen({ navigation, route }) {
     try {
       setLoadingDashas(true);
       const targetDate = new Date().toISOString().split('T')[0];
-      
+
       const formattedBirthData = {
         name: birth.name,
         date: birth.date.includes('T') ? birth.date.split('T')[0] : birth.date,
@@ -1572,10 +1700,10 @@ export default function ChatScreen({ navigation, route }) {
         longitude: parseFloat(birth.longitude),
         location: birth.place || 'Unknown'
       };
-      
+
       const { chartAPI } = require('../../services/api');
       const response = await chartAPI.calculateCascadingDashas(formattedBirthData, targetDate);
-      
+
       if (response.data && !response.data.error) {
         setDashaData(response.data);
       }
@@ -1594,12 +1722,12 @@ export default function ChatScreen({ navigation, route }) {
     checkBirthData();
     loadLanguagePreference();
     fetchPricing({ force: false });
-    
+
     // Add focus listener to re-check birth data when returning to screen
     const unsubscribe = navigation.addListener('focus', () => {
       checkBirthData();
     });
-    
+
     // Handle navigation params
     if (route.params?.resetToGreeting) {
       suppressAutoOpenChatRef.current = true;
@@ -1641,7 +1769,7 @@ export default function ChatScreen({ navigation, route }) {
       }
       setShowGreeting(false);
     }
-    
+
     // Handle start chat param (e.g. from notification tap). Refresh birth data from storage
     // first so the notification's native_id selection is applied, then open chat.
     if (route.params?.startChat) {
@@ -1718,7 +1846,7 @@ export default function ChatScreen({ navigation, route }) {
         partnershipPrefillInProgressRef.current = false;
       }, 120);
     }
-    
+
     // Handle mundane mode param
     if (route.params?.mode === 'mundane') {
       setIsMundane(true);
@@ -1727,7 +1855,7 @@ export default function ChatScreen({ navigation, route }) {
       setShowModeSelector(false);
       if (route.params?.mundaneContext) {
         setMundaneContext(route.params.mundaneContext);
-        
+
         // Sync selected country if provided in context
         if (route.params.mundaneContext.country) {
           const countryMatch = mundaneCountries.find(c => c.name === route.params.mundaneContext.country);
@@ -1735,7 +1863,7 @@ export default function ChatScreen({ navigation, route }) {
             setSelectedCountry(countryMatch);
           }
         }
-        
+
         // Sync selected year if provided in context (event_date)
         if (route.params.mundaneContext.event_date) {
           const year = new Date(route.params.mundaneContext.event_date).getFullYear();
@@ -1744,7 +1872,7 @@ export default function ChatScreen({ navigation, route }) {
       }
       navigation.setParams({ mode: undefined, mundaneContext: undefined });
     }
-    
+
     // Handle back button
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (!showGreeting) {
@@ -1769,7 +1897,7 @@ export default function ChatScreen({ navigation, route }) {
       }
       return false;
     });
-    
+
     return () => {
       clearInstantScrollRetries();
       unsubscribe();
@@ -1828,7 +1956,7 @@ export default function ChatScreen({ navigation, route }) {
   }, [chatCountdownSeconds, pricing, pricingFeatures, pricingOriginal]);
 
   useEffect(() => {
-    
+
     if (birthData) {
       const shouldKeepChatOpen =
         keepChatOpenAfterNativeSelectRef.current || keepChatOpenAfterAskEntryRef.current;
@@ -1843,7 +1971,7 @@ export default function ChatScreen({ navigation, route }) {
         chatModePreferenceLoadedRef.current = false;
 
         setCurrentPersonId(personId);
-        
+
         // Load chart data for the new person
         setChartData(null); // Clear cached data
         if (!showGreeting) {
@@ -1912,21 +2040,21 @@ export default function ChatScreen({ navigation, route }) {
           }, 200);
           return;
         }
-        
+
         // Load messages from storage immediately
         loadMessagesFromStorage(personId).then(async storedMessages => {
           if (storedMessages.length > 0) {
             await hydrateSelectedChatMode(storedMessages, personId);
             setMessages(storedMessages);
             // Keep Home as the default view; history is restored only after the user opens chat.
-            
+
             // Set flag to auto-scroll when content renders
             setTimeout(() => {
               if (messages.length > 0) {
                 scrollToBottomReliably(false);
               }
             }, 50);
-            
+
             // Check for processing messages and resume polling.
             // This prevents a stuck "Analyzing..." state after app/background refresh.
             const hasResumedPending = shouldReturnToChat && switchedFromAnotherNative
@@ -1959,7 +2087,7 @@ export default function ChatScreen({ navigation, route }) {
             setTimeout(() => setIsAppStartup(false), 500);
           }
         });
-        
+
         // Check pending responses after person ID is set
         setTimeout(() => {
           checkPendingResponses(personId);
@@ -2075,7 +2203,7 @@ export default function ChatScreen({ navigation, route }) {
             const prevLength = messages.length;
             setMessages(prev => prev.length === 0 ? storedMessages : prev);
             // Keep Home as the default view; history is restored only after the user opens chat.
-            
+
             // Set flag to scroll if we loaded new messages and not showing greeting
             if (prevLength === 0 && storedMessages.length > 0 && !showGreeting) {
               setTimeout(() => {
@@ -2084,7 +2212,7 @@ export default function ChatScreen({ navigation, route }) {
                 }
               }, 50);
             }
-            
+
             const hasPendingProcessing = storedMessages.some(
               (msg) => msg?.isTyping && msg?.messageId
             );
@@ -2107,7 +2235,7 @@ export default function ChatScreen({ navigation, route }) {
         }
       }
     });
-    
+
     return unsubscribe;
   }, [currentPersonId, loading, isTyping, showGreeting, pendingMessages, sessionId, forceGreeting, route.params?.resetToGreeting, partnershipMode]);
 
@@ -2275,7 +2403,7 @@ export default function ChatScreen({ navigation, route }) {
     setShowGreeting(false);
     setShowMenu(false);
     setShowPartnershipSetupModal(true); // Open the new setup modal
-    
+
     // Add initial assistant message for partnership setup (the summarized bubble)
     const setupMessage = {
       id: `setup_${Date.now()}`,
@@ -2285,7 +2413,7 @@ export default function ChatScreen({ navigation, route }) {
       isSetup: true,
       setupType: 'partnership'
     };
-    
+
     setMessagesWithStorage([setupMessage]);
   };
 
@@ -2311,7 +2439,7 @@ export default function ChatScreen({ navigation, route }) {
     // selection can be a string (label) or an option object from a sub-step
     const selectionLabel = typeof selection === 'object' ? selection.label : selection;
     const activePreset = RELATIONSHIP_PRESETS.find(p => p.label === selectionLabel);
-    
+
     if (activePreset && activePreset.subSteps && partnershipRelation !== activePreset.label) {
       // Starting a complex preset flow
       setPartnershipRelation(activePreset.label);
@@ -2319,16 +2447,16 @@ export default function ChatScreen({ navigation, route }) {
     } else {
       // Continuing a sub-step or selecting a simple preset
       const currentPreset = RELATIONSHIP_PRESETS.find(p => partnershipRelation === p.label || partnershipRelation.startsWith(p.label + ':'));
-      
+
       if (currentPreset && currentPreset.subSteps && partnershipSubStep < currentPreset.subSteps.length) {
         // We are in the middle of sub-steps
         const valueToUse = typeof selection === 'object' ? selection.value : selection;
         const newRelation = (partnershipRelation === currentPreset.label)
           ? `${currentPreset.label}: ${valueToUse}`
           : `${partnershipRelation}, ${valueToUse}`;
-        
+
         setPartnershipRelation(newRelation);
-        
+
         if (partnershipSubStep + 1 < currentPreset.subSteps.length) {
           setPartnershipSubStep(partnershipSubStep + 1);
         } else {
@@ -2346,7 +2474,7 @@ export default function ChatScreen({ navigation, route }) {
     const isNativeSet = !!nativeChart;
     const isPartnerSet = !!partnerChart;
     const isRelationSet = !!partnershipRelation;
-    
+
     return (
       <Modal
         visible={showPartnershipSetupModal}
@@ -2364,7 +2492,7 @@ export default function ChatScreen({ navigation, route }) {
                 <Text style={{ fontSize: 20 }}>🤝</Text>
                 <Text style={[styles.modalTitle, { color: colors.text, fontSize: 18 }]}>Partnership Setup</Text>
               </View>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setShowPartnershipSetupModal(false)}
                 style={{ backgroundColor: colors.border, padding: 6, borderRadius: 20 }}
               >
@@ -2379,9 +2507,9 @@ export default function ChatScreen({ navigation, route }) {
             >
               <View style={styles.setupSlotsContainer}>
                 {/* Slot 1: Native */}
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[
-                    styles.setupSlot, 
+                    styles.setupSlot,
                     partnershipStep === 0 && styles.setupSlotActive,
                     isNativeSet && styles.setupSlotFilled
                   ]}
@@ -2407,9 +2535,9 @@ export default function ChatScreen({ navigation, route }) {
                 </TouchableOpacity>
 
                 {/* Slot 2: Partner */}
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[
-                    styles.setupSlot, 
+                    styles.setupSlot,
                     partnershipStep === 1 && styles.setupSlotActive,
                     isPartnerSet && styles.setupSlotFilled,
                     !isNativeSet && { opacity: 0.5 }
@@ -2438,9 +2566,9 @@ export default function ChatScreen({ navigation, route }) {
                 </TouchableOpacity>
 
                 {/* Slot 3: Relationship */}
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[
-                    styles.setupSlot, 
+                    styles.setupSlot,
                     partnershipStep === 2 && styles.setupSlotActive,
                     isRelationSet && styles.setupSlotFilled,
                     !isPartnerSet && { opacity: 0.5 }
@@ -2493,10 +2621,10 @@ export default function ChatScreen({ navigation, route }) {
               {partnershipStep === 0 && (
                 <View style={styles.setupSelectorContainer}>
                   {(() => {
-                    const filtered = nativeSearchQuery 
+                    const filtered = nativeSearchQuery
                       ? savedCharts.filter(c => c.name.toLowerCase().includes(nativeSearchQuery.toLowerCase()))
                       : savedCharts;
-                    
+
                     return (
                       <GHFlatList
                         horizontal
@@ -2508,7 +2636,7 @@ export default function ChatScreen({ navigation, route }) {
                         renderItem={({ item: chart }) => (
                           <TouchableOpacity
                             style={[
-                              styles.setupSelectorChip, 
+                              styles.setupSelectorChip,
                               { backgroundColor: '#ff6b3515', borderColor: '#ff6b35' },
                               chart.id === 'add-new' && chart.isEmpty === false && { opacity: 0.6 }
                             ]}
@@ -2537,7 +2665,7 @@ export default function ChatScreen({ navigation, route }) {
                 <View style={styles.setupSelectorContainer}>
                   {(() => {
                     const otherCharts = savedCharts.filter(c => c.id !== nativeChart?.id);
-                    const filtered = nativeSearchQuery 
+                    const filtered = nativeSearchQuery
                       ? otherCharts.filter(c => c.name.toLowerCase().includes(nativeSearchQuery.toLowerCase()))
                       : otherCharts;
 
@@ -2552,7 +2680,7 @@ export default function ChatScreen({ navigation, route }) {
                         renderItem={({ item: chart }) => (
                           <TouchableOpacity
                             style={[
-                              styles.setupSelectorChip, 
+                              styles.setupSelectorChip,
                               { backgroundColor: '#ff6b3515', borderColor: '#ff6b35' },
                               chart.id === 'add-new' && chart.isEmpty === false && { opacity: 0.6 }
                             ]}
@@ -2585,7 +2713,7 @@ export default function ChatScreen({ navigation, route }) {
                         <Text style={[styles.setupHelperText, { color: '#ff6b35', fontWeight: '700', fontSize: 13, marginBottom: 0 }]}>
                           Describe Relationship
                         </Text>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                           onPress={() => {
                             setIsTypingOtherRelation(false);
                             setOtherRelationText('');
@@ -2603,7 +2731,7 @@ export default function ChatScreen({ navigation, route }) {
                           placeholderTextColor={theme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                           autoFocus
                         />
-                        <TouchableOpacity 
+                        <TouchableOpacity
                           style={[
                             styles.otherDoneButton,
                             !otherRelationText.trim() && { opacity: 0.5 }
@@ -2623,18 +2751,18 @@ export default function ChatScreen({ navigation, route }) {
                     </View>
                   ) : (() => {
                     const currentPreset = RELATIONSHIP_PRESETS.find(p => partnershipRelation === p.label || partnershipRelation.startsWith(p.label + ':'));
-                    
+
                     if (currentPreset && currentPreset.subSteps && partnershipSubStep < currentPreset.subSteps.length) {
                       const subStep = currentPreset.subSteps[partnershipSubStep];
                       const options = subStep.options(nativeChart, partnerChart);
-                      
+
                       return (
                         <View>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                             <Text style={[styles.setupHelperText, { color: '#ff6b35', fontWeight: '700', fontSize: 13, marginBottom: 0 }]}>
                               {subStep.prompt}
                             </Text>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                               onPress={() => {
                                 setPartnershipRelation('');
                                 setPartnershipSubStep(0);
@@ -2689,7 +2817,7 @@ export default function ChatScreen({ navigation, route }) {
               )}
 
               {partnershipStep === 3 && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.setupConfirmButton}
                   onPress={() => {
                     // Add confirmation message to chat
@@ -2702,7 +2830,7 @@ export default function ChatScreen({ navigation, route }) {
                     setMessagesWithStorage(prev => [...prev, confirmMsg]);
                     setPartnershipStep(4); // Setup done
                     setShowPartnershipSetupModal(false); // Close modal
-                    
+
                     // Scroll to bottom
                     setTimeout(() => {
                       scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -2717,7 +2845,7 @@ export default function ChatScreen({ navigation, route }) {
               )}
 
               {partnershipStep < 4 && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.setupResetButton}
                   onPress={() => {
                     setNativeChart(null);
@@ -2781,7 +2909,7 @@ export default function ChatScreen({ navigation, route }) {
       });
       if (!ok) return;
     }
-    
+
     if (option.action === 'partnership') {
       openPartnershipModal(option.cost);
     } else if (option.action === 'relationshipMatch') {
@@ -2812,7 +2940,7 @@ export default function ChatScreen({ navigation, route }) {
       } else if (option.type === 'childbirth') {
         navigation.navigate('ChildbirthPlanner');
       } else {
-        navigation.navigate('AnalysisDetail', { 
+        navigation.navigate('AnalysisDetail', {
           analysisType: option.type,
           title: `${option.type.charAt(0).toUpperCase() + option.type.slice(1)} Analysis`,
           cost: option.cost,
@@ -2820,7 +2948,7 @@ export default function ChatScreen({ navigation, route }) {
         });
       }
     } else {
-      
+
       keepChatOpenAfterAskEntryRef.current = true;
       const isFomoChatEntry =
         option.queryContext &&
@@ -2841,13 +2969,13 @@ export default function ChatScreen({ navigation, route }) {
 
       // First load any existing chat history
       await loadChatHistory();
-      
+
       // Switch to chat mode immediately
       setShowGreeting(false);
       if (typeof option.initialMessage === 'string' && option.initialMessage.trim()) {
         setInputText(option.initialMessage.trim());
       }
-      
+
       // Reset special modes when starting standard chat
       if (partnershipMode) {
         setPartnershipMode(false);
@@ -2873,24 +3001,24 @@ export default function ChatScreen({ navigation, route }) {
           await restoreSelectedChatModeFromStorage(currentPersonId);
         }
       }
-      
+
       // Set flag to scroll when content renders
       setTimeout(() => {
         if (messages.length > 0) {
           scrollToBottomReliably(false);
         }
       }, 50);
-      
+
       // Check if we need to show welcome message
       setTimeout(async () => {
-        
+
         const storedMessages = await loadMessagesFromStorage(currentPersonId);
-        
+
         // Always show fresh welcome message when explicitly starting chat
         const nativeName = birthData?.name || 'there';
-        
+
         let welcomeMessage;
-        
+
         if (isMundaneRef.current) {
           welcomeMessage = {
             id: Date.now().toString(),
@@ -2913,7 +3041,7 @@ export default function ChatScreen({ navigation, route }) {
             timestamp: new Date().toISOString(),
           };
         }
-        
+
         // Only show a welcome message for truly empty threads.
         // If stored messages already exist, restore them as-is instead of injecting a fresh
         // welcome row that later sinks to the bottom on timestamp-based sorting.
@@ -2942,7 +3070,7 @@ export default function ChatScreen({ navigation, route }) {
         } catch (_) {}
         selectedBirthData = null;
       }
-      
+
       // If no single birth details, get from profiles
       if (!selectedBirthData) {
         let profiles = await storage.getBirthProfiles();
@@ -2955,13 +3083,13 @@ export default function ChatScreen({ navigation, route }) {
           }
           profiles = guestOnly;
         }
-        
+
         if (profiles && profiles.length > 0) {
           // Use the first profile or find 'self' relation
           selectedBirthData = profiles.find(p => p.relation === 'self') || profiles[0];
         }
       }
-      
+
       if (selectedBirthData && selectedBirthData.name) {
         setBirthData(selectedBirthData);
       } else {
@@ -3186,13 +3314,13 @@ export default function ChatScreen({ navigation, route }) {
       const token = await AsyncStorage.getItem('authToken');
       const sessionBirth = partnershipMode ? nativeChart : birthData;
       const sessionBirthChartId = sessionBirth?.id ?? sessionBirth?.birth_chart_id ?? null;
-      
+
       // Different endpoint for mundane vs personal
       const endpoint = isMundane ? '/mundane/session' : '/chat-v2/session';
       const body = isMundane
         ? { query_context: buildQueryContext() }
         : { birth_chart_id: sessionBirthChartId, query_context: buildQueryContext() };
-      
+
       if (!isMundane && !sessionBirthChartId) {
         Alert.alert(
           t('chat.sessionNeedsProfile', 'Profile required'),
@@ -3203,7 +3331,7 @@ export default function ChatScreen({ navigation, route }) {
         );
         return null;
       }
-      
+
       const response = await fetch(`${API_BASE_URL}${getEndpoint(endpoint)}`, {
         method: 'POST',
         headers: {
@@ -3212,14 +3340,14 @@ export default function ChatScreen({ navigation, route }) {
         },
         body: JSON.stringify(body)
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         const newSessionId = data.session_id;
         subjectGateOverrideRef.current = null;
         subjectGateMemoryRef.current = [];
         setSessionId(newSessionId);
-        
+
         if (!isMundane) {
           // Track session for personal chat only
           const sessionKey = chatPersonStorageKey(sessionBirth);
@@ -3229,7 +3357,7 @@ export default function ChatScreen({ navigation, route }) {
             await AsyncStorage.setItem(`chatSessions_${sessionKey}`, JSON.stringify(personSessions));
           }
         }
-        
+
         return newSessionId;
       }
     } catch (error) {
@@ -3248,7 +3376,7 @@ export default function ChatScreen({ navigation, route }) {
   const getLoadingMessages = (messageText) => {
     const lowerCaseMessage = messageText.toLowerCase();
     const isIOS = Platform.OS === 'ios';
-    
+
     // Keywords for different categories
     const careerKeywords = ['career', 'job', 'profession', 'work', 'employment'];
     const marriageKeywords = ['marriage', 'spouse', 'partner', 'relationship', 'love'];
@@ -3322,7 +3450,7 @@ export default function ChatScreen({ navigation, route }) {
             'I am comparing the chart signals that point to reflection, meaning, and inner growth.',
         ];
     }
-    
+
     // Default messages
     return [
       isIOS ? '☀️ Reviewing your chart...' : '☀️ Analyzing your birth chart...',
@@ -3521,7 +3649,7 @@ export default function ChatScreen({ navigation, route }) {
     };
 
     const shouldKeepPolling = () => (Date.now() - effectiveStartedAtMs) < maxProcessingMs;
-    
+
     // Add to pending messages if not resuming
     if (!isResume) {
       await addPendingMessage(messageId);
@@ -3529,23 +3657,23 @@ export default function ChatScreen({ navigation, route }) {
     if (!isPollActive()) {
       return;
     }
-    
+
     const poll = async () => {
       if (!isPollActive()) {
         return;
       }
       const pollStartTime = new Date().toISOString();
       // console.log(`🔍 [POLL START] messageId: ${messageId}, pollCount: ${pollCount}, time: ${pollStartTime}`);
-      
+
       try {
         const token = await AsyncStorage.getItem('authToken');
         if (!isPollActive()) {
           return;
         }
         const url = `${API_BASE_URL}${getEndpoint(`/chat-v2/status/${messageId}`)}`;
-        
+
         // console.log(`🌐 [FETCH START] URL: ${url}, time: ${new Date().toISOString()}`);
-        
+
         let timeoutId = null;
         const controller = new AbortController();
         try {
@@ -3563,16 +3691,16 @@ export default function ChatScreen({ navigation, route }) {
             return;
           }
           // console.log(`📡 [FETCH END] Response received for messageId: ${messageId}, status: ${response.status}, time: ${new Date().toISOString()}`);
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
-        
+
         const status = await response.json();
         const pollEndTime = new Date().toISOString();
         // console.log(`📊 [POLL END] messageId: ${messageId}, status: ${status.status}, pollCount: ${pollCount}, startTime: ${pollStartTime}, endTime: ${pollEndTime}`);
-        
+
         if (status.status === 'completed') {
           trackEvent('chat_response_received', {
             source: 'chat_screen',
@@ -3636,17 +3764,23 @@ export default function ChatScreen({ navigation, route }) {
             }
             const wasFreeQuestion = Boolean(freeUsedThisSendRef.current && !gatedNoCharge);
             if (wasFreeQuestion) {
+              suppressModeIntroAfterFreeRef.current = true;
+              setShowChatModeIntro(false);
+              setShowModeSelector(false);
+              setPodcastPromoVisible(false);
+              setPodcastPromoMessageId(null);
               freeUsedThisSendRef.current = false;
               const bonusOffer = status.first_purchase_bonus || status.gate_metadata?.first_purchase_bonus || null;
               console.log('[FirstPurchaseBonus] free answer completed', {
                 messageId,
                 enabled: bonusOffer?.enabled,
                 eligible: bonusOffer?.eligible,
+                offerEligible: bonusOffer?.offer_eligible,
                 reason: bonusOffer?.reason,
                 bonusCredits: bonusOffer?.bonus_credits,
                 windowMinutes: bonusOffer?.window_minutes,
               });
-              if (bonusOffer?.eligible) {
+              if (bonusOffer?.offer_eligible ?? bonusOffer?.eligible) {
                 showFirstPurchaseBonusOffer(messageId, bonusOffer);
               } else {
                 restoreFirstPurchaseBonusOfferFromMessages([
@@ -3665,7 +3799,7 @@ export default function ChatScreen({ navigation, route }) {
             }
             const mt = status.message_type || 'answer';
             const body = (status.content || '').trim();
-            if (!gatedNoCharge && !isInstantTierResponse && mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
+            if (!wasFreeQuestion && !gatedNoCharge && !isInstantTierResponse && mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
               setRatingEligibleMessageId(messageId);
               setPodcastPromoMessageId(messageId);
               setPodcastPromoVisible(true);
@@ -3689,10 +3823,10 @@ export default function ChatScreen({ navigation, route }) {
           finishPoll();
           return;
         }
-        
+
         if (status.status === 'failed') {
-          setMessagesWithStorage(prev => prev.map(msg => 
-            msg.messageId === messageId 
+          setMessagesWithStorage(prev => prev.map(msg =>
+            msg.messageId === messageId
               ? { ...msg, content: status.error_message || 'Analysis failed. Please try again.', isTyping: false }
               : msg
           ));
@@ -3702,7 +3836,7 @@ export default function ChatScreen({ navigation, route }) {
           finishPoll();
           return;
         }
-        
+
         // Still processing - continue polling
         if (status.status === 'processing') {
           console.log(`🔄 [POLL PROCESSING] messageId: ${messageId}, pollCount: ${pollCount}, continuing...`);
@@ -3781,7 +3915,7 @@ export default function ChatScreen({ navigation, route }) {
               maybeScrollMessagesToEnd(false);
             }, 80);
           }
-          
+
           pollCount++;
           if (shouldKeepPolling()) {
             // Use InteractionManager to ensure polling isn't blocked by UI updates
@@ -3794,11 +3928,11 @@ export default function ChatScreen({ navigation, route }) {
           } else {
             // console.log(`⏰ [POLL TIMEOUT] messageId: ${messageId} exceeded wait budget (${countdownBudgetSeconds}s + ${graceSeconds}s)`);
             // Timeout - show restart option
-            setMessagesWithStorage(prev => prev.map(msg => 
-              msg.messageId === messageId 
-                ? { 
-                    ...msg, 
-                    content: 'Analysis is taking longer than expected. The system is still working on your request.', 
+            setMessagesWithStorage(prev => prev.map(msg =>
+              msg.messageId === messageId
+                ? {
+                    ...msg,
+                    content: 'Analysis is taking longer than expected. The system is still working on your request.',
                     isTyping: false,
                     showRestartButton: true
                   }
@@ -3815,7 +3949,7 @@ export default function ChatScreen({ navigation, route }) {
             clearTimeout(timeoutId);
           }
         }
-        
+
       } catch (error) {
         if (error?.name === 'AbortError') {
           if (__DEV__) {
@@ -3842,11 +3976,11 @@ export default function ChatScreen({ navigation, route }) {
           } else {
             // console.log(`⏰ [POLL MAX TIMEOUT] messageId: ${messageId} exceeded wait budget (${countdownBudgetSeconds}s + ${graceSeconds}s)`);
             // Show timeout message
-            setMessagesWithStorage(prev => prev.map(msg => 
-              msg.messageId === messageId 
-                ? { 
-                    ...msg, 
-                    content: 'Analysis is taking longer than expected. The system is still working on your request.', 
+            setMessagesWithStorage(prev => prev.map(msg =>
+              msg.messageId === messageId
+                ? {
+                    ...msg,
+                    content: 'Analysis is taking longer than expected. The system is still working on your request.',
                     isTyping: false,
                     showRestartButton: true
                   }
@@ -3940,15 +4074,15 @@ export default function ChatScreen({ navigation, route }) {
         finishPoll();
       }
     };
-    
+
     // Start polling immediately (no delay)
     poll();
   };
-  
+
   const restartPolling = (messageId) => {
     // Update message to show restarting
-    setMessagesWithStorage(prev => prev.map(msg => 
-      msg.messageId === messageId 
+    setMessagesWithStorage(prev => prev.map(msg =>
+      msg.messageId === messageId
         ? {
             ...msg,
             content: '🔄 Checking for response...',
@@ -3959,7 +4093,7 @@ export default function ChatScreen({ navigation, route }) {
         : msg
     ));
     setLoading(true);
-    
+
     // Restart polling (resume mode)
     const processingMessage = messages.find(msg => msg.messageId === messageId);
     const userMessage = messages.find(msg => msg.id === processingMessage?.userMessageId);
@@ -3986,7 +4120,7 @@ export default function ChatScreen({ navigation, route }) {
         const requestedTier = useFreeQuestion
           ? 'standard'
           : (useInstantChat ? 'instant' : (isPremiumAnalysis ? 'premium' : 'standard'));
-        
+
         // Prepend relationship info to question for better backend context/logging
         const finalQuestion = (partnershipMode && partnershipRelation)
           ? `[Relationship: ${partnershipRelation}] ${messageText}`
@@ -4041,6 +4175,7 @@ export default function ChatScreen({ navigation, route }) {
           ...(subjectGateOverride ? { subject_gate_override: subjectGateOverride } : {}),
           ...(pendingNudgeIdRef.current ? { nudge_id: pendingNudgeIdRef.current } : {}),
           client_request_id: clientRequestId,
+          free_question_requested: useFreeQuestion,
         };
 
         console.log(`🚀 [API CALL] Sending request to /chat-v2/ask at: ${new Date().toISOString()} (attempt ${attempt})`);
@@ -4254,6 +4389,7 @@ export default function ChatScreen({ navigation, route }) {
 
     const shouldShowModeIntro =
       !showGreeting &&
+      !suppressModeIntroAfterFreeRef.current &&
       birthData &&
       !freeQuestionAvailable &&
       !chatModePreferenceLoadedRef.current &&
@@ -4266,6 +4402,18 @@ export default function ChatScreen({ navigation, route }) {
       !showChatModeIntro;
 
     if (!shouldShowModeIntro) return;
+
+    // This chooser belongs to entering chat, never to completion of a turn.
+    // Once a user message exists after the current entry began, do not open it
+    // even when loading/isTyping changes cause this effect to re-run.
+    const entryStartedAt = chatEntryStartedAtRef.current;
+    if (entryStartedAt > 0 && messages.some((msg) => {
+      if (msg?.role !== 'user') return false;
+      const timestamp = Date.parse(msg?.timestamp || msg?.created_at || '');
+      return Number.isFinite(timestamp) && timestamp >= entryStartedAt;
+    })) {
+      return;
+    }
 
     // Keep the intro keyed to the active chat entry, not the transient session id.
     // Session restoration can happen before the sheet opens, and gating on sessionId
@@ -4542,7 +4690,7 @@ export default function ChatScreen({ navigation, route }) {
       setPartnershipRelation(messageText);
       setPartnershipStep(3);
       setInputText('');
-      
+
       // Scroll to bottom
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -4556,7 +4704,7 @@ export default function ChatScreen({ navigation, route }) {
     setLoading(true);
     setIsTyping(true);
     setShowGreeting(false);
-    
+
     // Remove test message code
 
     // Add user message immediately (include chart name for badge)
@@ -4587,7 +4735,7 @@ export default function ChatScreen({ navigation, route }) {
       chatTier: outgoingTier,
       threadMode: outgoingTier,
     };
-    
+
     // Track chat message sent event
     trackAstrologyEvent.chatMessageSent('user_question');
     trackEvent('chat_message_sent', {
@@ -4595,7 +4743,7 @@ export default function ChatScreen({ navigation, route }) {
       mode: isMundane ? 'mundane' : (partnershipMode ? 'partnership' : outgoingTier),
       message_length: messageText?.length || 0,
     });
-    
+
     setMessagesWithStorage(prev => {
       const newMessages = [...prev, userMessage];
       return newMessages;
@@ -4624,7 +4772,7 @@ export default function ChatScreen({ navigation, route }) {
       expectedFreeQuestion: useFreeQuestion,
     };
     rememberMessageTier(processingMessageId, outgoingTier);
-    
+
     setMessagesWithStorage(prev => {
       const newMessages = [...prev, processingMessage];
       return newMessages;
@@ -4657,7 +4805,7 @@ export default function ChatScreen({ navigation, route }) {
     try {
       pendingChartMismatchSecondAttemptRef.current = false;
       const token = await AsyncStorage.getItem('authToken');
-      
+
       // Mundane mode - async with polling
       if (isMundane) {
         const mundaneBody = {
@@ -4678,7 +4826,7 @@ export default function ChatScreen({ navigation, route }) {
           // Ref fallback: state can lag one frame behind route params when starting from MundaneHub
           entities: mundaneContext?.entities ?? mundaneContextRef.current?.entities,
         };
-        
+
         const response = await fetch(`${API_BASE_URL}${getEndpoint('/mundane/analyze')}`, {
           method: 'POST',
           headers: {
@@ -4687,30 +4835,30 @@ export default function ChatScreen({ navigation, route }) {
           },
           body: JSON.stringify(mundaneBody)
         });
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           console.error('❌ API Error Response:', errorText);
           throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
-        
+
         const result = await response.json();
         const messageId = result.message_id;
-        
+
         if (!messageId) {
           throw new Error('No message ID received from server');
         }
-        
+
         // Update processing message with messageId
-        setMessagesWithStorage(prev => prev.map(msg => 
+        setMessagesWithStorage(prev => prev.map(msg =>
           msg.id === processingMessageId ? { ...msg, messageId } : msg
         ));
-        
+
         // Start polling
         pollForResponse(messageId, processingMessageId, currentSessionId, messageText);
         return;
       }
-      
+
       // Partnership mode validation
       if (partnershipMode && (!nativeChart || !partnerChart)) {
         Alert.alert('Error', Platform.OS === 'ios'
@@ -4753,7 +4901,7 @@ export default function ChatScreen({ navigation, route }) {
 
     } catch (error) {
       console.error('❌ Error sending message:', error);
-      
+
       // Log error to backend for developer monitoring (skip silent chart/session mismatch noise)
       if (shouldPostChatErrorToAdminLogs(error)) {
         try {
@@ -4768,16 +4916,16 @@ export default function ChatScreen({ navigation, route }) {
           console.error('Failed to log error:', logError);
         }
       }
-      
+
       const insufficientCredits = isChatInsufficientCreditsError(error);
       if (insufficientCredits) {
         fetchBalance().catch(() => {});
       }
       const userMessage = formatChatSendErrorMessage(error, { expectedFreeQuestion: useFreeQuestion });
-      
+
       // Replace processing message with error and show retry button
-      setMessagesWithStorage(prev => prev.map(msg => 
-        msg.id === processingMessageId 
+      setMessagesWithStorage(prev => prev.map(msg =>
+        msg.id === processingMessageId
           ? {
               ...msg,
               content: userMessage,
@@ -4910,7 +5058,7 @@ export default function ChatScreen({ navigation, route }) {
       const chatText = messages
         .map(msg => `${msg.role === 'user' ? 'You' : 'AstroRoshni'}: ${msg.content}`)
         .join('\n\n');
-      
+
       await Share.share({
         message: `☀️ AstroRoshni Chat\n\n${chatText}\n\nShared from AstroRoshni App`,
       });
@@ -5002,24 +5150,24 @@ export default function ChatScreen({ navigation, route }) {
     if (!message) {
       return;
     }
-    
+
     // Get the actual messageId (handle both camelCase and snake_case)
     const actualMessageId = message.messageId || message.message_id;
-    
+
     if (!actualMessageId) {
       // If no messageId, it's a local-only message, just remove from local state
       setMessagesWithStorage(prev => prev.filter(msg => msg.id !== message.id));
       return;
     }
-    
+
     // If it's a user message (role === 'user'), just remove from local state
     if (message.role === 'user' || message.sender === 'user') {
-      setMessagesWithStorage(prev => prev.filter(msg => 
+      setMessagesWithStorage(prev => prev.filter(msg =>
         (msg.messageId !== actualMessageId && msg.message_id !== actualMessageId)
       ));
       return;
     }
-    
+
     // If it's an assistant message, call the API to delete from server
     try {
       const token = await AsyncStorage.getItem('authToken');
@@ -5029,15 +5177,15 @@ export default function ChatScreen({ navigation, route }) {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (response.ok) {
         // Remove from local state after successful server deletion
-        setMessagesWithStorage(prev => prev.filter(msg => 
+        setMessagesWithStorage(prev => prev.filter(msg =>
           (msg.messageId !== actualMessageId && msg.message_id !== actualMessageId)
         ));
       } else if (response.status === 404) {
         // Message not found in database, remove from local state anyway
-        setMessagesWithStorage(prev => prev.filter(msg => 
+        setMessagesWithStorage(prev => prev.filter(msg =>
           (msg.messageId !== actualMessageId && msg.message_id !== actualMessageId)
         ));
       } else {
@@ -5105,7 +5253,7 @@ export default function ChatScreen({ navigation, route }) {
         {/* Header - outside KeyboardAvoidingView so home/greeting layout is never affected by keyboard */}
         <View style={styles.headerContainer}>
           <LinearGradient
-            colors={theme === 'dark' 
+            colors={theme === 'dark'
               ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
               : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.05)']}
             style={[
@@ -5141,12 +5289,12 @@ export default function ChatScreen({ navigation, route }) {
                 <Ionicons name="arrow-back" size={20} color={colors.text} />
               </TouchableOpacity>
             )}
-            
+
             <View style={styles.headerCenter}>
               {showGreeting ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: -16 }}>
                   <View style={styles.headerLogoContainer}>
-                    <Image 
+                    <Image
                       source={require('../../../assets/logo.png')}
                       style={styles.headerLogo}
                       resizeMode="contain"
@@ -5158,16 +5306,16 @@ export default function ChatScreen({ navigation, route }) {
                 </View>
               ) : isMundane ? (
                 <View style={styles.partnershipChipsContainer}>
-                  <TouchableOpacity 
-                    onPress={() => setShowCountryPicker(true)} 
+                  <TouchableOpacity
+                    onPress={() => setShowCountryPicker(true)}
                     style={[styles.nameChip, styles.compactChip]}
                   >
                     <Text style={[styles.compactChipText, { color: colors.textSecondary }]}>
                       {selectedCountry.name}
                     </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
-                    onPress={() => setShowYearPicker(true)} 
+                  <TouchableOpacity
+                    onPress={() => setShowYearPicker(true)}
                     style={[styles.nameChip, styles.compactChip]}
                   >
                     <Text style={[styles.compactChipText, { color: colors.textSecondary }]}>
@@ -5198,22 +5346,22 @@ export default function ChatScreen({ navigation, route }) {
                 </View>
               ) : (
                 <View style={styles.partnershipChipsContainer}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     onPress={() => {
                       setSelectingFor('native');
                       setShowChartPicker(true);
-                    }} 
+                    }}
                     style={[styles.nameChip, styles.nativeChip, styles.compactChip]}
                   >
                     <Text style={styles.compactChipText}>
                       {nativeChart?.name?.slice(0, 6) || 'Native'}{nativeChart?.name?.length > 6 ? '..' : ''}
                     </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     onPress={() => {
                       setSelectingFor('partner');
                       setShowChartPicker(true);
-                    }} 
+                    }}
                     style={[styles.nameChip, styles.partnerChip, styles.compactChip]}
                   >
                     <Text style={styles.compactChipText}>
@@ -5223,7 +5371,7 @@ export default function ChatScreen({ navigation, route }) {
                 </View>
               )}
             </View>
-            
+
             <View style={styles.headerRight}>
               {isGuruMember ? (
                 <View style={[styles.guruMemberBadge, { backgroundColor: theme === 'dark' ? 'rgba(255,107,53,0.2)' : 'rgba(255,107,53,0.12)', borderColor: colors.primary }]}>
@@ -5269,7 +5417,7 @@ export default function ChatScreen({ navigation, route }) {
                   </View>
                 </TouchableOpacity>
               )}
-              
+
               <TouchableOpacity
                 style={styles.menuButton}
                 onPress={openMenuDrawer}
@@ -5280,6 +5428,115 @@ export default function ChatScreen({ navigation, route }) {
           </LinearGradient>
         </View>
 
+        {!showGreeting && firstPurchaseBonusOffer && firstPurchaseBonusRemainingSeconds > 0 && !firstPurchaseBonusModalVisible && (
+          <TouchableOpacity
+            style={[
+              styles.firstPurchaseTopOffer,
+              {
+                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.10)' : colors.cardBackground,
+                borderColor: colors.primary,
+              },
+            ]}
+            onPress={openCreditsForFirstPurchaseBonus}
+            activeOpacity={0.9}
+          >
+            <View style={[styles.firstPurchaseTopOfferIcon, { backgroundColor: colors.primary }]}>
+              <Ionicons name="gift-outline" size={18} color={colors.onPrimary || '#fff'} />
+            </View>
+            <View style={styles.firstPurchaseTopOfferCopy}>
+              <Text style={[styles.firstPurchaseTopOfferTitle, { color: colors.text }]} numberOfLines={1}>
+                {t(firstPurchaseOfferSummary.double ? 'chat.firstPurchaseOffer.doubleTitle' : 'chat.firstPurchaseOffer.title')}
+              </Text>
+              <Text style={[styles.firstPurchaseTopOfferText, { color: colors.textSecondary }]} numberOfLines={1}>
+                {t('chat.firstPurchaseOffer.bonusLine', { bonus: firstPurchaseOfferSummary.bonus })}
+              </Text>
+            </View>
+            <View style={[
+              styles.firstPurchaseTopOfferTimer,
+              { borderColor: firstPurchaseOfferStageColor },
+            ]}>
+              <Text style={[styles.firstPurchaseTopOfferTimerText, { color: firstPurchaseOfferStageColor }]}>
+                {formatBonusCountdown(firstPurchaseBonusRemainingSeconds)}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+
+        <Modal
+          visible={Boolean(firstPurchaseBonusModalVisible && firstPurchaseBonusOffer)}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setFirstPurchaseBonusModalVisible(false)}
+        >
+          <View style={styles.firstPurchaseModalBackdrop}>
+            <View style={[styles.firstPurchaseModalCard, {
+              // The offer is a focused conversion modal; use an opaque theme
+              // surface so its copy remains readable over the backdrop.
+              backgroundColor: theme === 'dark' ? colors.backgroundSecondary : colors.cardBackground,
+              borderColor: colors.primary,
+            }]}>
+              <TouchableOpacity
+                style={styles.firstPurchaseModalClose}
+                onPress={() => setFirstPurchaseBonusModalVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel={t('chat.firstPurchaseOffer.continueReading')}
+              >
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+              <View style={[styles.firstPurchaseModalIcon, { backgroundColor: colors.primary }]}>
+                <Ionicons name="gift-outline" size={28} color={colors.onPrimary || '#fff'} />
+              </View>
+              <Text style={[styles.firstPurchaseModalEyebrow, { color: colors.primary }]}>
+                {t('chat.firstPurchaseOffer.eyebrow')}
+              </Text>
+              <Text style={[styles.firstPurchaseModalTitle, { color: colors.text }]}>
+                {t(firstPurchaseOfferSummary.double ? 'chat.firstPurchaseOffer.doubleTitle' : 'chat.firstPurchaseOffer.title')}
+              </Text>
+              <Text style={[styles.firstPurchaseModalBody, { color: colors.textSecondary }]}>
+                {t('chat.firstPurchaseOffer.body', {
+                  credits: firstPurchaseOfferSummary.purchasedCredits,
+                  bonus: firstPurchaseOfferSummary.bonus,
+                  minutes: firstPurchaseBonusOffer?.windowMinutes || 30,
+                })}
+              </Text>
+              <Text style={[styles.firstPurchaseModalPrice, { color: colors.text }]}>
+                {t('chat.firstPurchaseOffer.priceLine', {
+                  price: firstPurchaseOfferSummary.price,
+                  credits: firstPurchaseOfferSummary.total,
+                })}
+              </Text>
+              <Text style={[styles.firstPurchaseModalBonus, { color: colors.primary }]}>
+                {t('chat.firstPurchaseOffer.bonusLine', { bonus: firstPurchaseOfferSummary.bonus })}
+              </Text>
+              <View style={[styles.firstPurchaseModalCountdown, { borderColor: firstPurchaseOfferStageColor }]}>
+                <Ionicons name="time-outline" size={18} color={firstPurchaseOfferStageColor} />
+                <Text style={[styles.firstPurchaseModalCountdownText, { color: firstPurchaseOfferStageColor }]}>
+                  {t('chat.firstPurchaseOffer.expiresIn', { time: formatBonusCountdown(firstPurchaseBonusRemainingSeconds) })}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.firstPurchaseModalCta, { backgroundColor: colors.primary }]}
+                onPress={openCreditsForFirstPurchaseBonus}
+                activeOpacity={0.88}
+              >
+                <Text style={[styles.firstPurchaseModalCtaText, { color: colors.onPrimary || '#fff' }]}>
+                  {t('chat.firstPurchaseOffer.ctaWithPack', {
+                    credits: firstPurchaseOfferSummary.total,
+                    price: firstPurchaseOfferSummary.price,
+                  })}
+                </Text>
+                <Ionicons name="arrow-forward" size={18} color={colors.onPrimary || '#fff'} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setFirstPurchaseBonusModalVisible(false)}>
+                <Text style={[styles.firstPurchaseModalContinue, { color: colors.textSecondary }]}>
+                  {t('chat.firstPurchaseOffer.continueReading')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
         {showGreeting ? (
           <View
             style={{
@@ -5287,7 +5544,7 @@ export default function ChatScreen({ navigation, route }) {
               ...(Platform.OS === 'web' ? { minHeight: 0, overflow: 'hidden' } : null),
             }}
           >
-            <HomeScreen 
+            <HomeScreen
               birthData={birthData}
               onOptionSelect={handleGreetingOptionSelect}
               navigation={navigation}
@@ -5306,7 +5563,7 @@ export default function ChatScreen({ navigation, route }) {
           >
           {partnershipMode && (
             <View style={styles.floatingBadgesContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.floatingChangeBadge}
                 onPress={() => {
                   setShowPartnershipSetupModal(true);
@@ -5328,7 +5585,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Text style={[styles.partnershipBadgeText, { color: COLORS.white }]}>👥 Partnership Mode</Text>
                   </LinearGradient>
                 </View>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.partnershipBadgeClose}
                   onPress={() => {
                     setPartnershipMode(false);
@@ -5860,8 +6117,8 @@ export default function ChatScreen({ navigation, route }) {
                   partnershipMode && (partnershipStep === 0 || partnershipStep === 1) ? "Select a chart above..." :
                   partnershipMode && partnershipStep === 2 ? "Describe the relationship..." :
                   partnershipMode && partnershipStep === 3 ? "Click 'Ready' button above..." :
-                  showModeSelector ? "Type here..." : 
-                  isMundane ? "Ask about markets, politics, events..." : 
+                  showModeSelector ? "Type here..." :
+                  isMundane ? "Ask about markets, politics, events..." :
                   t('chat.inputPlaceholderShort', 'Type your question...')
                 }
                 placeholderTextColor={theme === 'dark' ? "rgba(255, 255, 255, 0.5)" : "rgba(0, 0, 0, 0.4)"}
@@ -5982,7 +6239,7 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             </LinearGradient>
 
-            
+
             {effectiveChatCost === 0 && !isKeyboardVisible && (
               <View style={styles.firstQuestionFreeBanner}>
                 <Text style={styles.firstQuestionFreeIcon}>🎁</Text>
@@ -5992,7 +6249,7 @@ export default function ChatScreen({ navigation, route }) {
                 </View>
               </View>
             )}
-            
+
             {freeQuestionRequiresNotifications && !partnershipMode && !isMundane && !isPremiumAnalysis && credits < effectiveChatCost && !isKeyboardVisible && (
               <TouchableOpacity
                 style={styles.notifGateBanner}
@@ -6005,36 +6262,15 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             )}
 
-            {firstPurchaseBonusOffer && !isKeyboardVisible && (
-              <TouchableOpacity
-                style={styles.firstPurchaseStickyOffer}
-                onPress={openCreditsForFirstPurchaseBonus}
-                activeOpacity={0.9}
-              >
-                <View style={styles.firstPurchaseStickyOfferIcon}>
-                  <Ionicons name="gift-outline" size={17} color={COLORS.white} />
-                </View>
-                <View style={styles.firstPurchaseStickyOfferCopy}>
-                  <Text style={styles.firstPurchaseStickyOfferTitle}>Bonus credits unlocked</Text>
-                  <Text style={styles.firstPurchaseStickyOfferText} numberOfLines={2}>
-                    {formatFirstPurchaseBonusCopy(firstPurchaseBonusOffer)}
-                  </Text>
-                </View>
-                <View style={styles.firstPurchaseStickyOfferButton}>
-                  <Text style={styles.firstPurchaseStickyOfferCta}>Buy</Text>
-                </View>
-              </TouchableOpacity>
-            )}
-
             {credits < effectiveChatCost && !freeQuestionRequiresNotifications && !firstPurchaseBonusOffer && !isKeyboardVisible && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.lowCreditBanner}
                 onPress={() => navigation.navigate('Credits')}
               >
                 <Text style={styles.lowCreditText}>💳 Get more credits to continue</Text>
               </TouchableOpacity>
             )}
-            
+
           </View>
         )}
         </View>
@@ -6043,31 +6279,31 @@ export default function ChatScreen({ navigation, route }) {
         {/* Quick Actions Bar - hide while keyboard is open so input isn't sandwiched above system keyboard */}
         {!showGreeting && !isKeyboardVisible && (
           <View style={[styles.quickActionsBar, { paddingBottom: Math.max(8, webBottomInset) }]}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.quickActionButton}
               onPress={() => setShowLanguageModal(true)}
             >
               <Ionicons name="language-outline" size={18} color={colors.text} />
               <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.language')}</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.quickActionButton}
               onPress={() => navigation.navigate('Chart', { birthData })}
             >
               <Ionicons name="pie-chart-outline" size={18} color={colors.text} />
               <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.chart')}</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.quickActionButton}
               onPress={() => setShowDashaBrowser(true)}
             >
               <Ionicons name="time-outline" size={18} color={colors.text} />
               <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.dasha')}</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={[styles.quickActionButton, partnershipMode && styles.quickActionButtonActive]}
               onPress={() => {
                 if (!partnershipMode) {
@@ -6082,8 +6318,8 @@ export default function ChatScreen({ navigation, route }) {
               <Ionicons name="people-outline" size={18} color={colors.text} />
               <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.partner')}</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.quickActionButton}
               onPress={() => navigation.navigate('ChatHistory')}
             >
@@ -6261,14 +6497,14 @@ export default function ChatScreen({ navigation, route }) {
             closeMenuDrawer();
           }}
         >
-          <TouchableOpacity 
-            style={styles.drawerOverlay} 
+          <TouchableOpacity
+            style={styles.drawerOverlay}
             activeOpacity={1}
             onPress={() => {
               closeMenuDrawer();
             }}
           >
-            <Animated.View 
+            <Animated.View
               style={[styles.drawerContent, {
                 transform: [{ translateX: drawerAnim }]
               }]}
@@ -6287,7 +6523,7 @@ export default function ChatScreen({ navigation, route }) {
                       }),
                     }],
                   }]}>
-                    <Image 
+                    <Image
                       source={require('../../../assets/logo.png')}
                       style={styles.logoImage}
                       resizeMode="contain"
@@ -6299,7 +6535,7 @@ export default function ChatScreen({ navigation, route }) {
                   <Text style={[styles.drawerSubtitle, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(31, 41, 55, 0.7)' }]}>{t('menu.subtitle')}</Text>
                 </View>
 
-                <GHScrollView 
+                <GHScrollView
                   ref={menuScrollViewRef}
                   style={styles.menuScrollView}
                   contentContainerStyle={styles.menuScrollContent}
@@ -6763,9 +6999,9 @@ export default function ChatScreen({ navigation, route }) {
                       }}
                     >
                       <LinearGradient
-                        colors={partnershipMode 
+                        colors={partnershipMode
                           ? (Platform.OS === 'android' ? ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.15)'] : ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.1)'])
-                          : (Platform.OS === 'android' 
+                          : (Platform.OS === 'android'
                             ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
                             : (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']))}
                         style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
@@ -6905,8 +7141,8 @@ export default function ChatScreen({ navigation, route }) {
 
         {/* Event Periods Modal */}
         {showEventPeriods && (
-          <EventPeriods 
-            visible={showEventPeriods} 
+          <EventPeriods
+            visible={showEventPeriods}
             onClose={() => {
               setShowEventPeriods(false);
             }}
@@ -6925,8 +7161,8 @@ export default function ChatScreen({ navigation, route }) {
         )}
 
         {/* Dasha Browser Modal */}
-        <CascadingDashaBrowser 
-          visible={showDashaBrowser} 
+        <CascadingDashaBrowser
+          visible={showDashaBrowser}
           onClose={() => setShowDashaBrowser(false)}
           birthData={birthData}
           onRequireBirthData={() => navigation.navigate('BirthProfileIntro', { returnTo: 'Home' })}
@@ -6942,13 +7178,13 @@ export default function ChatScreen({ navigation, route }) {
         >
           <View style={styles.enhancedPopupOverlay}>
             <View style={styles.enhancedPopup}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.popupClose}
                 onPress={() => setShowEnhancedPopup(false)}
               >
                 <Text style={styles.popupCloseText}>×</Text>
               </TouchableOpacity>
-              
+
               <View style={styles.popupHeader}>
                 <LinearGradient
                   colors={['#ff6b35', '#ff8c5a', '#ffd700']}
@@ -6969,8 +7205,8 @@ export default function ChatScreen({ navigation, route }) {
                   <Text style={styles.popupSubtitle}>{Platform.OS === 'ios' ? 'Unlock advanced chart study tools' : 'Unlock Advanced Cosmic Insights'}</Text>
                 </View>
               </View>
-              
-              <GHScrollView 
+
+              <GHScrollView
                 style={styles.popupContent}
                 contentContainerStyle={styles.popupContentContainer}
                 showsVerticalScrollIndicator={false}
@@ -6980,7 +7216,7 @@ export default function ChatScreen({ navigation, route }) {
                     ? 'Experience the most detailed chart study with advanced calculations and deeper interpretation techniques for comprehensive context.'
                     : 'Experience the most sophisticated chart analysis with advanced calculations and deeper interpretation techniques for comprehensive insights.'}
                 </Text>
-                
+
                 <View style={styles.benefitItem}>
                   <View style={styles.benefitIconContainer}>
                     <LinearGradient
@@ -6997,7 +7233,7 @@ export default function ChatScreen({ navigation, route }) {
                       : 'Examines Lagna, Navamsa, and divisional charts with intricate planetary relationships and house lordships'}</Text>
                   </View>
                 </View>
-                
+
                 <View style={styles.benefitItem}>
                   <View style={styles.benefitIconContainer}>
                     <LinearGradient
@@ -7012,7 +7248,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Text style={styles.benefitDesc}>{Platform.OS === 'ios' ? 'Studies Mahadasha, Antardasha, and Pratyantardasha layers for timing context and chart interpretation' : 'Analyzes Mahadasha, Antardasha, and Pratyantardasha periods with precise timing context'}</Text>
                   </View>
                 </View>
-                
+
                 <View style={styles.benefitItem}>
                   <View style={styles.benefitIconContainer}>
                     <LinearGradient
@@ -7029,7 +7265,7 @@ export default function ChatScreen({ navigation, route }) {
                       : 'Identifies powerful yogas like Raja, Dhana, Gaja Kesari and doshas affecting your life trajectory'}</Text>
                   </View>
                 </View>
-                
+
                 <View style={styles.benefitItem}>
                   <View style={styles.benefitIconContainer}>
                     <LinearGradient
@@ -7044,7 +7280,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Text style={styles.benefitDesc}>{Platform.OS === 'ios' ? 'Highlights personality themes, repeating patterns, and life-direction clues through nakshatra study' : 'Reveals hidden personality themes, repeating patterns, and life-purpose clues through nakshatra analysis'}</Text>
                   </View>
                 </View>
-                
+
                 <View style={styles.benefitItem}>
                   <View style={styles.benefitIconContainer}>
                     <LinearGradient
@@ -7059,7 +7295,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Text style={styles.benefitDesc}>{Platform.OS === 'ios' ? 'Maps current planetary transits against your birth chart for timing context' : 'Maps current planetary transits against your birth chart for accurate timing of events'}</Text>
                   </View>
                 </View>
-                
+
                 <View style={styles.benefitItem}>
                   <View style={styles.benefitIconContainer}>
                     <LinearGradient
@@ -7074,8 +7310,8 @@ export default function ChatScreen({ navigation, route }) {
                     <Text style={styles.benefitDesc}>Provides personalized gemstone, mantra, and ritual suggestions based on planetary strengths</Text>
                   </View>
                 </View>
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={styles.popupButton}
                   onPress={() => setShowEnhancedPopup(false)}
                 >
@@ -7090,7 +7326,7 @@ export default function ChatScreen({ navigation, route }) {
             </View>
           </View>
         </Modal>
-        
+
         {/* Chart Picker Modal */}
         <Modal
           visible={showChartPicker}
@@ -7108,7 +7344,7 @@ export default function ChatScreen({ navigation, route }) {
                   <Ionicons name="close" size={24} color={COLORS.textPrimary} />
                 </TouchableOpacity>
               </View>
-              
+
               <GHScrollView style={styles.chartPickerList}>
                 {savedCharts.map((chart, index) => (
                   <TouchableOpacity
@@ -7133,7 +7369,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
                   </TouchableOpacity>
                 ))}
-                
+
                 {savedCharts.length === 0 && (
                   <View style={styles.emptyChartList}>
                     <Text style={styles.emptyChartText}>No saved charts found</Text>
@@ -7144,7 +7380,7 @@ export default function ChatScreen({ navigation, route }) {
             </View>
           </View>
         </Modal>
-        
+
         {/* Country Picker Modal */}
         <Modal
           visible={showCountryPicker}
@@ -7203,7 +7439,7 @@ export default function ChatScreen({ navigation, route }) {
             </View>
           </View>
         </Modal>
-        
+
         {/* Year Picker Modal */}
         <Modal
           visible={showYearPicker}
@@ -7347,7 +7583,7 @@ export default function ChatScreen({ navigation, route }) {
           }
         }}
       />
-      
+
       <PremiumAnalysisModal
         visible={showPremiumModal}
         onClose={() => setShowPremiumModal(false)}
@@ -8225,6 +8461,149 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 12,
     fontWeight: '900',
+  },
+  firstPurchaseTopOffer: {
+    marginHorizontal: 10,
+    marginTop: 8,
+    marginBottom: 4,
+    minHeight: 58,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  firstPurchaseTopOfferIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  firstPurchaseTopOfferCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  firstPurchaseTopOfferTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  firstPurchaseTopOfferText: {
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 2,
+  },
+  firstPurchaseTopOfferTimer: {
+    minWidth: 48,
+    paddingHorizontal: 7,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  firstPurchaseTopOfferTimerText: {
+    fontSize: 12,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  firstPurchaseModalBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 22,
+    backgroundColor: 'rgba(0,0,0,0.58)',
+  },
+  firstPurchaseModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: 'center',
+  },
+  firstPurchaseModalClose: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    padding: 6,
+  },
+  firstPurchaseModalIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  firstPurchaseModalEyebrow: {
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  firstPurchaseModalTitle: {
+    marginTop: 7,
+    fontSize: 23,
+    lineHeight: 29,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  firstPurchaseModalBody: {
+    marginTop: 11,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  firstPurchaseModalPrice: {
+    marginTop: 14,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  firstPurchaseModalBonus: {
+    marginTop: 5,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  firstPurchaseModalCountdown: {
+    marginTop: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  firstPurchaseModalCountdownText: {
+    fontSize: 14,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  firstPurchaseModalCta: {
+    width: '100%',
+    marginTop: 20,
+    paddingVertical: 13,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  firstPurchaseModalCtaText: {
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  firstPurchaseModalContinue: {
+    marginTop: 15,
+    fontSize: 13,
+    fontWeight: '600',
   },
   notifGateBanner: {
     marginTop: 8,

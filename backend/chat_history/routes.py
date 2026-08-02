@@ -1417,6 +1417,13 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     nudge_id = str(request.get("nudge_id") or request.get("nudgeId") or "").strip()[:64]
     delivery_channel = str(request.get("delivery_channel") or request.get("deliveryChannel") or "").strip().lower()
     render_target = str(request.get("render_target") or request.get("renderTarget") or "").strip().lower()
+    # The client marks a send that was initiated while the one-time free
+    # question UI was active. This is only a subject-gate bypass hint; the
+    # server still performs the authoritative atomic free-question reserve
+    # and billing decision below.
+    free_question_requested = bool(
+        request.get("free_question_requested") or request.get("freeQuestionRequested")
+    )
     subject_gate_override = str(
         request.get("subject_gate_override") or request.get("subjectGateOverride") or ""
     ).strip().lower()
@@ -1536,8 +1543,18 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             )
         except Exception as free_gate_exc:
             logger.warning("free-question subject-gate check skipped: %s", free_gate_exc)
+    client_free_question_request = bool(
+        free_question_requested
+        and not partnership_mode
+        and not premium_analysis
+        and not instant_chat_active
+    )
     skip_subject_gate_for_fast_chat = bool(
-        instant_chat_active or speech_chat_requested or fomo_chat_requested or free_question_gate_eligible
+        instant_chat_active
+        or speech_chat_requested
+        or fomo_chat_requested
+        or free_question_gate_eligible
+        or client_free_question_request
     )
     if speech_chat_requested or requested_chat_tier == "instant":
         logger.info(
@@ -1638,7 +1655,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             _clear_pending_native_gate(conn, session_id)
             conn.commit()
 
-        pending_gate_state = None if (skip_subject_gate_for_fast_chat or free_question_gate_eligible) else _load_pending_native_gate(conn, session_id)
+        pending_gate_state = None if skip_subject_gate_for_fast_chat else _load_pending_native_gate(conn, session_id)
         if pending_gate_state and subject_gate_override == "":
             from ai.chat_subject_gate import ChatSubjectGate, build_subject_gate_message
 
@@ -1782,7 +1799,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 birth_details=birth_details,
                 language=language,
                 subject_gate_memory=subject_gate_memory,
-                allow_partnership_offer=not free_question_gate_eligible,
+                allow_partnership_offer=not (free_question_gate_eligible or client_free_question_request),
             )
             if subject_gate.get("gate_required"):
                 assistant_content = build_subject_gate_message(
@@ -1846,6 +1863,13 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             free_birth_hash,
         )
     )
+    if free_question_requested and not free_eligible:
+        logger.warning(
+            "free-question client/server eligibility mismatch user_id=%s session_id=%s birth_chart_id=%s; processing as paid if credits permit",
+            current_user.userid,
+            session_id,
+            _birth_chart_id_from_birth_details(birth_details),
+        )
     using_free_question = False
     chat_key = (
         'partnership_analysis_cost'
@@ -3951,7 +3975,18 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         f"{analysis_type} (Free): {question[:50]}...",
                     )
                     try:
-                        bonus_status = credit_service.get_first_purchase_bonus_status(user_id)
+                        # Resolve the offer against the entry-level active
+                        # pack so per-pack fixed overrides (for example 50 +
+                        # 50) are returned instead of the default percentage.
+                        try:
+                            preview_credits = min(credit_service.list_active_credit_amounts() or [50])
+                        except Exception:
+                            preview_credits = 50
+                        bonus_status = credit_service.get_first_purchase_bonus_status(
+                            user_id,
+                            purchased_credits=preview_credits,
+                            product_id=f"credits_{preview_credits}",
+                        )
                         first_purchase_bonus_payload = bonus_status
                         logger.info(
                             "first_purchase_bonus_after_free_question userid=%s eligible=%s reason=%s bonus_credits=%s window_minutes=%s",
@@ -4301,6 +4336,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             try:
                 from credits.remedy_funnel import record_funnel_event as record_remedy_funnel_event
                 from credits.free_answer_funnel import record_funnel_event as record_free_answer_funnel_event
+                from credits.first_purchase_offer_funnel import record_funnel_event as record_first_purchase_offer_funnel_event
 
                 if using_free_question and message_id is not None:
                     record_free_answer_funnel_event(
@@ -4309,6 +4345,20 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         message_id=str(message_id),
                         platform="server",
                     )
+                    # The offer is attached to this completed free answer.
+                    # Record the impression server-side so the funnel cannot
+                    # lose its first step if the client navigates away before
+                    # its background analytics request finishes.
+                    if isinstance(first_purchase_bonus_payload, dict) and (
+                        first_purchase_bonus_payload.get("offer_eligible")
+                        or first_purchase_bonus_payload.get("eligible")
+                    ):
+                        record_first_purchase_offer_funnel_event(
+                            userid=int(user_id),
+                            event_name="offer_shown",
+                            message_id=str(message_id),
+                            platform="server",
+                        )
 
                 next_action_payload = result.get("next_action")
                 if (

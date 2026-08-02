@@ -2596,7 +2596,10 @@ class CreditService:
         resolved_bonus_config = self._build_resolved_bonus_config(config, normalized_product_id)
         if resolved_bonus_config is not None:
             status["resolved_bonus_config"] = resolved_bonus_config
-        if status.get("eligible") and bonus <= 0:
+        # A status request without a pack amount is an eligibility check, not
+        # a purchase preview. Do not turn an eligible percentage/fixed offer
+        # off merely because there is no purchased_credits value yet.
+        if status.get("eligible") and purchased_credits is not None and bonus <= 0:
             status["eligible"] = False
             status["reason"] = "zero_bonus"
         return status
@@ -2729,6 +2732,35 @@ class CreditService:
             status,
             purchased_credits=purchased_credits,
             product_id=product_id,
+        )
+        # The post-free-question offer is the first-purchase bonus, but the
+        # admin-controlled purchase-discount campaign may also be active for
+        # this user.  Return it as display metadata without changing either
+        # eligibility or the purchase-awarding paths.
+        try:
+            discount_status = self.get_purchase_discount_status(userid)
+            status["purchase_discount"] = {
+                "enabled": bool(discount_status.get("enabled")),
+                "eligible": bool(discount_status.get("eligible")),
+                "percent": int(discount_status.get("percent") or 0),
+                "fixed_credits": int(discount_status.get("fixed_credits") or 0),
+                "max_bonus_credits": int(discount_status.get("max_bonus_credits") or 0),
+                "bonus_type": discount_status.get("bonus_type"),
+                "window_minutes": int(discount_status.get("window_minutes") or 0),
+                "reason": discount_status.get("reason"),
+                "expires_at": discount_status.get("expires_at"),
+            }
+        except Exception:
+            # A promotional setting must never make the free-answer offer
+            # unavailable.
+            status["purchase_discount"] = {"enabled": False, "eligible": False}
+        # UI eligibility includes either configured offer.  Keep `eligible`
+        # unchanged because it remains the first-purchase-bonus award gate.
+        status["offer_eligible"] = bool(
+            status.get("eligible") or status.get("purchase_discount", {}).get("eligible")
+        )
+        status["enabled"] = bool(
+            status.get("enabled") or status.get("purchase_discount", {}).get("enabled")
         )
 
         def _log_status(reason: str, extra: Optional[Dict[str, Any]] = None) -> None:
@@ -3142,6 +3174,12 @@ class CreditService:
             mark_converted_after_purchase(int(userid))
         except Exception:
             logger.debug("free_answer_funnel conversion mark skipped", exc_info=True)
+        try:
+            from credits.first_purchase_offer_funnel import mark_converted_after_purchase
+
+            mark_converted_after_purchase(int(userid))
+        except Exception:
+            logger.debug("first_purchase_offer_funnel conversion mark skipped", exc_info=True)
         return {
             "pack_bonus": pack_result,
             "first_purchase_bonus": first_result,

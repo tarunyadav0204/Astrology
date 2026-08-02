@@ -614,6 +614,7 @@
     "insufficientCreditsMessage": "This question needs {{cost}} credits — you have {{balance}}. Add credits to continue the study.",
     "insufficientCreditsCta": "Get credits",
     "insufficientCreditsLater": "Not now",
+    "firstPurchaseOffer": {"eyebrow":"LIMITED-TIME OFFER","title":"BONUS CREDITS UNLOCKED","doubleTitle":"DOUBLE CREDITS UNLOCKED","body":"For your first purchase, get {{bonus}} bonus credits when you buy {{credits}} credits. This offer is valid for the next {{minutes}} minutes.","priceLine":"Pay {{price}} and get {{credits}} credits","bonusLine":"That’s {{bonus}} bonus credits FREE","extraCredits":"extra credits","bonusCreditsWord":"bonus credits","discountWord":"off","cta":"Get bonus credits","ctaWithPack":"Claim {{credits}} credits for {{price}} →","continueReading":"Continue reading","expiresIn":"{{time}} left"},
     "betaNotice": "⚠️ BETA: Timeline studies are experimental. Use logic and discretion.",
     "disclaimerNotice": "⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.",
     "verified": "AstroRoshni Verified",

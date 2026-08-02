@@ -153,6 +153,37 @@ def test_google_play_credit_verify_failure_queues_operational_alert(monkeypatch)
     assert alerts[0]["reference_id"] == "GPA.test"
 
 
+def test_canceled_google_play_purchase_is_terminal_without_failure_alert(monkeypatch):
+    alerts = []
+    monkeypatch.setattr(
+        payment_failure_alerts,
+        "notify_payment_failure",
+        lambda **kwargs: alerts.append(kwargs),
+    )
+    monkeypatch.setattr(
+        routes,
+        "_verify_google_play_purchase",
+        lambda *_args, **_kwargs: {
+            "purchaseState": 1,
+            "orderId": "GPA.canceled",
+        },
+    )
+
+    result = routes._credit_verified_google_play_purchase(
+        userid=5491,
+        user_phone=None,
+        user_name=None,
+        purchase_token="canceled-token",
+        product_id="credits_250",
+        order_id_hint=None,
+    )
+
+    assert result["terminal"] is True
+    assert result["purchase_state"] == 1
+    assert result["credits_added"] == 0
+    assert alerts == []
+
+
 def test_already_credited_google_play_token_skips_provider_verification(monkeypatch):
     verify_calls = []
     monkeypatch.setattr(

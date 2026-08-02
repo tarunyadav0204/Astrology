@@ -354,6 +354,7 @@
     "insufficientCreditsMessage": "Cette question nécessite {{cost}} crédits — vous en avez {{balance}}. Ajoutez des crédits pour continuer.",
     "insufficientCreditsCta": "Obtenir des crédits",
     "insufficientCreditsLater": "Pas maintenant",
+    "firstPurchaseOffer": {"eyebrow":"OFFRE À DURÉE LIMITÉE","title":"CRÉDITS BONUS DÉBLOQUÉS","doubleTitle":"CRÉDITS DOUBLÉS DÉBLOQUÉS","body":"Pour votre premier achat, recevez {{bonus}} crédits bonus en achetant {{credits}} crédits. Cette offre est valable encore {{minutes}} minutes.","priceLine":"Payez {{price}} et recevez {{credits}} crédits","bonusLine":"{{bonus}} crédits bonus GRATUITS","extraCredits":"crédits supplémentaires","bonusCreditsWord":"crédits bonus","discountWord":"de réduction","cta":"Obtenir les crédits bonus","ctaWithPack":"Recevez {{credits}} crédits pour {{price}} →","continueReading":"Continuer la lecture","expiresIn":"{{time}} restantes"},
     "betaNotice": "⚠️ BETA : Les prédictions temporelles sont expérimentales. Utilisez votre logique et discrétion.",
     "disclaimerNotice": "⚖️ AVERTISSEMENT : L'astrologie est un outil probabiliste de guidance. Elle ne remplace pas un avis médical, juridique, financier ou de santé mentale. Consultez des professionnels qualifiés pour les décisions importantes.",
     "verified": "AstroRoshni Vérifié",

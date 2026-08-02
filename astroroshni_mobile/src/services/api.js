@@ -921,13 +921,27 @@ export const creditAPI = {
     );
   },
   getGooglePlayProducts: () => api.get(getEndpoint('/credits/google-play/products')),
-  getFirstPurchaseBonusStatus: (purchasedCredits = null) => {
-    const qs = purchasedCredits != null ? `?purchased_credits=${encodeURIComponent(purchasedCredits)}` : '';
+  getFirstPurchaseBonusStatus: (purchasedCredits = null, productId = null) => {
+    const params = new URLSearchParams();
+    if (purchasedCredits != null) params.set('purchased_credits', String(purchasedCredits));
+    if (productId) params.set('product_id', String(productId));
+    const query = params.toString();
+    const qs = query ? `?${query}` : '';
     return api.get(getEndpoint(`/credits/first-purchase-bonus/status${qs}`));
   },
   recordFreeAnswerFunnelEvent: (event, messageId = null, platform = null) =>
     api.post(
       getEndpoint('/credits/free-answer-funnel/event'),
+      {
+        event,
+        message_id: messageId || undefined,
+        platform: platform || Platform.OS,
+      },
+      BACKGROUND_REQUEST_CONFIG,
+    ),
+  recordFirstPurchaseOfferFunnelEvent: (event, messageId = null, platform = null) =>
+    api.post(
+      getEndpoint('/credits/first-purchase-offer-funnel/event'),
       {
         event,
         message_id: messageId || undefined,

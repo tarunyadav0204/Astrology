@@ -42,6 +42,13 @@ export const CREDIT_PACK_META = {
   },
 };
 
+// Keep promotional surfaces aligned with the entry-level pack.  This is
+// derived from the catalog rather than repeating a 50-credit assumption in
+// each screen, so changing the catalog order/amount updates the offer copy.
+export const LOWEST_CREDIT_PACK_CREDITS = Math.min(
+  ...Object.keys(CREDIT_PACK_META).map((credits) => Number(credits)).filter((credits) => credits > 0),
+);
+
 export function getCreditPackMeta(credits) {
   const n = Number(credits) || 0;
   return (

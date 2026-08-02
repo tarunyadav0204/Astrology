@@ -209,7 +209,7 @@ def test_rtdn_push_recovers_unknown_subscription_owner_and_syncs(monkeypatch):
     assert service.logged[0]["userid"] == 435
 
 
-def test_rtdn_push_returns_retriable_error_when_subscription_owner_unresolved(monkeypatch):
+def test_rtdn_push_quarantines_unresolved_subscription_owner_without_retry(monkeypatch):
     service = _CreditService()
     monkeypatch.setattr(routes, "credit_service", service)
     monkeypatch.setattr(
@@ -228,10 +228,37 @@ def test_rtdn_push_returns_retriable_error_when_subscription_owner_unresolved(mo
         }
     )
 
-    with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(routes.google_play_rtdn_push(body))
+    result = asyncio.run(routes.google_play_rtdn_push(body))
 
-    assert exc_info.value.status_code == 503
+    assert result == {"success": True, "ignored": "unresolved_subscription_owner"}
+    assert service.logged[0]["userid"] is None
+    assert service.logged[0]["event_kind"] == "unresolved_owner"
+
+
+def test_pull_worker_quarantines_unresolved_subscription_owner(monkeypatch):
+    service = _CreditService()
+    monkeypatch.setattr(
+        play_rtdn_worker,
+        "_resolve_userid_from_google_play_subscription",
+        lambda **_kwargs: None,
+    )
+
+    processed = play_rtdn_worker._process_one(
+        payload={
+            "eventTimeMillis": "1784883735490",
+            "subscriptionNotification": {
+                "purchaseToken": "unknown-token",
+                "subscriptionId": "subscription_vip_platinum",
+                "notificationType": 4,
+            },
+        },
+        message_id="message-unresolved",
+        credit_service=service,
+    )
+
+    assert processed is True
+    assert service.logged[0]["userid"] is None
+    assert service.logged[0]["event_kind"] == "unresolved_owner"
 
 
 def test_pull_worker_uses_same_unknown_subscription_owner_recovery(monkeypatch):

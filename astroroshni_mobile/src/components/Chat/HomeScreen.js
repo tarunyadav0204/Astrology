@@ -4159,15 +4159,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
-    borderWidth: 1,
-    ...Platform.select({
-      ios: {
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-      },
-      android: {
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-      },
-    }),
+    // The home option cards use their gradient/elevation for separation; an
+    // extra platform border rendered as a dark outline looks like a black
+    // frame around Partnership Analysis and Kundli Matching.
+    borderWidth: 0,
   },
   optionIconContainer: {
     marginRight: 16,

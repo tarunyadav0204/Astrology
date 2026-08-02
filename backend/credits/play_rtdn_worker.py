@@ -20,6 +20,7 @@ from credits.credit_service import CreditService
 from credits.play_subscription_events import rtdn_kind_for_notification_type
 from credits.routes import (
     _credit_verified_google_play_purchase,
+    _record_unresolved_subscription_rtdn,
     _resolve_userid_from_google_play_onetime_purchase,
     _resolve_userid_from_google_play_subscription,
     _sync_subscription_from_play,
@@ -151,11 +152,23 @@ def _process_one(
         if userid is None:
             if is_subscription:
                 logger.warning(
-                    "No user mapped for subscription token yet. event_id=%s product_id=%s. Will retry.",
+                    "No user mapped for subscription token; quarantining and acking "
+                    "event_id=%s product_id=%s.",
                     event_id,
                     product_id,
                 )
-                return False
+                # A legacy/stale token may never resolve. Persist the event so
+                # Pub/Sub does not retry it forever; app-open subscription sync
+                # remains the authoritative recovery path for real users.
+                return _record_unresolved_subscription_rtdn(
+                    service=credit_service,
+                    event_id=event_id,
+                    purchase_token=purchase_token,
+                    product_id=product_id,
+                    notification_type=notification_type,
+                    event_time_millis=event_time_millis,
+                    payload=payload,
+                )
             queued = credit_service.enqueue_pending_play_onetime_event(
                 event_id=event_id,
                 purchase_token=purchase_token,

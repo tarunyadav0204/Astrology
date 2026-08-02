@@ -21,8 +21,22 @@ logger = logging.getLogger(__name__)
 _name_cache = {}
 _MAX_NAME_CACHE = 10_000
 
-# Skip activity for these paths to reduce noise (health, static, etc.)
-SKIP_PATHS = frozenset({"/", "/health", "/favicon.ico", "/docs", "/redoc", "/openapi.json"})
+# Skip activity for these paths to reduce noise (health, static, etc.).
+# The API health/keepalive endpoints are polled frequently by Google health
+# checks and VM monitoring. Publishing those probes to Pub/Sub creates millions
+# of activity rows without representing user behaviour. Keep health-analysis
+# routes (for example /api/health/analyze) tracked; only these exact probes
+# are excluded.
+SKIP_PATHS = frozenset({
+    "/",
+    "/health",
+    "/api/health",
+    "/api/keepalive",
+    "/favicon.ico",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+})
 
 # Ops SMTP alert for /api/send-reset-code 4xx/500 was removed: not user-facing, and high volume
 # triggered Zoho "unusual sending activity" / rate limits. Use Sentry or logs for monitoring.
