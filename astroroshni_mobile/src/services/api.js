@@ -887,6 +887,13 @@ export const predictionAPI = {
     ),
 };
 
+export const panditAPI = {
+  getMe: () => api.get(getEndpoint('/pandit/me')),
+  getMeta: () => api.get(getEndpoint('/pandit/meta'), BACKGROUND_REQUEST_CONFIG),
+  join: (payload) => api.post(getEndpoint('/pandit/join'), payload, GLOBAL_ERROR_CONFIG),
+  updateProfile: (payload) => api.put(getEndpoint('/pandit/profile'), payload, GLOBAL_ERROR_CONFIG),
+};
+
 export const creditAPI = {
   // Balance is polled on mount; handle 401 locally as guest (do not hard-login).
   getBalance: () => api.get(getEndpoint('/credits/balance'), BACKGROUND_REQUEST_CONFIG),

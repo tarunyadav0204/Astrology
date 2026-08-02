@@ -48,6 +48,7 @@ export const CreditProvider = ({ children }) => {
   const [subscriptionDiscountPercent, setSubscriptionDiscountPercent] = useState(0);
   const [entitlements, setEntitlements] = useState([]);
   const [isAstrologerLicensed, setIsAstrologerLicensed] = useState(false);
+  const [isPanditLicensed, setIsPanditLicensed] = useState(false);
   const [isGuruMember, setIsGuruMember] = useState(false);
   const [pricing, setPricing] = useState({});
   const [pricingOriginal, setPricingOriginal] = useState({});
@@ -132,6 +133,7 @@ export const CreditProvider = ({ children }) => {
         setSubscriptionDiscountPercent(0);
         setEntitlements([]);
         setIsAstrologerLicensed(false);
+        setIsPanditLicensed(false);
         setIsGuruMember(false);
         return 0;
       }
@@ -164,6 +166,7 @@ export const CreditProvider = ({ children }) => {
       setSubscriptionDiscountPercent(Number(data?.subscription_discount_percent) || 0);
       setEntitlements(Array.isArray(data?.entitlements) ? data.entitlements : []);
       setIsAstrologerLicensed(Boolean(data?.is_astrologer_licensed));
+      setIsPanditLicensed(Boolean(data?.is_pandit_licensed));
       setIsGuruMember(Boolean(data?.is_guru_member));
       return balance;
     } catch (error) {
@@ -186,6 +189,7 @@ export const CreditProvider = ({ children }) => {
         setSubscriptionDiscountPercent(0);
         setEntitlements([]);
         setIsAstrologerLicensed(false);
+        setIsPanditLicensed(false);
         setIsGuruMember(false);
         return 0;
       }
@@ -254,6 +258,7 @@ export const CreditProvider = ({ children }) => {
         subscriptionDiscountPercent,
         entitlements,
         isAstrologerLicensed,
+        isPanditLicensed,
         isGuruMember,
         pricing,
         pricingOriginal,

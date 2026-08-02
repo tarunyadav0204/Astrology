@@ -81,6 +81,8 @@
     "blog": "Blog & Knowledge",
     "credits": "Credits",
     "support": "Support",
+    "panditDesk": "I am a Pandit",
+    "exitPanditMode": "Exit Pandit mode",
     "logout": "Logout"
   },
   "karmaAnalysis": {
@@ -409,7 +411,183 @@
     "positions": "Positions",
     "watchGuide": "Watch guide",
     "watchGuideTitle": "How to read this chart",
-    "watchGuideDuration": "4 min"
+    "watchGuideDuration": "4 min",
+    "houseDrawer": {
+      "significance": "Significance",
+      "mudakku": "Mudakku / Modakku",
+      "mudakkuDesc": "This house contains the Mudakku point for your chart.",
+      "sunNakshatra": "Sun Nakshatra",
+      "countToMula": "Count to Mula",
+      "landingNakshatra": "Landing nakshatra: {{nakshatra}} · Rashi: {{rashi}}",
+      "splitRule": "Split nakshatra rule applied.",
+      "singleLanding": "Single sign landing.",
+      "gandamoola": "Gandamoola (Gandanta)",
+      "gandantaLagnaHouse": "This is a Gandanta Lagna house ({{name}}).",
+      "gandantaPlanets": "This house contains one or more planets in Gandanta.",
+      "planet": "Planet",
+      "medium": "Medium",
+      "lagnaPoint": "Lagna point: {{name}}",
+      "moonAlso": "Moon also falls in {{name}}.",
+      "chartReading": "Chart reading",
+      "insightLoading": "Checking chart support, pressure, and timing...",
+      "supports": "What supports this house",
+      "pressure": "What adds pressure",
+      "activating": "What is activating it now",
+      "ashtakavarga": "Ashtakavarga",
+      "savExplain": "SAV shows the house’s total support. BAV shows how strongly the house lord contributes to this house.",
+      "strongestBav": "Strongest {{planet}} BAV houses: {{houses}}",
+      "weakestBav": "Weakest {{planet}} BAV houses: {{houses}}",
+      "occupantPlanets": "Occupant Planets",
+      "retrograde": "Retrograde",
+      "degreeInNakshatra": "{{degree}} in {{nakshatra}}",
+      "pada": "Pada {{pada}}",
+      "noPlanets": "No planets occupy this house.",
+      "houseLord": "House Lord",
+      "lordOf": "Lord of {{sign}} is {{lord}}",
+      "relatedChart": "Related chart",
+      "relatedChartDesc": "{{name}} is often used to validate this house theme more deeply.",
+      "makeAscendant": "Make Ascendant",
+      "ask": "Ask",
+      "openRelated": "Open {{id}}",
+      "moderate": "moderate",
+      "strong": "strong",
+      "weak": "weak",
+      "high": "High",
+      "houseOrdinal": "{{n}}",
+      "verdicts": {
+        "wellSupported": "Well supported",
+        "underStress": "Under stress",
+        "supportedButPressured": "Supported but pressured",
+        "quietlySupported": "Quietly supported",
+        "sensitiveArea": "Sensitive area",
+        "balanced": "Balanced but not strongly marked",
+        "activelyUnfolding": "Actively unfolding now",
+        "lightlyActivated": "Lightly activated now",
+        "natalPattern": "Natal pattern, not especially triggered now"
+      },
+      "roles": {
+        "yogiLord": "Yogi lord",
+        "avayogiLord": "Avayogi lord",
+        "dagdhaLord": "Dagdha lord"
+      },
+      "dignity": {
+        "ownSign": "own sign",
+        "exalted": "exalted",
+        "moolatrikona": "moolatrikona",
+        "favorable": "favorable",
+        "debilitated": "debilitated",
+        "unfavorable": "unfavorable",
+        "neutral": "neutral"
+      },
+      "relations": {
+        "greatFriend": "strong temporal support with the sign owner",
+        "friend": "friendly support with the sign owner",
+        "neutral": "neutral support with the sign owner",
+        "enemy": "friction with the sign owner",
+        "greatEnemy": "strong friction with the sign owner"
+      },
+      "dashaNames": {
+        "mahadasha": "Mahadasha",
+        "antardasha": "Antardasha",
+        "pratyantardasha": "Pratyantardasha"
+      },
+      "interpretation": {
+        "strong": "In {{chart}}, the {{house}} house is coming through as {{condition}}. {{area}} has cleaner support here, and the current timing is {{timing}}.",
+        "pressured": "In {{chart}}, the {{house}} house shows both support and pressure. {{area}} can deliver, but results are shaped by effort, maturity, and timing.",
+        "stress": "In {{chart}}, the {{house}} house is under noticeable pressure. {{area}} may require patience, better choices, and stronger timing support.",
+        "balanced": "In {{chart}}, the {{house}} house is not weak, but it is not overemphasized either. {{area}} depends more on the lord, aspects, and timing than on a single dominant signature."
+      },
+      "factors": {
+        "planetIsDignity": "{{planet}} is {{dignity}}.",
+        "lordSitsIn": {
+          "kendra": "{{planet}}, the house lord, sits in a kendra.",
+          "trikona": "{{planet}}, the house lord, sits in a trikona.",
+          "dusthana": "{{planet}}, the house lord, sits in a dusthana."
+        },
+        "upachaya": "{{planet}} gains strength through an upachaya placement.",
+        "isYogiLord": "{{planet}} is the Yogi lord.",
+        "isAvayogiLord": "{{planet}} is the Avayogi lord.",
+        "isDagdhaLord": "{{planet}} is functioning as a Dagdha lord.",
+        "isYogiLordChart": "{{planet}} is the Yogi lord for this chart.",
+        "isAvayogiLordChart": "{{planet}} is the Avayogi lord for this chart.",
+        "isDagdhaLordChart": "{{planet}} is the Dagdha lord for this chart.",
+        "lordRetroHard": "{{planet}}, the house lord, is retrograde and behaves less straightforwardly here.",
+        "lordRetroSoft": "{{planet}}, the house lord, is retrograde, making this house more reflective and internally active.",
+        "inGandanta": "{{planet}} is in Gandanta.",
+        "hasRelation": "{{planet}} has {{relation}}.",
+        "yogiAxis": "This house falls on the Yogi sign axis.",
+        "avayogiAxis": "This house falls on the Avayogi sign axis.",
+        "dagdhaAxis": "This house falls on the Dagdha sign axis.",
+        "yogiHouse": "This is marked as a yogi house in the chart.",
+        "badhakaAxis": "This house falls in the badhaka axis for the ascendant.",
+        "cuspGandanta": "The house cusp itself falls in Gandanta.",
+        "mangalDosha": "Mangal Dosha is impacting this house axis.",
+        "kaalSarp": "Kaal Sarp Dosha adds pressure to the chart pattern here.",
+        "pitraDosha": "Pitra Dosha is directly affecting ninth-house themes.",
+        "uttama": "Overall house assessment comes through as Uttama.",
+        "adhama": "Overall house assessment comes through as Adhama.",
+        "gandantaResidents": "Gandanta affects resident planet(s) {{planets}}.",
+        "lordGandanta": "The house lord {{planet}} is in Gandanta.",
+        "gandantaImpact": "Overall Gandanta impact on this house is {{level}}.",
+        "occupiesAs": {
+          "yogi": "{{planet}} occupies this house as the Yogi lord.",
+          "avayogi": "{{planet}} occupies this house as the Avayogi lord.",
+          "dagdha": "{{planet}} occupies this house as the Dagdha lord."
+        },
+        "placedRuledBy": "{{planet}} is placed in a sign ruled by a {{relation}}.",
+        "naturalSign": {
+          "friend": "{{planet}} is in a sign ruled by its natural friend {{other}}.",
+          "enemy": "{{planet}} is in a sign ruled by its natural enemy {{other}}."
+        },
+        "ownNakshatra": "{{planet}} is placed in its own nakshatra.",
+        "naturalNakshatra": {
+          "friend": "{{planet}} is in a nakshatra ruled by its natural friend {{other}}.",
+          "enemy": "{{planet}} is in a nakshatra ruled by its natural enemy {{other}}."
+        },
+        "occupiesDignity": "{{planet}} occupies this house in {{dignity}} dignity.",
+        "occupiesSupports": "{{planet}} occupies this house and supports its matters.",
+        "occupiesPressure": "{{planet}} occupies this house and adds pressure to its matters.",
+        "retroHard": "{{planet}} is retrograde here, making its results more irregular or delayed.",
+        "retroSoft": "{{planet}} is retrograde here, adding inward strength and reworking to this house.",
+        "aspectPressure": "{{planet}} aspects this house with pressure.",
+        "aspects": "{{planet}} aspects this house.",
+        "aspectYogi": "{{planet}} aspects this house as the Yogi lord.",
+        "aspectRetro": "{{planet}} is retrograde while aspecting this house, so its influence is more inward and reconsidering than direct.",
+        "aspectFromRuling": "{{planet}} aspects this house from the {{from}} while ruling {{ruling}}.",
+        "aspectCarrying": "{{planet}} aspects this house while also carrying {{houses}} lordship.",
+        "savStrong": "Sarvashtakavarga gives strong support with {{points}} SAV points.",
+        "savWeak": "Sarvashtakavarga is weak here with {{points}} SAV points.",
+        "bavSupportive": "{{planet}}'s Bhinnashtakavarga is supportive here with {{points}} points.",
+        "bavThin": "{{planet}}'s Bhinnashtakavarga is thin here with {{points}} points.",
+        "bavStrongest": "This is one of the strongest BAV houses for {{planet}}.",
+        "bavWeakest": "This is one of the weakest BAV houses for {{planet}}.",
+        "yogaTouches": "{{yoga}} also touches this house.",
+        "dashaLord": "{{dasha}} is running through {{planet}}, the house lord.",
+        "dashaOccupant": "{{dasha}} is running through {{planet}}, an occupant of this house.",
+        "dashaAspect": "{{dasha}} is running through {{planet}}, which aspects this house.",
+        "transitsInclude": "Current transits through this sign include {{planets}}."
+      }
+    },
+    "grahaDrishti": "Graha drishti",
+    "houseAbbr": "H",
+    "aspectSuffix": "aspect",
+    "noGrahaDrishti": "No graha drishti from other houses.",
+    "chartNames": {
+      "lagna": "Lagna (D1)",
+      "navamsa": "Navamsa (D9)",
+      "transit": "Transit",
+      "hora": "Hora (D2)",
+      "drekkana": "Drekkana (D3)",
+      "chaturthamsa": "Chaturthamsa (D4)",
+      "saptamsa": "Saptamsa (D7)",
+      "dashamsa": "Dasamsa (D10)",
+      "dwadashamsa": "Dwadashamsa (D12)",
+      "shodasamsa": "Shodasamsa (D16)",
+      "vimsamsa": "Vimsamsa (D20)",
+      "chaturvimsamsa": "Chaturvimsamsa (D24)",
+      "saptavimshamsa": "Saptavimshamsa (D27)",
+      "trimsamsa": "Trimsamsa (D30)"
+    }
   },
   "planets": {
     "Sun": "Su",
@@ -509,6 +687,9 @@
     "turningOnNotifications": "Turning on…",
     "aboutApp": "About AstroRoshni",
     "accountAndSecurity": "Account & security",
+    "panditDesk": "I am a Pandit",
+    "exitPanditMode": "Exit Pandit mode",
+    "exitPanditTheme": "Exit white Pandit theme",
     "deleteAccountTitle": "Delete Account",
     "deleteAccountConfirmBody": "This will permanently delete your account and associated data. This action cannot be undone.\n\nAre you sure you want to continue?",
     "deleteAccountFailed": "Failed to delete account. Please try again.",
@@ -614,7 +795,21 @@
     "insufficientCreditsMessage": "This question needs {{cost}} credits — you have {{balance}}. Add credits to continue the study.",
     "insufficientCreditsCta": "Get credits",
     "insufficientCreditsLater": "Not now",
-    "firstPurchaseOffer": {"eyebrow":"LIMITED-TIME OFFER","title":"BONUS CREDITS UNLOCKED","doubleTitle":"DOUBLE CREDITS UNLOCKED","body":"For your first purchase, get {{bonus}} bonus credits when you buy {{credits}} credits. This offer is valid for the next {{minutes}} minutes.","priceLine":"Pay {{price}} and get {{credits}} credits","bonusLine":"That’s {{bonus}} bonus credits FREE","extraCredits":"extra credits","bonusCreditsWord":"bonus credits","discountWord":"off","cta":"Get bonus credits","ctaWithPack":"Claim {{credits}} credits for {{price}} →","continueReading":"Continue reading","expiresIn":"{{time}} left"},
+    "firstPurchaseOffer": {
+      "eyebrow": "LIMITED-TIME OFFER",
+      "title": "BONUS CREDITS UNLOCKED",
+      "doubleTitle": "DOUBLE CREDITS UNLOCKED",
+      "body": "For your first purchase, get {{bonus}} bonus credits when you buy {{credits}} credits. This offer is valid for the next {{minutes}} minutes.",
+      "priceLine": "Pay {{price}} and get {{credits}} credits",
+      "bonusLine": "That’s {{bonus}} bonus credits FREE",
+      "extraCredits": "extra credits",
+      "bonusCreditsWord": "bonus credits",
+      "discountWord": "off",
+      "cta": "Get bonus credits",
+      "ctaWithPack": "Claim {{credits}} credits for {{price}} →",
+      "continueReading": "Continue reading",
+      "expiresIn": "{{time}} left"
+    },
     "betaNotice": "⚠️ BETA: Timeline studies are experimental. Use logic and discretion.",
     "disclaimerNotice": "⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.",
     "verified": "AstroRoshni Verified",
@@ -915,7 +1110,26 @@
       "subtitle": "Your chart blueprint awaits. Choose your path to understanding.",
       "lifePath": "{{name}}'s Life Path",
       "hello": "Hello",
-      "guestName": "Explorer"
+      "guestName": "Explorer",
+      "pandit": "Pandit Desk",
+      "practice": "Your practice"
+    },
+    "pandit": {
+      "badge": "Pandit mode · Free desk",
+      "badgeWithName": "Pandit mode · Free desk · {{name}}",
+      "clientTools": "Client tools",
+      "addNative": "Add new client chart",
+      "addNativeSub": "Enter birth details to create a chart for your client",
+      "makeKundli": "Make Kundli",
+      "makeKundliSub": "Branded Janam Kundli PDF for your client",
+      "findMuhurat": "Find Muhurat",
+      "findMuhuratSub": "Auspicious timings with reasons to share",
+      "todaysPanchang": "Today's Panchang",
+      "todaysPanchangSub": "Tithi, Choghadiya, Rahu Kaal for the day",
+      "practiceDetails": "Practice details",
+      "cityFallback": "City",
+      "pincodeFallback": "Pincode",
+      "switchPersonal": "Switch to personal app"
     },
     "guestNudge": {
       "title": "Create your free birth chart",
@@ -1173,7 +1387,10 @@
       "dashas": "Dashas",
       "ashtakvarga": "Ashtak-\nvarga",
       "positions": "Positions",
-      "cosmicRing": "Cosmic\nRing"
+      "cosmicRing": "Cosmic\nRing",
+      "precise": "Precise",
+      "safety": "Safety",
+      "fortune": "Fortune"
     },
     "cosmicRing": {
       "viewRing": "Ring"
@@ -1247,6 +1464,7 @@
       "eventsAndroid": "Predictions",
       "reports": "Reports",
       "dashas": "Dashas",
+      "muhurat": "Muhurat",
       "you": "You"
     },
     "askFAB": "Ask AstroRoshni",
@@ -1678,6 +1896,85 @@
       "level2": "L2 (Occupant)",
       "level3": "L3 (In Star of Owner)",
       "level4": "L4 (Owner)"
+    }
+  },
+  "panditPractice": {
+    "setupTitle": "Set up practice",
+    "detailsTitle": "Practice details",
+    "lead": "Free for pandits. Used on kundli PDFs and later to match puja requests near you.",
+    "practiceName": "Practice name *",
+    "city": "City *",
+    "pincode": "Pincode *",
+    "pujaTypes": "Puja types you perform *",
+    "languages": "Languages",
+    "tagline": "Tagline",
+    "phoneOnPdf": "Phone on PDF",
+    "email": "Email",
+    "website": "Website",
+    "address": "Address",
+    "activateCta": "Activate Free Desk",
+    "saveCta": "Save practice"
+  },
+  "houses": {
+    "1": {
+      "title": "1st House: Self & Appearance",
+      "desc": "Represents your personality, physical body, and general path in life.",
+      "area": "Self-expression and direction"
+    },
+    "2": {
+      "title": "2nd House: Wealth & Speech",
+      "desc": "Governs accumulated wealth, family, speech, and early education.",
+      "area": "Money, family, and speech"
+    },
+    "3": {
+      "title": "3rd House: Courage & Siblings",
+      "desc": "Represents short travels, siblings, communication, and your own efforts.",
+      "area": "Effort, courage, and communication"
+    },
+    "4": {
+      "title": "4th House: Mother & Comfort",
+      "desc": "Governs home, mother, vehicles, happiness, and inner peace.",
+      "area": "Home, emotional steadiness, and comforts"
+    },
+    "5": {
+      "title": "5th House: Creativity & Children",
+      "desc": "Represents intelligence, children, past life merits, and speculation.",
+      "area": "Creativity, children, and intelligence"
+    },
+    "6": {
+      "title": "6th House: Health & Enemies",
+      "desc": "Governs daily routine, health issues, debts, and competition.",
+      "area": "Work stress, health, and conflict management"
+    },
+    "7": {
+      "title": "7th House: Marriage & Partners",
+      "desc": "Represents long-term relationships, marriage, and business partnerships.",
+      "area": "Relationships and agreements"
+    },
+    "8": {
+      "title": "8th House: Transformation & Longevity",
+      "desc": "Governs sudden changes, longevity, occult, and hidden wealth.",
+      "area": "Transformation, vulnerability, and hidden shifts"
+    },
+    "9": {
+      "title": "9th House: Luck & Higher Learning",
+      "desc": "Represents fortune, father, long travels, and spiritual wisdom.",
+      "area": "Fortune, mentors, and meaning"
+    },
+    "10": {
+      "title": "10th House: Career & Fame",
+      "desc": "Governs profession, social status, fame, and authority.",
+      "area": "Career, visibility, and responsibility"
+    },
+    "11": {
+      "title": "11th House: Gains & Friends",
+      "desc": "Represents fulfillment of desires, income, and social circles.",
+      "area": "Gains, networks, and fulfillment"
+    },
+    "12": {
+      "title": "12th House: Loss & Spirituality",
+      "desc": "Governs isolation, expenses, foreign lands, and spiritual liberation.",
+      "area": "Losses, rest, withdrawal, and spiritual release"
     }
   }
 }

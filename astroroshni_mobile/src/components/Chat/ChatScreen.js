@@ -453,7 +453,14 @@ function chatPersonStorageKey(birth) {
 export default function ChatScreen({ navigation, route }) {
   const { t, i18n } = useTranslation();
   useAnalytics('ChatScreen');
-  const { theme, colors, getCardElevation } = useTheme();
+  const {
+    theme,
+    colors,
+    getCardElevation,
+    isPanditMode,
+    enterPanditMode,
+    exitPanditMode,
+  } = useTheme();
   const {
     credits,
     partnershipCost,
@@ -1627,6 +1634,18 @@ export default function ChatScreen({ navigation, route }) {
     { elevation: getCardElevation(3) }
   ];
 
+  const menuRowGradient = isPanditMode
+    ? ['rgba(24, 24, 27, 0.04)', 'rgba(24, 24, 27, 0.02)']
+    : Platform.OS === 'android'
+      ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+      : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']);
+  const menuRowBorder = isPanditMode
+    ? 'rgba(24, 24, 27, 0.1)'
+    : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)');
+  const menuAccentIconGradient = isPanditMode
+    ? ['#52525B', '#71717A']
+    : ['#ff6b35', '#ff8c5a'];
+
   const getSignName = (signNumber) => {
     if (signNumber === undefined || signNumber === null) return t('common.unknown', 'Unknown');
     const signs = {
@@ -1871,6 +1890,19 @@ export default function ChatScreen({ navigation, route }) {
         }
       }
       navigation.setParams({ mode: undefined, mundaneContext: undefined });
+    }
+
+    // Post-login resume from "I am a Pandit" (see openPanditMode).
+    if (route.params?.activatePandit) {
+      navigation.setParams({ activatePandit: undefined });
+      (async () => {
+        const { openPanditMode } = require('../Pandit/openPanditMode');
+        await openPanditMode({
+          navigation,
+          requireAuthForPaid,
+          enterPanditMode,
+        });
+      })();
     }
 
     // Handle back button
@@ -5255,18 +5287,30 @@ export default function ChatScreen({ navigation, route }) {
           <LinearGradient
             colors={theme === 'dark'
               ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
-              : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.05)']}
+              : isPanditMode
+                ? ['rgba(24, 24, 27, 0.04)', 'rgba(24, 24, 27, 0.02)']
+                : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.05)']}
             style={[
               styles.header,
               {
-                borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)',
+                borderColor: theme === 'dark'
+                  ? 'rgba(255, 255, 255, 0.2)'
+                  : isPanditMode
+                    ? 'rgba(24, 24, 27, 0.12)'
+                    : 'rgba(249, 115, 22, 0.2)',
                 elevation: getCardElevation(3),
               }
             ]}
           >
             {!showGreeting && (
               <TouchableOpacity
-                style={[styles.backButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}
+                style={[styles.backButton, {
+                  backgroundColor: theme === 'dark'
+                    ? 'rgba(255, 255, 255, 0.15)'
+                    : isPanditMode
+                      ? 'rgba(24, 24, 27, 0.08)'
+                      : 'rgba(249, 115, 22, 0.25)',
+                }]}
                 onPress={() => {
                   keepChatOpenAfterAskEntryRef.current = false;
                   setShowGreeting(true);
@@ -6549,14 +6593,12 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>✨</Text>
@@ -6582,14 +6624,12 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>👤</Text>
@@ -6607,14 +6647,12 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>➕</Text>
@@ -6632,14 +6670,12 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>📊</Text>
@@ -6657,14 +6693,12 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>⏰</Text>
@@ -6682,10 +6716,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -6706,14 +6738,12 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#FF6B35', '#FFA500']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>⚖️</Text>
@@ -6732,10 +6762,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -6757,10 +6785,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -6786,10 +6812,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -6811,14 +6835,12 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>🧘</Text>
@@ -6838,10 +6860,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -6863,10 +6883,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -6888,10 +6906,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -6914,14 +6930,12 @@ export default function ChatScreen({ navigation, route }) {
                       }}
                     >
                       <LinearGradient
-                        colors={Platform.OS === 'android'
-                          ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                          : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                        style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                        colors={menuRowGradient}
+                        style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                       >
                         <View style={styles.menuIconContainer}>
                           <LinearGradient
-                            colors={['#ff6b35', '#ff8c5a']}
+                            colors={menuAccentIconGradient}
                             style={styles.menuIconGradient}
                           >
                             <Text style={styles.menuEmoji}>🔁</Text>
@@ -6940,14 +6954,12 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>🎙️</Text>
@@ -6965,14 +6977,12 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#f97316', '#fb7185']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>📄</Text>
@@ -7001,14 +7011,14 @@ export default function ChatScreen({ navigation, route }) {
                       <LinearGradient
                         colors={partnershipMode
                           ? (Platform.OS === 'android' ? ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.15)'] : ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.1)'])
-                          : (Platform.OS === 'android'
-                            ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                            : (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']))}
-                        style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                          : menuRowGradient}
+                        style={[styles.menuGradient, { borderColor: partnershipMode
+                          ? (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(147, 51, 234, 0.25)')
+                          : menuRowBorder }]}
                       >
                         <View style={styles.menuIconContainer}>
                           <LinearGradient
-                            colors={partnershipMode ? ['#9333ea', '#a855f7'] : ['#ff6b35', '#ff8c5a']}
+                            colors={partnershipMode ? ['#9333ea', '#a855f7'] : menuAccentIconGradient}
                             style={styles.menuIconGradient}
                           >
                             <Text style={styles.menuEmoji}>👥</Text>
@@ -7027,10 +7037,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -7052,14 +7060,12 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>💳</Text>
@@ -7073,14 +7079,50 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
+                      closeMenuDrawer(async () => {
+                        const { openPanditMode } = require('../Pandit/openPanditMode');
+                        if (isPanditMode) {
+                          await exitPanditMode();
+                          return;
+                        }
+                        await openPanditMode({
+                          navigation,
+                          requireAuthForPaid,
+                          enterPanditMode,
+                        });
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={menuAccentIconGradient}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>🕉️</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>
+                        {isPanditMode
+                          ? t('menu.exitPanditMode', 'Exit Pandit mode')
+                          : t('menu.panditDesk', 'I am a Pandit')}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={getMenuOptionStyle()}
+                    onPress={() => {
                       closeMenuDrawer(() => { navigation.navigate('Support'); });
                     }}
                   >
                     <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -7107,11 +7149,21 @@ export default function ChatScreen({ navigation, route }) {
                   >
                     <LinearGradient
                       colors={['rgba(255, 59, 48, 0.2)', 'rgba(255, 59, 48, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)' }]}
+                      style={[styles.menuGradient, {
+                        borderColor: theme === 'dark'
+                          ? 'rgba(255, 255, 255, 0.2)'
+                          : isPanditMode
+                            ? 'rgba(220, 38, 38, 0.25)'
+                            : 'rgba(249, 115, 22, 0.3)',
+                      }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={isGuest ? ['#ff7b45', '#FF6B35'] : ['#ff3b30', '#ff6b60']}
+                          colors={
+                            isGuest
+                              ? (isPanditMode ? ['#52525B', '#71717A'] : ['#ff7b45', '#FF6B35'])
+                              : ['#ff3b30', '#ff6b60']
+                          }
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>{isGuest ? '🔑' : '🚪'}</Text>

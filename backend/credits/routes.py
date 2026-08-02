@@ -2220,12 +2220,13 @@ async def get_credit_balance(current_user: User = Depends(get_current_user)):
         logger.exception("Could not load entitlements for user=%s", current_user.userid)
         result["entitlements"] = []
         result["is_astrologer_licensed"] = current_user.role == "admin"
+        result["is_pandit_licensed"] = current_user.role == "admin"
     return result
 
 
 @router.get("/subscription")
 async def get_subscription_details(
-    family: str = Query(default="vip", pattern="^(vip|astrologer)$"),
+    family: str = Query(default="vip", pattern="^(vip|astrologer|pandit)$"),
     current_user: User = Depends(get_current_user),
 ):
     """Return full subscription details for the current user: tier_name, discount_percent, start_date, end_date (renewal), features. None if no active subscription."""

@@ -12,11 +12,22 @@ const NativeSelectorChip = ({
   maxLength = 12,
   showIcon = true 
 }) => {
-  const { theme, colors } = useTheme();
+  const { theme, colors, isPanditMode } = useTheme();
   if (!birthData) return null;
 
   const displayName = birthData.name?.slice(0, maxLength) + 
     (birthData.name?.length > maxLength ? '...' : '');
+
+  const chipBg = theme === 'dark'
+    ? 'rgba(255, 255, 255, 0.15)'
+    : isPanditMode
+      ? 'rgba(24, 24, 27, 0.06)'
+      : 'rgba(249, 115, 22, 0.15)';
+  const chipBorder = theme === 'dark'
+    ? 'rgba(255, 255, 255, 0.2)'
+    : isPanditMode
+      ? 'rgba(24, 24, 27, 0.12)'
+      : 'rgba(249, 115, 22, 0.2)';
 
   return (
     <TouchableOpacity 
@@ -24,8 +35,8 @@ const NativeSelectorChip = ({
       style={[
         styles.nameChip,
         {
-          backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.15)',
-          borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+          backgroundColor: chipBg,
+          borderColor: chipBorder,
         },
         style
       ]}

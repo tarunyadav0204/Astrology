@@ -42,6 +42,7 @@ import TradingCalendarScreen from './src/components/Trading/TradingCalendarScree
 import ChildbirthPlannerScreen from './src/components/ChildbirthPlannerScreen';
 import MuhuratHubScreen from './src/components/MuhuratHubScreen';
 import DailyPanchangScreen from './src/components/Panchang/DailyPanchangScreen';
+import { PanditHome, PanditPractice } from './src/components/Pandit/PanditDeskRoot';
 import UniversalMuhuratScreen from './src/components/UniversalMuhuratScreen';
 import EventScreen from './src/components/EventScreen';
 import MonthlyDeepScreen from './src/components/MonthlyDeepScreen';
@@ -189,6 +190,8 @@ const linking = {
       Support: 'contact',
       MuhuratHub: 'muhurat-finder',
       UniversalMuhurat: 'muhurat',
+      PanditHome: 'pandit',
+      PanditPractice: 'pandit/practice',
       NakshatraCalendar: 'nakshatras',
       NakshatraGuide: 'nakshatra-study',
       AnalysisHub: 'analysis',
@@ -210,6 +213,8 @@ const linking = {
       '/festivals/monthly': '/muhurat',
       '/marriage-analysis': '/kundli-matching',
       '/policy': '/about',
+      '/pandit-desk': '/pandit',
+      '/for-pandits': '/pandit',
     };
     return getStateFromPath(pathAliases[normalizedPath] || raw, options);
   },
@@ -308,6 +313,7 @@ export default function App() {
   const [initialRoute, setInitialRoute] = useState('Home');
   const [webContinueToken] = useState(() => getWebContinueTokenFromLocation());
   const [initialTheme, setInitialTheme] = useState(null);
+  const [initialPanditMode, setInitialPanditMode] = useState(false);
   const [forceUpdateInfo, setForceUpdateInfo] = useState(null);
   const [fatalRuntimeError, setFatalRuntimeError] = useState(null);
   const [isRecoveringFromCrash, setIsRecoveringFromCrash] = useState(false);
@@ -421,6 +427,9 @@ export default function App() {
     try {
       // Load theme first so first paint has correct theme (avoids flash/flicker)
       const savedTheme = await AsyncStorage.getItem('appTheme');
+      const panditFlag = await AsyncStorage.getItem('panditMode');
+      const panditOn = panditFlag === '1' || panditFlag === 'true';
+      setInitialPanditMode(panditOn);
       setInitialTheme(savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : 'dark');
 
       loadSavedLanguage();
@@ -749,7 +758,7 @@ export default function App() {
             : undefined
         }
       >
-        <ThemeProvider initialTheme={initialTheme}>
+        <ThemeProvider initialTheme={initialTheme} initialPanditMode={initialPanditMode}>
         <WebAlertProvider>
         <Animated.View
           style={{
@@ -961,6 +970,16 @@ export default function App() {
           <Stack.Screen 
             name="MuhuratHub" 
             component={MuhuratHubScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="PanditHome"
+            component={PanditHome}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="PanditPractice"
+            component={PanditPractice}
             options={{ headerShown: false }}
           />
           <Stack.Screen

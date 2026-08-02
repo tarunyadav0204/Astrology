@@ -1,8 +1,47 @@
-import React, { createContext, useState, useContext, useEffect, useMemo } from 'react';
+import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, StatusBar } from 'react-native';
+import i18n from '../locales/i18n';
+import { storage } from '../services/storage';
 
 const ThemeContext = createContext();
+
+export const PANDIT_MODE_KEY = 'panditMode';
+export const APP_THEME_KEY = 'appTheme';
+export const PANDIT_PREV_LANG_KEY = 'panditModePrevLanguage';
+const PANDIT_UI_LANGUAGE = 'hindi';
+
+async function applyPanditLanguage() {
+  try {
+    const current =
+      (await storage.getLanguage()) || i18n.language || 'english';
+    const savedPrev = await AsyncStorage.getItem(PANDIT_PREV_LANG_KEY);
+    if (!savedPrev) {
+      await AsyncStorage.setItem(PANDIT_PREV_LANG_KEY, current);
+    }
+    if (current !== PANDIT_UI_LANGUAGE) {
+      await storage.setLanguage(PANDIT_UI_LANGUAGE);
+      await i18n.changeLanguage(PANDIT_UI_LANGUAGE);
+    }
+  } catch (error) {
+    console.error('Error applying pandit language:', error);
+  }
+}
+
+async function restoreConsumerLanguage() {
+  try {
+    const prev = await AsyncStorage.getItem(PANDIT_PREV_LANG_KEY);
+    await AsyncStorage.removeItem(PANDIT_PREV_LANG_KEY);
+    if (prev && prev !== i18n.language) {
+      await storage.setLanguage(prev);
+      await i18n.changeLanguage(prev);
+    } else if (prev) {
+      await storage.setLanguage(prev);
+    }
+  } catch (error) {
+    console.error('Error restoring language after pandit mode:', error);
+  }
+}
 
 export const THEMES = {
   dark: {
@@ -50,9 +89,34 @@ export const THEMES = {
     cardBackground: '#ffffff',
     cardBorder: 'rgba(234, 88, 12, 0.25)',
     statusBarStyle: 'dark-content',
-    // For elements that need to read well on both themes (e.g. zodiac wheel stroke)
     strokeMuted: 'rgba(28, 25, 23, 0.2)',
     strokeStrong: 'rgba(28, 25, 23, 0.35)',
+  },
+  /** Clean white workbench while Pandit mode is on (app-wide). */
+  pandit: {
+    background: '#FFFFFF',
+    backgroundSecondary: '#F4F4F5',
+    backgroundTertiary: '#E4E4E7',
+    surface: '#FFFFFF',
+    text: '#18181B',
+    textSecondary: '#52525B',
+    textTertiary: '#71717A',
+    // Desk chrome: ink/zinc — no orange brand wash
+    primary: '#3F3F46',
+    secondary: '#52525B',
+    accent: '#71717A',
+    success: '#16A34A',
+    error: '#DC2626',
+    warning: '#A16207',
+    gradientStart: '#FFFFFF',
+    gradientMid: '#FFFFFF',
+    gradientEnd: '#FAFAFA',
+    gradientAccent: '#F4F4F5',
+    cardBackground: '#FFFFFF',
+    cardBorder: 'rgba(24, 24, 27, 0.1)',
+    statusBarStyle: 'dark-content',
+    strokeMuted: 'rgba(24, 24, 27, 0.15)',
+    strokeStrong: 'rgba(24, 24, 27, 0.3)',
   },
 };
 
@@ -61,8 +125,6 @@ function syncWebChromeTheme(themeName) {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return;
   const palette = THEMES[themeName] || THEMES.dark;
   const shellBg = palette.background;
-  // Home may set --ar-bottom-safe-color for the thin home-indicator strip only —
-  // never paint html/body/#root with that orange (it looked like a huge safe area).
   const bottomSafe = (
     document.documentElement.style.getPropertyValue('--ar-bottom-safe-color') || ''
   ).trim();
@@ -74,7 +136,6 @@ function syncWebChromeTheme(themeName) {
     document.head.appendChild(meta);
   }
   meta.setAttribute('content', chromeBg);
-  // media-specific tags (Expo sometimes emits light/dark variants)
   document.querySelectorAll('meta[name="theme-color"][media]').forEach((el) => {
     el.setAttribute('content', chromeBg);
   });
@@ -84,7 +145,6 @@ function syncWebChromeTheme(themeName) {
     appleBar.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
     document.head.appendChild(appleBar);
   }
-  // dark: blend into purple shell; light: default so icons stay dark on cream
   appleBar.setAttribute('content', themeName === 'dark' ? 'black-translucent' : 'default');
   document.documentElement.style.backgroundColor = shellBg;
   document.documentElement.style.colorScheme = themeName === 'dark' ? 'dark' : 'light';
@@ -95,7 +155,6 @@ function syncWebChromeTheme(themeName) {
   if (root) root.style.backgroundColor = shellBg;
 }
 
-/** Global StatusBar that matches active theme (fixes hardcoded orange in App.js). */
 export function ThemedStatusBar() {
   const { colors } = useTheme();
   return (
@@ -107,27 +166,44 @@ export function ThemedStatusBar() {
   );
 }
 
-export const ThemeProvider = ({ children, initialTheme }) => {
-  const [theme, setTheme] = useState(initialTheme === 'light' || initialTheme === 'dark' ? initialTheme : 'dark');
+export const ThemeProvider = ({ children, initialTheme, initialPanditMode = false }) => {
+  const resolvedConsumer =
+    initialTheme === 'light' || initialTheme === 'dark' ? initialTheme : 'dark';
+  const startPandit = Boolean(initialPanditMode);
+  const [consumerTheme, setConsumerTheme] = useState(resolvedConsumer);
+  const [isPanditMode, setIsPanditMode] = useState(startPandit);
+  const [theme, setTheme] = useState(startPandit ? 'pandit' : resolvedConsumer);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (initialTheme != null) {
-      return;
+    if (initialTheme != null || initialPanditMode) {
+      if (initialPanditMode) {
+        applyPanditLanguage();
+      }
+      return undefined;
     }
     loadTheme();
+    return undefined;
   }, []);
 
   useEffect(() => {
-    syncWebChromeTheme(theme);
+    syncWebChromeTheme(theme === 'pandit' ? 'pandit' : theme);
   }, [theme]);
 
   const loadTheme = async () => {
     try {
       setIsLoading(true);
-      const savedTheme = await AsyncStorage.getItem('appTheme');
-      if (savedTheme === 'light' || savedTheme === 'dark') {
-        setTheme(savedTheme);
+      const [savedTheme, panditFlag] = await Promise.all([
+        AsyncStorage.getItem(APP_THEME_KEY),
+        AsyncStorage.getItem(PANDIT_MODE_KEY),
+      ]);
+      const nextConsumer = savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : 'dark';
+      const panditOn = panditFlag === '1' || panditFlag === 'true';
+      setConsumerTheme(nextConsumer);
+      setIsPanditMode(panditOn);
+      setTheme(panditOn ? 'pandit' : nextConsumer);
+      if (panditOn) {
+        await applyPanditLanguage();
       }
     } catch (error) {
       console.error('Error loading theme:', error);
@@ -136,20 +212,47 @@ export const ThemeProvider = ({ children, initialTheme }) => {
     }
   };
 
+  const enterPanditMode = useCallback(async () => {
+    setIsPanditMode(true);
+    setTheme('pandit');
+    try {
+      await AsyncStorage.setItem(PANDIT_MODE_KEY, '1');
+      await applyPanditLanguage();
+    } catch (error) {
+      console.error('Error saving pandit mode:', error);
+    }
+  }, []);
+
+  const exitPanditMode = useCallback(async () => {
+    setIsPanditMode(false);
+    setTheme(consumerTheme);
+    try {
+      await AsyncStorage.setItem(PANDIT_MODE_KEY, '0');
+      await restoreConsumerLanguage();
+    } catch (error) {
+      console.error('Error clearing pandit mode:', error);
+    }
+  }, [consumerTheme]);
+
   const toggleTheme = async () => {
+    if (isPanditMode) {
+      // Leaving white pandit shell → restore consumer preference.
+      await exitPanditMode();
+      return;
+    }
     const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setConsumerTheme(newTheme);
     setTheme(newTheme);
     try {
-      await AsyncStorage.setItem('appTheme', newTheme);
+      await AsyncStorage.setItem(APP_THEME_KEY, newTheme);
     } catch (error) {
       console.error('Error saving theme:', error);
     }
   };
 
-  // On Android light theme, use card/surface colors almost same as background and remove elevation/shadow to avoid white inner-shadow look
-  const isAndroidLight = Platform.OS === 'android' && theme === 'light';
-  const baseColors = THEMES[theme];
-  const colors = isAndroidLight
+  const isAndroidLight = Platform.OS === 'android' && (theme === 'light' || theme === 'pandit');
+  const baseColors = THEMES[theme] || THEMES.dark;
+  const colors = isAndroidLight && theme === 'light'
     ? {
         ...baseColors,
         cardBackground: baseColors.background,
@@ -158,7 +261,6 @@ export const ThemeProvider = ({ children, initialTheme }) => {
       }
     : baseColors;
 
-  // Spread this onto any card View to remove elevation and shadow on Android light (fixes white inner shadow)
   const androidLightCardFixStyle = useMemo(() =>
     isAndroidLight
       ? {
@@ -170,7 +272,6 @@ export const ThemeProvider = ({ children, initialTheme }) => {
         }
       : {}, [isAndroidLight]);
 
-  // Helper function to get card elevation based on theme
   const getCardElevation = (defaultElevation = 3) => {
     if (isAndroidLight) {
       return 0;
@@ -179,7 +280,19 @@ export const ThemeProvider = ({ children, initialTheme }) => {
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, colors, toggleTheme, isLoading, getCardElevation, androidLightCardFixStyle }}>
+    <ThemeContext.Provider
+      value={{
+        theme,
+        colors,
+        toggleTheme,
+        isLoading,
+        getCardElevation,
+        androidLightCardFixStyle,
+        isPanditMode,
+        enterPanditMode,
+        exitPanditMode,
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   );

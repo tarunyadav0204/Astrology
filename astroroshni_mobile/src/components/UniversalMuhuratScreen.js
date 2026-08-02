@@ -6,12 +6,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { storage } from '../services/storage';
-import { API_BASE_URL, getEndpoint, COLORS } from '../utils/constants';
+import { API_BASE_URL, getEndpoint } from '../utils/constants';
 import LocationPicker from './LocationPicker';
 import { useCredits } from '../credits/CreditContext';
 import { useAuthGate } from '../auth/AuthGateContext';
 import { pricingAPI } from '../services/api';
 import WebDatePickerModal from './Common/WebDatePickerModal';
+import { useTheme } from '../context/ThemeContext';
 
 const isWeb = Platform.OS === 'web';
 
@@ -19,6 +20,18 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
   const { config } = route.params; 
   const { credits, fetchBalance } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
+  const { theme, colors } = useTheme();
+  const isDark = theme === 'dark';
+  const accent = isDark ? (config?.gradient?.[0] || colors.primary) : colors.primary;
+  const ui = {
+    text: colors.text,
+    muted: colors.textSecondary,
+    cardBg: isDark ? 'rgba(255,255,255,0.1)' : colors.cardBackground,
+    cardBorder: isDark ? 'rgba(255,255,255,0.2)' : colors.cardBorder,
+    insetBg: isDark ? 'rgba(0,0,0,0.3)' : colors.backgroundSecondary,
+    softBg: isDark ? 'rgba(255,255,255,0.08)' : colors.backgroundSecondary,
+    resultBg: isDark ? 'rgba(255,255,255,0.05)' : colors.cardBackground,
+  };
   
   const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
@@ -192,22 +205,24 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
     : (results?.best_available_recommendations || []);
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#120E24', '#261C45']} style={styles.bg}>
-        <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {isDark ? (
+        <LinearGradient colors={['#120E24', '#261C45']} style={StyleSheet.absoluteFill} />
+      ) : null}
+      <SafeAreaView style={styles.safeArea}>
           <ScrollView contentContainerStyle={styles.scroll}>
             
             <View style={styles.header}>
               <TouchableOpacity onPress={() => navigation.goBack()}>
-                <Icon name="arrow-back" size={24} color={COLORS.white} />
+                <Icon name="arrow-back" size={24} color={ui.text} />
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>{config.title}</Text>
+              <Text style={[styles.headerTitle, { color: ui.text }]}>{config.title}</Text>
               <View style={{width: 24}}/>
             </View>
 
-            <View style={styles.creditCard}>
+            <View style={[styles.creditCard, { backgroundColor: ui.softBg, borderColor: ui.cardBorder }]}>
               <View style={styles.creditRow}>
-                <Text style={styles.creditLabel}>💎 Cost: {creditInfo.cost} credits</Text>
+                <Text style={[styles.creditLabel, { color: ui.text }]}>💎 Cost: {creditInfo.cost} credits</Text>
                 <Text style={[styles.creditBalance, { color: credits >= creditInfo.cost ? '#00C853' : '#FF5722' }]}>
                   Balance: {credits}
                 </Text>
@@ -222,27 +237,27 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
               )}
             </View>
 
-            <View style={styles.card}>
-              <Text style={[styles.cardTitle, {color: config.gradient[0]}]}>📅 DATE RANGE</Text>
+            <View style={[styles.card, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}>
+              <Text style={[styles.cardTitle, { color: accent }]}>📅 DATE RANGE</Text>
               <View style={styles.row}>
-                <TouchableOpacity onPress={() => setShowStartPicker(true)} style={styles.picker}>
-                  <Text style={styles.pickerLabel}>From</Text>
-                  <Text style={styles.pickerValue}>{startDate.toLocaleDateString()}</Text>
+                <TouchableOpacity onPress={() => setShowStartPicker(true)} style={[styles.picker, { backgroundColor: ui.insetBg }]}>
+                  <Text style={[styles.pickerLabel, { color: ui.muted }]}>From</Text>
+                  <Text style={[styles.pickerValue, { color: ui.text }]}>{startDate.toLocaleDateString()}</Text>
                 </TouchableOpacity>
-                <Icon name="arrow-forward" size={20} color="#666" />
-                <TouchableOpacity onPress={() => setShowEndPicker(true)} style={styles.picker}>
-                  <Text style={styles.pickerLabel}>To</Text>
-                  <Text style={styles.pickerValue}>{endDate.toLocaleDateString()}</Text>
+                <Icon name="arrow-forward" size={20} color={ui.muted} />
+                <TouchableOpacity onPress={() => setShowEndPicker(true)} style={[styles.picker, { backgroundColor: ui.insetBg }]}>
+                  <Text style={[styles.pickerLabel, { color: ui.muted }]}>To</Text>
+                  <Text style={[styles.pickerValue, { color: ui.text }]}>{endDate.toLocaleDateString()}</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-            <View style={styles.card}>
-              <Text style={[styles.cardTitle, {color: config.gradient[0]}]}>📍 LOCATION</Text>
-              <TouchableOpacity style={styles.locBtn} onPress={() => setShowLocationPicker(true)}>
-                <Icon name="location" size={20} color="#fff" />
-                <Text style={styles.locText}>{location?.name || "Select City"}</Text>
-                <Text style={styles.changeText}>Change</Text>
+            <View style={[styles.card, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}>
+              <Text style={[styles.cardTitle, { color: accent }]}>📍 LOCATION</Text>
+              <TouchableOpacity style={[styles.locBtn, { backgroundColor: ui.insetBg }]} onPress={() => setShowLocationPicker(true)}>
+                <Icon name="location" size={20} color={ui.text} />
+                <Text style={[styles.locText, { color: ui.text }]}>{location?.name || "Select City"}</Text>
+                <Text style={[styles.changeText, { color: ui.muted }]}>Change</Text>
               </TouchableOpacity>
             </View>
 
@@ -251,24 +266,41 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
               onPress={calculate} 
               disabled={loading || credits < creditInfo.cost}
             >
-              <LinearGradient 
-                colors={credits >= creditInfo.cost ? config.gradient : ['#666', '#888']} 
-                style={styles.btnGrad}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff"/>
-                ) : (
-                  <Text style={styles.btnText}>
-                    {credits >= creditInfo.cost ? 'Find Auspicious Time' : 'Insufficient Credits'}
-                  </Text>
-                )}
-              </LinearGradient>
+              {isDark ? (
+                <LinearGradient 
+                  colors={credits >= creditInfo.cost ? config.gradient : ['#666', '#888']} 
+                  style={styles.btnGrad}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff"/>
+                  ) : (
+                    <Text style={styles.btnText}>
+                      {credits >= creditInfo.cost ? 'Find Auspicious Time' : 'Insufficient Credits'}
+                    </Text>
+                  )}
+                </LinearGradient>
+              ) : (
+                <View
+                  style={[
+                    styles.btnGrad,
+                    { backgroundColor: credits >= creditInfo.cost ? colors.primary : colors.backgroundTertiary },
+                  ]}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff"/>
+                  ) : (
+                    <Text style={styles.btnText}>
+                      {credits >= creditInfo.cost ? 'Find Auspicious Time' : 'Insufficient Credits'}
+                    </Text>
+                  )}
+                </View>
+              )}
             </TouchableOpacity>
 
             {results && (
               <View style={styles.results}>
-                <Text style={styles.resHeader}>Recommended Slots</Text>
-                <Text style={styles.auditHint}>Every date in your selected range is shown below. Tap a rejected date to see why.</Text>
+                <Text style={[styles.resHeader, { color: ui.text }]}>Recommended Slots</Text>
+                <Text style={[styles.auditHint, { color: ui.muted }]}>Every date in your selected range is shown below. Tap a rejected date to see why.</Text>
                 <View style={styles.dateAuditGrid}>
                   {[...(results.recommendations || []).map((item) => ({ ...item, accepted: true })), ...(results.best_available_recommendations || []).map((item) => ({ ...item, accepted: false, fallback: true })), ...(results.rejected_dates || []).map((item) => ({ ...item, accepted: false }))]
                     .sort((a, b) => String(a.date).localeCompare(String(b.date)))
@@ -282,55 +314,55 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
                             ? Alert.alert('Best available with cautions', `${item.date}\n${(item.date_warnings || []).join('\n')}`)
                             : Alert.alert('Why this date was rejected', `${item.date}\n${(item.reasons || []).join('\n')}`)}
                       >
-                        <Text style={styles.dateChipDate}>{item.date.slice(5)}</Text>
-                        <Text style={styles.dateChipState}>{item.accepted ? 'Suitable' : (item.fallback ? 'Caution' : 'Rejected')}</Text>
+                        <Text style={[styles.dateChipDate, { color: ui.text }]}>{item.date.slice(5)}</Text>
+                        <Text style={[styles.dateChipState, { color: ui.muted }]}>{item.accepted ? 'Suitable' : (item.fallback ? 'Caution' : 'Rejected')}</Text>
                       </TouchableOpacity>
                     ))}
                 </View>
                 {results.recommendations.length === 0 && visibleRecommendations.length === 0 ? (
-                  <View style={styles.noDataContainer}>
-                    <Text style={styles.noData}>No suitable vehicle Muhurat found</Text>
-                    <Text style={styles.noDataSub}>Traditional timing rules did not leave a recommended date in this range.</Text>
+                  <View style={[styles.noDataContainer, { backgroundColor: ui.resultBg }]}>
+                    <Text style={[styles.noData, { color: ui.text }]}>No suitable vehicle Muhurat found</Text>
+                    <Text style={[styles.noDataSub, { color: ui.muted }]}>Traditional timing rules did not leave a recommended date in this range.</Text>
                     {(results.rejected_dates || []).slice(0, 4).map((item) => (
-                      <Text key={item.date} style={styles.noDataTip}>• {item.date}: {(item.reasons || []).join(' ')}</Text>
+                      <Text key={item.date} style={[styles.noDataTip, { color: ui.muted }]}>• {item.date}: {(item.reasons || []).join(' ')}</Text>
                     ))}
-                    <Text style={styles.noDataTip}>Try extending the date range or choosing a different location.</Text>
+                    <Text style={[styles.noDataTip, { color: ui.muted }]}>Try extending the date range or choosing a different location.</Text>
                   </View>
                 ) : (
                   <>
                   {!results.recommendations.length && (
                     <View style={styles.fallbackNotice}>
-                      <Text style={styles.fallbackTitle}>Best available dates with cautions</Text>
-                      <Text style={styles.fallbackText}>{results.best_available_notice || 'These dates are shown only when you must proceed. They are not strict recommendations.'}</Text>
+                      <Text style={[styles.fallbackTitle, { color: isDark ? '#FFD080' : '#A16207' }]}>Best available dates with cautions</Text>
+                      <Text style={[styles.fallbackText, { color: ui.muted }]}>{results.best_available_notice || 'These dates are shown only when you must proceed. They are not strict recommendations.'}</Text>
                     </View>
                   )}
                   {visibleRecommendations.map((day, idx) => (
-                    <View key={idx} style={styles.resultItem}>
-                      <Text style={styles.resultDate}>{new Date(day.date).toDateString()}</Text>
+                    <View key={idx} style={[styles.resultItem, { backgroundColor: ui.resultBg, borderColor: ui.cardBorder, borderWidth: isDark ? 0 : 1 }]}>
+                      <Text style={[styles.resultDate, { color: ui.text }]}>{new Date(day.date).toDateString()}</Text>
                       {day.panchak?.is_panchak && (
                         <View style={styles.panchakAlert}>
                           <Text style={styles.panchakTitle}>⚠ Panchak is active</Text>
-                          <Text style={styles.panchakReason}>{day.panchak.reason}</Text>
+                          <Text style={[styles.panchakReason, { color: ui.muted }]}>{day.panchak.reason}</Text>
                           {(day.panchak.intervals || []).map((interval, intervalIndex) => (
                             <Text key={`${interval.start}-${interval.end}-${intervalIndex}`} style={styles.panchakInterval}>
                               Active from {interval.start} to {interval.end}
                             </Text>
                           ))}
-                          <Text style={styles.panchakNote}>Confirm a Panchak window with a qualified priest before use.</Text>
+                          <Text style={[styles.panchakNote, { color: ui.muted }]}>Confirm a Panchak window with a qualified priest before use.</Text>
                         </View>
                       )}
                       <View style={styles.slotGrid}>
                         {day.slots.map((slot, sIdx) => (
-                          <View key={sIdx} style={[styles.slot, day.panchak?.is_panchak && styles.panchakSlot]}>
-                            <Text style={styles.slotTime}>{slot.time}</Text>
-                            <Text style={styles.slotLagna}>{slot.lagna}</Text>
-                            <Text style={styles.slotScore}>{slot.quality} · {slot.score}/100</Text>
-                            <Text style={styles.slotRationale}>{slot.rationale}</Text>
+                          <View key={sIdx} style={[styles.slot, day.panchak?.is_panchak && styles.panchakSlot, !isDark && { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                            <Text style={[styles.slotTime, { color: ui.text }]}>{slot.time}</Text>
+                            <Text style={[styles.slotLagna, { color: isDark ? '#FFD700' : '#A16207' }]}>{slot.lagna}</Text>
+                            <Text style={[styles.slotScore, { color: ui.muted }]}>{slot.quality} · {slot.score}/100</Text>
+                            <Text style={[styles.slotRationale, { color: ui.muted }]}>{slot.rationale}</Text>
                             {slot.panchak && <Text style={styles.slotCaution}>⚠ Panchak active — confirm this slot with a qualified priest.</Text>}
                             {(slot.positives?.length > 0 || slot.cautions?.length > 0) && (
                               <View style={styles.slotFactors}>
-                                {slot.positives?.map((reason) => <Text key={`p-${reason}`} style={styles.slotPositive}>✓ {reason}</Text>)}
-                                {slot.cautions?.map((reason) => <Text key={`c-${reason}`} style={styles.slotCaution}>! {reason}</Text>)}
+                                {slot.positives?.map((reason) => <Text key={`p-${reason}`} style={[styles.slotPositive, !isDark && { color: '#15803D' }]}>✓ {reason}</Text>)}
+                                {slot.cautions?.map((reason) => <Text key={`c-${reason}`} style={[styles.slotCaution, !isDark && { color: '#A16207' }]}>! {reason}</Text>)}
                               </View>
                             )}
                           </View>
@@ -464,7 +496,6 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
           )}
 
         </SafeAreaView>
-      </LinearGradient>
     </View>
   );
 }

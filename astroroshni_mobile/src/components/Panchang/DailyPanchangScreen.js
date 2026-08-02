@@ -187,7 +187,7 @@ export default function DailyPanchangScreen({ navigation, route }) {
         <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            style={[styles.backBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)' }]}
+            style={[styles.backBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(24, 24, 27, 0.08)' }]}
           >
             <Ionicons name="arrow-back" size={20} color={colors.text} />
           </TouchableOpacity>

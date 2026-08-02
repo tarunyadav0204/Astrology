@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/Ionicons';
-import { COLORS } from '../utils/constants';
 import { pricingAPI } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -62,6 +62,8 @@ const MUHURAT_TYPES = [
 ];
 
 export default function MuhuratHubScreen({ navigation }) {
+  const { theme, colors } = useTheme();
+  const isDark = theme === 'dark';
   const [pricing, setPricing] = useState({});
   const [pricingOriginal, setPricingOriginal] = useState({});
 
@@ -91,92 +93,102 @@ export default function MuhuratHubScreen({ navigation }) {
     }
   };
 
+  const cardBg = isDark ? 'rgba(255,255,255,0.08)' : colors.cardBackground;
+  const cardBorder = isDark ? 'rgba(255,255,255,0.1)' : colors.cardBorder;
+  const bannerBg = isDark ? 'rgba(249,115,22,0.18)' : 'rgba(24, 24, 27, 0.04)';
+  const bannerBorder = isDark ? 'rgba(255,215,0,0.35)' : colors.cardBorder;
+  const iconCircleBg = isDark ? '#f97316' : colors.primary;
+
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#120E24', '#261C45']} style={styles.bg}>
-        <SafeAreaView style={styles.safeArea}>
-          
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()}>
-              <Icon name="arrow-back" size={24} color={COLORS.white} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Auspicious Timings</Text>
-            <View style={{width: 24}}/>
-          </View>
-
-          <Text style={styles.subHeader}>Select an event to plan</Text>
-
-          <TouchableOpacity
-            style={styles.panchangBanner}
-            onPress={() => navigation.navigate('DailyPanchang')}
-            activeOpacity={0.88}
-          >
-            <View style={styles.panchangBannerIcon}>
-              <Icon name="sunny" size={22} color="#fff" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.panchangBannerTitle}>Today's Panchang</Text>
-              <Text style={styles.panchangBannerSub}>Tithi, Choghadiya, Hora, Amrit & Rahu Kaal</Text>
-            </View>
-            <Icon name="chevron-forward" size={18} color="#FFD700" />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {isDark ? (
+        <LinearGradient colors={['#120E24', '#261C45']} style={StyleSheet.absoluteFill} />
+      ) : null}
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Icon name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Auspicious Timings</Text>
+          <View style={{ width: 24 }} />
+        </View>
 
-          <ScrollView contentContainerStyle={styles.grid}>
-            {MUHURAT_TYPES.map((item, index) => {
-              const costKey = COST_KEYS[item.id];
-              const cost = costKey != null ? (pricing[costKey] ?? 0) : 0;
-              const originalCost = costKey != null ? pricingOriginal[costKey] : null;
-              const showCost = cost > 0;
-              return (
-                <TouchableOpacity 
-                  key={index} 
-                  style={styles.card} 
-                  onPress={() => handlePress(item)}
-                >
-                  {showCost && (
-                    <View style={styles.costBadge}>
-                      <Icon name="flash" size={8} color="#854d0e" />
-                      {originalCost != null && originalCost > cost ? (
-                        <View style={styles.costWithDiscount}>
-                          <Text style={[styles.costText, styles.costOriginal]}>{originalCost}</Text>
-                          <Text style={styles.costText}>{cost}</Text>
-                        </View>
-                      ) : (
+        <Text style={[styles.subHeader, { color: colors.textSecondary }]}>Select an event to plan</Text>
+
+        <TouchableOpacity
+          style={[styles.panchangBanner, { backgroundColor: bannerBg, borderColor: bannerBorder }]}
+          onPress={() => navigation.navigate('DailyPanchang')}
+          activeOpacity={0.88}
+        >
+          <View style={[styles.panchangBannerIcon, { backgroundColor: iconCircleBg }]}>
+            <Icon name="sunny" size={22} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.panchangBannerTitle, { color: colors.text }]}>Today's Panchang</Text>
+            <Text style={[styles.panchangBannerSub, { color: colors.textSecondary }]}>
+              Tithi, Choghadiya, Hora, Amrit & Rahu Kaal
+            </Text>
+          </View>
+          <Icon name="chevron-forward" size={18} color={isDark ? '#FFD700' : colors.textTertiary} />
+        </TouchableOpacity>
+
+        <ScrollView contentContainerStyle={styles.grid}>
+          {MUHURAT_TYPES.map((item, index) => {
+            const costKey = COST_KEYS[item.id];
+            const cost = costKey != null ? (pricing[costKey] ?? 0) : 0;
+            const originalCost = costKey != null ? pricingOriginal[costKey] : null;
+            const showCost = cost > 0;
+            return (
+              <TouchableOpacity
+                key={index}
+                style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}
+                onPress={() => handlePress(item)}
+              >
+                {showCost && (
+                  <View style={styles.costBadge}>
+                    <Icon name="flash" size={8} color="#854d0e" />
+                    {originalCost != null && originalCost > cost ? (
+                      <View style={styles.costWithDiscount}>
+                        <Text style={[styles.costText, styles.costOriginal]}>{originalCost}</Text>
                         <Text style={styles.costText}>{cost}</Text>
-                      )}
-                    </View>
-                  )}
+                      </View>
+                    ) : (
+                      <Text style={styles.costText}>{cost}</Text>
+                    )}
+                  </View>
+                )}
+                {isDark ? (
                   <LinearGradient colors={item.gradient} style={styles.iconCircle}>
                     <Icon name={item.icon} size={28} color="#fff" />
                   </LinearGradient>
-                  <Text style={styles.cardTitle}>{item.title}</Text>
-                  <Text style={styles.cardSubtitle}>{item.subtitle}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-        </SafeAreaView>
-      </LinearGradient>
+                ) : (
+                  <View style={[styles.iconCircle, { backgroundColor: colors.backgroundSecondary }]}>
+                    <Icon name={item.icon} size={28} color={colors.primary} />
+                  </View>
+                )}
+                <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
+                <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{item.subtitle}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  bg: { flex: 1 },
   safeArea: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center' },
-  headerTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  subHeader: { color: '#aaa', marginLeft: 20, marginBottom: 12 },
+  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  subHeader: { marginLeft: 20, marginBottom: 12 },
   panchangBanner: {
     marginHorizontal: 20,
     marginBottom: 18,
     padding: 14,
     borderRadius: 14,
-    backgroundColor: 'rgba(249,115,22,0.18)',
     borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.35)',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -185,27 +197,24 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f97316',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  panchangBannerTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  panchangBannerSub: { color: '#cbd5e1', fontSize: 11, marginTop: 2 },
+  panchangBannerTitle: { fontSize: 15, fontWeight: '800' },
+  panchangBannerSub: { fontSize: 11, marginTop: 2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 15 },
-  card: { 
-    width: (width - 50) / 2, 
-    backgroundColor: 'rgba(255,255,255,0.08)', 
-    borderRadius: 16, 
-    padding: 15, 
-    margin: 5, 
+  card: {
+    width: (width - 50) / 2,
+    borderRadius: 16,
+    padding: 15,
+    margin: 5,
     marginBottom: 15,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)'
   },
   iconCircle: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  cardTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
-  cardSubtitle: { color: '#888', fontSize: 11, textAlign: 'center' },
+  cardTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  cardSubtitle: { fontSize: 11, textAlign: 'center' },
   costBadge: {
     position: 'absolute',
     top: 8,

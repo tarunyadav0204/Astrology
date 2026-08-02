@@ -416,6 +416,14 @@ export default function ReportsStudioScreen({ navigation, route }) {
 
   useEffect(() => {
     const params = route?.params || {};
+    if (params.reportType && typeof params.reportType === 'string') {
+      setSelectedReportType(params.reportType);
+      navigation.setParams({
+        ...params,
+        reportType: undefined,
+      });
+      return;
+    }
     if (params.selectorTarget && params.birthData) {
       if (params.selectorTarget === 'personA') {
         setSelectedPersonA(params.birthData);

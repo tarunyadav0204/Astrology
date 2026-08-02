@@ -70,7 +70,14 @@ const getRelationLabel = (profile) => {
 export default function ProfileScreen({ navigation, route }) {
   const { t } = useTranslation();
   useAnalytics('ProfileScreen');
-  const { theme, toggleTheme, colors } = useTheme();
+  const {
+    theme,
+    toggleTheme,
+    colors,
+    isPanditMode,
+    enterPanditMode,
+    exitPanditMode,
+  } = useTheme();
   const { credits } = useCredits();
   const { requireAuthForPaid, isGuest, refreshAuthState } = useAuthGate();
   const [userData, setUserData] = useState(null);
@@ -853,11 +860,47 @@ export default function ProfileScreen({ navigation, route }) {
 
                 <View style={[styles.settingDivider, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }]} />
 
+                <TouchableOpacity
+                  style={styles.settingItem}
+                  onPress={async () => {
+                    const { openPanditMode } = require('../Pandit/openPanditMode');
+                    if (isPanditMode) {
+                      await exitPanditMode();
+                      return;
+                    }
+                    await openPanditMode({
+                      navigation,
+                      requireAuthForPaid,
+                      enterPanditMode,
+                    });
+                  }}
+                >
+                  <View style={styles.settingLeft}>
+                    <Ionicons name="flower-outline" size={22} color="#ea580c" />
+                    <Text style={[styles.settingText, { color: colors.text }]}>
+                      {isPanditMode
+                        ? t('profile.exitPanditMode', 'Exit Pandit mode')
+                        : t('profile.panditDesk', 'I am a Pandit')}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+
+                <View style={[styles.settingDivider, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }]} />
+
                 <TouchableOpacity style={styles.settingItem} onPress={toggleTheme}>
                   <View style={styles.settingLeft}>
-                    <Ionicons name={theme === 'dark' ? 'sunny-outline' : 'moon-outline'} size={22} color="#ffd700" />
+                    <Ionicons
+                      name={isPanditMode || theme === 'dark' ? 'sunny-outline' : 'moon-outline'}
+                      size={22}
+                      color="#ffd700"
+                    />
                     <Text style={[styles.settingText, { color: colors.text }]}>
-                      {theme === 'dark' ? t('profile.darkTheme', 'Light Theme') : t('profile.lightTheme', 'Dark Theme')}
+                      {isPanditMode
+                        ? t('profile.exitPanditTheme', 'Exit white Pandit theme')
+                        : theme === 'dark'
+                          ? t('profile.darkTheme', 'Light Theme')
+                          : t('profile.lightTheme', 'Dark Theme')}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />

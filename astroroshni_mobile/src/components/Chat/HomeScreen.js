@@ -41,6 +41,7 @@ import { trackAcquisitionFunnelEvent } from '../../services/acquisitionTracking'
 import { extractFirstHttpsUrl } from '../../utils/blogLinks';
 import FomoHomeSheet from './FomoHomeSheet';
 import FomoHomeEntryCard from './FomoHomeEntryCard';
+import PanditHomePanel from '../Pandit/PanditHomePanel';
 import { getWebBottomInset, refreshWebShellHeight, setWebBottomSafeColor } from '../../platform/webSafeArea';
 
 let createPortal = null;
@@ -364,9 +365,26 @@ export default function HomeScreen({
       { status: 'viewed', screenName: 'HomeScreen' },
     ).catch(() => {});
   }, []);
-  const { theme, colors, androidLightCardFixStyle } = useTheme();
+  const { theme, colors, androidLightCardFixStyle, isPanditMode, exitPanditMode } = useTheme();
   const tabSafeColor = theme === 'dark' ? '#ea580c' : '#ffffff';
   const isDark = theme === 'dark';
+  const homePageGradient = isDark
+    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary]
+    : isPanditMode
+      ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientEnd]
+      : [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientAccent || '#fde68a'];
+  const homeHeaderGradient = isDark
+    ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']
+    : isPanditMode
+      ? ['#FFFFFF', '#FFFFFF', '#FAFAFA']
+      : ['rgba(255, 255, 255, 0.98)', 'rgba(255, 247, 237, 0.95)', 'rgba(255, 237, 213, 0.92)'];
+  const tabBarGradient = isDark
+    ? ['#f97316', '#ea580c']
+    : isPanditMode
+      ? ['#FFFFFF', '#FFFFFF']
+      : ['#ffffff', '#fff5f0'];
+  const tabActiveColor = isDark ? '#ffffff' : colors.primary;
+  const tabIdleColor = isDark ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary;
   const isIOS = Platform.OS === 'ios';
   const { freeQuestionAvailable, pricing, pricingOriginal, fetchPricing } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
@@ -1874,12 +1892,246 @@ const loadHomeData = async (nativeData = null) => {
     </View>
   );
 
+  const renderAstrologyTools = () => (
+          <View style={styles.toolsSection}>
+            <Text style={[styles.toolsSectionTitle, { color: colors.text }]}>
+              {t('home.sections.astrologyTools', 'Astrology Tools')}
+            </Text>
+            <AppScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.toolsScrollContent}
+              decelerationRate="fast"
+              snapToInterval={width * 0.3 + 12}
+            >
+              <TouchableOpacity 
+                style={[styles.toolCard, androidLightCardFixStyle]}
+                onPress={() =>
+                  requireBirthChart((data) =>
+                    navigation.navigate('ChartsHub', { birthData: data, tab: 'chart' }),
+                  )
+                }
+                activeOpacity={0.8}
+              >
+                <View style={[
+                  styles.toolGlassmorphism,
+                  androidLightCardFixStyle,
+                  {
+                    backgroundColor: theme === 'dark'
+                      ? 'rgba(255, 255, 255, 0.1)'
+                      : isPanditMode
+                        ? 'rgba(24, 24, 27, 0.04)'
+                        : 'rgba(251, 146, 60, 0.15)',
+                    borderColor: theme === 'dark'
+                      ? 'rgba(255, 255, 255, 0.2)'
+                      : isPanditMode
+                        ? 'rgba(24, 24, 27, 0.12)'
+                        : 'rgba(249, 115, 22, 0.3)',
+                  }
+                ]}>
+                  <View style={styles.toolIconContainer}>
+                    <Svg width="28" height="28" viewBox="0 0 48 48">
+                      <Rect x="2" y="2" width="44" height="44" fill="none" stroke="#ffffff" strokeWidth="2" />
+                      <Polygon points="24,2 46,24 24,46 2,24" fill="none" stroke="#ffd700" strokeWidth="1.5" />
+                      <Line x1="2" y1="2" x2="46" y2="46" stroke="#ff8a65" strokeWidth="1" />
+                      <Line x1="46" y1="2" x2="2" y2="46" stroke="#ff8a65" strokeWidth="1" />
+                    </Svg>
+                    <View style={[styles.toolIconGlow, { backgroundColor: '#ff8a65' }]} />
+                  </View>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.charts', 'Charts')}</Text>
+                </View>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.toolCard, androidLightCardFixStyle]}
+                onPress={() =>
+                  requireBirthChart((data) =>
+                    navigation.navigate('ChartsHub', { birthData: data, tab: 'dasha' }),
+                  )
+                }
+                activeOpacity={0.8}
+              >
+                <View style={[
+                  styles.toolGlassmorphism,
+                  androidLightCardFixStyle,
+                  {
+                    backgroundColor: theme === 'dark' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.15)',
+                    borderColor: 'rgba(139, 92, 246, 0.3)',
+                  }
+                ]}>
+                  <View style={styles.toolIconContainer}>
+                    <Icon name="time-outline" size={24} color="#A78BFA" />
+                    <View style={[styles.toolIconGlow, { backgroundColor: '#A78BFA' }]} />
+                  </View>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.dashas', 'Dashas')}</Text>
+                  {dashData?.current_dasha && typeof dashData.current_dasha === 'string' && (
+                    <View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
+                      <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>{dashData.current_dasha.split(' ')[0]}</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.toolCard, androidLightCardFixStyle]}
+                onPress={() =>
+                  requireBirthChart((data) =>
+                    navigation.navigate('KPSystem', { birthDetails: data }),
+                  )
+                }
+                activeOpacity={0.8}
+              >
+                <View style={[
+                  styles.toolGlassmorphism,
+                  androidLightCardFixStyle,
+                  {
+                    backgroundColor: theme === 'dark' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.15)',
+                    borderColor: 'rgba(16, 185, 129, 0.3)',
+                  }
+                ]}>
+                  <View style={styles.toolIconContainer}>
+                    <Icon name="locate-outline" size={24} color="#34D399" />
+                    <View style={[styles.toolIconGlow, { backgroundColor: '#34D399' }]} />
+                  </View>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('menu.kpSystem', 'KP System')}</Text>
+                  <View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
+                    <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>{t('home.tools.precise', 'Precise')}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.toolCard, androidLightCardFixStyle]}
+                onPress={() =>
+                  requireBirthChart((data) =>
+                    navigation.navigate('KotaChakra', { birthChartId: data?.id }),
+                  )
+                }
+                activeOpacity={0.8}
+              >
+                <View style={[
+                  styles.toolGlassmorphism,
+                  androidLightCardFixStyle,
+                  {
+                    backgroundColor: theme === 'dark' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.15)',
+                    borderColor: 'rgba(245, 158, 11, 0.3)',
+                  }
+                ]}>
+                  <View style={styles.toolIconContainer}>
+                    <Icon name="shield-checkmark-outline" size={24} color="#FBBF24" />
+                    <View style={[styles.toolIconGlow, { backgroundColor: '#FBBF24' }]} />
+                  </View>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('menu.kotaChakra', 'Kota Chakra')}</Text>
+                  <View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
+                    <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>{t('home.tools.safety', 'Safety')}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.toolCard, androidLightCardFixStyle]}
+                onPress={() => requireBirthChart(() => navigation.navigate('Yogas'))}
+                activeOpacity={0.8}
+              >
+                <View style={[
+                  styles.toolGlassmorphism,
+                  androidLightCardFixStyle,
+                  {
+                    backgroundColor: theme === 'dark' ? 'rgba(236, 72, 153, 0.1)' : 'rgba(236, 72, 153, 0.15)',
+                    borderColor: 'rgba(236, 72, 153, 0.3)',
+                  }
+                ]}>
+                  <View style={styles.toolIconContainer}>
+                    <Icon name="diamond-outline" size={24} color="#F472B6" />
+                    <View style={[styles.toolIconGlow, { backgroundColor: '#F472B6' }]} />
+                  </View>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('menu.yogas', 'Yogas')}</Text>
+<View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
+                  <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>{t('home.tools.fortune', 'Fortune')}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.toolCard, androidLightCardFixStyle]}
+                onPress={() =>
+                  requireBirthChart((data) =>
+                    navigation.navigate('ChartsHub', { birthData: data, tab: 'ashtakvarga' }),
+                  )
+                }
+                activeOpacity={0.8}
+              >
+                <View style={[
+                  styles.toolGlassmorphism,
+                  androidLightCardFixStyle,
+                  {
+                    backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.15)',
+                    borderColor: 'rgba(59, 130, 246, 0.3)',
+                  }
+                ]}>
+                  <View style={styles.toolIconContainer}>
+                    <Icon name="grid-outline" size={24} color="#60A5FA" />
+                    <View style={[styles.toolIconGlow, { backgroundColor: '#60A5FA' }]} />
+                  </View>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.ashtakvarga', 'Ashtak-\nvarga')}</Text>
+                </View>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.toolCard, androidLightCardFixStyle]}
+                onPress={() =>
+                  requireBirthChart((data) => {
+                    if (!chartData?.planets) return;
+                    navigation.navigate('PlanetaryPositions', { chartData, birthData: data });
+                  })
+                }
+                activeOpacity={0.8}
+              >
+                <View style={[
+                  styles.toolGlassmorphism,
+                  androidLightCardFixStyle,
+                  {
+                    backgroundColor: theme === 'dark' ? 'rgba(244, 63, 94, 0.1)' : 'rgba(244, 63, 94, 0.15)',
+                    borderColor: 'rgba(244, 63, 94, 0.3)',
+                  }
+                ]}>
+                  <View style={styles.toolIconContainer}>
+                    <Icon name="planet-outline" size={24} color="#FB7185" />
+                    <View style={[styles.toolIconGlow, { backgroundColor: '#FB7185' }]} />
+                  </View>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.positions', 'Positions')}</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.toolCard, androidLightCardFixStyle]}
+                onPress={() => requireBirthChart(() => navigation.navigate('CosmicRing'))}
+                activeOpacity={0.8}
+              >
+                <View style={[
+                  styles.toolGlassmorphism,
+                  androidLightCardFixStyle,
+                  {
+                    backgroundColor: theme === 'dark' ? 'rgba(56, 189, 248, 0.1)' : 'rgba(56, 189, 248, 0.15)',
+                    borderColor: 'rgba(56, 189, 248, 0.3)',
+                  }
+                ]}>
+                  <View style={styles.toolIconContainer}>
+                    <Icon name="ellipse-outline" size={24} color="#38BDF8" />
+                    <View style={[styles.toolIconGlow, { backgroundColor: '#38BDF8' }]} />
+                  </View>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.cosmicRing', 'Cosmic\nRing')}</Text>
+                </View>
+              </TouchableOpacity>
+            </AppScrollView>
+          </View>
+
+  );
+
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={theme === 'dark' 
-          ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] 
-          : [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientAccent || '#fde68a']}
+        colors={homePageGradient}
         style={styles.gradient}
       >
         
@@ -1894,18 +2146,25 @@ const loadHomeData = async (nativeData = null) => {
         {/* Header with Native Selector & Big 3 Dashboard - Integrated into ScrollView */}
         <View style={styles.header}>
           <LinearGradient
-            colors={theme === 'dark' 
-              ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] 
-              : ['rgba(255, 255, 255, 0.98)', 'rgba(255, 247, 237, 0.95)', 'rgba(255, 237, 213, 0.92)']}
-            style={[styles.headerDashboard, androidLightCardFixStyle, theme === 'light' ? { borderColor: colors.cardBorder } : {}]}
+            colors={homeHeaderGradient}
+            style={[
+              styles.headerDashboard,
+              androidLightCardFixStyle,
+              (theme === 'light' || isPanditMode) ? { borderColor: colors.cardBorder } : {},
+            ]}
           >
             <View style={styles.headerTopRow}>
               <View style={styles.headerProfileInfo}>
                 <Text style={[styles.headerGreeting, { color: colors.textSecondary }]}>
-                  {t('home.greeting.hello', 'Hello')},
+                  {isPanditMode
+                    ? t('home.greeting.pandit', 'Pandit Desk')
+                    : t('home.greeting.hello', 'Hello')}
+                  {isPanditMode ? '' : ','}
                 </Text>
                 <Text style={[styles.headerName, { color: colors.text }]} numberOfLines={1}>
-                  {displayData?.name || t('home.greeting.guestName', 'Explorer')}
+                  {isPanditMode
+                    ? (displayData?.name || t('home.greeting.practice', 'Your practice'))
+                    : (displayData?.name || t('home.greeting.guestName', 'Explorer'))}
                 </Text>
               </View>
               <NativeSelectorChip 
@@ -1923,7 +2182,7 @@ const loadHomeData = async (nativeData = null) => {
               />
             </View>
 
-            <View style={[styles.headerBigThree, theme === 'light' && { backgroundColor: colors.surface }]}>
+            <View style={[styles.headerBigThree, (theme === 'light' || isPanditMode) && { backgroundColor: colors.surface }]}>
               <TouchableOpacity 
                 style={styles.headerSignItem}
                 onPress={() => {
@@ -1944,7 +2203,7 @@ const loadHomeData = async (nativeData = null) => {
                 </View>
               </TouchableOpacity>
 
-              <View style={[styles.headerDivider, theme === 'light' && { backgroundColor: colors.cardBorder }]} />
+              <View style={[styles.headerDivider, (theme === 'light' || isPanditMode) && { backgroundColor: colors.cardBorder }]} />
 
               <TouchableOpacity 
                 style={styles.headerSignItem}
@@ -1966,7 +2225,7 @@ const loadHomeData = async (nativeData = null) => {
                 </View>
               </TouchableOpacity>
 
-              <View style={[styles.headerDivider, theme === 'light' && { backgroundColor: colors.cardBorder }]} />
+              <View style={[styles.headerDivider, (theme === 'light' || isPanditMode) && { backgroundColor: colors.cardBorder }]} />
 
               <TouchableOpacity 
                 style={styles.headerSignItem}
@@ -1990,6 +2249,22 @@ const loadHomeData = async (nativeData = null) => {
             </View>
           </LinearGradient>
         </View>
+
+        {isPanditMode ? (
+          <>
+            <PanditHomePanel navigation={navigation} showExit={false} />
+            {renderAstrologyTools()}
+            <TouchableOpacity
+              style={{ marginHorizontal: 16, marginBottom: 24, alignItems: 'center', paddingVertical: 14 }}
+              onPress={() => exitPanditMode()}
+            >
+              <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '700' }}>
+                {t('home.pandit.switchPersonal', 'Switch to personal app')}
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+        <>
 
         {!displayData ? (
           <View
@@ -2612,229 +2887,7 @@ const loadHomeData = async (nativeData = null) => {
             </TouchableOpacity>
           )}
 
-          {/* Astrology Tools Section */}
-          <View style={styles.toolsSection}>
-            <Text style={[styles.toolsSectionTitle, { color: colors.text }]}>{t('home.sections.astrologyTools', '🔧 Astrology Tools')}</Text>
-            <AppScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.toolsScrollContent}
-              decelerationRate="fast"
-              snapToInterval={width * 0.3 + 12}
-            >
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() =>
-                  requireBirthChart((data) =>
-                    navigation.navigate('ChartsHub', { birthData: data, tab: 'chart' }),
-                  )
-                }
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(251, 146, 60, 0.15)',
-                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Svg width="28" height="28" viewBox="0 0 48 48">
-                      <Rect x="2" y="2" width="44" height="44" fill="none" stroke="#ffffff" strokeWidth="2" />
-                      <Polygon points="24,2 46,24 24,46 2,24" fill="none" stroke="#ffd700" strokeWidth="1.5" />
-                      <Line x1="2" y1="2" x2="46" y2="46" stroke="#ff8a65" strokeWidth="1" />
-                      <Line x1="46" y1="2" x2="2" y2="46" stroke="#ff8a65" strokeWidth="1" />
-                    </Svg>
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#ff8a65' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.charts', 'Charts')}</Text>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() =>
-                  requireBirthChart((data) =>
-                    navigation.navigate('ChartsHub', { birthData: data, tab: 'dasha' }),
-                  )
-                }
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.15)',
-                    borderColor: 'rgba(139, 92, 246, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="time-outline" size={24} color="#A78BFA" />
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#A78BFA' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.dashas', 'Dashas')}</Text>
-                  {dashData?.current_dasha && typeof dashData.current_dasha === 'string' && (
-                    <View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
-                      <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>{dashData.current_dasha.split(' ')[0]}</Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() =>
-                  requireBirthChart((data) =>
-                    navigation.navigate('KPSystem', { birthDetails: data }),
-                  )
-                }
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.15)',
-                    borderColor: 'rgba(16, 185, 129, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="locate-outline" size={24} color="#34D399" />
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#34D399' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('menu.kpSystem', 'KP System')}</Text>
-                  <View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
-                    <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>Precise</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() =>
-                  requireBirthChart((data) =>
-                    navigation.navigate('KotaChakra', { birthChartId: data?.id }),
-                  )
-                }
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.15)',
-                    borderColor: 'rgba(245, 158, 11, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="shield-checkmark-outline" size={24} color="#FBBF24" />
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#FBBF24' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('menu.kotaChakra', 'Kota Chakra')}</Text>
-                  <View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
-                    <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>Safety</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => requireBirthChart(() => navigation.navigate('Yogas'))}
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(236, 72, 153, 0.1)' : 'rgba(236, 72, 153, 0.15)',
-                    borderColor: 'rgba(236, 72, 153, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="diamond-outline" size={24} color="#F472B6" />
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#F472B6' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('menu.yogas', 'Yogas')}</Text>
-<View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
-                  <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>Fortune</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() =>
-                  requireBirthChart((data) =>
-                    navigation.navigate('ChartsHub', { birthData: data, tab: 'ashtakvarga' }),
-                  )
-                }
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.15)',
-                    borderColor: 'rgba(59, 130, 246, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="grid-outline" size={24} color="#60A5FA" />
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#60A5FA' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.ashtakvarga', 'Ashtak-\nvarga')}</Text>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() =>
-                  requireBirthChart((data) => {
-                    if (!chartData?.planets) return;
-                    navigation.navigate('PlanetaryPositions', { chartData, birthData: data });
-                  })
-                }
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(244, 63, 94, 0.1)' : 'rgba(244, 63, 94, 0.15)',
-                    borderColor: 'rgba(244, 63, 94, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="planet-outline" size={24} color="#FB7185" />
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#FB7185' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.positions', 'Positions')}</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => requireBirthChart(() => navigation.navigate('CosmicRing'))}
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(56, 189, 248, 0.1)' : 'rgba(56, 189, 248, 0.15)',
-                    borderColor: 'rgba(56, 189, 248, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="ellipse-outline" size={24} color="#38BDF8" />
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#38BDF8' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.cosmicRing', 'Cosmic\nRing')}</Text>
-                </View>
-              </TouchableOpacity>
-            </AppScrollView>
-          </View>
+          {renderAstrologyTools()}
 
           {/* Cosmic Weather - Transits & Mini Zodiac */}
           <View style={[styles.planetarySection, theme === 'light' && { backgroundColor: colors.cardBackground, borderColor: 'rgba(234, 88, 12, 0.18)' }]}>
@@ -3025,6 +3078,8 @@ const loadHomeData = async (nativeData = null) => {
 
 
         </View>
+        </>
+        )}
       </VerticalPageScroll>
       
       {/* Monthly Predictions Welcome Modal */}
@@ -3326,7 +3381,7 @@ const loadHomeData = async (nativeData = null) => {
         },
       ]}>
         <LinearGradient
-          colors={theme === 'dark' ? ['#f97316', '#ea580c'] : ['#ffffff', '#fff5f0']}
+          colors={tabBarGradient}
           style={StyleSheet.absoluteFill}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
@@ -3348,36 +3403,48 @@ const loadHomeData = async (nativeData = null) => {
             <Icon 
               name="chatbubble-ellipses-outline" 
               size={22} 
-              color={activeTab === 'ask' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} 
+              color={activeTab === 'ask' ? tabActiveColor : tabIdleColor} 
             />
           </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'ask' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'ask' ? '800' : '600' }]}>
+          <Text style={[styles.tabLabel, { color: activeTab === 'ask' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'ask' ? '800' : '600' }]}>
             {t('home.tabs.ask', 'Ask')}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
           style={styles.tabItem} 
-          onPress={() => onOptionSelect({ action: 'events' })}
+          onPress={() => {
+            if (isPanditMode) {
+              navigation.navigate('MuhuratHub');
+              return;
+            }
+            onOptionSelect({ action: 'events' });
+          }}
           activeOpacity={0.7}
         >
           <View style={styles.tabIconContainer}>
             <Icon 
               name="calendar-outline" 
               size={22} 
-              color={activeTab === 'events' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} 
+              color={activeTab === 'events' ? tabActiveColor : tabIdleColor} 
             />
           </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'events' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'events' ? '800' : '600' }]}>
-            {isIOS
-              ? t('home.tabs.events', 'Timing')
-              : t('home.tabs.eventsAndroid', 'Predictions')}
+          <Text style={[styles.tabLabel, { color: activeTab === 'events' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'events' ? '800' : '600' }]}>
+            {isPanditMode
+              ? t('home.tabs.muhurat', 'Muhurat')
+              : isIOS
+                ? t('home.tabs.events', 'Timing')
+                : t('home.tabs.eventsAndroid', 'Predictions')}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
           style={styles.tabItem} 
           onPress={async () => {
+            if (isPanditMode) {
+              navigation.navigate('ReportsStudio', { reportType: 'janam_kundli' });
+              return;
+            }
             const ok = await requireAuthForPaid({
               feature: t('authGate.featureReports'),
               message: t('authGate.messageReports'),
@@ -3392,10 +3459,10 @@ const loadHomeData = async (nativeData = null) => {
             <Icon 
               name="document-text-outline" 
               size={22} 
-              color={activeTab === 'reports' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} 
+              color={activeTab === 'reports' ? tabActiveColor : tabIdleColor} 
             />
           </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'reports' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'reports' ? '800' : '600' }]}>
+          <Text style={[styles.tabLabel, { color: activeTab === 'reports' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'reports' ? '800' : '600' }]}>
             {t('home.tabs.reports', 'Reports')}
           </Text>
         </TouchableOpacity>
@@ -3410,15 +3477,15 @@ const loadHomeData = async (nativeData = null) => {
           <View style={styles.tabIconContainer}>
             <Svg width="22" height="22" viewBox="0 0 48 48">
               {/* Outer square */}
-              <Rect x="2" y="2" width="44" height="44" fill="none" stroke={activeTab === 'charts' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} strokeWidth="3" />
+              <Rect x="2" y="2" width="44" height="44" fill="none" stroke={activeTab === 'charts' ? tabActiveColor : tabIdleColor} strokeWidth="3" />
               {/* Inner diamond */}
-              <Polygon points="24,2 46,24 24,46 2,24" fill="none" stroke={activeTab === 'charts' ? '#ffd700' : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} strokeWidth="2" />
+              <Polygon points="24,2 46,24 24,46 2,24" fill="none" stroke={activeTab === 'charts' ? (isPanditMode ? tabActiveColor : '#ffd700') : tabIdleColor} strokeWidth="2" />
               {/* Diagonal lines creating triangular houses */}
-              <Line x1="2" y1="2" x2="46" y2="46" stroke={activeTab === 'charts' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} strokeWidth="1.5" />
-              <Line x1="46" y1="2" x2="2" y2="46" stroke={activeTab === 'charts' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} strokeWidth="1.5" />
+              <Line x1="2" y1="2" x2="46" y2="46" stroke={activeTab === 'charts' ? tabActiveColor : tabIdleColor} strokeWidth="1.5" />
+              <Line x1="46" y1="2" x2="2" y2="46" stroke={activeTab === 'charts' ? tabActiveColor : tabIdleColor} strokeWidth="1.5" />
             </Svg>
           </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'charts' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'charts' ? '800' : '600' }]}>
+          <Text style={[styles.tabLabel, { color: activeTab === 'charts' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'charts' ? '800' : '600' }]}>
             {t('home.tabs.charts', 'Charts')}
           </Text>
         </TouchableOpacity>
@@ -3432,10 +3499,10 @@ const loadHomeData = async (nativeData = null) => {
             <Icon 
               name="person-outline" 
               size={22} 
-              color={activeTab === 'you' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} 
+              color={activeTab === 'you' ? tabActiveColor : tabIdleColor} 
             />
           </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'you' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'you' ? '800' : '600' }]}>
+          <Text style={[styles.tabLabel, { color: activeTab === 'you' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'you' ? '800' : '600' }]}>
             {t('home.tabs.you', 'You')}
           </Text>
         </TouchableOpacity>

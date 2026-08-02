@@ -10,6 +10,8 @@ from db import execute, get_conn
 
 ASTROLOGER_SUBSCRIPTION_FAMILY = "astrologer"
 ASTROLOGER_TOOLS_ENTITLEMENT = "astrologer_tools"
+PANDIT_SUBSCRIPTION_FAMILY = "pandit"
+PANDIT_DESK_ENTITLEMENT = "pandit_desk"
 
 
 def get_active_entitlements(userid: int, *, role: Optional[str] = None) -> List[str]:
@@ -17,6 +19,7 @@ def get_active_entitlements(userid: int, *, role: Optional[str] = None) -> List[
     entitlements = set()
     if str(role or "").strip().lower() == "admin":
         entitlements.add(ASTROLOGER_TOOLS_ENTITLEMENT)
+        entitlements.add(PANDIT_DESK_ENTITLEMENT)
     with get_conn() as conn:
         cursor = execute(
             conn,
@@ -63,5 +66,6 @@ def entitlement_summary(user: User) -> Dict[str, object]:
     return {
         "entitlements": entitlements,
         "is_astrologer_licensed": ASTROLOGER_TOOLS_ENTITLEMENT in entitlements,
+        "is_pandit_licensed": PANDIT_DESK_ENTITLEMENT in entitlements,
         "admin_access": str(user.role or "").strip().lower() == "admin",
     }

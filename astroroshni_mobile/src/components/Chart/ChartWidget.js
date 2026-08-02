@@ -28,7 +28,9 @@ const isWeb = Platform.OS === 'web';
 const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, onOpenChartGuide, division, navigation, onHousePress }, ref) => {
   const { t } = useTranslation();
   const { theme } = useTheme();
-  const isLight = theme === 'light';
+  // light + pandit share white chrome; only dark keeps translucent white buttons
+  const isLight = theme !== 'dark';
+  const isPanditMode = theme === 'pandit';
   const [chartStyle, setChartStyle] = useState(defaultStyle);
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(false);
   const [currentChartType, setCurrentChartType] = useState(chartType || 'lagna');
@@ -489,15 +491,15 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize]);
 
   const QuickActionButton = ({ icon, label, onPress, active, primary }) => {
-    const iconColor = primary ? '#fff' : (isLight ? '#1e293b' : '#fff');
-    const textColor = primary ? '#fff' : (isLight ? '#1e293b' : '#fff');
+    const iconColor = primary ? '#fff' : (isLight ? '#18181B' : '#fff');
+    const textColor = primary ? '#fff' : (isLight ? '#18181B' : '#fff');
     return (
       <TouchableOpacity 
         style={[
           styles.quickActionButton, 
           isLight && styles.quickActionButtonLight,
           active && (isLight ? styles.quickActionButtonActiveLight : styles.quickActionButtonActive),
-          primary && styles.quickActionButtonPrimary
+          primary && (isPanditMode ? styles.quickActionButtonPrimaryPandit : styles.quickActionButtonPrimary),
         ]} 
         onPress={onPress}
       >
@@ -893,20 +895,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   quickActionButtonLight: {
-    backgroundColor: 'rgba(30, 41, 59, 0.08)',
-    borderColor: 'rgba(30, 41, 59, 0.2)',
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(24, 24, 27, 0.18)',
+    borderWidth: 1.5,
   },
   quickActionButtonActive: { 
     backgroundColor: 'rgba(255, 255, 255, 0.25)', 
     borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   quickActionButtonActiveLight: {
-    backgroundColor: 'rgba(30, 41, 59, 0.15)',
-    borderColor: 'rgba(30, 41, 59, 0.35)',
+    backgroundColor: 'rgba(24, 24, 27, 0.08)',
+    borderColor: 'rgba(24, 24, 27, 0.35)',
   },
   quickActionButtonPrimary: {
     backgroundColor: '#ff6b35',
     borderColor: '#ff8a65',
+  },
+  quickActionButtonPrimaryPandit: {
+    backgroundColor: '#3F3F46',
+    borderColor: '#27272A',
   },
   quickActionText: { fontSize: 12, fontWeight: '600' },
   quickActionTextActive: { fontWeight: '800' },

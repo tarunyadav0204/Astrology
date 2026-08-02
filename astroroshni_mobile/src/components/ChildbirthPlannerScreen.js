@@ -12,6 +12,7 @@ import { useCredits } from '../credits/CreditContext';
 import { useAuthGate } from '../auth/AuthGateContext';
 import { pricingAPI } from '../services/api';
 import WebDatePickerModal from './Common/WebDatePickerModal';
+import { useTheme } from '../context/ThemeContext';
 
 const isWeb = Platform.OS === 'web';
 
@@ -19,6 +20,16 @@ const isWeb = Platform.OS === 'web';
 export default function ChildbirthPlannerScreen({ navigation }) {
   const { credits, fetchBalance } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
+  const { theme, colors } = useTheme();
+  const isDark = theme === 'dark';
+  const ui = {
+    text: colors.text,
+    muted: colors.textSecondary,
+    cardBg: isDark ? 'rgba(255,255,255,0.1)' : colors.cardBackground,
+    cardBorder: isDark ? 'rgba(255,255,255,0.2)' : colors.cardBorder,
+    insetBg: isDark ? 'rgba(0,0,0,0.3)' : colors.backgroundSecondary,
+    softBg: isDark ? 'rgba(255,255,255,0.08)' : colors.backgroundSecondary,
+  };
   const [loading, setLoading] = useState(false);
   const [motherProfile, setMotherProfile] = useState(null);
   
@@ -208,24 +219,26 @@ export default function ChildbirthPlannerScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.gradient}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {isDark ? (
+        <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={StyleSheet.absoluteFill} />
+      ) : null}
         <SafeAreaView style={styles.safeArea}>
           <ScrollView contentContainerStyle={styles.scroll}>
             
             {/* Header */}
             <View style={styles.header}>
               <TouchableOpacity onPress={() => navigation.goBack()}>
-                <Icon name="arrow-back" size={24} color={COLORS.white} />
+                <Icon name="arrow-back" size={24} color={ui.text} />
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>Childbirth Planner</Text>
+              <Text style={[styles.headerTitle, { color: ui.text }]}>Childbirth Planner</Text>
               <View style={styles.placeholder} />
             </View>
 
             {/* Credit Info Card */}
-            <View style={styles.creditCard}>
+            <View style={[styles.creditCard, { backgroundColor: ui.softBg, borderColor: ui.cardBorder, borderWidth: 1 }]}>
               <View style={styles.creditRow}>
-                <Text style={styles.creditLabel}>💎 Cost: {creditInfo.cost} credits</Text>
+                <Text style={[styles.creditLabel, { color: ui.text }]}>💎 Cost: {creditInfo.cost} credits</Text>
                 <Text style={[styles.creditBalance, { color: credits >= creditInfo.cost ? '#00C853' : '#FF5722' }]}>
                   Balance: {credits}
                 </Text>
@@ -241,45 +254,45 @@ export default function ChildbirthPlannerScreen({ navigation }) {
             </View>
 
             {/* Mother Selection Card */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>👩 MOTHER'S CHART</Text>
-              <TouchableOpacity style={styles.locationBtn} onPress={() => navigation.navigate('SelectNative', { returnTo: 'ChildbirthPlanner' })}>
-                <Icon name="person" size={20} color={COLORS.white} />
-                <Text style={styles.locationText}>
+            <View style={[styles.card, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder, borderWidth: 1 }]}>
+              <Text style={[styles.cardTitle, { color: ui.text }]}>👩 MOTHER'S CHART</Text>
+              <TouchableOpacity style={[styles.locationBtn, { backgroundColor: ui.insetBg }]} onPress={() => navigation.navigate('SelectNative', { returnTo: 'ChildbirthPlanner' })}>
+                <Icon name="person" size={20} color={ui.text} />
+                <Text style={[styles.locationText, { color: ui.text }]}>
                   {motherProfile?.name || "Select mother's chart"}
                 </Text>
-                <Icon name="chevron-forward" size={20} color="rgba(255,255,255,0.6)" />
+                <Icon name="chevron-forward" size={20} color={ui.muted} />
               </TouchableOpacity>
-              <Text style={styles.hint}>Required for nakshatra calculations</Text>
+              <Text style={[styles.hint, { color: ui.muted }]}>Required for nakshatra calculations</Text>
             </View>
 
             {/* Date Selection Card */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>📅 SELECT DATE RANGE</Text>
+            <View style={[styles.card, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder, borderWidth: 1 }]}>
+              <Text style={[styles.cardTitle, { color: ui.text }]}>📅 SELECT DATE RANGE</Text>
               <View style={styles.dateRow}>
-                <TouchableOpacity style={styles.dateBtn} onPress={() => setShowStartPicker(true)}>
-                  <Text style={styles.dateLabel}>From</Text>
-                  <Text style={styles.dateValue}>{startDate.toLocaleDateString()}</Text>
+                <TouchableOpacity style={[styles.dateBtn, { backgroundColor: ui.insetBg }]} onPress={() => setShowStartPicker(true)}>
+                  <Text style={[styles.dateLabel, { color: ui.muted }]}>From</Text>
+                  <Text style={[styles.dateValue, { color: ui.text }]}>{startDate.toLocaleDateString()}</Text>
                 </TouchableOpacity>
-                <Icon name="arrow-forward" size={20} color="rgba(255,255,255,0.6)" />
-                <TouchableOpacity style={styles.dateBtn} onPress={() => setShowEndPicker(true)}>
-                  <Text style={styles.dateLabel}>To</Text>
-                  <Text style={styles.dateValue}>{endDate.toLocaleDateString()}</Text>
+                <Icon name="arrow-forward" size={20} color={ui.muted} />
+                <TouchableOpacity style={[styles.dateBtn, { backgroundColor: ui.insetBg }]} onPress={() => setShowEndPicker(true)}>
+                  <Text style={[styles.dateLabel, { color: ui.muted }]}>To</Text>
+                  <Text style={[styles.dateValue, { color: ui.text }]}>{endDate.toLocaleDateString()}</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             {/* Location Card */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>🏥 DELIVERY LOCATION</Text>
-              <TouchableOpacity style={styles.locationBtn} onPress={() => setShowLocationPicker(true)}>
-                <Icon name="location" size={20} color={COLORS.white} />
-                <Text style={styles.locationText}>
+            <View style={[styles.card, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder, borderWidth: 1 }]}>
+              <Text style={[styles.cardTitle, { color: ui.text }]}>🏥 DELIVERY LOCATION</Text>
+              <TouchableOpacity style={[styles.locationBtn, { backgroundColor: ui.insetBg }]} onPress={() => setShowLocationPicker(true)}>
+                <Icon name="location" size={20} color={ui.text} />
+                <Text style={[styles.locationText, { color: ui.text }]}>
                   {deliveryLocation?.name || "Select delivery location"}
                 </Text>
-                <Icon name="chevron-forward" size={20} color="rgba(255,255,255,0.6)" />
+                <Icon name="chevron-forward" size={20} color={ui.muted} />
               </TouchableOpacity>
-              <Text style={styles.hint}>Default: {motherProfile?.place || "Mother's location"}</Text>
+              <Text style={[styles.hint, { color: ui.muted }]}>Default: {motherProfile?.place || "Mother's location"}</Text>
             </View>
 
             {/* Calculate Button */}
@@ -288,37 +301,54 @@ export default function ChildbirthPlannerScreen({ navigation }) {
               onPress={calculateDates} 
               disabled={loading || !creditInfo.can_afford}
             >
-              <LinearGradient 
-                colors={creditInfo.can_afford ? ['#ff6b35', '#ff8c5a'] : ['#666', '#888']} 
-                style={styles.calcGradient}
-              >
-                {loading ? (
-                  <ActivityIndicator color={COLORS.white} />
-                ) : (
-                  <Text style={styles.calcButtonText}>
-                    {creditInfo.can_afford ? 'Find Auspicious Dates' : 'Insufficient Credits'}
-                  </Text>
-                )}
-              </LinearGradient>
+              {isDark ? (
+                <LinearGradient 
+                  colors={creditInfo.can_afford ? ['#ff6b35', '#ff8c5a'] : ['#666', '#888']} 
+                  style={styles.calcGradient}
+                >
+                  {loading ? (
+                    <ActivityIndicator color={COLORS.white} />
+                  ) : (
+                    <Text style={styles.calcButtonText}>
+                      {creditInfo.can_afford ? 'Find Auspicious Dates' : 'Insufficient Credits'}
+                    </Text>
+                  )}
+                </LinearGradient>
+              ) : (
+                <View
+                  style={[
+                    styles.calcGradient,
+                    { backgroundColor: creditInfo.can_afford ? colors.primary : colors.backgroundTertiary },
+                  ]}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.calcButtonText}>
+                      {creditInfo.can_afford ? 'Find Auspicious Dates' : 'Insufficient Credits'}
+                    </Text>
+                  )}
+                </View>
+              )}
             </TouchableOpacity>
 
             {/* Results */}
             {results && (
               <View style={styles.resultsContainer}>
-                <Text style={styles.resultHeader}>✨ Recommended Slots</Text>
+                <Text style={[styles.resultHeader, { color: ui.text }]}>✨ Recommended Slots</Text>
                 {results.recommendations.length === 0 ? (
-                  <View style={styles.noDataCard}>
-                    <Text style={styles.noDataText}>No auspicious dates found in this period</Text>
-                <Text style={styles.noDataHint}>Try widening the date range and checking different chart conditions:</Text>
-                    <Text style={styles.noDataTip}>• Extending the date range to 60-90 days</Text>
-                    <Text style={styles.noDataTip}>• Avoiding eclipse periods and inauspicious months</Text>
-                    <Text style={styles.noDataTip}>• Checking different lunar months</Text>
+                  <View style={[styles.noDataCard, { backgroundColor: ui.softBg }]}>
+                    <Text style={[styles.noDataText, { color: ui.text }]}>No auspicious dates found in this period</Text>
+                <Text style={[styles.noDataHint, { color: ui.muted }]}>Try widening the date range and checking different chart conditions:</Text>
+                    <Text style={[styles.noDataTip, { color: ui.muted }]}>• Extending the date range to 60-90 days</Text>
+                    <Text style={[styles.noDataTip, { color: ui.muted }]}>• Avoiding eclipse periods and inauspicious months</Text>
+                    <Text style={[styles.noDataTip, { color: ui.muted }]}>• Checking different lunar months</Text>
                   </View>
                 ) : (
                   results.recommendations.map((day, idx) => (
-                    <View key={idx} style={styles.resultItem}>
+                    <View key={idx} style={[styles.resultItem, { backgroundColor: ui.softBg, borderColor: ui.cardBorder, borderWidth: isDark ? 0 : 1 }]}>
                       <View style={styles.dateHeader}>
-                        <Text style={styles.dateTitle}>{new Date(day.date).toDateString()}</Text>
+                        <Text style={[styles.dateTitle, { color: ui.text }]}>{new Date(day.date).toDateString()}</Text>
                         <View style={styles.tag}>
                           <Text style={styles.tagText}>{day.nakshatra}</Text>
                         </View>
@@ -326,21 +356,21 @@ export default function ChildbirthPlannerScreen({ navigation }) {
                       {day.panchak?.is_panchak && (
                         <View style={styles.panchakAlert}>
                           <Text style={styles.panchakTitle}>⚠ Panchak is active</Text>
-                          <Text style={styles.panchakReason}>{day.panchak.reason}</Text>
+                          <Text style={[styles.panchakReason, { color: ui.muted }]}>{day.panchak.reason}</Text>
                           {(day.panchak.intervals || []).map((interval, intervalIndex) => (
                             <Text key={`${interval.start}-${interval.end}-${intervalIndex}`} style={styles.panchakInterval}>
                               Active from {interval.start} to {interval.end}
                             </Text>
                           ))}
-                          <Text style={styles.panchakNote}>Confirm a Panchak window with a qualified priest before use.</Text>
+                          <Text style={[styles.panchakNote, { color: ui.muted }]}>Confirm a Panchak window with a qualified priest before use.</Text>
                         </View>
                       )}
                       
                       <View style={styles.slotGrid}>
                         {day.slots.map((slot, sIdx) => (
                           <View key={sIdx} style={[styles.slot, day.panchak?.is_panchak && styles.panchakSlot]}>
-                            <Text style={styles.slotTime}>{slot.time}</Text>
-                            <Text style={styles.slotLagna}>{slot.lagna}</Text>
+                            <Text style={[styles.slotTime, { color: ui.text }]}>{slot.time}</Text>
+                            <Text style={[styles.slotLagna, { color: isDark ? '#FFD700' : '#A16207' }]}>{slot.lagna}</Text>
                           </View>
                         ))}
                       </View>
@@ -495,7 +525,6 @@ export default function ChildbirthPlannerScreen({ navigation }) {
           )}
 
         </SafeAreaView>
-      </LinearGradient>
     </View>
   );
 }
