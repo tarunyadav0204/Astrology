@@ -685,6 +685,37 @@ export const adminService = {
     return response.json();
   },
 
+  async getAdminPandits(params = {}) {
+    const sp = new URLSearchParams();
+    if (params.pincode) sp.set('pincode', String(params.pincode));
+    if (params.q) sp.set('q', String(params.q));
+    if (params.verified_jobs != null) sp.set('verified_jobs', String(!!params.verified_jobs));
+    if (params.setup_complete != null) sp.set('setup_complete', String(!!params.setup_complete));
+    if (params.page != null) sp.set('page', String(params.page));
+    if (params.limit != null) sp.set('limit', String(params.limit));
+    const qs = sp.toString();
+    const url = getAdminEndpoint('/admin/pandits') + (qs ? `?${qs}` : '');
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to fetch pandits');
+    }
+    return response.json();
+  },
+
+  async patchAdminPandit(userid, body) {
+    const response = await fetch(getAdminEndpoint(`/admin/pandits/${userid}`), {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to update pandit');
+    }
+    return response.json();
+  },
+
   async getAdminIssues(params = {}) {
     const sp = new URLSearchParams();
     if (params.status) sp.set('status', params.status);

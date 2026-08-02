@@ -6573,7 +6573,26 @@ export default function ChatScreen({ navigation, route }) {
                       resizeMode="contain"
                     />
                   </Animated.View>
-                  <Text style={[styles.drawerTitle, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>
+                  <Text
+                    style={[
+                      styles.drawerTitle,
+                      {
+                        color: theme === 'dark' ? '#ffffff' : '#1f2937',
+                        ...(theme === 'dark'
+                          ? {
+                              textShadowColor: 'rgba(0, 0, 0, 0.3)',
+                              textShadowOffset: { width: 0, height: 2 },
+                              textShadowRadius: 4,
+                            }
+                          : {
+                              fontWeight: isPanditMode || String(i18n.language || '').toLowerCase().startsWith('hi')
+                                ? '600'
+                                : '700',
+                              letterSpacing: 0,
+                            }),
+                      },
+                    ]}
+                  >
                     {Platform.OS === 'ios' ? 'Study Menu' : t('menu.title')}
                   </Text>
                   <Text style={[styles.drawerSubtitle, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(31, 41, 55, 0.7)' }]}>{t('menu.subtitle')}</Text>
@@ -8913,9 +8932,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 6,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    // Shadow only applied inline when theme === 'dark' (smudges light/pandit UI).
   },
   drawerSubtitle: {
     fontSize: 14,

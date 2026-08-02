@@ -2653,7 +2653,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: 4,
   },
   headerSubtitle: {
@@ -2691,7 +2691,7 @@ const styles = StyleSheet.create({
   },
   balanceAmount: {
     fontSize: 48,
-    fontWeight: '800',
+    fontWeight: '600',
     marginBottom: 4,
   },
   balanceCreditsText: {
@@ -2758,7 +2758,7 @@ const styles = StyleSheet.create({
 
   sectionTitle: {
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: 8,
   },
   sectionSubtitle: {
@@ -2799,7 +2799,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   packRelaunchBanner: {
     flexDirection: 'row',
@@ -2815,7 +2815,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   buyProductStack: {
     gap: 12,
@@ -2840,7 +2840,7 @@ const styles = StyleSheet.create({
   },
   creditPackName: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   creditPackBadge: {
     borderRadius: 999,
@@ -2850,12 +2850,11 @@ const styles = StyleSheet.create({
   creditPackBadgeText: {
     color: '#fff',
     fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
+    fontWeight: '600',
   },
   creditPackPricePrimary: {
     fontSize: 28,
-    fontWeight: '800',
+    fontWeight: '600',
     marginBottom: 2,
   },
   creditPackCreditsSecondary: {
@@ -2865,12 +2864,12 @@ const styles = StyleSheet.create({
   },
   creditPackQuestions: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: 2,
   },
   creditPackSave: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     marginTop: 2,
   },
   creditPackCard: {
@@ -2883,18 +2882,18 @@ const styles = StyleSheet.create({
   },
   creditPackCredits: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '600',
     marginBottom: 6,
   },
   creditPackBonus: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     marginTop: 2,
     marginBottom: 2,
   },
   creditPackPrice: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: 12,
   },
   creditPackButton: {
@@ -2906,7 +2905,7 @@ const styles = StyleSheet.create({
   creditPackButtonText: {
     color: '#fff',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   vipDiscountPanel: {
     borderWidth: 1,
@@ -2930,7 +2929,7 @@ const styles = StyleSheet.create({
   },
   vipDiscountTitle: {
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '600',
     marginBottom: 6,
   },
   vipDiscountText: {
@@ -2958,7 +2957,7 @@ const styles = StyleSheet.create({
   },
   vipDiscountPrimaryActionText: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   vipDiscountSecondaryAction: {
     minHeight: 44,
@@ -2972,7 +2971,7 @@ const styles = StyleSheet.create({
   },
   vipDiscountSecondaryActionText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   vipPlanList: {
     marginTop: 14,
@@ -2997,7 +2996,7 @@ const styles = StyleSheet.create({
   },
   vipPlanRowTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '600',
     marginBottom: 4,
   },
   vipPlanRowMeta: {
@@ -3019,7 +3018,7 @@ const styles = StyleSheet.create({
   vipPlanRowButtonText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   vipManageActions: {
     marginTop: 12,
@@ -3064,7 +3063,7 @@ const styles = StyleSheet.create({
   redeemText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -3116,7 +3115,7 @@ const styles = StyleSheet.create({
   },
   transactionAmount: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
     flexShrink: 0,
     textAlign: 'right',
     minWidth: 44,
@@ -3202,7 +3201,7 @@ const styles = StyleSheet.create({
   },
   purchaseModalTitle: {
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -3220,7 +3219,7 @@ const styles = StyleSheet.create({
   },
   purchaseModalCreditsText: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   purchaseModalButtonWrap: {
     borderRadius: 14,
@@ -3235,7 +3234,7 @@ const styles = StyleSheet.create({
   purchaseModalButtonText: {
     color: '#fff',
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: '600',
   },
 });
 

@@ -118,6 +118,7 @@ from marriage.marriage_routes import router as marriage_router
 from reports.routes import router as reports_router
 from reports.admin_routes import router as reports_admin_router
 from pandit.routes import router as pandit_router
+from pandit.admin_routes import router as pandit_admin_router
 from progeny.progeny_routes import router as progeny_router
 from routes.mundane_routes import router as mundane_router
 from routes.places_routes import router as places_router
@@ -1013,6 +1014,7 @@ app.include_router(marriage_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
 app.include_router(reports_admin_router, prefix="/api")
 app.include_router(pandit_router, prefix="/api")
+app.include_router(pandit_admin_router, prefix="/api")
 app.include_router(progeny_router, prefix="/api")
 app.include_router(trading_router, prefix="/api")
 app.include_router(yogini_dasha_router, prefix="/api")

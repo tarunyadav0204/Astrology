@@ -18,9 +18,10 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 import { panditAPI } from '../../services/api';
 import { useCredits } from '../../credits/CreditContext';
+import { trackAstrologyEvent } from '../../utils/analytics';
 import { LANGUAGE_OPTIONS, PUJA_TYPE_OPTIONS } from './panditConstants';
 
-// Theme is global: after join we enter pandit mode so Home/tabs go white.
+// Theme is global: openPanditMode enters white pandit shell before this screen.
 
 function Chip({ label, selected, onPress, colors }) {
   return (
@@ -115,7 +116,13 @@ export default function PanditPracticeScreen({ navigation, route }) {
       };
       if (isJoin) {
         await panditAPI.join(payload);
+        trackAstrologyEvent.panditJoined({
+          pincode: payload.pincode,
+          city: payload.city,
+          puja_types_count: payload.puja_types?.length || 0,
+        });
         await fetchBalance();
+        // Idempotent if openPanditMode already entered white theme.
         await enterPanditMode();
         Alert.alert(
           'Pandit mode on',
@@ -339,10 +346,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.04)',
   },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700' },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '600' },
   scroll: { padding: 20, paddingBottom: 40 },
-  lead: { fontSize: 14, lineHeight: 20, marginBottom: 18 },
-  label: { fontSize: 12, fontWeight: '700', marginBottom: 6, marginTop: 12 },
+  lead: { fontSize: 14, lineHeight: 22, marginBottom: 18 },
+  label: { fontSize: 12, fontWeight: '600', marginBottom: 6, marginTop: 12 },
   input: {
     borderWidth: 1,
     borderRadius: 12,
@@ -357,12 +364,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  chipText: { fontSize: 13, fontWeight: '600' },
+  chipText: { fontSize: 13, fontWeight: '500' },
   cta: {
     marginTop: 28,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
   },
-  ctaText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  ctaText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

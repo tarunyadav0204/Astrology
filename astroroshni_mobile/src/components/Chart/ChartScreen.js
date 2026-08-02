@@ -825,7 +825,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
           chartFlowIntrinsic,
         ]}
       >
-        <View style={[styles.chartArea, webIntrinsic, chartFlowIntrinsic, embedded && Platform.OS === 'web' ? { paddingTop: 0 } : null]}>
+        <View style={[styles.chartArea, webIntrinsic, chartFlowIntrinsic, embedded && Platform.OS === 'web' ? { paddingTop: 4 } : null]}>
           <View
             style={[
               styles.chartWrapper,

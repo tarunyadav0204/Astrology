@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Platform, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Platform, Modal, Share } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/Ionicons';
@@ -13,11 +13,19 @@ import { useAuthGate } from '../auth/AuthGateContext';
 import { pricingAPI } from '../services/api';
 import WebDatePickerModal from './Common/WebDatePickerModal';
 import { useTheme } from '../context/ThemeContext';
+import { trackAstrologyEvent } from '../utils/analytics';
+import { useTranslation } from 'react-i18next';
 
 const isWeb = Platform.OS === 'web';
 
 export default function UniversalMuhuratScreen({ route, navigation }) {
-  const { config } = route.params; 
+  const { t } = useTranslation();
+  const { config: rawConfig } = route.params;
+  const config = {
+    ...rawConfig,
+    title: t(`muhurat.types.${rawConfig?.id}.title`, rawConfig?.title || 'Muhurat'),
+    subtitle: t(`muhurat.types.${rawConfig?.id}.subtitle`, rawConfig?.subtitle || ''),
+  };
   const { credits, fetchBalance } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
   const { theme, colors } = useTheme();
@@ -78,7 +86,7 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
         setLocation({
           latitude: parseFloat(data.latitude),
           longitude: parseFloat(data.longitude),
-          name: data.place || "My Location"
+          name: data.place || t('muhurat.common.myLocation', 'My Location')
         });
       }
     } catch(e) { console.error(e); }
@@ -113,36 +121,49 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
 
   const calculate = async () => {
     if (!userProfile || !location) {
-      Alert.alert("Missing Data", "Please verify your profile and location.");
+      Alert.alert(
+        t('muhurat.common.missingData', 'Missing Data'),
+        t('muhurat.common.verifyProfileLocation', 'Please verify your profile and location.'),
+      );
       return;
     }
 
     const authOk = await requireAuthForPaid({
       feature: 'muhurat search',
-      message: 'Sign in to run a muhurat search. Credits are charged only after you confirm.',
+      message: t(
+        'muhurat.common.signInSearch',
+        'Sign in to run a muhurat search. Credits are charged only after you confirm.',
+      ),
       resume: { resumeRoute: 'UniversalMuhurat', resumeParams: route?.params || {} },
     });
     if (!authOk) return;
 
     if (credits < creditInfo.cost) {
       Alert.alert(
-        "Insufficient Credits", 
-        `You need ${creditInfo.cost} credits but have ${credits}. Please purchase more credits.`,
+        t('muhurat.common.insufficientCredits', 'Insufficient Credits'),
+        t('muhurat.common.needCredits', {
+          cost: creditInfo.cost,
+          credits,
+          defaultValue: 'You need {{cost}} credits but have {{credits}}. Please purchase more credits.',
+        }),
         [
-          { text: "Cancel", style: "cancel" },
-          { text: "Buy Credits", onPress: () => navigation.navigate('CreditScreen') }
-        ]
+          { text: t('muhurat.common.cancel', 'Cancel'), style: 'cancel' },
+          { text: t('muhurat.common.buyCredits', 'Buy Credits'), onPress: () => navigation.navigate('Credits') },
+        ],
       );
       return;
     }
 
     Alert.alert(
-      "Confirm Calculation", 
-      `This will deduct ${creditInfo.cost} credits from your account. Do you want to proceed?`,
+      t('muhurat.common.confirmCalculation', 'Confirm Calculation'),
+      t('muhurat.common.confirmDeduct', {
+        cost: creditInfo.cost,
+        defaultValue: 'This will deduct {{cost}} credits from your account. Do you want to proceed?',
+      }),
       [
-        { text: "Cancel", style: "cancel" },
-        { text: "Proceed", onPress: () => performCalculation() }
-      ]
+        { text: t('muhurat.common.cancel', 'Cancel'), style: 'cancel' },
+        { text: t('muhurat.common.proceed', 'Proceed'), onPress: () => performCalculation() },
+      ],
     );
   };
 
@@ -179,9 +200,14 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
       const json = await response.json();
       
       if (response.status === 402) {
-        Alert.alert("Insufficient Credits", json.detail?.message || "Please buy more credits.", [
-          { text: "Cancel" }, { text: "Buy", onPress: () => navigation.navigate('CreditScreen') }
-        ]);
+        Alert.alert(
+          t('muhurat.common.insufficientCredits', 'Insufficient Credits'),
+          json.detail?.message || t('muhurat.common.pleaseBuyMore', 'Please buy more credits.'),
+          [
+            { text: t('muhurat.common.cancel', 'Cancel') },
+            { text: t('muhurat.common.buy', 'Buy'), onPress: () => navigation.navigate('Credits') },
+          ],
+        );
       } else if (json.status === 'success') {
         setResults(json.data);
         await fetchBalance();
@@ -191,10 +217,16 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
           can_afford: (json.remaining_credits || credits - prev.cost) >= prev.cost
         }));
       } else {
-        Alert.alert("Error", "Calculation failed.");
+        Alert.alert(
+          t('muhurat.common.error', 'Error'),
+          t('muhurat.common.calculationFailed', 'Calculation failed.'),
+        );
       }
     } catch (e) {
-      Alert.alert("Error", "Network Error");
+      Alert.alert(
+        t('muhurat.common.error', 'Error'),
+        t('muhurat.common.networkError', 'Network Error'),
+      );
     } finally {
       setLoading(false);
     }
@@ -203,6 +235,48 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
   const visibleRecommendations = results?.recommendations?.length
     ? results.recommendations
     : (results?.best_available_recommendations || []);
+
+  const shareMuhuratResults = async () => {
+    if (!results) return;
+    const muhuratType = config?.id || config?.key || config?.title || 'muhurat';
+    const lines = [
+      t('muhurat.common.shareTitle', {
+        title: config?.title || muhuratType,
+        defaultValue: 'AstroRoshni Muhurat — {{title}}',
+      }),
+      '',
+      ...visibleRecommendations.slice(0, 8).map((day) => {
+        const slots = (day.slots || [])
+          .slice(0, 3)
+          .map((slot) => `${slot.time}${slot.lagna ? ` · ${slot.lagna}` : ''}`)
+          .join('; ');
+        return `• ${day.date}${slots ? ` — ${slots}` : ''}`;
+      }),
+    ];
+    if (!visibleRecommendations.length) {
+      lines.push(t('muhurat.common.noDatesInRange', 'No suitable dates found in the selected range.'));
+    }
+    try {
+      trackAstrologyEvent.shareTapped({
+        content_type: 'muhurat',
+        muhurat_type: muhuratType,
+        source: 'universal_muhurat',
+      });
+      await Share.share({
+        message: lines.join('\n'),
+        title: config?.title || t('home.tabs.muhurat', 'Muhurat'),
+      });
+      trackAstrologyEvent.muhuratShared(muhuratType, {
+        recommendation_count: visibleRecommendations.length,
+      });
+    } catch (error) {
+      if (String(error?.message || '').toLowerCase().includes('dismiss')) return;
+      Alert.alert(
+        t('muhurat.common.shareFailed', 'Share failed'),
+        error?.message || t('muhurat.common.shareFailedBody', 'Could not share muhurat results.'),
+      );
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -222,42 +296,46 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
 
             <View style={[styles.creditCard, { backgroundColor: ui.softBg, borderColor: ui.cardBorder }]}>
               <View style={styles.creditRow}>
-                <Text style={[styles.creditLabel, { color: ui.text }]}>💎 Cost: {creditInfo.cost} credits</Text>
+                <Text style={[styles.creditLabel, { color: ui.text }]}>
+                  💎 {t('muhurat.common.costCredits', { cost: creditInfo.cost, defaultValue: 'Cost: {{cost}} credits' })}
+                </Text>
                 <Text style={[styles.creditBalance, { color: credits >= creditInfo.cost ? '#00C853' : '#FF5722' }]}>
-                  Balance: {credits}
+                  {t('muhurat.common.balance', { credits, defaultValue: 'Balance: {{credits}}' })}
                 </Text>
               </View>
               {credits < creditInfo.cost && (
                 <TouchableOpacity 
                   style={styles.buyCreditsBtn} 
-                  onPress={() => navigation.navigate('CreditScreen')}
+                  onPress={() => navigation.navigate('Credits')}
                 >
-                  <Text style={styles.buyCreditsText}>Buy Credits</Text>
+                  <Text style={styles.buyCreditsText}>{t('muhurat.common.buyCredits', 'Buy Credits')}</Text>
                 </TouchableOpacity>
               )}
             </View>
 
             <View style={[styles.card, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}>
-              <Text style={[styles.cardTitle, { color: accent }]}>📅 DATE RANGE</Text>
+              <Text style={[styles.cardTitle, { color: accent }]}>📅 {t('muhurat.common.dateRange', 'DATE RANGE')}</Text>
               <View style={styles.row}>
                 <TouchableOpacity onPress={() => setShowStartPicker(true)} style={[styles.picker, { backgroundColor: ui.insetBg }]}>
-                  <Text style={[styles.pickerLabel, { color: ui.muted }]}>From</Text>
+                  <Text style={[styles.pickerLabel, { color: ui.muted }]}>{t('muhurat.common.from', 'From')}</Text>
                   <Text style={[styles.pickerValue, { color: ui.text }]}>{startDate.toLocaleDateString()}</Text>
                 </TouchableOpacity>
                 <Icon name="arrow-forward" size={20} color={ui.muted} />
                 <TouchableOpacity onPress={() => setShowEndPicker(true)} style={[styles.picker, { backgroundColor: ui.insetBg }]}>
-                  <Text style={[styles.pickerLabel, { color: ui.muted }]}>To</Text>
+                  <Text style={[styles.pickerLabel, { color: ui.muted }]}>{t('muhurat.common.to', 'To')}</Text>
                   <Text style={[styles.pickerValue, { color: ui.text }]}>{endDate.toLocaleDateString()}</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             <View style={[styles.card, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}>
-              <Text style={[styles.cardTitle, { color: accent }]}>📍 LOCATION</Text>
+              <Text style={[styles.cardTitle, { color: accent }]}>📍 {t('muhurat.common.location', 'LOCATION')}</Text>
               <TouchableOpacity style={[styles.locBtn, { backgroundColor: ui.insetBg }]} onPress={() => setShowLocationPicker(true)}>
                 <Icon name="location" size={20} color={ui.text} />
-                <Text style={[styles.locText, { color: ui.text }]}>{location?.name || "Select City"}</Text>
-                <Text style={[styles.changeText, { color: ui.muted }]}>Change</Text>
+                <Text style={[styles.locText, { color: ui.text }]}>
+                  {location?.name || t('muhurat.common.selectCity', 'Select City')}
+                </Text>
+                <Text style={[styles.changeText, { color: ui.muted }]}>{t('muhurat.common.change', 'Change')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -275,7 +353,9 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
                     <ActivityIndicator color="#fff"/>
                   ) : (
                     <Text style={styles.btnText}>
-                      {credits >= creditInfo.cost ? 'Find Auspicious Time' : 'Insufficient Credits'}
+                      {credits >= creditInfo.cost
+                        ? t('muhurat.common.findAuspiciousTime', 'Find Auspicious Time')
+                        : t('muhurat.common.insufficientCredits', 'Insufficient Credits')}
                     </Text>
                   )}
                 </LinearGradient>
@@ -290,7 +370,9 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
                     <ActivityIndicator color="#fff"/>
                   ) : (
                     <Text style={styles.btnText}>
-                      {credits >= creditInfo.cost ? 'Find Auspicious Time' : 'Insufficient Credits'}
+                      {credits >= creditInfo.cost
+                        ? t('muhurat.common.findAuspiciousTime', 'Find Auspicious Time')
+                        : t('muhurat.common.insufficientCredits', 'Insufficient Credits')}
                     </Text>
                   )}
                 </View>
@@ -299,8 +381,23 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
 
             {results && (
               <View style={styles.results}>
-                <Text style={[styles.resHeader, { color: ui.text }]}>Recommended Slots</Text>
-                <Text style={[styles.auditHint, { color: ui.muted }]}>Every date in your selected range is shown below. Tap a rejected date to see why.</Text>
+                <View style={styles.resultsHeaderRow}>
+                  <Text style={[styles.resHeader, { color: ui.text, flex: 1 }]}>
+                    {t('muhurat.common.recommendedSlots', 'Recommended Slots')}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={shareMuhuratResults}
+                    style={[styles.shareBtn, { backgroundColor: ui.insetBg, borderColor: ui.cardBorder }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('muhurat.common.share', 'Share')}
+                  >
+                    <Icon name="share-outline" size={18} color={ui.text} />
+                    <Text style={[styles.shareBtnText, { color: ui.text }]}>{t('muhurat.common.share', 'Share')}</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.auditHint, { color: ui.muted }]}>
+                  {t('muhurat.common.auditHint', 'Every date in your selected range is shown below. Tap a rejected date to see why.')}
+                </Text>
                 <View style={styles.dateAuditGrid}>
                   {[...(results.recommendations || []).map((item) => ({ ...item, accepted: true })), ...(results.best_available_recommendations || []).map((item) => ({ ...item, accepted: false, fallback: true })), ...(results.rejected_dates || []).map((item) => ({ ...item, accepted: false }))]
                     .sort((a, b) => String(a.date).localeCompare(String(b.date)))
@@ -309,46 +406,68 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
                         key={item.date}
                         style={[styles.dateChip, item.accepted ? styles.dateChipAccepted : (item.fallback ? styles.dateChipFallback : styles.dateChipRejected)]}
                         onPress={() => item.accepted
-                          ? Alert.alert('Suitable date', `${item.date}\n${(item.slots || []).map((slot) => `${slot.time} · ${slot.lagna} · ${slot.score}/100`).join('\n')}`)
+                          ? Alert.alert(t('muhurat.common.suitableDate', 'Suitable date'), `${item.date}\n${(item.slots || []).map((slot) => `${slot.time} · ${slot.lagna} · ${slot.score}/100`).join('\n')}`)
                           : item.fallback
-                            ? Alert.alert('Best available with cautions', `${item.date}\n${(item.date_warnings || []).join('\n')}`)
-                            : Alert.alert('Why this date was rejected', `${item.date}\n${(item.reasons || []).join('\n')}`)}
+                            ? Alert.alert(t('muhurat.common.bestAvailableCautions', 'Best available with cautions'), `${item.date}\n${(item.date_warnings || []).join('\n')}`)
+                            : Alert.alert(t('muhurat.common.whyRejected', 'Why this date was rejected'), `${item.date}\n${(item.reasons || []).join('\n')}`)}
                       >
                         <Text style={[styles.dateChipDate, { color: ui.text }]}>{item.date.slice(5)}</Text>
-                        <Text style={[styles.dateChipState, { color: ui.muted }]}>{item.accepted ? 'Suitable' : (item.fallback ? 'Caution' : 'Rejected')}</Text>
+                        <Text style={[styles.dateChipState, { color: ui.muted }]}>
+                          {item.accepted
+                            ? t('muhurat.common.suitable', 'Suitable')
+                            : (item.fallback
+                              ? t('muhurat.common.caution', 'Caution')
+                              : t('muhurat.common.rejected', 'Rejected'))}
+                        </Text>
                       </TouchableOpacity>
                     ))}
                 </View>
                 {results.recommendations.length === 0 && visibleRecommendations.length === 0 ? (
                   <View style={[styles.noDataContainer, { backgroundColor: ui.resultBg }]}>
-                    <Text style={[styles.noData, { color: ui.text }]}>No suitable vehicle Muhurat found</Text>
-                    <Text style={[styles.noDataSub, { color: ui.muted }]}>Traditional timing rules did not leave a recommended date in this range.</Text>
+                    <Text style={[styles.noData, { color: ui.text }]}>
+                      {t('muhurat.common.noMuhuratFound', 'No suitable muhurat found')}
+                    </Text>
+                    <Text style={[styles.noDataSub, { color: ui.muted }]}>
+                      {t('muhurat.common.noMuhuratSub', 'Traditional timing rules did not leave a recommended date in this range.')}
+                    </Text>
                     {(results.rejected_dates || []).slice(0, 4).map((item) => (
                       <Text key={item.date} style={[styles.noDataTip, { color: ui.muted }]}>• {item.date}: {(item.reasons || []).join(' ')}</Text>
                     ))}
-                    <Text style={[styles.noDataTip, { color: ui.muted }]}>Try extending the date range or choosing a different location.</Text>
+                    <Text style={[styles.noDataTip, { color: ui.muted }]}>
+                      {t('muhurat.common.extendRangeTip', 'Try extending the date range or choosing a different location.')}
+                    </Text>
                   </View>
                 ) : (
                   <>
                   {!results.recommendations.length && (
                     <View style={styles.fallbackNotice}>
-                      <Text style={[styles.fallbackTitle, { color: isDark ? '#FFD080' : '#A16207' }]}>Best available dates with cautions</Text>
-                      <Text style={[styles.fallbackText, { color: ui.muted }]}>{results.best_available_notice || 'These dates are shown only when you must proceed. They are not strict recommendations.'}</Text>
+                      <Text style={[styles.fallbackTitle, { color: isDark ? '#FFD080' : '#A16207' }]}>
+                        {t('muhurat.common.bestAvailableTitle', 'Best available dates with cautions')}
+                      </Text>
+                      <Text style={[styles.fallbackText, { color: ui.muted }]}>
+                        {results.best_available_notice || t('muhurat.common.bestAvailableDefault', 'These dates are shown only when you must proceed. They are not strict recommendations.')}
+                      </Text>
                     </View>
                   )}
                   {visibleRecommendations.map((day, idx) => (
                     <View key={idx} style={[styles.resultItem, { backgroundColor: ui.resultBg, borderColor: ui.cardBorder, borderWidth: isDark ? 0 : 1 }]}>
                       <Text style={[styles.resultDate, { color: ui.text }]}>{new Date(day.date).toDateString()}</Text>
                       {day.panchak?.is_panchak && (
-                        <View style={styles.panchakAlert}>
-                          <Text style={styles.panchakTitle}>⚠ Panchak is active</Text>
+                        <View style={[styles.panchakAlert, !isDark && { backgroundColor: 'rgba(234, 88, 12, 0.08)', borderColor: 'rgba(234, 88, 12, 0.35)' }]}>
+                          <Text style={[styles.panchakTitle, !isDark && { color: '#C2410C' }]}>⚠ {t('muhurat.common.panchakActive', 'Panchak is active')}</Text>
                           <Text style={[styles.panchakReason, { color: ui.muted }]}>{day.panchak.reason}</Text>
                           {(day.panchak.intervals || []).map((interval, intervalIndex) => (
-                            <Text key={`${interval.start}-${interval.end}-${intervalIndex}`} style={styles.panchakInterval}>
-                              Active from {interval.start} to {interval.end}
+                            <Text key={`${interval.start}-${interval.end}-${intervalIndex}`} style={[styles.panchakInterval, !isDark && { color: '#9A3412' }]}>
+                              {t('muhurat.common.panchakActiveFrom', {
+                                start: interval.start,
+                                end: interval.end,
+                                defaultValue: 'Active from {{start}} to {{end}}',
+                              })}
                             </Text>
                           ))}
-                          <Text style={[styles.panchakNote, { color: ui.muted }]}>Confirm a Panchak window with a qualified priest before use.</Text>
+                          <Text style={[styles.panchakNote, { color: ui.muted }]}>
+                            {t('muhurat.common.panchakConfirm', 'Confirm a Panchak window with a qualified priest before use.')}
+                          </Text>
                         </View>
                       )}
                       <View style={styles.slotGrid}>
@@ -358,7 +477,11 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
                             <Text style={[styles.slotLagna, { color: isDark ? '#FFD700' : '#A16207' }]}>{slot.lagna}</Text>
                             <Text style={[styles.slotScore, { color: ui.muted }]}>{slot.quality} · {slot.score}/100</Text>
                             <Text style={[styles.slotRationale, { color: ui.muted }]}>{slot.rationale}</Text>
-                            {slot.panchak && <Text style={styles.slotCaution}>⚠ Panchak active — confirm this slot with a qualified priest.</Text>}
+                            {slot.panchak && (
+                              <Text style={styles.slotCaution}>
+                                ⚠ {t('muhurat.common.panchakSlotConfirm', 'Panchak active — confirm this slot with a priest before use.')}
+                              </Text>
+                            )}
                             {(slot.positives?.length > 0 || slot.cautions?.length > 0) && (
                               <View style={styles.slotFactors}>
                                 {slot.positives?.map((reason) => <Text key={`p-${reason}`} style={[styles.slotPositive, !isDark && { color: '#15803D' }]}>✓ {reason}</Text>)}
@@ -382,7 +505,7 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
               <WebDatePickerModal
                 visible={showStartPicker}
                 value={startDate}
-                title="From date"
+                title={t('muhurat.common.fromDate', 'From date')}
                 minimumDate={new Date()}
                 onClose={() => setShowStartPicker(false)}
                 onChange={(next) => {
@@ -393,7 +516,7 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
               <WebDatePickerModal
                 visible={showEndPicker}
                 value={endDate}
-                title="To date"
+                title={t('muhurat.common.toDate', 'To date')}
                 minimumDate={startDate}
                 onClose={() => setShowEndPicker(false)}
                 onChange={setEndDate}
@@ -407,10 +530,10 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
                     <View style={styles.pickerGradient}>
                       <View style={styles.pickerHeader}>
                         <TouchableOpacity onPress={() => setShowStartPicker(false)}>
-                          <Text style={styles.pickerButton}>Cancel</Text>
+                          <Text style={styles.pickerButton}>{t('muhurat.common.cancel', 'Cancel')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setShowStartPicker(false)}>
-                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>Done</Text>
+                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>{t('birthForm.picker.done', 'Done')}</Text>
                         </TouchableOpacity>
                       </View>
                       <DateTimePicker
@@ -434,10 +557,10 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
                     <View style={styles.pickerGradient}>
                       <View style={styles.pickerHeader}>
                         <TouchableOpacity onPress={() => setShowEndPicker(false)}>
-                          <Text style={styles.pickerButton}>Cancel</Text>
+                          <Text style={styles.pickerButton}>{t('muhurat.common.cancel', 'Cancel')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setShowEndPicker(false)}>
-                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>Done</Text>
+                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>{t('birthForm.picker.done', 'Done')}</Text>
                         </TouchableOpacity>
                       </View>
                       <DateTimePicker
@@ -506,48 +629,59 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   scroll: { padding: 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  headerTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
+  headerTitle: { color: '#fff', fontSize: 20, fontWeight: '600' },
   creditCard: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 12, padding: 15, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
   creditRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   creditLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '600' },
-  creditBalance: { fontSize: 14, fontWeight: 'bold' },
+  creditBalance: { fontSize: 14, fontWeight: '600' },
   buyCreditsBtn: { backgroundColor: '#FF5722', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 6, alignSelf: 'flex-start', marginTop: 8 },
-  buyCreditsText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  buyCreditsText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   card: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 16, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  cardTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 15, color: 'rgba(255,255,255,0.8)' },
+  cardTitle: { fontSize: 14, fontWeight: '600', marginBottom: 15, color: 'rgba(255,255,255,0.8)' },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   picker: { backgroundColor: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 8, width: '42%' },
   pickerLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
-  pickerValue: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginTop: 2 },
+  pickerValue: { color: '#fff', fontSize: 16, fontWeight: '600', marginTop: 2 },
   locBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 8, gap: 10 },
   locText: { flex: 1, color: '#fff', fontSize: 16 },
   changeText: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
   btn: { borderRadius: 12, overflow: 'hidden', marginBottom: 20 },
   btnGrad: { padding: 16, alignItems: 'center' },
-  btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  btnText: { color: '#fff', fontWeight: '600', fontSize: 16 },
   disabledButton: { opacity: 0.6 },
   results: { marginTop: 20 },
-  resHeader: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
+  resultsHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  shareBtnText: { fontSize: 13, fontWeight: '600' },
+  resHeader: { color: '#fff', fontSize: 18, fontWeight: '600', marginBottom: 15 },
   auditHint: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginBottom: 10 },
   dateAuditGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 15 },
   dateChip: { borderRadius: 8, paddingVertical: 7, paddingHorizontal: 9, minWidth: 66, borderWidth: 1 },
   dateChipAccepted: { backgroundColor: 'rgba(0, 200, 83, 0.18)', borderColor: 'rgba(129, 255, 169, 0.75)' },
   dateChipRejected: { backgroundColor: 'rgba(198, 40, 40, 0.18)', borderColor: 'rgba(255, 128, 128, 0.75)' },
   dateChipFallback: { backgroundColor: 'rgba(188, 116, 24, 0.18)', borderColor: 'rgba(245, 180, 70, 0.8)' },
-  dateChipDate: { color: '#fff', fontSize: 12, fontWeight: 'bold', textAlign: 'center' },
+  dateChipDate: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center' },
   dateChipState: { color: 'rgba(255,255,255,0.7)', fontSize: 9, textAlign: 'center', marginTop: 2 },
   noDataContainer: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 20, alignItems: 'center' },
   noData: { color: 'rgba(255,255,255,0.8)', fontSize: 16, marginBottom: 8, textAlign: 'center' },
   noDataSub: { color: 'rgba(255,255,255,0.6)', fontSize: 14, marginBottom: 10, textAlign: 'center' },
   noDataTip: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 5 },
   fallbackNotice: { marginTop: 12, padding: 14, borderRadius: 12, backgroundColor: 'rgba(188, 116, 24, 0.14)', borderWidth: 1, borderColor: 'rgba(245, 180, 70, 0.55)' },
-  fallbackTitle: { color: '#FFD080', fontSize: 16, fontWeight: '700', marginBottom: 5 },
+  fallbackTitle: { color: '#FFD080', fontSize: 16, fontWeight: '600', marginBottom: 5 },
   fallbackText: { color: 'rgba(255,255,255,0.72)', fontSize: 13, lineHeight: 19 },
   resultItem: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 15, marginBottom: 15 },
-  resultDate: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
+  resultDate: { color: '#fff', fontSize: 16, fontWeight: '600', marginBottom: 10 },
   slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   slot: { backgroundColor: 'rgba(0, 200, 83, 0.15)', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, alignItems: 'center', width: '100%' },
-  slotTime: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  slotTime: { color: '#fff', fontWeight: '600', fontSize: 14 },
   slotLagna: { color: '#FFD700', fontSize: 10 },
   slotScore: { color: 'rgba(255,255,255,0.65)', fontSize: 9, marginTop: 2 },
   slotRationale: { color: 'rgba(255,255,255,0.75)', fontSize: 9, marginTop: 4, textAlign: 'center' },
@@ -555,7 +689,7 @@ const styles = StyleSheet.create({
   slotPositive: { color: '#B9F6CA', fontSize: 9, marginTop: 2 },
   slotCaution: { color: '#FFE082', fontSize: 9, marginTop: 2 },
   panchakAlert: { backgroundColor: 'rgba(255, 87, 34, 0.14)', borderWidth: 1, borderColor: 'rgba(255, 152, 0, 0.55)', borderRadius: 10, padding: 10, marginBottom: 12 },
-  panchakTitle: { color: '#FFB74D', fontSize: 14, fontWeight: 'bold', marginBottom: 4 },
+  panchakTitle: { color: '#FFB74D', fontSize: 14, fontWeight: '600', marginBottom: 4 },
   panchakReason: { color: 'rgba(255,255,255,0.78)', fontSize: 12, lineHeight: 17 },
   panchakInterval: { color: '#FFD180', fontSize: 12, fontWeight: '600', marginTop: 4 },
   panchakNote: { color: 'rgba(255,255,255,0.7)', fontSize: 11, lineHeight: 15, marginTop: 6 },

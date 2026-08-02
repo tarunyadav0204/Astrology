@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 import { pricingAPI } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 
@@ -17,55 +18,55 @@ const COST_KEYS = {
   business: 'business'
 };
 
-// CONFIGURATION: Add new Muhurats here in the future
-const MUHURAT_TYPES = [
+const MUHURAT_TYPE_DEFS = [
   {
     id: 'childbirth',
-    title: 'C-Section',
-    subtitle: 'Safe delivery planning',
     icon: 'medical',
     gradient: ['#FF6B6B', '#EE5D5D'],
-    route: 'ChildbirthPlanner' // Keep legacy separate if needed
+    route: 'ChildbirthPlanner',
   },
   {
     id: 'vehicle',
-    title: 'Vehicle Buy',
-    subtitle: 'Safety & Longevity',
     icon: 'car-sport',
     gradient: ['#FF9800', '#F57C00'],
-    endpoint: '/muhurat/vehicle-purchase'
+    endpoint: '/muhurat/vehicle-purchase',
   },
   {
     id: 'property',
-    title: 'Griha Pravesh',
-    subtitle: 'Peace & Prosperity',
     icon: 'home',
     gradient: ['#4CAF50', '#388E3C'],
-    endpoint: '/muhurat/griha-pravesh'
+    endpoint: '/muhurat/griha-pravesh',
   },
   {
     id: 'gold',
-    title: 'Gold Purchase',
-    subtitle: 'Wealth & Prosperity',
     icon: 'diamond',
     gradient: ['#FFD700', '#FFA500'],
-    endpoint: '/muhurat/gold-purchase'
+    endpoint: '/muhurat/gold-purchase',
   },
   {
     id: 'business',
-    title: 'Business Opening',
-    subtitle: 'Success & Growth',
     icon: 'briefcase',
     gradient: ['#9C27B0', '#7B1FA2'],
-    endpoint: '/muhurat/business-opening'
-  }
+    endpoint: '/muhurat/business-opening',
+  },
 ];
 
 export default function MuhuratHubScreen({ navigation }) {
+  const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
   const [pricing, setPricing] = useState({});
   const [pricingOriginal, setPricingOriginal] = useState({});
+
+  const muhuratTypes = useMemo(
+    () =>
+      MUHURAT_TYPE_DEFS.map((item) => ({
+        ...item,
+        title: t(`muhurat.types.${item.id}.title`, item.id),
+        subtitle: t(`muhurat.types.${item.id}.subtitle`, ''),
+      })),
+    [t],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -88,7 +89,6 @@ export default function MuhuratHubScreen({ navigation }) {
     if (item.route) {
       navigation.navigate(item.route);
     } else {
-      // Pass the config to the Universal Screen
       navigation.navigate('UniversalMuhurat', { config: item });
     }
   };
@@ -109,11 +109,15 @@ export default function MuhuratHubScreen({ navigation }) {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Icon name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Auspicious Timings</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {t('muhurat.hub.title', 'Auspicious Timings')}
+          </Text>
           <View style={{ width: 24 }} />
         </View>
 
-        <Text style={[styles.subHeader, { color: colors.textSecondary }]}>Select an event to plan</Text>
+        <Text style={[styles.subHeader, { color: colors.textSecondary }]}>
+          {t('muhurat.hub.subtitle', 'Select an event to plan')}
+        </Text>
 
         <TouchableOpacity
           style={[styles.panchangBanner, { backgroundColor: bannerBg, borderColor: bannerBorder }]}
@@ -124,16 +128,18 @@ export default function MuhuratHubScreen({ navigation }) {
             <Icon name="sunny" size={22} color="#fff" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.panchangBannerTitle, { color: colors.text }]}>Today's Panchang</Text>
+            <Text style={[styles.panchangBannerTitle, { color: colors.text }]}>
+              {t('muhurat.hub.todaysPanchang', "Today's Panchang")}
+            </Text>
             <Text style={[styles.panchangBannerSub, { color: colors.textSecondary }]}>
-              Tithi, Choghadiya, Hora, Amrit & Rahu Kaal
+              {t('muhurat.hub.todaysPanchangSub', 'Tithi, Choghadiya, Hora, Amrit & Rahu Kaal')}
             </Text>
           </View>
           <Icon name="chevron-forward" size={18} color={isDark ? '#FFD700' : colors.textTertiary} />
         </TouchableOpacity>
 
         <ScrollView contentContainerStyle={styles.grid}>
-          {MUHURAT_TYPES.map((item, index) => {
+          {muhuratTypes.map((item, index) => {
             const costKey = COST_KEYS[item.id];
             const cost = costKey != null ? (pricing[costKey] ?? 0) : 0;
             const originalCost = costKey != null ? pricingOriginal[costKey] : null;
@@ -181,7 +187,8 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  // Keep ≤600: heavy weights look smudged on light/Hindi (faux-bold Devanagari).
+  headerTitle: { fontSize: 20, fontWeight: '600' },
   subHeader: { marginLeft: 20, marginBottom: 12 },
   panchangBanner: {
     marginHorizontal: 20,
@@ -200,7 +207,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  panchangBannerTitle: { fontSize: 15, fontWeight: '800' },
+  panchangBannerTitle: { fontSize: 15, fontWeight: '600' },
   panchangBannerSub: { fontSize: 11, marginTop: 2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 15 },
   card: {
@@ -213,7 +220,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   iconCircle: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  cardTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  cardTitle: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
   cardSubtitle: { fontSize: 11, textAlign: 'center' },
   costBadge: {
     position: 'absolute',
@@ -231,7 +238,7 @@ const styles = StyleSheet.create({
   },
   costText: {
     fontSize: 9,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#854d0e',
     marginLeft: 2,
   },

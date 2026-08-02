@@ -279,6 +279,12 @@ export const trackAstrologyEvent = {
     }),
   addPaymentInfo: (success = true, opts = {}) =>
     trackMetaStandard(MetaStandardEvent.ADD_PAYMENT_INFO, { success, ...opts }),
+  panditJoined: (meta = {}) => trackEvent('pandit_joined', meta),
+  kundliGenerated: (meta = {}) =>
+    trackEvent('kundli_generated', { report_type: 'janam_kundli', ...meta }),
+  muhuratShared: (muhuratType, meta = {}) =>
+    trackEvent('muhurat_shared', { muhurat_type: muhuratType || 'unknown', ...meta }),
+  shareTapped: (meta = {}) => trackEvent('share_tapped', meta),
 };
 
 export const setUserProperties = async (properties) => {

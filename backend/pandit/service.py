@@ -56,6 +56,7 @@ def _row_to_profile(row) -> Optional[Dict[str, Any]]:
         website,
         address,
         setup_complete,
+        verified_jobs,
         created_at,
         updated_at,
     ) = row
@@ -73,6 +74,7 @@ def _row_to_profile(row) -> Optional[Dict[str, Any]]:
         "website": website or "",
         "address": address or "",
         "setup_complete": bool(setup_complete),
+        "verified_jobs": bool(verified_jobs),
         "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else created_at,
         "updated_at": updated_at.isoformat() if hasattr(updated_at, "isoformat") else updated_at,
     }
@@ -85,6 +87,7 @@ def get_profile(userid: int) -> Optional[Dict[str, Any]]:
             """
             SELECT userid, display_name, city, pincode, languages, puja_types, status,
                    tagline, phone, email, website, address, setup_complete,
+                   COALESCE(verified_jobs, FALSE) AS verified_jobs,
                    created_at, updated_at
             FROM pandit_profiles
             WHERE userid = ?

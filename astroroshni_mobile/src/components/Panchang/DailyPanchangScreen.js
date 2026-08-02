@@ -15,6 +15,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { panchangAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import DateNavigator from '../Common/DateNavigator';
+import { useTranslation } from 'react-i18next';
 
 const toDateKey = (d) => {
   const y = d.getFullYear();
@@ -51,6 +52,7 @@ const isActiveRange = (start, end) => {
 };
 
 function PeriodRow({ label, start, end, tone, colors, isDark }) {
+  const { t } = useTranslation();
   const active = isActiveRange(start, end);
   const toneColor = tone === 'caution' ? '#EF4444' : tone === 'good' ? '#10B981' : colors.primary;
   return (
@@ -66,7 +68,7 @@ function PeriodRow({ label, start, end, tone, colors, isDark }) {
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={[styles.periodLabel, { color: colors.text }]} numberOfLines={1}>
           {label}
-          {active ? ' · now' : ''}
+          {active ? ` · ${t('muhurat.panchang.now', 'now')}` : ''}
         </Text>
         <Text style={[styles.periodTime, { color: toneColor }]}>
           {formatClock(start)} – {formatClock(end)}
@@ -77,6 +79,7 @@ function PeriodRow({ label, start, end, tone, colors, isDark }) {
 }
 
 export default function DailyPanchangScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
   const [loading, setLoading] = useState(true);
@@ -92,9 +95,9 @@ export default function DailyPanchangScreen({ navigation, route }) {
     return {
       latitude: Number(p.latitude) || 28.6139,
       longitude: Number(p.longitude) || 77.2090,
-      placeLabel: p.placeLabel || 'New Delhi',
+      placeLabel: p.placeLabel || t('muhurat.panchang.newDelhi', 'New Delhi'),
     };
-  }, [route?.params]);
+  }, [route?.params, t]);
 
   const dateKey = useMemo(() => toDateKey(selectedDate), [selectedDate]);
 
@@ -134,12 +137,12 @@ export default function DailyPanchangScreen({ navigation, route }) {
         inauspicious: ina?.data || ina,
       });
     } catch (e) {
-      setError(e?.message || 'Failed to load panchang');
+      setError(e?.message || t('muhurat.panchang.loadFailed', 'Failed to load panchang'));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [coords, dateKey]);
+  }, [coords, dateKey, t]);
 
   useEffect(() => {
     setLoading(true);
@@ -165,14 +168,14 @@ export default function DailyPanchangScreen({ navigation, route }) {
     const out = [];
     if (s.brahma_muhurta) {
       out.push({
-        name: 'Brahma Muhurta',
+        name: t('muhurat.panchang.brahmaMuhurta', 'Brahma Muhurta'),
         start_time: s.brahma_muhurta.start_time,
         end_time: s.brahma_muhurta.end_time,
       });
     }
     if (s.abhijit_muhurta) {
       out.push({
-        name: 'Abhijit Muhurta',
+        name: t('muhurat.panchang.abhijitMuhurta', 'Abhijit Muhurta'),
         start_time: s.abhijit_muhurta.start_time,
         end_time: s.abhijit_muhurta.end_time,
       });
@@ -192,7 +195,7 @@ export default function DailyPanchangScreen({ navigation, route }) {
             <Ionicons name="arrow-back" size={20} color={colors.text} />
           </TouchableOpacity>
           <View style={styles.headerCenter}>
-            <Text style={[styles.title, { color: colors.text }]}>Daily Panchang</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{t('muhurat.panchang.title', 'Daily Panchang')}</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]} numberOfLines={1}>
               {payload?.placeLabel || coords.placeLabel}
             </Text>
@@ -217,7 +220,7 @@ export default function DailyPanchangScreen({ navigation, route }) {
           <View style={styles.centered}>
             <Text style={{ color: colors.text, marginBottom: 12 }}>{error}</Text>
             <TouchableOpacity onPress={load}>
-              <Text style={{ color: colors.primary, fontWeight: '700' }}>Retry</Text>
+              <Text style={{ color: colors.primary, fontWeight: '600' }}>{t('muhurat.panchang.retry', 'Retry')}</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -228,26 +231,35 @@ export default function DailyPanchangScreen({ navigation, route }) {
             }
           >
             <View style={[styles.card, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(234,88,12,0.16)' }]}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Sun</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('muhurat.panchang.sun', 'Sun')}</Text>
               <Text style={[styles.meta, { color: colors.textSecondary }]}>
-                Sunrise {sun?.sunrise || '—'} · Sunset {sun?.sunset || '—'}
+                {t('muhurat.panchang.sunriseSunset', {
+                  sunrise: sun?.sunrise || '—',
+                  sunset: sun?.sunset || '—',
+                  defaultValue: 'Sunrise {{sunrise}} · Sunset {{sunset}}',
+                })}
               </Text>
               {dayContext ? (
                 <Text style={[styles.meta, { color: colors.textSecondary, marginTop: 6 }]}>
                   {dayContext.ritu} · {dayContext.ayana}
-                  {dayContext.chandra_balam?.status ? ` · Chandra ${dayContext.chandra_balam.status}` : ''}
+                  {dayContext.chandra_balam?.status
+                    ? ` · ${t('muhurat.panchang.chandra', {
+                        status: dayContext.chandra_balam.status,
+                        defaultValue: 'Chandra {{status}}',
+                      })}`
+                    : ''}
                 </Text>
               ) : null}
             </View>
 
             <View style={[styles.card, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(234,88,12,0.16)' }]}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Elements</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('muhurat.panchang.elements', 'Elements')}</Text>
               {[
-                ['Tithi', basic?.tithi?.name],
-                ['Nakshatra', basic?.nakshatra?.name],
-                ['Yoga', basic?.yoga?.name],
-                ['Karana', basic?.karana?.name],
-                ['Vara', basic?.vara?.name],
+                [t('muhurat.panchang.tithi', 'Tithi'), basic?.tithi?.name],
+                [t('muhurat.panchang.nakshatra', 'Nakshatra'), basic?.nakshatra?.name],
+                [t('muhurat.panchang.yoga', 'Yoga'), basic?.yoga?.name],
+                [t('muhurat.panchang.karana', 'Karana'), basic?.karana?.name],
+                [t('muhurat.panchang.vara', 'Vara'), basic?.vara?.name],
               ].map(([k, v]) => (
                 <View key={k} style={styles.elementRow}>
                   <Text style={[styles.elementKey, { color: colors.textSecondary }]}>{k}</Text>
@@ -256,11 +268,11 @@ export default function DailyPanchangScreen({ navigation, route }) {
               ))}
             </View>
 
-            <Text style={[styles.blockTitle, { color: colors.text }]}>Auspicious</Text>
+            <Text style={[styles.blockTitle, { color: colors.text }]}>{t('muhurat.panchang.auspicious', 'Auspicious')}</Text>
             {(Array.isArray(amrit) ? amrit : amrit?.start ? [amrit] : []).map((p, i) => (
               <PeriodRow
                 key={`amrit-${i}`}
-                label="Amrit Kalam"
+                label={t('muhurat.panchang.amritKalam', 'Amrit Kalam')}
                 start={p.start_time || p.start}
                 end={p.end_time || p.end}
                 tone="good"
@@ -270,7 +282,7 @@ export default function DailyPanchangScreen({ navigation, route }) {
             ))}
             {specialTimes.abhijit ? (
               <PeriodRow
-                label="Abhijit"
+                label={t('muhurat.panchang.abhijit', 'Abhijit')}
                 start={`${payload.date} ${specialTimes.abhijit.start}`}
                 end={`${payload.date} ${specialTimes.abhijit.end}`}
                 tone="good"
@@ -290,10 +302,10 @@ export default function DailyPanchangScreen({ navigation, route }) {
               />
             ))}
 
-            <Text style={[styles.blockTitle, { color: colors.text }]}>Inauspicious</Text>
+            <Text style={[styles.blockTitle, { color: colors.text }]}>{t('muhurat.panchang.inauspicious', 'Inauspicious')}</Text>
             {payload?.inauspicious?.rahu_kaal ? (
               <PeriodRow
-                label="Rahu Kaal"
+                label={t('muhurat.panchang.rahuKaal', 'Rahu Kaal')}
                 start={payload.inauspicious.rahu_kaal.start_time}
                 end={payload.inauspicious.rahu_kaal.end_time}
                 tone="caution"
@@ -304,7 +316,7 @@ export default function DailyPanchangScreen({ navigation, route }) {
             {(payload?.inauspicious?.dur_muhurta || []).map((p, i) => (
               <PeriodRow
                 key={`dur-${i}`}
-                label={`Dur Muhurta ${i + 1}`}
+                label={t('muhurat.panchang.durMuhurta', { n: i + 1, defaultValue: 'Dur Muhurta {{n}}' })}
                 start={p.start_time}
                 end={p.end_time}
                 tone="caution"
@@ -315,7 +327,7 @@ export default function DailyPanchangScreen({ navigation, route }) {
             {(payload?.inauspicious?.varjyam || []).map((p, i) => (
               <PeriodRow
                 key={`var-${i}`}
-                label="Varjyam"
+                label={t('muhurat.panchang.varjyam', 'Varjyam')}
                 start={p.start_time}
                 end={p.end_time}
                 tone="caution"
@@ -324,7 +336,7 @@ export default function DailyPanchangScreen({ navigation, route }) {
               />
             ))}
 
-            <Text style={[styles.blockTitle, { color: colors.text }]}>Day Choghadiya</Text>
+            <Text style={[styles.blockTitle, { color: colors.text }]}>{t('muhurat.panchang.dayChoghadiya', 'Day Choghadiya')}</Text>
             {dayChog.map((p, i) => (
               <PeriodRow
                 key={`dc-${i}`}
@@ -337,7 +349,7 @@ export default function DailyPanchangScreen({ navigation, route }) {
               />
             ))}
 
-            <Text style={[styles.blockTitle, { color: colors.text }]}>Night Choghadiya</Text>
+            <Text style={[styles.blockTitle, { color: colors.text }]}>{t('muhurat.panchang.nightChoghadiya', 'Night Choghadiya')}</Text>
             {nightChog.slice(0, 4).map((p, i) => (
               <PeriodRow
                 key={`nc-${i}`}
@@ -350,7 +362,7 @@ export default function DailyPanchangScreen({ navigation, route }) {
               />
             ))}
 
-            <Text style={[styles.blockTitle, { color: colors.text }]}>Day Hora</Text>
+            <Text style={[styles.blockTitle, { color: colors.text }]}>{t('muhurat.panchang.dayHora', 'Day Hora')}</Text>
             {dayHora.map((p, i) => (
               <PeriodRow
                 key={`h-${i}`}
@@ -367,7 +379,7 @@ export default function DailyPanchangScreen({ navigation, route }) {
               style={[styles.secondaryBtn, { borderColor: colors.primary }]}
               onPress={() => navigation.navigate('MuhuratHub')}
             >
-              <Text style={{ color: colors.primary, fontWeight: '700' }}>Open event muhurat planners</Text>
+              <Text style={{ color: colors.primary, fontWeight: '600' }}>{t('muhurat.panchang.openPlanners', 'Open event muhurat planners')}</Text>
             </TouchableOpacity>
           </ScrollView>
         )}
@@ -397,7 +409,7 @@ const styles = StyleSheet.create({
   headerCenter: { flex: 1, minWidth: 0, alignItems: 'center' },
   headerSpacer: { width: 36 },
   dateNavWrap: { paddingHorizontal: 12, paddingTop: 8 },
-  title: { fontSize: 16, fontWeight: '800' },
+  title: { fontSize: 16, fontWeight: '600' },
   subtitle: { fontSize: 11, marginTop: 2 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   scroll: { padding: 16, paddingBottom: 40 },
@@ -407,7 +419,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 12,
   },
-  sectionTitle: { fontSize: 15, fontWeight: '800', marginBottom: 6 },
+  sectionTitle: { fontSize: 15, fontWeight: '600', marginBottom: 6 },
   meta: { fontSize: 13 },
   elementRow: {
     flexDirection: 'row',
@@ -415,10 +427,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   elementKey: { fontSize: 13 },
-  elementVal: { fontSize: 13, fontWeight: '700' },
+  elementVal: { fontSize: 13, fontWeight: '600' },
   blockTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     marginTop: 8,
     marginBottom: 8,
   },
@@ -429,8 +441,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 8,
   },
-  periodLabel: { fontSize: 13, fontWeight: '700' },
-  periodTime: { fontSize: 12, fontWeight: '700', marginTop: 2 },
+  periodLabel: { fontSize: 13, fontWeight: '600' },
+  periodTime: { fontSize: 12, fontWeight: '600', marginTop: 2 },
   secondaryBtn: {
     marginTop: 16,
     borderWidth: 1,

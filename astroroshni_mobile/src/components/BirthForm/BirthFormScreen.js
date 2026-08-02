@@ -804,7 +804,19 @@ export default function BirthFormScreen({ navigation, route }) {
                 </View>
 
                 {/* Step Title */}
-                <Text style={[styles.stepTitle, { color: colors.text }]}>{getStepTitle()}</Text>
+                <Text
+                style={[
+                  styles.stepTitle,
+                  { color: colors.text },
+                  theme === 'dark' && {
+                    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+                    textShadowOffset: { width: 0, height: 2 },
+                    textShadowRadius: 4,
+                  },
+                ]}
+              >
+                {getStepTitle()}
+              </Text>
 
                 {/* Step Content */}
                 {step === 1 && (
@@ -1449,9 +1461,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 40,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
   },
   inputContainer: {
     width: '100%',

@@ -19,6 +19,7 @@ RUNTIME_MIGRATIONS = (
     "add_parashari_fomo_generation_claims.sql",
     "add_manifestation_syntheses.sql",
     "add_pandit_desk.sql",
+    "add_pandit_verified_jobs.sql",
 )
 
 if str(BACKEND_DIR) not in sys.path:

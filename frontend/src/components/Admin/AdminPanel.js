@@ -36,6 +36,7 @@ import AdminNudgeCampaigns from './AdminNudgeCampaigns';
 import AdminAudienceBuilder from './AdminAudienceBuilder';
 import AdminNudgeAnalytics from './AdminNudgeAnalytics';
 import AdminIssues from './AdminIssues';
+import AdminPandits from './AdminPandits';
 import AdminGooglePlayTestimonials from './AdminGooglePlayTestimonials';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AdminPanel.css';
@@ -3160,6 +3161,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           Notifications
         </button>
         <button
+          className={`tab ${activeTab === 'pandits' ? 'active' : ''}`}
+          onClick={() => setActiveTab('pandits')}
+        >
+          Pandits
+        </button>
+        <button
           className={`tab ${activeTab === 'issues' ? 'active' : ''}`}
           onClick={() => setActiveTab('issues')}
         >
@@ -4209,6 +4216,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         )}
 
         {activeTab === 'expenses' && <AdminExpenses />}
+
+        {activeTab === 'pandits' && <AdminPandits />}
 
         {activeTab === 'issues' && <AdminIssues />}
 

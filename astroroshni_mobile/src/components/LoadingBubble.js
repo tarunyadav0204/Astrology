@@ -203,7 +203,19 @@ const LoadingBubble = ({
                         end={{ x: 1, y: 1 }}
                         style={styles.welcomeBubble}
                     >
-                        <Text style={[styles.welcomeTitle, { color: isDarkMode ? '#ffd700' : '#ff6b35' }]}>☀️ AstroRoshni</Text>
+                        <Text
+                          style={[
+                            styles.welcomeTitle,
+                            { color: isDarkMode ? '#ffd700' : '#ff6b35' },
+                            isDarkMode && {
+                              textShadowColor: 'rgba(255, 107, 53, 0.3)',
+                              textShadowOffset: { width: 0, height: 2 },
+                              textShadowRadius: 8,
+                            },
+                          ]}
+                        >
+                          ☀️ AstroRoshni
+                        </Text>
                         <Text style={[styles.welcomeSubtext, { color: isDarkMode ? '#fff' : '#1a1a1a' }]}>{t('chat.preparingInsights', 'Preparing your chart insights...')}</Text>
                     </LinearGradient>
                 </View>
@@ -220,7 +232,19 @@ const LoadingBubble = ({
                     end={{ x: 1, y: 1 }}
                     style={styles.chartBubble}
                 >
-                    <Text style={[styles.chartTitle, { color: isDarkMode ? '#ffd700' : '#ff6b35' }]}>☀️ AstroRoshni</Text>
+                    <Text
+                      style={[
+                        styles.chartTitle,
+                        { color: isDarkMode ? '#ffd700' : '#ff6b35' },
+                        isDarkMode && {
+                          textShadowColor: 'rgba(255, 107, 53, 0.3)',
+                          textShadowOffset: { width: 0, height: 2 },
+                          textShadowRadius: 8,
+                        },
+                      ]}
+                    >
+                      ☀️ AstroRoshni
+                    </Text>
                     <View style={styles.timerCard}>
                         <View style={styles.timerTopRow}>
                             <Text style={styles.timerTitle}>Estimated Time Remaining</Text>
@@ -287,7 +311,19 @@ const LoadingBubble = ({
                     </View>
                 </Animated.View>
                 
-                <Text style={[styles.welcomeTitle, { color: theme === 'dark' ? '#ffd700' : '#ff6b35' }]}>AstroRoshni</Text>
+                <Text
+                  style={[
+                    styles.welcomeTitle,
+                    { color: theme === 'dark' ? '#ffd700' : '#ff6b35' },
+                    theme === 'dark' && {
+                      textShadowColor: 'rgba(255, 107, 53, 0.3)',
+                      textShadowOffset: { width: 0, height: 2 },
+                      textShadowRadius: 8,
+                    },
+                  ]}
+                >
+                  AstroRoshni
+                </Text>
                 <View style={styles.timerCard}>
                     <View style={styles.timerTopRow}>
                         <Text style={styles.timerTitle}>Estimated Time Remaining</Text>
@@ -404,9 +440,6 @@ const styles = StyleSheet.create({
         fontSize: 28,
         fontWeight: '800',
         marginBottom: 16,
-        textShadowColor: 'rgba(255, 107, 53, 0.3)',
-        textShadowOffset: { width: 0, height: 2 },
-        textShadowRadius: 8,
     },
     timerCard: {
         width: '100%',
@@ -539,9 +572,6 @@ const styles = StyleSheet.create({
         fontSize: 28,
         fontWeight: '800',
         marginBottom: 20,
-        textShadowColor: 'rgba(255, 107, 53, 0.3)',
-        textShadowOffset: { width: 0, height: 2 },
-        textShadowRadius: 8,
     },
     chartContainer: {
         width: 300,

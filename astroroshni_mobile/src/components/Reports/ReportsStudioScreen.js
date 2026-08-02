@@ -25,6 +25,7 @@ import { storage } from '../../services/storage';
 import { reportAPI } from '../../services/api';
 import { downloadPdfToLocalUri, sharePDFOnWhatsApp } from '../../utils/pdfGenerator';
 import { useAnalytics } from '../../hooks/useAnalytics';
+import { trackAstrologyEvent } from '../../utils/analytics';
 import { useTranslation } from 'react-i18next';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import NotificationEnableBanner from '../Notifications/NotificationEnableBanner';
@@ -693,6 +694,13 @@ export default function ReportsStudioScreen({ navigation, route }) {
         // Refresh balance after job completion (fresh generate deducts; cache reopen is a no-op).
         fetchBalance?.().catch(() => {});
         loadPastReports();
+        if (reportType === 'janam_kundli' && !options?.fromRestore) {
+          trackAstrologyEvent.kundliGenerated({
+            report_id: reportId,
+            language: reportLanguage,
+          });
+          trackAstrologyEvent.pdfGenerated('janam_kundli');
+        }
         try {
           const pdfUrl = data.pdf_url || await resolveReportPdfUrl(reportId, data.pdf_url || '');
           if (!pdfUrl) {
@@ -1168,7 +1176,11 @@ export default function ReportsStudioScreen({ navigation, route }) {
       const pdfUrl = await resolveReportPdfUrl(item.report_id);
       if (!pdfUrl) throw new Error(t('reports.pdfOpenUnavailable', 'We could not open the PDF right now.'));
       const pdfUri = await downloadPdfToLocalUri(pdfUrl, buildReportPdfFileName(item.report_id));
-      await sharePDFOnWhatsApp(pdfUri);
+      await sharePDFOnWhatsApp(pdfUri, {
+        contentType: 'report_pdf',
+        reportType: item.report_type || selectedReportType,
+        source: 'reports_studio_history',
+      });
     } catch (error) {
       console.error('[ReportsStudio] share past report failed', error);
       Alert.alert(t('reports.pdfErrorTitle', 'PDF error'), genericPdfError);
@@ -1931,7 +1943,11 @@ export default function ReportsStudioScreen({ navigation, route }) {
                     <TouchableOpacity
                       onPress={async () => {
                         try {
-                          await sharePDFOnWhatsApp(generatedPdfUri);
+                          await sharePDFOnWhatsApp(generatedPdfUri, {
+                            contentType: 'report_pdf',
+                            reportType: selectedReportType,
+                            source: 'reports_studio_result',
+                          });
                         } catch (error) {
                           console.error('Share report PDF failed:', error);
                           Alert.alert(

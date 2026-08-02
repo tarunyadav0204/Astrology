@@ -303,7 +303,19 @@ export default function AnalysisHubScreen({ navigation }) {
                     resizeMode="contain"
                   />
                 </Animated.View>
-              <Text style={[styles.heroTitle, { color: colors.text }]}>{Platform.OS === 'ios' ? 'Study Your Life Patterns' : "Unlock Your Life's Mysteries"}</Text>
+              <Text
+                style={[
+                  styles.heroTitle,
+                  { color: colors.text },
+                  isDark && {
+                    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+                    textShadowOffset: { width: 0, height: 2 },
+                    textShadowRadius: 4,
+                  },
+                ]}
+              >
+                {Platform.OS === 'ios' ? 'Study Your Life Patterns' : "Unlock Your Life's Mysteries"}
+              </Text>
               <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
                   {Platform.OS === 'ios'
                     ? 'Explore chart patterns across career, relationships, health, and growth'
@@ -485,9 +497,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     textAlign: 'center',
     marginBottom: 12,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
   },
   heroSubtitle: {
     fontSize: 16,

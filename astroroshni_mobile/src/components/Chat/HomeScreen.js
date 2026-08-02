@@ -33,6 +33,7 @@ import { PhysicalTraitsModal } from '../PhysicalTraitsModal';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
+import { hindiReadableTextStyle, isHindiLocale } from '../../utils/hindiText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCredits } from '../../credits/CreditContext';
@@ -366,6 +367,10 @@ export default function HomeScreen({
     ).catch(() => {});
   }, []);
   const { theme, colors, androidLightCardFixStyle, isPanditMode, exitPanditMode } = useTheme();
+  // Pandit forces Hindi; soften weights/spacing so Devanagari isn't faux-bold/smudged.
+  const isHindiUi = isPanditMode || isHindiLocale(i18n.language);
+  const tabActiveWeight = isHindiUi ? '600' : '800';
+  const tabIdleWeight = isHindiUi ? '500' : '600';
   const tabSafeColor = theme === 'dark' ? '#ea580c' : '#ffffff';
   const isDark = theme === 'dark';
   const homePageGradient = isDark
@@ -695,6 +700,11 @@ export default function HomeScreen({
           setFomoHomeData(null);
           return null;
         }
+        // A feature-flag change can arrive while an old sheet is still open.
+        // Close it immediately when the authoritative response is disabled or
+        // has no eligible teasers; never render an empty active-areas sheet.
+        setShowFomoHomeSheet(false);
+        setFomoHomeData(null);
         return null;
       }
       if (fomoDataKeyRef.current && fomoDataKeyRef.current !== requestKey) {
@@ -732,6 +742,9 @@ export default function HomeScreen({
         setFomoStatus('analyzing');
         return null;
       }
+      // The backend flag is authoritative. Clear both cached data and any
+      // sheet left visible from a previous enabled session.
+      setShowFomoHomeSheet(false);
       if (fomoLoadKeyRef.current === requestKey) {
         fomoDataKeyRef.current = '';
         fomoLoadedAtRef.current = 0;
@@ -1894,7 +1907,12 @@ const loadHomeData = async (nativeData = null) => {
 
   const renderAstrologyTools = () => (
           <View style={styles.toolsSection}>
-            <Text style={[styles.toolsSectionTitle, { color: colors.text }]}>
+            <Text
+              style={[
+                hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, styles.toolsSectionTitle),
+                { color: colors.text },
+              ]}
+            >
               {t('home.sections.astrologyTools', 'Astrology Tools')}
             </Text>
             <AppScrollView 
@@ -2155,13 +2173,24 @@ const loadHomeData = async (nativeData = null) => {
           >
             <View style={styles.headerTopRow}>
               <View style={styles.headerProfileInfo}>
-                <Text style={[styles.headerGreeting, { color: colors.textSecondary }]}>
+                <Text
+                  style={[
+                    hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, styles.headerGreeting),
+                    { color: colors.textSecondary },
+                  ]}
+                >
                   {isPanditMode
                     ? t('home.greeting.pandit', 'Pandit Desk')
                     : t('home.greeting.hello', 'Hello')}
                   {isPanditMode ? '' : ','}
                 </Text>
-                <Text style={[styles.headerName, { color: colors.text }]} numberOfLines={1}>
+                <Text
+                  style={[
+                    hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, styles.headerName),
+                    { color: colors.text },
+                  ]}
+                  numberOfLines={1}
+                >
                   {isPanditMode
                     ? (displayData?.name || t('home.greeting.practice', 'Your practice'))
                     : (displayData?.name || t('home.greeting.guestName', 'Explorer'))}
@@ -2707,44 +2736,6 @@ const loadHomeData = async (nativeData = null) => {
             </TouchableOpacity>
           </Modal>
 
-
-          {/* Mini Insight Modal - theme aware */}
-          <Modal
-            visible={!!activeInsight}
-            transparent={true}
-            animationType="fade"
-            onRequestClose={() => setActiveInsight(null)}
-          >
-            <TouchableOpacity 
-              style={[styles.modalOverlay, { backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.45)' }]} 
-              activeOpacity={1} 
-              onPress={() => setActiveInsight(null)}
-            >
-              <View style={styles.insightModalContent}>
-                <LinearGradient
-                  colors={theme === 'dark' 
-                    ? [colors.backgroundSecondary, colors.backgroundTertiary] 
-                    : [colors.background, colors.backgroundSecondary]}
-                  style={[styles.insightGradient, { borderColor: colors.cardBorder }]}
-                >
-                  <View style={styles.insightHeader}>
-                    <Text style={styles.insightEmoji}>{activeInsight?.icon}</Text>
-                    <Text style={[styles.insightTitle, { color: colors.primary }]}>{activeInsight?.title}</Text>
-                  </View>
-                  <Text style={[styles.insightDescription, { color: colors.text }]}>
-                    {activeInsight?.description}
-                  </Text>
-                  <TouchableOpacity
-                    style={[styles.insightCloseButton, { backgroundColor: colors.primary }]}
-                    onPress={() => setActiveInsight(null)}
-                  >
-                    <Text style={styles.insightCloseText}>{t('languageModal.close', 'Close')}</Text>
-                  </TouchableOpacity>
-                </LinearGradient>
-              </View>
-            </TouchableOpacity>
-          </Modal>
-
           {/* First question free — exciting promo modal */}
           <Modal
             visible={showFirstQuestionFreeModal}
@@ -3081,6 +3072,43 @@ const loadHomeData = async (nativeData = null) => {
         </>
         )}
       </VerticalPageScroll>
+
+      {/* Mini Insight Modal — shared by personal + pandit header chips */}
+      <Modal
+        visible={!!activeInsight}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setActiveInsight(null)}
+      >
+        <TouchableOpacity
+          style={[styles.modalOverlay, { backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.45)' }]}
+          activeOpacity={1}
+          onPress={() => setActiveInsight(null)}
+        >
+          <View style={styles.insightModalContent}>
+            <LinearGradient
+              colors={theme === 'dark'
+                ? [colors.backgroundSecondary, colors.backgroundTertiary]
+                : [colors.background, colors.backgroundSecondary]}
+              style={[styles.insightGradient, { borderColor: colors.cardBorder }]}
+            >
+              <View style={styles.insightHeader}>
+                <Text style={styles.insightEmoji}>{activeInsight?.icon}</Text>
+                <Text style={[styles.insightTitle, { color: colors.primary }]}>{activeInsight?.title}</Text>
+              </View>
+              <Text style={[styles.insightDescription, { color: colors.text }]}>
+                {activeInsight?.description}
+              </Text>
+              <TouchableOpacity
+                style={[styles.insightCloseButton, { backgroundColor: colors.primary }]}
+                onPress={() => setActiveInsight(null)}
+              >
+                <Text style={styles.insightCloseText}>{t('languageModal.close', 'Close')}</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+        </TouchableOpacity>
+      </Modal>
       
       {/* Monthly Predictions Welcome Modal */}
       <Modal
@@ -3259,7 +3287,12 @@ const loadHomeData = async (nativeData = null) => {
       </Modal>
 
       <FomoHomeSheet
-        visible={showFomoHomeSheet}
+        visible={Boolean(
+          showFomoHomeSheet
+          && fomoHomeData?.status === 'ready'
+          && Array.isArray(fomoHomeData?.teasers)
+          && fomoHomeData.teasers.length > 0
+        )}
         data={fomoHomeData}
         onDismiss={dismissFomoHome}
         onAsk={askFomoQuestion}
@@ -3406,7 +3439,7 @@ const loadHomeData = async (nativeData = null) => {
               color={activeTab === 'ask' ? tabActiveColor : tabIdleColor} 
             />
           </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'ask' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'ask' ? '800' : '600' }]}>
+          <Text style={[styles.tabLabel, { color: activeTab === 'ask' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'ask' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
             {t('home.tabs.ask', 'Ask')}
           </Text>
         </TouchableOpacity>
@@ -3429,7 +3462,7 @@ const loadHomeData = async (nativeData = null) => {
               color={activeTab === 'events' ? tabActiveColor : tabIdleColor} 
             />
           </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'events' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'events' ? '800' : '600' }]}>
+          <Text style={[styles.tabLabel, { color: activeTab === 'events' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'events' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
             {isPanditMode
               ? t('home.tabs.muhurat', 'Muhurat')
               : isIOS
@@ -3462,7 +3495,7 @@ const loadHomeData = async (nativeData = null) => {
               color={activeTab === 'reports' ? tabActiveColor : tabIdleColor} 
             />
           </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'reports' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'reports' ? '800' : '600' }]}>
+          <Text style={[styles.tabLabel, { color: activeTab === 'reports' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'reports' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
             {t('home.tabs.reports', 'Reports')}
           </Text>
         </TouchableOpacity>
@@ -3485,7 +3518,7 @@ const loadHomeData = async (nativeData = null) => {
               <Line x1="46" y1="2" x2="2" y2="46" stroke={activeTab === 'charts' ? tabActiveColor : tabIdleColor} strokeWidth="1.5" />
             </Svg>
           </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'charts' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'charts' ? '800' : '600' }]}>
+          <Text style={[styles.tabLabel, { color: activeTab === 'charts' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'charts' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
             {t('home.tabs.charts', 'Charts')}
           </Text>
         </TouchableOpacity>
@@ -3502,7 +3535,7 @@ const loadHomeData = async (nativeData = null) => {
               color={activeTab === 'you' ? tabActiveColor : tabIdleColor} 
             />
           </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'you' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'you' ? '800' : '600' }]}>
+          <Text style={[styles.tabLabel, { color: activeTab === 'you' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'you' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
             {t('home.tabs.you', 'You')}
           </Text>
         </TouchableOpacity>

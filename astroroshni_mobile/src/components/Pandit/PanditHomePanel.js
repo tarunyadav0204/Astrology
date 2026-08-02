@@ -147,11 +147,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 16,
   },
-  badgeText: { flex: 1, color: '#166534', fontSize: 13, fontWeight: '600' },
+  badgeText: { flex: 1, color: '#166534', fontSize: 13, fontWeight: '500' },
   sectionLabel: {
     fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.4,
+    fontWeight: '600',
+    letterSpacing: 0,
     marginBottom: 10,
   },
   card: {
@@ -171,8 +171,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cardBody: { flex: 1, minWidth: 0 },
-  cardTitle: { fontSize: 16, fontWeight: '800' },
+  // Keep ≤600: Devanagari faux-bold at 800 looks shadowed on white.
+  cardTitle: { fontSize: 16, fontWeight: '600' },
   cardSub: { fontSize: 12, marginTop: 2 },
   exitBtn: { marginTop: 8, alignItems: 'center', paddingVertical: 14 },
-  exitText: { fontSize: 15, fontWeight: '700' },
+  exitText: { fontSize: 15, fontWeight: '600' },
 });

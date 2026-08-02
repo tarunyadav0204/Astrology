@@ -847,6 +847,17 @@ export const generateRelationshipReportPDF = async ({
 
 export const sharePDFOnWhatsApp = async (pdfUri, options = {}) => {
   try {
+    try {
+      const { trackAstrologyEvent } = require('./analytics');
+      trackAstrologyEvent.shareTapped({
+        content_type: options.contentType || options.content_type || 'pdf',
+        report_type: options.reportType || options.report_type || undefined,
+        source: options.source || undefined,
+      });
+    } catch (_) {
+      /* analytics must never block share */
+    }
+
     if (!pdfUri) {
       // Web/PWA: browser print/save dialog already handled export.
       return;

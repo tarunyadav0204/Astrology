@@ -866,9 +866,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
     paddingHorizontal: 10,
-    paddingTop: 2,
-    paddingBottom: 6,
-    marginTop: 0,
+    paddingTop: 10,
+    paddingBottom: 10,
+    marginTop: 4,
     zIndex: 2,
   },
   webToolbarLeft: {

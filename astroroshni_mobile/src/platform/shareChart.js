@@ -93,6 +93,16 @@ async function shareOrDownloadWebBlob(blob, filename = 'astroroshni-chart.png') 
  * Capture the chart view and open the system share sheet (or download on web fallback).
  */
 export async function shareCapturedChart(captureViewRef) {
+  try {
+    const { trackAstrologyEvent } = require('../utils/analytics');
+    trackAstrologyEvent.shareTapped({
+      content_type: 'chart_image',
+      source: 'chart_screen',
+    });
+  } catch (_) {
+    /* analytics must never block share */
+  }
+
   if (Platform.OS === 'web') {
     const blob = await captureWebBlob(captureViewRef);
     await shareOrDownloadWebBlob(blob);

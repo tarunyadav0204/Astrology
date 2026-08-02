@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Platform, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Platform, Modal, Share } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/Ionicons';
@@ -13,11 +13,14 @@ import { useAuthGate } from '../auth/AuthGateContext';
 import { pricingAPI } from '../services/api';
 import WebDatePickerModal from './Common/WebDatePickerModal';
 import { useTheme } from '../context/ThemeContext';
+import { trackAstrologyEvent } from '../utils/analytics';
+import { useTranslation } from 'react-i18next';
 
 const isWeb = Platform.OS === 'web';
 
 
 export default function ChildbirthPlannerScreen({ navigation }) {
+  const { t } = useTranslation();
   const { credits, fetchBalance } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
   const { theme, colors } = useTheme();
@@ -89,7 +92,7 @@ export default function ChildbirthPlannerScreen({ navigation }) {
         setDeliveryLocation({
           latitude: parseFloat(data.latitude),
           longitude: parseFloat(data.longitude),
-          name: data.place || "Mother's location"
+          name: data.place || t('muhurat.childbirth.mothersLocation', "Mother's location")
         });
       }
     } catch(e) { 
@@ -114,35 +117,48 @@ export default function ChildbirthPlannerScreen({ navigation }) {
 
   const calculateDates = async () => {
     if (!motherProfile) {
-      Alert.alert("Missing Information", "Please select mother's chart first.");
+      Alert.alert(
+        t('muhurat.childbirth.missingInfo', 'Missing Information'),
+        t('muhurat.childbirth.selectMotherFirst', "Please select mother's chart first.")
+      );
       return;
     }
     
     if (!deliveryLocation) {
-      Alert.alert("Missing Information", "Please select delivery location.");
+      Alert.alert(
+        t('muhurat.childbirth.missingInfo', 'Missing Information'),
+        t('muhurat.childbirth.selectDeliveryFirst', 'Please select delivery location.')
+      );
       return;
     }
 
     const authOk = await requireAuthForPaid({
       feature: 'childbirth planner',
-      message: 'Sign in to run the childbirth muhurat planner.',
+      message: t('muhurat.childbirth.signIn', 'Sign in to run the childbirth muhurat planner.'),
       resume: { resumeRoute: 'ChildbirthPlanner', resumeParams: {} },
     });
     if (!authOk) return;
 
     const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
     if (daysDiff > 30) {
-      Alert.alert("Date Range Limit", "Date range cannot exceed 30 days. Please adjust your selection.");
+      Alert.alert(
+        t('muhurat.childbirth.dateRangeLimit', 'Date Range Limit'),
+        t('muhurat.childbirth.dateRangeLimitBody', 'Date range cannot exceed 30 days. Please adjust your selection.')
+      );
       return;
     }
 
     if (!creditInfo.can_afford) {
       Alert.alert(
-        "Insufficient Credits", 
-        `You need ${creditInfo.cost} credits but have ${creditInfo.current_credits}. Please purchase more credits.`,
+        t('muhurat.common.insufficientCredits', 'Insufficient Credits'),
+        t('muhurat.common.needCredits', {
+          cost: creditInfo.cost,
+          credits: creditInfo.current_credits,
+          defaultValue: 'You need {{cost}} credits but have {{credits}}. Please purchase more credits.',
+        }),
         [
-          { text: "Cancel", style: "cancel" },
-          { text: "Buy Credits", onPress: () => navigation.navigate('CreditScreen') }
+          { text: t('muhurat.common.cancel', 'Cancel'), style: 'cancel' },
+          { text: t('muhurat.common.buyCredits', 'Buy Credits'), onPress: () => navigation.navigate('Credits') },
         ]
       );
       return;
@@ -150,11 +166,14 @@ export default function ChildbirthPlannerScreen({ navigation }) {
 
     // Confirmation dialog before deducting credits
     Alert.alert(
-      "Confirm Calculation", 
-      `This will deduct ${creditInfo.cost} credits from your account. Do you want to proceed?`,
+      t('muhurat.common.confirmCalculation', 'Confirm Calculation'),
+      t('muhurat.common.confirmDeduct', {
+        cost: creditInfo.cost,
+        defaultValue: 'This will deduct {{cost}} credits from your account. Do you want to proceed?',
+      }),
       [
-        { text: "Cancel", style: "cancel" },
-        { text: "Proceed", onPress: () => performCalculation() }
+        { text: t('muhurat.common.cancel', 'Cancel'), style: 'cancel' },
+        { text: t('muhurat.common.proceed', 'Proceed'), onPress: () => performCalculation() },
       ]
     );
   };
@@ -193,11 +212,11 @@ export default function ChildbirthPlannerScreen({ navigation }) {
       const json = await response.json();
       if (response.status === 402) {
         Alert.alert(
-          "Insufficient Credits", 
-          json.detail?.message || "Not enough credits",
+          t('muhurat.common.insufficientCredits', 'Insufficient Credits'),
+          json.detail?.message || t('muhurat.childbirth.notEnoughCredits', 'Not enough credits'),
           [
-            { text: "Cancel", style: "cancel" },
-            { text: "Buy Credits", onPress: () => navigation.navigate('CreditScreen') }
+            { text: t('muhurat.common.cancel', 'Cancel'), style: 'cancel' },
+            { text: t('muhurat.common.buyCredits', 'Buy Credits'), onPress: () => navigation.navigate('Credits') },
           ]
         );
       } else if (json.status === 'success') {
@@ -209,10 +228,16 @@ export default function ChildbirthPlannerScreen({ navigation }) {
           can_afford: (json.remaining_credits || credits - prev.cost) >= prev.cost
         }));
       } else {
-        Alert.alert("Error", "Calculation failed. Please check inputs.");
+        Alert.alert(
+          t('muhurat.common.error', 'Error'),
+          t('muhurat.childbirth.calculationFailed', 'Calculation failed. Please check inputs.')
+        );
       }
     } catch (e) {
-      Alert.alert("Error", "Network request failed.");
+      Alert.alert(
+        t('muhurat.common.error', 'Error'),
+        t('muhurat.common.networkError', 'Network Error')
+      );
     } finally {
       setLoading(false);
     }
@@ -231,52 +256,54 @@ export default function ChildbirthPlannerScreen({ navigation }) {
               <TouchableOpacity onPress={() => navigation.goBack()}>
                 <Icon name="arrow-back" size={24} color={ui.text} />
               </TouchableOpacity>
-              <Text style={[styles.headerTitle, { color: ui.text }]}>Childbirth Planner</Text>
+              <Text style={[styles.headerTitle, { color: ui.text }]}>{t('muhurat.childbirth.title', 'Childbirth Planner')}</Text>
               <View style={styles.placeholder} />
             </View>
 
             {/* Credit Info Card */}
             <View style={[styles.creditCard, { backgroundColor: ui.softBg, borderColor: ui.cardBorder, borderWidth: 1 }]}>
               <View style={styles.creditRow}>
-                <Text style={[styles.creditLabel, { color: ui.text }]}>💎 Cost: {creditInfo.cost} credits</Text>
+                <Text style={[styles.creditLabel, { color: ui.text }]}>
+                  💎 {t('muhurat.common.costCredits', { cost: creditInfo.cost, defaultValue: 'Cost: {{cost}} credits' })}
+                </Text>
                 <Text style={[styles.creditBalance, { color: credits >= creditInfo.cost ? '#00C853' : '#FF5722' }]}>
-                  Balance: {credits}
+                  {t('muhurat.common.balance', { credits, defaultValue: 'Balance: {{credits}}' })}
                 </Text>
               </View>
               {!creditInfo.can_afford && (
                 <TouchableOpacity 
                   style={styles.buyCreditsBtn} 
-                  onPress={() => navigation.navigate('CreditScreen')}
+                  onPress={() => navigation.navigate('Credits')}
                 >
-                  <Text style={styles.buyCreditsText}>Buy Credits</Text>
+                  <Text style={styles.buyCreditsText}>{t('muhurat.common.buyCredits', 'Buy Credits')}</Text>
                 </TouchableOpacity>
               )}
             </View>
 
             {/* Mother Selection Card */}
             <View style={[styles.card, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder, borderWidth: 1 }]}>
-              <Text style={[styles.cardTitle, { color: ui.text }]}>👩 MOTHER'S CHART</Text>
+              <Text style={[styles.cardTitle, { color: ui.text }]}>👩 {t('muhurat.childbirth.mothersChart', "MOTHER'S CHART")}</Text>
               <TouchableOpacity style={[styles.locationBtn, { backgroundColor: ui.insetBg }]} onPress={() => navigation.navigate('SelectNative', { returnTo: 'ChildbirthPlanner' })}>
                 <Icon name="person" size={20} color={ui.text} />
                 <Text style={[styles.locationText, { color: ui.text }]}>
-                  {motherProfile?.name || "Select mother's chart"}
+                  {motherProfile?.name || t('muhurat.childbirth.selectMother', "Select mother's chart")}
                 </Text>
                 <Icon name="chevron-forward" size={20} color={ui.muted} />
               </TouchableOpacity>
-              <Text style={[styles.hint, { color: ui.muted }]}>Required for nakshatra calculations</Text>
+              <Text style={[styles.hint, { color: ui.muted }]}>{t('muhurat.childbirth.motherRequired', 'Required for nakshatra calculations')}</Text>
             </View>
 
             {/* Date Selection Card */}
             <View style={[styles.card, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder, borderWidth: 1 }]}>
-              <Text style={[styles.cardTitle, { color: ui.text }]}>📅 SELECT DATE RANGE</Text>
+              <Text style={[styles.cardTitle, { color: ui.text }]}>📅 {t('muhurat.childbirth.selectDateRange', 'SELECT DATE RANGE')}</Text>
               <View style={styles.dateRow}>
                 <TouchableOpacity style={[styles.dateBtn, { backgroundColor: ui.insetBg }]} onPress={() => setShowStartPicker(true)}>
-                  <Text style={[styles.dateLabel, { color: ui.muted }]}>From</Text>
+                  <Text style={[styles.dateLabel, { color: ui.muted }]}>{t('muhurat.common.from', 'From')}</Text>
                   <Text style={[styles.dateValue, { color: ui.text }]}>{startDate.toLocaleDateString()}</Text>
                 </TouchableOpacity>
                 <Icon name="arrow-forward" size={20} color={ui.muted} />
                 <TouchableOpacity style={[styles.dateBtn, { backgroundColor: ui.insetBg }]} onPress={() => setShowEndPicker(true)}>
-                  <Text style={[styles.dateLabel, { color: ui.muted }]}>To</Text>
+                  <Text style={[styles.dateLabel, { color: ui.muted }]}>{t('muhurat.common.to', 'To')}</Text>
                   <Text style={[styles.dateValue, { color: ui.text }]}>{endDate.toLocaleDateString()}</Text>
                 </TouchableOpacity>
               </View>
@@ -284,15 +311,19 @@ export default function ChildbirthPlannerScreen({ navigation }) {
 
             {/* Location Card */}
             <View style={[styles.card, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder, borderWidth: 1 }]}>
-              <Text style={[styles.cardTitle, { color: ui.text }]}>🏥 DELIVERY LOCATION</Text>
+              <Text style={[styles.cardTitle, { color: ui.text }]}>🏥 {t('muhurat.childbirth.deliveryLocation', 'DELIVERY LOCATION')}</Text>
               <TouchableOpacity style={[styles.locationBtn, { backgroundColor: ui.insetBg }]} onPress={() => setShowLocationPicker(true)}>
                 <Icon name="location" size={20} color={ui.text} />
                 <Text style={[styles.locationText, { color: ui.text }]}>
-                  {deliveryLocation?.name || "Select delivery location"}
+                  {deliveryLocation?.name || t('muhurat.childbirth.selectDeliveryLocation', 'Select delivery location')}
                 </Text>
                 <Icon name="chevron-forward" size={20} color={ui.muted} />
               </TouchableOpacity>
-              <Text style={[styles.hint, { color: ui.muted }]}>Default: {motherProfile?.place || "Mother's location"}</Text>
+              <Text style={[styles.hint, { color: ui.muted }]}>
+                {motherProfile?.place
+                  ? `${t('muhurat.childbirth.defaultMotherLocation', "Default: mother's location").split(':')[0]}: ${motherProfile.place}`
+                  : t('muhurat.childbirth.defaultMotherLocation', "Default: mother's location")}
+              </Text>
             </View>
 
             {/* Calculate Button */}
@@ -310,7 +341,9 @@ export default function ChildbirthPlannerScreen({ navigation }) {
                     <ActivityIndicator color={COLORS.white} />
                   ) : (
                     <Text style={styles.calcButtonText}>
-                      {creditInfo.can_afford ? 'Find Auspicious Dates' : 'Insufficient Credits'}
+                      {creditInfo.can_afford
+                        ? t('muhurat.common.findAuspiciousDates', 'Find Auspicious Dates')
+                        : t('muhurat.common.insufficientCredits', 'Insufficient Credits')}
                     </Text>
                   )}
                 </LinearGradient>
@@ -325,7 +358,9 @@ export default function ChildbirthPlannerScreen({ navigation }) {
                     <ActivityIndicator color="#fff" />
                   ) : (
                     <Text style={styles.calcButtonText}>
-                      {creditInfo.can_afford ? 'Find Auspicious Dates' : 'Insufficient Credits'}
+                      {creditInfo.can_afford
+                        ? t('muhurat.common.findAuspiciousDates', 'Find Auspicious Dates')
+                        : t('muhurat.common.insufficientCredits', 'Insufficient Credits')}
                     </Text>
                   )}
                 </View>
@@ -335,14 +370,59 @@ export default function ChildbirthPlannerScreen({ navigation }) {
             {/* Results */}
             {results && (
               <View style={styles.resultsContainer}>
-                <Text style={[styles.resultHeader, { color: ui.text }]}>✨ Recommended Slots</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 10 }}>
+                  <Text style={[styles.resultHeader, { color: ui.text, flex: 1, marginBottom: 0 }]}>✨ {t('muhurat.common.recommendedSlots', 'Recommended Slots')}</Text>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      const days = results.recommendations || [];
+                      const shareTitle = t('muhurat.childbirth.shareTitle', 'AstroRoshni — Childbirth Muhurat');
+                      const lines = [
+                        shareTitle,
+                        '',
+                        ...days.slice(0, 8).map((day) => `• ${day.date}${day.nakshatra ? ` · ${day.nakshatra}` : ''}`),
+                      ];
+                      if (!days.length) lines.push(t('muhurat.childbirth.noAuspicious', 'No auspicious dates found in this period'));
+                      try {
+                        trackAstrologyEvent.shareTapped({
+                          content_type: 'muhurat',
+                          muhurat_type: 'childbirth',
+                          source: 'childbirth_planner',
+                        });
+                        await Share.share({ message: lines.join('\n'), title: shareTitle });
+                        trackAstrologyEvent.muhuratShared('childbirth', {
+                          recommendation_count: days.length,
+                        });
+                      } catch (error) {
+                        if (String(error?.message || '').toLowerCase().includes('dismiss')) return;
+                        Alert.alert(
+                          t('muhurat.common.shareFailed', 'Share failed'),
+                          error?.message || t('muhurat.common.shareFailedBody', 'Could not share muhurat results.')
+                        );
+                      }
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      paddingHorizontal: 10,
+                      paddingVertical: 8,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: ui.cardBorder,
+                      backgroundColor: ui.insetBg,
+                    }}
+                  >
+                    <Icon name="share-outline" size={18} color={ui.text} />
+                    <Text style={{ color: ui.text, fontSize: 13, fontWeight: '600' }}>{t('muhurat.common.share', 'Share')}</Text>
+                  </TouchableOpacity>
+                </View>
                 {results.recommendations.length === 0 ? (
                   <View style={[styles.noDataCard, { backgroundColor: ui.softBg }]}>
-                    <Text style={[styles.noDataText, { color: ui.text }]}>No auspicious dates found in this period</Text>
-                <Text style={[styles.noDataHint, { color: ui.muted }]}>Try widening the date range and checking different chart conditions:</Text>
-                    <Text style={[styles.noDataTip, { color: ui.muted }]}>• Extending the date range to 60-90 days</Text>
-                    <Text style={[styles.noDataTip, { color: ui.muted }]}>• Avoiding eclipse periods and inauspicious months</Text>
-                    <Text style={[styles.noDataTip, { color: ui.muted }]}>• Checking different lunar months</Text>
+                    <Text style={[styles.noDataText, { color: ui.text }]}>{t('muhurat.childbirth.noAuspicious', 'No auspicious dates found in this period')}</Text>
+                <Text style={[styles.noDataHint, { color: ui.muted }]}>{t('muhurat.childbirth.emptyHint', 'Try widening the date range and checking different chart conditions:')}</Text>
+                    <Text style={[styles.noDataTip, { color: ui.muted }]}>• {t('muhurat.childbirth.tipExtend', 'Extending the date range to 60-90 days')}</Text>
+                    <Text style={[styles.noDataTip, { color: ui.muted }]}>• {t('muhurat.childbirth.tipEclipse', 'Avoiding eclipse periods and inauspicious months')}</Text>
+                    <Text style={[styles.noDataTip, { color: ui.muted }]}>• {t('muhurat.childbirth.tipLunar', 'Checking different lunar months')}</Text>
                   </View>
                 ) : (
                   results.recommendations.map((day, idx) => (
@@ -354,15 +434,19 @@ export default function ChildbirthPlannerScreen({ navigation }) {
                         </View>
                       </View>
                       {day.panchak?.is_panchak && (
-                        <View style={styles.panchakAlert}>
-                          <Text style={styles.panchakTitle}>⚠ Panchak is active</Text>
+                        <View style={[styles.panchakAlert, !isDark && { backgroundColor: 'rgba(234, 88, 12, 0.08)', borderColor: 'rgba(234, 88, 12, 0.35)' }]}>
+                          <Text style={[styles.panchakTitle, !isDark && { color: '#C2410C' }]}>⚠ {t('muhurat.common.panchakActive', 'Panchak is active')}</Text>
                           <Text style={[styles.panchakReason, { color: ui.muted }]}>{day.panchak.reason}</Text>
                           {(day.panchak.intervals || []).map((interval, intervalIndex) => (
-                            <Text key={`${interval.start}-${interval.end}-${intervalIndex}`} style={styles.panchakInterval}>
-                              Active from {interval.start} to {interval.end}
+                            <Text key={`${interval.start}-${interval.end}-${intervalIndex}`} style={[styles.panchakInterval, !isDark && { color: '#9A3412' }]}>
+                              {t('muhurat.common.panchakActiveFrom', {
+                                start: interval.start,
+                                end: interval.end,
+                                defaultValue: 'Active from {{start}} to {{end}}',
+                              })}
                             </Text>
                           ))}
-                          <Text style={[styles.panchakNote, { color: ui.muted }]}>Confirm a Panchak window with a qualified priest before use.</Text>
+                          <Text style={[styles.panchakNote, { color: ui.muted }]}>{t('muhurat.common.panchakConfirm', 'Confirm a Panchak window with a qualified priest before use.')}</Text>
                         </View>
                       )}
                       
@@ -388,7 +472,7 @@ export default function ChildbirthPlannerScreen({ navigation }) {
               <WebDatePickerModal
                 visible={showStartPicker}
                 value={startDate}
-                title="From date"
+                title={t('muhurat.common.fromDate', 'From date')}
                 minimumDate={new Date()}
                 onClose={() => setShowStartPicker(false)}
                 onChange={(next) => {
@@ -399,13 +483,16 @@ export default function ChildbirthPlannerScreen({ navigation }) {
               <WebDatePickerModal
                 visible={showEndPicker}
                 value={endDate}
-                title="To date"
+                title={t('muhurat.common.toDate', 'To date')}
                 minimumDate={startDate}
                 onClose={() => setShowEndPicker(false)}
                 onChange={(d) => {
                   const daysDiff = Math.ceil((d - startDate) / (1000 * 60 * 60 * 24));
                   if (daysDiff > 30) {
-                    Alert.alert("Date Range Limit", "Please select a date within 30 days of start date.");
+                    Alert.alert(
+                      t('muhurat.childbirth.dateRangeLimit', 'Date Range Limit'),
+                      t('muhurat.childbirth.dateRangeLimitBody', 'Date range cannot exceed 30 days. Please adjust your selection.')
+                    );
                     return;
                   }
                   setEndDate(d);
@@ -420,10 +507,10 @@ export default function ChildbirthPlannerScreen({ navigation }) {
                     <View style={styles.pickerGradient}>
                       <View style={styles.pickerHeader}>
                         <TouchableOpacity onPress={() => setShowStartPicker(false)}>
-                          <Text style={styles.pickerButton}>Cancel</Text>
+                          <Text style={styles.pickerButton}>{t('muhurat.common.cancel', 'Cancel')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setShowStartPicker(false)}>
-                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>Done</Text>
+                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>{t('birthForm.picker.done', 'Done')}</Text>
                         </TouchableOpacity>
                       </View>
                       <DateTimePicker
@@ -447,17 +534,20 @@ export default function ChildbirthPlannerScreen({ navigation }) {
                     <View style={styles.pickerGradient}>
                       <View style={styles.pickerHeader}>
                         <TouchableOpacity onPress={() => setShowEndPicker(false)}>
-                          <Text style={styles.pickerButton}>Cancel</Text>
+                          <Text style={styles.pickerButton}>{t('muhurat.common.cancel', 'Cancel')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => {
                           const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
                           if (daysDiff > 30) {
-                            Alert.alert("Date Range Limit", "Please select a date within 30 days of start date.");
+                            Alert.alert(
+                              t('muhurat.childbirth.dateRangeLimit', 'Date Range Limit'),
+                              t('muhurat.childbirth.dateRangeLimitBody', 'Date range cannot exceed 30 days. Please adjust your selection.')
+                            );
                             return;
                           }
                           setShowEndPicker(false);
                         }}>
-                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>Done</Text>
+                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>{t('birthForm.picker.done', 'Done')}</Text>
                         </TouchableOpacity>
                       </View>
                       <DateTimePicker
@@ -500,7 +590,10 @@ export default function ChildbirthPlannerScreen({ navigation }) {
                     if(d) {
                       const daysDiff = Math.ceil((d - startDate) / (1000 * 60 * 60 * 24));
                       if (daysDiff > 30) {
-                        Alert.alert("Date Range Limit", "Please select a date within 30 days of start date.");
+                        Alert.alert(
+                          t('muhurat.childbirth.dateRangeLimit', 'Date Range Limit'),
+                          t('muhurat.childbirth.dateRangeLimitBody', 'Date range cannot exceed 30 days. Please adjust your selection.')
+                        );
                         return;
                       }
                       setEndDate(d);
@@ -543,7 +636,7 @@ const styles = StyleSheet.create({
   headerTitle: { 
     color: COLORS.white, 
     fontSize: 20, 
-    fontWeight: 'bold' 
+    fontWeight: '600' 
   },
   placeholder: { width: 24 },
   
@@ -568,7 +661,7 @@ const styles = StyleSheet.create({
   },
   creditBalance: {
     fontSize: 14,
-    fontWeight: 'bold'
+    fontWeight: '600'
   },
   buyCreditsBtn: {
     backgroundColor: '#FF5722',
@@ -580,7 +673,7 @@ const styles = StyleSheet.create({
   buyCreditsText: {
     color: COLORS.white,
     fontSize: 12,
-    fontWeight: 'bold'
+    fontWeight: '600'
   },
   
   card: { 
@@ -594,7 +687,7 @@ const styles = StyleSheet.create({
   cardTitle: { 
     color: 'rgba(255,255,255,0.8)', 
     fontSize: 14, 
-    fontWeight: 'bold', 
+    fontWeight: '600', 
     marginBottom: 15 
   },
   dateRow: { 
@@ -615,7 +708,7 @@ const styles = StyleSheet.create({
   dateValue: { 
     color: COLORS.white, 
     fontSize: 16, 
-    fontWeight: 'bold', 
+    fontWeight: '600', 
     marginTop: 2 
   },
   
@@ -649,7 +742,7 @@ const styles = StyleSheet.create({
   },
   calcButtonText: { 
     color: COLORS.white, 
-    fontWeight: 'bold', 
+    fontWeight: '600', 
     fontSize: 16 
   },
   disabledButton: {
@@ -660,7 +753,7 @@ const styles = StyleSheet.create({
   resultHeader: { 
     color: COLORS.white, 
     fontSize: 18, 
-    fontWeight: 'bold', 
+    fontWeight: '600', 
     marginBottom: 15 
   },
   resultItem: { 
@@ -680,7 +773,7 @@ const styles = StyleSheet.create({
   dateTitle: { 
     color: COLORS.white, 
     fontSize: 16, 
-    fontWeight: 'bold' 
+    fontWeight: '600' 
   },
   tag: { 
     backgroundColor: 'rgba(255,255,255,0.1)', 
@@ -708,7 +801,7 @@ const styles = StyleSheet.create({
   },
   slotTime: { 
     color: COLORS.white, 
-    fontWeight: 'bold', 
+    fontWeight: '600', 
     fontSize: 14 
   },
   slotLagna: { 
@@ -716,7 +809,7 @@ const styles = StyleSheet.create({
     fontSize: 10 
   },
   panchakAlert: { backgroundColor: 'rgba(255, 87, 34, 0.14)', borderWidth: 1, borderColor: 'rgba(255, 152, 0, 0.55)', borderRadius: 10, padding: 10, marginBottom: 12 },
-  panchakTitle: { color: '#FFB74D', fontSize: 14, fontWeight: 'bold', marginBottom: 4 },
+  panchakTitle: { color: '#FFB74D', fontSize: 14, fontWeight: '600', marginBottom: 4 },
   panchakReason: { color: 'rgba(255,255,255,0.78)', fontSize: 12, lineHeight: 17 },
   panchakInterval: { color: '#FFD180', fontSize: 12, fontWeight: '600', marginTop: 4 },
   panchakNote: { color: 'rgba(255,255,255,0.7)', fontSize: 11, lineHeight: 15, marginTop: 6 },

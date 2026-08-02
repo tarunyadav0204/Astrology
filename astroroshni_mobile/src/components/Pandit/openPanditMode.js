@@ -22,6 +22,8 @@ export async function openPanditMode({
   try {
     const res = await panditAPI.getMe();
     const data = res?.data || {};
+    // White pandit theme must apply before practice setup — otherwise join UI stays dark.
+    await enterPanditMode();
     if (!data.desk_ready) {
       navigation.navigate('PanditPractice', {
         mode: 'join',
@@ -29,7 +31,6 @@ export async function openPanditMode({
       });
       return false;
     }
-    await enterPanditMode();
     navigation.navigate('Home');
     return true;
   } catch (error) {
