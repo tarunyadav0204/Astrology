@@ -666,7 +666,10 @@
       "practiceDetails": "प्रैक्टिस विवरण",
       "cityFallback": "शहर",
       "pincodeFallback": "पिनकोड",
-      "switchPersonal": "व्यक्तिगत ऐप पर जाएँ"
+      "switchPersonal": "व्यक्तिगत ऐप पर जाएँ",
+      "setupIncompleteTitle": "प्रैक्टिस सेटअप पूरा करें",
+      "setupIncompleteBody": "मुफ़्त पंडित डेस्क खोलने के लिए प्रैक्टिस विवरण भरें, या व्यक्तिगत ऐप पर वापस जाएँ।",
+      "completeSetup": "सेटअप पूरा करें"
     },
     "firstQuestionFree": {
       "title": "आपका पहला प्रश्न मुफ़्त है!",
@@ -1554,7 +1557,28 @@
     "website": "वेबसाइट",
     "address": "पता",
     "activateCta": "मुफ़्त डेस्क सक्रिय करें",
-    "saveCta": "प्रैक्टिस सहेजें"
+    "saveCta": "प्रैक्टिस सहेजें",
+    "notNow": "अभी नहीं — व्यक्तिगत ऐप उपयोग करें",
+    "pujaTypeOptions": {
+      "satyanarayan": "सत्यनारायण",
+      "griha_pravesh": "गृह प्रवेश",
+      "vivah": "विवाह",
+      "naamkaran": "नामकरण",
+      "mundan": "मुंडन",
+      "vastu": "वास्तु",
+      "navagraha": "नवग्रह",
+      "rudrabhishek": "रुद्राभिषेक",
+      "other": "अन्य"
+    },
+    "languageOptions": {
+      "hindi": "हिंदी",
+      "english": "अंग्रेज़ी",
+      "marathi": "मराठी",
+      "gujarati": "गुजराती",
+      "tamil": "तमिल",
+      "telugu": "तेलुगु",
+      "bengali": "बंगाली"
+    }
   },
   "houses": {
     "1": {

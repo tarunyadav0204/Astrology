@@ -1129,7 +1129,10 @@
       "practiceDetails": "Practice details",
       "cityFallback": "City",
       "pincodeFallback": "Pincode",
-      "switchPersonal": "Switch to personal app"
+      "switchPersonal": "Switch to personal app",
+      "setupIncompleteTitle": "Finish practice setup",
+      "setupIncompleteBody": "Add your practice details to unlock the free pandit desk, or switch back to the personal app.",
+      "completeSetup": "Complete setup"
     },
     "guestNudge": {
       "title": "Create your free birth chart",
@@ -1913,7 +1916,28 @@
     "website": "Website",
     "address": "Address",
     "activateCta": "Activate Free Desk",
-    "saveCta": "Save practice"
+    "saveCta": "Save practice",
+    "notNow": "Not now — use personal app",
+    "pujaTypeOptions": {
+      "satyanarayan": "Satyanarayan",
+      "griha_pravesh": "Griha Pravesh",
+      "vivah": "Vivah",
+      "naamkaran": "Naamkaran",
+      "mundan": "Mundan",
+      "vastu": "Vastu",
+      "navagraha": "Navagraha",
+      "rudrabhishek": "Rudrabhishek",
+      "other": "Other"
+    },
+    "languageOptions": {
+      "hindi": "Hindi",
+      "english": "English",
+      "marathi": "Marathi",
+      "gujarati": "Gujarati",
+      "tamil": "Tamil",
+      "telugu": "Telugu",
+      "bengali": "Bengali"
+    }
   },
   "houses": {
     "1": {

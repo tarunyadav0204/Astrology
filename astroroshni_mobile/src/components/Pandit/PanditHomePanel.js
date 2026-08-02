@@ -30,6 +30,7 @@ export default function PanditHomePanel({ navigation, showExit = true }) {
   const { t } = useTranslation();
   const { colors, exitPanditMode } = useTheme();
   const [profile, setProfile] = useState(null);
+  const [deskReady, setDeskReady] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useFocusEffect(
@@ -41,13 +42,9 @@ export default function PanditHomePanel({ navigation, showExit = true }) {
           const res = await panditAPI.getMe();
           if (cancelled) return;
           const data = res?.data || {};
-          if (!data.desk_ready) {
-            navigation.navigate('PanditPractice', {
-              mode: 'join',
-              profile: data.profile || null,
-            });
-            return;
-          }
+          // Never auto-navigate to practice setup — that trapped users in a loop
+          // (back → Home → navigate Practice again, and again after app reopen).
+          setDeskReady(Boolean(data.desk_ready));
           setProfile(data.profile || null);
         } catch (_) {
           /* keep last profile */
@@ -56,8 +53,12 @@ export default function PanditHomePanel({ navigation, showExit = true }) {
         }
       })();
       return () => { cancelled = true; };
-    }, [navigation])
+    }, [])
   );
+
+  const leavePersonal = async () => {
+    await exitPanditMode();
+  };
 
   return (
     <View style={styles.wrap}>
@@ -73,14 +74,46 @@ export default function PanditHomePanel({ navigation, showExit = true }) {
         </Text>
       </View>
 
-      <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-        {t('home.pandit.clientTools', 'Client tools')}
-      </Text>
-
       {loading ? (
         <ActivityIndicator color={colors.primary} style={{ marginVertical: 24 }} />
+      ) : deskReady === false ? (
+        <>
+          <View style={[styles.setupCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.setupTitle, { color: colors.text }]}>
+              {t('home.pandit.setupIncompleteTitle', 'Finish practice setup')}
+            </Text>
+            <Text style={[styles.setupBody, { color: colors.textSecondary }]}>
+              {t(
+                'home.pandit.setupIncompleteBody',
+                'Add your practice details to unlock the free pandit desk, or switch back to the personal app.',
+              )}
+            </Text>
+            <TouchableOpacity
+              style={[styles.setupCta, { backgroundColor: colors.primary }]}
+              onPress={() =>
+                navigation.navigate('PanditPractice', {
+                  mode: 'join',
+                  profile,
+                })
+              }
+              activeOpacity={0.85}
+            >
+              <Text style={styles.setupCtaText}>
+                {t('home.pandit.completeSetup', 'Complete setup')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.exitBtn} onPress={leavePersonal}>
+            <Text style={[styles.exitText, { color: colors.primary }]}>
+              {t('home.pandit.switchPersonal', 'Switch to personal app')}
+            </Text>
+          </TouchableOpacity>
+        </>
       ) : (
         <>
+          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+            {t('home.pandit.clientTools', 'Client tools')}
+          </Text>
           <ActionCard
             icon="person-add-outline"
             title={t('home.pandit.addNative', 'Add new client chart')}
@@ -116,21 +149,15 @@ export default function PanditHomePanel({ navigation, showExit = true }) {
             colors={colors}
             onPress={() => navigation.navigate('PanditPractice', { mode: 'edit', profile })}
           />
+          {showExit ? (
+            <TouchableOpacity style={styles.exitBtn} onPress={leavePersonal}>
+              <Text style={[styles.exitText, { color: colors.primary }]}>
+                {t('home.pandit.switchPersonal', 'Switch to personal app')}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </>
       )}
-
-      {showExit ? (
-        <TouchableOpacity
-          style={styles.exitBtn}
-          onPress={async () => {
-            await exitPanditMode();
-          }}
-        >
-          <Text style={[styles.exitText, { color: colors.primary }]}>
-            {t('home.pandit.switchPersonal', 'Switch to personal app')}
-          </Text>
-        </TouchableOpacity>
-      ) : null}
     </View>
   );
 }
@@ -154,6 +181,20 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     marginBottom: 10,
   },
+  setupCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 8,
+  },
+  setupTitle: { fontSize: 16, fontWeight: '600', marginBottom: 6 },
+  setupBody: { fontSize: 13, lineHeight: 19, marginBottom: 14 },
+  setupCta: {
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  setupCtaText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1905,246 +1905,184 @@ const loadHomeData = async (nativeData = null) => {
     </View>
   );
 
-  const renderAstrologyTools = () => (
-          <View style={styles.toolsSection}>
-            <Text
-              style={[
-                hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, styles.toolsSectionTitle),
-                { color: colors.text },
-              ]}
+  const renderAstrologyTools = () => {
+    const isLightSurface = theme === 'light' || isPanditMode;
+    const toolCardWidth = width * 0.24;
+    const tools = [
+      {
+        key: 'charts',
+        title: t('home.tools.charts', 'Charts'),
+        accent: '#EA580C',
+        tint: isLightSurface ? 'rgba(249, 115, 22, 0.12)' : 'rgba(255, 255, 255, 0.1)',
+        border: isLightSurface ? 'rgba(249, 115, 22, 0.28)' : 'rgba(255, 255, 255, 0.2)',
+        icon: 'chart',
+        onPress: () =>
+          requireBirthChart((data) =>
+            navigation.navigate('ChartsHub', { birthData: data, tab: 'chart' }),
+          ),
+      },
+      {
+        key: 'dashas',
+        title: t('home.tools.dashas', 'Dashas'),
+        accent: '#7C3AED',
+        tint: isLightSurface ? 'rgba(124, 58, 237, 0.12)' : 'rgba(139, 92, 246, 0.12)',
+        border: 'rgba(124, 58, 237, 0.28)',
+        icon: 'time-outline',
+        badge:
+          dashData?.current_dasha && typeof dashData.current_dasha === 'string'
+            ? dashData.current_dasha.split(' ')[0]
+            : null,
+        onPress: () =>
+          requireBirthChart((data) =>
+            navigation.navigate('ChartsHub', { birthData: data, tab: 'dasha' }),
+          ),
+      },
+      {
+        key: 'kp',
+        title: t('menu.kpSystem', 'KP System'),
+        accent: '#059669',
+        tint: isLightSurface ? 'rgba(5, 150, 105, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+        border: 'rgba(5, 150, 105, 0.28)',
+        icon: 'locate-outline',
+        badge: t('home.tools.precise', 'Precise'),
+        onPress: () =>
+          requireBirthChart((data) =>
+            navigation.navigate('KPSystem', { birthDetails: data }),
+          ),
+      },
+      {
+        key: 'kota',
+        title: t('menu.kotaChakra', 'Kota Chakra'),
+        accent: '#D97706',
+        tint: isLightSurface ? 'rgba(217, 119, 6, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+        border: 'rgba(217, 119, 6, 0.28)',
+        icon: 'shield-checkmark-outline',
+        badge: t('home.tools.safety', 'Safety'),
+        onPress: () =>
+          requireBirthChart((data) =>
+            navigation.navigate('KotaChakra', { birthChartId: data?.id }),
+          ),
+      },
+      {
+        key: 'yogas',
+        title: t('menu.yogas', 'Yogas'),
+        accent: '#DB2777',
+        tint: isLightSurface ? 'rgba(219, 39, 119, 0.12)' : 'rgba(236, 72, 153, 0.12)',
+        border: 'rgba(219, 39, 119, 0.28)',
+        icon: 'diamond-outline',
+        badge: t('home.tools.fortune', 'Fortune'),
+        onPress: () => requireBirthChart(() => navigation.navigate('Yogas')),
+      },
+      {
+        key: 'ashtakvarga',
+        title: t('home.tools.ashtakvarga', 'Ashtakvarga'),
+        accent: '#2563EB',
+        tint: isLightSurface ? 'rgba(37, 99, 235, 0.12)' : 'rgba(59, 130, 246, 0.12)',
+        border: 'rgba(37, 99, 235, 0.28)',
+        icon: 'grid-outline',
+        onPress: () =>
+          requireBirthChart((data) =>
+            navigation.navigate('ChartsHub', { birthData: data, tab: 'ashtakvarga' }),
+          ),
+      },
+      {
+        key: 'positions',
+        title: t('home.tools.positions', 'Positions'),
+        accent: '#E11D48',
+        tint: isLightSurface ? 'rgba(225, 29, 72, 0.12)' : 'rgba(244, 63, 94, 0.12)',
+        border: 'rgba(225, 29, 72, 0.28)',
+        icon: 'planet-outline',
+        onPress: () =>
+          requireBirthChart((data) => {
+            if (!chartData?.planets) return;
+            navigation.navigate('PlanetaryPositions', { chartData, birthData: data });
+          }),
+      },
+      {
+        key: 'cosmicRing',
+        title: t('home.tools.cosmicRing', 'Cosmic Ring'),
+        accent: '#0284C7',
+        tint: isLightSurface ? 'rgba(2, 132, 199, 0.12)' : 'rgba(56, 189, 248, 0.12)',
+        border: 'rgba(2, 132, 199, 0.28)',
+        icon: 'ellipse-outline',
+        onPress: () => requireBirthChart(() => navigation.navigate('CosmicRing')),
+      },
+    ];
+
+    const renderToolIcon = (tool) => {
+      if (tool.icon === 'chart') {
+        const frame = isLightSurface ? tool.accent : '#FFFFFF';
+        const diamond = isLightSurface ? '#CA8A04' : '#FFD700';
+        const cross = isLightSurface ? '#F97316' : '#FF8A65';
+        return (
+          <Svg width="30" height="30" viewBox="0 0 48 48">
+            <Rect x="2" y="2" width="44" height="44" fill="none" stroke={frame} strokeWidth="2.5" />
+            <Polygon points="24,2 46,24 24,46 2,24" fill="none" stroke={diamond} strokeWidth="1.8" />
+            <Line x1="2" y1="2" x2="46" y2="46" stroke={cross} strokeWidth="1.2" />
+            <Line x1="46" y1="2" x2="2" y2="46" stroke={cross} strokeWidth="1.2" />
+          </Svg>
+        );
+      }
+      return <Icon name={tool.icon} size={28} color={tool.accent} />;
+    };
+
+    return (
+      <View style={styles.toolsSection}>
+        <Text
+          style={[
+            hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, styles.toolsSectionTitle),
+            { color: colors.text },
+          ]}
+        >
+          {t('home.sections.astrologyTools', 'Astrology Tools')}
+        </Text>
+        <AppScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.toolsScrollContent}
+          decelerationRate="fast"
+          snapToInterval={toolCardWidth + 10}
+        >
+          {tools.map((tool) => (
+            <TouchableOpacity
+              key={tool.key}
+              style={[styles.toolCard, { width: toolCardWidth }, androidLightCardFixStyle]}
+              onPress={tool.onPress}
+              activeOpacity={0.8}
             >
-              {t('home.sections.astrologyTools', 'Astrology Tools')}
-            </Text>
-            <AppScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.toolsScrollContent}
-              decelerationRate="fast"
-              snapToInterval={width * 0.3 + 12}
-            >
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() =>
-                  requireBirthChart((data) =>
-                    navigation.navigate('ChartsHub', { birthData: data, tab: 'chart' }),
-                  )
-                }
-                activeOpacity={0.8}
-              >
-                <View style={[
+              <View
+                style={[
                   styles.toolGlassmorphism,
                   androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark'
-                      ? 'rgba(255, 255, 255, 0.1)'
-                      : isPanditMode
-                        ? 'rgba(24, 24, 27, 0.04)'
-                        : 'rgba(251, 146, 60, 0.15)',
-                    borderColor: theme === 'dark'
-                      ? 'rgba(255, 255, 255, 0.2)'
-                      : isPanditMode
-                        ? 'rgba(24, 24, 27, 0.12)'
-                        : 'rgba(249, 115, 22, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Svg width="28" height="28" viewBox="0 0 48 48">
-                      <Rect x="2" y="2" width="44" height="44" fill="none" stroke="#ffffff" strokeWidth="2" />
-                      <Polygon points="24,2 46,24 24,46 2,24" fill="none" stroke="#ffd700" strokeWidth="1.5" />
-                      <Line x1="2" y1="2" x2="46" y2="46" stroke="#ff8a65" strokeWidth="1" />
-                      <Line x1="46" y1="2" x2="2" y2="46" stroke="#ff8a65" strokeWidth="1" />
-                    </Svg>
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#ff8a65' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.charts', 'Charts')}</Text>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() =>
-                  requireBirthChart((data) =>
-                    navigation.navigate('ChartsHub', { birthData: data, tab: 'dasha' }),
-                  )
-                }
-                activeOpacity={0.8}
+                  { backgroundColor: tool.tint, borderColor: tool.border },
+                ]}
               >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.15)',
-                    borderColor: 'rgba(139, 92, 246, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="time-outline" size={24} color="#A78BFA" />
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#A78BFA' }]} />
+                {tool.badge ? (
+                  <View style={[styles.toolMiniStat, { backgroundColor: isLightSurface ? 'rgba(24,24,27,0.08)' : 'rgba(255,255,255,0.12)' }]}>
+                    <Text style={[styles.toolMiniStatText, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {tool.badge}
+                    </Text>
                   </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.dashas', 'Dashas')}</Text>
-                  {dashData?.current_dasha && typeof dashData.current_dasha === 'string' && (
-                    <View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
-                      <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>{dashData.current_dasha.split(' ')[0]}</Text>
-                    </View>
-                  )}
+                ) : null}
+                <View style={styles.toolIconContainer}>
+                  {renderToolIcon(tool)}
                 </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() =>
-                  requireBirthChart((data) =>
-                    navigation.navigate('KPSystem', { birthDetails: data }),
-                  )
-                }
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.15)',
-                    borderColor: 'rgba(16, 185, 129, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="locate-outline" size={24} color="#34D399" />
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#34D399' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('menu.kpSystem', 'KP System')}</Text>
-                  <View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
-                    <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>{t('home.tools.precise', 'Precise')}</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() =>
-                  requireBirthChart((data) =>
-                    navigation.navigate('KotaChakra', { birthChartId: data?.id }),
-                  )
-                }
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.15)',
-                    borderColor: 'rgba(245, 158, 11, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="shield-checkmark-outline" size={24} color="#FBBF24" />
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#FBBF24' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('menu.kotaChakra', 'Kota Chakra')}</Text>
-                  <View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
-                    <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>{t('home.tools.safety', 'Safety')}</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => requireBirthChart(() => navigation.navigate('Yogas'))}
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(236, 72, 153, 0.1)' : 'rgba(236, 72, 153, 0.15)',
-                    borderColor: 'rgba(236, 72, 153, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="diamond-outline" size={24} color="#F472B6" />
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#F472B6' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('menu.yogas', 'Yogas')}</Text>
-<View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
-                  <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>{t('home.tools.fortune', 'Fortune')}</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() =>
-                  requireBirthChart((data) =>
-                    navigation.navigate('ChartsHub', { birthData: data, tab: 'ashtakvarga' }),
-                  )
-                }
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.15)',
-                    borderColor: 'rgba(59, 130, 246, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="grid-outline" size={24} color="#60A5FA" />
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#60A5FA' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.ashtakvarga', 'Ashtak-\nvarga')}</Text>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() =>
-                  requireBirthChart((data) => {
-                    if (!chartData?.planets) return;
-                    navigation.navigate('PlanetaryPositions', { chartData, birthData: data });
-                  })
-                }
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(244, 63, 94, 0.1)' : 'rgba(244, 63, 94, 0.15)',
-                    borderColor: 'rgba(244, 63, 94, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="planet-outline" size={24} color="#FB7185" />
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#FB7185' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.positions', 'Positions')}</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.toolCard, androidLightCardFixStyle]}
-                onPress={() => requireBirthChart(() => navigation.navigate('CosmicRing'))}
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.toolGlassmorphism,
-                  androidLightCardFixStyle,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(56, 189, 248, 0.1)' : 'rgba(56, 189, 248, 0.15)',
-                    borderColor: 'rgba(56, 189, 248, 0.3)',
-                  }
-                ]}>
-                  <View style={styles.toolIconContainer}>
-                    <Icon name="ellipse-outline" size={24} color="#38BDF8" />
-                    <View style={[styles.toolIconGlow, { backgroundColor: '#38BDF8' }]} />
-                  </View>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.cosmicRing', 'Cosmic\nRing')}</Text>
-                </View>
-              </TouchableOpacity>
-            </AppScrollView>
-          </View>
-
-  );
+                <Text
+                  style={[
+                    hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, styles.toolTitle),
+                    { color: colors.text },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {tool.title}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </AppScrollView>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -5156,18 +5094,16 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   
-  // Astrology Tools Section
+  // Astrology Tools Section — compact square tiles
   toolsSection: {
     marginBottom: 24,
   },
   toolsSectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 16,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
     paddingHorizontal: 4,
     textAlign: 'left',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
   },
   toolsGrid: {
     flexDirection: 'row',
@@ -5176,29 +5112,19 @@ const styles = StyleSheet.create({
   },
   toolsScrollContent: {
     paddingHorizontal: 4,
-    gap: 12,
+    gap: 10,
   },
   toolCard: {
-    width: width * 0.26,
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: 'hidden',
   },
   toolGlassmorphism: {
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
     alignItems: 'center',
-    minHeight: 80,
-    maxHeight: 80,
     justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-      },
-      android: {
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-      },
-    }),
+    height: 84,
+    borderRadius: 14,
     borderWidth: 1,
   },
   toolEmoji: {
@@ -5206,19 +5132,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   toolTitle: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '600',
     textAlign: 'center',
-    marginTop: 2,
-    lineHeight: 12,
+    marginTop: 6,
+    lineHeight: 14,
+    paddingHorizontal: 2,
   },
   toolIconContainer: {
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
-    marginBottom: 2,
   },
   toolIconGlow: {
     position: 'absolute',
@@ -5232,16 +5157,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 4,
     right: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     paddingHorizontal: 4,
     paddingVertical: 1,
     borderRadius: 6,
+    maxWidth: '55%',
   },
   toolMiniStatText: {
     fontSize: 8,
-    fontWeight: '800',
-    color: 'rgba(255, 255, 255, 0.6)',
-    textTransform: 'uppercase',
+    fontWeight: '600',
   },
   planetarySection: {
     marginBottom: 30,

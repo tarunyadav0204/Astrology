@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,10 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -44,10 +46,32 @@ function Chip({ label, selected, onPress, colors }) {
 
 export default function PanditPracticeScreen({ navigation, route }) {
   const { t } = useTranslation();
-  const { colors, enterPanditMode } = useTheme();
+  const { colors, enterPanditMode, exitPanditMode } = useTheme();
   const { fetchBalance } = useCredits();
   const initial = route?.params?.profile || null;
   const isJoin = route?.params?.mode !== 'edit';
+
+  const leaveSetup = useCallback(async () => {
+    // Incomplete join persisted pandit mode — leaving must clear it or Home traps the user.
+    if (isJoin) {
+      await exitPanditMode();
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      return;
+    }
+    if (navigation.canGoBack()) navigation.goBack();
+    else navigation.navigate('Home');
+  }, [exitPanditMode, isJoin, navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onHardwareBack = () => {
+        leaveSetup();
+        return true;
+      };
+      const sub = BackHandler.addEventListener('hardwareBackPress', onHardwareBack);
+      return () => sub.remove();
+    }, [leaveSetup])
+  );
 
   const [displayName, setDisplayName] = useState(initial?.display_name || '');
   const [city, setCity] = useState(initial?.city || '');
@@ -155,10 +179,7 @@ export default function PanditPracticeScreen({ navigation, route }) {
       <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Home'))}
-            style={styles.backBtn}
-          >
+          <TouchableOpacity onPress={leaveSetup} style={styles.backBtn} accessibilityRole="button">
             <Ionicons name="arrow-back" size={22} color={colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
@@ -223,7 +244,7 @@ export default function PanditPracticeScreen({ navigation, route }) {
               {PUJA_TYPE_OPTIONS.map((opt) => (
                 <Chip
                   key={opt.id}
-                  label={opt.label}
+                  label={t(`panditPractice.pujaTypeOptions.${opt.id}`, opt.label)}
                   selected={pujaTypes.includes(opt.id)}
                   onPress={() => toggle(pujaTypes, setPujaTypes, opt.id)}
                   colors={colors}
@@ -238,7 +259,7 @@ export default function PanditPracticeScreen({ navigation, route }) {
               {LANGUAGE_OPTIONS.map((opt) => (
                 <Chip
                   key={opt.id}
-                  label={opt.label}
+                  label={t(`panditPractice.languageOptions.${opt.id}`, opt.label)}
                   selected={languages.includes(opt.id)}
                   onPress={() => toggle(languages, setLanguages, opt.id)}
                   colors={colors}
@@ -320,6 +341,14 @@ export default function PanditPracticeScreen({ navigation, route }) {
                 </Text>
               )}
             </TouchableOpacity>
+
+            {isJoin ? (
+              <TouchableOpacity style={styles.secondaryCta} onPress={leaveSetup} disabled={saving}>
+                <Text style={[styles.secondaryCtaText, { color: colors.primary }]}>
+                  {t('panditPractice.notNow', 'Not now — use personal app')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -371,5 +400,11 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
-  ctaText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  ctaText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  secondaryCta: {
+    marginTop: 14,
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  secondaryCtaText: { fontSize: 15, fontWeight: '600' },
 });
