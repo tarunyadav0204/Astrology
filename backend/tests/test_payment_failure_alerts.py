@@ -281,3 +281,50 @@ def test_razorpay_credit_grant_failure_queues_operational_alert(monkeypatch):
     assert alerts[0]["provider"] == "razorpay"
     assert alerts[0]["reference_id"] == "pay_test"
     assert alerts[0]["error_code"] == "payment_amount_mismatch"
+
+
+@pytest.mark.parametrize(
+    ("notes_extra", "external_token", "excluded"),
+    [
+        ({}, None, False),
+        ({"gp_external_tx_token": "play-external-token"}, None, True),
+        ({}, "play-external-token", True),
+    ],
+)
+def test_razorpay_play_user_choice_excludes_web_bonus(
+    monkeypatch, notes_extra, external_token, excluded
+):
+    calls = []
+
+    class FakeCreditService:
+        def has_transaction_with_reference(self, *_args):
+            return False
+
+        def add_credits(self, *_args, **_kwargs):
+            return True
+
+        def apply_purchase_extras(self, **kwargs):
+            calls.append(kwargs)
+            return {"bonus_credits_added": 0}
+
+    monkeypatch.setattr(razorpay_routes, "credit_service", FakeCreditService())
+    notes = {
+        "userid": "435",
+        "credits": "100",
+        "product_id": "credits_100",
+        **notes_extra,
+    }
+    result = razorpay_routes._process_captured_payment(
+        {
+            "id": "pay_test_choice" if excluded else "pay_test_web",
+            "order_id": "order_test",
+            "status": "captured",
+            "amount": 19900,
+            "notes": notes,
+        },
+        external_transaction_token=external_token,
+    )
+
+    assert result["success"] is True
+    assert calls
+    assert calls[-1]["exclude_web_topup_bonus"] is excluded

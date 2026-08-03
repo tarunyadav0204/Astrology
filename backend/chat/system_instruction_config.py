@@ -390,6 +390,19 @@ CHART_ANALYSIS_STRUCTURE = """
 [CHART_ANALYSIS-4] AVOID: Do not predict specific events or timelines. Focus on the inherent potential and challenges.
 """
 
+LOCATION_RECOMMENDATION_STRUCTURE = """
+[LOCATION-1] ROLE: Locational astrology guide (Vedic digvijaya + relocated charts). Answer WHERE to move/settle for the user's goal—not a full multi-school life reading.
+[LOCATION-2] DATA SOVEREIGNTY: Treat `locational_recommendation` as the primary evidence pack. Cite preferred/avoid directions and top_cities in pack rank order. Do not invent cities outside the pack or reverse city ranking without stronger pack reasons.
+[LOCATION-3] ANSWER SHAPE:
+    1. Preferred compass directions (1–3) and why (direction lords / goal houses).
+    2. City shortlist from the pack matching `location_scope` (india / abroad / both). Use top_cities_india and top_cities_abroad when present.
+    3. 1–2 directions or places to be cautious about.
+    4. Brief timing caution from current dasha lords vs relocated placement (no fake exact move date).
+[LOCATION-4] STYLE: Practical and decisive in Quick Answer. Technical WHY can be shorter than a normal deep-dive; skip empty KP/Nadi/Sudarshana sections if the pack does not support them.
+[LOCATION-5] SCOPE: Candidate pools are curated India metros and/or curated global hubs based on location_scope. Do not invent Western ASC/MC ACG lines or cities absent from the pack.
+[LOCATION-6] HONESTY: Locational support is probabilistic. Never guarantee a job, marriage, visa, or wealth outcome from a city alone.
+"""
+
 GENERAL_ADVICE_STRUCTURE = """
 [GENERAL_ADVICE-1] SECTION_HEADER: Must be titled "Guidance and Remedies"
 [GENERAL_ADVICE-2] FOCUS: Provide a remedy-focused reading ONLY when this turn is an explicit Remedies CTA follow-up.
@@ -611,6 +624,22 @@ def build_system_instruction(analysis_type=None, intent_category=None, include_a
                 PERSONAL_CONSULTATION_RULES,
             )
         )
+
+    # Locational cartography: lean instruction focused on directions + metro pack.
+    if mode and str(mode).upper() == "RECOMMEND_LOCATION":
+        return "\n".join(
+            (
+                CORE_PERSONA,
+                death_ethics_block(death_analysis_unlocked),
+                FETAL_SEX_ETHICS,
+                LOCATION_RECOMMENDATION_STRUCTURE,
+                DASHA_DATES_SOVEREIGNTY,
+                DATA_SOVEREIGNTY,
+                PERSONAL_CONSULTATION_RULES,
+                CLASSICAL_CITATIONS,
+                USER_MEMORY,
+            )
+        )
     
     # Normalize category aliases used by intent router / lifespan fail-safe.
     cat = str(intent_category or "general").strip().lower()
@@ -678,6 +707,8 @@ def build_system_instruction(analysis_type=None, intent_category=None, include_a
         instruction += "\n" + LIFESPAN_EVENT_TIMING_STRUCTURE
     elif analysis_type == 'LIFE_TERMINATION_RESEARCH':
         instruction += "\n" + LONGEVITY_ANALYSIS + "\n" + LIFE_TERMINATION_RESEARCH_STRUCTURE
+    elif analysis_type == 'LOCATION_RECOMMENDATION' or (mode and str(mode).upper() == "RECOMMEND_LOCATION"):
+        instruction += "\n" + LOCATION_RECOMMENDATION_STRUCTURE
     else:
         # Default to general analysis for any other case
         instruction += "\n" + CHART_ANALYSIS_STRUCTURE

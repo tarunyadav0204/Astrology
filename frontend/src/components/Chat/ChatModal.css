@@ -933,17 +933,31 @@
     .follow-up-questions {
         gap: 6px;
         margin: 12px 0 6px 0;
+        flex-direction: column;
+        align-items: stretch;
     }
     
     .follow-up-btn {
         font-size: 11px;
         padding: 6px 10px;
-        white-space: normal;
+        white-space: normal !important;
         word-break: break-word;
+        overflow-wrap: anywhere;
         line-height: 1.3;
+        display: block;
+        width: 100%;
         min-width: 0;
-        flex: 1 1 auto;
-        max-width: calc(50% - 3px);
+        max-width: 100%;
+        flex: 0 0 auto;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+    .follow-up-btn .follow-up-btn__label {
+        display: block;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
     }
     
     .chat-modal-header {
@@ -1297,13 +1311,23 @@
 .follow-up-questions {
     margin: 16px 0 8px 0;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
     gap: 8px;
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
     box-sizing: border-box;
 }
 
 .follow-up-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     background: rgba(248, 250, 252, 0.9);
     border: 1px solid rgba(255, 255, 255, 0.3);
     color: #334155;
@@ -1312,14 +1336,25 @@
     font-size: 12px;
     cursor: pointer;
     transition: all 0.3s ease;
-    white-space: normal;
-    flex-shrink: 1;
+    white-space: normal !important;
+    text-align: left;
+    flex: 0 0 auto;
     font-weight: 500;
     word-wrap: break-word;
-    overflow-wrap: break-word;
+    overflow-wrap: anywhere;
+    word-break: break-word;
     hyphens: auto;
-    max-width: 100%;
     box-sizing: border-box;
+    overflow: hidden;
+}
+
+.follow-up-btn .follow-up-btn__label {
+    display: block;
+    max-width: 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .follow-up-btn:hover {

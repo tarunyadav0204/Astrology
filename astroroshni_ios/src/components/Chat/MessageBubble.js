@@ -39,6 +39,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const [availableVoices, setAvailableVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [imageZoomScale, setImageZoomScale] = useState(1);
   const [isImageLoading, setIsImageLoading] = useState(true);
   const skeletonAnim = useRef(new Animated.Value(0)).current;
 
@@ -1469,29 +1470,67 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         visible={showImageModal}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowImageModal(false)}
+        onRequestClose={() => {
+          setShowImageModal(false);
+          setImageZoomScale(1);
+        }}
       >
-        <TouchableOpacity
-          style={styles.imageModalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowImageModal(false)}
-        >
-          <View style={styles.imageModalContainer}>
-            {message.summary_image && (
-              <Image
-                source={{ uri: message.summary_image }}
-                style={styles.fullScreenImage}
-                resizeMode="contain"
-              />
-            )}
+        <View style={styles.imageModalOverlay}>
+          <View style={styles.imageModalToolbar}>
+            <View style={styles.imageModalZoomRow}>
+              <TouchableOpacity
+                style={styles.imageZoomBtn}
+                onPress={() => setImageZoomScale((s) => Math.max(1, Number((s / 1.25).toFixed(2))))}
+              >
+                <Text style={styles.imageZoomBtnText}>−</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.imageZoomBtn}
+                onPress={() => setImageZoomScale(1)}
+              >
+                <Text style={styles.imageZoomBtnText}>{Math.round(imageZoomScale * 100)}%</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.imageZoomBtn}
+                onPress={() => setImageZoomScale((s) => Math.min(5, Number((s * 1.25).toFixed(2))))}
+              >
+                <Text style={styles.imageZoomBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
               style={styles.closeImageButton}
-              onPress={() => setShowImageModal(false)}
+              onPress={() => {
+                setShowImageModal(false);
+                setImageZoomScale(1);
+              }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
               <Text style={styles.closeImageButtonText}>✕</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+          <Text style={styles.imageModalHint}>Pinch to zoom · drag to pan</Text>
+          <ScrollView
+            style={styles.imageModalScroll}
+            contentContainerStyle={styles.imageModalScrollContent}
+            maximumZoomScale={5}
+            minimumZoomScale={1}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            centerContent
+            bouncesZoom
+          >
+            {message.summary_image ? (
+              <Image
+                source={{ uri: message.summary_image }}
+                style={[
+                  styles.fullScreenImage,
+                  { transform: [{ scale: imageZoomScale }] },
+                ]}
+                resizeMode="contain"
+              />
+            ) : null}
+          </ScrollView>
+        </View>
       </Modal>
     </Animated.View>
   );
@@ -2274,8 +2313,67 @@ const styles = StyleSheet.create({
   imageModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.95)',
+  },
+  imageModalToolbar: {
+    paddingTop: Platform.OS === 'ios' ? 54 : 28,
+    paddingHorizontal: 16,
+    paddingBottom: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 2,
+  },
+  imageModalZoomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  imageZoomBtn: {
+    minWidth: 44,
+    height: 36,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageZoomBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  imageModalHint: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  imageModalScroll: {
+    flex: 1,
+  },
+  imageModalScrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    minHeight: Dimensions.get('window').height * 0.75,
+  },
+  fullScreenImage: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height * 0.75,
+  },
+  closeImageButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeImageButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
   },
   imageModalCloseButton: {
     position: 'absolute',

@@ -3188,6 +3188,11 @@ export default function ChatScreen({ navigation, route }) {
         terms: m.terms || [],
         glossary: m.glossary || {},
         images: m.images || [],
+        summary_image:
+          m.summary_image
+          || (Array.isArray(m.images) && m.images[0])
+          || (typeof m.images === 'string' ? m.images : null)
+          || null,
         message_type: m.message_type,
         intent_gate: m.intent_gate,
         gate_metadata: m.gate_metadata,

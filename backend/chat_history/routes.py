@@ -263,10 +263,10 @@ def _build_answer_history_from_rows(history_rows):
     return history[-3:] if len(history) > 3 else history
 
 
-def _load_chat_history_and_state(session_id: str):
-    with get_conn() as conn:
+def _load_chat_history_and_state(session_id: str, conn=None):
+    def _read(active_conn):
         cur = execute(
-            conn,
+            active_conn,
             """
                 SELECT sender, content, message_type
                 FROM chat_messages
@@ -278,23 +278,186 @@ def _load_chat_history_and_state(session_id: str):
         )
         history_rows = cur.fetchall() or []
         cur = execute(
-            conn,
+            active_conn,
             "SELECT clarification_count, extracted_context FROM conversation_state WHERE session_id = %s",
             (session_id,),
         )
         state_row = cur.fetchone()
-    extracted_context = {}
-    if state_row and state_row[1]:
-        try:
-            extracted_context = json.loads(state_row[1])
-        except Exception:
-            extracted_context = {}
-    return {
-        "history_rows": history_rows,
-        "history": _build_answer_history_from_rows(history_rows),
-        "clarification_count": state_row[0] if state_row else 0,
-        "extracted_context": extracted_context,
+        extracted_context = {}
+        if state_row and state_row[1]:
+            try:
+                extracted_context = json.loads(state_row[1])
+            except Exception:
+                extracted_context = {}
+        return {
+            "history_rows": history_rows,
+            "history": _build_answer_history_from_rows(history_rows),
+            "clarification_count": state_row[0] if state_row else 0,
+            "extracted_context": extracted_context,
+        }
+
+    if conn is not None:
+        return _read(conn)
+    with get_conn() as owned_conn:
+        return _read(owned_conn)
+
+
+def _should_skip_subject_gate_for_location_clarify(
+    session_id: str,
+    question: str,
+    conn=None,
+) -> bool:
+    """
+    Avoid partnership/subject gates hijacking short India/abroad/both replies
+    that answer a RECOMMEND_LOCATION clarification.
+    """
+    try:
+        state = _load_chat_history_and_state(session_id, conn=conn)
+    except Exception:
+        return False
+
+    extracted = state.get("extracted_context") if isinstance(state.get("extracted_context"), dict) else {}
+    if extracted.get("awaiting_location_scope"):
+        return True
+
+    clarification_count = int(state.get("clarification_count") or 0)
+    if clarification_count <= 0:
+        return False
+
+    try:
+        from ai.intent_router import _infer_location_scope_from_text
+
+        if _infer_location_scope_from_text(question):
+            return True
+    except Exception:
+        pass
+
+    # Last assistant turn was an intent-router clarification about place geography.
+    rows = state.get("history_rows") or []
+    for sender, content, message_type in reversed(rows):
+        if sender != "assistant":
+            continue
+        if str(message_type or "").strip().lower() != "clarification":
+            break
+        text = str(content or "").lower()
+        geo_cues = (
+            "india",
+            "abroad",
+            "overseas",
+            "both",
+            "भारत",
+            "विदेश",
+            "cities",
+            "shehar",
+            "शहर",
+            "location",
+            "place suggestions",
+        )
+        if any(cue in text for cue in geo_cues):
+            return True
+        break
+    return False
+
+
+def _build_subject_gate_question_context(session_id: str, latest_question: str) -> Dict[str, Any]:
+    """
+    For subject-gate classification, append prior clarification-chain context so
+    short replies like "both" are judged with the original user question.
+    """
+    latest = str(latest_question or "").strip()
+    payload = {
+        "question_for_gate": latest,
+        "latest_user_reply": latest,
+        "prior_user_question": "",
+        "assistant_clarification": "",
+        "clarification_count": 0,
+        "used_clarification_context": False,
     }
+    if not latest:
+        return payload
+
+    try:
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                "SELECT clarification_count FROM conversation_state WHERE session_id = %s",
+                (session_id,),
+            )
+            row = cur.fetchone()
+            clarification_count = int(row[0] or 0) if row else 0
+            payload["clarification_count"] = clarification_count
+            if clarification_count <= 0:
+                return payload
+
+            cur = execute(
+                conn,
+                "SELECT COALESCE(MAX(message_id), 0) FROM chat_messages WHERE session_id = %s",
+                (session_id,),
+            )
+            max_row = cur.fetchone()
+            max_id = int(max_row[0] or 0) if max_row else 0
+            # New reply is not inserted yet; use synthetic id after current max.
+            synthetic_message_id = max_id + 1
+
+            chain_parts = get_user_question_chain_for_clarification(
+                session_id, synthetic_message_id, conn
+            )
+            original_question = get_original_question_for_clarification(
+                session_id, synthetic_message_id, conn
+            )
+
+            cur = execute(
+                conn,
+                """
+                SELECT content FROM chat_messages
+                WHERE session_id = %s
+                  AND sender = 'assistant'
+                  AND message_type = 'clarification'
+                ORDER BY message_id DESC
+                LIMIT 1
+                """,
+                (session_id,),
+            )
+            clar_row = cur.fetchone()
+            assistant_clarification = str(clar_row[0] or "").strip() if clar_row else ""
+    except Exception:
+        logger.warning("subject_gate_clarification_context_failed session_id=%s", session_id, exc_info=True)
+        return payload
+
+    prior = str(original_question or "").strip()
+    if not prior and chain_parts:
+        prior = str(chain_parts[0] or "").strip()
+    if not prior:
+        return payload
+
+    merged = _merge_clarification_chain_parts(
+        chain_parts or ([prior] if prior else []),
+        latest,
+        max_len=700,
+    )
+    # Explicit shape so the gate LLM cannot treat the short reply as a new topic.
+    if assistant_clarification:
+        question_for_gate = (
+            f"Earlier user question: {prior}\n"
+            f"Assistant clarification: {assistant_clarification}\n"
+            f"User reply now: {latest}"
+        )
+    else:
+        question_for_gate = (
+            f"Earlier user question: {prior}\n"
+            f"User reply now: {latest}\n"
+            f"Combined context: {merged}"
+        )
+
+    payload.update(
+        {
+            "question_for_gate": question_for_gate,
+            "prior_user_question": prior,
+            "assistant_clarification": assistant_clarification,
+            "used_clarification_context": True,
+        }
+    )
+    return payload
 
 
 def _ensure_conversation_state_pending_gate_cols(conn):
@@ -1325,11 +1488,34 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
                 message_data["glossary"] = []
         else:
             message_data["glossary"] = []
-        if len(msg) > 7 and msg[7]:  # images
-            try:
-                message_data["images"] = json.loads(msg[7])
-            except:
-                message_data["images"] = []
+        if len(msg) > 7 and msg[7]:  # images (URL string, data URI, or JSON list)
+            raw_images = msg[7]
+            summary_image = None
+            images_list: list = []
+            if isinstance(raw_images, (bytes, bytearray)):
+                raw_images = raw_images.decode("utf-8", errors="ignore")
+            if isinstance(raw_images, str):
+                text = raw_images.strip()
+                if text.startswith("data:image") or text.startswith("http://") or text.startswith("https://"):
+                    summary_image = text
+                    images_list = [text]
+                else:
+                    try:
+                        parsed_images = json.loads(text)
+                        if isinstance(parsed_images, list):
+                            images_list = parsed_images
+                            if parsed_images and isinstance(parsed_images[0], str):
+                                summary_image = parsed_images[0]
+                        elif isinstance(parsed_images, str):
+                            summary_image = parsed_images
+                            images_list = [parsed_images]
+                    except Exception:
+                        # Plain non-JSON string stored in images column
+                        summary_image = text
+                        images_list = [text]
+            message_data["images"] = images_list
+            if summary_image:
+                message_data["summary_image"] = summary_image
         else:
             message_data["images"] = []
         mt = msg[8] if len(msg) > 8 else None
@@ -1647,6 +1833,23 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 return response
         log_ask_phase("session_and_idempotency_check")
 
+        # Locational / city asks are always single-chart — never keep a stuck partnership gate.
+        from ai.intent_router import _looks_like_location_recommendation_question
+
+        is_location_recommendation_question_early = _looks_like_location_recommendation_question(
+            sanitize_text(question)
+        )
+        # Reuse the open connection — nested get_conn() can exhaust the pool and hang/fail asks.
+        skip_subject_gate_for_location_clarify_early = _should_skip_subject_gate_for_location_clarify(
+            session_id,
+            sanitize_text(question),
+            conn=conn,
+        )
+        if is_location_recommendation_question_early or skip_subject_gate_for_location_clarify_early:
+            subject_gate_override = subject_gate_override or "selected_chart_only"
+            _clear_pending_native_gate(conn, session_id)
+            conn.commit()
+
         if subject_gate_override in {
             "selected_chart_only",
             "single_chart_only",
@@ -1779,8 +1982,25 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         log_ask_phase("session_turn_limit_check", user_turn_count=int(user_turn_count or 0))
 
     is_plain_text_channel = delivery_channel == "whatsapp" or render_target == "plain_text"
+    from ai.intent_router import _looks_like_location_recommendation_question
+
+    is_location_recommendation_question = _looks_like_location_recommendation_question(
+        sanitize_text(question)
+    )
+    skip_subject_gate_for_location_clarify = _should_skip_subject_gate_for_location_clarify(
+        session_id,
+        sanitize_text(question),
+    )
+    skip_subject_gate_for_location = bool(
+        skip_subject_gate_for_location_clarify or is_location_recommendation_question
+    )
+    if skip_subject_gate_for_location:
+        # Keep single-chart path for locational / city / India-abroad asks.
+        # Pending gate is already cleared earlier in this request when applicable.
+        subject_gate_override = subject_gate_override or "selected_chart_only"
     if (
         not skip_subject_gate_for_fast_chat
+        and not skip_subject_gate_for_location
         and
         chat_subject_gate_enabled_for_user(current_user.userid)
         and not is_plain_text_channel
@@ -1794,12 +2014,26 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         try:
             from ai.chat_subject_gate import ChatSubjectGate, build_subject_gate_message
 
+            gate_question_ctx = _build_subject_gate_question_context(
+                session_id,
+                sanitize_text(question),
+            )
+            if gate_question_ctx.get("used_clarification_context"):
+                _chat_log_event(
+                    "subject_gate_clarification_context_applied",
+                    session_id=session_id,
+                    clarification_count=gate_question_ctx.get("clarification_count"),
+                    prior_preview=str(gate_question_ctx.get("prior_user_question") or "")[:120],
+                    reply_preview=str(gate_question_ctx.get("latest_user_reply") or "")[:80],
+                )
+
             subject_gate = await ChatSubjectGate().classify(
-                question=sanitize_text(question),
+                question=gate_question_ctx.get("question_for_gate") or sanitize_text(question),
                 birth_details=birth_details,
                 language=language,
                 subject_gate_memory=subject_gate_memory,
                 allow_partnership_offer=not (free_question_gate_eligible or client_free_question_request),
+                clarification_context=gate_question_ctx if gate_question_ctx.get("used_clarification_context") else None,
             )
             if subject_gate.get("gate_required"):
                 assistant_content = build_subject_gate_message(
@@ -2285,6 +2519,13 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                     (datetime.now(), assistant_message_id),
                 )
                 conn.commit()
+            logger.info(
+                "chat_ask_queued message_id=%s session_id=%s user_id=%s local_mode=%s",
+                assistant_message_id,
+                session_id,
+                current_user.userid,
+                bool((os.getenv("CHAT_TASKS_LOCAL_MODE") or "").strip().lower() in {"1", "true", "yes", "on"}),
+            )
         except Exception as exc:
             logger.exception("failed to mark chat task enqueued message_id=%s: %s", assistant_message_id, exc)
     else:
@@ -3304,6 +3545,71 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 or is_whatsapp_plain_text
                 or fomo_chat_active
             )
+
+            from ai.intent_router import (
+                _infer_location_scope_from_text,
+                _location_scope_clarification_fallback,
+                _looks_like_location_recommendation_question,
+                _normalize_location_scope_value,
+            )
+
+            # Hard gate BEFORE intent LLM: location asks without stated india/abroad/both
+            # must clarify. This also proves the running process has the latest code.
+            looks_location_q = _looks_like_location_recommendation_question(question)
+            awaiting_location_scope = bool(
+                isinstance(extracted_context, dict)
+                and extracted_context.get("awaiting_location_scope")
+            )
+            text_scope_raw = _infer_location_scope_from_text(question)
+
+            if (
+                not force_ready
+                and not fomo_chat_active
+                and (looks_location_q or awaiting_location_scope)
+                and not text_scope_raw
+            ):
+                clarify_q = _location_scope_clarification_fallback(question, language=language)
+                clarify_ctx = {
+                    "location_scope": None,
+                    "awaiting_location_scope": True,
+                }
+                if isinstance(extracted_context, dict):
+                    for keep_key in ("prediction_anchors", "aspect"):
+                        if extracted_context.get(keep_key) is not None:
+                            clarify_ctx[keep_key] = extracted_context.get(keep_key)
+                with get_conn() as conn:
+                    execute(
+                        conn,
+                        """
+                            UPDATE chat_messages
+                            SET content = %s, status = %s, message_type = %s, completed_at = %s,
+                                language = %s
+                            WHERE message_id = %s
+                        """,
+                        (
+                            sanitize_text(clarify_q),
+                            "completed",
+                            "clarification",
+                            datetime.now(),
+                            language,
+                            message_id,
+                        ),
+                    )
+                    execute(
+                        conn,
+                        """
+                            INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (session_id) DO UPDATE SET
+                                clarification_count = conversation_state.clarification_count + 1,
+                                extracted_context = EXCLUDED.extracted_context,
+                                last_updated = CURRENT_TIMESTAMP
+                        """,
+                        (session_id, 1, json.dumps(clarify_ctx)),
+                    )
+                    conn.commit()
+                _release_free_question_if_reserved(using_free_question, user_id, birth_details)
+                return
             
             # Check if this is a clarification response and combine with original question
             combined_question = question
@@ -3365,7 +3671,133 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     language=language,
                     force_ready=force_ready,
                     query_context=query_context,
+                    clarification_count=clarification_count,
                 )
+
+            # If hard-gate was skipped because user already stated scope (or force_ready),
+            # still bind text scope onto RECOMMEND_LOCATION intents.
+            if text_scope_raw:
+                intent.setdefault("extracted_context", {})
+                if isinstance(intent.get("extracted_context"), dict):
+                    intent["extracted_context"]["location_scope"] = text_scope_raw
+                    intent["extracted_context"].pop("awaiting_location_scope", None)
+                if looks_location_q or awaiting_location_scope:
+                    intent["mode"] = "RECOMMEND_LOCATION"
+                    intent["answer_mode"] = "location_recommendation"
+                    intent["status"] = "READY"
+                    intent["clarification_question"] = None
+
+            # Location scope must come from THIS turn's user text (or an in-progress
+            # awaiting_location_scope clarification). Do NOT reuse a prior session's
+            # location_scope for a fresh "where should I live" ask — that silently
+            # skipped India/abroad clarification after an earlier India default.
+            if isinstance(extracted_context, dict):
+                intent.setdefault("extracted_context", {})
+                if isinstance(intent.get("extracted_context"), dict):
+                    text_scope = _infer_location_scope_from_text(combined_question)
+                    prior_scope = _normalize_location_scope_value(
+                        extracted_context.get("location_scope")
+                    )
+                    awaiting_scope = bool(extracted_context.get("awaiting_location_scope"))
+                    mode_u = str(intent.get("mode") or "").upper()
+
+                    if text_scope:
+                        intent["extracted_context"]["location_scope"] = text_scope
+                        intent["extracted_context"].pop("awaiting_location_scope", None)
+                        intent["status"] = "READY"
+                        intent["clarification_question"] = None
+                    elif (
+                        awaiting_scope
+                        and prior_scope
+                        and mode_u == "RECOMMEND_LOCATION"
+                        and not intent["extracted_context"].get("location_scope")
+                    ):
+                        # Only carry prior scope forward while resolving an open clarify.
+                        intent["extracted_context"]["location_scope"] = prior_scope
+                        intent["extracted_context"].pop("awaiting_location_scope", None)
+                        intent["status"] = "READY"
+                        intent["clarification_question"] = None
+                    elif awaiting_scope and mode_u == "RECOMMEND_LOCATION":
+                        intent["extracted_context"].setdefault("awaiting_location_scope", True)
+
+            # Location cartography: if scope missing and LLM omitted the question, retry once
+            # with an LLM-only clarify instruction (no hardcoded clarification text).
+            needs_location_retry = bool(
+                isinstance(intent, dict)
+                and str(intent.get("mode") or "").upper() == "RECOMMEND_LOCATION"
+                and intent.get("_needs_location_scope_clarify_retry")
+                and not force_ready
+                and not (
+                    isinstance(intent.get("extracted_context"), dict)
+                    and intent["extracted_context"].get("location_scope")
+                )
+            )
+            if needs_location_retry:
+                if is_instant_chat:
+                    intent = await intent_router.classify_instant_intent(
+                        combined_question,
+                        history,
+                        clarification_count=clarification_count,
+                        max_clarifications=max_clarifications,
+                        language=language,
+                        force_ready=False,
+                        force_location_scope_clarify=True,
+                        query_context=query_context,
+                    )
+                else:
+                    intent = await intent_router.classify_intent(
+                        combined_question,
+                        history,
+                        all_user_facts,
+                        language=language,
+                        force_ready=False,
+                        force_location_scope_clarify=True,
+                        query_context=query_context,
+                        clarification_count=clarification_count,
+                    )
+                # Re-apply ONLY user-stated scope from this reply after retry.
+                if isinstance(intent, dict):
+                    from ai.intent_router import _infer_location_scope_from_text
+
+                    text_scope = _infer_location_scope_from_text(combined_question)
+                    intent.setdefault("extracted_context", {})
+                    if text_scope and isinstance(intent.get("extracted_context"), dict):
+                        intent["extracted_context"]["location_scope"] = text_scope
+                        intent["extracted_context"].pop("awaiting_location_scope", None)
+                        intent["status"] = "READY"
+                        intent["clarification_question"] = None
+
+            # Ensure location asks always clarify India/abroad/both (never silently default to India,
+            # except force_ready / WhatsApp plain-text channels).
+            location_scope_clarify_pending = bool(
+                isinstance(intent, dict)
+                and str(intent.get("mode") or "").upper() == "RECOMMEND_LOCATION"
+                and not (
+                    isinstance(intent.get("extracted_context"), dict)
+                    and intent["extracted_context"].get("location_scope")
+                )
+            )
+            if location_scope_clarify_pending:
+                from ai.intent_router import _location_scope_clarification_fallback
+
+                has_q = bool(str(intent.get("clarification_question") or "").strip())
+                if force_ready:
+                    intent.setdefault("extracted_context", {})
+                    if isinstance(intent.get("extracted_context"), dict):
+                        intent["extracted_context"]["location_scope"] = "india"
+                        intent["extracted_context"].pop("awaiting_location_scope", None)
+                    intent["status"] = "READY"
+                    intent["clarification_question"] = None
+                else:
+                    intent.setdefault("extracted_context", {})
+                    if isinstance(intent.get("extracted_context"), dict):
+                        intent["extracted_context"]["location_scope"] = None
+                        intent["extracted_context"]["awaiting_location_scope"] = True
+                    intent["status"] = "CLARIFY"
+                    if not has_q:
+                        intent["clarification_question"] = _location_scope_clarification_fallback(
+                            combined_question, language=language
+                        )
             intent_router_ms = round((time.time() - routing_start) * 1000, 1)
             MAX_CLARIFICATIONS = max_clarifications
 
@@ -3426,14 +3858,31 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     end_year=end_year,
                 )
             
-            # Check if clarification needed and under limit
-            if intent.get('status') == 'CLARIFY' and clarification_count < MAX_CLARIFICATIONS:
+            # Check if clarification needed and under limit.
+            # Location India/abroad scope is mandatory — allow it even if the session
+            # already used its generic clarification budget.
+            location_scope_clarify = bool(
+                str(intent.get("mode") or "").upper() == "RECOMMEND_LOCATION"
+                and isinstance(intent.get("extracted_context"), dict)
+                and intent["extracted_context"].get("awaiting_location_scope")
+                and not intent["extracted_context"].get("location_scope")
+                and str(intent.get("status") or "").upper() == "CLARIFY"
+            )
+            can_return_clarification = bool(
+                intent.get("status") == "CLARIFY"
+                and (
+                    clarification_count < MAX_CLARIFICATIONS
+                    or location_scope_clarify
+                )
+            )
+            if can_return_clarification:
                 _chat_log_event(
                     "clarification_returned",
                     session_id=session_id,
                     message_id=message_id,
                     clarification_count=clarification_count,
                     max_clarifications=MAX_CLARIFICATIONS,
+                    location_scope_clarify=location_scope_clarify,
                 )
                 # Return clarification question
                 with get_conn() as conn:
@@ -3513,8 +3962,12 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         
         # Build context based on intent
         context_start = time.time()
+        # Locational cartography needs relocated city scoring — use full natal context, not instant slim pack.
+        use_instant_slim_context = bool(
+            is_instant_chat and str(intent.get("mode") or "").upper() != "RECOMMEND_LOCATION"
+        )
         
-        if is_instant_chat:
+        if use_instant_slim_context:
             context = {
                 "analysis_type": "instant_chat",
                 "instant_chat": True,
@@ -3617,13 +4070,16 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 requested_period,
                 intent,
             )
-            context["analysis_type"] = "birth"
+            if str(intent.get("mode") or "").upper() == "RECOMMEND_LOCATION":
+                context["analysis_type"] = "locational_recommendation"
+            else:
+                context["analysis_type"] = "birth"
             context_time = time.time() - context_start
             _chat_log_event(
                 "chat_context_built",
                 session_id=session_id,
                 message_id=message_id,
-                mode="birth",
+                mode="locational" if context.get("analysis_type") == "locational_recommendation" else "birth",
                 context_ms=round(context_time * 1000, 1),
                 analysis_type=context.get("analysis_type"),
                 has_transit_period=bool(requested_period),
@@ -4047,6 +4503,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     
                     # Get summary image from result if available (store as string, not JSON)
                     summary_image = result.get('summary_image', None)
+                    if not summary_image and isinstance(context, dict) and context.get("locational_recommendation"):
+                        try:
+                            from chat.location_map_renderer import maybe_attach_locational_summary_image
+
+                            maybe_attach_locational_summary_image(result, context)
+                            summary_image = result.get("summary_image")
+                        except Exception:
+                            logger.exception("locational_map_attach_on_save_failed message_id=%s", message_id)
 
                     # Normalize follow-up questions to a simple list of plain strings.
                     # The model may sometimes return objects like {"icon": "💡", "question": "Ask about ..."}.

@@ -140,6 +140,7 @@ class ChatSubjectGate:
         language: str = "english",
         subject_gate_memory: list[Dict[str, Any]] | None = None,
         allow_partnership_offer: bool = True,
+        clarification_context: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         compact_memory = []
         if isinstance(subject_gate_memory, list):
@@ -155,6 +156,20 @@ class ChatSubjectGate:
                     "intent_gate": item.get("intent_gate"),
                     "original_question": item.get("original_question"),
                 })
+
+        clar_note = ""
+        if isinstance(clarification_context, dict) and clarification_context.get("used_clarification_context"):
+            clar_note = f"""
+Clarification-turn context (IMPORTANT):
+- This is NOT a brand-new question. The user is answering an earlier clarification.
+- Earlier user question: {clarification_context.get("prior_user_question") or ""}
+- Assistant clarification: {clarification_context.get("assistant_clarification") or ""}
+- Latest user reply only: {clarification_context.get("latest_user_reply") or ""}
+- Interpret the latest reply ONLY as an answer to that earlier question/clarification.
+- Do NOT treat short replies like "both", "India", "abroad", "yes", "no", "first", "A", or similar as a new partnership / two-person request by themselves.
+- Prefer gate_required=false unless the FULL earlier question clearly needs another person's chart or partnership analysis.
+"""
+
         prompt = f"""
 You are a routing gate for an astrology chat app. Decide whether the user's question can be answered using the currently selected birth profile, or whether the app must first collect another person's chart or exact relationship setup.
 
@@ -169,7 +184,7 @@ STRICT RULES:
 - If previous user choices show the user already chose selected-chart-only for the same referenced person or same exact relation in this chat, you may return gate_required=false only for a clear follow-up continuation of that same unresolved gate topic. Do not suppress a new gate for a fresh standalone question just because the relation is the same.
 - In previous user choices, `relation_to_user` is the exact remembered relation/context; `relation_family` is broad metadata only. Never use `relation_family` alone to suppress a new gate. For example, a prior choice about "elder sister" or "sister" must not suppress a new gate for "brother"; a prior choice about "sibling" must not suppress sister/brother unless the new question explicitly references the same exact sibling context.
 - For spouse / wife / husband / partner relationship questions, default to partnership_offer unless this is clearly just a direct continuation of the immediately prior selected-chart-only path for the same exact topic.
-
+{clar_note}
 Currently selected birth profile:
 {json.dumps(_compact_birth_details(birth_details), ensure_ascii=False)}
 
@@ -215,6 +230,11 @@ When NOT to gate:
 - The user mentions another person only as background but the focus remains the selected native.
 - The user explicitly says they do not know the other person's birth details or asks to answer from the selected chart only; continue normal chat.
 - The message is casual, non-astrology, or asks what the app can do.
+- Location / city / relocation geography replies: if the user is only choosing India vs abroad/overseas vs both (or answering a prior clarification about where to look for cities/places), return gate_required=false. Words like "both", "India", "abroad", "overseas", "विदेश", "भारत" in that context mean place-scope, NOT partnership between two people.
+- Where-to-move / which-city / which-location / favorable-direction questions about the selected native are single-chart location questions — do not offer partnership_offer. "Locations" / "cities" / "places" for wealth, career, money, marriage, or living are geography asks about the selected chart, NOT a two-person connection.
+  Example: "What locations are good for me to generate wealth" -> gate_required=false (selected_chart location recommendation).
+  Example: "Which cities are best for my career" -> gate_required=false.
+  Example: "Where should I move for money" -> gate_required=false.
 - When Partnership Analysis offer is unavailable, never return `partnership_offer` and never mention Partnership Analysis in `user_message`. For relationship questions in that case, either return `create_subject_chart` when the other person's own chart is needed, or return `gate_required=false` so the Standard single-chart answer can continue.
 
 Return ONLY valid JSON:

@@ -260,6 +260,28 @@ Your response MUST follow this exact sequence. The subsection headers under "Ast
 - [NO INLINE REMEDIES]: Do not include remedy layers, upayas, gemstones, mantras, charity/seva lists, OR practical wellness plans (diet/exercise/yoga/pranayama/dosha routines) in this normal reading. Timing & Guidance = phases and chart themes only.
 """
 
+TEMPLATE_LOCATION_RECOMMENDATION = """
+### 🏛️ RESPONSE STRUCTURE (MANDATORY) — LOCATIONAL GUIDANCE
+Use the `locational_recommendation` pack as primary evidence. Follow this sequence:
+1. <div class="quick-answer-card">**Quick Answer**: State the best 1–2 directions and the top cities for the user's goal in plain language, matching `location_scope` (India / abroad / both). Mention one caution. Keep this a complete practical answer.</div>
+2. ### Preferred Directions
+   - List preferred and avoid directions from the pack with short chart reasons (direction lords / goal houses).
+3. ### Best Cities
+   - Rank pack cities in order. If `location_scope` is both, present India and abroad shortlists separately using `top_cities_india` / `top_cities_abroad` when present.
+   - For each city: name, country (if abroad), compass direction from birth place, relocated ASC (if given), and 1–2 pack reasons.
+4. ### Why This Supports Your Goal
+   - Brief synthesis tying goal houses/karakas to the shortlist. Cite natal support lightly; do not open a full multi-school deep-dive.
+5. ### Timing Caution
+   - Use pack `timing_caution` + current dasha context. Advise when a move is more supported vs when to wait—no fake exact relocation date.
+6. <div class="final-thoughts-card">**Final Verdict**: One decisive shortlist (directions + cities) and the main caveat.</div>
+
+### 🚨 FORMATTING RULES
+- [HEADERS]: Use ### for main headers.
+- Do NOT invent cities outside the provided pack.
+- Do NOT claim Western ASC/MC ACG lines unless present in data.
+- No remedy dump unless this turn is an explicit Remedies CTA.
+"""
+
 TEMPLATE_FOMO_MANIFESTATION_DETAIL = """
 ### SELECTED FOMO MANIFESTATION RESPONSE (MANDATORY)
 This is a focused event-synthesis answer for one deterministic manifestation
@@ -584,6 +606,7 @@ SCHEMA_MAPPING = {
     # CTA-only remedy mode (query_context.remedy_followup). Wording-only asks are remapped away before schema selection.
     'RECOMMEND_REMEDY_FOR_PROBLEM': TEMPLATE_REMEDIAL_GUIDANCE,
     'REMEDIAL_GUIDANCE': TEMPLATE_REMEDIAL_GUIDANCE,
+    'RECOMMEND_LOCATION': TEMPLATE_LOCATION_RECOMMENDATION,
     'MUNDANE': TEMPLATE_MUNDANE,
     'DEV_EVENT_LOG': TEMPLATE_DEV_EVENT_LOG,
     'LIFESPAN_EVENT_TIMING': TEMPLATE_LIFESPAN_TIMELINE,
@@ -680,6 +703,7 @@ def get_response_schema_for_mode(mode: str, premium_analysis: bool = False, char
         'LIFE_TERMINATION_RESEARCH',
         'RECOMMEND_REMEDY_FOR_PROBLEM',
         'REMEDIAL_GUIDANCE',
+        'RECOMMEND_LOCATION',
     ]:
         # Ensure there's a newline before appending
         schema_with_common_blocks = base_schema.strip() + "\n"
@@ -698,7 +722,7 @@ def get_response_schema_for_mode(mode: str, premium_analysis: bool = False, char
    SUMMARY_IMAGE_END
 """
         # This is appended carefully to avoid breaking the structure of simpler templates
-        if mode.upper() in ['ANALYZE_TOPIC_POTENTIAL', 'ANALYZE_ROOT_CAUSE', 'PREDICT_PERIOD_OUTLOOK', 'DEFAULT', 'PREDICT_DAILY', 'LIFESPAN_EVENT_TIMING', 'LIFE_TERMINATION_RESEARCH']:
+        if mode.upper() in ['ANALYZE_TOPIC_POTENTIAL', 'ANALYZE_ROOT_CAUSE', 'PREDICT_PERIOD_OUTLOOK', 'DEFAULT', 'PREDICT_DAILY', 'LIFESPAN_EVENT_TIMING', 'LIFE_TERMINATION_RESEARCH', 'RECOMMEND_LOCATION']:
              return schema_with_common_blocks + "\n" + image_instructions
 
     return schema_with_common_blocks

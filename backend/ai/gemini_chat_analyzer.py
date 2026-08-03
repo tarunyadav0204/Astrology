@@ -1159,34 +1159,7 @@ class GeminiChatAnalyzer:
             # Generate summary image if prompt exists (Replicate/Flux disabled — see __init__).
             summary_image_url = None
             # if self.flux_service and premium_analysis and parsed_response.get('summary_image_prompt'):
-            #     try:
-            #         print(f"\n🎨 SUMMARY IMAGE GENERATION:")
-            #         print(f"   Premium analysis: {premium_analysis}")
-            #         print(f"   Flux service available: {bool(self.flux_service)}")
-            #         print(f"   Prompt exists: {bool(parsed_response.get('summary_image_prompt'))}")
-            #         print(f"   Prompt preview: {parsed_response.get('summary_image_prompt', '')[:150]}...")
-            #
-            #         image_result = await self.flux_service.generate_image(parsed_response['summary_image_prompt'])
-            #
-            #         print(f"\n🔍 IMAGE SERVICE RESPONSE:")
-            #         print(f"   Type: {type(image_result)}")
-            #         print(f"   Value: {image_result}")
-            #         print(f"   Is string: {isinstance(image_result, str)}")
-            #         print(f"   Is truthy: {bool(image_result)}")
-            #
-            #         if image_result:
-            #             summary_image_url = image_result
-            #             print(f"   ✅ SUMMARY IMAGE SUCCESS: {summary_image_url}")
-            #         else:
-            #             print(f"   ❌ SUMMARY IMAGE FAILED: No URL returned")
-            #
-            #     except Exception as e:
-            #         print(f"   ⚠️ SUMMARY IMAGE EXCEPTION:")
-            #         print(f"      Error type: {type(e).__name__}")
-            #         print(f"      Error message: {str(e)}")
-            #         print(f"      Full error: {repr(e)}")
-            #         import traceback
-            #         print(f"      Stack trace: {traceback.format_exc()}")
+            #     ...
             # else:
             logger.debug(
                 "summary_image_skipped premium=%s flux_available=%s prompt_exists=%s",
@@ -1195,7 +1168,7 @@ class GeminiChatAnalyzer:
                 bool(parsed_response.get("summary_image_prompt")),
             )
             response_char_count = len(parsed_response.get("content") or "")
-            return {
+            result_payload = {
                 'success': True,
                 'response': parsed_response['content'],
                 'terms': matched_term_ids,
@@ -1220,6 +1193,16 @@ class GeminiChatAnalyzer:
                     'chat_llm_model': model_name or None,
                 },
             }
+            try:
+                from chat.location_map_renderer import maybe_attach_locational_summary_image
+
+                result_payload = maybe_attach_locational_summary_image(
+                    result_payload,
+                    enhanced_context,
+                )
+            except Exception:
+                logger.exception("locational_summary_image_attach_failed")
+            return result_payload
         except asyncio.TimeoutError:
             total_request_time = time.time() - total_request_start
             logger.warning("chat_llm_timeout total_s=%.2f", total_request_time)

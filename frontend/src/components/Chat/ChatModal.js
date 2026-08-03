@@ -312,7 +312,13 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 // Add image if present
                 if (msg.summary_image) {
                     try {
-                        const imgData = msg.summary_image.startsWith('data:') ? msg.summary_image : `data:image/png;base64,${msg.summary_image}`;
+                        const imgData = (
+                            msg.summary_image.startsWith('data:')
+                            || msg.summary_image.startsWith('http://')
+                            || msg.summary_image.startsWith('https://')
+                        )
+                            ? msg.summary_image
+                            : `data:image/png;base64,${msg.summary_image}`;
                         doc.addImage(imgData, 'PNG', margin + 5, yPosition, maxWidth - 10, 50);
                         yPosition += 55;
                     } catch (error) {
@@ -529,7 +535,10 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                 message_type: msg.message_type || 'answer',
                                 intent_gate: msg.intent_gate || (msg.gate_metadata && msg.gate_metadata.intent_gate),
                                 gate_metadata: msg.gate_metadata || null,
-                                summary_image: msg.summary_image || null // Add summary_image from database
+                                summary_image: msg.summary_image
+                                    || (Array.isArray(msg.images) && msg.images[0])
+                                    || (typeof msg.images === 'string' ? msg.images : null)
+                                    || null // Add summary_image from database
                             };
                             
                             console.log('📜 Loaded message:', { id: msg.message_id, sender: msg.sender, hasContent: !!msg.content });

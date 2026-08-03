@@ -765,6 +765,31 @@ async def lifespan(app: FastAPI):
         log_lifecycle_event("startup_step_failed", level=logging.WARNING, step="startup_db_lock", error=str(e))
     try:
         logger.info("startup_complete")
+        local_chat_worker_thread = None
+        try:
+            from chat_history.task_queue import chat_tasks_enabled, local_chat_tasks_enabled
+
+            if chat_tasks_enabled() and local_chat_tasks_enabled():
+                import threading
+                from chat_history.local_worker import run_forever as run_local_chat_worker
+
+                local_chat_worker_thread = threading.Thread(
+                    target=run_local_chat_worker,
+                    name="local-chat-worker",
+                    daemon=True,
+                )
+                local_chat_worker_thread.start()
+                logger.info(
+                    "local_chat_worker_started reason=CHAT_TASKS_LOCAL_MODE "
+                    "(chat asks are queued; this thread processes them)"
+                )
+        except Exception as e:
+            log_lifecycle_event(
+                "startup_step_failed",
+                level=logging.WARNING,
+                step="start_local_chat_worker",
+                error=str(e),
+            )
         yield
     finally:
         logger.debug("shutdown_lifespan_begin")

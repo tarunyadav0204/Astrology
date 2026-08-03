@@ -147,7 +147,7 @@ def evaluate_parallel_chat_gate(context: dict, *, user_id: Optional[int] = None)
         return False, "partner_birth_pair_present", diagnostics
     if analysis_type and analysis_type != "birth":
         return False, f"analysis_type_{analysis_type}", diagnostics
-    if mode in ("prashna", "annual"):
+    if mode in ("prashna", "annual", "recommend_location"):
         return False, f"mode_{mode}", diagnostics
     if mode.startswith("predict_daily"):
         return False, "mode_predict_daily", diagnostics

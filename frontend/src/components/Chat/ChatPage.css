@@ -726,6 +726,10 @@ button.chat-header-credits.credits-display:active {
 .message-text {
     line-height: 1.5;
     margin-bottom: 5px;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    box-sizing: border-box;
 }
 
 .message-timestamp {
@@ -1634,9 +1638,13 @@ button.chat-header-credits.credits-display:active {
 .chat-response .follow-up-questions {
     margin: 16px 0 10px 0;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
     gap: 8px;
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
     box-sizing: border-box;
 }
 
@@ -1644,6 +1652,10 @@ button.chat-header-credits.credits-display:active {
 .chat-response .follow-up-btn {
     appearance: none;
     -webkit-appearance: none;
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     background: rgba(248, 250, 252, 0.95);
     border: 1px solid rgba(255, 107, 53, 0.22);
     color: #334155;
@@ -1653,15 +1665,27 @@ button.chat-header-credits.credits-display:active {
     line-height: 1.35;
     cursor: pointer;
     transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease;
-    white-space: normal;
+    /* WebKit/PWA <button> often ignores wrapping without explicit normal + inner block label */
+    white-space: normal !important;
     text-align: left;
-    flex-shrink: 1;
+    flex: 0 0 auto;
     font-weight: 600;
     word-wrap: break-word;
-    overflow-wrap: break-word;
+    overflow-wrap: anywhere;
+    word-break: break-word;
     hyphens: auto;
-    max-width: 100%;
     box-sizing: border-box;
+    overflow: hidden;
+}
+
+.message-text .follow-up-btn .follow-up-btn__label,
+.chat-response .follow-up-btn .follow-up-btn__label {
+    display: block;
+    max-width: 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .message-text .follow-up-btn:hover,

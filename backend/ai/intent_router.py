@@ -754,6 +754,363 @@ def _normalize_lifespan_timing_mode(result: Dict[str, Any]) -> None:
         result["mode"] = "LIFESPAN_EVENT_TIMING"
 
 
+def _looks_like_location_recommendation_question(user_question: str) -> bool:
+    """Heuristic for where-to-move / which-city / favorable-direction asks."""
+    q = _normalize_question_for_intent(user_question)
+    if not q:
+        return False
+    # Timing-of-move questions stay on lifespan/relocation timing, not cartography.
+    if any(
+        phrase in q
+        for phrase in (
+            "when will i move",
+            "when should i move",
+            "when will i relocate",
+            "when can i move",
+            "kab shift",
+            "kab move",
+        )
+    ):
+        return False
+    cues = (
+        "where should i move",
+        "where should i relocate",
+        "where should i settle",
+        "where to move",
+        "where to relocate",
+        "where to settle",
+        "which city",
+        "which place",
+        "which location",
+        "best city",
+        "best place to live",
+        "best place for",
+        "best location",
+        "good location",
+        "good locations",
+        "locations are good",
+        "locations good for",
+        "favorable location",
+        "favourable location",
+        "favorable direction",
+        "favourable direction",
+        "which direction",
+        "best direction",
+        "where will i get",
+        "where can i get",
+        "kis shehar",
+        "kaun sa shehar",
+        "kahan shift",
+        "kahan move",
+        "kahan settle",
+        "kahan jaakar",
+        "kahan jakar",
+        "city for career",
+        "city for job",
+        "city for money",
+        "city for marriage",
+        "location for career",
+        "location for wealth",
+        "location for money",
+        "locations for",
+        "places for wealth",
+        "places for money",
+        "places for career",
+        "relocate for career",
+        "relocate for job",
+        "move for career",
+        "move for money",
+        "move for marriage",
+        "astrocartography",
+        "astro cartography",
+        "relocation chart",
+        "move abroad",
+        "settle abroad",
+        "which country",
+        "where should i live",
+        "where to live",
+    )
+    if any(cue in q for cue in cues):
+        return True
+
+    # Broader: place/city/location wording + life-goal wording on the selected native.
+    place_tokens = (
+        "location",
+        "locations",
+        "city",
+        "cities",
+        "place",
+        "places",
+        "shehar",
+        "शहर",
+        "direction",
+        "directions",
+        "relocat",
+        "where to",
+        "kahan",
+        "कहाँ",
+    )
+    goal_tokens = (
+        "wealth",
+        "money",
+        "rich",
+        "income",
+        "career",
+        "job",
+        "business",
+        "marriage",
+        "relationship",
+        "live",
+        "settle",
+        "move",
+        "grow",
+        "generate",
+        "earn",
+        "prosper",
+    )
+    has_place = any(tok in q for tok in place_tokens)
+    has_goal = any(tok in q for tok in goal_tokens)
+    if has_place and has_goal:
+        # Avoid partnership false-positives: "relationship with my wife in which city" is rare;
+        # "my relationship with..." without place intent stays gated by subject gate.
+        if "relationship with" in q or "compatibility with" in q:
+            return False
+        return True
+    return False
+
+
+def _normalize_location_scope_value(value: Any) -> str | None:
+    raw = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "india": "india",
+        "india_only": "india",
+        "domestic": "india",
+        "within_india": "india",
+        "indian": "india",
+        "abroad": "abroad",
+        "overseas": "abroad",
+        "foreign": "abroad",
+        "international": "abroad",
+        "outside_india": "abroad",
+        "both": "both",
+        "india_and_abroad": "both",
+        "anywhere": "both",
+        "either": "both",
+        "all": "both",
+    }
+    scope = aliases.get(raw)
+    return scope if scope in {"india", "abroad", "both"} else None
+
+
+def _infer_location_scope_from_text(user_question: str) -> str | None:
+    """
+    Detect india/abroad/both when the user already stated it.
+    Used only to avoid re-asking — never to invent the clarification question text.
+    """
+    q = _normalize_question_for_intent(user_question)
+    if not q:
+        return None
+
+    # Word-boundary helpers: plain `"india" in q` falsely matches "locations".
+    def _has_word(word: str) -> bool:
+        return bool(re.search(rf"(?<![a-z0-9]){re.escape(word)}(?![a-z0-9])", q))
+
+    both_cues = (
+        "india and abroad",
+        "india or abroad",
+        "both india",
+        "both abroad",
+        "either india",
+        "anywhere",
+        "kahi bhi",
+        "कहीं भी",
+        "भारत और विदेश",
+        "india + abroad",
+        "domestic and international",
+    )
+    mentions_india = _has_word("india") or ("भारत" in q) or _has_word("bharat")
+    mentions_abroad = any(
+        cue in q
+        for cue in (
+            "abroad",
+            "overseas",
+            "foreign",
+            "विदेश",
+            "bahar",
+            "outside",
+        )
+    )
+    if any(cue in q for cue in both_cues) or (mentions_india and mentions_abroad):
+        # "both" / "either" style answers
+        if any(cue in q for cue in ("both", "either", "anywhere", "kahi bhi", "कहीं भी", "and abroad", "or abroad", "और विदेश")):
+            return "both"
+
+    abroad_cues = (
+        "abroad",
+        "overseas",
+        "outside india",
+        "outside of india",
+        "foreign country",
+        "other country",
+        "settle abroad",
+        "move abroad",
+        "move overseas",
+        "विदेश",
+        "bahar",
+        "बाहर",
+        "gulf",
+        "dubai",
+        "singapore",
+        "canada",
+        "usa",
+        "u.s.",
+        "america",
+        "uk",
+        "london",
+        "europe",
+        "australia",
+    )
+    india_only_cues = (
+        "only india",
+        "india only",
+        "within india",
+        "in india",
+        "indian cities",
+        "भारत में",
+        "सिर्फ भारत",
+        "केवल भारत",
+        "desh mein",
+        "india mein",
+    )
+
+    abroad_hit = any(cue in q for cue in abroad_cues)
+    india_hit = any(cue in q for cue in india_only_cues) or (
+        mentions_india and not abroad_hit
+    )
+
+    if abroad_hit and india_hit:
+        return "both"
+    if abroad_hit:
+        return "abroad"
+    if india_hit:
+        return "india"
+    # Short clarification replies
+    if q in {"india", "भारत", "bharat", "indian"}:
+        return "india"
+    if q in {"abroad", "overseas", "foreign", "विदेश", "bahar", "international"}:
+        return "abroad"
+    if q in {"both", "either", "anywhere", "दोनों"}:
+        return "both"
+    return None
+
+
+def _resolve_location_scope(result: Dict[str, Any], user_question: str) -> str | None:
+    """
+    Accept india/abroad/both only when the user (or a prior turn) stated it in text.
+
+    Do NOT trust the LLM's extracted_context.location_scope alone — models often invent
+    "india" and skip the India/abroad clarification.
+    """
+    return _infer_location_scope_from_text(user_question)
+
+
+def _location_scope_clarification_fallback(user_question: str, language: str = "english") -> str:
+    """Last-resort clarify text when the LLM omitted clarification_question."""
+    q = str(user_question or "")
+    if any("\u0900" <= ch <= "\u097F" for ch in q) or str(language or "").strip().lower().startswith("hi"):
+        return "क्या आप भारत के शहर देखना चाहते हैं, विदेश के, या दोनों?"
+    return "Would you like city suggestions in India, abroad, or both?"
+
+
+def _apply_recommend_location_divisional_defaults(result: Dict[str, Any], user_question: str) -> None:
+    if not str(result.get("category") or "").strip() or str(result.get("category")).strip().lower() in _WEAK_INTENT_CATEGORIES:
+        _refine_life_event_category(user_question, result)
+        if str(result.get("category") or "").strip().lower() in _WEAK_INTENT_CATEGORIES:
+            q = _normalize_question_for_intent(user_question)
+            if any(k in q for k in ("career", "job", "profession", "naukri", "promotion")):
+                result["category"] = "career"
+            elif any(k in q for k in ("wealth", "money", "finance", "rich", "income")):
+                result["category"] = "wealth"
+            elif any(k in q for k in ("marriage", "relationship", "love", "partner", "spouse")):
+                result["category"] = "relationship"
+            elif any(k in q for k in ("visa", "abroad", "foreign", "overseas")):
+                result["category"] = "visa"
+            else:
+                result["category"] = "general"
+    result["divisional_charts"] = get_default_divisional_charts_for_category(
+        str(result.get("category") or "general")
+    )
+    charts = list(result.get("divisional_charts") or [])
+    if "D4" not in charts:
+        charts.append("D4")
+    if str(result.get("category") or "").lower() in {"visa", "foreign", "travel"} and "D12" not in charts:
+        charts.append("D12")
+    result["divisional_charts"] = charts
+
+
+def _force_recommend_location_mode(
+    result: Dict[str, Any],
+    user_question: str,
+    *,
+    force_ready: bool = False,
+    language: str = "english",
+) -> None:
+    """
+    Normalize RECOMMEND_LOCATION routing.
+
+    Important: never invent clarification_question text here unless the LLM omitted it —
+    prefer LLM wording in the user's language. Code only detects already-stated
+    india/abroad/both scope from the user text (never from LLM hallucinations).
+    """
+    mode_u = str(result.get("mode") or "").strip().upper()
+    looks_location = _looks_like_location_recommendation_question(user_question) or mode_u == "RECOMMEND_LOCATION"
+    if not looks_location:
+        return
+
+    result["mode"] = "RECOMMEND_LOCATION"
+    result["context_type"] = "birth"
+    result["needs_transits"] = False
+    result["answer_mode"] = "location_recommendation"
+    _apply_recommend_location_divisional_defaults(result, user_question)
+
+    result.setdefault("extracted_context", {})
+    if not isinstance(result["extracted_context"], dict):
+        result["extracted_context"] = {}
+
+    # Drop LLM-invented scope unless the user text actually states it.
+    text_scope = _resolve_location_scope(result, user_question)
+    result["extracted_context"]["location_scope"] = text_scope
+    if text_scope:
+        result["extracted_context"].pop("awaiting_location_scope", None)
+        result["status"] = "READY"
+        result["clarification_question"] = None
+        result.pop("_needs_location_scope_clarify_retry", None)
+        return
+
+    # Scope unknown: ask via LLM clarification (do not hardcode the question first).
+    result["extracted_context"]["awaiting_location_scope"] = True
+    result["extracted_context"]["location_scope"] = None
+
+    if force_ready:
+        # Channels that forbid clarification: default to India shortlist.
+        result["extracted_context"]["location_scope"] = "india"
+        result["extracted_context"].pop("awaiting_location_scope", None)
+        result["status"] = "READY"
+        result["clarification_question"] = None
+        return
+
+    clarification = str(result.get("clarification_question") or "").strip()
+    if clarification:
+        # Keep LLM-authored clarification question (any language/script) as-is.
+        result["status"] = "CLARIFY"
+        result.pop("_needs_location_scope_clarify_retry", None)
+        return
+
+    # No usable clarification text yet — request one language-aware retry, then fallback in routes.
+    result["status"] = "CLARIFY"
+    result["_needs_location_scope_clarify_retry"] = True
+    result["clarification_question"] = None
+
 def _is_unlocked_life_termination_research_question(question: str) -> bool:
     """
     Restricted death/life-termination mode selector.
@@ -953,6 +1310,8 @@ class IntentRouter:
         normalized_query_context: Dict[str, Any] | None,
         include_chart_insights: bool,
         d1_chart: Dict[str, Any] | None = None,
+        force_ready: bool = False,
+        language: str = "english",
     ) -> Dict[str, Any]:
         if 'status' not in result:
             result['status'] = 'READY'
@@ -966,6 +1325,12 @@ class IntentRouter:
         if 'category' not in result or result['category'] is None:
             result['category'] = 'general'
         _refine_life_event_category(user_question, result)
+        _force_recommend_location_mode(
+            result,
+            user_question,
+            force_ready=force_ready,
+            language=language,
+        )
         if 'extracted_context' not in result or not isinstance(result.get('extracted_context'), dict):
             result['extracted_context'] = {}
         if 'needs_transits' not in result:
@@ -1139,7 +1504,7 @@ Current question: "{user_question}"
 
 Task:
 1. Semantically understand the user's question in any language/script.
-2. Decide READY vs CLARIFY. Clarify only when the core topic/event is genuinely unclear, the user asks multiple unrelated life areas, or a reference like "this/that" cannot be resolved from recent history. Do not clarify for one clear domain with multiple facets, follow-up challenges, or natural messy phrasing.
+2. Decide READY vs CLARIFY. Clarify when the core topic/event is genuinely unclear, the user asks multiple unrelated life areas, a reference like "this/that" cannot be resolved from recent history, OR the mode is RECOMMEND_LOCATION and india-vs-abroad scope is unknown. Do not clarify for one clear domain with multiple facets, follow-up challenges, or natural messy phrasing.
 3. Select the astrology mode, answer mode, subject, category, timeframe/date, chart focus, transit need, and compact divisional chart list.
 
 Modes:
@@ -1149,6 +1514,7 @@ Modes:
 - LIFE_TERMINATION_RESEARCH: only with the configured unlock phrase and explicit death/longevity-end timing.
 - ANALYZE_PERSONALITY: nature, traits, temperament, self-understanding.
 - ANALYZE_TOPIC_POTENTIAL: "how is my career/marriage/health/money/relationship" style readings.
+- RECOMMEND_LOCATION: where to move/relocate/settle, which city/place/direction is favorable for a goal (career, wealth, marriage, etc.). Not for "when will I move" timing. If location_scope is unknown, CLARIFY and ask whether they want India only, abroad, or both — in the SAME language/script as the current question (LLM-authored wording only).
 - RECOMMEND_REMEDY_FOR_PROBLEM: ONLY when query_context already marks a Remedies CTA follow-up. Wording like "what should I do" / "upay" alone is NOT enough — use ANALYZE_ROOT_CAUSE or ANALYZE_TOPIC_POTENTIAL with answer_mode problem_diagnosis / topic_reading so the UI can offer the Remedies card.
 
 Answer modes:
@@ -1159,6 +1525,7 @@ Answer modes:
 - event_prediction: when/if one specific event happens.
 - potential_capacity: suitability, promise, aptitude, capacity.
 - comparison_choice: choosing between options.
+- location_recommendation: where to move / which city or direction for a life goal.
 - problem_diagnosis: why something is blocked, delayed, unstable, difficult.
 - remedy_action: ONLY when query_context already marks a Remedies CTA follow-up (remedy_followup / open_remedy / follow_up_type=remedy_action). Never choose from wording alone.
 - topic_reading: focused reading when no other answer mode fits.
@@ -1194,19 +1561,23 @@ Calibration:
 - "How is my relationship with my wife?" -> READY, ANALYZE_TOPIC_POTENTIAL, category relationship or marriage, answer_mode topic_reading, target_subject_key wife, needs_transits false.
 - "How will my health be this year?" -> READY, PREDICT_PERIOD_OUTLOOK, category health, answer_mode timing_window, target_subject_key self, context_type annual, needs_transits true, timeframe this year.
 - "How will my career be in the second half of 2028?" -> READY, PREDICT_PERIOD_OUTLOOK, category career, answer_mode timing_window, target_subject_key self, needs_transits true, timeframe second half of 2028.
+- "Where should I move for my career?" -> CLARIFY, RECOMMEND_LOCATION, category career, answer_mode location_recommendation, location_scope null; clarification_question in the user's language asking India vs abroad vs both.
+- "Where should I move in India for career?" -> READY, RECOMMEND_LOCATION, location_scope india.
+- "Which city abroad is best for wealth?" -> READY, RECOMMEND_LOCATION, category wealth, location_scope abroad.
+- User previously asked where to move; now answers "abroad" / "विदेश" / "both" -> READY, RECOMMEND_LOCATION with matching location_scope.
 
 Return exactly this JSON shape:
 {{
   "status": "CLARIFY" or "READY",
   "clarification_question": "same language/script as user, only when CLARIFY",
   "chart_insights": [],
-  "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_REMEDY_FOR_PROBLEM",
+  "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_LOCATION" or "RECOMMEND_REMEDY_FOR_PROBLEM",
   "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
-  "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "problem_diagnosis" or "remedy_action" or "topic_reading",
+  "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "location_recommendation" or "problem_diagnosis" or "remedy_action" or "topic_reading",
   "target_subject_key": "one allowed target subject",
   "needs_year_clarification": false,
   "daily_intent_confirmed": true or false,
-  "extracted_context": {{"timeframe":"", "aspect":"", "specific_date": null, "specific_date_basis":"not_date_bound"}},
+  "extracted_context": {{"timeframe":"", "aspect":"", "specific_date": null, "specific_date_basis":"not_date_bound", "location_scope":"india or abroad or both or null", "awaiting_location_scope": false}},
   "context_type": "birth" or "annual",
   "category": "general",
   "year": "year only when annual is clearly asked",
@@ -1242,6 +1613,7 @@ Return exactly this JSON shape:
         language: str = 'english',
         force_ready: bool = False,
         force_clarify: bool = False,
+        force_location_scope_clarify: bool = False,
         query_context: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         import time
@@ -1276,7 +1648,18 @@ If the question is vague, make a reasonable assumption and proceed.
 """
 
         force_clarify_instruction = ""
-        if force_clarify:
+        if force_location_scope_clarify:
+            force_clarify = True
+            force_clarify_instruction = """
+You must return status "CLARIFY".
+mode MUST be "RECOMMEND_LOCATION".
+answer_mode MUST be "location_recommendation".
+Write exactly ONE short clarification_question asking whether they want place suggestions in India only, abroad/overseas, or both.
+Do NOT hardcode English if the user wrote in another language/script — match the CURRENT QUESTION language/script exactly.
+Do not ask for birth details. Do not ask about goal/category if already clear.
+Set extracted_context.location_scope to null and awaiting_location_scope to true.
+"""
+        elif force_clarify:
             force_clarify_instruction = """
 You must return status "CLARIFY".
 Ask exactly one short clarification question to narrow the user's topic.
@@ -1322,6 +1705,8 @@ Rules:
 - Use `LIFE_TERMINATION_RESEARCH` only when the configured death/longevity unlock phrase is present and the user explicitly asks death/life-termination/lifespan-end timing. This is not normal health mode.
 - Use `ANALYZE_PERSONALITY` for personality/self-understanding questions.
 - Use `ANALYZE_TOPIC_POTENTIAL` for "how is my career/love/money/health" style questions.
+- Use `RECOMMEND_LOCATION` for where to move/relocate/settle, which city/place/direction for a goal. Not for "when will I move".
+- For `RECOMMEND_LOCATION`: if the user has NOT clearly said India-only / abroad-overseas / both, return CLARIFY. Your clarification_question MUST ask that geography preference in the SAME language/script as the current question (LLM-authored; never English-by-default). Set extracted_context.location_scope to "india"|"abroad"|"both" when known, else null.
 - Use `RECOMMEND_REMEDY_FOR_PROBLEM` ONLY when query_context already marks a Remedies CTA follow-up. Plain "what should I do" / upay wording → `ANALYZE_ROOT_CAUSE` + `problem_diagnosis` (not a full remedy dump).
 - IMPORTANT: clarification is ALLOWED in instant mode. Do NOT default to READY when the ask is genuinely unclear.
 - Return `CLARIFY` only when the user has not made the core topic specific enough to answer well in one instant reply, or when the message explicitly contains separate unrelated asks.
@@ -1402,13 +1787,13 @@ Return ONLY this JSON shape:
   "status": "CLARIFY" or "READY",
   "clarification_question": "short question only when status=CLARIFY",
   "chart_insights": [],
-  "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_REMEDY_FOR_PROBLEM",
+  "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_LOCATION" or "RECOMMEND_REMEDY_FOR_PROBLEM",
   "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
-  "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "problem_diagnosis" or "remedy_action" or "topic_reading",
+  "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "location_recommendation" or "problem_diagnosis" or "remedy_action" or "topic_reading",
   "target_subject_key": "self" or "spouse" or "wife" or "husband" or "partner" or "child" or "first_child" or "second_child" or "third_child" or "mother" or "father" or "sibling" or "brother" or "sister" or "younger_brother" or "younger_sister" or "younger_sibling" or "elder_brother" or "elder_sister" or "elder_sibling" or "maternal_uncle" or "uncle",
   "needs_year_clarification": false,
   "daily_intent_confirmed": true or false,
-  "extracted_context": {{"timeframe":"...", "aspect":"...", "specific_date":"YYYY-MM-DD only when daily_intent_confirmed=true", "specific_date_basis":"explicit_user_day or relative_user_day or not_date_bound"}},
+  "extracted_context": {{"timeframe":"...", "aspect":"...", "specific_date":"YYYY-MM-DD only when daily_intent_confirmed=true", "specific_date_basis":"explicit_user_day or relative_user_day or not_date_bound", "location_scope":"india or abroad or both or null", "awaiting_location_scope": true or false}},
   "context_type": "birth" or "annual",
   "category": "career" or "job" or "promotion" or "business" or "love" or "relationship" or "marriage" or "partner" or "wealth" or "money" or "finance" or "health" or "disease" or "property" or "home" or "child" or "pregnancy" or "education" or "learning" or "travel" or "visa" or "foreign" or "gain" or "wish" or "general" or "son" or "daughter" or "mother" or "father" or "spouse" or "siblings" or "children" or "family" or "soul" or "spirituality" or "purpose" or "dharma" or "vehicles" or "timing",
   "year": "year only when annual is clearly asked",
@@ -1538,6 +1923,8 @@ Return ONLY this JSON shape:
                 normalized_query_context=normalized_query_context,
                 include_chart_insights=False,
                 d1_chart=d1_chart,
+                force_ready=force_ready,
+                language=language,
             )
             final["_llm_usage_stage"] = _build_usage_stage(
                 stage="instant_intent_router",
@@ -1574,7 +1961,7 @@ Return ONLY this JSON shape:
             )
             return fallback
         
-    async def classify_intent(self, user_question: str, chat_history: list = None, user_facts: dict = None, clarification_count: int = 0, language: str = 'english', force_ready: bool = False, d1_chart: dict = None, force_clarify: bool = False, query_context: Dict[str, Any] | None = None) -> Dict[str, str]:
+    async def classify_intent(self, user_question: str, chat_history: list = None, user_facts: dict = None, clarification_count: int = 0, language: str = 'english', force_ready: bool = False, d1_chart: dict = None, force_clarify: bool = False, force_location_scope_clarify: bool = False, query_context: Dict[str, Any] | None = None) -> Dict[str, str]:
         """
         Returns: {'status': 'CLARIFY' | 'READY', 'mode': 'PREDICT_DAILY' | 'ANALYZE_PERSONALITY' | ..., 'category': 'job'|'love'|..., 'needs_transits': bool, 'transit_request': {...}, 'extracted_context': {...}, 'context_type': 'birth' | 'annual'}
         """
@@ -1691,7 +2078,23 @@ Set appropriate mode, category, and divisional_charts based on the question cont
 """
 
         force_clarify_instruction = ""
-        if force_clarify:
+        if force_location_scope_clarify:
+            force_clarify = True
+            force_clarify_instruction = """
+🚨🚨🚨 ABSOLUTE OVERRIDE - LOCATION SCOPE CLARIFICATION 🚨🚨🚨
+
+You are ABSOLUTELY REQUIRED to return status: "CLARIFY".
+You are ABSOLUTELY FORBIDDEN from returning status: "READY".
+
+mode MUST be "RECOMMEND_LOCATION".
+answer_mode MUST be "location_recommendation".
+
+You MUST generate exactly ONE concise "clarification_question" asking whether the user wants place suggestions in India only, abroad/overseas, or both.
+The clarification_question MUST be authored in the inferred CURRENT QUESTION language/script (not English by default).
+Do NOT ask for birth details. Do NOT invent unrelated life-area choices.
+Set extracted_context.location_scope to null and awaiting_location_scope to true.
+"""
+        elif force_clarify:
             force_clarify_instruction = """
 🚨🚨🚨 ABSOLUTE OVERRIDE - RETURN CLARIFICATION 🚨🚨🚨
 
@@ -1858,6 +2261,9 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
         - "ANALYZE_TOPIC_POTENTIAL": Assesses the potential of a life area (e.g., "Tell me about my financial prospects.").
         - "ANALYZE_PERSONALITY": Describes the user's character based on their chart (e.g., "What does my chart say about me?", "What are my strengths?").
         - "ANALYZE_ROOT_CAUSE": For deep-seated "why" questions (e.g., "Why do I always struggle with self-confidence?").
+        - "RECOMMEND_LOCATION": Where to move/relocate/settle, which city/place/direction favors a goal (career, wealth, marriage, etc.). Not for "when will I move" timing questions.
+          🚨 If the user has not clearly chosen India-only vs abroad/overseas vs both, return status "CLARIFY" with mode RECOMMEND_LOCATION. Write clarification_question yourself in the CURRENT QUESTION language/script asking that geography preference. Set extracted_context.location_scope to "india"|"abroad"|"both" when known, else null.
+          🚨 When the user already said India / abroad / both (in any language), return READY with that location_scope — do not re-ask.
         - "RECOMMEND_REMEDY_FOR_PROBLEM": ONLY when the client already marked a Remedies CTA follow-up. For wording-only asks like "I have anxiety, what can I do?", use ANALYZE_ROOT_CAUSE / problem_diagnosis instead (UI offers Remedies separately).
 
         CHART-FOCUS DETECTION:
@@ -1879,7 +2285,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
             "status": "CLARIFY" or "READY",
             "clarification_question": "Your clarifying question here (only if status=CLARIFY; when giving options, use lettered quick replies like Type A/Type B with variable count, not fixed 3; keep same language + script as CURRENT QUESTION)",
             "chart_insights": [],
-            "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "PREDICT_EVENT_TIMING" or "PREDICT_EVENTS_FOR_PERIOD" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "ANALYZE_ROOT_CAUSE" or "RECOMMEND_REMEDY_FOR_PROBLEM",
+            "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "PREDICT_EVENT_TIMING" or "PREDICT_EVENTS_FOR_PERIOD" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "ANALYZE_ROOT_CAUSE" or "RECOMMEND_LOCATION" or "RECOMMEND_REMEDY_FOR_PROBLEM",
             "chart_focus": {{
                 "kind": "chart_specific",
                 "primary": "D1 or D9 or D10 or D7 or Karkamsa or Swamsa",
@@ -1889,7 +2295,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
                 "requested": ["D10"]
             }} or null,
             "daily_intent_confirmed": true or false,
-            "extracted_context": {{ "timeframe": "2025", "aspect": "promotion", "specific_date": "YYYY-MM-DD only when daily_intent_confirmed=true", "specific_date_basis": "explicit_user_day or relative_user_day or not_date_bound" }},
+            "extracted_context": {{ "timeframe": "2025", "aspect": "promotion", "specific_date": "YYYY-MM-DD only when daily_intent_confirmed=true", "specific_date_basis": "explicit_user_day or relative_user_day or not_date_bound", "location_scope": "india or abroad or both or null", "awaiting_location_scope": true or false }},
             "context_type": "annual" or "birth",
             "category": "category_name",
             "year": "SPECIFIC_YEAR_FROM_QUESTION (only for annual context_type)",
@@ -1944,6 +2350,8 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
                 normalized_query_context=normalized_query_context,
                 include_chart_insights=False,
                 d1_chart=d1_chart,
+                force_ready=force_ready,
+                language=language,
             )
         except Exception as e:
             total_time = time.time() - intent_start

@@ -5,6 +5,8 @@ import { showToast } from '../../utils/toast';
 import { useCredits } from '../../context/CreditContext';
 import { splitFreeAnswerContent } from '../../utils/freeAnswerSplit';
 import NorthIndianChart from '../Charts/NorthIndianChart';
+import ZoomableImageLightbox, { resolveSummaryImageSrc } from './ZoomableImageLightbox';
+import './ZoomableImageLightbox.css';
 import {
     stopAndRevokePodcastPlayback,
     registerPodcastPlayback,
@@ -377,6 +379,7 @@ const MessageBubble = ({
     const [podcastDuration, setPodcastDuration] = useState(0);
     const [podcastIsPlaying, setPodcastIsPlaying] = useState(false);
     const [podcastPlaybackRate, setPodcastPlaybackRate] = useState(1);
+    const [summaryLightboxSrc, setSummaryLightboxSrc] = useState(null);
     const podcastAudioRef = useRef(null);
     const podcastFetchAbortRef = useRef(null);
     const podcastBlobRef = useRef(null);
@@ -960,10 +963,8 @@ const MessageBubble = ({
             .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
             .replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ');
         
-        // 2. Add summary image (centered, 500px)
-        if (message.summary_image) {
-            formatted = `<div class="summary-image-container" style="margin: 0 auto 20px auto; borderRadius: 12px; overflow: hidden; boxShadow: 0 4px 16px rgba(0,0,0,0.15); background: linear-gradient(135deg, rgba(255,107,53,0.1), rgba(138,43,226,0.1)); border: 2px solid rgba(255,107,53,0.3); maxWidth: 500px;"><img src="${message.summary_image}" alt="Analysis Summary" style="width: 100%; height: auto; display: block;" onError="this.style.display='none'; this.parentElement.style.display='none';" /></div>` + formatted;
-        }
+        // 2. Summary image is rendered as a React thumbnail (click → fullscreen zoom).
+        // Do not inject it into HTML here (would duplicate / block click handlers).
         
         // 3. Normalize line breaks
         formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -973,7 +974,7 @@ const MessageBubble = ({
         formatted = formatted.replace(/<div class="follow-up-questions">([\s\S]*?)<\/div>/g, (match, questions) => {
             const parts = splitFollowUpQuestionsBlock(questions);
             const questionList = parts
-                .map((q) => `<button type="button" class="follow-up-btn">${escapeHtmlTextContent(q)}</button>`)
+                .map((q) => `<button type="button" class="follow-up-btn"><span class="follow-up-btn__label">${escapeHtmlTextContent(q)}</span></button>`)
                 .join('');
             return `<div class="follow-up-questions">${questionList}</div>`;
         });
@@ -1300,31 +1301,22 @@ const MessageBubble = ({
                                 ) : (
                                     <>
                                         {message.summary_image && (
-                                            <div
-                                                style={{
-                                                    margin: '0 auto 12px auto',
-                                                    borderRadius: 12,
-                                                    overflow: 'hidden',
-                                                    boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-                                                    background: 'linear-gradient(135deg, rgba(255,107,53,0.1), rgba(138,43,226,0.1))',
-                                                    border: '2px solid rgba(255,107,53,0.3)',
-                                                    maxWidth: 500
-                                                }}
+                                            <button
+                                                type="button"
+                                                className="chat-summary-image-thumb"
+                                                onClick={() => setSummaryLightboxSrc(resolveSummaryImageSrc(message.summary_image))}
+                                                aria-label="Open map full screen"
                                             >
                                                 <img
-                                                    src={
-                                                        message.summary_image.startsWith('data:')
-                                                            ? message.summary_image
-                                                            : `data:image/png;base64,${message.summary_image}`
-                                                    }
-                                                    alt="Analysis Summary"
-                                                    style={{ width: '100%', height: 'auto', display: 'block' }}
+                                                    src={resolveSummaryImageSrc(message.summary_image)}
+                                                    alt="Location map"
                                                     onError={(e) => {
                                                         e.currentTarget.style.display = 'none';
                                                         if (e.currentTarget?.parentElement) e.currentTarget.parentElement.style.display = 'none';
                                                     }}
                                                 />
-                                            </div>
+                                                <span className="chat-summary-image-thumb__hint">Tap to expand</span>
+                                            </button>
                                         )}
                                         {message.chartData && (
                                             <div style={{
@@ -1382,14 +1374,36 @@ const MessageBubble = ({
                         <>
                             {/* Always use ResponseRenderer for assistant messages */}
                             {message.role === 'assistant' ? (
-                                <div
-                                    dangerouslySetInnerHTML={{
-                                        __html: formatContent(
-                                            shouldBlurDetail ? freeSplit.quick : message.content,
-                                            message,
-                                        ),
-                                    }}
-                                />
+                                <>
+                                    {message.summary_image && (
+                                        <button
+                                            type="button"
+                                            className="chat-summary-image-thumb"
+                                            onClick={() => setSummaryLightboxSrc(resolveSummaryImageSrc(message.summary_image))}
+                                            aria-label="Open map full screen"
+                                        >
+                                            <img
+                                                src={resolveSummaryImageSrc(message.summary_image)}
+                                                alt="Location map"
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display = 'none';
+                                                    if (e.currentTarget?.parentElement) {
+                                                        e.currentTarget.parentElement.style.display = 'none';
+                                                    }
+                                                }}
+                                            />
+                                            <span className="chat-summary-image-thumb__hint">Tap to expand</span>
+                                        </button>
+                                    )}
+                                    <div
+                                        dangerouslySetInnerHTML={{
+                                            __html: formatContent(
+                                                shouldBlurDetail ? freeSplit.quick : message.content,
+                                                message,
+                                            ),
+                                        }}
+                                    />
+                                </>
                             ) : (
                                 <div dangerouslySetInnerHTML={{ __html: formatContent(message.content) }} />
                             )}
@@ -1858,6 +1872,14 @@ const MessageBubble = ({
                     </div>,
                     document.body
                 )}
+
+            {summaryLightboxSrc && (
+                <ZoomableImageLightbox
+                    src={summaryLightboxSrc}
+                    alt="Location map"
+                    onClose={() => setSummaryLightboxSrc(null)}
+                />
+            )}
 
             {/* Tooltip Modal using Portal */}
             {tooltipModal.show && createPortal(

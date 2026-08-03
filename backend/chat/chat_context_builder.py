@@ -451,6 +451,22 @@ class ChatContextBuilder:
                 full_context["lifespan_timing_evidence"] = pack
         except Exception:
             logger.exception("lifespan_timing_evidence_build_failed")
+
+        # Locational cartography pack (directions + India metro ranking)
+        try:
+            from chat.locational_context_builder import build_locational_recommendation_pack
+
+            loc_pack = build_locational_recommendation_pack(
+                birth_data,
+                intent_result=intent_result,
+                natal_chart=full_context.get("d1_chart"),
+                current_dashas=full_context.get("current_dashas"),
+            )
+            if loc_pack:
+                full_context["locational_recommendation"] = loc_pack
+                full_context["analysis_type"] = "locational_recommendation"
+        except Exception:
+            logger.exception("locational_recommendation_pack_failed")
         
         # Apply minification before returning
         return self._minify_data(full_context)

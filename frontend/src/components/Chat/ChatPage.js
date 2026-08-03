@@ -105,6 +105,11 @@ function normalizeChatV2SessionMessages(items) {
                 terms: Array.isArray(item.terms) ? item.terms : [],
                 glossary: item.glossary && typeof item.glossary === 'object' ? item.glossary : {},
                 images: Array.isArray(item.images) ? item.images : [],
+                summary_image:
+                    item.summary_image
+                    || (Array.isArray(item.images) && item.images[0])
+                    || (typeof item.images === 'string' ? item.images : null)
+                    || null,
                 gate_metadata: item.gate_metadata || null,
                 intent_gate: item.intent_gate || item.gate_metadata?.intent_gate || undefined,
                 isFromDatabase: true,

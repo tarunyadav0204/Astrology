@@ -3134,8 +3134,14 @@ class CreditService:
         purchase_source: str,
         purchase_reference_id: str,
         product_id: Optional[str] = None,
+        exclude_web_topup_bonus: bool = False,
     ) -> Dict[str, Any]:
-        """Apply pack bonus, first-purchase bonus, open purchase discount, and web top-up bonus."""
+        """Apply purchase extras, optionally excluding the web-only top-up bonus.
+
+        Play User Choice payments are settled by Razorpay too, but they are not
+        web/PWA purchases.  Callers must set ``exclude_web_topup_bonus`` for
+        that channel so the Razorpay source alone cannot grant the web offer.
+        """
         pack_result = self.maybe_apply_pack_bonus(
             userid=userid,
             purchased_credits=purchased_credits,
@@ -3157,13 +3163,21 @@ class CreditService:
             purchase_reference_id=purchase_reference_id,
             product_id=product_id,
         )
-        web_result = self.maybe_apply_web_topup_bonus(
-            userid=userid,
-            purchased_credits=purchased_credits,
-            purchase_source=purchase_source,
-            purchase_reference_id=purchase_reference_id,
-            product_id=product_id,
-        )
+        if exclude_web_topup_bonus:
+            web_result = {
+                "applied": False,
+                "eligible": False,
+                "bonus_credits": 0,
+                "reason": "excluded_purchase_channel",
+            }
+        else:
+            web_result = self.maybe_apply_web_topup_bonus(
+                userid=userid,
+                purchased_credits=purchased_credits,
+                purchase_source=purchase_source,
+                purchase_reference_id=purchase_reference_id,
+                product_id=product_id,
+            )
         pack_added = int(pack_result.get("bonus_credits") or 0) if pack_result.get("applied") else 0
         first_added = int(first_result.get("bonus_credits") or 0) if first_result.get("applied") else 0
         discount_added = int(discount_result.get("bonus_credits") or 0) if discount_result.get("applied") else 0

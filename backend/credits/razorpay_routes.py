@@ -305,7 +305,11 @@ def _verify_webhook_signature(body: bytes, signature: Optional[str]) -> bool:
     return hmac.compare_digest(expected, signature)
 
 
-def _process_captured_payment(payment: Dict[str, Any]) -> Dict[str, Any]:
+def _process_captured_payment(
+    payment: Dict[str, Any],
+    *,
+    external_transaction_token: Optional[str] = None,
+) -> Dict[str, Any]:
     payment_id = (payment.get("id") or "").strip()
     order_id = (payment.get("order_id") or "").strip()
 
@@ -333,6 +337,13 @@ def _process_captured_payment(payment: Dict[str, Any]) -> Dict[str, Any]:
         return failure(f"Payment not captured (status={status})", code="payment_not_captured")
 
     notes = payment.get("notes") or {}
+    # Razorpay is also used for Google Play User Choice (alternative billing).
+    # That payment must receive Play treatment, not the web/PWA top-up bonus.
+    play_external_token = (
+        str(external_transaction_token or "").strip()
+        or str(notes.get("gp_external_tx_token") or "").strip()
+    )
+    is_play_alternative_billing = bool(play_external_token)
     uid_raw = str(notes.get("userid") or "").strip()
     credits_raw = str(notes.get("credits") or "").strip()
     product_id = str(notes.get("product_id") or "").strip()
@@ -377,6 +388,7 @@ def _process_captured_payment(payment: Dict[str, Any]) -> Dict[str, Any]:
             purchase_source=RAZORPAY_SOURCE,
             purchase_reference_id=payment_id,
             product_id=product_id,
+            exclude_web_topup_bonus=is_play_alternative_billing,
         )
         return {
             "success": True,
@@ -398,6 +410,10 @@ def _process_captured_payment(payment: Dict[str, Any]) -> Dict[str, Any]:
             "currency": payment.get("currency"),
             "product_id": product_id,
             "method": payment.get("method"),
+            "billing_channel": (
+                "google_play_user_choice"
+                if is_play_alternative_billing else "web_pwa"
+            ),
         }
     )
 
@@ -423,6 +439,7 @@ def _process_captured_payment(payment: Dict[str, Any]) -> Dict[str, Any]:
         purchase_source=RAZORPAY_SOURCE,
         purchase_reference_id=payment_id,
         product_id=product_id,
+        exclude_web_topup_bonus=is_play_alternative_billing,
     )
     bonus_added = int(extras.get("bonus_credits_added") or 0)
     return {
@@ -655,11 +672,14 @@ async def razorpay_verify(body: VerifyPaymentBody, current_user: User = Depends(
         )
         raise HTTPException(status_code=403, detail="Payment does not belong to this account")
 
-    result = _process_captured_payment(payment)
+    gp_body_tok = (body.google_play_external_transaction_token or "").strip() or None
+    result = _process_captured_payment(
+        payment,
+        external_transaction_token=gp_body_tok,
+    )
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result.get("message") or "Could not apply credits")
 
-    gp_body_tok = (body.google_play_external_transaction_token or "").strip() or None
     _maybe_report_play_user_choice_credit_purchase(
         payment=payment,
         payment_notes=notes,
