@@ -445,11 +445,16 @@ def internal_verify_razorpay_payment(
         )
         raise HTTPException(status_code=403, detail="Payment does not belong to this account")
 
-    result = _process_captured_payment(payment)
+    # Razorpay is also used for Google Play User Choice.  Pass the token
+    # through so the shared grant path can exclude the web/PWA-only bonus.
+    gp_body_tok = (request.google_play_external_transaction_token or "").strip() or None
+    result = _process_captured_payment(
+        payment,
+        external_transaction_token=gp_body_tok,
+    )
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result.get("message") or "Could not apply credits")
 
-    gp_body_tok = (request.google_play_external_transaction_token or "").strip() or None
     _maybe_report_play_user_choice_credit_purchase(
         payment=payment,
         payment_notes=notes,
