@@ -110,6 +110,8 @@ function normalizeChatV2SessionMessages(items) {
                     || (Array.isArray(item.images) && item.images[0])
                     || (typeof item.images === 'string' ? item.images : null)
                     || null,
+                follow_up_questions: Array.isArray(item.follow_up_questions) ? item.follow_up_questions : [],
+                next_action: item.next_action || null,
                 gate_metadata: item.gate_metadata || null,
                 intent_gate: item.intent_gate || item.gate_metadata?.intent_gate || undefined,
                 isFromDatabase: true,

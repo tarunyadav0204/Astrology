@@ -461,6 +461,7 @@ class ChatContextBuilder:
                 intent_result=intent_result,
                 natal_chart=full_context.get("d1_chart"),
                 current_dashas=full_context.get("current_dashas"),
+                user_question=user_question or "",
             )
             if loc_pack:
                 full_context["locational_recommendation"] = loc_pack

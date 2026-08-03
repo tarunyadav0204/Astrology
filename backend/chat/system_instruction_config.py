@@ -399,7 +399,7 @@ LOCATION_RECOMMENDATION_STRUCTURE = """
     3. 1–2 directions or places to be cautious about.
     4. Brief timing caution from current dasha lords vs relocated placement (no fake exact move date).
 [LOCATION-4] STYLE: Practical and decisive in Quick Answer. Technical WHY can be shorter than a normal deep-dive; skip empty KP/Nadi/Sudarshana sections if the pack does not support them.
-[LOCATION-5] SCOPE: Candidate pools are curated India metros and/or curated global hubs based on location_scope. Do not invent Western ASC/MC ACG lines or cities absent from the pack.
+[LOCATION-5] SCOPE: Candidate pools are curated India metros and/or region-specific global hub packs (Gulf/GCC, Southeast Asia, East Asia, Europe, UK & Ireland, Oceania, North America, Africa) based on location_scope. If preferred_hub_regions / top_cities_by_hub_region are present, prefer those packs. Do not invent Western ASC/MC ACG lines or cities absent from the pack.
 [LOCATION-6] HONESTY: Locational support is probabilistic. Never guarantee a job, marriage, visa, or wealth outcome from a city alone.
 """
 

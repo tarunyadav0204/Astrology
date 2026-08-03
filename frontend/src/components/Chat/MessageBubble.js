@@ -75,6 +75,21 @@ const IconRefreshOutline = (p) => (
 const splitFollowUpQuestionsBlock = (inner) => {
     const raw = (inner || '').trim();
     if (!raw) return [];
+    // If the model already emitted buttons, pull their text.
+    if (/<button\b/i.test(raw)) {
+        const fromButtons = [];
+        const buttonRe = /<button\b[^>]*>([\s\S]*?)<\/button>/gi;
+        let bm;
+        while ((bm = buttonRe.exec(raw)) !== null) {
+            const label = String(bm[1] || '')
+                .replace(/<[^>]+>/g, ' ')
+                .replace(/\s+/g, ' ')
+                .replace(/^-\s*/, '')
+                .trim();
+            if (label) fromButtons.push(label);
+        }
+        if (fromButtons.length) return fromButtons;
+    }
     const byLines = raw.split(/\n/).map((l) => l.trim()).filter(Boolean);
     let items;
     if (byLines.length > 1) {
@@ -90,12 +105,38 @@ const splitFollowUpQuestionsBlock = (inner) => {
     return items.map((q) => q.replace(/^-\s*/, '').trim()).filter(Boolean);
 };
 
-const escapeHtmlTextContent = (s) =>
-    String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+/** Match follow-up wrappers even when the model escapes quotes. */
+const FOLLOW_UP_BLOCK_RE =
+    /<div\s+class\s*=\s*(?:["']|&quot;|\\["'])follow-up-questions(?:["']|&quot;|\\["'])\s*>([\s\S]*?)<\/div>/gi;
+
+const extractFollowUpQuestionsFromContent = (content) => {
+    const text = String(content || '');
+    if (!text) return [];
+    const questions = [];
+    const re = new RegExp(FOLLOW_UP_BLOCK_RE.source, 'gi');
+    let match;
+    while ((match = re.exec(text)) !== null) {
+        questions.push(...splitFollowUpQuestionsBlock(match[1]));
+    }
+    return questions;
+};
+
+const stripFollowUpQuestionsBlocks = (content) =>
+    String(content || '').replace(new RegExp(FOLLOW_UP_BLOCK_RE.source, 'gi'), '').trim();
+
+const followUpChipLayoutStyle = {
+    display: 'block',
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
+    boxSizing: 'border-box',
+    whiteSpace: 'normal',
+    overflowWrap: 'anywhere',
+    wordBreak: 'break-word',
+    textAlign: 'left',
+    appearance: 'none',
+    WebkitAppearance: 'none',
+};
 
 const writeTextToClipboard = async (text) => {
     const value = String(text || '');
@@ -297,6 +338,16 @@ const MessageBubble = ({
     const insightsKey = message?.processingClientId ?? message?.messageId ?? null;
     const chartInsights = Array.isArray(message?.chartInsights) ? message.chartInsights : [];
     const [insightIndex, setInsightIndex] = useState(0);
+    const followUpQuestions = useMemo(() => {
+        const fromContent = extractFollowUpQuestionsFromContent(message?.content);
+        if (fromContent.length) return fromContent;
+        if (Array.isArray(message?.follow_up_questions)) {
+            return message.follow_up_questions
+                .map((item) => String(item || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
+                .filter(Boolean);
+        }
+        return [];
+    }, [message?.content, message?.follow_up_questions]);
     const messageChatTier = String(message?.chatTier || message?.chat_tier || '').trim().toLowerCase();
     const nextAction = message?.next_action || message?.nextAction || null;
     const nextActionType = String(nextAction?.type || '').trim().toLowerCase();
@@ -970,14 +1021,8 @@ const MessageBubble = ({
         formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         formatted = convertMarkdownTablesToStackedBlocks(formatted);
         
-        // 4. Handle Follow-up Questions (chips; click handled in message-text onClick)
-        formatted = formatted.replace(/<div class="follow-up-questions">([\s\S]*?)<\/div>/g, (match, questions) => {
-            const parts = splitFollowUpQuestionsBlock(questions);
-            const questionList = parts
-                .map((q) => `<button type="button" class="follow-up-btn"><span class="follow-up-btn__label">${escapeHtmlTextContent(q)}</span></button>`)
-                .join('');
-            return `<div class="follow-up-questions">${questionList}</div>`;
-        });
+        // 4. Strip Follow-up Questions from HTML — rendered as React chips (PWA-safe wrapping).
+        formatted = stripFollowUpQuestionsBlocks(formatted);
         
         // 5. Handle Final Thoughts
         formatted = formatted.replace(/(### Final Thoughts[\s\S]*?)(?=###|$)/g, (match, finalThoughts) => {
@@ -1213,14 +1258,6 @@ const MessageBubble = ({
                 <div 
                     className="message-text enhanced-formatting"
                     onClick={(e) => {
-                        const followBtn = e.target.closest('.follow-up-btn');
-                        if (followBtn && onFollowUpClick) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const text = (followBtn.textContent || '').trim();
-                            if (text) onFollowUpClick(text);
-                            return;
-                        }
                         // Check for tooltip wrapper clicks
                         if (e.target.classList.contains('tooltip-wrapper')) {
                             const term = e.target.querySelector('.term-tooltip').textContent;
@@ -1435,6 +1472,64 @@ const MessageBubble = ({
                     )}
                 </div>
 
+                {message.role === 'assistant'
+                    && !message.isTyping
+                    && !message.isProcessing
+                    && followUpQuestions.length > 0 && (
+                    <div
+                        className="follow-up-questions"
+                        style={{
+                            margin: '16px 0 10px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'stretch',
+                            gap: 8,
+                            width: '100%',
+                            maxWidth: '100%',
+                            minWidth: 0,
+                            boxSizing: 'border-box',
+                        }}
+                    >
+                        {followUpQuestions.map((question, index) => (
+                            <button
+                                key={`follow-up-${index}-${question.slice(0, 24)}`}
+                                type="button"
+                                className="follow-up-btn"
+                                style={{
+                                    ...followUpChipLayoutStyle,
+                                    background: 'rgba(255, 107, 53, 0.08)',
+                                    border: '1px solid rgba(255, 107, 53, 0.25)',
+                                    color: '#7c2d12',
+                                    padding: '10px 12px',
+                                    borderRadius: 20,
+                                    fontSize: 13,
+                                    lineHeight: 1.4,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    overflow: 'hidden',
+                                }}
+                                onClick={() => {
+                                    if (onFollowUpClick) onFollowUpClick(question);
+                                }}
+                            >
+                                <span
+                                    className="follow-up-btn__label"
+                                    style={{
+                                        display: 'block',
+                                        maxWidth: '100%',
+                                        minWidth: 0,
+                                        whiteSpace: 'normal',
+                                        overflowWrap: 'anywhere',
+                                        wordBreak: 'break-word',
+                                    }}
+                                >
+                                    {question}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+
                 {message.role === 'assistant' && !message.isTyping && !message.isProcessing && showNextActionCard && (
                     <div
                         className="remedy-next-action-card"
@@ -1466,6 +1561,7 @@ const MessageBubble = ({
                         <button
                             type="button"
                             className="follow-up-btn"
+                            style={followUpChipLayoutStyle}
                             onClick={() => {
                                 const nextQuestion = isRemedyNextAction
                                     ? remedyClickPrompt

@@ -25,6 +25,7 @@ def build_locational_recommendation_pack(
     intent_result: Optional[Dict[str, Any]] = None,
     natal_chart: Optional[Dict[str, Any]] = None,
     current_dashas: Optional[Dict[str, Any]] = None,
+    user_question: str = "",
 ) -> Optional[Dict[str, Any]]:
     """
     Return a cite-only locational pack when mode is RECOMMEND_LOCATION.
@@ -48,6 +49,27 @@ def build_locational_recommendation_pack(
         logger.info("locational_pack_skipped missing_location_scope")
         return None
 
+    from calculators.locational_calculator import infer_hub_regions_from_text
+
+    # Prefer geography named in THIS question; fall back to extracted_context only if empty.
+    hub_regions = infer_hub_regions_from_text(user_question or "")
+    if not hub_regions:
+        extracted = intent.get("extracted_context") if isinstance(intent.get("extracted_context"), dict) else {}
+        # Combined clarify chain may live on intent question fields.
+        for key in ("question", "combined_question", "original_question"):
+            if not hub_regions:
+                hub_regions = infer_hub_regions_from_text(str(intent.get(key) or ""))
+        raw_regions = extracted.get("hub_regions") or extracted.get("preferred_hub_regions") or []
+        if isinstance(raw_regions, str):
+            raw_regions = [raw_regions]
+        if isinstance(raw_regions, list) and raw_regions and not hub_regions:
+            # Only accept known region ids — never free-form LLM city inventions.
+            from calculators.locational_calculator import normalize_hub_region
+
+            hub_regions = [
+                r for r in (normalize_hub_region(x) for x in raw_regions) if r and r != "india"
+            ]
+
     category = str(intent.get("category") or "general")
     try:
         from calculators.locational_calculator import LocationalCalculator
@@ -57,6 +79,7 @@ def build_locational_recommendation_pack(
             birth_data,
             category=category,
             location_scope=location_scope,
+            hub_regions=hub_regions or None,
             natal_chart=natal_chart,
             current_dashas=current_dashas,
             top_n=5 if location_scope != "both" else 6,

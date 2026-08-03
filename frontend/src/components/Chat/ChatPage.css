@@ -349,6 +349,7 @@ button.chat-header-credits.credits-display:active {
     border-radius: 20px;
     position: relative;
     box-sizing: border-box;
+    overflow-x: hidden;
 }
 
 .message-bubble.user .message-content {
@@ -729,6 +730,7 @@ button.chat-header-credits.credits-display:active {
     min-width: 0;
     max-width: 100%;
     overflow-wrap: break-word;
+    overflow-x: hidden;
     box-sizing: border-box;
 }
 
@@ -1633,7 +1635,9 @@ button.chat-header-credits.credits-display:active {
     color: #666;
 }
 
-/* Follow-up question chips inside assistant HTML (MessageBubble formatContent) */
+/* Follow-up question chips (React-rendered in MessageBubble; keep CSS as safety net) */
+.message-bubble .follow-up-questions,
+.message-content .follow-up-questions,
 .message-text .follow-up-questions,
 .chat-response .follow-up-questions {
     margin: 16px 0 10px 0;
@@ -1648,24 +1652,25 @@ button.chat-header-credits.credits-display:active {
     box-sizing: border-box;
 }
 
+.message-bubble .follow-up-btn,
+.message-content .follow-up-btn,
 .message-text .follow-up-btn,
 .chat-response .follow-up-btn {
     appearance: none;
     -webkit-appearance: none;
     display: block;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    background: rgba(248, 250, 252, 0.95);
-    border: 1px solid rgba(255, 107, 53, 0.22);
-    color: #334155;
-    padding: 8px 12px;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    background: rgba(255, 107, 53, 0.08);
+    border: 1px solid rgba(255, 107, 53, 0.25);
+    color: #7c2d12;
+    padding: 10px 12px;
     border-radius: 20px;
     font-size: 13px;
-    line-height: 1.35;
+    line-height: 1.4;
     cursor: pointer;
     transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease;
-    /* WebKit/PWA <button> often ignores wrapping without explicit normal + inner block label */
     white-space: normal !important;
     text-align: left;
     flex: 0 0 auto;
@@ -1678,12 +1683,14 @@ button.chat-header-credits.credits-display:active {
     overflow: hidden;
 }
 
+.message-bubble .follow-up-btn .follow-up-btn__label,
+.message-content .follow-up-btn .follow-up-btn__label,
 .message-text .follow-up-btn .follow-up-btn__label,
 .chat-response .follow-up-btn .follow-up-btn__label {
     display: block;
     max-width: 100%;
     min-width: 0;
-    white-space: normal;
+    white-space: normal !important;
     overflow-wrap: anywhere;
     word-break: break-word;
 }

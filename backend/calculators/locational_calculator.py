@@ -1,7 +1,9 @@
 """
 Personal locational astrology (Vedic digvijaya + relocated charts).
 
-MVP: direction scores by goal + India metro ranking from relocated D1.
+MVP: direction scores by goal + India metro / regional abroad hub ranking
+from relocated D1. Abroad hubs are grouped by region pack (Gulf, SE Asia,
+East Asia, Europe, UK/Ireland, Oceania, North America, Africa).
 Planet longitudes stay fixed for a birth moment; houses/ASC change with lat/lon.
 Timezone must remain the *birth* timezone so JD does not shift.
 """
@@ -9,6 +11,7 @@ Timezone must remain the *birth* timezone so JD does not shift.
 from __future__ import annotations
 
 import math
+import re
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -116,48 +119,285 @@ GOAL_KARAKAS: Dict[str, List[str]] = {
 
 # Curated India metros for ranking
 INDIA_METROS: List[Dict[str, Any]] = [
-    {"name": "Delhi NCR", "latitude": 28.6139, "longitude": 77.2090, "country": "India", "region": "india"},
-    {"name": "Mumbai", "latitude": 19.0760, "longitude": 72.8777, "country": "India", "region": "india"},
-    {"name": "Bengaluru", "latitude": 12.9716, "longitude": 77.5946, "country": "India", "region": "india"},
-    {"name": "Hyderabad", "latitude": 17.3850, "longitude": 78.4867, "country": "India", "region": "india"},
-    {"name": "Chennai", "latitude": 13.0827, "longitude": 80.2707, "country": "India", "region": "india"},
-    {"name": "Kolkata", "latitude": 22.5726, "longitude": 88.3639, "country": "India", "region": "india"},
-    {"name": "Pune", "latitude": 18.5204, "longitude": 73.8567, "country": "India", "region": "india"},
-    {"name": "Ahmedabad", "latitude": 23.0225, "longitude": 72.5714, "country": "India", "region": "india"},
-    {"name": "Jaipur", "latitude": 26.9124, "longitude": 75.7873, "country": "India", "region": "india"},
-    {"name": "Lucknow", "latitude": 26.8467, "longitude": 80.9462, "country": "India", "region": "india"},
-    {"name": "Chandigarh", "latitude": 30.7333, "longitude": 76.7794, "country": "India", "region": "india"},
-    {"name": "Kochi", "latitude": 9.9312, "longitude": 76.2673, "country": "India", "region": "india"},
-    {"name": "Indore", "latitude": 22.7196, "longitude": 75.8577, "country": "India", "region": "india"},
-    {"name": "Nagpur", "latitude": 21.1458, "longitude": 79.0882, "country": "India", "region": "india"},
-    {"name": "Bhopal", "latitude": 23.2599, "longitude": 77.4126, "country": "India", "region": "india"},
+    {"name": "Delhi NCR", "latitude": 28.6139, "longitude": 77.2090, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Mumbai", "latitude": 19.0760, "longitude": 72.8777, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Bengaluru", "latitude": 12.9716, "longitude": 77.5946, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Hyderabad", "latitude": 17.3850, "longitude": 78.4867, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Chennai", "latitude": 13.0827, "longitude": 80.2707, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Kolkata", "latitude": 22.5726, "longitude": 88.3639, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Pune", "latitude": 18.5204, "longitude": 73.8567, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Ahmedabad", "latitude": 23.0225, "longitude": 72.5714, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Jaipur", "latitude": 26.9124, "longitude": 75.7873, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Lucknow", "latitude": 26.8467, "longitude": 80.9462, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Chandigarh", "latitude": 30.7333, "longitude": 76.7794, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Kochi", "latitude": 9.9312, "longitude": 76.2673, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Indore", "latitude": 22.7196, "longitude": 75.8577, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Nagpur", "latitude": 21.1458, "longitude": 79.0882, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Bhopal", "latitude": 23.2599, "longitude": 77.4126, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Surat", "latitude": 21.1702, "longitude": 72.8311, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Coimbatore", "latitude": 11.0168, "longitude": 76.9558, "country": "India", "region": "india", "hub_region": "india"},
+    {"name": "Visakhapatnam", "latitude": 17.6868, "longitude": 83.2185, "country": "India", "region": "india", "hub_region": "india"},
 ]
 
-# Curated global hubs for abroad / India+abroad ranking
+
+def _hub(name: str, lat: float, lon: float, country: str, hub_region: str) -> Dict[str, Any]:
+    return {
+        "name": name,
+        "latitude": lat,
+        "longitude": lon,
+        "country": country,
+        "region": "abroad",
+        "hub_region": hub_region,
+    }
+
+
+# Region-specific abroad packs (flattened into GLOBAL_HUBS below).
+HUB_REGION_PACKS: Dict[str, List[Dict[str, Any]]] = {
+    "gulf": [
+        _hub("Dubai", 25.2048, 55.2708, "UAE", "gulf"),
+        _hub("Abu Dhabi", 24.4539, 54.3773, "UAE", "gulf"),
+        _hub("Sharjah", 25.3463, 55.4209, "UAE", "gulf"),
+        _hub("Doha", 25.2854, 51.5310, "Qatar", "gulf"),
+        _hub("Riyadh", 24.7136, 46.6753, "Saudi Arabia", "gulf"),
+        _hub("Jeddah", 21.4858, 39.1925, "Saudi Arabia", "gulf"),
+        _hub("Kuwait City", 29.3759, 47.9774, "Kuwait", "gulf"),
+        _hub("Manama", 26.2235, 50.5876, "Bahrain", "gulf"),
+        _hub("Muscat", 23.5880, 58.3829, "Oman", "gulf"),
+    ],
+    "se_asia": [
+        _hub("Singapore", 1.3521, 103.8198, "Singapore", "se_asia"),
+        _hub("Bangkok", 13.7563, 100.5018, "Thailand", "se_asia"),
+        _hub("Kuala Lumpur", 3.1390, 101.6869, "Malaysia", "se_asia"),
+        _hub("Jakarta", -6.2088, 106.8456, "Indonesia", "se_asia"),
+        _hub("Ho Chi Minh City", 10.8231, 106.6297, "Vietnam", "se_asia"),
+        _hub("Hanoi", 21.0278, 105.8342, "Vietnam", "se_asia"),
+        _hub("Manila", 14.5995, 120.9842, "Philippines", "se_asia"),
+        _hub("Penang", 5.4141, 100.3288, "Malaysia", "se_asia"),
+    ],
+    "east_asia": [
+        _hub("Hong Kong", 22.3193, 114.1694, "Hong Kong", "east_asia"),
+        _hub("Tokyo", 35.6762, 139.6503, "Japan", "east_asia"),
+        _hub("Osaka", 34.6937, 135.5023, "Japan", "east_asia"),
+        _hub("Seoul", 37.5665, 126.9780, "South Korea", "east_asia"),
+        _hub("Taipei", 25.0330, 121.5654, "Taiwan", "east_asia"),
+        _hub("Shanghai", 31.2304, 121.4737, "China", "east_asia"),
+    ],
+    "europe": [
+        _hub("Berlin", 52.5200, 13.4050, "Germany", "europe"),
+        _hub("Frankfurt", 50.1109, 8.6821, "Germany", "europe"),
+        _hub("Munich", 48.1351, 11.5820, "Germany", "europe"),
+        _hub("Amsterdam", 52.3676, 4.9041, "Netherlands", "europe"),
+        _hub("Paris", 48.8566, 2.3522, "France", "europe"),
+        _hub("Zurich", 47.3769, 8.5417, "Switzerland", "europe"),
+        _hub("Stockholm", 59.3293, 18.0686, "Sweden", "europe"),
+        _hub("Barcelona", 41.3874, 2.1686, "Spain", "europe"),
+        _hub("Milan", 45.4642, 9.1900, "Italy", "europe"),
+        _hub("Warsaw", 52.2297, 21.0122, "Poland", "europe"),
+        _hub("Lisbon", 38.7223, -9.1393, "Portugal", "europe"),
+        _hub("Vienna", 48.2082, 16.3738, "Austria", "europe"),
+    ],
+    "uk_ireland": [
+        _hub("London", 51.5074, -0.1278, "UK", "uk_ireland"),
+        _hub("Manchester", 53.4808, -2.2426, "UK", "uk_ireland"),
+        _hub("Edinburgh", 55.9533, -3.1883, "UK", "uk_ireland"),
+        _hub("Dublin", 53.3498, -6.2603, "Ireland", "uk_ireland"),
+    ],
+    "oceania": [
+        _hub("Sydney", -33.8688, 151.2093, "Australia", "oceania"),
+        _hub("Melbourne", -37.8136, 144.9631, "Australia", "oceania"),
+        _hub("Brisbane", -27.4698, 153.0251, "Australia", "oceania"),
+        _hub("Perth", -31.9505, 115.8605, "Australia", "oceania"),
+        _hub("Auckland", -36.8485, 174.7633, "New Zealand", "oceania"),
+    ],
+    "north_america": [
+        _hub("Toronto", 43.6532, -79.3832, "Canada", "north_america"),
+        _hub("Vancouver", 49.2827, -123.1207, "Canada", "north_america"),
+        _hub("Calgary", 51.0447, -114.0719, "Canada", "north_america"),
+        _hub("New York", 40.7128, -74.0060, "USA", "north_america"),
+        _hub("San Francisco Bay Area", 37.7749, -122.4194, "USA", "north_america"),
+        _hub("Seattle", 47.6062, -122.3321, "USA", "north_america"),
+        _hub("Austin", 30.2672, -97.7431, "USA", "north_america"),
+        _hub("Chicago", 41.8781, -87.6298, "USA", "north_america"),
+        _hub("Dallas", 32.7767, -96.7970, "USA", "north_america"),
+        _hub("Boston", 42.3601, -71.0589, "USA", "north_america"),
+        _hub("Atlanta", 33.7490, -84.3880, "USA", "north_america"),
+        _hub("Los Angeles", 34.0522, -118.2437, "USA", "north_america"),
+    ],
+    "africa": [
+        _hub("Johannesburg", -26.2041, 28.0473, "South Africa", "africa"),
+        _hub("Cape Town", -33.9249, 18.4241, "South Africa", "africa"),
+        _hub("Nairobi", -1.2921, 36.8219, "Kenya", "africa"),
+        _hub("Lagos", 6.5244, 3.3792, "Nigeria", "africa"),
+        _hub("Cairo", 30.0444, 31.2357, "Egypt", "africa"),
+    ],
+}
+
+HUB_REGION_LABELS: Dict[str, str] = {
+    "india": "India",
+    "gulf": "Gulf / GCC",
+    "se_asia": "Southeast Asia",
+    "east_asia": "East Asia",
+    "europe": "Europe",
+    "uk_ireland": "UK & Ireland",
+    "oceania": "Australia & New Zealand",
+    "north_america": "North America",
+    "africa": "Africa",
+}
+
+VALID_HUB_REGIONS = frozenset(k for k in HUB_REGION_PACKS.keys())
+
+# Flat abroad candidate list (all region packs).
 GLOBAL_HUBS: List[Dict[str, Any]] = [
-    {"name": "Dubai", "latitude": 25.2048, "longitude": 55.2708, "country": "UAE", "region": "abroad"},
-    {"name": "Abu Dhabi", "latitude": 24.4539, "longitude": 54.3773, "country": "UAE", "region": "abroad"},
-    {"name": "Doha", "latitude": 25.2854, "longitude": 51.5310, "country": "Qatar", "region": "abroad"},
-    {"name": "Riyadh", "latitude": 24.7136, "longitude": 46.6753, "country": "Saudi Arabia", "region": "abroad"},
-    {"name": "Singapore", "latitude": 1.3521, "longitude": 103.8198, "country": "Singapore", "region": "abroad"},
-    {"name": "Hong Kong", "latitude": 22.3193, "longitude": 114.1694, "country": "Hong Kong", "region": "abroad"},
-    {"name": "Tokyo", "latitude": 35.6762, "longitude": 139.6503, "country": "Japan", "region": "abroad"},
-    {"name": "Bangkok", "latitude": 13.7563, "longitude": 100.5018, "country": "Thailand", "region": "abroad"},
-    {"name": "Sydney", "latitude": -33.8688, "longitude": 151.2093, "country": "Australia", "region": "abroad"},
-    {"name": "Melbourne", "latitude": -37.8136, "longitude": 144.9631, "country": "Australia", "region": "abroad"},
-    {"name": "London", "latitude": 51.5074, "longitude": -0.1278, "country": "UK", "region": "abroad"},
-    {"name": "Dublin", "latitude": 53.3498, "longitude": -6.2603, "country": "Ireland", "region": "abroad"},
-    {"name": "Berlin", "latitude": 52.5200, "longitude": 13.4050, "country": "Germany", "region": "abroad"},
-    {"name": "Amsterdam", "latitude": 52.3676, "longitude": 4.9041, "country": "Netherlands", "region": "abroad"},
-    {"name": "Toronto", "latitude": 43.6532, "longitude": -79.3832, "country": "Canada", "region": "abroad"},
-    {"name": "Vancouver", "latitude": 49.2827, "longitude": -123.1207, "country": "Canada", "region": "abroad"},
-    {"name": "New York", "latitude": 40.7128, "longitude": -74.0060, "country": "USA", "region": "abroad"},
-    {"name": "San Francisco Bay Area", "latitude": 37.7749, "longitude": -122.4194, "country": "USA", "region": "abroad"},
-    {"name": "Seattle", "latitude": 47.6062, "longitude": -122.3321, "country": "USA", "region": "abroad"},
-    {"name": "Austin", "latitude": 30.2672, "longitude": -97.7431, "country": "USA", "region": "abroad"},
+    city for pack in HUB_REGION_PACKS.values() for city in pack
 ]
 
 VALID_LOCATION_SCOPES = frozenset({"india", "abroad", "both"})
+
+# Text cues → hub_region (user-stated geography preference; never LLM-invented).
+_HUB_REGION_TEXT_CUES: Dict[str, Tuple[str, ...]] = {
+    "gulf": (
+        "gulf",
+        "gcc",
+        "uae",
+        "dubai",
+        "abu dhabi",
+        "sharjah",
+        "qatar",
+        "doha",
+        "saudi",
+        "riyadh",
+        "jeddah",
+        "kuwait",
+        "bahrain",
+        "oman",
+        "muscat",
+        "middle east",
+        "गल्फ",
+        "खाड़ी",
+    ),
+    "se_asia": (
+        "southeast asia",
+        "south east asia",
+        "se asia",
+        "asean",
+        "singapore",
+        "bangkok",
+        "thailand",
+        "malaysia",
+        "kuala lumpur",
+        "indonesia",
+        "jakarta",
+        "vietnam",
+        "philippines",
+        "manila",
+        "दक्षिण पूर्व एशिया",
+    ),
+    "east_asia": (
+        "east asia",
+        "japan",
+        "tokyo",
+        "osaka",
+        "korea",
+        "seoul",
+        "hong kong",
+        "taiwan",
+        "taipei",
+        "shanghai",
+        "china",
+        "पूर्वी एशिया",
+    ),
+    "uk_ireland": (
+        "uk",
+        "u.k.",
+        "united kingdom",
+        "britain",
+        "british",
+        "london",
+        "manchester",
+        "edinburgh",
+        "scotland",
+        "england",
+        "ireland",
+        "dublin",
+        "यूके",
+    ),
+    "europe": (
+        "europe",
+        "european",
+        "eu",
+        "germany",
+        "berlin",
+        "frankfurt",
+        "munich",
+        "netherlands",
+        "amsterdam",
+        "france",
+        "paris",
+        "switzerland",
+        "zurich",
+        "sweden",
+        "stockholm",
+        "spain",
+        "barcelona",
+        "italy",
+        "milan",
+        "poland",
+        "warsaw",
+        "portugal",
+        "lisbon",
+        "austria",
+        "vienna",
+        "यूरोप",
+    ),
+    "oceania": (
+        "australia",
+        "sydney",
+        "melbourne",
+        "brisbane",
+        "perth",
+        "new zealand",
+        "auckland",
+        "oceania",
+        "ऑस्ट्रेलिया",
+    ),
+    "north_america": (
+        "north america",
+        "united states",
+        "usa",
+        "u.s.",
+        "u.s.a",
+        "america",
+        "canada",
+        "toronto",
+        "vancouver",
+        "calgary",
+        "new york",
+        "california",
+        "san francisco",
+        "seattle",
+        "austin",
+        "chicago",
+        "dallas",
+        "boston",
+        "atlanta",
+        "los angeles",
+        "अमेरिका",
+        "कनाडा",
+    ),
+    "africa": (
+        "africa",
+        "south africa",
+        "johannesburg",
+        "cape town",
+        "kenya",
+        "nairobi",
+        "nigeria",
+        "lagos",
+        "egypt",
+        "cairo",
+        "अफ्रीका",
+    ),
+}
 
 
 def normalize_location_scope(value: Any) -> Optional[str]:
@@ -183,13 +423,104 @@ def normalize_location_scope(value: Any) -> Optional[str]:
     return scope if scope in VALID_LOCATION_SCOPES else None
 
 
-def candidate_cities_for_scope(location_scope: str) -> List[Dict[str, Any]]:
+def normalize_hub_region(value: Any) -> Optional[str]:
+    raw = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "gulf": "gulf",
+        "gcc": "gulf",
+        "middle_east": "gulf",
+        "uae": "gulf",
+        "se_asia": "se_asia",
+        "southeast_asia": "se_asia",
+        "south_east_asia": "se_asia",
+        "asean": "se_asia",
+        "east_asia": "east_asia",
+        "europe": "europe",
+        "eu": "europe",
+        "uk": "uk_ireland",
+        "uk_ireland": "uk_ireland",
+        "britain": "uk_ireland",
+        "ireland": "uk_ireland",
+        "oceania": "oceania",
+        "australia": "oceania",
+        "anz": "oceania",
+        "north_america": "north_america",
+        "usa": "north_america",
+        "canada": "north_america",
+        "america": "north_america",
+        "africa": "africa",
+        "india": "india",
+    }
+    region = aliases.get(raw)
+    if region == "india":
+        return "india"
+    return region if region in VALID_HUB_REGIONS else None
+
+
+def infer_hub_regions_from_text(user_question: str) -> List[str]:
+    """
+    Detect preferred abroad hub packs from user text (Gulf, Europe, SE Asia…).
+    Deterministic word/phrase match only — never invent from LLM.
+    """
+    q = " ".join(str(user_question or "").lower().split())
+    if not q:
+        return []
+
+    def _has_word(word: str) -> bool:
+        return bool(re.search(rf"(?<![a-z0-9]){re.escape(word)}(?![a-z0-9])", q))
+
+    found: List[str] = []
+    for region, cues in _HUB_REGION_TEXT_CUES.items():
+        for cue in cues:
+            cue_l = cue.strip().lower()
+            if not cue_l:
+                continue
+            # Avoid "east asia" matching inside "southeast asia".
+            if cue_l == "east asia" and (
+                "southeast asia" in q or "south east asia" in q or "se asia" in q
+            ):
+                continue
+            # Short ASCII tokens need word boundaries ("uk", "eu", "usa").
+            if " " not in cue_l and cue_l.isascii() and len(cue_l) <= 3:
+                hit = _has_word(cue_l)
+            elif cue_l in {"usa", "u.s.", "u.s.a", "u.k."}:
+                hit = _has_word(cue_l.replace(".", "")) or cue_l in q or _has_word("usa")
+            else:
+                hit = cue_l in q
+            if cue_l in {"eu", "uk"}:
+                hit = _has_word(cue_l)
+            if hit:
+                found.append(region)
+                break
+    # Preserve pack order for stable shortlists.
+    order = list(HUB_REGION_PACKS.keys())
+    return [r for r in order if r in set(found)]
+
+
+def candidate_cities_for_scope(
+    location_scope: str,
+    *,
+    hub_regions: Optional[Sequence[str]] = None,
+) -> List[Dict[str, Any]]:
     scope = normalize_location_scope(location_scope) or "india"
+    wanted = []
+    for raw in hub_regions or []:
+        region = normalize_hub_region(raw)
+        if region and region != "india" and region not in wanted:
+            wanted.append(region)
+
+    if scope == "india":
+        return list(INDIA_METROS)
+
+    if wanted:
+        abroad = [city for region in wanted for city in HUB_REGION_PACKS.get(region, [])]
+    else:
+        abroad = list(GLOBAL_HUBS)
+
     if scope == "abroad":
-        return list(GLOBAL_HUBS)
-    if scope == "both":
-        return list(INDIA_METROS) + list(GLOBAL_HUBS)
-    return list(INDIA_METROS)
+        return abroad
+    # both
+    return list(INDIA_METROS) + abroad
 
 OWN_SIGNS = {
     "Sun": {4},
@@ -427,6 +758,7 @@ class LocationalCalculator:
         *,
         category: str = "general",
         location_scope: str = "india",
+        hub_regions: Optional[Sequence[str]] = None,
         natal_chart: Optional[Dict[str, Any]] = None,
         current_dashas: Optional[Dict[str, Any]] = None,
         top_n: int = 5,
@@ -434,6 +766,11 @@ class LocationalCalculator:
     ) -> Dict[str, Any]:
         goal = normalize_goal_category(category)
         scope = normalize_location_scope(location_scope) or "india"
+        preferred_hub_regions: List[str] = []
+        for raw in hub_regions or []:
+            region = normalize_hub_region(raw)
+            if region and region != "india" and region not in preferred_hub_regions:
+                preferred_hub_regions.append(region)
         goal_houses = list(GOAL_HOUSES.get(goal, GOAL_HOUSES["general"]))
         # Foreign settlement questions emphasize 9th/12th alongside the goal.
         if scope in {"abroad", "both"}:
@@ -464,8 +801,12 @@ class LocationalCalculator:
 
         birth_lat = float(birth_data["latitude"])
         birth_lon = float(birth_data["longitude"])
+        candidates = list(
+            metros
+            or candidate_cities_for_scope(scope, hub_regions=preferred_hub_regions or None)
+        )
         city_rows: List[Dict[str, Any]] = []
-        for metro in list(metros or candidate_cities_for_scope(scope)):
+        for metro in candidates:
             try:
                 row = self._score_metro(
                     birth_data=birth_data,
@@ -506,18 +847,50 @@ class LocationalCalculator:
             top_abroad = abroad_rows[:limit] if scope == "abroad" else []
             top_cities = city_rows[:limit]
 
+        # Best city per abroad hub pack (helps answers when scanning many regions).
+        top_by_hub_region: List[Dict[str, Any]] = []
+        if scope in {"abroad", "both"}:
+            region_order = preferred_hub_regions or list(HUB_REGION_PACKS.keys())
+            for hub_key in region_order:
+                best = next((c for c in abroad_rows if c.get("hub_region") == hub_key), None)
+                if not best:
+                    continue
+                top_by_hub_region.append(
+                    {
+                        "hub_region": hub_key,
+                        "hub_region_label": HUB_REGION_LABELS.get(hub_key, hub_key),
+                        "city": best,
+                    }
+                )
+
         md_lord, ad_lord = _extract_dasha_lords(current_dashas)
+        pool_note = (
+            f"Abroad pool filtered to hub packs: {', '.join(preferred_hub_regions)}."
+            if preferred_hub_regions
+            else "Abroad pool uses curated regional hub packs (Gulf, SE Asia, East Asia, Europe, UK/Ireland, Oceania, North America, Africa)."
+        )
 
         return {
-            "schema_version": "locational_recommendation.v1",
+            "schema_version": "locational_recommendation.v2",
             "goal_category": goal,
             "location_scope": scope,
+            "preferred_hub_regions": preferred_hub_regions,
+            "hub_regions_considered": [
+                {
+                    "id": key,
+                    "label": HUB_REGION_LABELS.get(key, key),
+                    "city_count": sum(1 for c in city_rows if c.get("hub_region") == key),
+                }
+                for key in (preferred_hub_regions or list(HUB_REGION_PACKS.keys()))
+                if any(c.get("hub_region") == key for c in city_rows)
+            ],
             "goal_houses": goal_houses,
             "goal_karakas": karakas,
             "method_notes": [
                 "Direction scores use Ashta-Dikpala lords weighted by dignity, house quality, and link to goal houses/karakas.",
                 "City scores use relocated D1 (same birth JD, new lat/lon): ASC quality, goal-house occupancy, lord strength, dasha-lord placement, and compass alignment to preferred directions.",
-                "Candidate pool is India metros, curated global hubs, or both — based on location_scope. Not Western ASC/MC ACG lines.",
+                "Candidate pool is India metros and/or region-specific global hub packs based on location_scope (and optional user-stated region like Gulf/Europe/SE Asia). Not Western ASC/MC ACG lines.",
+                pool_note,
             ],
             "birth_place": {
                 "place": birth_data.get("place"),
@@ -530,6 +903,7 @@ class LocationalCalculator:
             "top_cities": top_cities,
             "top_cities_india": top_india,
             "top_cities_abroad": top_abroad,
+            "top_cities_by_hub_region": top_by_hub_region,
             "all_cities_ranked": [
                 {
                     "name": c["name"],
@@ -537,6 +911,8 @@ class LocationalCalculator:
                     "compass_direction": c["compass_direction"],
                     "country": c.get("country"),
                     "region": c.get("region"),
+                    "hub_region": c.get("hub_region"),
+                    "hub_region_label": c.get("hub_region_label"),
                 }
                 for c in city_rows
             ],
@@ -622,6 +998,8 @@ class LocationalCalculator:
         name = str(metro["name"])
         region = str(metro.get("region") or ("india" if metro.get("country") == "India" else "abroad"))
         country = str(metro.get("country") or metro.get("state") or "")
+        hub_region = str(metro.get("hub_region") or ("india" if region == "india" else "abroad"))
+        hub_region_label = HUB_REGION_LABELS.get(hub_region, hub_region.replace("_", " ").title())
         obj = _relocated_birth_obj(birth_data, lat, lon, name)
         chart = self._chart_calc.calculate_chart(obj)
         planets = chart.get("planets") or {}
@@ -697,6 +1075,8 @@ class LocationalCalculator:
             "state": metro.get("state"),
             "country": country,
             "region": region,
+            "hub_region": hub_region,
+            "hub_region_label": hub_region_label,
             "latitude": lat,
             "longitude": lon,
             "score": round(score, 2),

@@ -268,7 +268,8 @@ Use the `locational_recommendation` pack as primary evidence. Follow this sequen
    - List preferred and avoid directions from the pack with short chart reasons (direction lords / goal houses).
 3. ### Best Cities
    - Rank pack cities in order. If `location_scope` is both, present India and abroad shortlists separately using `top_cities_india` / `top_cities_abroad` when present.
-   - For each city: name, country (if abroad), compass direction from birth place, relocated ASC (if given), and 1–2 pack reasons.
+   - If `top_cities_by_hub_region` is present (abroad/both), briefly note the strongest city per region pack (Gulf, SE Asia, Europe, etc.) when it helps the user compare geographies.
+   - For each city: name, country (if abroad), region pack label when available, compass direction from birth place, relocated ASC (if given), and 1–2 pack reasons.
 4. ### Why This Supports Your Goal
    - Brief synthesis tying goal houses/karakas to the shortlist. Cite natal support lightly; do not open a full multi-school deep-dive.
 5. ### Timing Caution
