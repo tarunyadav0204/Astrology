@@ -9,6 +9,10 @@
  *
  * Fix: never size the shell from visualViewport; prefer innerHeight/clientHeight
  * (or inset:0 fill on standalone). Cap bottom inset for home indicator.
+ *
+ * Keyboard: do NOT refresh shell height from visualViewport resize/scroll — that
+ * fights Safari's keyboard scroll and flickers the chat thread. Measure keyboard
+ * overlap separately via getWebKeyboardOverlap / subscribeWebKeyboardOverlap.
  */
 import { Platform } from 'react-native';
 
@@ -20,6 +24,9 @@ export const WEB_MAX_BOTTOM_INSET = 34;
  * Home/Chart tab bars use getWebBottomInset so their background paints that zone.
  */
 export const WEB_TAB_BOTTOM_PAD = 10;
+
+/** Ignore tiny URL-bar / chrome changes; real keyboards are much taller. */
+const WEB_KEYBOARD_OPEN_THRESHOLD = 80;
 
 export function isIosStandalonePwa() {
   if (typeof window === 'undefined') return false;
@@ -81,14 +88,56 @@ export function getWebTabBottomPad(rnInsetsBottom = 0) {
 }
 
 /**
- * Visible layout height for the app shell.
- * Never use visualViewport.height — on iOS standalone it under-reports and
- * leaves a dead strip under #root when height/max-height are locked to it.
+ * How many CSS pixels the software keyboard (or Safari chrome) covers at the
+ * bottom of the layout viewport. Used to lift chat composer on iOS PWA web.
  */
-function resolveShellHeight() {
-  const inner = Math.round(window.innerHeight || 0);
-  const client = Math.round(document.documentElement?.clientHeight || 0);
-  return Math.max(inner, client);
+export function getWebKeyboardOverlap() {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return 0;
+  try {
+    const vv = window.visualViewport;
+    if (!vv) return 0;
+    const layoutH = Math.round(window.innerHeight || document.documentElement?.clientHeight || 0);
+    if (layoutH <= 0) return 0;
+    const overlap = Math.round(layoutH - vv.height - (vv.offsetTop || 0));
+    return Math.max(0, overlap);
+  } catch (_) {
+    return 0;
+  }
+}
+
+/**
+ * Subscribe to keyboard / visual-viewport overlap changes (web only).
+ * Debounced to one rAF so chat layout does not thrash while Safari animates.
+ */
+export function subscribeWebKeyboardOverlap(callback) {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') {
+    return () => {};
+  }
+  if (typeof callback !== 'function') return () => {};
+
+  let raf = 0;
+  const notify = () => {
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      try {
+        callback(getWebKeyboardOverlap());
+      } catch (_) {}
+    });
+  };
+
+  const vv = window.visualViewport;
+  vv?.addEventListener('resize', notify);
+  vv?.addEventListener('scroll', notify);
+  window.addEventListener('resize', notify);
+  notify();
+
+  return () => {
+    if (raf) cancelAnimationFrame(raf);
+    vv?.removeEventListener('resize', notify);
+    vv?.removeEventListener('scroll', notify);
+    window.removeEventListener('resize', notify);
+  };
 }
 
 /**
@@ -100,11 +149,16 @@ export function refreshWebShellHeight() {
     return;
   }
 
-  try {
-    window.scrollTo(0, 0);
-    if (document.documentElement) document.documentElement.scrollTop = 0;
-    if (document.body) document.body.scrollTop = 0;
-  } catch (_) {}
+  // While the keyboard is open, forcing scrollTop=0 fights Safari and flickers chat.
+  const keyboardOpen = getWebKeyboardOverlap() >= WEB_KEYBOARD_OPEN_THRESHOLD;
+
+  if (!keyboardOpen) {
+    try {
+      window.scrollTo(0, 0);
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+    } catch (_) {}
+  }
 
   const root = document.documentElement;
   const appRoot = document.getElementById('root');
@@ -137,6 +191,10 @@ export function refreshWebShellHeight() {
 /**
  * Lock html/body/#root to the real window height (critical for iOS standalone PWA).
  * Call once at web startup.
+ *
+ * Important: do NOT subscribe to visualViewport here. Keyboard open/close fires
+ * vv resize/scroll continuously; re-applying shell + scrollTo(0) causes the
+ * chat screen flicker and can hide the focused input.
  */
 export function installWebViewportHeightLock() {
   if (Platform.OS !== 'web' || typeof window === 'undefined' || typeof document === 'undefined') {
@@ -156,22 +214,12 @@ export function installWebViewportHeightLock() {
   window.addEventListener('orientationchange', apply);
   window.addEventListener('pageshow', apply);
   document.addEventListener('visibilitychange', apply);
-  // Keep listening to visualViewport for keyboard / URL-bar changes, but apply()
-  // never sizes the shell from visualViewport.height alone.
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', apply);
-    window.visualViewport.addEventListener('scroll', apply);
-  }
 
   return () => {
     window.removeEventListener('resize', apply);
     window.removeEventListener('orientationchange', apply);
     window.removeEventListener('pageshow', apply);
     document.removeEventListener('visibilitychange', apply);
-    if (window.visualViewport) {
-      window.visualViewport.removeEventListener('resize', apply);
-      window.visualViewport.removeEventListener('scroll', apply);
-    }
   };
 }
 

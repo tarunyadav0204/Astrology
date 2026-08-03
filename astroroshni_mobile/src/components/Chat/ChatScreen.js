@@ -25,7 +25,7 @@ import { ScrollView as GHScrollView, FlatList as GHFlatList } from 'react-native
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getWebTabBottomPad } from '../../platform/webSafeArea';
+import { getWebTabBottomPad, subscribeWebKeyboardOverlap } from '../../platform/webSafeArea';
 import { useFocusEffect } from '@react-navigation/native';
 
 import MessageBubble from './MessageBubble';
@@ -1407,6 +1407,20 @@ export default function ChatScreen({ navigation, route }) {
       setIsKeyboardVisible(false);
       setKeyboardBottomInset(0);
     };
+
+    // Expo Web / iOS PWA: RN Keyboard events are unreliable. Lift composer from
+    // visualViewport overlap instead (and do not thrash shell height here).
+    if (Platform.OS === 'web') {
+      return subscribeWebKeyboardOverlap((overlap) => {
+        if (overlap >= 80) {
+          setIsKeyboardVisible(true);
+          setKeyboardBottomInset(Math.min(overlap, maxKeyboardInset));
+        } else {
+          clearKeyboardInset();
+        }
+      });
+    }
+
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (e) => {
@@ -1427,6 +1441,18 @@ export default function ChatScreen({ navigation, route }) {
       hideDidSub?.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return undefined;
+    if (!isKeyboardVisible || keyboardBottomInset < 80) return undefined;
+    // Keep the latest messages visible above the lifted composer (no smooth scroll = less flicker).
+    const t = setTimeout(() => {
+      try {
+        scrollViewRef.current?.scrollToEnd?.({ animated: false });
+      } catch (_) {}
+    }, 60);
+    return () => clearTimeout(t);
+  }, [isKeyboardVisible, keyboardBottomInset]);
 
   useEffect(() => {
     if (showGreeting && podcastPromoVisible) {
@@ -5944,7 +5970,8 @@ export default function ChatScreen({ navigation, route }) {
           paddingHorizontal: 12,
           paddingBottom:
             keyboardBottomInset > 0
-              ? keyboardBottomInset + 20
+              // Web overlap already equals covered pixels; native needs a little extra.
+              ? (Platform.OS === 'web' ? keyboardBottomInset : keyboardBottomInset + 20)
               : (Platform.OS === 'web' ? webBottomInset : 0),
         }}
         >

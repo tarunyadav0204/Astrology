@@ -1058,9 +1058,6 @@ const CreditScreen = ({ navigation, route }) => {
                   message: successMsg,
                   creditsAdded,
                 });
-                if (plan.subscription_family === 'astrologer' && C.returnTo) {
-                  setTimeout(() => C.navigation.navigate(C.returnTo, C.returnParams || {}), 450);
-                }
                 userChoiceIapLog('listener_credit_flow_ok', { creditSku, creditsAdded });
                 return;
               }
@@ -2538,7 +2535,7 @@ const CreditScreen = ({ navigation, route }) => {
           onPress={closePurchaseModal}
         >
           <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={styles.modalContentWrap}>
-            <View style={[styles.purchaseModalCard, androidGlassFixStyle, { backgroundColor: promoCardBg, borderColor: colors.cardBorder }]}>
+            <View style={[styles.purchaseModalCard, androidGlassFixStyle, { backgroundColor: isDark ? colors.backgroundSecondary : colors.cardBackground, borderColor: colors.cardBorder }]}>
               <View style={[styles.purchaseModalIconWrap, { backgroundColor: purchaseModal.type === 'error' ? (isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.12)') : purchaseModal.type === 'already_credited' ? (isDark ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.12)') : (isDark ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.12)') }]}>
                 <Ionicons
                   name={purchaseModal.type === 'error' ? 'alert-circle' : purchaseModal.type === 'already_credited' ? 'information-circle' : 'checkmark-circle'}
