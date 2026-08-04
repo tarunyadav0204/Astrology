@@ -99,6 +99,19 @@ select {
   -webkit-tap-highlight-color: transparent;
 }
 
+/*
+ * RN multiline TextInput → <textarea>. Without rows=1 it defaults to 2 rows and
+ * the placeholder sits high vs. the send button. Force single-line intrinsic size.
+ */
+#root textarea {
+  margin: 0;
+  resize: none;
+  vertical-align: middle;
+  box-sizing: border-box;
+  /* Override UA 2-row default if rows attr is missing on any composer */
+  field-sizing: fixed;
+}
+
 input:focus,
 input:focus-visible,
 textarea:focus,

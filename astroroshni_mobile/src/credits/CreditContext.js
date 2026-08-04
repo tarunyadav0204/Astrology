@@ -244,6 +244,22 @@ export const CreditProvider = ({ children }) => {
     fetchPricing({ force: true });
   }, [fetchBalance, fetchPricing]);
 
+  // PWA: when returning from another app/tab after a purchase, refresh balance.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return undefined;
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchBalance();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onVisibility);
+    };
+  }, [fetchBalance]);
+
   return (
     <CreditContext.Provider
       value={{

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import json
@@ -2180,7 +2180,14 @@ async def web_notification_opt_in(
 
 
 @router.get("/balance")
-async def get_credit_balance(current_user: User = Depends(get_current_user)):
+async def get_credit_balance(
+    response: Response,
+    current_user: User = Depends(get_current_user),
+):
+    # Avoid stale balances in PWA/Safari after purchases on another client.
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     balance = credit_service.get_user_credits(current_user.userid)
     free_used = credit_service.get_free_chat_question_used(current_user.userid)
     free_ok = credit_service.is_free_standard_chat_question_available(current_user.userid)

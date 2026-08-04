@@ -79,21 +79,18 @@ def _normalize_result(raw: Dict[str, Any]) -> tuple[bool, str]:
 
 
 class FetalSexQueryClassifier:
-    """Gemini flash-lite gate: multilingual intent for fetal sex / gender of unborn."""
+    """Gemini 3 Flash gate: multilingual intent for fetal sex / gender of unborn."""
 
     def __init__(self):
         api_key = os.getenv("GEMINI_API_KEY")
         genai.configure(api_key=api_key)
-        from utils.admin_settings import get_setting
-
-        model_name = (get_setting("gemini_intent_model") or "models/gemini-2.5-flash-lite").strip()
-        if "pro" in model_name.lower():
-            model_name = "models/gemini-2.5-flash-lite"
+        # Hardcoded: fetal gate always uses Gemini 3 Flash (ignore admin intent model).
+        model_name = "models/gemini-3-flash-preview"
         config = genai.GenerationConfig(temperature=0, top_p=0.95, top_k=40)
         try:
             self.model = genai.GenerativeModel(model_name, generation_config=config)
         except Exception:
-            self.model = genai.GenerativeModel("models/gemini-2.0-flash-lite-001", generation_config=config)
+            self.model = genai.GenerativeModel("models/gemini-3-flash-preview", generation_config=config)
 
     async def classify(self, *, question: str, language: str = "english") -> Dict[str, Any]:
         q = (question or "").strip()

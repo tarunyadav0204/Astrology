@@ -624,6 +624,8 @@ export default function ChatScreen({ navigation, route }) {
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
+  /** Expo Web: RN multiline TextInput defaults to 2 textarea rows → placeholder sits high. */
+  const [webComposerHeight, setWebComposerHeight] = useState(44);
   const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [waitSideReplying, setWaitSideReplying] = useState(false);
@@ -6184,10 +6186,25 @@ export default function ChatScreen({ navigation, route }) {
                 style={[
                   styles.modernTextInput,
                   { color: colors.text },
-                  showModeSelector && styles.modernTextInputCollapsed
+                  showModeSelector && styles.modernTextInputCollapsed,
+                  Platform.OS === 'web' && !showModeSelector
+                    ? { height: webComposerHeight }
+                    : null,
                 ]}
                 value={inputText}
-                onChangeText={setInputText}
+                onChangeText={(text) => {
+                  setInputText(text);
+                  if (Platform.OS === 'web' && !text) {
+                    setWebComposerHeight(44);
+                  }
+                }}
+                onContentSizeChange={(e) => {
+                  if (Platform.OS !== 'web' || showModeSelector) return;
+                  const next = Math.ceil(e?.nativeEvent?.contentSize?.height || 0);
+                  if (!next) return;
+                  const clamped = Math.min(100, Math.max(44, next));
+                  setWebComposerHeight((prev) => (prev === clamped ? prev : clamped));
+                }}
                 placeholder={
                   activeWaitSideMessage ? "Reply while the full answer is prepared..." :
                   loading ? "Analyzing..." :
@@ -6208,6 +6225,9 @@ export default function ChatScreen({ navigation, route }) {
                   (!loading && (credits >= effectiveChatCost || freeQuestionNotificationGate) && !(partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3)))
                 }
                 multiline
+                // RN Web: without rows=1, <textarea> defaults to 2 rows and placeholder sits high.
+                {...(Platform.OS === 'web' ? { rows: 1, numberOfLines: 1 } : {})}
+                textAlignVertical="center"
                 blurOnSubmit={false}
               />
 
@@ -8334,13 +8354,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.white,
     paddingHorizontal: 16,
-    paddingVertical: 10,
     maxHeight: 100,
+    ...Platform.select({
+      web: {
+        // Single-line box matching send button; height grows via webComposerHeight.
+        minHeight: 44,
+        lineHeight: 22,
+        // Slightly more top padding — Safari placeholder/glyphs sit optically high.
+        paddingTop: 12,
+        paddingBottom: 10,
+        outlineStyle: 'none',
+        overflow: 'hidden',
+      },
+      default: {
+        paddingVertical: 10,
+      },
+    }),
   },
   modernTextInputCollapsed: {
     height: 44,
     maxHeight: 44,
     minHeight: 44,
+    ...Platform.select({
+      web: {
+        lineHeight: 22,
+        paddingTop: 12,
+        paddingBottom: 10,
+      },
+      default: {},
+    }),
   },
   premiumToggleButton: {
     marginHorizontal: 4,

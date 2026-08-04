@@ -321,6 +321,9 @@ const CreditScreen = ({ navigation, route }) => {
   useFocusEffect(
     React.useCallback(() => {
       let cancelled = false;
+      // Always refetch on open — navigation "focus" listeners registered in useEffect
+      // can miss the first focus on Expo Web / PWA, leaving a stale balance.
+      fetchBalance();
       (async () => {
         const ok = await requireAuthForPaid({
           feature: t('authGate.featureCredits'),
@@ -334,7 +337,7 @@ const CreditScreen = ({ navigation, route }) => {
       return () => {
         cancelled = true;
       };
-    }, [navigation, requireAuthForPaid])
+    }, [navigation, requireAuthForPaid, fetchBalance, t])
   );
 
   const [promoCode, setPromoCode] = useState('');

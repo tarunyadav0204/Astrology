@@ -896,7 +896,17 @@ export const panditAPI = {
 
 export const creditAPI = {
   // Balance is polled on mount; handle 401 locally as guest (do not hard-login).
-  getBalance: () => api.get(getEndpoint('/credits/balance'), BACKGROUND_REQUEST_CONFIG),
+  getBalance: () =>
+    api.get(getEndpoint('/credits/balance'), {
+      ...BACKGROUND_REQUEST_CONFIG,
+      // PWA/Safari can serve a stale GET; always bypass HTTP cache for balance.
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+        Expires: '0',
+      },
+      params: { _: Date.now() },
+    }),
   getSubscriptionDetails: (family = 'vip') =>
     api.get(getEndpoint(`/credits/subscription?family=${encodeURIComponent(family)}`)),
   getEntitlements: () => api.get(getEndpoint('/credits/entitlements')),
