@@ -10,6 +10,7 @@ import AdminActivity from './AdminActivity';
 import AdminUserProfile from './AdminUserProfile';
 import AdminCreditsDashboard from './AdminCreditsDashboard';
 import AdminCreditsIntelligence from './AdminCreditsIntelligence';
+import AdminBuyerAnalysis from './AdminBuyerAnalysis';
 import AdminQuestionCostSummary from './AdminQuestionCostSummary';
 import AdminUserCreditManagement from './AdminUserCreditManagement';
 import AdminFreeAnswerFunnel from './AdminFreeAnswerFunnel';
@@ -3213,6 +3214,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Intelligence
           </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'buyerAnalysis' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('buyerAnalysis')}
+          >
+            Buyer analysis
+          </button>
           <button 
             className={`subtab ${activeSubTab === 'management' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('management')}
@@ -4559,6 +4567,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'credits' && activeSubTab === 'intelligence' && (
           <AdminCreditsIntelligence onCreateCampaignFromSegment={openNudgeCampaignFromCreditsSegment} />
+        )}
+
+        {activeTab === 'credits' && activeSubTab === 'buyerAnalysis' && (
+          <AdminBuyerAnalysis />
         )}
 
         {activeTab === 'credits' && activeSubTab === 'ledger' && (

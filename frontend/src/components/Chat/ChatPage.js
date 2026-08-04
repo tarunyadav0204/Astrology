@@ -1372,7 +1372,7 @@ const ChatPage = ({ onLogin }) => {
         return () => window.clearTimeout(timer);
     }, [firstPurchaseOfferModalOpen]);
 
-    const recordFirstPurchaseOfferFunnelEvent = (event, messageId) => {
+    const recordFirstPurchaseOfferFunnelEvent = async (event, messageId) => {
         const mid = messageId != null ? String(messageId).trim() : '';
         if (!mid) return;
         const token = localStorage.getItem('token');
@@ -1383,18 +1383,22 @@ const ChatPage = ({ onLogin }) => {
             'X-AstroRoshni-Authorization': `Bearer ${token}`,
         };
         const body = JSON.stringify({ event, message_id: mid, platform: 'web' });
-        // keepalive: claim navigates straight into CreditsModal; don't drop the beacon.
-        fetch('/api/credits/first-purchase-offer-funnel/event', {
-            method: 'POST',
-            headers,
-            body,
-            keepalive: true,
-        }).catch(() => {});
+        try {
+            await fetch('/api/credits/first-purchase-offer-funnel/event', {
+                method: 'POST',
+                headers,
+                body,
+                keepalive: true,
+            });
+        } catch (_) {
+            /* non-blocking for UX; CreditsModal also records as backup */
+        }
     };
 
-    const claimFirstPurchaseOffer = () => {
+    const claimFirstPurchaseOffer = async () => {
         const messageId = firstPurchaseOffer?.messageId;
-        recordFirstPurchaseOfferFunnelEvent('offer_clicked', messageId);
+        // Persist click before opening credits so the beacon is not dropped mid-transition.
+        await recordFirstPurchaseOfferFunnelEvent('offer_clicked', messageId);
         setCreditsOfferMessageId(messageId ? String(messageId) : null);
         setFirstPurchaseOfferModalOpen(false);
         setShowCreditsModal(true);

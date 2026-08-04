@@ -1418,6 +1418,37 @@ async def admin_first_purchase_offer_funnel(
         raise HTTPException(status_code=500, detail="Failed to load first-purchase offer funnel") from e
 
 
+@router.get("/admin/buyer-analysis")
+async def admin_buyer_analysis(
+    from_date: Optional[str] = Query(default=None),
+    to_date: Optional[str] = Query(default=None),
+    group_by: str = Query(default="source", pattern="^(source|medium|campaign|source_medium)$"),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Week-by-week buyer analytics (UTM × purchases, new vs repeat, cohorts).
+
+    Uses one pooled connection with a local statement_timeout so it cannot starve chat.
+    Runs in a threadpool so the async event loop stays free for chat traffic.
+    Results are cached briefly in-process.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    from starlette.concurrency import run_in_threadpool
+    from credits.buyer_analytics import get_buyer_analytics
+
+    try:
+        return await run_in_threadpool(
+            get_buyer_analytics,
+            from_date=from_date,
+            to_date=to_date,
+            group_by=group_by,
+        )
+    except Exception as e:
+        logger.exception("buyer_analysis analytics failed")
+        raise HTTPException(status_code=500, detail="Failed to load buyer analysis") from e
+
+
 @router.get("/admin/free-answer-funnel")
 async def admin_free_answer_funnel(
     from_date: Optional[str] = Query(default=None),

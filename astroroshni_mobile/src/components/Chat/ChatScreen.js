@@ -861,19 +861,29 @@ export default function ChatScreen({ navigation, route }) {
     messages.length > 0 &&
     messages.every((msg) => msg?.isWelcome);
 
-  const openCreditsForFirstPurchaseBonus = useCallback(() => {
+  const openCreditsForFirstPurchaseBonus = useCallback(async () => {
     setFirstPurchaseBonusModalVisible(false);
     const messageId = firstPurchaseBonusOffer?.messageId != null
       ? String(firstPurchaseBonusOffer.messageId).trim()
       : '';
     if (messageId) {
-      // Fire before navigate; CreditScreen also records as backup if this is aborted.
-      creditAPI.recordFirstPurchaseOfferFunnelEvent('offer_clicked', messageId).catch((e) => {
+      // Await so navigate does not abort the request. Cap wait so a slow network
+      // cannot block opening Credits; CreditScreen still records as backup.
+      try {
+        await Promise.race([
+          creditAPI.recordFirstPurchaseOfferFunnelEvent('offer_clicked', messageId),
+          new Promise((resolve) => setTimeout(resolve, 1500)),
+        ]);
+      } catch (e) {
         console.log('[FirstPurchaseBonus] click tracking failed', e?.message || e);
-      });
+      }
     }
-    navigation.navigate('Credits', {
-      firstPurchaseOfferMessageId: messageId || undefined,
+    // merge:true — if Credits is already on the stack, still update params so the
+    // destination backup effect can see firstPurchaseOfferMessageId.
+    navigation.navigate({
+      name: 'Credits',
+      params: { firstPurchaseOfferMessageId: messageId || undefined },
+      merge: true,
     });
   }, [firstPurchaseBonusOffer?.messageId, navigation]);
 

@@ -324,6 +324,14 @@ const CreditScreen = ({ navigation, route }) => {
       // Always refetch on open — navigation "focus" listeners registered in useEffect
       // can miss the first focus on Expo Web / PWA, leaving a stale balance.
       fetchBalance();
+      // Backup for first-purchase offer taps: Chat may abort the click POST while
+      // navigating here; record again on focus (insert is idempotent).
+      const offerMessageId = route?.params?.firstPurchaseOfferMessageId;
+      if (offerMessageId) {
+        creditAPI.recordFirstPurchaseOfferFunnelEvent('offer_clicked', String(offerMessageId)).catch((error) => {
+          console.log('[FirstPurchaseBonus] focus click tracking failed', error?.message || error);
+        });
+      }
       (async () => {
         const ok = await requireAuthForPaid({
           feature: t('authGate.featureCredits'),
@@ -337,7 +345,7 @@ const CreditScreen = ({ navigation, route }) => {
       return () => {
         cancelled = true;
       };
-    }, [navigation, requireAuthForPaid, fetchBalance, t])
+    }, [navigation, requireAuthForPaid, fetchBalance, t, route?.params?.firstPurchaseOfferMessageId])
   );
 
   const [promoCode, setPromoCode] = useState('');
@@ -765,9 +773,9 @@ const CreditScreen = ({ navigation, route }) => {
     };
   }, [navigation, iapReady, productIds, subscriptionProductIds]);
 
-  // Record the click at the destination as well as at the source. The chat
-  // screen can unmount during navigation before its background request
-  // completes; the funnel insert is idempotent.
+  // Record the click at the destination as well as at the source. Chat can
+  // unmount mid-request; also re-fire when merge:true updates params on an
+  // already-mounted Credits screen. Insert is idempotent per message.
   useEffect(() => {
     const messageId = route?.params?.firstPurchaseOfferMessageId;
     if (!messageId) return;
