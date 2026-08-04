@@ -165,16 +165,42 @@ def _note_helpful_indexes(conn) -> None:
             _INDEXES_READY = True
 
 
-def _revenue_inr_sql(alias: str = "ct") -> str:
-    meta = f"{alias}.metadata"
+# Match Credit Ledger admin summary (get_search_transaction_summary):
+# 1 credit = ₹1 until 2026-07-14; ₹2 from 2026-07-15 (date(created_at),
+# or original purchase date for refund reversals).
+_CREDIT_INR_RATE_CUTOVER = "2026-07-15"
+
+
+def _signed_credits_sql(alias: str = "ct") -> str:
+    """Net purchased credits contribution for one ledger row (ledger summary rules)."""
     return f"""
     CASE
-      WHEN {meta} IS NULL OR btrim({meta}::text) = '' THEN NULL
-      WHEN {meta}::text ~ '"amount_paise"[[:space:]]*:[[:space:]]*[0-9]+'
-        THEN (substring({meta}::text from '"amount_paise"[[:space:]]*:[[:space:]]*([0-9]+)')::numeric / 100.0)
-      WHEN {meta}::text ~ '"price_amount_micros"[[:space:]]*:[[:space:]]*[0-9]+'
-        THEN (substring({meta}::text from '"price_amount_micros"[[:space:]]*:[[:space:]]*([0-9]+)')::numeric / 1000000.0)
-      ELSE NULL
+      WHEN {alias}.source IN ('google_play', 'razorpay')
+       AND {alias}.transaction_type IN ('earned', 'refund')
+      THEN ABS({alias}.amount)::bigint
+      WHEN {alias}.source IN ('google_play_refund', 'razorpay_refund')
+       AND {alias}.transaction_type = 'spent'
+      THEN -ABS({alias}.amount)::bigint
+      ELSE 0::bigint
+    END
+    """
+
+
+def _is_purchase_sql(alias: str = "ct") -> str:
+    return f"""
+    (
+      {alias}.source IN ('google_play', 'razorpay')
+      AND {alias}.transaction_type IN ('earned', 'refund')
+    )
+    """
+
+
+def _billing_source_sql(alias: str = "ct") -> str:
+    return f"""
+    CASE
+      WHEN {alias}.source IN ('google_play', 'google_play_refund') THEN 'google_play'
+      WHEN {alias}.source IN ('razorpay', 'razorpay_refund') THEN 'razorpay'
+      ELSE {alias}.source
     END
     """
 
@@ -205,37 +231,78 @@ def get_buyer_analytics(
         gb = "source"
     channel_sql = _CHANNEL_SQL[gb]
 
-    cache_key = _cache_key(fd, td, gb)
+    # v2: credits/INR aligned with Credit Ledger net purchased summary
+    cache_key = f"v2|{_cache_key(fd, td, gb)}"
     cached = _cache_get(cache_key)
     if cached is not None:
         return cached
 
     started = time.perf_counter()
+    # Date window matches Credit Ledger: created_at >= 'YYYY-MM-DD 00:00:00'
+    # and created_at < to_date + 1 day (naive timestamp compare, same as search summary).
+    range_start = f"{fd.isoformat()} 00:00:00"
+    signed_credits = _signed_credits_sql("ct")
+    is_purchase = _is_purchase_sql("ct")
+    billing_source = _billing_source_sql("ct")
+
     sql = f"""
-    WITH bounds AS (
-      SELECT
-        (%s::timestamp AT TIME ZONE '{_ADMIN_TZ}') AS range_start,
-        ((%s::date + 1)::timestamp AT TIME ZONE '{_ADMIN_TZ}') AS range_end
-    ),
-    purchases AS (
+    WITH ledger_events AS (
       SELECT
         ct.userid,
-        ct.amount::bigint AS credits,
-        ct.source,
+        ct.reference_id,
         ct.created_at,
-        {_revenue_inr_sql('ct')} AS revenue_inr,
+        {billing_source} AS source,
+        {is_purchase} AS is_purchase,
+        {signed_credits} AS credits,
         (
           date_trunc(
             'week',
             ((ct.created_at AT TIME ZONE 'UTC') AT TIME ZONE '{_ADMIN_TZ}')
           )
-        )::date AS week_start
+        )::date AS week_start,
+        CASE
+          WHEN {is_purchase} THEN ct.created_at
+          ELSE COALESCE(
+            (
+              SELECT MIN(original.created_at)
+              FROM credit_transactions original
+              WHERE original.userid = ct.userid
+                AND original.reference_id IS NOT DISTINCT FROM ct.reference_id
+                AND original.source IN ('google_play', 'razorpay')
+                AND original.transaction_type IN ('earned', 'refund')
+            ),
+            ct.created_at
+          )
+        END AS rate_at
       FROM credit_transactions ct
-      CROSS JOIN bounds b
-      WHERE ct.transaction_type = 'earned'
-        AND ct.source IN ('google_play', 'razorpay')
-        AND ct.created_at >= b.range_start
-        AND ct.created_at < b.range_end
+      WHERE ct.created_at >= %s::timestamp
+        AND ct.created_at < (%s::date + INTERVAL '1 day')
+        AND (
+          (
+            ct.source IN ('google_play', 'razorpay')
+            AND ct.transaction_type IN ('earned', 'refund')
+          )
+          OR (
+            ct.source IN ('google_play_refund', 'razorpay_refund')
+            AND ct.transaction_type = 'spent'
+          )
+        )
+    ),
+    purchases AS (
+      SELECT
+        le.userid,
+        le.credits,
+        le.source,
+        le.created_at,
+        le.is_purchase,
+        le.week_start,
+        (
+          le.credits * CASE
+            WHEN date(le.rate_at) >= DATE '{_CREDIT_INR_RATE_CUTOVER}' THEN 2
+            ELSE 1
+          END
+        )::float8 AS revenue_inr
+      FROM ledger_events le
     ),
     buyer_ids AS (
       SELECT DISTINCT userid FROM purchases
@@ -244,8 +311,8 @@ def get_buyer_analytics(
       SELECT ct.userid, MIN(ct.created_at) AS first_purchase_at
       FROM credit_transactions ct
       INNER JOIN buyer_ids b ON b.userid = ct.userid
-      WHERE ct.transaction_type = 'earned'
-        AND ct.source IN ('google_play', 'razorpay')
+      WHERE ct.source IN ('google_play', 'razorpay')
+        AND ct.transaction_type IN ('earned', 'refund')
       GROUP BY ct.userid
     ),
     user_utm AS (
@@ -266,6 +333,7 @@ def get_buyer_analytics(
         p.credits,
         p.source,
         p.created_at,
+        p.is_purchase,
         p.revenue_inr,
         p.week_start,
         uf.first_purchase_at,
@@ -283,23 +351,31 @@ def get_buyer_analytics(
     ),
     kpis AS (
       SELECT
-        COUNT(*)::bigint AS purchase_count,
-        COUNT(DISTINCT userid)::bigint AS unique_buyers,
+        COUNT(*) FILTER (WHERE is_purchase)::bigint AS purchase_count,
+        COUNT(DISTINCT userid) FILTER (WHERE is_purchase)::bigint AS unique_buyers,
         COALESCE(SUM(credits), 0)::bigint AS credits_purchased,
         COALESCE(SUM(revenue_inr), 0)::float8 AS estimated_revenue_inr,
-        COUNT(DISTINCT userid) FILTER (WHERE first_week = week_start)::bigint AS new_buyers,
-        COUNT(DISTINCT userid) FILTER (WHERE first_week < week_start)::bigint AS repeat_buyers
+        COUNT(DISTINCT userid) FILTER (
+          WHERE is_purchase AND first_week = week_start
+        )::bigint AS new_buyers,
+        COUNT(DISTINCT userid) FILTER (
+          WHERE is_purchase AND first_week < week_start
+        )::bigint AS repeat_buyers
       FROM enriched
     ),
     weekly_nr AS (
       SELECT
         week_start,
-        COUNT(*)::bigint AS purchase_count,
-        COUNT(DISTINCT userid)::bigint AS buyers,
+        COUNT(*) FILTER (WHERE is_purchase)::bigint AS purchase_count,
+        COUNT(DISTINCT userid) FILTER (WHERE is_purchase)::bigint AS buyers,
         COALESCE(SUM(credits), 0)::bigint AS credits,
         COALESCE(SUM(revenue_inr), 0)::float8 AS revenue_inr,
-        COUNT(DISTINCT userid) FILTER (WHERE first_week = week_start)::bigint AS new_buyers,
-        COUNT(DISTINCT userid) FILTER (WHERE first_week < week_start)::bigint AS repeat_buyers
+        COUNT(DISTINCT userid) FILTER (
+          WHERE is_purchase AND first_week = week_start
+        )::bigint AS new_buyers,
+        COUNT(DISTINCT userid) FILTER (
+          WHERE is_purchase AND first_week < week_start
+        )::bigint AS repeat_buyers
       FROM enriched
       GROUP BY week_start
     ),
@@ -307,31 +383,39 @@ def get_buyer_analytics(
       SELECT
         week_start,
         channel,
-        COUNT(*)::bigint AS purchase_count,
-        COUNT(DISTINCT userid)::bigint AS buyers,
+        COUNT(*) FILTER (WHERE is_purchase)::bigint AS purchase_count,
+        COUNT(DISTINCT userid) FILTER (WHERE is_purchase)::bigint AS buyers,
         COALESCE(SUM(credits), 0)::bigint AS credits,
         COALESCE(SUM(revenue_inr), 0)::float8 AS revenue_inr,
-        COUNT(DISTINCT userid) FILTER (WHERE first_week = week_start)::bigint AS new_buyers,
-        COUNT(DISTINCT userid) FILTER (WHERE first_week < week_start)::bigint AS repeat_buyers
+        COUNT(DISTINCT userid) FILTER (
+          WHERE is_purchase AND first_week = week_start
+        )::bigint AS new_buyers,
+        COUNT(DISTINCT userid) FILTER (
+          WHERE is_purchase AND first_week < week_start
+        )::bigint AS repeat_buyers
       FROM enriched
       GROUP BY week_start, channel
     ),
     leaderboard AS (
       SELECT
         channel,
-        COUNT(*)::bigint AS purchase_count,
-        COUNT(DISTINCT userid)::bigint AS buyers,
+        COUNT(*) FILTER (WHERE is_purchase)::bigint AS purchase_count,
+        COUNT(DISTINCT userid) FILTER (WHERE is_purchase)::bigint AS buyers,
         COALESCE(SUM(credits), 0)::bigint AS credits,
         COALESCE(SUM(revenue_inr), 0)::float8 AS revenue_inr,
         COUNT(DISTINCT userid) FILTER (
-          WHERE first_week >= %s::date AND first_week <= %s::date
+          WHERE is_purchase
+            AND first_week >= %s::date
+            AND first_week <= %s::date
         )::bigint AS new_buyers_in_range,
-        COUNT(DISTINCT userid) FILTER (WHERE first_week < week_start)::bigint AS repeat_purchase_users,
+        COUNT(DISTINCT userid) FILTER (
+          WHERE is_purchase AND first_week < week_start
+        )::bigint AS repeat_purchase_users,
         ROUND(
           (
             PERCENTILE_CONT(0.5) WITHIN GROUP (
               ORDER BY EXTRACT(EPOCH FROM (first_purchase_at - first_open_at)) / 86400.0
-            )
+            ) FILTER (WHERE is_purchase AND first_open_at IS NOT NULL)
           )::numeric,
           1
         ) AS median_days_install_to_first_buy
@@ -341,7 +425,8 @@ def get_buyer_analytics(
     cohort_base AS (
       SELECT DISTINCT userid, first_week AS cohort_week
       FROM enriched
-      WHERE first_week >= %s::date
+      WHERE is_purchase
+        AND first_week >= %s::date
         AND first_week <= %s::date
     ),
     cohort_returns AS (
@@ -352,6 +437,7 @@ def get_buyer_analytics(
       FROM cohort_base c
       INNER JOIN enriched e
         ON e.userid = c.userid
+       AND e.is_purchase
        AND e.week_start >= c.cohort_week
        AND e.week_start <= c.cohort_week + 8
       GROUP BY c.cohort_week, weeks_later
@@ -364,8 +450,8 @@ def get_buyer_analytics(
     billing AS (
       SELECT
         source,
-        COUNT(*)::bigint AS purchase_count,
-        COUNT(DISTINCT userid)::bigint AS buyers,
+        COUNT(*) FILTER (WHERE is_purchase)::bigint AS purchase_count,
+        COUNT(DISTINCT userid) FILTER (WHERE is_purchase)::bigint AS buyers,
         COALESCE(SUM(credits), 0)::bigint AS credits,
         COALESCE(SUM(revenue_inr), 0)::float8 AS revenue_inr
       FROM enriched
@@ -422,7 +508,7 @@ def get_buyer_analytics(
     """
 
     query_params = (
-        fd.isoformat(),
+        range_start,
         td.isoformat(),
         fd.isoformat(),
         td.isoformat(),
@@ -479,7 +565,7 @@ def get_buyer_analytics(
                 "purchase_count": int(r.get("purchase_count") or 0),
                 "buyers": int(r.get("buyers") or 0),
                 "credits": int(r.get("credits") or 0),
-                "revenue_inr": round(float(r.get("revenue_inr") or 0), 2),
+                "revenue_inr": int(round(float(r.get("revenue_inr") or 0))),
                 "new_buyers": int(r.get("new_buyers") or 0),
                 "repeat_buyers": int(r.get("repeat_buyers") or 0),
             }
@@ -494,7 +580,7 @@ def get_buyer_analytics(
                 "purchase_count": int(r.get("purchase_count") or 0),
                 "buyers": int(r.get("buyers") or 0),
                 "credits": int(r.get("credits") or 0),
-                "revenue_inr": round(float(r.get("revenue_inr") or 0), 2),
+                "revenue_inr": int(round(float(r.get("revenue_inr") or 0))),
                 "new_buyers": int(r.get("new_buyers") or 0),
                 "repeat_buyers": int(r.get("repeat_buyers") or 0),
             }
@@ -509,7 +595,7 @@ def get_buyer_analytics(
                 "purchase_count": int(r.get("purchase_count") or 0),
                 "buyers": int(r.get("buyers") or 0),
                 "credits": int(r.get("credits") or 0),
-                "revenue_inr": round(float(r.get("revenue_inr") or 0), 2),
+                "revenue_inr": int(round(float(r.get("revenue_inr") or 0))),
                 "new_buyers_in_range": int(r.get("new_buyers_in_range") or 0),
                 "repeat_purchase_users": int(r.get("repeat_purchase_users") or 0),
                 "median_days_install_to_first_buy": float(median) if median is not None else None,
@@ -524,7 +610,7 @@ def get_buyer_analytics(
                 "purchase_count": int(r.get("purchase_count") or 0),
                 "buyers": int(r.get("buyers") or 0),
                 "credits": int(r.get("credits") or 0),
-                "revenue_inr": round(float(r.get("revenue_inr") or 0), 2),
+                "revenue_inr": int(round(float(r.get("revenue_inr") or 0))),
             }
         )
 
@@ -534,12 +620,19 @@ def get_buyer_analytics(
         "timezone": _ADMIN_TZ,
         "group_by": gb,
         "attribution": "first_touch_install",
+        "money_basis": "ledger_net_purchased",
+        "credit_inr_rate": {
+            "before": 1,
+            "from_date": _CREDIT_INR_RATE_CUTOVER,
+            "on_or_after": 2,
+            "note": "Same as Credit Ledger: credits × ₹/credit; refunds use original purchase date for the rate",
+        },
         "max_range_days": _MAX_RANGE_DAYS,
         "kpis": {
             "purchase_count": int(kpis.get("purchase_count") or 0),
             "unique_buyers": unique_buyers,
             "credits_purchased": int(kpis.get("credits_purchased") or 0),
-            "estimated_revenue_inr": round(float(kpis.get("estimated_revenue_inr") or 0), 2),
+            "estimated_revenue_inr": int(round(float(kpis.get("estimated_revenue_inr") or 0))),
             "new_buyers": int(kpis.get("new_buyers") or 0),
             "repeat_buyers": repeat_buyers,
             "repeat_buyer_pct": repeat_pct,

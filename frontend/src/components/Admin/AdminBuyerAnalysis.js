@@ -120,8 +120,8 @@ export default function AdminBuyerAnalysis() {
           <h3>Buyer analysis</h3>
           <p>
             Week-by-week credit purchases by UTM (first-touch install), new vs repeat buyers, and
-            return cohorts. Queries use a pooled connection with a 15s statement timeout and a short
-            server cache so admin refreshes do not starve chat traffic.
+            return cohorts. Credits and INR match Credit Ledger net purchased (purchases − refunds;
+            ₹1/credit before 15 Jul 2026, ₹2 after).
           </p>
         </div>
         <div className="aba-filters">
@@ -149,10 +149,11 @@ export default function AdminBuyerAnalysis() {
       </div>
 
       <div className="aba-meta">
-        Applied IST range: <strong>{data?.from_date || fromDate}</strong> →{' '}
+        Applied range: <strong>{data?.from_date || fromDate}</strong> →{' '}
         <strong>{data?.to_date || toDate}</strong>
         {data?.query_ms != null ? ` · ${data.query_ms} ms` : ''}
         {data?.cached ? ' · cached' : ''}
+        {data?.money_basis ? ` · ${data.money_basis}` : ''}
         {data?.attribution ? ` · attribution: ${data.attribution}` : ''}
       </div>
 
@@ -160,7 +161,7 @@ export default function AdminBuyerAnalysis() {
 
       <div className="aba-kpis">
         <div className="aba-kpi">
-          <div className="aba-kpi-label">Revenue (est.)</div>
+          <div className="aba-kpi-label">Net purchase amount</div>
           <div className="aba-kpi-value">{formatInr(kpis.estimated_revenue_inr)}</div>
         </div>
         <div className="aba-kpi">
@@ -181,7 +182,7 @@ export default function AdminBuyerAnalysis() {
           </div>
         </div>
         <div className="aba-kpi">
-          <div className="aba-kpi-label">Credits bought</div>
+          <div className="aba-kpi-label">Net purchased credits</div>
           <div className="aba-kpi-value">{formatInt(kpis.credits_purchased)}</div>
         </div>
       </div>
