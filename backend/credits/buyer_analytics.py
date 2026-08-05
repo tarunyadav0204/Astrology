@@ -232,7 +232,8 @@ def get_buyer_analytics(
     channel_sql = _CHANNEL_SQL[gb]
 
     # v2: credits/INR aligned with Credit Ledger net purchased summary
-    cache_key = f"v2|{_cache_key(fd, td, gb)}"
+    # v3: cohort lag is week count (days/7), not raw day diff mislabeled as W+N
+    cache_key = f"v3|{_cache_key(fd, td, gb)}"
     cached = _cache_get(cache_key)
     if cached is not None:
         return cached
