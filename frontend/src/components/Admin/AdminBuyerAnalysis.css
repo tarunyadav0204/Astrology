@@ -119,6 +119,18 @@
   font-size: 1rem;
 }
 
+.admin-buyer-analysis .aba-section-note {
+  margin: -0.25rem 0 0.75rem;
+  max-width: 48rem;
+  color: #78716c;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.admin-buyer-analysis .aba-muted {
+  color: #a8a29e;
+}
+
 .admin-buyer-analysis .aba-table-wrap {
   overflow-x: auto;
   border: 1px solid #e7e5e4;

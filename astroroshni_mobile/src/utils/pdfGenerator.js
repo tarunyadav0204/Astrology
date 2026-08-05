@@ -45,8 +45,10 @@ async function printHtmlDocumentOnWeb(html, timeoutMs = 45000) {
 
   return new Promise((resolve, reject) => {
     let settled = false;
+    let blobUrl = null;
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
+    iframe.setAttribute('title', 'AstroRoshni PDF export');
     iframe.style.position = 'fixed';
     iframe.style.left = '-12000px';
     iframe.style.top = '0';
@@ -55,14 +57,26 @@ async function printHtmlDocumentOnWeb(html, timeoutMs = 45000) {
     iframe.style.border = '0';
     iframe.style.visibility = 'hidden';
 
-    const finish = (err) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
+    const cleanup = () => {
       window.removeEventListener('afterprint', onAfterPrint);
       if (iframe.parentNode) {
         iframe.parentNode.removeChild(iframe);
       }
+      if (blobUrl) {
+        try {
+          URL.revokeObjectURL(blobUrl);
+        } catch (_) {
+          /* ignore */
+        }
+        blobUrl = null;
+      }
+    };
+
+    const finish = (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      cleanup();
       if (err) reject(err);
       else resolve(null);
     };
@@ -79,8 +93,25 @@ async function printHtmlDocumentOnWeb(html, timeoutMs = 45000) {
           return;
         }
         window.addEventListener('afterprint', onAfterPrint);
-        win.focus();
-        win.print();
+        // Prefer printing the iframe document; fall back to opening a blob tab if blocked.
+        try {
+          win.focus();
+          win.print();
+        } catch (printErr) {
+          // Popup fallback when iframe print is blocked after an async gap.
+          const opened = blobUrl ? window.open(blobUrl, '_blank') : null;
+          if (!opened) {
+            throw printErr;
+          }
+          setTimeout(() => {
+            try {
+              opened.focus();
+              opened.print();
+            } catch (_) {
+              /* user can print from the tab */
+            }
+          }, 400);
+        }
         // Some browsers never fire afterprint for iframe jobs.
         setTimeout(() => finish(), 2500);
       } catch (err) {
@@ -90,18 +121,26 @@ async function printHtmlDocumentOnWeb(html, timeoutMs = 45000) {
 
     iframe.onload = () => {
       // Allow layout/fonts to settle before print preview opens.
-      setTimeout(triggerPrint, 250);
+      setTimeout(triggerPrint, 300);
     };
 
-    document.body.appendChild(iframe);
-    const doc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (!doc) {
-      finish(new Error('Could not prepare PDF export'));
-      return;
+    try {
+      blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+      iframe.src = blobUrl;
+      document.body.appendChild(iframe);
+    } catch (err) {
+      // Fallback for older browsers: write into about:blank.
+      document.body.appendChild(iframe);
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!doc) {
+        finish(new Error('Could not prepare PDF export'));
+        return;
+      }
+      doc.open();
+      doc.write(html);
+      doc.close();
+      setTimeout(triggerPrint, 300);
     }
-    doc.open();
-    doc.write(html);
-    doc.close();
   });
 }
 
@@ -582,7 +621,9 @@ const getEventMonthName = (monthId) => {
 };
 
 const getIntensityColor = (intensity) => {
-  switch ((intensity || '').toLowerCase()) {
+  // LLM / caches sometimes store intensity as a number; String() matches MonthlyAccordion.
+  const normalized = String(intensity ?? '').toLowerCase();
+  switch (normalized) {
     case 'high': return '#FF4444';
     case 'medium': return '#FFAA00';
     default: return '#4CAF50';
@@ -593,22 +634,32 @@ const getIntensityColor = (intensity) => {
  * Generate PDF for Event Screen timeline (year + macro trends + all monthly accordions).
  * @param {{ year: number, nativeName: string, monthlyData: { macro_trends?: string[], monthly_predictions?: Array<{ month_id: number, focus_areas?: string[], events?: any[] }> } }} params
  */
-export const generateEventTimelinePDF = async ({ year, nativeName, monthlyData, logoDataUri: optionLogoUri } = {}) => {
+export const generateEventTimelinePDF = async ({
+  year,
+  nativeName,
+  monthlyData,
+  logoDataUri: optionLogoUri,
+  timeoutMs = 120000,
+} = {}) => {
   try {
     const logoDataUri = optionLogoUri ?? null;
-    const trends = monthlyData?.macro_trends || [];
-    const monthly = monthlyData?.monthly_predictions || [];
+    const trends = Array.isArray(monthlyData?.macro_trends) ? monthlyData.macro_trends : [];
+    const monthly = Array.isArray(monthlyData?.monthly_predictions)
+      ? monthlyData.monthly_predictions.filter((m) => m && typeof m === 'object')
+      : [];
 
     const accordionsHtml = monthly.map((month) => {
       const monthName = getEventMonthName(month.month_id);
-      const tags = month.focus_areas || [];
-      const events = month.events || [];
+      const tags = Array.isArray(month.focus_areas)
+        ? month.focus_areas.filter((x) => x != null).map((x) => String(x))
+        : [];
+      const events = Array.isArray(month.events) ? month.events.filter((e) => e && typeof e === 'object') : [];
       const tagsHtml = tags.length
         ? `<div class="event-tags">${tags.map((t) => `<span class="event-tag">${escapeHtml(t)}</span>`).join('')}</div>`
         : '';
       const eventsHtml = events.map((ev) => {
         const intensityColor = getIntensityColor(ev.intensity);
-        const manifestations = ev.possible_manifestations || [];
+        const manifestations = Array.isArray(ev.possible_manifestations) ? ev.possible_manifestations : [];
         const manifestationsHtml = manifestations.length
           ? `<div class="manifestations">
               <div class="manifestations-title">Possible Scenarios (${manifestations.length})</div>
@@ -622,8 +673,12 @@ export const generateEventTimelinePDF = async ({ year, nativeName, monthlyData, 
               }).join('')}
             </div>`
           : '';
-        const datesHtml = ev.start_date && ev.end_date ? `<div class="event-dates">📅 ${escapeHtml(ev.start_date)} to ${escapeHtml(ev.end_date)}</div>` : '';
-        const triggerHtml = ev.trigger_logic ? `<div class="event-trigger">🎯 ${escapeHtml(ev.trigger_logic)}</div>` : '';
+        const datesHtml = ev.start_date && ev.end_date
+          ? `<div class="event-dates">${escapeHtml(ev.start_date)} to ${escapeHtml(ev.end_date)}</div>`
+          : '';
+        const triggerHtml = ev.trigger_logic
+          ? `<div class="event-trigger">${escapeHtml(ev.trigger_logic)}</div>`
+          : '';
         return `
           <div class="event-block">
             <span class="event-dot" style="background:${intensityColor}"></span>
@@ -647,7 +702,7 @@ export const generateEventTimelinePDF = async ({ year, nativeName, monthlyData, 
     const trendsHtml = trends.length
       ? `<div class="macro-section">
           <div class="macro-title">The Vibe of ${year}</div>
-          <ul class="macro-list">${trends.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
+          <ul class="macro-list">${trends.map((t) => `<li>${escapeHtml(typeof t === 'string' ? t : (t?.text || t?.trend || String(t)))}</li>`).join('')}</ul>
         </div>`
       : '';
 
@@ -704,7 +759,7 @@ export const generateEventTimelinePDF = async ({ year, nativeName, monthlyData, 
               <div class="subtitle">${new Date().toLocaleString()}</div>
             </div>
             ${trendsHtml}
-            <div class="section-label">📅 Monthly Guide</div>
+            <div class="section-label">Monthly Guide</div>
             ${accordionsHtml}
             <div class="footer">
               <div class="disclaimer-title">Important Disclaimer</div>
@@ -719,7 +774,7 @@ export const generateEventTimelinePDF = async ({ year, nativeName, monthlyData, 
         </body>
       </html>`;
 
-    return printHtmlToPdfFile({ html, base64: false });
+    return printHtmlToPdfFile({ html, base64: false, timeoutMs });
   } catch (error) {
     console.error('Event timeline PDF error:', error);
     throw error;

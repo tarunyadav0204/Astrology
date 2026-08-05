@@ -7,6 +7,7 @@ from auth import get_current_user
 from ..services.chart_service import KPChartService
 from ..services.horary_service import KPHoraryService
 from ..services.event_timing_service import KPEventTimingService
+from ..services.fructification_service import compute_fructification
 from ..utils.kp_calculations import KPCalculations
 
 router = APIRouter(prefix="/kp", tags=["KP Astrology"])
@@ -17,6 +18,17 @@ class KPChartRequest(BaseModel):
     latitude: float
     longitude: float
     timezone: Optional[str] = ""
+
+class KPFructificationRequest(BaseModel):
+    birth_date: str
+    birth_time: str
+    latitude: float
+    longitude: float
+    timezone: Optional[str] = ""
+    as_of_date: Optional[str] = None
+    as_of_time: Optional[str] = None
+    language: Optional[str] = "en"
+    synthesize: Optional[bool] = True
 
 class HoraryRequest(BaseModel):
     question_number: int
@@ -132,5 +144,25 @@ async def predict_event_timing(request: EventTimingRequest, current_user: dict =
             request.event_type
         )
         return {"success": True, "data": predictions}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/fructification")
+async def get_fructification(request: KPFructificationRequest, current_user: dict = Depends(get_current_user)):
+    """Houses giving results today / this hour, with KP + dasha gates and life-theme predictions."""
+    try:
+        data = await compute_fructification(
+            birth_date=request.birth_date,
+            birth_time=request.birth_time,
+            latitude=request.latitude,
+            longitude=request.longitude,
+            timezone=request.timezone or "",
+            as_of_date=request.as_of_date,
+            as_of_time=request.as_of_time,
+            language=request.language or "en",
+            synthesize=bool(request.synthesize) if request.synthesize is not None else True,
+        )
+        return {"success": True, "data": data}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

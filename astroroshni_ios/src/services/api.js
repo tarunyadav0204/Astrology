@@ -527,6 +527,7 @@ export const chatErrorAPI = {
 export const kpAPI = {
   getKPChart: (birthData) => api.post(getEndpoint('/kp/chart'), birthData),
   getRulingPlanets: (birthData) => api.post(getEndpoint('/kp/ruling-planets'), birthData),
+  getFructification: (payload) => api.post(getEndpoint('/kp/fructification'), payload),
 };
 
 export const supportAPI = {

@@ -26,7 +26,8 @@ function getEventMonthName(monthId) {
 }
 
 function getIntensityColor(intensity) {
-  switch ((intensity || '').toLowerCase()) {
+  const normalized = String(intensity ?? '').toLowerCase();
+  switch (normalized) {
     case 'high':
       return '#FF4444';
     case 'medium':

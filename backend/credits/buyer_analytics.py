@@ -432,15 +432,17 @@ def get_buyer_analytics(
     cohort_returns AS (
       SELECT
         c.cohort_week,
-        (e.week_start - c.cohort_week) AS weeks_later,
+        -- week_start values are Monday dates; date-date is days in Postgres.
+        ((e.week_start - c.cohort_week) / 7)::int AS weeks_later,
         COUNT(DISTINCT e.userid)::bigint AS buyers
       FROM cohort_base c
       INNER JOIN enriched e
         ON e.userid = c.userid
        AND e.is_purchase
        AND e.week_start >= c.cohort_week
-       AND e.week_start <= c.cohort_week + 8
-      GROUP BY c.cohort_week, weeks_later
+       AND e.week_start <= c.cohort_week + INTERVAL '8 weeks'
+       AND ((e.week_start - c.cohort_week) / 7) BETWEEN 0 AND 8
+      GROUP BY c.cohort_week, ((e.week_start - c.cohort_week) / 7)::int
     ),
     cohort_sizes AS (
       SELECT cohort_week, COUNT(*)::bigint AS cohort_size

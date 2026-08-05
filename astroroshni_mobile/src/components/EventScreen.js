@@ -1215,14 +1215,28 @@ export default function EventScreen({ route }) {
     if (!monthlyData) return;
     try {
       setIsExportingPdf(true);
-      const logoDataUri = await getLogoDataUriForModule(require('../../assets/logo.png'));
+      // On web, skip blocking logo I/O before print so the user gesture is less likely to expire.
+      // Native can afford the await; logo is nice-to-have either way.
+      let logoDataUri = null;
+      if (Platform.OS === 'web') {
+        logoDataUri = null;
+      } else {
+        try {
+          logoDataUri = await getLogoDataUriForModule(require('../../assets/logo.png'));
+        } catch (_) {
+          logoDataUri = null;
+        }
+      }
       const pdfUri = await generateEventTimelinePDF({
         year: selectedYear,
         nativeName: nativeName || '',
         monthlyData,
         logoDataUri,
       });
-      await sharePDFOnWhatsApp(pdfUri);
+      await sharePDFOnWhatsApp(pdfUri, {
+        contentType: 'event_timeline',
+        source: 'event_screen',
+      });
     } catch (error) {
       console.error('Export PDF error:', error);
       Alert.alert('Export failed', userFacingPdfExportError(error));

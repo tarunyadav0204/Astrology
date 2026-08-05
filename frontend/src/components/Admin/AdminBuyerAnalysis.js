@@ -39,6 +39,15 @@ function weekLabel(weekStart) {
   }).format(d);
 }
 
+/** True when the W+N week has started (IST). Future lags stay blank. */
+function cohortLagStarted(cohortWeek, lagWeeks) {
+  if (!cohortWeek) return false;
+  const startMs = Date.parse(`${String(cohortWeek).slice(0, 10)}T00:00:00+05:30`);
+  if (Number.isNaN(startMs)) return false;
+  const lagStartMs = startMs + Number(lagWeeks || 0) * 7 * 86400000;
+  return lagStartMs <= Date.now();
+}
+
 export default function AdminBuyerAnalysis() {
   const initial = defaultRange();
   const [fromDate, setFromDate] = useState(initial.from);
@@ -307,6 +316,10 @@ export default function AdminBuyerAnalysis() {
 
       <section className="aba-section">
         <h4>Return cohort (first-buy week → later weeks)</h4>
+        <p className="aba-section-note">
+          W+0 is the first-purchase week. W+N is buyers from that cohort who also purchased N calendar weeks later.
+          Cells for weeks that have not started yet show —.
+        </p>
         <div className="aba-table-wrap">
           <table className="aba-table aba-cohort">
             <thead>
@@ -324,6 +337,13 @@ export default function AdminBuyerAnalysis() {
                   <td>{weekLabel(c.cohort_week)}</td>
                   <td>{formatInt(c.cohort_size)}</td>
                   {[...Array(maxCohortLag + 1)].map((_, i) => {
+                    if (!cohortLagStarted(c.cohort_week, i)) {
+                      return (
+                        <td key={i} title="Week not started yet" className="aba-muted">
+                          —
+                        </td>
+                      );
+                    }
                     const n = Number(c.returns?.[String(i)] || 0);
                     const pct = c.cohort_size ? Math.round((100 * n) / c.cohort_size) : 0;
                     return (

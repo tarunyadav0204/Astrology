@@ -18,7 +18,8 @@ export function userFacingPdfExportError(error) {
     lower.includes('destructure') ||
     lower.includes('undefined') ||
     lower.includes('null') ||
-    lower.includes('not created')
+    lower.includes('not created') ||
+    lower.includes('tolowercase is not a function')
   ) {
     return PDF_EXPORT_DEFAULT_ERROR;
   }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Animated, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,44 @@ import { storage } from '../services/storage';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 import NativeSelectorChip from '../components/Common/NativeSelectorChip';
+import DateNavigator from '../components/Common/DateNavigator';
+
+function formatLocalDate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function formatLocalTime(d) {
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
+}
+
+function birthMomentFromDetails(birthDetails) {
+    if (!birthDetails?.date || !birthDetails?.time) return null;
+    const dateStr = String(birthDetails.date).split('T')[0];
+    let timeStr = String(birthDetails.time);
+    if (timeStr.includes('T')) timeStr = timeStr.split('T')[1];
+    timeStr = timeStr.slice(0, 5);
+    const [y, mo, d] = dateStr.split('-').map(Number);
+    const [hh, mm] = timeStr.split(':').map(Number);
+    if (![y, mo, d].every(Number.isFinite)) return null;
+    return new Date(y, mo - 1, d, hh || 0, mm || 0, 0, 0);
+}
+
+function formatFriendlyDateTime(d) {
+    if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+    });
+}
 
 const PlanetaryTable = ({ data, theme, colors }) => {
     if (!data || data.length === 0) return <Text style={[styles.errorText, { color: colors.textSecondary }]}>No data available</Text>;
@@ -115,18 +153,31 @@ const CuspalTable = ({ data, theme, colors }) => {
     );
 };
 
+const sigChipStyles = (theme, colors) => {
+    const isDark = theme === 'dark';
+    return {
+        cardBg: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(249, 115, 22, 0.05)',
+        // Dark: solid chip + light label (tint+orange text is too low-contrast).
+        chipBg: isDark ? colors.primary : 'rgba(249, 115, 22, 0.14)',
+        chipBorder: isDark ? colors.primary : 'rgba(249, 115, 22, 0.55)',
+        chipText: isDark ? '#fff7ed' : colors.primary,
+        title: isDark ? '#fdba74' : colors.primary,
+    };
+};
+
 const SignificatorsView = ({ data, theme, colors }) => {
     if (!data) return <Text style={[styles.errorText, { color: colors.textSecondary }]}>No data available</Text>;
-    
+    const chip = sigChipStyles(theme, colors);
+
     return (
         <ScrollView showsVerticalScrollIndicator={false}>
             {Object.entries(data).map(([house, significators]) => (
-                <View key={house} style={[styles.significatorCard, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(249, 115, 22, 0.05)' }]}>
-                    <Text style={[styles.significatorHouse, { color: colors.primary }]}>House {house}</Text>
+                <View key={house} style={[styles.significatorCard, { backgroundColor: chip.cardBg }]}>
+                    <Text style={[styles.significatorHouse, { color: chip.title }]}>House {house}</Text>
                     <View style={styles.significatorChips}>
                         {significators.map((sig, idx) => (
-                            <View key={idx} style={[styles.significatorChip, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
-                                <Text style={[styles.significatorText, { color: colors.primary }]}>{sig}</Text>
+                            <View key={idx} style={[styles.significatorChip, { backgroundColor: chip.chipBg, borderColor: chip.chipBorder }]}>
+                                <Text style={[styles.significatorText, { color: chip.chipText }]}>{sig}</Text>
                             </View>
                         ))}
                     </View>
@@ -138,16 +189,17 @@ const SignificatorsView = ({ data, theme, colors }) => {
 
 const PlanetSignificatorsView = ({ data, theme, colors }) => {
     if (!data) return <Text style={[styles.errorText, { color: colors.textSecondary }]}>No data available</Text>;
-    
+    const chip = sigChipStyles(theme, colors);
+
     return (
         <ScrollView showsVerticalScrollIndicator={false}>
             {Object.entries(data).map(([planet, houses]) => (
-                <View key={planet} style={[styles.significatorCard, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(249, 115, 22, 0.05)' }]}>
-                    <Text style={[styles.significatorHouse, { color: colors.primary }]}>{planet}</Text>
+                <View key={planet} style={[styles.significatorCard, { backgroundColor: chip.cardBg }]}>
+                    <Text style={[styles.significatorHouse, { color: chip.title }]}>{planet}</Text>
                     <View style={styles.significatorChips}>
                         {houses.map((house, idx) => (
-                            <View key={idx} style={[styles.significatorChip, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
-                                <Text style={[styles.significatorText, { color: colors.primary }]}>House {house}</Text>
+                            <View key={idx} style={[styles.significatorChip, { backgroundColor: chip.chipBg, borderColor: chip.chipBorder }]}>
+                                <Text style={[styles.significatorText, { color: chip.chipText }]}>House {house}</Text>
                             </View>
                         ))}
                     </View>
@@ -159,12 +211,14 @@ const PlanetSignificatorsView = ({ data, theme, colors }) => {
 
 const FourStepTheoryView = ({ data, theme, colors }) => {
     if (!data) return <Text style={[styles.errorText, { color: colors.textSecondary }]}>No data available</Text>;
+    const chip = sigChipStyles(theme, colors);
+    const isDark = theme === 'dark';
 
     const renderStep = (num, label, lord, houses) => (
         <View style={styles.stepContainer}>
             <View style={styles.stepIndicator}>
                 <View style={[styles.stepDot, { backgroundColor: colors.primary }]} />
-                {num < 4 && <View style={[styles.stepLine, { backgroundColor: colors.primary + '30' }]} />}
+                {num < 4 && <View style={[styles.stepLine, { backgroundColor: isDark ? 'rgba(253, 186, 116, 0.35)' : 'rgba(249, 115, 22, 0.25)' }]} />}
             </View>
             <View style={styles.stepContent}>
                 <Text style={[styles.stepNumber, { color: colors.textSecondary }]}>Step {num}: {label}</Text>
@@ -172,8 +226,8 @@ const FourStepTheoryView = ({ data, theme, colors }) => {
                     <Text style={[styles.stepLord, { color: colors.text }]}>{lord}</Text>
                     <View style={styles.stepHouses}>
                         {houses.length > 0 ? houses.map((h, idx) => (
-                            <View key={idx} style={[styles.miniHouseChip, { backgroundColor: colors.primary + '10' }]}>
-                                <Text style={[styles.miniHouseText, { color: colors.primary }]}>{h}</Text>
+                            <View key={idx} style={[styles.miniHouseChip, { backgroundColor: chip.chipBg, borderColor: chip.chipBorder, borderWidth: 1 }]}>
+                                <Text style={[styles.miniHouseText, { color: chip.chipText }]}>{h}</Text>
                             </View>
                         )) : <Text style={[styles.noHousesText, { color: colors.textSecondary }]}>No houses</Text>}
                     </View>
@@ -185,11 +239,11 @@ const FourStepTheoryView = ({ data, theme, colors }) => {
     return (
         <ScrollView showsVerticalScrollIndicator={false}>
             {Object.entries(data).map(([planet, steps]) => (
-                <View key={planet} style={[styles.fourStepCard, { 
-                    backgroundColor: Platform.OS === 'android' 
-                        ? (theme === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(249, 115, 22, 0.08)')
-                        : (theme === 'dark' ? 'rgba(255, 255, 255, 0.03)' : 'rgba(249, 115, 22, 0.03)'), 
-                    borderColor: colors.primary + '20' 
+                <View key={planet} style={[styles.fourStepCard, {
+                    backgroundColor: Platform.OS === 'android'
+                        ? (isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(249, 115, 22, 0.08)')
+                        : (isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(249, 115, 22, 0.03)'),
+                    borderColor: isDark ? 'rgba(253, 186, 116, 0.35)' : 'rgba(249, 115, 22, 0.2)',
                 }]}>
                     <View style={styles.fourStepHeader}>
                         <View style={[styles.planetIconCircle, { backgroundColor: colors.primary }]}>
@@ -197,7 +251,7 @@ const FourStepTheoryView = ({ data, theme, colors }) => {
                         </View>
                         <Text style={[styles.fourStepPlanetTitle, { color: colors.text }]}>{planet} Analysis</Text>
                     </View>
-                    
+
                     <View style={styles.stepsList}>
                         {renderStep(1, 'Planet', steps.planet.name, steps.planet.houses)}
                         {renderStep(2, 'Star Lord', steps.star_lord.name, steps.star_lord.houses)}
@@ -262,6 +316,357 @@ const RulingPlanetsView = ({ data, theme, colors }) => {
     );
 };
 
+const TONE_COLORS = {
+    supportive: '#15803d',
+    mixed: '#a16207',
+    challenging: '#b91c1c',
+    neutral: '#475569',
+};
+
+const TONE_LABELS = {
+    supportive: 'Favourable',
+    mixed: 'Mixed',
+    challenging: 'Under pressure',
+    neutral: 'Neutral',
+};
+
+const RP_ROLE_SHORT = {
+    day_lord: 'Day Lord',
+    moon_star_lord: 'Moon Star',
+    moon_sign_lord: 'Moon Sign',
+    asc_star_lord: 'Asc Star',
+    asc_sub_lord: 'Asc Sub',
+    moon_sub_lord: 'Moon Sub',
+};
+
+const FructificationView = ({ data, theme, colors }) => {
+    const [scopeTab, setScopeTab] = useState('today'); // 'today' | 'hour'
+    const [expandedHouse, setExpandedHouse] = useState(null);
+    const [calcOpen, setCalcOpen] = useState(false);
+
+    useEffect(() => {
+        setExpandedHouse(null);
+        setCalcOpen(false);
+    }, [scopeTab, data?.as_of]);
+
+    if (!data) return null;
+
+    const isDark = theme === 'dark';
+    const surface = isDark ? 'rgba(255,255,255,0.08)' : '#ffffff';
+    const surfaceMuted = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,247,237,0.95)';
+    const border = isDark ? 'rgba(255,255,255,0.16)' : 'rgba(194, 65, 12, 0.18)';
+    const bodyText = isDark ? 'rgba(255,255,255,0.92)' : '#1c1917';
+    const mutedText = isDark ? 'rgba(255,255,255,0.72)' : '#44403c';
+    const subtleText = isDark ? 'rgba(255,255,255,0.55)' : '#78716c';
+
+    const block = scopeTab === 'hour' ? data.hour : data.today;
+    const houses = block?.houses_giving_results || [];
+    const secondary = block?.houses_secondary || [];
+    const manifestations = block?.manifestations || [];
+    const gate = block?.dasha_gate || {};
+    const calc = block?.calculation || {};
+    const roleMap = block?.ruling_planets_used || {};
+
+    const dasha = data.dasha || {};
+    const dashaBits = [
+        ['MD', dasha.mahadasha?.planet || dasha.mahadasha],
+        ['AD', dasha.antardasha?.planet || dasha.antardasha],
+        ['PD', dasha.pratyantardasha?.planet || dasha.pratyantardasha],
+        ['SK', dasha.sookshma?.planet || dasha.sookshma],
+        ['PR', dasha.prana?.planet || dasha.prana],
+    ].filter(([, p]) => p);
+
+    const scopeCopy = scopeTab === 'today'
+        ? {
+            title: 'Today',
+            blurb: 'Houses that can give results across the day, using Day Lord and Moon star lord.',
+            formulaHint: 'AD/PD ∩ Sookshma ∩ Day ruling planets',
+        }
+        : {
+            title: 'This hour',
+            blurb: 'Sharper timing for the selected hour, using the full ruling-planet set.',
+            formulaHint: 'AD/PD ∩ Sookshma ∩ Prana ∩ Hour ruling planets',
+        };
+
+    const renderHowSteps = (how, accent) => {
+        if (!how?.steps?.length) return null;
+        return (
+            <View style={[styles.fructHowBox, { borderColor: border, backgroundColor: surfaceMuted }]}>
+                {how.summary ? (
+                    <Text style={[styles.fructHowSummary, { color: bodyText }]}>{how.summary}</Text>
+                ) : null}
+                {how.steps.map((step) => (
+                    <View key={`${step.step}-${step.title}`} style={[styles.fructHowStep, { borderTopColor: border }]}>
+                        <View style={styles.fructHowStepHead}>
+                            <Text style={[styles.fructHowStepTitle, { color: accent || colors.primary }]}>
+                                Step {step.step} · {step.title}
+                            </Text>
+                            {typeof step.passed === 'boolean' ? (
+                                <View style={[styles.fructPassPill, { backgroundColor: step.passed ? 'rgba(22,163,74,0.15)' : 'rgba(220,38,38,0.15)' }]}>
+                                    <Text style={{ color: step.passed ? '#15803d' : '#b91c1c', fontSize: 11, fontWeight: '800' }}>
+                                        {step.passed ? 'Pass' : 'Fail'}
+                                    </Text>
+                                </View>
+                            ) : null}
+                        </View>
+                        <Text style={[styles.fructBody, { color: mutedText }]}>{step.detail}</Text>
+                        {step.dasha_hits?.length ? (
+                            <Text style={[styles.fructBody, { color: mutedText, marginTop: 6 }]}>
+                                Dasha hits: {step.dasha_hits.map((h) => `${h.label} (${h.planet}) → H${(h.planet_houses || []).join(', H')}`).join(' · ')}
+                            </Text>
+                        ) : null}
+                        {step.activating_rps?.length ? (
+                            <Text style={[styles.fructBody, { color: mutedText, marginTop: 6 }]}>
+                                {step.activating_rps.map((r) => (
+                                    `${r.planet}${r.roles?.length ? ` as ${r.roles.join(' / ')}` : ''} → H${(r.natal_houses || []).join(', H')}`
+                                )).join('\n')}
+                            </Text>
+                        ) : null}
+                        {step.linked_by_planet ? (
+                            <Text style={[styles.fructBody, { color: mutedText, marginTop: 6 }]}>
+                                Linked houses: {Object.entries(step.linked_by_planet).map(([p, hs]) => `${p} → H${(hs || []).join(', H')}`).join(' · ')}
+                            </Text>
+                        ) : null}
+                    </View>
+                ))}
+            </View>
+        );
+    };
+
+    const renderHouseCard = (row, soft = false) => {
+        const key = `${scopeTab}-${row.tier || 'p'}-${row.house}`;
+        const expanded = expandedHouse === key;
+        const tone = soft ? TONE_COLORS.neutral : (TONE_COLORS[row.tone] || TONE_COLORS.neutral);
+        const toneLabel = soft ? 'Background' : (TONE_LABELS[row.tone] || 'Neutral');
+        return (
+            <View key={key} style={{ marginBottom: 10 }}>
+                <TouchableOpacity
+                    activeOpacity={0.88}
+                    onPress={() => setExpandedHouse(expanded ? null : key)}
+                    style={[
+                        styles.fructHouseCard,
+                        {
+                            backgroundColor: soft ? surfaceMuted : surface,
+                            borderColor: soft ? border : `${tone}66`,
+                            borderLeftColor: tone,
+                        },
+                    ]}
+                >
+                    <View style={[styles.fructHouseBadge, { backgroundColor: `${tone}18` }]}>
+                        <Text style={[styles.fructHouseNum, { color: tone }]}>H{row.house}</Text>
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={[styles.fructHouseTitle, { color: bodyText }]} numberOfLines={2}>
+                            {row.label || `House ${row.house}`}
+                        </Text>
+                        <Text style={[styles.fructHouseMeta, { color: mutedText }]} numberOfLines={2}>
+                            {(row.activating_rps || []).join(' · ') || 'No ruling planet'}
+                        </Text>
+                        <View style={[styles.fructTonePill, { backgroundColor: `${tone}18`, alignSelf: 'flex-start' }]}>
+                            <Text style={[styles.fructTonePillText, { color: tone }]}>{toneLabel}</Text>
+                        </View>
+                    </View>
+                    <View style={styles.fructHowLinkRow}>
+                        <Text style={[styles.fructHowLink, { color: colors.primary }]}>
+                            {expanded ? 'Hide' : 'Why'}
+                        </Text>
+                        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.primary} />
+                    </View>
+                </TouchableOpacity>
+                {expanded ? renderHowSteps(row.how, soft ? colors.primary : tone) : null}
+            </View>
+        );
+    };
+
+    return (
+        <View>
+            <View style={[styles.fructIntroCard, { backgroundColor: surface, borderColor: border }]}>
+                <Text style={[styles.fructIntroTitle, { color: bodyText }]}>What can give results</Text>
+                <Text style={[styles.fructBody, { color: mutedText, marginBottom: 0 }]}>
+                    Natal KP significators × current dasha × ruling planets at the selected moment.
+                </Text>
+            </View>
+
+            {dashaBits.length ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.fructDashaRow}>
+                    {dashaBits.map(([label, planet]) => (
+                        <View key={label} style={[styles.fructDashaChip, { backgroundColor: surface, borderColor: border }]}>
+                            <Text style={[styles.fructDashaLabel, { color: subtleText }]}>{label}</Text>
+                            <Text style={[styles.fructDashaPlanet, { color: bodyText }]}>{planet}</Text>
+                        </View>
+                    ))}
+                </ScrollView>
+            ) : null}
+
+            <View style={[styles.fructScopeBar, { backgroundColor: isDark ? 'rgba(0,0,0,0.28)' : 'rgba(255,237,213,0.9)', borderColor: border }]}>
+                {[
+                    { id: 'today', label: 'Today', count: (data.today?.houses_giving_results || []).length },
+                    { id: 'hour', label: 'This hour', count: (data.hour?.houses_giving_results || []).length },
+                ].map((tab) => {
+                    const active = scopeTab === tab.id;
+                    return (
+                        <TouchableOpacity
+                            key={tab.id}
+                            style={[
+                                styles.fructScopeChip,
+                                { backgroundColor: active ? colors.primary : 'transparent' },
+                            ]}
+                            onPress={() => setScopeTab(tab.id)}
+                            activeOpacity={0.9}
+                        >
+                            <Text style={[styles.fructScopeChipText, { color: active ? '#fff' : bodyText }]}>
+                                {tab.label}
+                            </Text>
+                            <Text style={[styles.fructScopeCount, { color: active ? 'rgba(255,255,255,0.85)' : subtleText }]}>
+                                {tab.count} house{tab.count === 1 ? '' : 's'}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
+            </View>
+
+            <Text style={[styles.fructScopeBlurb, { color: mutedText }]}>{scopeCopy.blurb}</Text>
+
+            {Object.keys(roleMap).length ? (
+                <View style={[styles.fructRpStrip, { backgroundColor: surfaceMuted, borderColor: border }]}>
+                    <Text style={[styles.fructSubheadInline, { color: subtleText }]}>Ruling planets used</Text>
+                    <View style={styles.fructHouseRow}>
+                        {Object.entries(roleMap).filter(([, v]) => v).map(([key, planet]) => (
+                            <View key={key} style={[styles.fructRpChip, { backgroundColor: surface, borderColor: border }]}>
+                                <Text style={[styles.fructRpRole, { color: subtleText }]}>{RP_ROLE_SHORT[key] || key}</Text>
+                                <Text style={[styles.fructRpPlanet, { color: bodyText }]}>{planet}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
+            ) : null}
+
+            {gate.prana_fallback ? (
+                <View style={[styles.fructNotice, { backgroundColor: 'rgba(249,115,22,0.12)', borderColor: 'rgba(249,115,22,0.35)' }]}>
+                    <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
+                    <Text style={[styles.fructBody, { color: bodyText, flex: 1, marginBottom: 0 }]}>
+                        Prana did not confirm this hour. Showing Sookshma ∩ ruling planets instead.
+                    </Text>
+                </View>
+            ) : null}
+
+            <TouchableOpacity
+                onPress={() => setCalcOpen((v) => !v)}
+                style={[styles.fructCalcToggle, { borderColor: border, backgroundColor: surface }]}
+                activeOpacity={0.88}
+            >
+                <View style={[styles.fructCalcIcon, { backgroundColor: `${colors.primary}18` }]}>
+                    <Ionicons name="git-branch-outline" size={16} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                    <Text style={[styles.fructHowLink, { color: bodyText }]}>
+                        {calcOpen ? 'Hide full calculation' : 'Show full calculation'}
+                    </Text>
+                    <Text style={[styles.fructBody, { color: mutedText, marginBottom: 0 }]} numberOfLines={calcOpen ? 0 : 2}>
+                        {calc.formula || scopeCopy.formulaHint}
+                    </Text>
+                </View>
+                <Ionicons name={calcOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.primary} />
+            </TouchableOpacity>
+
+            {calcOpen && calc.steps?.length ? (
+                <View style={[styles.fructHowBox, { borderColor: border, backgroundColor: surfaceMuted, marginBottom: 14 }]}>
+                    {calc.steps.map((step) => (
+                        <View key={`${scopeTab}-calc-${step.step}`} style={[styles.fructHowStep, { borderTopColor: border }]}>
+                            <Text style={[styles.fructHowStepTitle, { color: colors.primary }]}>
+                                Step {step.step} · {step.title}
+                            </Text>
+                            <Text style={[styles.fructBody, { color: mutedText }]}>{step.detail}</Text>
+                            {step.ruling_planets_used ? (
+                                <Text style={[styles.fructBody, { color: mutedText, marginTop: 6 }]}>
+                                    {Object.entries(step.ruling_planets_used)
+                                        .filter(([, v]) => v)
+                                        .map(([k, v]) => `${RP_ROLE_SHORT[k] || k}: ${v}`)
+                                        .join(' · ')}
+                                </Text>
+                            ) : null}
+                            {step.houses_by_level ? (
+                                <Text style={[styles.fructBody, { color: mutedText, marginTop: 6 }]}>
+                                    {Object.entries(step.houses_by_level)
+                                        .map(([k, hs]) => `${k}: H${(hs || []).join(', H') || '—'}`)
+                                        .join('\n')}
+                                </Text>
+                            ) : null}
+                        </View>
+                    ))}
+                </View>
+            ) : null}
+
+            <Text style={[styles.fructSectionTitle, { color: bodyText }]}>Houses giving results</Text>
+            {houses.length ? houses.map((row) => renderHouseCard(row, false)) : (
+                <View style={[styles.fructEmpty, { backgroundColor: surfaceMuted, borderColor: border }]}>
+                    <Text style={[styles.fructBody, { color: mutedText, marginBottom: 0, textAlign: 'center' }]}>
+                        No primary fructifying houses for {scopeCopy.title.toLowerCase()}.
+                    </Text>
+                </View>
+            )}
+
+            {secondary.length ? (
+                <>
+                    <Text style={[styles.fructSectionTitle, { color: bodyText, marginTop: 8 }]}>Background only</Text>
+                    <Text style={[styles.fructBody, { color: mutedText }]}>
+                        Present through a weaker ruling-planet link — not counted as primary results.
+                    </Text>
+                    {secondary.map((row) => renderHouseCard(row, true))}
+                </>
+            ) : null}
+
+            <Text style={[styles.fructSectionTitle, { color: bodyText, marginTop: 8 }]}>Predictions</Text>
+            {manifestations.length ? manifestations.map((item) => {
+                const tone = TONE_COLORS[item.outcome_tone] || TONE_COLORS.neutral;
+                return (
+                    <View
+                        key={item.manifestation_id || item.signature_key || item.label}
+                        style={[styles.fructCard, { backgroundColor: surface, borderColor: border, borderLeftColor: tone }]}
+                    >
+                        <View style={styles.fructCardTop}>
+                            <Text style={[styles.fructCardEyebrow, { color: subtleText }]}>
+                                {(item.domain || 'theme').toString()}
+                            </Text>
+                            <View style={[styles.fructTonePill, { backgroundColor: `${tone}18` }]}>
+                                <Text style={[styles.fructTonePillText, { color: tone }]}>
+                                    {TONE_LABELS[item.outcome_tone] || 'Neutral'}
+                                </Text>
+                            </View>
+                        </View>
+                        <Text style={[styles.fructCardTitle, { color: bodyText }]}>{item.label}</Text>
+                        {item.summary ? (
+                            <Text style={[styles.fructBody, { color: mutedText }]}>{item.summary}</Text>
+                        ) : null}
+                        {(item.possibilities || []).slice(0, 5).map((p) => (
+                            <View key={p} style={styles.fructPossibilityRow}>
+                                <View style={[styles.fructDot, { backgroundColor: tone }]} />
+                                <Text style={[styles.fructBullet, { color: bodyText }]}>{p}</Text>
+                            </View>
+                        ))}
+                        <View style={[styles.fructHouseRow, { marginTop: 10 }]}>
+                            {(item.house_roles || []).map((role) => (
+                                <View
+                                    key={`${item.manifestation_id}-${role.native_house}`}
+                                    style={[styles.fructTinyChipWrap, { backgroundColor: `${tone}16` }]}
+                                >
+                                    <Text style={[styles.fructTinyChip, { color: tone }]}>H{role.native_house}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                );
+            }) : (
+                <View style={[styles.fructEmpty, { backgroundColor: surfaceMuted, borderColor: border }]}>
+                    <Text style={[styles.fructBody, { color: mutedText, marginBottom: 0, textAlign: 'center' }]}>
+                        No life themes matched for {scopeCopy.title.toLowerCase()}.
+                    </Text>
+                </View>
+            )}
+        </View>
+    );
+};
+
 const KPScreen = ({ route, navigation }) => {
     const { birthDetails: initialBirthDetails } = route.params || {};
     const [birthDetails, setBirthDetails] = useState(initialBirthDetails);
@@ -270,9 +675,24 @@ const KPScreen = ({ route, navigation }) => {
     const [rulingPlanets, setRulingPlanets] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    // H-Sig / P-Sig: Birth (default) or Today/explore at birth place.
+    const [sigMode, setSigMode] = useState('birth'); // 'birth' | 'today'
+    const [sigMoment, setSigMoment] = useState(() => new Date());
+    const [sigData, setSigData] = useState({
+        significators: null,
+        planetSignificators: null,
+        fourStepTheory: null,
+    });
+    const [sigLoading, setSigLoading] = useState(false);
+    const [sigError, setSigError] = useState(null);
+    const [fructData, setFructData] = useState(null);
+    const [fructLoading, setFructLoading] = useState(false);
+    const [fructError, setFructError] = useState(null);
     const { t } = useTranslation();
     const { theme, colors } = useTheme();
     const fadeAnim = useRef(new Animated.Value(0)).current;
+    const sigRequestIdRef = useRef(0);
+    const fructRequestIdRef = useRef(0);
 
     useEffect(() => {
         fetchAndProcessKPData();
@@ -313,6 +733,156 @@ const KPScreen = ({ route, navigation }) => {
         return unsubscribe;
     }, [navigation, route.params?.birthDetails, birthDetails]);
 
+    const buildKpPayload = useCallback((dateStr, timeStr) => ({
+        birth_date: dateStr,
+        birth_time: timeStr,
+        latitude: birthDetails?.latitude,
+        longitude: birthDetails?.longitude,
+        timezone: '',
+    }), [birthDetails?.latitude, birthDetails?.longitude]);
+
+    const resolveSigMoment = useCallback(() => {
+        if (sigMode === 'birth') {
+            return birthMomentFromDetails(birthDetails);
+        }
+        return sigMoment instanceof Date ? sigMoment : new Date();
+    }, [sigMode, birthDetails, sigMoment]);
+
+    const fetchSignificatorsForMoment = useCallback(async (moment) => {
+        if (birthDetails?.latitude == null || birthDetails?.longitude == null) {
+            setSigError('Birth location is incomplete.');
+            return;
+        }
+        if (!(moment instanceof Date) || Number.isNaN(moment.getTime())) {
+            setSigError('Invalid date/time for significators.');
+            return;
+        }
+        const requestId = ++sigRequestIdRef.current;
+        setSigLoading(true);
+        setSigError(null);
+        try {
+            const payload = buildKpPayload(formatLocalDate(moment), formatLocalTime(moment));
+            const response = await kpAPI.getKPChart(payload);
+            if (requestId !== sigRequestIdRef.current) return;
+            if (response.data && response.data.success) {
+                const rawData = response.data.data;
+                setSigData({
+                    significators: rawData.significators,
+                    planetSignificators: rawData.planet_significators,
+                    fourStepTheory: rawData.four_step_theory,
+                });
+            } else {
+                setSigError(response.data?.detail || 'Failed to update for selected moment.');
+            }
+        } catch (e) {
+            if (requestId !== sigRequestIdRef.current) return;
+            setSigError(e.message || 'Failed to update for selected moment.');
+            console.error('KP moment API Error:', e.response?.data || e);
+        } finally {
+            if (requestId === sigRequestIdRef.current) {
+                setSigLoading(false);
+            }
+        }
+    }, [birthDetails?.latitude, birthDetails?.longitude, buildKpPayload]);
+
+    const fetchFructificationForMoment = useCallback(async (moment) => {
+        if (birthDetails?.latitude == null || birthDetails?.longitude == null) {
+            setFructError('Birth location is incomplete.');
+            return;
+        }
+        if (!birthDetails?.date || !birthDetails?.time) {
+            setFructError('Birth details are incomplete.');
+            return;
+        }
+        if (!(moment instanceof Date) || Number.isNaN(moment.getTime())) {
+            setFructError('Invalid date/time.');
+            return;
+        }
+        const requestId = ++fructRequestIdRef.current;
+        setFructLoading(true);
+        setFructError(null);
+        try {
+            const birthDate = String(birthDetails.date).split('T')[0];
+            let birthTime = String(birthDetails.time);
+            if (birthTime.includes('T')) birthTime = birthTime.split('T')[1];
+            birthTime = birthTime.slice(0, 5);
+            const payload = {
+                birth_date: birthDate,
+                birth_time: birthTime,
+                latitude: birthDetails.latitude,
+                longitude: birthDetails.longitude,
+                timezone: '',
+                as_of_date: formatLocalDate(moment),
+                as_of_time: formatLocalTime(moment),
+                language: 'en',
+                synthesize: true,
+            };
+            const response = await kpAPI.getFructification(payload);
+            if (requestId !== fructRequestIdRef.current) return;
+            if (response.data && response.data.success) {
+                setFructData(response.data.data);
+            } else {
+                setFructError(response.data?.detail || 'Failed to load results for this moment.');
+            }
+        } catch (e) {
+            if (requestId !== fructRequestIdRef.current) return;
+            setFructError(e.message || 'Failed to load results for this moment.');
+            console.error('KP fructification API Error:', e.response?.data || e);
+        } finally {
+            if (requestId === fructRequestIdRef.current) {
+                setFructLoading(false);
+            }
+        }
+    }, [birthDetails]);
+
+    // Debounced refetch when mode / birth / explorer moment changes.
+    useEffect(() => {
+        if (birthDetails?.latitude == null || birthDetails?.longitude == null) return;
+        const moment = resolveSigMoment();
+        if (!moment) return;
+        const timer = setTimeout(() => {
+            fetchSignificatorsForMoment(moment);
+        }, sigMode === 'today' ? 280 : 0);
+        return () => clearTimeout(timer);
+    }, [
+        sigMode,
+        sigMoment,
+        birthDetails?.latitude,
+        birthDetails?.longitude,
+        birthDetails?.date,
+        birthDetails?.time,
+        birthDetails?.name,
+        resolveSigMoment,
+        fetchSignificatorsForMoment,
+    ]);
+
+    // Results tab: always uses clock moment at birth place (natal chart × current dasha/RPs).
+    useEffect(() => {
+        if (activeTab !== 'results') return;
+        if (birthDetails?.latitude == null || birthDetails?.longitude == null) return;
+        const moment = sigMoment instanceof Date ? sigMoment : new Date();
+        const timer = setTimeout(() => {
+            fetchFructificationForMoment(moment);
+        }, 280);
+        return () => clearTimeout(timer);
+    }, [
+        activeTab,
+        sigMoment,
+        birthDetails?.latitude,
+        birthDetails?.longitude,
+        birthDetails?.date,
+        birthDetails?.time,
+        birthDetails?.name,
+        fetchFructificationForMoment,
+    ]);
+
+    const selectSigMode = (mode) => {
+        if (mode === 'today') {
+            setSigMoment(new Date());
+        }
+        setSigMode(mode);
+    };
+
     const fetchAndProcessKPData = async () => {
         if (!birthDetails || !birthDetails.date || !birthDetails.time) {
             setError('Birth details are incomplete.');
@@ -321,15 +891,12 @@ const KPScreen = ({ route, navigation }) => {
         }
         try {
             setLoading(true);
-            const apiPayload = {
-                birth_date: birthDetails.date.split('T')[0],
-                birth_time: birthDetails.time.split('T')[1] ? birthDetails.time.split('T')[1].slice(0, 5) : birthDetails.time,
-                latitude: birthDetails.latitude,
-                longitude: birthDetails.longitude,
-                timezone: '',
-            };
+            const apiPayload = buildKpPayload(
+                birthDetails.date.split('T')[0],
+                birthDetails.time.split('T')[1] ? birthDetails.time.split('T')[1].slice(0, 5) : birthDetails.time,
+            );
             
-            // Fetch both KP Chart and Ruling Planets in parallel
+            // Natal KP chart + ruling planets (birth moment). Significators use sigMoment separately.
             const [response, rpResponse] = await Promise.all([
                 kpAPI.getKPChart(apiPayload),
                 kpAPI.getRulingPlanets(apiPayload)
@@ -350,9 +917,6 @@ const KPScreen = ({ route, navigation }) => {
                 setProcessedData({
                     planets: planetsData,
                     cusps: cuspsData,
-                    significators: rawData.significators,
-                    planetSignificators: rawData.planet_significators,
-                    fourStepTheory: rawData.four_step_theory,
                 });
             } else {
                 setError(response.data.detail || 'Failed to fetch KP data.');
@@ -369,7 +933,199 @@ const KPScreen = ({ route, navigation }) => {
         }
     };
 
+    const renderMomentControls = () => {
+        const birthMoment = birthMomentFromDetails(birthDetails);
+        const activeMoment = resolveSigMoment();
+        const isDark = theme === 'dark';
+        const segmentActiveBg = isDark ? 'rgba(255, 107, 53, 0.95)' : colors.primary;
+        const segmentIdleBg = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(249, 115, 22, 0.1)';
+
+        return (
+            <>
+                <View style={[styles.sigModeBar, { backgroundColor: isDark ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.65)' }]}>
+                    {['birth', 'today'].map((mode) => {
+                        const active = sigMode === mode;
+                        return (
+                            <TouchableOpacity
+                                key={mode}
+                                style={[styles.sigModeChip, { backgroundColor: active ? segmentActiveBg : segmentIdleBg }]}
+                                onPress={() => selectSigMode(mode)}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={[styles.sigModeChipText, { color: active ? '#fff' : colors.text }]}>
+                                    {mode === 'birth' ? 'Birth' : 'Today'}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+
+                {sigMode === 'birth' ? (
+                    <View style={styles.sigMetaRow}>
+                        <Ionicons name="sparkles-outline" size={14} color={colors.primary} />
+                        <Text style={[styles.sigHint, { color: colors.textSecondary, marginBottom: 0, flex: 1 }]}>
+                            Natal moment{birthMoment ? ` · ${formatFriendlyDateTime(birthMoment)}` : ''}
+                        </Text>
+                    </View>
+                ) : (
+                    <>
+                        <View style={styles.sigMetaRow}>
+                            <Ionicons name="time-outline" size={14} color={colors.primary} />
+                            <Text style={[styles.sigHint, { color: colors.textSecondary, marginBottom: 0, flex: 1 }]}>
+                                Explore any moment at birth place
+                            </Text>
+                            <TouchableOpacity
+                                style={[styles.sigNowBtn, { backgroundColor: segmentIdleBg }]}
+                                onPress={() => setSigMoment(new Date())}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                                <Ionicons name="refresh" size={13} color={colors.primary} />
+                                <Text style={[styles.sigNowBtnText, { color: colors.primary }]}>Now</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <DateNavigator
+                            date={sigMoment}
+                            onDateChange={setSigMoment}
+                            includeTime
+                            resetDate={new Date()}
+                            cosmicTheme={isDark}
+                        />
+                    </>
+                )}
+
+                {sigLoading ? (
+                    <View style={styles.sigLoadingRow}>
+                        <ActivityIndicator size="small" color={colors.primary} />
+                        <Text style={[styles.loadingText, { color: colors.textSecondary, marginLeft: 8 }]}>
+                            Updating…
+                        </Text>
+                    </View>
+                ) : null}
+                {!sigLoading && activeMoment && sigMode === 'today' ? (
+                    <Text style={[styles.sigActiveStamp, { color: colors.textSecondary }]}>
+                        Showing {formatFriendlyDateTime(activeMoment)}
+                    </Text>
+                ) : null}
+                {sigError ? (
+                    <Text style={[styles.errorText, { color: colors.error }]}>{sigError}</Text>
+                ) : null}
+            </>
+        );
+    };
+
+    const renderMomentDrivenTab = (kind) => {
+        let body = null;
+        if (!sigError) {
+            if (kind === 'house') {
+                body = <SignificatorsView data={sigData.significators} theme={theme} colors={colors} />;
+            } else if (kind === 'planet') {
+                body = <PlanetSignificatorsView data={sigData.planetSignificators} theme={theme} colors={colors} />;
+            } else {
+                body = <FourStepTheoryView data={sigData.fourStepTheory} theme={theme} colors={colors} />;
+            }
+        }
+
+        return (
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+                {renderMomentControls()}
+                {body}
+            </ScrollView>
+        );
+    };
+
+    const renderResultsTab = () => {
+        const isDark = theme === 'dark';
+        const segmentIdleBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.12)';
+        const activeMoment = sigMoment instanceof Date ? sigMoment : new Date();
+        const bodyText = isDark ? 'rgba(255,255,255,0.92)' : '#1c1917';
+        const mutedText = isDark ? 'rgba(255,255,255,0.72)' : '#44403c';
+        return (
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
+                <View style={[styles.fructMomentBar, {
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.92)',
+                    borderColor: isDark ? 'rgba(255,255,255,0.14)' : 'rgba(194, 65, 12, 0.16)',
+                }]}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={[styles.fructMomentTitle, { color: bodyText }]}>Selected moment</Text>
+                        <Text style={[styles.fructMomentMeta, { color: mutedText }]}>
+                            Birth place · {formatFriendlyDateTime(activeMoment)}
+                        </Text>
+                    </View>
+                    <TouchableOpacity
+                        style={[styles.sigNowBtn, { backgroundColor: segmentIdleBg }]}
+                        onPress={() => setSigMoment(new Date())}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                        <Ionicons name="refresh" size={14} color={colors.primary} />
+                        <Text style={[styles.sigNowBtnText, { color: colors.primary }]}>Now</Text>
+                    </TouchableOpacity>
+                </View>
+                <DateNavigator
+                    date={activeMoment}
+                    onDateChange={setSigMoment}
+                    includeTime
+                    resetDate={new Date()}
+                    cosmicTheme={isDark}
+                />
+                {fructLoading ? (
+                    <View style={[styles.sigLoadingRow, { marginTop: 8 }]}>
+                        <ActivityIndicator size="small" color={colors.primary} />
+                        <Text style={[styles.fructBodyLoading, { color: mutedText }]}>
+                            Computing today & this hour…
+                        </Text>
+                    </View>
+                ) : null}
+                {fructError ? (
+                    <Text style={[styles.errorText, { color: colors.error }]}>{fructError}</Text>
+                ) : null}
+                {!fructError && !fructLoading ? (
+                    <FructificationView data={fructData} theme={theme} colors={colors} />
+                ) : null}
+            </ScrollView>
+        );
+    };
+
     const renderContent = () => {
+        if (activeTab === 'results') {
+            if (birthDetails?.latitude == null || birthDetails?.longitude == null) {
+                if (loading) {
+                    return (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color={colors.primary} />
+                            <Text style={[styles.loadingText, { color: colors.text }]}>Loading KP Analysis...</Text>
+                        </View>
+                    );
+                }
+                return <Text style={[styles.errorText, { color: colors.error }]}>{error || 'Birth location is incomplete.'}</Text>;
+            }
+            return renderResultsTab();
+        }
+
+        if (
+            activeTab === 'significators'
+            || activeTab === 'planetSignificators'
+            || activeTab === 'fourStep'
+        ) {
+            // Moment-driven tabs share Birth/Today + navigator (independent of natal planets/cusps).
+            if (birthDetails?.latitude == null || birthDetails?.longitude == null) {
+                if (loading) {
+                    return (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color={colors.primary} />
+                            <Text style={[styles.loadingText, { color: colors.text }]}>Loading KP Analysis...</Text>
+                        </View>
+                    );
+                }
+                return <Text style={[styles.errorText, { color: colors.error }]}>{error || 'Birth location is incomplete.'}</Text>;
+            }
+            const kind = activeTab === 'significators'
+                ? 'house'
+                : activeTab === 'planetSignificators'
+                    ? 'planet'
+                    : 'fourStep';
+            return renderMomentDrivenTab(kind);
+        }
+
         if (loading) {
             return (
                 <View style={styles.loadingContainer}>
@@ -395,12 +1151,6 @@ const KPScreen = ({ route, navigation }) => {
                 );
             case 'cusps':
                 return <CuspalTable data={processedData.cusps} theme={theme} colors={colors} />;
-            case 'significators':
-                return <SignificatorsView data={processedData.significators} theme={theme} colors={colors} />;
-            case 'planetSignificators':
-                return <PlanetSignificatorsView data={processedData.planetSignificators} theme={theme} colors={colors} />;
-            case 'fourStep':
-                return <FourStepTheoryView data={processedData.fourStepTheory} theme={theme} colors={colors} />;
             default:
                 return null;
         }
@@ -435,10 +1185,13 @@ const KPScreen = ({ route, navigation }) => {
                     <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
                         <View style={styles.tabContainer}>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                                {['planets', 'cusps', 'significators', 'planetSignificators', 'fourStep'].map((tab) => (
+                                {['planets', 'cusps', 'significators', 'planetSignificators', 'fourStep', 'results'].map((tab) => (
                                     <TouchableOpacity
                                         key={tab}
-                                        onPress={() => setActiveTab(tab)}
+                                        onPress={() => {
+                                            if (tab === 'results') setSigMoment(new Date());
+                                            setActiveTab(tab);
+                                        }}
                                         style={[styles.tab, activeTab === tab && styles.activeTab]}
                                     >
                                         <LinearGradient
@@ -449,11 +1202,15 @@ const KPScreen = ({ route, navigation }) => {
                                                     : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
                                             style={styles.tabGradient}
                                         >
-                                            <Text style={[styles.tabText, { color: activeTab === tab ? '#fff' : colors.text }]}>
-                                                {tab === 'planets' ? 'Planets' : 
-                                                 tab === 'cusps' ? 'Cusps' : 
-                                                 tab === 'significators' ? 'H-Sig' : 
-                                                 tab === 'planetSignificators' ? 'P-Sig' : '4-Step'}
+                                            <Text
+                                                numberOfLines={1}
+                                                style={[styles.tabText, { color: activeTab === tab ? '#fff' : colors.text }]}
+                                            >
+                                                {tab === 'planets' ? 'Planets' :
+                                                 tab === 'cusps' ? 'Cusps' :
+                                                 tab === 'significators' ? 'H-Sig' :
+                                                 tab === 'planetSignificators' ? 'P-Sig' :
+                                                 tab === 'fourStep' ? 'Steps' : 'Results'}
                                             </Text>
                                         </LinearGradient>
                                     </TouchableOpacity>
@@ -464,10 +1221,12 @@ const KPScreen = ({ route, navigation }) => {
                         <View style={[styles.contentCard, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.9)' }]}>
                             {renderContent()}
                             
-                            <View style={[styles.legend, { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.1)' : 'rgba(249, 115, 22, 0.08)' }]}>
-                                <Text style={[styles.legendTitle, { color: colors.text }]}>Legend:</Text>
-                                <Text style={[styles.legendText, { color: colors.textSecondary }]}>SL = Sign Lord  •  NL = Nakshatra Lord  •  SB = Sub Lord  •  SS = Sub-Sub Lord  •  Pd = Pada</Text>
-                            </View>
+                            {activeTab !== 'results' ? (
+                                <View style={[styles.legend, { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.1)' : 'rgba(249, 115, 22, 0.08)' }]}>
+                                    <Text style={[styles.legendTitle, { color: colors.text }]}>Legend:</Text>
+                                    <Text style={[styles.legendText, { color: colors.textSecondary }]}>SL = Sign Lord  •  NL = Nakshatra Lord  •  SB = Sub Lord  •  SS = Sub-Sub Lord  •  Pd = Pada</Text>
+                                </View>
+                            ) : null}
                         </View>
                     </Animated.View>
                 </SafeAreaView>
@@ -518,19 +1277,19 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     tab: {
-        flex: 1,
         borderRadius: 12,
         overflow: 'hidden',
+        flexShrink: 0,
     },
     tabGradient: {
-        paddingVertical: 12,
-        paddingHorizontal: 16,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
         alignItems: 'center',
         borderRadius: 12,
     },
     tabText: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 13,
+        fontWeight: '700',
     },
     contentCard: {
         flex: 1,
@@ -543,6 +1302,366 @@ const styles = StyleSheet.create({
         elevation: 4,
         // Android Glassmorphism Fix - Use dark tint instead of white
         backgroundColor: Platform.OS === 'android' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.05)',
+    },
+    sigModeBar: {
+        flexDirection: 'row',
+        gap: 8,
+        padding: 4,
+        borderRadius: 12,
+        marginBottom: 10,
+    },
+    sigModeChip: {
+        flex: 1,
+        paddingVertical: 9,
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    sigModeChipText: {
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    sigMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 10,
+    },
+    sigHint: {
+        fontSize: 12,
+        marginBottom: 8,
+        lineHeight: 16,
+    },
+    sigNowBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 8,
+    },
+    sigNowBtnText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    sigActiveStamp: {
+        fontSize: 11,
+        marginBottom: 8,
+        fontWeight: '600',
+    },
+    sigLoadingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    fructMomentBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        borderWidth: 1,
+        borderRadius: 14,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        marginBottom: 10,
+    },
+    fructMomentTitle: {
+        fontSize: 15,
+        fontWeight: '800',
+        marginBottom: 2,
+    },
+    fructMomentMeta: {
+        fontSize: 13,
+        lineHeight: 18,
+        fontWeight: '500',
+    },
+    fructBodyLoading: {
+        marginLeft: 10,
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    fructIntroCard: {
+        borderWidth: 1,
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 12,
+    },
+    fructIntroTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        marginBottom: 6,
+    },
+    fructBody: {
+        fontSize: 14,
+        lineHeight: 21,
+        marginBottom: 6,
+        fontWeight: '500',
+    },
+    fructSectionTitle: {
+        fontSize: 16,
+        fontWeight: '800',
+        marginBottom: 10,
+        marginTop: 4,
+    },
+    fructSubheadInline: {
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 8,
+    },
+    fructScopeBar: {
+        flexDirection: 'row',
+        gap: 6,
+        padding: 4,
+        borderRadius: 14,
+        borderWidth: 1,
+        marginBottom: 10,
+    },
+    fructScopeChip: {
+        flex: 1,
+        borderRadius: 11,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
+        alignItems: 'center',
+    },
+    fructScopeChipText: {
+        fontSize: 14,
+        fontWeight: '800',
+    },
+    fructScopeCount: {
+        fontSize: 11,
+        fontWeight: '600',
+        marginTop: 2,
+    },
+    fructScopeBlurb: {
+        fontSize: 14,
+        lineHeight: 20,
+        marginBottom: 12,
+        fontWeight: '500',
+    },
+    fructRpStrip: {
+        borderWidth: 1,
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 12,
+    },
+    fructRpChip: {
+        borderWidth: 1,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+    },
+    fructRpRole: {
+        fontSize: 10,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    fructRpPlanet: {
+        fontSize: 13,
+        fontWeight: '800',
+        marginTop: 2,
+    },
+    fructNotice: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 12,
+    },
+    fructHouseRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    fructHouseCard: {
+        borderWidth: 1,
+        borderLeftWidth: 4,
+        borderRadius: 14,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    fructHouseBadge: {
+        width: 46,
+        height: 46,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    fructHouseNum: {
+        fontSize: 16,
+        fontWeight: '800',
+    },
+    fructHouseTitle: {
+        fontSize: 14,
+        fontWeight: '800',
+        marginBottom: 3,
+        lineHeight: 19,
+    },
+    fructHouseMeta: {
+        fontSize: 13,
+        lineHeight: 18,
+        fontWeight: '500',
+        marginBottom: 6,
+    },
+    fructTonePill: {
+        borderRadius: 999,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+    },
+    fructTonePillText: {
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    fructHowLinkRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+    },
+    fructHowLink: {
+        fontSize: 13,
+        fontWeight: '800',
+    },
+    fructHowBox: {
+        borderWidth: 1,
+        borderRadius: 14,
+        paddingHorizontal: 12,
+        paddingTop: 4,
+        paddingBottom: 8,
+        marginTop: 8,
+    },
+    fructHowSummary: {
+        fontSize: 14,
+        fontWeight: '700',
+        marginTop: 10,
+        marginBottom: 4,
+        lineHeight: 20,
+    },
+    fructHowStep: {
+        paddingTop: 10,
+        marginTop: 6,
+        borderTopWidth: StyleSheet.hairlineWidth,
+    },
+    fructHowStepHead: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+        gap: 8,
+    },
+    fructHowStepTitle: {
+        fontSize: 13,
+        fontWeight: '800',
+        flex: 1,
+    },
+    fructPassPill: {
+        borderRadius: 999,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+    },
+    fructCalcToggle: {
+        borderWidth: 1,
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    fructCalcIcon: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    fructCard: {
+        borderWidth: 1,
+        borderLeftWidth: 4,
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 12,
+    },
+    fructCardTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+        gap: 8,
+    },
+    fructCardEyebrow: {
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+        flex: 1,
+    },
+    fructCardTitle: {
+        fontSize: 16,
+        fontWeight: '800',
+        marginBottom: 6,
+        lineHeight: 22,
+    },
+    fructPossibilityRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        marginBottom: 6,
+    },
+    fructDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        marginTop: 7,
+    },
+    fructBullet: {
+        flex: 1,
+        fontSize: 14,
+        lineHeight: 21,
+        fontWeight: '500',
+    },
+    fructTinyChipWrap: {
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    fructTinyChip: {
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    fructDashaRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 12,
+        paddingRight: 4,
+    },
+    fructDashaChip: {
+        borderRadius: 12,
+        borderWidth: 1,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        alignItems: 'center',
+        minWidth: 58,
+    },
+    fructDashaLabel: {
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 0.4,
+    },
+    fructDashaPlanet: {
+        fontSize: 13,
+        fontWeight: '800',
+        marginTop: 2,
+    },
+    fructEmpty: {
+        borderWidth: 1,
+        borderRadius: 14,
+        padding: 16,
+        marginBottom: 12,
     },
     loadingContainer: {
         flex: 1,
@@ -611,7 +1730,7 @@ const styles = StyleSheet.create({
     },
     significatorText: {
         fontSize: 13,
-        fontWeight: '600',
+        fontWeight: '700',
     },
     legend: {
         marginTop: 16,
@@ -731,13 +1850,15 @@ const styles = StyleSheet.create({
         marginLeft: 10,
     },
     miniHouseChip: {
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        minWidth: 22,
+        alignItems: 'center',
     },
     miniHouseText: {
-        fontSize: 10,
-        fontWeight: '700',
+        fontSize: 11,
+        fontWeight: '800',
     },
     noHousesText: {
         fontSize: 10,

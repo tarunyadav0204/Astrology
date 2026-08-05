@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -653,7 +654,14 @@ export default function MonthlyDeepScreen() {
     if (!singleMonth) return;
     try {
       setIsExportingPdf(true);
-      const logoDataUri = await getLogoDataUriForModule(require('../../assets/logo.png'));
+      let logoDataUri = null;
+      if (Platform.OS !== 'web') {
+        try {
+          logoDataUri = await getLogoDataUriForModule(require('../../assets/logo.png'));
+        } catch (_) {
+          logoDataUri = null;
+        }
+      }
       // Build a minimal monthlyData object containing only this month for the PDF generator
       const monthlyDataForPdf = monthlyData && monthlyData.monthly_predictions
         ? { ...monthlyData, monthly_predictions: monthlyData.monthly_predictions.filter(m => m.month_id === singleMonth.month_id) }
@@ -665,7 +673,10 @@ export default function MonthlyDeepScreen() {
         monthlyData: monthlyDataForPdf,
         logoDataUri,
       });
-      await sharePDFOnWhatsApp(pdfUri);
+      await sharePDFOnWhatsApp(pdfUri, {
+        contentType: 'monthly_deep',
+        source: 'monthly_deep_screen',
+      });
     } catch (error) {
       console.error('Monthly deep export PDF error:', error);
       Alert.alert('Export failed', userFacingPdfExportError(error));
