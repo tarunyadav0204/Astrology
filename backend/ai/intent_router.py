@@ -755,127 +755,10 @@ def _normalize_lifespan_timing_mode(result: Dict[str, Any]) -> None:
 
 
 def _looks_like_location_recommendation_question(user_question: str) -> bool:
-    """Heuristic for where-to-move / which-city / favorable-direction asks."""
-    q = _normalize_question_for_intent(user_question)
-    if not q:
-        return False
-    # Timing-of-move questions stay on lifespan/relocation timing, not cartography.
-    if any(
-        phrase in q
-        for phrase in (
-            "when will i move",
-            "when should i move",
-            "when will i relocate",
-            "when can i move",
-            "kab shift",
-            "kab move",
-        )
-    ):
-        return False
-    cues = (
-        "where should i move",
-        "where should i relocate",
-        "where should i settle",
-        "where to move",
-        "where to relocate",
-        "where to settle",
-        "which city",
-        "which place",
-        "which location",
-        "best city",
-        "best place to live",
-        "best place for",
-        "best location",
-        "good location",
-        "good locations",
-        "locations are good",
-        "locations good for",
-        "favorable location",
-        "favourable location",
-        "favorable direction",
-        "favourable direction",
-        "which direction",
-        "best direction",
-        "where will i get",
-        "where can i get",
-        "kis shehar",
-        "kaun sa shehar",
-        "kahan shift",
-        "kahan move",
-        "kahan settle",
-        "kahan jaakar",
-        "kahan jakar",
-        "city for career",
-        "city for job",
-        "city for money",
-        "city for marriage",
-        "location for career",
-        "location for wealth",
-        "location for money",
-        "locations for",
-        "places for wealth",
-        "places for money",
-        "places for career",
-        "relocate for career",
-        "relocate for job",
-        "move for career",
-        "move for money",
-        "move for marriage",
-        "astrocartography",
-        "astro cartography",
-        "relocation chart",
-        "move abroad",
-        "settle abroad",
-        "which country",
-        "where should i live",
-        "where to live",
-    )
-    if any(cue in q for cue in cues):
-        return True
+    """Deprecated keyword heuristic — location mode is LLM-decided only.
 
-    # Broader: place/city/location wording + life-goal wording on the selected native.
-    place_tokens = (
-        "location",
-        "locations",
-        "city",
-        "cities",
-        "place",
-        "places",
-        "shehar",
-        "शहर",
-        "direction",
-        "directions",
-        "relocat",
-        "where to",
-        "kahan",
-        "कहाँ",
-    )
-    goal_tokens = (
-        "wealth",
-        "money",
-        "rich",
-        "income",
-        "career",
-        "job",
-        "business",
-        "marriage",
-        "relationship",
-        "live",
-        "settle",
-        "move",
-        "grow",
-        "generate",
-        "earn",
-        "prosper",
-    )
-    has_place = any(tok in q for tok in place_tokens)
-    has_goal = any(tok in q for tok in goal_tokens)
-    if has_place and has_goal:
-        # Avoid partnership false-positives: "relationship with my wife in which city" is rare;
-        # "my relationship with..." without place intent stays gated by subject gate.
-        if "relationship with" in q or "compatibility with" in q:
-            return False
-        return True
+    Kept as a no-op so older imports do not break. Always returns False.
+    """
     return False
 
 
@@ -1067,15 +950,13 @@ def _force_recommend_location_mode(
     language: str = "english",
 ) -> None:
     """
-    Normalize RECOMMEND_LOCATION routing.
+    Normalize RECOMMEND_LOCATION only when the intent LLM already chose that mode.
 
-    Important: never invent clarification_question text here unless the LLM omitted it —
-    prefer LLM wording in the user's language. Code only detects already-stated
-    india/abroad/both scope from the user text (never from LLM hallucinations).
+    Do not keyword-force location mode — birth Place: fields + marriage wording
+    falsely triggered cartography. India/abroad scope still comes from user text only.
     """
     mode_u = str(result.get("mode") or "").strip().upper()
-    looks_location = _looks_like_location_recommendation_question(user_question) or mode_u == "RECOMMEND_LOCATION"
-    if not looks_location:
+    if mode_u != "RECOMMEND_LOCATION":
         return
 
     result["mode"] = "RECOMMEND_LOCATION"
@@ -1525,7 +1406,7 @@ Modes:
 - LIFE_TERMINATION_RESEARCH: only with the configured unlock phrase and explicit death/longevity-end timing.
 - ANALYZE_PERSONALITY: nature, traits, temperament, self-understanding.
 - ANALYZE_TOPIC_POTENTIAL: "how is my career/marriage/health/money/relationship" style readings.
-- RECOMMEND_LOCATION: where to move/relocate/settle, which city/place/direction is favorable for a goal (career, wealth, marriage, etc.). Not for "when will I move" timing. If location_scope is unknown, CLARIFY and ask whether they want India only, abroad, or both — in the SAME language/script as the current question (LLM-authored wording only).
+- RECOMMEND_LOCATION: ONLY when the user is asking where to relocate / live / settle, or which city / place / country / direction is favorable. Not for "when will I move" timing. Not for marriage/relationship timing, compatibility, or rival questions. Birth-detail lines like "Place: <city>" are NOT a location ask. If location_scope is unknown, CLARIFY and ask whether they want India only, abroad, or both — in the SAME language/script as the current question (LLM-authored wording only).
 - RECOMMEND_REMEDY_FOR_PROBLEM: ONLY when query_context already marks a Remedies CTA follow-up. Wording like "what should I do" / "upay" alone is NOT enough — use ANALYZE_ROOT_CAUSE or ANALYZE_TOPIC_POTENTIAL with answer_mode problem_diagnosis / topic_reading so the UI can offer the Remedies card.
 
 Answer modes:
@@ -1576,6 +1457,8 @@ Calibration:
 - "Where should I move in India for career?" -> READY, RECOMMEND_LOCATION, location_scope india.
 - "Which city abroad is best for wealth?" -> READY, RECOMMEND_LOCATION, category wealth, location_scope abroad.
 - User previously asked where to move; now answers "abroad" / "विदेश" / "both" -> READY, RECOMMEND_LOCATION with matching location_scope.
+- "When will I get married?" -> READY, LIFESPAN_EVENT_TIMING (or event timing), NOT RECOMMEND_LOCATION.
+- Birth details with Place: cities + marriage/love/commitment asks -> marriage/relationship timing or topic reading, NOT RECOMMEND_LOCATION.
 
 Return exactly this JSON shape:
 {{
@@ -1716,7 +1599,7 @@ Rules:
 - Use `LIFE_TERMINATION_RESEARCH` only when the configured death/longevity unlock phrase is present and the user explicitly asks death/life-termination/lifespan-end timing. This is not normal health mode.
 - Use `ANALYZE_PERSONALITY` for personality/self-understanding questions.
 - Use `ANALYZE_TOPIC_POTENTIAL` for "how is my career/love/money/health" style questions.
-- Use `RECOMMEND_LOCATION` for where to move/relocate/settle, which city/place/direction for a goal. Not for "when will I move".
+- Use `RECOMMEND_LOCATION` ONLY when the user wants where to relocate/live/settle, or which city/place/country/direction is favorable. Not for "when will I move". Not for marriage timing, love/compatibility, or "whom will he marry". Birth "Place:" fields are NOT a relocate ask.
 - For `RECOMMEND_LOCATION`: if the user has NOT clearly said India-only / abroad-overseas / both, return CLARIFY. Your clarification_question MUST ask that geography preference in the SAME language/script as the current question (LLM-authored; never English-by-default). Set extracted_context.location_scope to "india"|"abroad"|"both" when known, else null.
 - Use `RECOMMEND_REMEDY_FOR_PROBLEM` ONLY when query_context already marks a Remedies CTA follow-up. Plain "what should I do" / upay wording → `ANALYZE_ROOT_CAUSE` + `problem_diagnosis` (not a full remedy dump).
 - IMPORTANT: clarification is ALLOWED in instant mode. Do NOT default to READY when the ask is genuinely unclear.
@@ -2272,7 +2155,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
         - "ANALYZE_TOPIC_POTENTIAL": Assesses the potential of a life area (e.g., "Tell me about my financial prospects.").
         - "ANALYZE_PERSONALITY": Describes the user's character based on their chart (e.g., "What does my chart say about me?", "What are my strengths?").
         - "ANALYZE_ROOT_CAUSE": For deep-seated "why" questions (e.g., "Why do I always struggle with self-confidence?").
-        - "RECOMMEND_LOCATION": Where to move/relocate/settle, which city/place/direction favors a goal (career, wealth, marriage, etc.). Not for "when will I move" timing questions.
+        - "RECOMMEND_LOCATION": ONLY when the user asks where to relocate/live/settle, or which city/place/country/direction is favorable. Not for "when will I move". Not for marriage timing, love/compatibility, or rival questions. Birth-detail "Place:" lines are NOT a relocate ask.
           🚨 If the user has not clearly chosen India-only vs abroad/overseas vs both, return status "CLARIFY" with mode RECOMMEND_LOCATION. Write clarification_question yourself in the CURRENT QUESTION language/script asking that geography preference. Set extracted_context.location_scope to "india"|"abroad"|"both" when known, else null.
           🚨 When the user already said India / abroad / both (in any language), return READY with that location_scope — do not re-ask.
         - "RECOMMEND_REMEDY_FOR_PROBLEM": ONLY when the client already marked a Remedies CTA follow-up. For wording-only asks like "I have anxiety, what can I do?", use ANALYZE_ROOT_CAUSE / problem_diagnosis instead (UI offers Remedies separately).

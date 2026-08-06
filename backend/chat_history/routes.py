@@ -1833,19 +1833,13 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 return response
         log_ask_phase("session_and_idempotency_check")
 
-        # Locational / city asks are always single-chart — never keep a stuck partnership gate.
-        from ai.intent_router import _looks_like_location_recommendation_question
-
-        is_location_recommendation_question_early = _looks_like_location_recommendation_question(
-            sanitize_text(question)
-        )
-        # Reuse the open connection — nested get_conn() can exhaust the pool and hang/fail asks.
+        # Locational / city clarify replies stay on the selected chart — never partnership gate.
         skip_subject_gate_for_location_clarify_early = _should_skip_subject_gate_for_location_clarify(
             session_id,
             sanitize_text(question),
             conn=conn,
         )
-        if is_location_recommendation_question_early or skip_subject_gate_for_location_clarify_early:
+        if skip_subject_gate_for_location_clarify_early:
             subject_gate_override = subject_gate_override or "selected_chart_only"
             _clear_pending_native_gate(conn, session_id)
             conn.commit()
@@ -1982,20 +1976,13 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         log_ask_phase("session_turn_limit_check", user_turn_count=int(user_turn_count or 0))
 
     is_plain_text_channel = delivery_channel == "whatsapp" or render_target == "plain_text"
-    from ai.intent_router import _looks_like_location_recommendation_question
-
-    is_location_recommendation_question = _looks_like_location_recommendation_question(
-        sanitize_text(question)
-    )
     skip_subject_gate_for_location_clarify = _should_skip_subject_gate_for_location_clarify(
         session_id,
         sanitize_text(question),
     )
-    skip_subject_gate_for_location = bool(
-        skip_subject_gate_for_location_clarify or is_location_recommendation_question
-    )
+    skip_subject_gate_for_location = bool(skip_subject_gate_for_location_clarify)
     if skip_subject_gate_for_location:
-        # Keep single-chart path for locational / city / India-abroad asks.
+        # Keep single-chart path while answering India/abroad location-scope clarify.
         # Pending gate is already cleared earlier in this request when applicable.
         subject_gate_override = subject_gate_override or "selected_chart_only"
     if (
@@ -3549,68 +3536,17 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             from ai.intent_router import (
                 _infer_location_scope_from_text,
                 _location_scope_clarification_fallback,
-                _looks_like_location_recommendation_question,
                 _normalize_location_scope_value,
             )
 
-            # Hard gate BEFORE intent LLM: location asks without stated india/abroad/both
-            # must clarify. This also proves the running process has the latest code.
-            looks_location_q = _looks_like_location_recommendation_question(question)
+            # Location India/abroad clarify is decided AFTER the intent LLM chooses
+            # RECOMMEND_LOCATION — do not keyword-force cartography before routing.
             awaiting_location_scope = bool(
                 isinstance(extracted_context, dict)
                 and extracted_context.get("awaiting_location_scope")
             )
             text_scope_raw = _infer_location_scope_from_text(question)
 
-            if (
-                not force_ready
-                and not fomo_chat_active
-                and (looks_location_q or awaiting_location_scope)
-                and not text_scope_raw
-            ):
-                clarify_q = _location_scope_clarification_fallback(question, language=language)
-                clarify_ctx = {
-                    "location_scope": None,
-                    "awaiting_location_scope": True,
-                }
-                if isinstance(extracted_context, dict):
-                    for keep_key in ("prediction_anchors", "aspect"):
-                        if extracted_context.get(keep_key) is not None:
-                            clarify_ctx[keep_key] = extracted_context.get(keep_key)
-                with get_conn() as conn:
-                    execute(
-                        conn,
-                        """
-                            UPDATE chat_messages
-                            SET content = %s, status = %s, message_type = %s, completed_at = %s,
-                                language = %s
-                            WHERE message_id = %s
-                        """,
-                        (
-                            sanitize_text(clarify_q),
-                            "completed",
-                            "clarification",
-                            datetime.now(),
-                            language,
-                            message_id,
-                        ),
-                    )
-                    execute(
-                        conn,
-                        """
-                            INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
-                            VALUES (%s, %s, %s)
-                            ON CONFLICT (session_id) DO UPDATE SET
-                                clarification_count = conversation_state.clarification_count + 1,
-                                extracted_context = EXCLUDED.extracted_context,
-                                last_updated = CURRENT_TIMESTAMP
-                        """,
-                        (session_id, 1, json.dumps(clarify_ctx)),
-                    )
-                    conn.commit()
-                _release_free_question_if_reserved(using_free_question, user_id, birth_details)
-                return
-            
             # Check if this is a clarification response and combine with original question
             combined_question = question
             if clarification_count > 0 and not fomo_chat_active:
@@ -3674,24 +3610,28 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     clarification_count=clarification_count,
                 )
 
-            # If hard-gate was skipped because user already stated scope (or force_ready),
-            # still bind text scope onto RECOMMEND_LOCATION intents.
-            if text_scope_raw:
+            # Bind user-stated India/abroad/both onto RECOMMEND_LOCATION (or an open
+            # location-scope clarify reply). Never force cartography from keywords alone.
+            mode_u_early = str(intent.get("mode") or "").upper() if isinstance(intent, dict) else ""
+            if (
+                text_scope_raw
+                and isinstance(intent, dict)
+                and (awaiting_location_scope or mode_u_early == "RECOMMEND_LOCATION")
+            ):
                 intent.setdefault("extracted_context", {})
                 if isinstance(intent.get("extracted_context"), dict):
                     intent["extracted_context"]["location_scope"] = text_scope_raw
                     intent["extracted_context"].pop("awaiting_location_scope", None)
-                if looks_location_q or awaiting_location_scope:
-                    intent["mode"] = "RECOMMEND_LOCATION"
-                    intent["answer_mode"] = "location_recommendation"
-                    intent["status"] = "READY"
-                    intent["clarification_question"] = None
+                intent["mode"] = "RECOMMEND_LOCATION"
+                intent["answer_mode"] = "location_recommendation"
+                intent["status"] = "READY"
+                intent["clarification_question"] = None
 
             # Location scope must come from THIS turn's user text (or an in-progress
             # awaiting_location_scope clarification). Do NOT reuse a prior session's
             # location_scope for a fresh "where should I live" ask — that silently
             # skipped India/abroad clarification after an earlier India default.
-            if isinstance(extracted_context, dict):
+            if isinstance(extracted_context, dict) and isinstance(intent, dict):
                 intent.setdefault("extracted_context", {})
                 if isinstance(intent.get("extracted_context"), dict):
                     text_scope = _infer_location_scope_from_text(combined_question)
@@ -3701,7 +3641,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     awaiting_scope = bool(extracted_context.get("awaiting_location_scope"))
                     mode_u = str(intent.get("mode") or "").upper()
 
-                    if text_scope:
+                    if mode_u != "RECOMMEND_LOCATION":
+                        # User changed topic — drop a stale location-scope clarify.
+                        intent["extracted_context"].pop("awaiting_location_scope", None)
+                    elif text_scope:
                         intent["extracted_context"]["location_scope"] = text_scope
                         intent["extracted_context"].pop("awaiting_location_scope", None)
                         intent["status"] = "READY"
@@ -3709,7 +3652,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     elif (
                         awaiting_scope
                         and prior_scope
-                        and mode_u == "RECOMMEND_LOCATION"
                         and not intent["extracted_context"].get("location_scope")
                     ):
                         # Only carry prior scope forward while resolving an open clarify.
@@ -3717,7 +3659,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         intent["extracted_context"].pop("awaiting_location_scope", None)
                         intent["status"] = "READY"
                         intent["clarification_question"] = None
-                    elif awaiting_scope and mode_u == "RECOMMEND_LOCATION":
+                    elif awaiting_scope:
                         intent["extracted_context"].setdefault("awaiting_location_scope", True)
 
             # Location cartography: if scope missing and LLM omitted the question, retry once

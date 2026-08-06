@@ -316,18 +316,33 @@ const RulingPlanetsView = ({ data, theme, colors }) => {
     );
 };
 
-const TONE_COLORS = {
-    supportive: '#15803d',
-    mixed: '#a16207',
-    challenging: '#b91c1c',
-    neutral: '#475569',
-};
-
+// High-contrast tone UI for purple→orange KP gradient (avoid amber; solid pills).
 const TONE_LABELS = {
     supportive: 'Favourable',
     mixed: 'Mixed',
     challenging: 'Under pressure',
     neutral: 'Neutral',
+};
+
+const TONE_UI = {
+    light: {
+        supportive: { accent: '#15803d', pillBg: '#15803d', pillText: '#ffffff', softBg: '#dcfce7' },
+        mixed: { accent: '#0369a1', pillBg: '#0369a1', pillText: '#ffffff', softBg: '#e0f2fe' },
+        challenging: { accent: '#be123c', pillBg: '#be123c', pillText: '#ffffff', softBg: '#ffe4e6' },
+        neutral: { accent: '#475569', pillBg: '#475569', pillText: '#ffffff', softBg: '#e2e8f0' },
+    },
+    // Fully opaque fills — translucent greens/reds/ambers vanish on purple→orange gradient.
+    dark: {
+        supportive: { accent: '#22c55e', pillBg: '#15803d', pillText: '#ffffff', softBg: '#14532d' },
+        mixed: { accent: '#38bdf8', pillBg: '#0369a1', pillText: '#ffffff', softBg: '#0c4a6e' },
+        challenging: { accent: '#fb7185', pillBg: '#be123c', pillText: '#ffffff', softBg: '#881337' },
+        neutral: { accent: '#e2e8f0', pillBg: '#64748b', pillText: '#ffffff', softBg: '#334155' },
+    },
+};
+
+const toneUi = (tone, isDark) => {
+    const palette = isDark ? TONE_UI.dark : TONE_UI.light;
+    return palette[tone] || palette.neutral;
 };
 
 const RP_ROLE_SHORT = {
@@ -339,10 +354,14 @@ const RP_ROLE_SHORT = {
     moon_sub_lord: 'Moon Sub',
 };
 
-const FructificationView = ({ data, theme, colors }) => {
-    const [scopeTab, setScopeTab] = useState('today'); // 'today' | 'hour'
+const FructificationView = ({ data, theme, colors, initialScope = 'today' }) => {
+    const [scopeTab, setScopeTab] = useState(initialScope === 'hour' ? 'hour' : 'today'); // 'today' | 'hour'
     const [expandedHouse, setExpandedHouse] = useState(null);
     const [calcOpen, setCalcOpen] = useState(false);
+
+    useEffect(() => {
+        setScopeTab(initialScope === 'hour' ? 'hour' : 'today');
+    }, [initialScope, data?.as_of]);
 
     useEffect(() => {
         setExpandedHouse(null);
@@ -352,12 +371,15 @@ const FructificationView = ({ data, theme, colors }) => {
     if (!data) return null;
 
     const isDark = theme === 'dark';
-    const surface = isDark ? 'rgba(255,255,255,0.08)' : '#ffffff';
-    const surfaceMuted = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,247,237,0.95)';
-    const border = isDark ? 'rgba(255,255,255,0.16)' : 'rgba(194, 65, 12, 0.18)';
-    const bodyText = isDark ? 'rgba(255,255,255,0.92)' : '#1c1917';
-    const mutedText = isDark ? 'rgba(255,255,255,0.72)' : '#44403c';
-    const subtleText = isDark ? 'rgba(255,255,255,0.55)' : '#78716c';
+    // Fully opaque cards — glass fills let the purple→orange gradient kill contrast.
+    const surface = isDark ? '#1a1030' : '#ffffff';
+    const surfaceMuted = isDark ? '#241540' : '#f1f5f9';
+    const border = isDark ? 'rgba(255,255,255,0.22)' : 'rgba(100, 116, 139, 0.28)';
+    const bodyText = isDark ? '#f8fafc' : '#0f172a';
+    const mutedText = isDark ? '#cbd5e1' : '#334155';
+    const subtleText = isDark ? '#94a3b8' : '#64748b';
+    // Avoid orange link text over the orange end of the gradient.
+    const linkColor = isDark ? '#f8fafc' : colors.primary;
 
     const block = scopeTab === 'hour' ? data.hour : data.today;
     const houses = block?.houses_giving_results || [];
@@ -379,8 +401,8 @@ const FructificationView = ({ data, theme, colors }) => {
     const scopeCopy = scopeTab === 'today'
         ? {
             title: 'Today',
-            blurb: 'Houses that can give results across the day, using Day Lord and Moon star lord.',
-            formulaHint: 'AD/PD ∩ Sookshma ∩ Day ruling planets',
+            blurb: 'Houses that can give results across the day (Day Lord + Moon star lord), including any house already confirmed this hour.',
+            formulaHint: 'AD/PD ∩ Sookshma ∩ Day ruling planets ∪ this hour',
         }
         : {
             title: 'This hour',
@@ -390,6 +412,8 @@ const FructificationView = ({ data, theme, colors }) => {
 
     const renderHowSteps = (how, accent) => {
         if (!how?.steps?.length) return null;
+        const passTone = toneUi('supportive', isDark);
+        const failTone = toneUi('challenging', isDark);
         return (
             <View style={[styles.fructHowBox, { borderColor: border, backgroundColor: surfaceMuted }]}>
                 {how.summary ? (
@@ -398,12 +422,12 @@ const FructificationView = ({ data, theme, colors }) => {
                 {how.steps.map((step) => (
                     <View key={`${step.step}-${step.title}`} style={[styles.fructHowStep, { borderTopColor: border }]}>
                         <View style={styles.fructHowStepHead}>
-                            <Text style={[styles.fructHowStepTitle, { color: accent || colors.primary }]}>
+                            <Text style={[styles.fructHowStepTitle, { color: accent || linkColor }]}>
                                 Step {step.step} · {step.title}
                             </Text>
                             {typeof step.passed === 'boolean' ? (
-                                <View style={[styles.fructPassPill, { backgroundColor: step.passed ? 'rgba(22,163,74,0.15)' : 'rgba(220,38,38,0.15)' }]}>
-                                    <Text style={{ color: step.passed ? '#15803d' : '#b91c1c', fontSize: 11, fontWeight: '800' }}>
+                                <View style={[styles.fructPassPill, { backgroundColor: step.passed ? passTone.pillBg : failTone.pillBg }]}>
+                                    <Text style={{ color: step.passed ? passTone.pillText : failTone.pillText, fontSize: 11, fontWeight: '800' }}>
                                         {step.passed ? 'Pass' : 'Fail'}
                                     </Text>
                                 </View>
@@ -436,7 +460,7 @@ const FructificationView = ({ data, theme, colors }) => {
     const renderHouseCard = (row, soft = false) => {
         const key = `${scopeTab}-${row.tier || 'p'}-${row.house}`;
         const expanded = expandedHouse === key;
-        const tone = soft ? TONE_COLORS.neutral : (TONE_COLORS[row.tone] || TONE_COLORS.neutral);
+        const tone = soft ? toneUi('neutral', isDark) : toneUi(row.tone, isDark);
         const toneLabel = soft ? 'Background' : (TONE_LABELS[row.tone] || 'Neutral');
         return (
             <View key={key} style={{ marginBottom: 10 }}>
@@ -447,13 +471,13 @@ const FructificationView = ({ data, theme, colors }) => {
                         styles.fructHouseCard,
                         {
                             backgroundColor: soft ? surfaceMuted : surface,
-                            borderColor: soft ? border : `${tone}66`,
-                            borderLeftColor: tone,
+                            borderColor: soft ? border : tone.accent,
+                            borderLeftColor: tone.accent,
                         },
                     ]}
                 >
-                    <View style={[styles.fructHouseBadge, { backgroundColor: `${tone}18` }]}>
-                        <Text style={[styles.fructHouseNum, { color: tone }]}>H{row.house}</Text>
+                    <View style={[styles.fructHouseBadge, { backgroundColor: tone.pillBg }]}>
+                        <Text style={[styles.fructHouseNum, { color: tone.pillText }]}>H{row.house}</Text>
                     </View>
                     <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={[styles.fructHouseTitle, { color: bodyText }]} numberOfLines={2}>
@@ -462,18 +486,23 @@ const FructificationView = ({ data, theme, colors }) => {
                         <Text style={[styles.fructHouseMeta, { color: mutedText }]} numberOfLines={2}>
                             {(row.activating_rps || []).join(' · ') || 'No ruling planet'}
                         </Text>
-                        <View style={[styles.fructTonePill, { backgroundColor: `${tone}18`, alignSelf: 'flex-start' }]}>
-                            <Text style={[styles.fructTonePillText, { color: tone }]}>{toneLabel}</Text>
+                        <View style={[styles.fructTonePill, { backgroundColor: tone.pillBg, alignSelf: 'flex-start' }]}>
+                            <Text style={[styles.fructTonePillText, { color: tone.pillText }]}>{toneLabel}</Text>
                         </View>
+                        {row.included_from_hour ? (
+                            <Text style={[styles.fructHouseMeta, { color: subtleText, marginTop: 4, marginBottom: 0 }]}>
+                                Confirmed this hour
+                            </Text>
+                        ) : null}
                     </View>
                     <View style={styles.fructHowLinkRow}>
-                        <Text style={[styles.fructHowLink, { color: colors.primary }]}>
+                        <Text style={[styles.fructHowLink, { color: linkColor }]}>
                             {expanded ? 'Hide' : 'Why'}
                         </Text>
-                        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.primary} />
+                        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={linkColor} />
                     </View>
                 </TouchableOpacity>
-                {expanded ? renderHowSteps(row.how, soft ? colors.primary : tone) : null}
+                {expanded ? renderHowSteps(row.how, soft ? linkColor : tone.accent) : null}
             </View>
         );
     };
@@ -498,7 +527,7 @@ const FructificationView = ({ data, theme, colors }) => {
                 </ScrollView>
             ) : null}
 
-            <View style={[styles.fructScopeBar, { backgroundColor: isDark ? 'rgba(0,0,0,0.28)' : 'rgba(255,237,213,0.9)', borderColor: border }]}>
+            <View style={[styles.fructScopeBar, { backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : '#f1f5f9', borderColor: border }]}>
                 {[
                     { id: 'today', label: 'Today', count: (data.today?.houses_giving_results || []).length },
                     { id: 'hour', label: 'This hour', count: (data.hour?.houses_giving_results || []).length },
@@ -542,8 +571,8 @@ const FructificationView = ({ data, theme, colors }) => {
             ) : null}
 
             {gate.prana_fallback ? (
-                <View style={[styles.fructNotice, { backgroundColor: 'rgba(249,115,22,0.12)', borderColor: 'rgba(249,115,22,0.35)' }]}>
-                    <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
+                <View style={[styles.fructNotice, { backgroundColor: isDark ? 'rgba(56,189,248,0.18)' : '#e0f2fe', borderColor: isDark ? '#38bdf8' : '#7dd3fc' }]}>
+                    <Ionicons name="information-circle-outline" size={16} color={isDark ? '#38bdf8' : '#0369a1'} />
                     <Text style={[styles.fructBody, { color: bodyText, flex: 1, marginBottom: 0 }]}>
                         Prana did not confirm this hour. Showing Sookshma ∩ ruling planets instead.
                     </Text>
@@ -555,8 +584,8 @@ const FructificationView = ({ data, theme, colors }) => {
                 style={[styles.fructCalcToggle, { borderColor: border, backgroundColor: surface }]}
                 activeOpacity={0.88}
             >
-                <View style={[styles.fructCalcIcon, { backgroundColor: `${colors.primary}18` }]}>
-                    <Ionicons name="git-branch-outline" size={16} color={colors.primary} />
+                <View style={[styles.fructCalcIcon, { backgroundColor: isDark ? 'rgba(253,186,116,0.2)' : 'rgba(249,115,22,0.14)' }]}>
+                    <Ionicons name="git-branch-outline" size={16} color={linkColor} />
                 </View>
                 <View style={{ flex: 1 }}>
                     <Text style={[styles.fructHowLink, { color: bodyText }]}>
@@ -566,14 +595,14 @@ const FructificationView = ({ data, theme, colors }) => {
                         {calc.formula || scopeCopy.formulaHint}
                     </Text>
                 </View>
-                <Ionicons name={calcOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.primary} />
+                <Ionicons name={calcOpen ? 'chevron-up' : 'chevron-down'} size={18} color={linkColor} />
             </TouchableOpacity>
 
             {calcOpen && calc.steps?.length ? (
                 <View style={[styles.fructHowBox, { borderColor: border, backgroundColor: surfaceMuted, marginBottom: 14 }]}>
                     {calc.steps.map((step) => (
                         <View key={`${scopeTab}-calc-${step.step}`} style={[styles.fructHowStep, { borderTopColor: border }]}>
-                            <Text style={[styles.fructHowStepTitle, { color: colors.primary }]}>
+                            <Text style={[styles.fructHowStepTitle, { color: linkColor }]}>
                                 Step {step.step} · {step.title}
                             </Text>
                             <Text style={[styles.fructBody, { color: mutedText }]}>{step.detail}</Text>
@@ -616,50 +645,89 @@ const FructificationView = ({ data, theme, colors }) => {
                 </>
             ) : null}
 
-            <Text style={[styles.fructSectionTitle, { color: bodyText, marginTop: 8 }]}>Predictions</Text>
-            {manifestations.length ? manifestations.map((item) => {
-                const tone = TONE_COLORS[item.outcome_tone] || TONE_COLORS.neutral;
-                return (
-                    <View
-                        key={item.manifestation_id || item.signature_key || item.label}
-                        style={[styles.fructCard, { backgroundColor: surface, borderColor: border, borderLeftColor: tone }]}
-                    >
-                        <View style={styles.fructCardTop}>
-                            <Text style={[styles.fructCardEyebrow, { color: subtleText }]}>
-                                {(item.domain || 'theme').toString()}
+            <Text style={[styles.fructSectionTitle, { color: bodyText, marginTop: 8 }]}>Combined life themes</Text>
+            <Text style={[styles.fructBody, { color: mutedText }]}>
+                Same house-set wording cache as What’s activated now — for you, spouse, mother, and father — so either screen can fill the cache for the other.
+            </Text>
+            {manifestations.length ? (() => {
+                const order = ['self', 'spouse', 'mother', 'father'];
+                const groups = [];
+                manifestations.forEach((item) => {
+                    const subject = item.subject || 'self';
+                    const existing = groups.find((g) => g.subject === subject);
+                    if (existing) existing.items.push(item);
+                    else groups.push({ subject, items: [item] });
+                });
+                groups.sort((a, b) => {
+                    const ai = order.indexOf(a.subject);
+                    const bi = order.indexOf(b.subject);
+                    return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+                });
+                const subjectLabel = (subject) => (subject === 'self' ? 'For you' : `Your ${subject}`);
+                return groups.map((group) => (
+                    <View key={group.subject} style={{ marginBottom: 14 }}>
+                        <View style={styles.fructSubjectHead}>
+                            <View style={[styles.fructSubjectIcon, { backgroundColor: isDark ? 'rgba(253,186,116,0.2)' : 'rgba(249,115,22,0.14)' }]}>
+                                <Ionicons
+                                    name={group.subject === 'self' ? 'person-outline' : 'people-outline'}
+                                    size={16}
+                                    color={linkColor}
+                                />
+                            </View>
+                            <Text style={[styles.fructSubjectTitle, { color: bodyText }]}>
+                                {subjectLabel(group.subject)}
                             </Text>
-                            <View style={[styles.fructTonePill, { backgroundColor: `${tone}18` }]}>
-                                <Text style={[styles.fructTonePillText, { color: tone }]}>
-                                    {TONE_LABELS[item.outcome_tone] || 'Neutral'}
-                                </Text>
-                            </View>
                         </View>
-                        <Text style={[styles.fructCardTitle, { color: bodyText }]}>{item.label}</Text>
-                        {item.summary ? (
-                            <Text style={[styles.fructBody, { color: mutedText }]}>{item.summary}</Text>
-                        ) : null}
-                        {(item.possibilities || []).slice(0, 5).map((p) => (
-                            <View key={p} style={styles.fructPossibilityRow}>
-                                <View style={[styles.fructDot, { backgroundColor: tone }]} />
-                                <Text style={[styles.fructBullet, { color: bodyText }]}>{p}</Text>
-                            </View>
-                        ))}
-                        <View style={[styles.fructHouseRow, { marginTop: 10 }]}>
-                            {(item.house_roles || []).map((role) => (
+                        {group.items.map((item) => {
+                            const tone = toneUi(item.outcome_tone, isDark);
+                            return (
                                 <View
-                                    key={`${item.manifestation_id}-${role.native_house}`}
-                                    style={[styles.fructTinyChipWrap, { backgroundColor: `${tone}16` }]}
+                                    key={item.manifestation_id || item.signature_key || item.label}
+                                    style={[styles.fructCard, { backgroundColor: surface, borderColor: border, borderLeftColor: tone.accent }]}
                                 >
-                                    <Text style={[styles.fructTinyChip, { color: tone }]}>H{role.native_house}</Text>
+                                    <View style={styles.fructCardTop}>
+                                        <Text style={[styles.fructCardEyebrow, { color: subtleText }]}>
+                                            {(item.domain || 'theme').toString()}
+                                        </Text>
+                                        <View style={[styles.fructTonePill, { backgroundColor: tone.pillBg }]}>
+                                            <Text style={[styles.fructTonePillText, { color: tone.pillText }]}>
+                                                {TONE_LABELS[item.outcome_tone] || 'Neutral'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <Text style={[styles.fructCardTitle, { color: bodyText }]}>{item.label}</Text>
+                                    {item.summary ? (
+                                        <Text style={[styles.fructBody, { color: mutedText }]}>{item.summary}</Text>
+                                    ) : null}
+                                    {(item.possibilities || []).slice(0, 5).map((p) => (
+                                        <View key={p} style={styles.fructPossibilityRow}>
+                                            <View style={[styles.fructDot, { backgroundColor: tone.accent }]} />
+                                            <Text style={[styles.fructBullet, { color: bodyText }]}>{p}</Text>
+                                        </View>
+                                    ))}
+                                    <View style={[styles.fructHouseRow, { marginTop: 10 }]}>
+                                        {(item.house_roles || []).map((role) => (
+                                            <View
+                                                key={`${item.manifestation_id}-${role.native_house}-${role.relative_house}`}
+                                                style={[styles.fructTinyChipWrap, { backgroundColor: tone.pillBg }]}
+                                            >
+                                                <Text style={[styles.fructTinyChip, { color: tone.pillText }]}>
+                                                    {group.subject === 'self'
+                                                        ? `H${role.native_house}`
+                                                        : `H${role.native_house}→H${role.relative_house}`}
+                                                </Text>
+                                            </View>
+                                        ))}
+                                    </View>
                                 </View>
-                            ))}
-                        </View>
+                            );
+                        })}
                     </View>
-                );
-            }) : (
+                ));
+            })() : (
                 <View style={[styles.fructEmpty, { backgroundColor: surfaceMuted, borderColor: border }]}>
                     <Text style={[styles.fructBody, { color: mutedText, marginBottom: 0, textAlign: 'center' }]}>
-                        No life themes matched for {scopeCopy.title.toLowerCase()}.
+                        No combined house themes matched for {scopeCopy.title.toLowerCase()}. Activated houses still show above.
                     </Text>
                 </View>
             )}
@@ -668,9 +736,11 @@ const FructificationView = ({ data, theme, colors }) => {
 };
 
 const KPScreen = ({ route, navigation }) => {
-    const { birthDetails: initialBirthDetails } = route.params || {};
+    const { birthDetails: initialBirthDetails, initialTab, initialPredictionsScope } = route.params || {};
     const [birthDetails, setBirthDetails] = useState(initialBirthDetails);
-    const [activeTab, setActiveTab] = useState('planets');
+    const [activeTab, setActiveTab] = useState(
+        initialTab === 'results' || !initialTab ? 'results' : initialTab
+    );
     const [processedData, setProcessedData] = useState(null);
     const [rulingPlanets, setRulingPlanets] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -821,7 +891,9 @@ const KPScreen = ({ route, navigation }) => {
             if (requestId !== fructRequestIdRef.current) return;
             if (response.data && response.data.success) {
                 setFructData(response.data.data);
+                setFructError(null);
             } else {
+                // Keep prior results visible if we already have them.
                 setFructError(response.data?.detail || 'Failed to load results for this moment.');
             }
         } catch (e) {
@@ -1071,15 +1143,24 @@ const KPScreen = ({ route, navigation }) => {
                     <View style={[styles.sigLoadingRow, { marginTop: 8 }]}>
                         <ActivityIndicator size="small" color={colors.primary} />
                         <Text style={[styles.fructBodyLoading, { color: mutedText }]}>
-                            Computing today & this hour…
+                            {fructData ? 'Refreshing today & this hour…' : 'Computing today & this hour…'}
                         </Text>
                     </View>
                 ) : null}
                 {fructError ? (
                     <Text style={[styles.errorText, { color: colors.error }]}>{fructError}</Text>
                 ) : null}
-                {!fructError && !fructLoading ? (
-                    <FructificationView data={fructData} theme={theme} colors={colors} />
+                {fructData ? (
+                    <FructificationView
+                        data={fructData}
+                        theme={theme}
+                        colors={colors}
+                        initialScope={initialPredictionsScope === 'hour' ? 'hour' : 'today'}
+                    />
+                ) : (!fructLoading && !fructError) ? (
+                    <Text style={[styles.fructBodyLoading, { color: mutedText, marginTop: 12 }]}>
+                        No results loaded yet. Tap Now to compute.
+                    </Text>
                 ) : null}
             </ScrollView>
         );
@@ -1185,11 +1266,13 @@ const KPScreen = ({ route, navigation }) => {
                     <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
                         <View style={styles.tabContainer}>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                                {['planets', 'cusps', 'significators', 'planetSignificators', 'fourStep', 'results'].map((tab) => (
+                                {['results', 'planets', 'cusps', 'significators', 'planetSignificators', 'fourStep'].map((tab) => (
                                     <TouchableOpacity
                                         key={tab}
                                         onPress={() => {
-                                            if (tab === 'results') setSigMoment(new Date());
+                                            if (tab === 'results' && activeTab !== 'results') {
+                                                setSigMoment(new Date());
+                                            }
                                             setActiveTab(tab);
                                         }}
                                         style={[styles.tab, activeTab === tab && styles.activeTab]}
@@ -1210,7 +1293,7 @@ const KPScreen = ({ route, navigation }) => {
                                                  tab === 'cusps' ? 'Cusps' :
                                                  tab === 'significators' ? 'H-Sig' :
                                                  tab === 'planetSignificators' ? 'P-Sig' :
-                                                 tab === 'fourStep' ? 'Steps' : 'Results'}
+                                                 tab === 'fourStep' ? 'Steps' : 'Predictions'}
                                             </Text>
                                         </LinearGradient>
                                     </TouchableOpacity>
@@ -1218,7 +1301,7 @@ const KPScreen = ({ route, navigation }) => {
                             </ScrollView>
                         </View>
 
-                        <View style={[styles.contentCard, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.9)' }]}>
+                        <View style={[styles.contentCard, { backgroundColor: theme === 'dark' ? (activeTab === 'results' ? '#140c24' : 'rgba(255, 255, 255, 0.05)') : 'rgba(255, 255, 255, 0.9)' }]}>
                             {renderContent()}
                             
                             {activeTab !== 'results' ? (
@@ -1400,6 +1483,25 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         marginBottom: 10,
         marginTop: 4,
+    },
+    fructSubjectHead: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 10,
+    },
+    fructSubjectIcon: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    fructSubjectTitle: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: '800',
+        letterSpacing: -0.2,
     },
     fructSubheadInline: {
         fontSize: 11,

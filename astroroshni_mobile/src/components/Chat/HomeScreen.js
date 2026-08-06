@@ -42,6 +42,7 @@ import { trackAcquisitionFunnelEvent } from '../../services/acquisitionTracking'
 import { extractFirstHttpsUrl } from '../../utils/blogLinks';
 import FomoHomeSheet from './FomoHomeSheet';
 import FomoHomeEntryCard from './FomoHomeEntryCard';
+import KpTodayCarousel from './KpTodayCarousel';
 import PanditHomePanel from '../Pandit/PanditHomePanel';
 import { getWebBottomInset, refreshWebShellHeight, setWebBottomSafeColor } from '../../platform/webSafeArea';
 
@@ -2367,6 +2368,21 @@ const loadHomeData = async (nativeData = null) => {
             )}
           </AppScrollView>
         </View>
+
+        {(currentNativeData || birthData)?.date ? (
+          <KpTodayCarousel
+            birthDetails={currentNativeData || birthData}
+            onOpenKp={(scope = 'today') => {
+              requireBirthChart((data) =>
+                navigation.navigate('KPSystem', {
+                  birthDetails: data,
+                  initialTab: 'results',
+                  initialPredictionsScope: scope === 'hour' ? 'hour' : 'today',
+                })
+              );
+            }}
+          />
+        ) : null}
 
         <FomoHomeEntryCard
           data={fomoHomeData}

@@ -7,27 +7,36 @@ Algorithm (product-agreed):
                     (soft fallback without Prana if empty)
   Today results   = Today eligible ∩ day ruling planets (Day Lord + Moon Star Lord)
   Hour results    = Hour eligible ∩ moment ruling planets (Asc/Moon star+sub + Day Lord)
-  Manifestations  = HOUSE_COMBINATIONS (+ single-house fallbacks) + LLM synthesis cache
+  Today ⊇ Hour    = any house giving results this hour is also counted for today
+                    (hour is part of the day; Asc/Moon sub can confirm what day RPs miss)
+  Manifestations  = one combined theme per subject (self/spouse/mother/father)
+                    from primary activated houses → shared cache or LLM
 """
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 from shared.dasha_calculator import DashaCalculator
 from prediction_engine.house_significations import (
-    COMBINATION_TONE_READINGS,
-    HOUSE_COMBINATIONS,
     HOUSE_SIGNIFICATIONS,
-    HOUSE_TONE_READINGS,
+    relative_house_for_native,
 )
+from prediction_engine.subjects import SUBJECTS
 from prediction_engine.contracts import Polarity
 from prediction_engine.manifestation_synthesis import synthesize_manifestations
 from utils.timezone_service import parse_timezone_offset
 
+logger = logging.getLogger(__name__)
+
 from ..utils.kp_calculations import KPCalculations
 from .chart_service import KPChartService
+
+# Same subject set as Activation Explorer / Combined Life Themes — shared LLM cache.
+KP_MANIFESTATION_SUBJECTS = ("self", "spouse", "mother", "father")
 
 DUSTHANA = {6, 8, 12}
 FULFILLMENT = {11}
@@ -467,6 +476,67 @@ def _active_rp_planets(role_map: Mapping[str, str], keys: Sequence[str]) -> List
     return planets
 
 
+def _theme_from_houses(
+    *,
+    scope: str,
+    subject: str,
+    theme_key: str,
+    label: str,
+    summary: str,
+    possibilities: Sequence[str],
+    domain: str,
+    native_houses: Sequence[int],
+    tone_by_native: Mapping[int, str],
+    window: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Build one theme for a subject. Relatives use relative_house for LLM/cache identity."""
+    house_roles = []
+    tones = []
+    # Map native → relative; if two natives collapse to one relative, keep stronger pressure tone.
+    relative_tone: Dict[int, str] = {}
+    relative_native: Dict[int, int] = {}
+    tone_rank = {
+        Polarity.CHALLENGING.value: 3,
+        Polarity.MIXED.value: 2,
+        Polarity.SUPPORTIVE.value: 1,
+        Polarity.NEUTRAL.value: 0,
+    }
+    for native in sorted(int(h) for h in native_houses):
+        tone = str(tone_by_native.get(native) or Polarity.NEUTRAL.value)
+        relative = native if subject == "self" else relative_house_for_native(subject, native)
+        prev = relative_tone.get(relative)
+        if prev is None or tone_rank.get(tone, 0) >= tone_rank.get(prev, 0):
+            relative_tone[relative] = tone
+            relative_native[relative] = native
+
+    for relative in sorted(relative_tone):
+        tone = relative_tone[relative]
+        tones.append(tone)
+        native = relative_native[relative]
+        house_roles.append({
+            "native_house": native,
+            "relative_house": relative,
+            "role": "focus",
+            "outcome_tone": tone,
+            "activation_state": "kp_fructifying",
+        })
+
+    return {
+        "manifestation_id": f"kp-{scope}-{subject}-{theme_key}",
+        "signature_key": f"kp:{scope}:{subject}:{theme_key}",
+        "subject": subject,
+        "domain": domain,
+        "label": label,
+        "summary": summary,
+        "possibilities": list(possibilities),
+        "outcome_tone": _combine_tones(tones),
+        "synthesis_strength": "moderate",
+        "house_roles": house_roles,
+        "window": dict(window),
+        "source": "kp_fructification",
+    }
+
+
 def _build_deterministic_manifestations(
     *,
     scope: str,
@@ -474,11 +544,17 @@ def _build_deterministic_manifestations(
     as_of: datetime,
     dasha: Mapping[str, Any],
 ) -> List[Dict[str, Any]]:
-    tone_by_house = {
+    """One combined theme per subject (self/spouse/mother/father) → shared cache or LLM.
+
+    Same fingerprint as Combined Life Themes:
+      subject + activated houses (native for self, relative for others) + tone_by_house
+    So KP and Chart activation screens populate / reuse the same wording cache.
+    """
+    tone_by_native = {
         int(row["house"]): str(row.get("tone") or Polarity.NEUTRAL.value)
         for row in primary_houses
     }
-    activated = set(tone_by_house)
+    activated = set(tone_by_native)
     if not activated:
         return []
 
@@ -493,74 +569,42 @@ def _build_deterministic_manifestations(
         "prana": _planet(dasha.get("prana")),
     }
 
-    items: List[Dict[str, Any]] = []
-    covered: Set[int] = set()
-
-    for combo in HOUSE_COMBINATIONS:
-        required = {int(h) for h in combo.relative_houses}
-        if not required or not required.issubset(activated):
-            continue
-        house_roles = []
-        tones = []
-        for house in sorted(required):
-            tone = tone_by_house[house]
-            tones.append(tone)
-            role = "focus" if house in set(combo.focus_relative_houses) else "support"
-            house_roles.append({
-                "native_house": house,
-                "relative_house": house,
-                "role": role,
-                "outcome_tone": tone,
-                "activation_state": "kp_fructifying",
-            })
-            covered.add(house)
-        outcome = _combine_tones(tones)
-        polarity = _polarity(outcome)
-        tone_reading = (COMBINATION_TONE_READINGS.get(combo.key) or {}).get(polarity, "")
-        items.append({
-            "manifestation_id": f"kp-{scope}-{combo.key}",
-            "signature_key": f"kp:{scope}:{combo.key}",
-            "subject": "self",
-            "domain": combo.key.split("_")[0],
-            "label": combo.label,
-            "summary": tone_reading or combo.label,
-            "possibilities": list(combo.manifestations),
-            "outcome_tone": outcome,
-            "synthesis_strength": "moderate",
-            "house_roles": house_roles,
-            "window": window,
-            "source": "kp_fructification",
-        })
-
-    # Single-house themes for primary houses not covered by a combination.
-    for house in sorted(activated - covered):
+    activated_key = tuple(sorted(activated))
+    house_list = ", ".join(f"H{h}" for h in activated_key)
+    seed_possibilities: List[str] = []
+    for house in activated_key:
         sig = HOUSE_SIGNIFICATIONS.get(house)
-        if not sig:
-            continue
-        tone = tone_by_house[house]
-        polarity = _polarity(tone)
-        summary = (HOUSE_TONE_READINGS.get(house) or {}).get(polarity, sig.label)
-        items.append({
-            "manifestation_id": f"kp-{scope}-house-{house}",
-            "signature_key": f"kp:{scope}:house:{house}",
-            "subject": "self",
-            "domain": "other",
-            "label": sig.label,
-            "summary": summary,
-            "possibilities": list(sig.manifestations)[:4],
-            "outcome_tone": tone,
-            "synthesis_strength": "moderate",
-            "house_roles": [{
-                "native_house": house,
-                "relative_house": house,
-                "role": "focus",
-                "outcome_tone": tone,
-                "activation_state": "kp_fructifying",
-            }],
-            "window": window,
-            "source": "kp_fructification",
-        })
+        if sig and sig.manifestations:
+            seed_possibilities.extend(list(sig.manifestations)[:2])
+    seed = list(dict.fromkeys(seed_possibilities))[:8]
+    theme_key = f"combined-{'-'.join(str(h) for h in activated_key)}"
 
+    items: List[Dict[str, Any]] = []
+    for subject in KP_MANIFESTATION_SUBJECTS:
+        if subject == "self":
+            label = "Combined activated life themes"
+            summary = (
+                f"Houses {house_list} are co-activated and can combine into practical life themes."
+            )
+        else:
+            subject_label = SUBJECTS[subject].label
+            label = "Combined activated life themes"
+            summary = (
+                f"Native houses {house_list} read for {subject_label} via relative-house "
+                "significations (shared cache with What is activated now)."
+            )
+        items.append(_theme_from_houses(
+            scope=scope,
+            subject=subject,
+            theme_key=theme_key,
+            label=label,
+            summary=summary,
+            possibilities=seed,
+            domain="other",
+            native_houses=activated_key,
+            tone_by_native=tone_by_native,
+            window=window,
+        ))
     return items
 
 
@@ -781,6 +825,93 @@ def analyze_window(
     }
 
 
+def _merge_hour_primaries_into_today(
+    today: Dict[str, Any],
+    hour: Dict[str, Any],
+    *,
+    as_of: datetime,
+    dasha: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Ensure Today never looks empty when This hour has fructifying houses.
+
+    Day RPs are only Day Lord + Moon Star Lord; hour adds Asc/Moon star+sub, so hour can
+    confirm houses the day gate alone misses. Those houses still belong to "today".
+    """
+    today_primary = {
+        int(row["house"]): dict(row)
+        for row in (today.get("houses_giving_results") or [])
+        if row.get("house") is not None
+    }
+    today_secondary = {
+        int(row["house"]): dict(row)
+        for row in (today.get("houses_secondary") or [])
+        if row.get("house") is not None
+    }
+    absorbed: List[int] = []
+
+    for row in hour.get("houses_giving_results") or []:
+        house = int(row["house"])
+        if house in today_primary:
+            continue
+        if house in today_secondary:
+            promoted = dict(today_secondary.pop(house))
+            promoted["tier"] = "primary"
+            promoted["included_from_hour"] = True
+            how = dict(promoted.get("how") or {})
+            how["summary"] = (
+                (how.get("summary") or f"H{house} is primary for today")
+                + " Included because it is giving results this hour."
+            )
+            promoted["how"] = how
+            today_primary[house] = promoted
+        else:
+            cloned = dict(row)
+            cloned["tier"] = "primary"
+            cloned["included_from_hour"] = True
+            how = dict(cloned.get("how") or {})
+            how["summary"] = (
+                (how.get("summary") or f"H{house} is primary for today")
+                + " Day RPs alone did not confirm it; included because this hour’s "
+                "ruling planets confirm it within today’s dasha gate."
+            )
+            cloned["how"] = how
+            # Keep hour activating RPs for transparency; scope label stays useful in UI.
+            today_primary[house] = cloned
+        absorbed.append(house)
+
+    if not absorbed:
+        return today
+
+    primary_rows = [today_primary[h] for h in sorted(today_primary)]
+    secondary_rows = [today_secondary[h] for h in sorted(today_secondary)]
+    out = dict(today)
+    out["houses_giving_results"] = primary_rows
+    out["houses_secondary"] = secondary_rows
+    out["hour_houses_absorbed"] = absorbed
+    calc = dict(out.get("calculation") or {})
+    steps = list(calc.get("steps") or [])
+    steps.append({
+        "step": len(steps) + 1,
+        "title": "Hour houses counted for today",
+        "detail": (
+            "This hour confirmed house(s) "
+            + ", ".join(f"H{h}" for h in absorbed)
+            + " via Asc/Moon star or sub lords. They are included in Today because "
+            "the hour falls within the day."
+        ),
+        "houses": absorbed,
+    })
+    calc["steps"] = steps
+    out["calculation"] = calc
+    out["manifestations_deterministic"] = _build_deterministic_manifestations(
+        scope="today",
+        primary_houses=primary_rows,
+        as_of=as_of,
+        dasha=dasha,
+    )
+    return out
+
+
 async def compute_fructification(
     *,
     birth_date: str,
@@ -827,28 +958,73 @@ async def compute_fructification(
         scope="hour",
         as_of=as_of,
     )
+    today = _merge_hour_primaries_into_today(today, hour, as_of=as_of, dasha=dasha)
 
     async def _with_synthesis(block: Dict[str, Any]) -> Dict[str, Any]:
         deterministic = list(block.pop("manifestations_deterministic") or [])
         out = dict(block)
-        if not synthesize or not deterministic:
+        if not deterministic:
+            out["manifestations"] = []
+            out["manifestation_synthesis"] = {
+                "version": None,
+                "cached_or_generated": "empty",
+                "error": False,
+            }
+            return out
+        if not synthesize:
             out["manifestations"] = deterministic
             out["manifestation_synthesis"] = {
                 "version": None,
-                "cached_or_generated": "skipped" if not synthesize else "empty",
+                "cached_or_generated": "skipped",
+                "error": False,
             }
             return out
-        synthesis = await synthesize_manifestations(
-            deterministic=deterministic,
-            locale=language or "en",
-        )
-        out["manifestations"] = synthesis.get("manifestations") or deterministic
-        out["manifestation_synthesis"] = {
-            "version": synthesis.get("synthesis_version"),
-            "error": bool(synthesis.get("synthesis_error")),
-            "partial": bool(synthesis.get("synthesis_partial")),
-        }
+        try:
+            synthesis = await synthesize_manifestations(
+                deterministic=deterministic,
+                locale=language or "en",
+            )
+            out["manifestations"] = synthesis.get("manifestations") or deterministic
+            errored = bool(synthesis.get("synthesis_error"))
+            out["manifestation_synthesis"] = {
+                "version": synthesis.get("synthesis_version"),
+                "cached_or_generated": (
+                    "error"
+                    if errored and not synthesis.get("synthesis_version")
+                    else "cache_or_llm"
+                ),
+                "error": errored,
+                "partial": bool(synthesis.get("synthesis_partial")),
+                "theme_count": len(out["manifestations"]),
+            }
+        except Exception:
+            # Never blank Results when LLM/cache fails — keep deterministic themes.
+            logger.exception("KP manifestation synthesis failed; returning deterministic themes")
+            out["manifestations"] = deterministic
+            out["manifestation_synthesis"] = {
+                "version": None,
+                "cached_or_generated": "deterministic_fallback",
+                "error": True,
+                "theme_count": len(deterministic),
+            }
         return out
+
+    # Warm cache once for overlapping today/hour fingerprints, then attach each window.
+    today_det = list(today.get("manifestations_deterministic") or [])
+    hour_det = list(hour.get("manifestations_deterministic") or [])
+    if synthesize and (today_det or hour_det):
+        try:
+            await synthesize_manifestations(
+                deterministic=today_det + hour_det,
+                locale=language or "en",
+            )
+        except Exception:
+            logger.exception("KP shared manifestation warm-up failed; continuing per window")
+
+    today_out, hour_out = await asyncio.gather(
+        _with_synthesis(today),
+        _with_synthesis(hour),
+    )
 
     dasha_public = {
         "mahadasha": dasha.get("mahadasha"),
@@ -863,6 +1039,6 @@ async def compute_fructification(
         "dasha": dasha_public,
         "ruling_planets": ruling_planets,
         "natal_planet_significators": planet_sigs,
-        "today": await _with_synthesis(today),
-        "hour": await _with_synthesis(hour),
+        "today": today_out,
+        "hour": hour_out,
     }
