@@ -183,9 +183,26 @@ function KpTodayReaderSheet({
   // Sheet is width 100% with overlay pad 16 and maxWidth 440 — page must match that exactly for paging.
   const pageWidth = Math.min(windowWidth - 32, 440);
   const cardPad = 18;
+  const pageIndexRef = useRef(0);
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 55,
+    minimumViewTime: 40,
+  }).current;
+
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    const next = viewableItems?.[0]?.index;
+    if (typeof next !== 'number' || next < 0) return;
+    if (next === pageIndexRef.current) return;
+    pageIndexRef.current = next;
+    setPageIndex(next);
+  }).current;
 
   useEffect(() => {
-    if (visible) setPageIndex(0);
+    if (visible) {
+      pageIndexRef.current = 0;
+      setPageIndex(0);
+    }
   }, [visible, reader?.headline]);
 
   if (!visible) return null;
@@ -253,14 +270,21 @@ function KpTodayReaderSheet({
                   offset: pageWidth * index,
                   index,
                 })}
-                onMomentumScrollEnd={(e) => {
-                  const next = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
-                  const clamped = Math.max(0, Math.min(next, pages.length - 1));
-                  if (clamped !== pageIndex) {
-                    setPageIndex(clamped);
-                    trackEvent('kp_today_reader_swipe', { page: clamped, pages: pages.length });
-                  }
+                viewabilityConfig={viewabilityConfig}
+                onViewableItemsChanged={onViewableItemsChanged}
+                onScroll={(e) => {
+                  const x = e.nativeEvent.contentOffset.x;
+                  if (!pageWidth) return;
+                  const next = Math.max(
+                    0,
+                    Math.min(pages.length - 1, Math.round(x / pageWidth))
+                  );
+                  if (next === pageIndexRef.current) return;
+                  pageIndexRef.current = next;
+                  setPageIndex(next);
+                  trackEvent('kp_today_reader_swipe', { page: next, pages: pages.length });
                 }}
+                scrollEventThrottle={16}
                 renderItem={({ item, index }) => (
                   <View style={[styles.pageSlot, { width: pageWidth, paddingHorizontal: cardPad }]}>
                     <View
