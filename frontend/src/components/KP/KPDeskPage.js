@@ -313,6 +313,7 @@ function KPDeskPage({ user, onLogin }) {
         <div className="kp-desk-bar__left">
           <button type="button" className="kp-desk-bar__back" onClick={() => navigate('/charts-dashas')}>← Charts</button>
           <strong className="kp-desk-bar__brand">KP Desk</strong>
+          <button type="button" className="kp-desk-bar__back" onClick={() => navigate('/charts-dashas/nadi')}>Nadi</button>
           <span className="kp-desk-bar__native">
             {birthData?.name || 'No native'}
             {birthData?.date ? ` · ${String(birthData.date).split('T')[0]}` : ''}

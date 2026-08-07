@@ -488,12 +488,27 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
                     <p>{formatDate(result.as_of)} – {formatDate(result.horizon_end, { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                   </div>
                   <div className="activation-timeline">
-                    {dashaWindows.map((window, index) => (
+                    {dashaWindows.map((window, index) => {
+                      const openLabels = (window.opened_by || [])
+                        .filter((c) => c?.label && c.kind !== 'horizon_start' && c.kind !== 'horizon_end')
+                        .map((c) => c.label);
+                      const closeLabels = (window.closed_by || [])
+                        .filter((c) => c?.label && c.kind !== 'horizon_start' && c.kind !== 'horizon_end')
+                        .map((c) => c.label);
+                      return (
                       <div className={`activation-timeline-window${index === 0 ? ' is-current' : ''}`} key={`${window.start_date}-${window.transit_signature}`}>
                         <span>{formatDate(window.start_date)} – {formatDate(window.end_date)}</span>
                         <strong>{window.mahadasha} → {window.antardasha} → {window.pratyantardasha}</strong>
+                        {(openLabels.length || closeLabels.length) ? (
+                          <em className="activation-timeline-why">
+                            {openLabels.length ? `Opens: ${openLabels.join(' · ')}` : null}
+                            {openLabels.length && closeLabels.length ? ' · ' : null}
+                            {closeLabels.length ? `Then: ${closeLabels.join(' · ')}` : null}
+                          </em>
+                        ) : null}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </section>
 

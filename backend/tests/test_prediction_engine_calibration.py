@@ -87,7 +87,7 @@ def test_every_candidate_has_real_natal_promise_and_carrier_transit(calibration_
             assert not candidate.resolution.missing_required_houses
             assert candidate.resolution.carrier_planets
             assert candidate.resolution.transit_reinforced
-            assert {"AD", "PD"}.intersection(candidate.activation.active_dasha_levels)
+            assert {"MD", "AD", "PD"}.intersection(candidate.activation.active_dasha_levels)
             assert candidate.activation.primary_houses_covered == candidate.native_houses
             assert candidate.activation.carrier_planets
             assert candidate.activation.transit_reinforced
@@ -98,7 +98,7 @@ def test_every_candidate_has_real_natal_promise_and_carrier_transit(calibration_
                 if row.provider == "transit_house_ledger"
                 and row.facts.get("timing_trigger")
             }
-            assert event_transit, case["key"]
+            assert event_transit or candidate.activation.natal_position_reinforced, case["key"]
             if candidate.activation.band.value == "strong":
                 natal_targets = {
                     row.facts.get("natal_planet")

@@ -560,6 +560,14 @@
   font-weight: 750;
 }
 
+.activation-timeline-why {
+  font-style: normal;
+  font-size: 0.62rem;
+  line-height: 1.35;
+  font-weight: 650;
+  color: #9f1239;
+}
+
 .activation-workspace {
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);

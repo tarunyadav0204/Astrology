@@ -212,6 +212,46 @@ def _transit_states_for_day(
     return states
 
 
+# Slow / structural bodies whose rāśi (and Rx/combustion) define timing slices.
+# Sun is intentionally omitted: a lone Sun ingress does not re-slice windows.
+# Sun still affects slices indirectly when a watched planet's combustion flips.
+SIGNATURE_STRUCTURE_PLANETS = ("Jupiter", "Saturn", "Rahu", "Ketu")
+
+
+def _transit_signature_planets(dasha_row: Dict[str, str]) -> Tuple[str, ...]:
+    """Planets whose transit facts cut activation timing windows.
+
+    Includes MD/AD/PD lords plus Jupiter, Saturn, Rahu, Ketu.
+    Does not include Sun — bare Sun sign/house change is not a window boundary.
+    """
+    dasha_planets = {
+        dasha_row["mahadasha"],
+        dasha_row["antardasha"],
+        dasha_row["pratyantardasha"],
+    }
+    return tuple(sorted(set((*dasha_planets, *SIGNATURE_STRUCTURE_PLANETS))))
+
+
+def _normalise_signature_fact(
+    planet: str,
+    state: Dict[str, Any],
+    *,
+    include_nakshatra: bool,
+) -> Dict[str, Any]:
+    """Canonical facts so signature hash and boundary diffs stay aligned."""
+    fact: Dict[str, Any] = {
+        "sign": str(state.get("sign") or ""),
+        "retrograde": bool(state.get("retrograde")),
+        "combustion": (
+            "combust" if state.get("combustion") == "combust" else "normal"
+        ),
+    }
+    if include_nakshatra:
+        fact["nakshatra_index"] = int(state.get("nakshatra_index") or 0)
+        fact["nakshatra"] = str(state.get("nakshatra") or "")
+    return fact
+
+
 def _transit_signature(
     dasha_row: Dict[str, str], states: Dict[str, Dict[str, Any]]
 ) -> str:
@@ -220,10 +260,7 @@ def _transit_signature(
         dasha_row["antardasha"],
         dasha_row["pratyantardasha"],
     }
-    planets = tuple(sorted(set((
-        *dasha_planets,
-        "Sun", "Jupiter", "Saturn", "Rahu", "Ketu",
-    ))))
+    planets = _transit_signature_planets(dasha_row)
     payload = {
         "dasha": [
             dasha_row["mahadasha"],
@@ -231,21 +268,128 @@ def _transit_signature(
             dasha_row["pratyantardasha"],
         ],
         "transits": {
-            planet: {
-                "sign": states[planet]["sign"],
-                **(
-                    {"nakshatra_index": states[planet]["nakshatra_index"]}
-                    if planet in dasha_planets else {}
-                ),
-                "retrograde": states[planet]["retrograde"],
-                "combustion": states[planet]["combustion"],
-            }
+            planet: _normalise_signature_fact(
+                planet,
+                states[planet],
+                include_nakshatra=planet in dasha_planets,
+            )
             for planet in planets
         },
     }
+    # Nakṣatra name is display-only; hash must stay index-stable.
+    hash_payload = {
+        "dasha": payload["dasha"],
+        "transits": {
+            planet: {
+                key: value
+                for key, value in fact.items()
+                if key != "nakshatra"
+            }
+            for planet, fact in payload["transits"].items()
+        },
+    }
     return hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        json.dumps(hash_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()[:20]
+
+
+def _window_boundary_changes(
+    prev_row: Dict[str, str],
+    prev_states: Dict[str, Dict[str, Any]],
+    row: Dict[str, str],
+    states: Dict[str, Dict[str, Any]],
+) -> Tuple[Dict[str, Any], ...]:
+    """Human-readable reasons a timing window opens (signature / dasha flip)."""
+    changes: List[Dict[str, Any]] = []
+    for level, key in (
+        ("MD", "mahadasha"),
+        ("AD", "antardasha"),
+        ("PD", "pratyantardasha"),
+    ):
+        if prev_row[key] != row[key]:
+            changes.append({
+                "kind": "dasha",
+                "level": level,
+                "planet": row[key],
+                "from_planet": prev_row[key],
+                "to_planet": row[key],
+                "label": f"{level} {row[key]} begins",
+            })
+
+    dasha_planets = {
+        row["mahadasha"],
+        row["antardasha"],
+        row["pratyantardasha"],
+    }
+    watched_dasha = dasha_planets | {
+        prev_row["mahadasha"],
+        prev_row["antardasha"],
+        prev_row["pratyantardasha"],
+    }
+
+    for planet in sorted(
+        set(_transit_signature_planets(row)) | set(_transit_signature_planets(prev_row))
+    ):
+        if planet not in prev_states or planet not in states:
+            continue
+        prev = _normalise_signature_fact(
+            planet, prev_states[planet], include_nakshatra=planet in watched_dasha
+        )
+        curr = _normalise_signature_fact(
+            planet, states[planet], include_nakshatra=planet in watched_dasha
+        )
+        if prev["sign"] != curr["sign"]:
+            changes.append({
+                "kind": "sign",
+                "planet": planet,
+                "from_value": prev["sign"],
+                "to_value": curr["sign"],
+                "label": f"{planet} → {curr['sign']}",
+            })
+        if (
+            planet in watched_dasha
+            and prev.get("nakshatra_index") != curr.get("nakshatra_index")
+        ):
+            changes.append({
+                "kind": "nakshatra",
+                "planet": planet,
+                "from_value": prev.get("nakshatra") or prev.get("nakshatra_index"),
+                "to_value": curr.get("nakshatra") or curr.get("nakshatra_index"),
+                "label": (
+                    f"{planet} nakṣatra → {curr.get('nakshatra')}"
+                    if curr.get("nakshatra")
+                    else f"{planet} nakṣatra changes"
+                ),
+            })
+        if prev["retrograde"] != curr["retrograde"]:
+            changes.append({
+                "kind": "retrograde",
+                "planet": planet,
+                "to_value": curr["retrograde"],
+                "label": (
+                    f"{planet} stations retrograde"
+                    if curr["retrograde"]
+                    else f"{planet} stations direct"
+                ),
+            })
+        if prev["combustion"] != curr["combustion"]:
+            changes.append({
+                "kind": "combustion",
+                "planet": planet,
+                "to_value": curr["combustion"],
+                "label": (
+                    f"{planet} combust"
+                    if curr["combustion"] == "combust"
+                    else f"{planet} leaves combustion"
+                ),
+            })
+
+    if not changes:
+        changes.append({
+            "kind": "signature_shift",
+            "label": "Transit signature shift",
+        })
+    return tuple(changes)
 
 
 def _build_windows(
@@ -266,6 +410,13 @@ def _build_windows(
     active_start: date | None = None
     active_signature = ""
     active_row: Dict[str, str] | None = None
+    active_states: Dict[str, Dict[str, Any]] | None = None
+    active_opened_by: Tuple[Dict[str, Any], ...] = (
+        {
+            "kind": "horizon_start",
+            "label": "Scan start",
+        },
+    )
 
     for day in _date_range(start, end):
         row = _dasha_for_day(dasha_rows, day)
@@ -278,11 +429,14 @@ def _build_windows(
         states_by_signature.setdefault(signature, states)
 
         if active_start is None:
-            active_start, active_signature, active_row = day, signature, row
+            active_start, active_signature, active_row, active_states = (
+                day, signature, row, states
+            )
             continue
         if signature == active_signature:
             continue
-        assert active_row is not None
+        assert active_row is not None and active_states is not None
+        boundary = _window_boundary_changes(active_row, active_states, row, states)
         windows.append(
             PredictionWindow(
                 start_date=active_start.isoformat(),
@@ -291,9 +445,19 @@ def _build_windows(
                 antardasha=active_row["antardasha"],
                 pratyantardasha=active_row["pratyantardasha"],
                 transit_signature=active_signature,
+                opened_by=active_opened_by,
+                closed_by=boundary,
             )
         )
-        active_start, active_signature, active_row = day, signature, row
+        active_start, active_signature, active_row, active_states = (
+            day, signature, row, states
+        )
+        active_opened_by = boundary or (
+            {
+                "kind": "signature_shift",
+                "label": "Transit signature shift",
+            },
+        )
 
     if active_start is None or active_row is None:
         raise PredictionCalculationError("No deterministic prediction windows were constructed")
@@ -305,6 +469,13 @@ def _build_windows(
             antardasha=active_row["antardasha"],
             pratyantardasha=active_row["pratyantardasha"],
             transit_signature=active_signature,
+            opened_by=active_opened_by,
+            closed_by=(
+                {
+                    "kind": "horizon_end",
+                    "label": "Horizon end",
+                },
+            ),
         )
     )
     return windows, states_by_signature, daily_states

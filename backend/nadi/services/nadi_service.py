@@ -10,6 +10,10 @@ router = APIRouter()
 from .timeline_service import router as timeline_router
 router.include_router(timeline_router)
 
+# BNN Nadi Desk (linkage + activation ledger)
+from .desk_service import router as desk_router
+router.include_router(desk_router)
+
 class NadiService:
     """Main service for Nadi astrology calculations"""
     

@@ -201,8 +201,10 @@ export const apiService = {
     };
     const target =
       targetDateStr && String(targetDateStr).trim()
-        ? String(targetDateStr).split('T')[0]
+        ? String(targetDateStr).trim()
         : new Date().toISOString().split('T')[0];
+    // Keep clock when caller passes YYYY-MM-DDTHH:mm[:ss] (desk as-of time).
+    // Date-only values stay date-only; backend anchors those at noon.
     const response = await apiClient.post(getEndpoint('/calculate-cascading-dashas'), {
       birth_data: payload,
       target_date: target,
@@ -237,6 +239,16 @@ export const apiService = {
       horizon_days: horizonDays,
       maximum_candidates: 100,
       trace,
+    });
+    return response.data;
+  },
+
+  getNadiDesk: async ({ birthData, chartData, asOf, transitPlanets }) => {
+    const response = await apiClient.post(getEndpoint('/nadi-desk'), {
+      birth_data: birthData,
+      chart_data: chartData,
+      as_of: asOf,
+      transit_planets: transitPlanets || null,
     });
     return response.data;
   },

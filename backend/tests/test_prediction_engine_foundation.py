@@ -128,7 +128,7 @@ def test_real_service_generates_traceable_deterministic_result():
     first = service.generate(request)
     second = service.generate(request)
 
-    assert first.schema_version == "prediction_engine.v19"
+    assert first.schema_version == "prediction_engine.v21"
     assert first.profile == "parashari_fomo_v1"
     assert first.evidence_signature == second.evidence_signature
     assert [row.manifestation_id for row in first.chart_manifestations] == [
@@ -147,8 +147,10 @@ def test_real_service_generates_traceable_deterministic_result():
     assert all({row.house for row in first.house_activations} == set(range(1, 13)) for _ in (0,))
     assert all(candidate.resolution is not None for candidate in first.candidates)
     assert all(
-        candidate.resolution.rule_id
-        == "house_first_activation_with_bounded_manifestations"
+        candidate.resolution.rule_id in {
+            "house_first_activation_with_bounded_manifestations",
+            "house_first_combination_with_bounded_manifestations",
+        }
         for candidate in first.candidates
     )
     import json

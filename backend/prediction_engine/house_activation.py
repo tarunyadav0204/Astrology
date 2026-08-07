@@ -2,10 +2,14 @@ from __future__ import annotations
 
 """House-first Parashari activation ledger.
 
-This module deliberately does not name events.  It establishes what can be
-said before an event vocabulary is consulted: the natal connections of the
-running dasha lords, cooperation within MD/AD/PD, and transit triggers.  A
-transit-only house remains visible in the ledger but cannot become an event.
+Dasha-lord-centric policy (v5.1):
+
+- MD, AD, and PD are independent carriers.
+- A carrier opens houses only by natal portfolio: lordship, natal occupation,
+  natal aspect. Transit alone does not open a house.
+- Active when an opening carrier also occupies/aspects that house in transit.
+- Fully activated when an opening carrier's transit contacts its own natal
+  (occupation or aspect), or Sun sits on that carrier's natal/transit seat.
 """
 
 from dataclasses import dataclass
@@ -34,15 +38,10 @@ from .nakshatra_transit import (
     nakshatra_lord_natal_condition,
     nakshatra_transit_relation,
 )
-from .primitives import CLASSICAL_PLANETS, aspected_houses, ruled_houses
+from .primitives import aspected_houses, ruled_houses
 
 
-HOUSE_ACTIVATION_POLICY_VERSION = "4.1.0"
-
-# Slow transits are allowed to reinforce timing even when the planet is not a
-# dasha lord.  Faster planets are retained as short triggers only when they are
-# themselves in the active dasha chain.
-TIMING_TRANSIT_TRIGGERS = frozenset({"Sun", "Jupiter", "Saturn", "Rahu", "Ketu"})
+HOUSE_ACTIVATION_POLICY_VERSION = "5.1.0"
 DASHA_LEVEL_ORDER = {"MD": 0, "AD": 1, "PD": 2}
 
 
@@ -166,6 +165,23 @@ def _transit_aspects_natal(
 ) -> bool:
     return natal_house == transit_house or natal_house in aspected_houses(
         transit_planet, transit_house
+    )
+
+
+def _transit_relations_to_house(
+    planet: str, transit_house: int, house: int
+) -> Tuple[str, ...]:
+    relations: List[str] = []
+    if transit_house == house:
+        relations.append("occupation")
+    if house in aspected_houses(planet, transit_house):
+        relations.append("aspect")
+    return tuple(relations)
+
+
+def _sun_contacts_house(sun_house: int, target_house: int) -> bool:
+    return target_house == sun_house or target_house in aspected_houses(
+        "Sun", sun_house
     )
 
 
@@ -513,16 +529,43 @@ class HouseActivationEngine:
             window.transit_signature
         ]
         dasha_planets = {planet for _, planet in levels}
-        transit_trigger_set = dasha_planets | set(TIMING_TRANSIT_TRIGGERS)
-        results: List[HouseActivation] = []
+        levels_by_planet: Dict[str, Set[str]] = {}
+        for level, planet in levels:
+            levels_by_planet.setdefault(planet, set()).add(level)
 
+        # Per dasha lord: self-contact and Sun add-on (lord fully awake).
+        self_contact_planets: Set[str] = set()
+        sun_activated_planets: Set[str] = set()
+        sun_state = transit_states.get("Sun")
+        sun_house = int(sun_state["house"]) if sun_state else None
+        for planet in dasha_planets:
+            natal = chart["planets"].get(planet)
+            transit = transit_states.get(planet)
+            if natal is None or transit is None:
+                continue
+            natal_house = int(natal["house"])
+            transit_house = int(transit["house"])
+            if _transit_aspects_natal(planet, transit_house, natal_house):
+                self_contact_planets.add(planet)
+            if sun_house is not None and (
+                _sun_contacts_house(sun_house, natal_house)
+                or _sun_contacts_house(sun_house, transit_house)
+            ):
+                sun_activated_planets.add(planet)
+
+        results: List[HouseActivation] = []
         for house in range(1, 13):
             evidence: List[Evidence] = []
             natal_connections: List[_NatalConnection] = []
+            carrier_planets: Set[str] = set()
+            transit_hit_planets: Set[str] = set()
+            transit_connections: List[Dict[str, Any]] = []
+            trigger_planets: Set[str] = set()
+
             for level, planet in levels:
                 for relation in _planet_relations_to_house(chart, planet, house):
-                    connection = _NatalConnection(level, planet, relation)
-                    natal_connections.append(connection)
+                    natal_connections.append(_NatalConnection(level, planet, relation))
+                    carrier_planets.add(planet)
                     evidence.append(_evidence(
                         window=window,
                         provider="natal_dasha_house",
@@ -534,26 +577,117 @@ class HouseActivationEngine:
                         key=f"natal-dasha:{level}:{planet}:{relation}:{house}",
                     ))
 
-            direct_planets = {row.planet for row in natal_connections}
-            connected_planets = _connected_planets(relationships, direct_planets)
-            active_levels = {
-                level for level, planet in levels if planet in connected_planets
-            }
-            direct_subperiod = any(
-                row.level in {"AD", "PD"} for row in natal_connections
-            )
-            cooperative_subperiod = any(
-                level in {"AD", "PD"} and planet in connected_planets
-                for level, planet in levels
-            )
-            deliverable = bool(natal_connections) and (
-                direct_subperiod or cooperative_subperiod
-            )
+            # Transit only times houses already in a dasha lord's natal portfolio.
+            # Sa→Ra→Sa transit aspect on H6 does not open H6 when no dasha lord
+            # has natal lordship/occupation/aspect there.
+            for planet in sorted(carrier_planets):
+                transit = transit_states.get(planet)
+                if transit is None:
+                    continue
+                transit_house = int(transit["house"])
+                for relation in _transit_relations_to_house(
+                    planet, transit_house, house
+                ):
+                    transit_hit_planets.add(planet)
+                    trigger_planets.add(planet)
+                    transit_connections.append({
+                        "planet": planet,
+                        "relation": relation,
+                        "relations": (relation,),
+                        "transit_house": transit_house,
+                        "timing_trigger": True,
+                        "dasha_planet": True,
+                        "dasha_levels": tuple(sorted(
+                            levels_by_planet.get(planet, ()),
+                            key=DASHA_LEVEL_ORDER.get,
+                        )),
+                    })
+                    evidence.append(_evidence(
+                        window=window,
+                        provider="transit_house_ledger",
+                        rule_id=f"dasha_planet_transit_{relation}_house",
+                        planet=planet,
+                        house=house,
+                        importance=Importance.PRIMARY,
+                        facts={
+                            "relation": relation,
+                            "transit_house": transit_house,
+                            "timing_trigger": True,
+                            "dasha_planet": True,
+                            "dasha_levels": tuple(sorted(
+                                levels_by_planet.get(planet, ()),
+                                key=DASHA_LEVEL_ORDER.get,
+                            )),
+                        },
+                        key=f"transit-house:{planet}:{relation}:{house}",
+                    ))
 
+            # Self-contact / Sun evidence for carriers of this house.
+            for planet in sorted(carrier_planets):
+                natal = chart["planets"][planet]
+                transit = transit_states[planet]
+                natal_house = int(natal["house"])
+                transit_house = int(transit["house"])
+                planet_levels = tuple(sorted(
+                    levels_by_planet.get(planet, ()), key=DASHA_LEVEL_ORDER.get
+                ))
+                if planet in self_contact_planets:
+                    relation = (
+                        "conjunction" if transit_house == natal_house else "aspect"
+                    )
+                    evidence.append(_evidence(
+                        window=window,
+                        provider="transit_natal_ledger",
+                        rule_id="dasha_lord_transit_contacts_own_natal",
+                        planet=planet,
+                        house=house,
+                        importance=Importance.PRIMARY,
+                        facts={
+                            "natal_planet": planet,
+                            "natal_house": natal_house,
+                            "transit_house": transit_house,
+                            "relation": relation,
+                            "same_planet_natal_repetition": True,
+                            "dasha_levels": planet_levels,
+                        },
+                        key=(
+                            f"transit-natal-self:{planet}:"
+                            f"{transit_house}:{natal_house}"
+                        ),
+                    ))
+                if planet in sun_activated_planets and sun_house is not None:
+                    contacts_natal = _sun_contacts_house(sun_house, natal_house)
+                    contacts_transit = _sun_contacts_house(sun_house, transit_house)
+                    target = "natal" if contacts_natal else "transit"
+                    target_house = natal_house if contacts_natal else transit_house
+                    relation = (
+                        "conjunction" if sun_house == target_house else "aspect"
+                    )
+                    evidence.append(_evidence(
+                        window=window,
+                        provider="transit_natal_ledger",
+                        rule_id=f"sun_contacts_dasha_lord_{target}",
+                        planet="Sun",
+                        house=house,
+                        importance=Importance.PRIMARY,
+                        facts={
+                            "natal_planet": planet,
+                            "natal_house": natal_house,
+                            "transit_house": transit_house,
+                            "sun_house": sun_house,
+                            "target": target,
+                            "target_house": target_house,
+                            "relation": relation,
+                            "dasha_levels": planet_levels,
+                        },
+                        key=f"sun-dasha-lord:{planet}:{target}:{sun_house}:{target_house}",
+                    ))
+
+            # Confirmatory MD–AD–PD natal sambandha among carriers.
             relevant_relationships = tuple(
                 row for row in relationships
                 if row.relations and {row.first_planet, row.second_planet}.intersection(
-                    connected_planets
+                    carrier_planets
                 )
             )
             for row in relevant_relationships:
@@ -578,180 +712,90 @@ class HouseActivationEngine:
                     ),
                 ))
 
-            transit_connections: List[Dict[str, Any]] = []
-            trigger_planets: Set[str] = set()
-            self_natal_reinforcement_planets: Set[str] = set()
-            nakshatra_return_planets: Set[str] = set()
-            levels_by_planet: Dict[str, Set[str]] = {}
-            for level, planet in levels:
-                levels_by_planet.setdefault(planet, set()).add(level)
-            if deliverable:
-                for planet, planet_levels in levels_by_planet.items():
-                    if planet not in connected_planets:
-                        continue
-                    natal = chart["planets"].get(planet)
-                    transit = transit_states.get(planet)
-                    if natal is None or transit is None:
-                        continue
-                    resonance = nakshatra_transit_relation(
-                        float(natal["longitude"]),
-                        float(transit["longitude"]),
-                    )
-                    if resonance is None:
-                        continue
-                    lord = str(resonance["common_nakshatra_lord"])
-                    relevant, relevance_reasons = nakshatra_lord_house_relevance(
-                        chart, lord, house, dasha_planets
-                    )
-                    is_exact_return = (
-                        resonance["relation"] == "exact_natal_nakshatra_return"
-                    )
-                    if is_exact_return:
-                        nakshatra_return_planets.add(planet)
-                    lord_condition = nakshatra_lord_natal_condition(
-                        chart, calculation.natal_dignities, lord
-                    )
-                    evidence.append(_evidence(
-                        window=window,
-                        provider="transit_nakshatra_ledger",
-                        rule_id=(
-                            "dasha_planet_exact_natal_nakshatra_return"
-                            if is_exact_return
-                            else "dasha_planet_nakshatra_dispositor_resonance"
-                        ),
-                        planet=planet,
-                        house=house,
-                        importance=Importance.CONFIRMATORY,
-                        facts={
-                            "dasha_levels": tuple(sorted(
-                                planet_levels, key=DASHA_LEVEL_ORDER.get
-                            )),
-                            **resonance,
-                            "nakshatra_lord_relevant": relevant,
-                            "nakshatra_lord_relevance_reasons": relevance_reasons,
-                            "nakshatra_lord_natal_condition": lord_condition,
-                            "nakshatra_lord_expression": (
-                                nakshatra_lord_expression(lord_condition)
-                            ),
-                            "creates_house_promise": False,
-                            "qualifies_as_direct_natal_contact": False,
-                            "qualifies_as_strong_natal_return_confirmation": (
-                                is_exact_return
-                            ),
-                        },
-                        key=(
-                            f"transit-nakshatra:{planet}:{resonance['relation']}:"
-                            f"{resonance['transit_nakshatra']['index']}"
-                        ),
-                    ))
-            for planet in CLASSICAL_PLANETS:
+            # Nakṣatra resonance remains confirmatory, not a full-activation gate.
+            for planet in sorted(carrier_planets):
+                natal = chart["planets"].get(planet)
                 transit = transit_states.get(planet)
-                if transit is None:
+                if natal is None or transit is None:
                     continue
-                transit_house = int(transit["house"])
-                relations_to_house: List[str] = []
-                if transit_house == house:
-                    relations_to_house.append("occupation")
-                if house in aspected_houses(planet, transit_house):
-                    relations_to_house.append("aspect")
-                if not relations_to_house:
-                    continue
-
-                is_timing_trigger = planet in transit_trigger_set
-                transit_connections.append({
-                    "planet": planet,
-                    "relations": tuple(relations_to_house),
-                    "transit_house": transit_house,
-                    "timing_trigger": is_timing_trigger,
-                    "dasha_planet": planet in dasha_planets,
-                })
-                if is_timing_trigger:
-                    trigger_planets.add(planet)
-                for relation in relations_to_house:
-                    evidence.append(_evidence(
-                        window=window,
-                        provider="transit_house_ledger",
-                        rule_id=f"transit_{relation}_house",
-                        planet=planet,
-                        house=house,
-                        importance=(
-                            Importance.PRIMARY
-                            if planet in dasha_planets
-                            else Importance.CONFIRMATORY
-                        ),
-                        facts={
-                            "relation": relation,
-                            "transit_house": transit_house,
-                            "timing_trigger": is_timing_trigger,
-                            "dasha_planet": planet in dasha_planets,
-                        },
-                        key=f"transit-house:{planet}:{relation}:{house}",
-                    ))
-
-                if is_timing_trigger and connected_planets:
-                    for natal_planet in connected_planets:
-                        natal_house = int(chart["planets"][natal_planet]["house"])
-                        if _transit_aspects_natal(planet, transit_house, natal_house):
-                            if planet == natal_planet:
-                                self_natal_reinforcement_planets.add(planet)
-                            evidence.append(_evidence(
-                                window=window,
-                                provider="transit_natal_ledger",
-                                rule_id="timing_planet_contacts_natal_dasha_carrier",
-                                planet=planet,
-                                house=house,
-                                importance=Importance.CONFIRMATORY,
-                                facts={
-                                    "natal_planet": natal_planet,
-                                    "natal_house": natal_house,
-                                    "transit_house": transit_house,
-                                    "relation": (
-                                        "conjunction"
-                                        if transit_house == natal_house else "aspect"
-                                    ),
-                                    "same_planet_natal_repetition": planet == natal_planet,
-                                },
-                                key=(
-                                    f"transit-natal:{planet}:{natal_planet}:"
-                                    f"{transit_house}:{natal_house}"
-                                ),
-                            ))
-
-            has_timing_transit = bool(trigger_planets)
-            full_reinforcement_planets = (
-                dasha_planets
-                & trigger_planets
-                & (
-                    self_natal_reinforcement_planets
-                    | nakshatra_return_planets
+                resonance = nakshatra_transit_relation(
+                    float(natal["longitude"]),
+                    float(transit["longitude"]),
                 )
+                if resonance is None:
+                    continue
+                lord = str(resonance["common_nakshatra_lord"])
+                relevant, relevance_reasons = nakshatra_lord_house_relevance(
+                    chart, lord, house, dasha_planets
+                )
+                is_exact_return = (
+                    resonance["relation"] == "exact_natal_nakshatra_return"
+                )
+                lord_condition = nakshatra_lord_natal_condition(
+                    chart, calculation.natal_dignities, lord
+                )
+                planet_levels = tuple(sorted(
+                    levels_by_planet.get(planet, ()), key=DASHA_LEVEL_ORDER.get
+                ))
+                evidence.append(_evidence(
+                    window=window,
+                    provider="transit_nakshatra_ledger",
+                    rule_id=(
+                        "dasha_planet_exact_natal_nakshatra_return"
+                        if is_exact_return
+                        else "dasha_planet_nakshatra_dispositor_resonance"
+                    ),
+                    planet=planet,
+                    house=house,
+                    importance=Importance.CONFIRMATORY,
+                    facts={
+                        "dasha_levels": planet_levels,
+                        **resonance,
+                        "nakshatra_lord_relevant": relevant,
+                        "nakshatra_lord_relevance_reasons": relevance_reasons,
+                        "nakshatra_lord_natal_condition": lord_condition,
+                        "nakshatra_lord_expression": (
+                            nakshatra_lord_expression(lord_condition)
+                        ),
+                        "creates_house_promise": False,
+                        "qualifies_as_direct_natal_contact": False,
+                        "qualifies_as_strong_natal_return_confirmation": (
+                            is_exact_return
+                        ),
+                    },
+                    key=(
+                        f"transit-nakshatra:{planet}:{resonance['relation']}:"
+                        f"{resonance['transit_nakshatra']['index']}"
+                    ),
+                ))
+
+            fully_awake = (
+                carrier_planets & (self_contact_planets | sun_activated_planets)
             )
-            natal_relation_reinforcement = bool(full_reinforcement_planets)
-            if deliverable and has_timing_transit and natal_relation_reinforcement:
+            natal_position_reinforced = bool(fully_awake)
+            has_transit_delivery = bool(transit_hit_planets)
+            opened = bool(carrier_planets)
+
+            if opened and natal_position_reinforced:
                 state = HouseActivationState.FULLY_REINFORCED
                 band = ActivationBand.STRONG
-                rule_id = "natal_dasha_delivery_transit_and_natal_contact"
-            elif deliverable and has_timing_transit:
+                rule_id = "dasha_lord_house_with_self_or_sun_activation"
+            elif opened and has_transit_delivery:
                 state = HouseActivationState.DASHA_TRANSIT_ACTIVATED
                 band = ActivationBand.MODERATE
-                rule_id = "natal_dasha_delivery_with_transit_activation"
-            elif natal_connections:
+                rule_id = "dasha_natal_house_with_transit_hit"
+            elif opened:
                 state = HouseActivationState.DASHA_CONNECTED
-                band = ActivationBand.MODERATE if deliverable else ActivationBand.INSUFFICIENT
-                rule_id = (
-                    "natal_house_connected_to_active_subperiod"
-                    if deliverable else "mahadasha_only_or_unrelated_dasha_connection"
-                )
-            elif has_timing_transit:
-                state = HouseActivationState.TRANSIT_ONLY
-                band = ActivationBand.INSUFFICIENT
-                rule_id = "transit_activation_without_current_dasha_natal_connection"
+                band = ActivationBand.MODERATE
+                rule_id = "dasha_lord_natal_opens_house"
             else:
                 state = HouseActivationState.DORMANT
                 band = ActivationBand.INSUFFICIENT
-                rule_id = "no_current_dasha_or_relevant_transit_activation"
+                rule_id = "no_dasha_lord_opens_house"
 
-            carrier_planets = connected_planets if natal_connections else set()
+            active_levels = {
+                level for level, planet in levels if planet in carrier_planets
+            }
             promise = next(
                 (row for row in calculation.natal_promises if int(row["house"]) == house),
                 None,
@@ -828,18 +872,15 @@ class HouseActivationEngine:
                 calculation, window, house, carrier_planets
             ))
             timing_triggers: List[Dict[str, Any]] = []
-            sun_relations = tuple(
-                relation
-                for connection in transit_connections
-                if connection["planet"] == "Sun" and connection["timing_trigger"]
-                for relation in connection["relations"]
-            )
-            if sun_relations:
+            if carrier_planets & sun_activated_planets and sun_house is not None:
                 timing_triggers.append({
                     "kind": "sun_reinforcement",
                     "start_date": window.start_date,
                     "end_date": window.end_date,
-                    "house_relations": sun_relations,
+                    "sun_house": sun_house,
+                    "activated_dasha_lords": tuple(sorted(
+                        carrier_planets & sun_activated_planets
+                    )),
                     "creates_event_without_dasha_promise": False,
                 })
             timing_triggers.extend(_moon_short_triggers(
@@ -869,9 +910,9 @@ class HouseActivationEngine:
                     row.independent_key for row in evidence if row.independent_key
                 }),
                 active_dasha_levels=tuple(sorted(active_levels, key=DASHA_LEVEL_ORDER.get)),
-                transit_reinforced=has_timing_transit,
-                natal_position_reinforced=natal_relation_reinforcement,
-                primary_houses_covered=(house,) if natal_connections else (),
+                transit_reinforced=has_transit_delivery or natal_position_reinforced,
+                natal_position_reinforced=natal_position_reinforced,
+                primary_houses_covered=(house,) if opened else (),
                 carrier_planets=tuple(sorted(carrier_planets)),
                 rule_id=rule_id,
             )
@@ -889,7 +930,7 @@ class HouseActivationEngine:
                 } for row in natal_connections),
                 transit_connections=tuple(transit_connections),
                 dasha_relationships=relevant_relationships,
-                trigger_planets=tuple(sorted(trigger_planets)),
+                trigger_planets=tuple(sorted(trigger_planets | fully_awake)),
                 timing_triggers=tuple(timing_triggers),
                 evidence=tuple(evidence),
             ))

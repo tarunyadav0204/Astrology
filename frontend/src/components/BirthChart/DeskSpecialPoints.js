@@ -29,6 +29,36 @@ function planetAbbr(name) {
   return PLANET_ABBR[name] || String(name).slice(0, 2);
 }
 
+const NAKSHATRAS = [
+  'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra',
+  'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni',
+  'Hasta', 'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha',
+  'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha',
+  'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati',
+];
+
+function nakshatraOfLon(lon) {
+  if (typeof lon !== 'number' || Number.isNaN(lon)) return null;
+  const n = ((lon % 360) + 360) % 360;
+  return NAKSHATRAS[Math.floor(n / 13.333333)] || null;
+}
+
+function nakshatraShort(name) {
+  if (!name) return null;
+  const first = String(name).split(/\s+/)[0];
+  return first.length > 7 ? first.slice(0, 6) : first;
+}
+
+function planetNakshatra(chartData, planetName) {
+  const data = chartData?.planets?.[planetName];
+  if (!data) return null;
+  if (typeof data.nakshatra === 'string' && data.nakshatra.trim()) return data.nakshatra.trim();
+  if (typeof data.nakshatra_name === 'string' && data.nakshatra_name.trim()) {
+    return data.nakshatra_name.trim();
+  }
+  return nakshatraOfLon(data.longitude);
+}
+
 function fmtPoint(point) {
   if (!point) return '—';
   const deg = point.degree != null ? `${Number(point.degree).toFixed(1)}°` : '';
@@ -44,6 +74,7 @@ const DeskSpecialPoints = ({ birthData, chartData, variant = 'strip' }) => {
   const [badhaka, setBadhaka] = useState(null);
   const [sniper, setSniper] = useState(null);
   const [pushkara, setPushkara] = useState(null);
+  const [gandanta, setGandanta] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -52,16 +83,18 @@ const DeskSpecialPoints = ({ birthData, chartData, variant = 'strip' }) => {
       setBadhaka(null);
       setSniper(null);
       setPushkara(null);
+      setGandanta(null);
       return undefined;
     }
     let cancelled = false;
     (async () => {
       try {
-        const [yogiRes, badhakaRes, sniperRes, d9Res] = await Promise.all([
+        const [yogiRes, badhakaRes, sniperRes, d9Res, ganRes] = await Promise.all([
           apiService.calculateYogi(birthData),
           apiService.calculateBadhakaMaraka(chartData).catch(() => null),
           apiService.calculateSniperPoints(chartData).catch(() => null),
           apiService.calculateDivisionalChart(birthData, 9).catch(() => null),
+          apiService.calculateGandantaAnalysis(chartData).catch(() => null),
         ]);
         let push = null;
         if (d9Res?.divisional_chart) {
@@ -72,6 +105,7 @@ const DeskSpecialPoints = ({ birthData, chartData, variant = 'strip' }) => {
         setBadhaka(badhakaRes);
         setSniper(sniperRes?.sniper_points || sniperRes || null);
         setPushkara(push?.pushkara_analysis || push || null);
+        setGandanta(ganRes?.gandanta_analysis || ganRes?.data?.gandanta_analysis || ganRes || null);
         setError(null);
       } catch (err) {
         if (!cancelled) setError(err?.message || 'Failed to load special points');
@@ -159,8 +193,65 @@ const DeskSpecialPoints = ({ birthData, chartData, variant = 'strip' }) => {
       });
     }
 
+    const ganRows = gandanta?.planets_in_gandanta || gandanta?.planetary_gandanta || [];
+    const ganEntries = ganRows
+      .map((row) => {
+        const name = typeof row.planet === 'string' ? row.planet : (row.planet?.name || row.name);
+        const info = row.gandanta_info || row;
+        if (!name || !(info?.is_gandanta || row.is_gandanta)) return null;
+        const nak = planetNakshatra(chartData, name);
+        return {
+          abbr: planetAbbr(name),
+          name,
+          nak,
+          info,
+          label: [planetAbbr(name), nakshatraShort(nak)].filter(Boolean).join(' '),
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 5);
+    const lagnaGan = gandanta?.lagna_gandanta?.is_gandanta
+      ? (gandanta.lagna_gandanta.gandanta_info || gandanta.lagna_gandanta)
+      : null;
+    if (ganEntries.length || lagnaGan) {
+      const valueParts = [];
+      let lagnaNak = null;
+      if (lagnaGan) {
+        const ascLon = typeof chartData?.ascendant === 'number'
+          ? chartData.ascendant
+          : chartData?.houses?.[0]?.longitude;
+        lagnaNak = nakshatraOfLon(ascLon);
+        valueParts.push(['Asc', nakshatraShort(lagnaNak)].filter(Boolean).join(' '));
+      }
+      valueParts.push(...ganEntries.map((row) => row.label));
+      const titles = ganEntries.map((row) => ([
+        row.name,
+        row.nak ? `nakṣatra ${row.nak}` : null,
+        row.info.gandanta_name || 'Gandanta',
+        row.info.intensity || null,
+        row.info.distance_from_junction != null ? `${row.info.distance_from_junction}°` : null,
+      ].filter(Boolean).join(' · ')));
+      if (lagnaGan) {
+        titles.unshift([
+          'Lagna',
+          lagnaNak ? `nakṣatra ${lagnaNak}` : null,
+          lagnaGan.gandanta_name || 'Gandanta',
+          lagnaGan.intensity || null,
+        ].filter(Boolean).join(' · '));
+      }
+      list.push({
+        key: 'gandanta',
+        label: 'Gandanta',
+        value: valueParts.join(' · ') || 'Yes',
+        tone: 'gandanta',
+        title: titles.length
+          ? `Gandamoola (Gandanta): ${titles.join('; ')}`
+          : 'Gandamoola (Gandanta) junction affliction',
+      });
+    }
+
     return list;
-  }, [yogi, badhaka, sniper, pushkara]);
+  }, [yogi, badhaka, sniper, pushkara, gandanta, chartData]);
 
   if (error) {
     return <div className={`desk-sp desk-sp--${variant} desk-sp--error`}>{error}</div>;

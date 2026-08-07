@@ -5,7 +5,7 @@ import json
 from dataclasses import replace
 from datetime import date, timedelta
 from itertools import product
-from typing import Dict, Iterable, List, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 from .context import CalculationContext, EvaluationContext
 from .contracts import (
@@ -46,7 +46,7 @@ from .subjects import SUBJECTS, SUBJECT_REGISTRY_VERSION, native_houses_for_subj
 from .taxonomy import EVENT_FAMILIES, TAXONOMY_VERSION, EventFamily
 
 
-ENGINE_VERSION = "5.5.0"
+ENGINE_VERSION = "5.6.0"
 _ACTIVATION_PROVIDERS = {
     "dasha_house_activation",
     "dispositor_activation",
@@ -399,6 +399,8 @@ def _consolidate_candidates(
             transit_signature=hashlib.sha256(
                 "|".join(signatures).encode("utf-8")
             ).hexdigest()[:20],
+            opened_by=previous.window.opened_by,
+            closed_by=candidate.window.closed_by,
         )
         merged[-1] = replace(
             previous,
@@ -560,6 +562,26 @@ def _group_shared_house_interpretations(
     return grouped
 
 
+def _timing_transit_fingerprint(
+    connections: Sequence[Dict[str, Any]],
+) -> Tuple[Tuple[Any, ...], ...]:
+    """Only Ju/Sa/Ra/Ke/Sun/dasha timing contacts define merge identity.
+
+    Fast planets (Moon, Mercury, …) still appear in transit_connections for
+    evidence, but their daily motion must not split otherwise-identical
+    house windows — that asymmetrically hid houses like H7 from long tiles.
+    """
+    return tuple(sorted(
+        (
+            str(item.get("planet") or ""),
+            tuple(item.get("relations") or ()),
+            int(item.get("transit_house") or 0),
+        )
+        for item in connections
+        if item.get("timing_trigger")
+    ))
+
+
 def _merge_house_activation_windows(
     rows: Sequence[HouseActivation],
 ) -> Tuple[HouseActivation, ...]:
@@ -585,7 +607,8 @@ def _merge_house_activation_windows(
             and previous.window.antardasha == row.window.antardasha
             and previous.window.pratyantardasha == row.window.pratyantardasha
             and tuple(previous.natal_connections) == tuple(row.natal_connections)
-            and tuple(previous.transit_connections) == tuple(row.transit_connections)
+            and _timing_transit_fingerprint(previous.transit_connections)
+            == _timing_transit_fingerprint(row.transit_connections)
             and previous.activation.natal_position_reinforced
             == row.activation.natal_position_reinforced
         )
@@ -607,6 +630,7 @@ def _merge_house_activation_windows(
                     + row.window.transit_signature
                 ).encode("utf-8")
             ).hexdigest()[:20],
+            closed_by=row.window.closed_by,
         )
         evidence = tuple(
             replace(
@@ -864,6 +888,8 @@ def _combination_candidates(
                 hashlib.sha256(
                     "|".join(row.window.transit_signature for row in rows).encode("utf-8")
                 ).hexdigest()[:20],
+                opened_by=first.window.opened_by,
+                closed_by=rows[-1].window.closed_by,
             )
             activation = ActivationAssessment(
                 band=ActivationBand.STRONG if all_full else ActivationBand.MODERATE,

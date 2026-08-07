@@ -168,7 +168,7 @@ def test_same_native_house_across_subject_frames_is_returned_as_alternatives():
     }
     assert current[2].state == HouseActivationState.FULLY_REINFORCED
     assert current[8].state == HouseActivationState.FULLY_REINFORCED
-    assert current[6].state == HouseActivationState.TRANSIT_ONLY
+    assert current[6].state == HouseActivationState.DORMANT
     assert current[6].activation.band == ActivationBand.INSUFFICIENT
     assert current[6].activation.active_dasha_levels == ()
     assert current[6].activation.carrier_planets == ()
@@ -286,11 +286,11 @@ def test_same_native_house_across_subject_frames_is_returned_as_alternatives():
         "Mars": "mixed",
         "Saturn": "challenging",
     }
-    assert current[6].activation.rule_id == "transit_activation_without_current_dasha_natal_connection"
+    assert current[6].activation.rule_id == "no_dasha_lord_opens_house"
     assert set(current[8].activation.carrier_planets) == {"Rahu", "Saturn"}
-    assert current[9].state == HouseActivationState.TRANSIT_ONLY
+    assert current[9].state == HouseActivationState.DORMANT
     assert current[9].activation.band == ActivationBand.INSUFFICIENT
-    assert current[1].state == HouseActivationState.TRANSIT_ONLY
+    assert current[1].state == HouseActivationState.DORMANT
     assert "Sun" not in current[1].activation.carrier_planets
     assert "Moon" not in current[8].trigger_planets
     assert any(
@@ -362,11 +362,19 @@ def test_future_sun_contact_surfaces_father_only_in_its_timing_window():
     )
     sun_h2 = next(
         row for row in result.house_activations
-        if row.house == 2 and row.window.start_date == "2026-08-17"
+        if row.house == 2
+        and any(
+            evidence.planet == "Sun"
+            and evidence.provider == "transit_natal_ledger"
+            and evidence.facts.get("natal_planet") == "Saturn"
+            for evidence in row.evidence
+        )
     )
-    assert sun_h2.window.end_date == "2026-09-16"
+    assert sun_h2.window.start_date > current_h2.window.start_date
     assert not any(
-        evidence.planet == "Sun" and evidence.provider == "transit_natal_ledger"
+        evidence.planet == "Sun"
+        and evidence.provider == "transit_natal_ledger"
+        and evidence.facts.get("natal_planet")
         for evidence in current_h2.evidence
     )
     assert any(

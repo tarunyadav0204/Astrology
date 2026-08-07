@@ -22,6 +22,10 @@ const ChartWidget = ({
   /** Parashari/KP desk: minimize chrome so the chart fills the cell */
   deskMode = false,
   showFooterHint = true,
+  onHouseSelect = null,
+  selectedHouseNumber = null,
+  highlightedPlanets = null,
+  highlightedHouseNumbers = null,
 }) => {
   const [chartStyle, setChartStyle] = useState(defaultStyle || 'north');
   const [showAshtakavarga, setShowAshtakavarga] = useState(false);
@@ -117,12 +121,18 @@ const ChartWidget = ({
   useEffect(() => {
     if (chartType === 'transit' && birthData && transitDate) {
       setLoading(true);
+      const transitDay = (() => {
+        if (transitDate instanceof Date && !Number.isNaN(transitDate.getTime())) {
+          const y = transitDate.getFullYear();
+          const m = String(transitDate.getMonth() + 1).padStart(2, '0');
+          const d = String(transitDate.getDate()).padStart(2, '0');
+          return `${y}-${m}-${d}`;
+        }
+        return String(transitDate).split('T')[0];
+      })();
       apiService.calculateTransits({
         birth_data: birthData,
-        transit_date:
-          transitDate instanceof Date
-            ? transitDate.toISOString().split('T')[0]
-            : String(transitDate).split('T')[0],
+        transit_date: transitDay,
       })
         .then((response) => {
           setTransitChartData(response);
@@ -431,6 +441,10 @@ const ChartWidget = ({
             showDegreeNakshatra={showDegreeNakshatra}
             showFooterHint={showFooterHint}
             deskMode={deskMode}
+            onHouseSelect={onHouseSelect}
+            selectedHouseNumber={selectedHouseNumber}
+            highlightedPlanets={highlightedPlanets}
+            highlightedHouseNumbers={highlightedHouseNumbers}
           />
         ) : (
           <SouthIndianChart 
@@ -441,6 +455,10 @@ const ChartWidget = ({
             showDegreeNakshatra={showDegreeNakshatra}
             showFooterHint={showFooterHint}
             deskMode={deskMode}
+            onHouseSelect={onHouseSelect}
+            selectedHouseNumber={selectedHouseNumber}
+            highlightedPlanets={highlightedPlanets}
+            highlightedHouseNumbers={highlightedHouseNumbers}
           />
         )}
       </ChartContainer>

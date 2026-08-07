@@ -119,6 +119,7 @@ const BirthChartCreationPage = lazy(() => import('./components/BirthChart/BirthC
 const ChartsDashasWorkspacePage = lazy(() => import('./components/BirthChart/ChartsDashasWorkspacePage'));
 const ActivationExplorerPage = lazy(() => import('./components/BirthChart/ActivationExplorerPage'));
 const KPDeskPage = lazy(() => import('./components/KP/KPDeskPage'));
+const NadiDeskPage = lazy(() => import('./components/Nadi/NadiDeskPage'));
 const Dashboard = lazy(() => import('./components/Dashboard/Dashboard'));
 const PredictionsPage = lazy(() => import('./components/PredictionsPage/PredictionsPage'));
 const PanchangPage = lazy(() => import('./components/Panchang/PanchangPage'));
@@ -722,6 +723,27 @@ function App() {
                   authView={authView}
                   setAuthView={setAuthView}
                   description="Sign in to open the KP desk for your saved birth chart."
+                  onAuthenticated={handleLogin}
+                />
+              </>
+            } />
+            <Route path="/charts-dashas/nadi" element={
+              <>
+                <NadiDeskPage
+                  user={user}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                />
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to open the Nadi desk for your saved birth chart."
                   onAuthenticated={handleLogin}
                 />
               </>

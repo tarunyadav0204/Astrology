@@ -57,31 +57,75 @@ function formatLocalDate(date) {
   return `${y}-${m}-${d}`;
 }
 
+function formatLocalTime(date) {
+  const h = String(date.getHours()).padStart(2, '0');
+  const m = String(date.getMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+/** As-of key for API: date-only at noon semantics, or date+time when clock is set. */
+function formatAsOfTarget(date, { withTime = true } = {}) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+  const day = formatLocalDate(date);
+  if (!withTime) return day;
+  return `${day}T${formatLocalTime(date)}:00`;
+}
+
 /** Parse API YYYY-MM-DD as local calendar date (avoid UTC off-by-one). */
 function parsePeriodDate(value) {
   if (!value) return null;
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return new Date(value.getFullYear(), value.getMonth(), value.getDate(), 12, 0, 0, 0);
+    return new Date(
+      value.getFullYear(),
+      value.getMonth(),
+      value.getDate(),
+      value.getHours(),
+      value.getMinutes(),
+      value.getSeconds(),
+      0
+    );
   }
-  const str = String(value).split('T')[0];
-  const [y, m, d] = str.split('-').map(Number);
+  const str = String(value);
+  if (str.includes('T') && str.length > 10) {
+    const d = new Date(str);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  const day = str.split('T')[0];
+  const [y, m, d] = day.split('-').map(Number);
   if (!y || !m || !d) return null;
   return new Date(y, m - 1, d, 12, 0, 0, 0);
 }
 
 /**
- * Cascading API marks "current" with target_date at midnight.
+ * Cascading API marks "current" with target_date at noon when date-only.
  * Periods often start mid-day, so midnight on the start date is still inside
  * the previous period — jump to the next calendar day when the period allows.
+ * Preserve as-of clock when jumping from a period click.
  */
-function jumpDateForPeriod(period) {
+function jumpDateForPeriod(period, asOfDate) {
   const start = parsePeriodDate(period?.start);
   const end = parsePeriodDate(period?.end);
   if (!start) return null;
-  if (!end || end.getTime() <= start.getTime()) return start;
-  const nextDay = new Date(start);
-  nextDay.setDate(nextDay.getDate() + 1);
-  return nextDay.getTime() <= end.getTime() ? nextDay : start;
+  let jump;
+  if (!end || end.getTime() <= start.getTime()) {
+    jump = start;
+  } else {
+    const nextDay = new Date(start);
+    nextDay.setDate(nextDay.getDate() + 1);
+    jump = nextDay.getTime() <= end.getTime() ? nextDay : start;
+  }
+  if (asOfDate instanceof Date && !Number.isNaN(asOfDate.getTime())) {
+    jump = new Date(
+      jump.getFullYear(),
+      jump.getMonth(),
+      jump.getDate(),
+      asOfDate.getHours(),
+      asOfDate.getMinutes(),
+      0,
+      0
+    );
+  }
+  return jump;
 }
 
 function progressPct(start, end, asOf) {
@@ -289,10 +333,10 @@ const DeskDashaPanel = ({ birthData, chartData, asOfDate, onJumpToDate, system, 
   const activeSystem = system || 'vimshottari';
   const setSystem = onSystemChange || (() => {});
 
-  // Calendar day only — ignore clock drift from ±D/W/M navigators vs noon picker.
+  // Full as-of (date+time) so ±H / time picker reloads the cascade.
   const asOfKey = useMemo(
     () => (asOfDate instanceof Date && !Number.isNaN(asOfDate.getTime())
-      ? formatLocalDate(asOfDate)
+      ? formatAsOfTarget(asOfDate, { withTime: true })
       : ''),
     [asOfDate]
   );
@@ -307,7 +351,9 @@ const DeskDashaPanel = ({ birthData, chartData, asOfDate, onJumpToDate, system, 
       setError(null);
     }
     const target = asOfKey;
-    const asOfNoon = parsePeriodDate(asOfKey);
+    const asOfMoment = parsePeriodDate(asOfKey) || asOfDate;
+    // Date-only for systems that only accept YYYY-MM-DD
+    const targetDay = asOfKey.slice(0, 10);
     const payload = birthPayload(birthData);
 
     try {
@@ -315,29 +361,29 @@ const DeskDashaPanel = ({ birthData, chartData, asOfDate, onJumpToDate, system, 
       if (activeSystem === 'vimshottari') {
         const data = await apiService.calculateCascadingDashas(birthData, target);
         if (signal?.aborted) return;
-        next = normalizeVimshottari(data, asOfNoon);
+        next = normalizeVimshottari(data, asOfMoment);
       } else if (activeSystem === 'yogini') {
         const response = await fetch('/api/yogini-dasha', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...payload, years: 5, target_date: target }),
+          body: JSON.stringify({ ...payload, years: 5, target_date: targetDay }),
           signal,
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (data.error) throw new Error(data.error);
-        next = normalizeYogini(data, asOfNoon);
+        next = normalizeYogini(data, asOfMoment);
       } else if (activeSystem === 'kalachakra') {
         const response = await fetch('/api/calculate-kalchakra-dasha', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ birth_data: payload, target_date: target }),
+          body: JSON.stringify({ birth_data: payload, target_date: targetDay }),
           signal,
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (data.error) throw new Error(data.error);
-        next = normalizeKalachakra(data, asOfNoon);
+        next = normalizeKalachakra(data, asOfMoment);
       } else if (activeSystem === 'chara') {
         const response = await fetch('/api/chara-dasha/calculate', {
           method: 'POST',
@@ -348,7 +394,7 @@ const DeskDashaPanel = ({ birthData, chartData, asOfDate, onJumpToDate, system, 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (data.status !== 'success') throw new Error(data.error || 'Chara failed');
-        next = await normalizeChara(data, birthData, asOfNoon);
+        next = await normalizeChara(data, birthData, asOfMoment);
       }
       if (!signal?.aborted) setView(next);
     } catch (err) {
@@ -360,7 +406,7 @@ const DeskDashaPanel = ({ birthData, chartData, asOfDate, onJumpToDate, system, 
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [birthData, asOfKey, activeSystem]);
+  }, [birthData, asOfKey, asOfDate, activeSystem]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -385,7 +431,7 @@ const DeskDashaPanel = ({ birthData, chartData, asOfDate, onJumpToDate, system, 
 
   const handleSelect = (period) => {
     if (!onJumpToDate) return;
-    const jump = jumpDateForPeriod(period);
+    const jump = jumpDateForPeriod(period, asOfDate);
     if (!jump) return;
     onJumpToDate(jump);
   };

@@ -531,13 +531,27 @@ def _window(rows: Sequence[HouseActivation], overlap: Tuple[date, date]) -> Pred
     digest = hashlib.sha256(
         "|".join(sorted(row.window.transit_signature for row in rows)).encode("utf-8")
     ).hexdigest()[:20]
+    start = overlap[0].isoformat()
+    end = overlap[1].isoformat()
+    opened_by = seed.opened_by
+    closed_by = seed.closed_by
+    for row in rows:
+        if row.window.start_date == start and row.window.opened_by:
+            opened_by = row.window.opened_by
+            break
+    for row in rows:
+        if row.window.end_date == end and row.window.closed_by:
+            closed_by = row.window.closed_by
+            break
     return PredictionWindow(
-        start_date=overlap[0].isoformat(),
-        end_date=overlap[1].isoformat(),
+        start_date=start,
+        end_date=end,
         mahadasha=seed.mahadasha,
         antardasha=seed.antardasha,
         pratyantardasha=seed.pratyantardasha,
         transit_signature=digest,
+        opened_by=opened_by,
+        closed_by=closed_by,
     )
 
 

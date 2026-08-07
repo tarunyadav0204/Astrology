@@ -1382,6 +1382,73 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         </div>
       </section>
 
+      {/* Core tools — desks + Ashtakavarga (compact, early on page) */}
+      <section className="core-tools-section" aria-labelledby="vedic-astrology-tools-heading">
+        <div className="container">
+          <div className="vedic-tools-header vedic-tools-header--compact">
+            <p className="vedic-tools-eyebrow">Core tools</p>
+            <h2 id="vedic-astrology-tools-heading" className="vedic-tools-title">
+              Vedic astrology tools
+            </h2>
+            <p className="vedic-tools-subtitle">
+              Parashari, Nadi, and KP desks — plus Ashtakavarga, matching, and Panchang from one starting point.
+            </p>
+          </div>
+          <div className="vedic-tools-featured vedic-tools-featured--compact">
+            <div className="astro-tools-hub-grid astro-tools-hub-grid--desks">
+              <button
+                type="button"
+                className="astro-tools-hub-card astro-tools-hub-card--compact astro-tools-hub-card--parashari"
+                onClick={() => navigate('/charts-dashas')}
+              >
+                <span className="astro-tools-hub-card__icon" aria-hidden>P</span>
+                <span className="astro-tools-hub-card__body">
+                  <span className="astro-tools-hub-card__name">Parashari Desk</span>
+                  <span className="astro-tools-hub-card__desc">D1, divisionals, dashas, activations</span>
+                </span>
+                <span className="astro-tools-hub-card__arrow" aria-hidden>→</span>
+              </button>
+              <button
+                type="button"
+                className="astro-tools-hub-card astro-tools-hub-card--compact astro-tools-hub-card--nadi"
+                onClick={() => navigate('/charts-dashas/nadi')}
+              >
+                <span className="astro-tools-hub-card__icon" aria-hidden>N</span>
+                <span className="astro-tools-hub-card__body">
+                  <span className="astro-tools-hub-card__name">Nadi Desk</span>
+                  <span className="astro-tools-hub-card__desc">BNN links, karakas, age activation</span>
+                </span>
+                <span className="astro-tools-hub-card__arrow" aria-hidden>→</span>
+              </button>
+              <button
+                type="button"
+                className="astro-tools-hub-card astro-tools-hub-card--compact astro-tools-hub-card--kp"
+                onClick={() => navigate('/charts-dashas/kp')}
+              >
+                <span className="astro-tools-hub-card__icon" aria-hidden>KP</span>
+                <span className="astro-tools-hub-card__body">
+                  <span className="astro-tools-hub-card__name">KP Desk</span>
+                  <span className="astro-tools-hub-card__desc">Cusps, significators, as-of timing</span>
+                </span>
+                <span className="astro-tools-hub-card__arrow" aria-hidden>→</span>
+              </button>
+              <button
+                type="button"
+                className="astro-tools-hub-card astro-tools-hub-card--compact astro-tools-hub-card--ashtakavarga"
+                onClick={() => navigate('/ashtakavarga')}
+              >
+                <span className="astro-tools-hub-card__icon" aria-hidden>⊞</span>
+                <span className="astro-tools-hub-card__body">
+                  <span className="astro-tools-hub-card__name">Ashtakavarga</span>
+                  <span className="astro-tools-hub-card__desc">Bindus, transit vs birth timing</span>
+                </span>
+                <span className="astro-tools-hub-card__arrow" aria-hidden>→</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Instant Destiny Reading Section - COMMENTED OUT */}
       {/*
       <section className="instant-destiny-section">
@@ -1588,66 +1655,9 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       </section>
       */}
 
-      {/* Main Content */}
+      {/* Main Content — matching, nakshatra, panchang */}
       <div className="main-content">
         <div className="container">
-          <div className="vedic-tools-header">
-            <span className="vedic-symbol vedic-symbol-1">🕉️</span>
-            <span className="vedic-symbol vedic-symbol-2">卍</span>
-            <span className="vedic-symbol vedic-symbol-3">🔱</span>
-            <span className="vedic-symbol vedic-symbol-4">☸️</span>
-            <span className="vedic-symbol vedic-symbol-5">🪔</span>
-            <span className="vedic-symbol vedic-symbol-6">🌸</span>
-            <p className="vedic-tools-eyebrow">Core tools</p>
-            <h2 id="vedic-astrology-tools-heading" className="vedic-tools-title">
-              Vedic astrology tools
-            </h2>
-            <p className="vedic-tools-subtitle">Work with matching, nakshatras, and daily Panchang from one clean starting point.</p>
-            <div className="vedic-tools-divider"></div>
-          </div>
-          <div className="vedic-tools-featured">
-            <div className="astro-tools-hub-grid">
-              <button
-                type="button"
-                className="astro-tools-hub-card astro-tools-hub-card--charts-dashas"
-                onClick={() => {
-                  navigate('/charts-dashas');
-                }}
-              >
-                <span className="astro-tools-hub-card__icon" aria-hidden>
-                  📊
-                </span>
-                <span className="astro-tools-hub-card__body">
-                  <span className="astro-tools-hub-card__name">Charts &amp; Dashas</span>
-                  <span className="astro-tools-hub-card__desc">
-                    AstroVishnu workspace — lagna, divisionals, transit, and Vimshottari dashas in one dashboard
-                  </span>
-                </span>
-                <span className="astro-tools-hub-card__arrow" aria-hidden>
-                  →
-                </span>
-              </button>
-              <button
-                type="button"
-                className="astro-tools-hub-card astro-tools-hub-card--ashtakavarga"
-                onClick={() => navigate('/ashtakavarga')}
-              >
-                <span className="astro-tools-hub-card__icon" aria-hidden>
-                  ⊞
-                </span>
-                <span className="astro-tools-hub-card__body">
-                  <span className="astro-tools-hub-card__name">Ashtakavarga</span>
-                  <span className="astro-tools-hub-card__desc">
-                    Sarva and BAV bindus, transit vs birth, event timing — full page
-                  </span>
-                </span>
-                <span className="astro-tools-hub-card__arrow" aria-hidden>
-                  →
-                </span>
-              </button>
-            </div>
-          </div>
-
           <div className="content-grid">
             {/* Column 1 - Kundli Matching (40%) */}
             <div className="form-card matching-compact">

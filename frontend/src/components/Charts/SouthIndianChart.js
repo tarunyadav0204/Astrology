@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { CHART_CONFIG } from '../../config/dashboard.config';
 import { apiService } from '../../services/apiService';
@@ -17,6 +17,10 @@ const SouthIndianChart = ({
   chartRefHighlight = null,
   showFooterHint = true,
   deskMode = false,
+  onHouseSelect = null,
+  selectedHouseNumber = null,
+  highlightedPlanets = null,
+  highlightedHouseNumbers = null,
 }) => {
   const { signs, planets } = CHART_CONFIG;
   const chartId = resolveChartId(chartType, division);
@@ -39,6 +43,16 @@ const SouthIndianChart = ({
     rashiIndex: null,
   });
   
+  const highlightedPlanetSet = useMemo(() => {
+    if (!highlightedPlanets?.length) return null;
+    return new Set(highlightedPlanets.map((name) => String(name).toLowerCase()));
+  }, [highlightedPlanets]);
+
+  const highlightedHouseSet = useMemo(() => {
+    if (!highlightedHouseNumbers?.length) return null;
+    return new Set(highlightedHouseNumbers.map((n) => Number(n)));
+  }, [highlightedHouseNumbers]);
+
   // Handle chart reference highlighting from chat
   useEffect(() => {
     if (chartRefHighlight) {
@@ -247,6 +261,15 @@ const SouthIndianChart = ({
   const openHouseInsight = (rashiIndex, houseNumber) => {
     const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
     setHouseContextMenu({ show: false, x: 0, y: 0, houseNumber: null, signName: null });
+    if (typeof onHouseSelect === 'function') {
+      onHouseSelect({
+        houseNumber,
+        rashiIndex,
+        signName: rashiNames[rashiIndex],
+        chartId,
+      });
+      return;
+    }
     setHouseInsight({
       show: true,
       houseNumber,
@@ -465,6 +488,7 @@ const SouthIndianChart = ({
       />
       <svg 
         viewBox={deskMode || !showFooterHint ? '0 0 340 340' : '0 0 340 360'}
+        data-selected-house={selectedHouseNumber || undefined}
         style={deskMode ? {
           width: '100%',
           height: '100%',
@@ -544,6 +568,18 @@ const SouthIndianChart = ({
                   onClick={(e) => handleRashiClick(e, pos.sign, houseNumber)}
                   onContextMenu={(e) => handleRashiClick(e, pos.sign, houseNumber)}
                 />
+
+                {highlightedHouseSet?.has(houseNumber) ? (
+                  <rect
+                    x={pos.x + 2}
+                    y={pos.y + 2}
+                    width={pos.width - 4}
+                    height={pos.height - 4}
+                    fill="rgba(159, 18, 57, 0.07)"
+                    stroke="none"
+                    style={{ pointerEvents: 'none' }}
+                  />
+                ) : null}
 
                 {/* Chart reference highlighting from chat */}
                 {chartRefHighlightState?.type === 'house' && parseInt(chartRefHighlightState.value) === houseNumber && (
@@ -637,11 +673,28 @@ const SouthIndianChart = ({
                           <animate attributeName="opacity" values="0.8;0.3;0.8" dur="1.5s" repeatCount="indefinite"/>
                         </circle>
                       )}
+                      {(() => {
+                        const isLit = highlightedPlanetSet?.has(planet.name.toLowerCase());
+                        const fontPx = totalPlanets > 4 ? 8 : totalPlanets > 2 ? 10 : totalPlanets > 1 ? 12 : 14;
+                        if (!isLit) return null;
+                        return (
+                          <rect
+                            x={planetX - fontPx * 0.85}
+                            y={planetY - 5}
+                            width={fontPx * 1.7}
+                            height={2}
+                            rx={1}
+                            fill="#9f1239"
+                            opacity={0.85}
+                            style={{ pointerEvents: 'none' }}
+                          />
+                        );
+                      })()}
                       {/* Planet symbol */}
                       <text x={planetX} 
                             y={planetY - 8} 
                             fontSize={totalPlanets > 4 ? "8" : totalPlanets > 2 ? "10" : totalPlanets > 1 ? "12" : "14"} 
-                            fill={getPlanetColor(planet)}
+                            fill={highlightedPlanetSet?.has(planet.name.toLowerCase()) ? '#9f1239' : getPlanetColor(planet)}
                             fontWeight="900"
                             textAnchor="middle"
                             style={{ cursor: 'pointer' }}

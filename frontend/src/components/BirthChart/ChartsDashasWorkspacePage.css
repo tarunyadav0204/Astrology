@@ -104,6 +104,24 @@
   background: #fff1f2;
 }
 
+.parashari-desk-chip--activations {
+  border-color: rgba(159, 18, 57, 0.4);
+  color: var(--pd-accent);
+  font-weight: 800;
+  box-shadow: 0 1px 0 rgba(159, 18, 57, 0.12);
+}
+
+.parashari-desk-chip--activations.is-active {
+  background: var(--pd-accent);
+  border-color: var(--pd-accent);
+  color: #fff;
+}
+
+.parashari-desk-chip--activations.is-active em {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
 .parashari-desk-bar__tools {
   display: inline-flex;
   align-items: center;
@@ -312,12 +330,56 @@
   grid-template-rows: auto minmax(0, 1fr);
 }
 
+/*
+ * Activations focus: left ≈ former dasha width (D1 | Transit + dashas),
+ * right = full-height activations column.
+ */
+.parashari-desk-grid--act-focus {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 1.2fr);
+  grid-template-rows: minmax(0, 1.05fr) minmax(0, 1fr);
+}
+
+.parashari-desk-grid--act-focus .parashari-desk-panel--d1 {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.parashari-desk-grid--act-focus .parashari-desk-panel--transit {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.parashari-desk-grid--act-focus .parashari-desk-panel--dasha {
+  grid-column: 1 / 3;
+  grid-row: 2;
+}
+
+.parashari-desk-grid--act-focus .parashari-desk-panel--activations {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  grid-template-rows: minmax(0, 1fr);
+  padding: 0;
+}
+
+.parashari-desk-analysis__chrome {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--pd-line);
+  background: #f8f2eb;
+}
+
+.parashari-desk-analysis__chrome .desk-str {
+  border-bottom: 1px solid rgba(70, 45, 35, 0.1);
+}
+
 .parashari-desk-analysis__head {
   display: flex;
   align-items: center;
   padding: 0.15rem 0.3rem;
-  border-bottom: 1px solid var(--pd-line);
-  background: #f8f2eb;
+  background: transparent;
+  border-bottom: 0;
   min-height: 26px;
 }
 
@@ -354,9 +416,33 @@
   box-shadow: 0 1px 3px rgba(40, 20, 10, 0.08);
 }
 
+.parashari-desk-analysis__tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1rem;
+  margin-left: 0.2rem;
+  padding: 0 0.22rem;
+  border-radius: 999px;
+  background: rgba(159, 18, 57, 0.12);
+  color: var(--pd-accent);
+  font-size: 0.52rem;
+  font-style: normal;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
 .parashari-desk-analysis__body {
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.parashari-desk-analysis__body > * {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 
 .parashari-desk-panel__head {
@@ -455,6 +541,20 @@
   .parashari-desk-panel--transit { grid-column: 2; grid-row: 2; }
   .parashari-desk-panel--dasha { grid-column: 1 / -1; grid-row: 3; }
   .parashari-desk-panel--analysis { grid-column: 1 / -1; grid-row: 4; min-height: 220px; }
+
+  .parashari-desk-grid--act-focus {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 0.9fr) minmax(0, 0.95fr) minmax(0, 1.1fr);
+  }
+
+  .parashari-desk-grid--act-focus .parashari-desk-panel--d1 { grid-column: 1; grid-row: 1; }
+  .parashari-desk-grid--act-focus .parashari-desk-panel--transit { grid-column: 2; grid-row: 1; }
+  .parashari-desk-grid--act-focus .parashari-desk-panel--dasha { grid-column: 1 / -1; grid-row: 2; }
+  .parashari-desk-grid--act-focus .parashari-desk-panel--activations {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    min-height: 320px;
+  }
 }
 
 @media (max-width: 900px) {
@@ -481,7 +581,8 @@
   .parashari-desk-panel--div,
   .parashari-desk-panel--transit,
   .parashari-desk-panel--dasha,
-  .parashari-desk-panel--analysis {
+  .parashari-desk-panel--analysis,
+  .parashari-desk-panel--activations {
     grid-column: auto;
     grid-row: auto;
     min-height: 300px;

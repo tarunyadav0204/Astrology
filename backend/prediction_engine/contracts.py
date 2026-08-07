@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from .errors import PredictionInputError
 
 
-SCHEMA_VERSION = "prediction_engine.v19"
+SCHEMA_VERSION = "prediction_engine.v21"
 
 
 class EvidenceStatus(str, Enum):
@@ -161,6 +161,21 @@ class PredictionWindow:
     antardasha: str
     pratyantardasha: str
     transit_signature: str
+    # Why this slice opened / closed — diffs of dasha + signature transit facts.
+    opened_by: Sequence[Dict[str, Any]] = ()
+    closed_by: Sequence[Dict[str, Any]] = ()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+            "mahadasha": self.mahadasha,
+            "antardasha": self.antardasha,
+            "pratyantardasha": self.pratyantardasha,
+            "transit_signature": self.transit_signature,
+            "opened_by": [dict(item) for item in self.opened_by],
+            "closed_by": [dict(item) for item in self.closed_by],
+        }
 
 
 @dataclass(frozen=True)
@@ -242,6 +257,7 @@ class HouseActivation:
         value["state"] = self.state.value
         value["activation"]["band"] = self.activation.band.value
         value["outcome"]["tone"] = self.outcome.tone.value
+        value["window"] = self.window.to_dict()
         value["evidence"] = (
             [item.to_dict() for item in self.evidence] if include_evidence else []
         )

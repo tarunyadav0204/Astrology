@@ -67,6 +67,10 @@
   color: #8a3a3a;
 }
 
+.desk-cond__chip--warn em {
+  color: #991b1b;
+}
+
 .desk-cond__chip--good {
   border-color: rgba(61, 107, 79, 0.28);
   background: rgba(61, 107, 79, 0.08);

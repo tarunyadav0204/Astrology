@@ -72,6 +72,33 @@ export const DatePickerInput = styled.input`
   margin: 0;
 `;
 
+export const TimeInput = styled.input.withConfig({
+  shouldForwardProp: (prop) => !['$variant'].includes(prop),
+})`
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: ${({ $variant }) => ($variant === 'light' ? '#7a2850' : '#ffffff')};
+  min-width: 5.2rem;
+  padding: 0.22rem 0.35rem;
+  border-radius: 12px;
+  border: 1px solid ${({ $variant }) => ($variant === 'light' ? 'rgba(194, 24, 91, 0.14)' : 'rgba(255, 255, 255, 0.2)')};
+  background: ${({ $variant }) => ($variant === 'light' ? 'rgba(255, 255, 255, 0.92)' : 'rgba(255, 255, 255, 0.15)')};
+  box-shadow: ${({ $variant }) => ($variant === 'light' ? '0 6px 14px rgba(194, 24, 91, 0.06)' : 'none')};
+
+  &:focus-visible {
+    outline: 2px solid #c2185b;
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 0.64rem;
+    min-width: 4.6rem;
+    padding: 0.18rem 0.28rem;
+  }
+`;
+
 export const ButtonGroup = styled.div`
   display: flex;
   gap: 0.2rem;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { CHART_CONFIG } from '../../config/dashboard.config';
 import { apiService } from '../../services/apiService';
@@ -64,6 +64,13 @@ const NorthIndianChart = ({
   chartRefHighlight = null,
   showFooterHint = true,
   deskMode = false,
+  /** When set (desk), left-click docks house insight instead of popup */
+  onHouseSelect = null,
+  selectedHouseNumber = null,
+  /** Persistent planet rings (e.g. Nadi yoga members) — full names */
+  highlightedPlanets = null,
+  /** Soft house fills for yoga members' houses */
+  highlightedHouseNumbers = null,
 }) => {
   const { signs, planets } = CHART_CONFIG;
   const chartId = resolveChartId(chartType, division);
@@ -95,6 +102,16 @@ const NorthIndianChart = ({
       return () => clearTimeout(timer);
     }
   }, [chartRefHighlight]);
+
+  const highlightedPlanetSet = useMemo(() => {
+    if (!highlightedPlanets?.length) return null;
+    return new Set(highlightedPlanets.map((name) => String(name).toLowerCase()));
+  }, [highlightedPlanets]);
+
+  const highlightedHouseSet = useMemo(() => {
+    if (!highlightedHouseNumbers?.length) return null;
+    return new Set(highlightedHouseNumbers.map((n) => Number(n)));
+  }, [highlightedHouseNumbers]);
 
   
 
@@ -171,6 +188,15 @@ const NorthIndianChart = ({
   const openHouseInsight = (rashiIndex, houseNumber) => {
     const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
     setHouseContextMenu({ show: false, x: 0, y: 0, houseNumber: null, signName: null });
+    if (typeof onHouseSelect === 'function') {
+      onHouseSelect({
+        houseNumber,
+        rashiIndex,
+        signName: rashiNames[rashiIndex],
+        chartId,
+      });
+      return;
+    }
     setHouseInsight({
       show: true,
       houseNumber,
@@ -529,6 +555,7 @@ const NorthIndianChart = ({
       />
       <svg 
         viewBox={deskMode || !showFooterHint ? '0 0 400 400' : '0 0 400 440'}
+        data-selected-house={selectedHouseNumber || undefined}
         style={deskMode ? {
           width: '100%',
           height: '100%',
@@ -615,6 +642,16 @@ const NorthIndianChart = ({
             />
 
             
+            {/* Desk / yoga house soft fill */}
+            {highlightedHouseSet?.has(houseNumber) ? (
+              <path
+                d={houseData.path}
+                fill="rgba(159, 18, 57, 0.07)"
+                stroke="none"
+                style={{ pointerEvents: 'none' }}
+              />
+            ) : null}
+
             {/* House highlighting for aspects */}
             {aspectsHighlight.show && aspectsHighlight.houseNumber === houseNumber && (
               <circle cx={houseData.center.x} cy={houseData.center.y} r="35" 
@@ -839,11 +876,24 @@ const NorthIndianChart = ({
                       <animate attributeName="opacity" values="0.8;0.3;0.8" dur="1.5s" repeatCount="indefinite"/>
                     </circle>
                   )}
+                  {/* Desk yoga / karaka: accent glyph + thin underline (no rings) */}
+                  {highlightedPlanetSet?.has(planet.name.toLowerCase()) ? (
+                    <rect
+                      x={planetX - (Number(symbolFontSize) * 0.85)}
+                      y={planetY - 5}
+                      width={Number(symbolFontSize) * 1.7}
+                      height={2}
+                      rx={1}
+                      fill="#9f1239"
+                      opacity={0.85}
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  ) : null}
                   {/* Planet symbol */}
                   <text x={planetX} 
                         y={planetY - 8} 
                         fontSize={symbolFontSize} 
-                        fill={getPlanetColor(planet)}
+                        fill={highlightedPlanetSet?.has(planet.name.toLowerCase()) ? '#9f1239' : getPlanetColor(planet)}
                         fontWeight="900"
                         textAnchor="middle"
                         style={{ cursor: 'pointer' }}
