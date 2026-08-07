@@ -3852,7 +3852,11 @@ async def calculate_cascading_dashas(request: dict):
         from shared.dasha_calculator import DashaCalculator
         
         birth_data = BirthData(**request['birth_data'])
-        target_date = datetime.strptime(request.get('target_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
+        # Noon as-of: date navigators send YYYY-MM-DD; midnight misses mid-day period starts
+        # and drops AD→Prana. Same anchor as chat dasha resolution.
+        target_date = DashaCalculator.parse_as_of_datetime(
+            request.get('target_date', datetime.now().strftime('%Y-%m-%d'))
+        )
     except Exception as e:
         logger.warning("cascading dasha input validation failed: %s", e)
         return {
@@ -3907,28 +3911,35 @@ async def calculate_cascading_dashas(request: dict):
         'pratyantar_dashas': [],
         'sookshma_dashas': [],
         'prana_dashas': [],
-        'current_dashas': current_dashas.get('current_dashas', {})
+        'current_dashas': {
+            'mahadasha': current_dashas.get('mahadasha'),
+            'antardasha': current_dashas.get('antardasha'),
+            'pratyantardasha': current_dashas.get('pratyantardasha'),
+            'sookshma': current_dashas.get('sookshma'),
+            'prana': current_dashas.get('prana'),
+        },
+        'as_of': target_date.strftime('%Y-%m-%d'),
     }
     
     if current_maha:
         # Use DashaCalculator list helpers (same YEAR_LEN math as chat) — not the old
         # date-truncated proportional splitter that drifted ~1–2 days.
         antar_raw = calculator.list_antardashas(current_maha, target_date)
+        current_antar = calculator.pick_current_period(antar_raw, target_date, half_open=True)
         result['antar_dashas'] = calculator.strip_internal_period_fields(antar_raw)
 
-        current_antar = next((a for a in antar_raw if a.get('current')), None)
         if current_antar:
             pratyantar_raw = calculator.list_pratyantardashas(current_maha, current_antar, target_date)
+            current_pratyantar = calculator.pick_current_period(pratyantar_raw, target_date)
             result['pratyantar_dashas'] = calculator.strip_internal_period_fields(pratyantar_raw)
 
-            current_pratyantar = next((p for p in pratyantar_raw if p.get('current')), None)
             if current_pratyantar:
                 sookshma_raw = calculator.list_sookshmas(
                     current_maha, current_antar, current_pratyantar, target_date
                 )
+                current_sookshma = calculator.pick_current_period(sookshma_raw, target_date)
                 result['sookshma_dashas'] = calculator.strip_internal_period_fields(sookshma_raw)
 
-                current_sookshma = next((s for s in sookshma_raw if s.get('current')), None)
                 if current_sookshma:
                     prana_raw = calculator.list_pranas(
                         current_maha,
@@ -3937,6 +3948,7 @@ async def calculate_cascading_dashas(request: dict):
                         current_sookshma,
                         target_date,
                     )
+                    calculator.pick_current_period(prana_raw, target_date)
                     result['prana_dashas'] = calculator.strip_internal_period_fields(prana_raw)
     log_lifecycle_event(
         "cascading_dashas_complete",
@@ -3962,9 +3974,8 @@ async def calculate_sub_dashas(request: dict):
     birth_data = BirthData(**request['birth_data'])
     parent_dasha = request['parent_dasha']
     dasha_type = request['dasha_type']
-    target_date = datetime.strptime(
-        request.get('target_date', datetime.now().strftime('%Y-%m-%d')),
-        '%Y-%m-%d',
+    target_date = DashaCalculator.parse_as_of_datetime(
+        request.get('target_date', datetime.now().strftime('%Y-%m-%d'))
     )
 
     birth_dict = {

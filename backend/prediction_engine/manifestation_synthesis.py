@@ -248,6 +248,15 @@ def _normalize_theme_item(item: Any, *, fallback_theme_key: str = "") -> Optiona
         normalized["possibilities"] = [normalized["possibility"]]
     if isinstance(normalized.get("manifestations"), list) and not normalized.get("possibilities"):
         normalized["possibilities"] = normalized["manifestations"]
+    for list_key in ("possibilities", "rationale"):
+        value = normalized.get(list_key)
+        if isinstance(value, str):
+            text = value.strip()
+            normalized[list_key] = [text] if text else []
+        elif value is None:
+            normalized[list_key] = []
+        elif not isinstance(value, list):
+            normalized[list_key] = [str(value)]
     return normalized
 
 

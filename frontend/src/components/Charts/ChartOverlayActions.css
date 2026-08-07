@@ -1,0 +1,64 @@
+.chart-overlay-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 10;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.28rem;
+  max-width: calc(100% - 16px);
+  pointer-events: none;
+}
+
+.chart-overlay-actions--desk {
+  top: 34px;
+  right: 4px;
+  z-index: 3;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.chart-overlay-actions__btn {
+  pointer-events: auto;
+  appearance: none;
+  margin: 0;
+  padding: 0.22rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(70, 45, 35, 0.18);
+  background: rgba(255, 252, 248, 0.96);
+  color: #4a372e;
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(40, 20, 10, 0.08);
+  backdrop-filter: blur(4px);
+}
+
+.chart-overlay-actions__btn:hover {
+  border-color: rgba(70, 45, 35, 0.28);
+  background: #fff;
+  color: #1f1714;
+}
+
+.chart-overlay-actions__btn:focus-visible {
+  outline: 2px solid rgba(159, 18, 57, 0.35);
+  outline-offset: 1px;
+}
+
+.chart-overlay-actions__btn--reset {
+  border-color: rgba(159, 18, 57, 0.28);
+  color: #9f1239;
+  background: rgba(255, 252, 248, 0.98);
+}
+
+.chart-overlay-actions__btn--reset:hover {
+  border-color: rgba(159, 18, 57, 0.45);
+  background: #fff1f2;
+  color: #9f1239;
+}

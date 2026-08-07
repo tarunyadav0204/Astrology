@@ -1,0 +1,64 @@
+.desk-lords {
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  background: #fffcf8;
+}
+
+.desk-lords--status {
+  display: grid;
+  place-items: center;
+  color: #6b5c54;
+  font-size: 0.72rem;
+  padding: 0.75rem;
+}
+
+.desk-lords__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.desk-lords__table th,
+.desk-lords__table td {
+  padding: 0.22rem 0.28rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(70, 45, 35, 0.08);
+  white-space: nowrap;
+}
+
+.desk-lords__table th {
+  position: sticky;
+  top: 0;
+  background: #f3ebe3;
+  color: #6b5c54;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 0.55rem;
+  z-index: 1;
+}
+
+.desk-lords__table td strong {
+  color: #9f1239;
+  font-weight: 800;
+}
+
+.desk-lords__tenants {
+  white-space: normal;
+  max-width: 7rem;
+  line-height: 1.25;
+  color: #1f1714;
+  font-weight: 650;
+}
+
+.desk-lords__table tr.is-ex td:nth-child(5) {
+  color: #3d6b4f;
+  font-weight: 800;
+}
+
+.desk-lords__table tr.is-db td:nth-child(5) {
+  color: #8a3a3a;
+  font-weight: 800;
+}

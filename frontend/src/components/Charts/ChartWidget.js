@@ -19,12 +19,14 @@ const ChartWidget = ({
   chartRefHighlight = null,
   /** Flat toolbar + square corners when embedded in Parashara dashboard (avoids stacked “headers”) */
   embedInDashboard = false,
+  /** Parashari/KP desk: minimize chrome so the chart fills the cell */
+  deskMode = false,
   showFooterHint = true,
 }) => {
   const [chartStyle, setChartStyle] = useState(defaultStyle || 'north');
   const [showAshtakavarga, setShowAshtakavarga] = useState(false);
   const [showMaximized, setShowMaximized] = useState(false);
-  const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(true);
+  const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(!deskMode);
   const [showSpecialPoints, setShowSpecialPoints] = useState(false);
   const [specialPointsData, setSpecialPointsData] = useState(null);
   const [showPlanetaryDignities, setShowPlanetaryDignities] = useState(false);
@@ -68,6 +70,50 @@ const ChartWidget = ({
     }
   }, [chartType, birthData, division, chartData]);
 
+  // Karkamsa / Swamsa (Jaimini) — need Atmakaraka then recast chart
+  useEffect(() => {
+    if ((chartType !== 'karkamsa' && chartType !== 'swamsa') || !chartData?.planets) {
+      return undefined;
+    }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      try {
+        const karakas = await apiService.calculateCharaKarakas(chartData, birthData);
+        const ak =
+          karakas?.chara_karakas?.Atmakaraka?.planet
+          || karakas?.chara_karakas?.AK?.planet
+          || karakas?.atmakaraka
+          || Object.entries(karakas?.chara_karakas || {}).find(([k]) => /atma/i.test(k))?.[1]?.planet;
+        if (!ak) throw new Error('Atmakaraka not found');
+        const res = chartType === 'karkamsa'
+          ? await apiService.calculateKarkamsaChart(chartData, ak)
+          : await apiService.calculateSwamsaChart(chartData, ak);
+        const chart = chartType === 'karkamsa'
+          ? res?.karkamsa?.karkamsa_chart
+          : res?.swamsa?.swamsa_chart;
+        if (cancelled) return;
+        // Normalize houses array for NorthIndianChart (expects index-based sign)
+        if (chart?.houses && Array.isArray(chart.houses)) {
+          chart.houses = chart.houses.map((h, i) => ({
+            ...h,
+            sign: typeof h.sign === 'number' ? h.sign : (h.sign_index ?? i),
+            longitude: h.longitude ?? ((typeof h.sign === 'number' ? h.sign : i) * 30),
+          }));
+        }
+        setDivisionalData(chart || null);
+      } catch (error) {
+        console.error(`Failed to calculate ${chartType} chart:`, error);
+        if (!cancelled) setDivisionalData(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [chartType, chartData, birthData]);
+
   useEffect(() => {
     if (chartType === 'transit' && birthData && transitDate) {
       setLoading(true);
@@ -97,6 +143,8 @@ const ChartWidget = ({
         return chartData;
       case 'navamsa':
       case 'divisional':
+      case 'karkamsa':
+      case 'swamsa':
         return divisionalData || chartData;
       case 'transit':
         return transitChartData || chartData;
@@ -176,11 +224,27 @@ const ChartWidget = ({
   };
   
   return (
-    <WidgetContainer $embedInDashboard={embedInDashboard}>
+    <WidgetContainer $embedInDashboard={embedInDashboard} $deskMode={deskMode}>
+      {!deskMode ? (
       <WidgetHeader $embedInDashboard={embedInDashboard}>
-        <WidgetTitle title={title} $embedInDashboard={embedInDashboard}>
-          {title}
-        </WidgetTitle>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, flex: 1 }}>
+          <WidgetTitle title={title} $embedInDashboard={embedInDashboard}>
+            {title}
+          </WidgetTitle>
+          <span
+            style={{
+              fontSize: embedInDashboard ? '0.58rem' : '0.65rem',
+              color: embedInDashboard ? '#6b6568' : '#8b5a3c',
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              lineHeight: 1.2,
+            }}
+          >
+            Click or right-click a house for options
+          </span>
+        </div>
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0, flexWrap: 'nowrap', overflow: 'hidden' }}>
           <button
             onClick={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
@@ -311,13 +375,50 @@ const ChartWidget = ({
           )}
         </div>
       </WidgetHeader>
+      ) : null}
       
-      <ChartContainer $embedInDashboard={embedInDashboard}>
+      <ChartContainer $embedInDashboard={embedInDashboard} $deskMode={deskMode} style={deskMode ? { position: 'relative' } : undefined}>
+        {deskMode ? (
+          <div
+            className="chart-desk-mini-bar"
+            style={{
+              position: 'absolute',
+              top: 2,
+              right: 2,
+              zIndex: 5,
+              display: 'flex',
+              gap: 4,
+            }}
+          >
+            <StyleToggle onClick={toggleStyle} title="North / South Indian">
+              {chartStyle === 'north' ? 'N' : 'S'}
+            </StyleToggle>
+            {!isMobile && (
+              <button
+                type="button"
+                onClick={() => setShowMaximized(true)}
+                style={{
+                  padding: '2px 6px',
+                  fontSize: '10px',
+                  background: 'rgba(255,255,255,0.9)',
+                  color: '#666',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  lineHeight: 1.2,
+                }}
+                title="Maximize chart"
+              >
+                ⛶
+              </button>
+            )}
+          </div>
+        ) : null}
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px', color: '#666' }}>
             Calculating divisional chart...
           </div>
-        ) : !divisionalData && (chartType === 'navamsa' || chartType === 'divisional') ? (
+        ) : !divisionalData && (chartType === 'navamsa' || chartType === 'divisional' || chartType === 'karkamsa' || chartType === 'swamsa') ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px', color: '#e91e63' }}>
             Failed to load divisional chart
           </div>
@@ -326,16 +427,20 @@ const ChartWidget = ({
             chartData={processedData}
             chartType={chartType}
             birthData={birthData}
+            division={division}
             showDegreeNakshatra={showDegreeNakshatra}
             showFooterHint={showFooterHint}
+            deskMode={deskMode}
           />
         ) : (
           <SouthIndianChart 
             chartData={processedData}
             chartType={chartType}
             birthData={birthData}
+            division={division}
             showDegreeNakshatra={showDegreeNakshatra}
             showFooterHint={showFooterHint}
+            deskMode={deskMode}
           />
         )}
       </ChartContainer>
@@ -987,7 +1092,7 @@ const ChartWidget = ({
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#666' }}>
                   Calculating divisional chart...
                 </div>
-              ) : !divisionalData && (chartType === 'navamsa' || chartType === 'divisional') ? (
+              ) : !divisionalData && (chartType === 'navamsa' || chartType === 'divisional' || chartType === 'karkamsa' || chartType === 'swamsa') ? (
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#e91e63' }}>
                   Failed to load divisional chart
                 </div>
@@ -997,6 +1102,7 @@ const ChartWidget = ({
                     chartData={processedData}
                     chartType={chartType}
                     birthData={birthData}
+                    division={division}
                     showDegreeNakshatra={showDegreeNakshatra}
                     chartRefHighlight={chartRefHighlight}
                     showFooterHint={showFooterHint}
@@ -1008,6 +1114,7 @@ const ChartWidget = ({
                     chartData={processedData}
                     chartType={chartType}
                     birthData={birthData}
+                    division={division}
                     showDegreeNakshatra={showDegreeNakshatra}
                     chartRefHighlight={chartRefHighlight}
                     showFooterHint={showFooterHint}

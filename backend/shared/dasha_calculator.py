@@ -6,7 +6,7 @@ Used by both main.py and classical engine to ensure consistent calculations
 import swisseph as swe
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from math import ceil
 from utils.timezone_service import parse_timezone_offset
 
@@ -199,6 +199,56 @@ class DashaCalculator:
     def strip_internal_period_fields(periods: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Remove non-JSON helper keys before returning from an API."""
         return [{k: v for k, v in p.items() if not k.startswith('_')} for p in periods]
+
+    @staticmethod
+    def parse_as_of_datetime(value) -> datetime:
+        """Parse date-only as-of as local noon.
+
+        Cascading UIs navigate by calendar day. Midnight (00:00) often falls *before*
+        a period that starts later the same day, so AD/PD/SD/Prana come back empty.
+        Noon matches chat's dasha anchor and lands inside the selected day.
+        """
+        if isinstance(value, datetime):
+            if value.hour or value.minute or value.second or value.microsecond:
+                return value
+            return value.replace(hour=12, minute=0, second=0, microsecond=0)
+        raw = str(value or '').strip()
+        if not raw:
+            raw = datetime.now().strftime('%Y-%m-%d')
+        date_part = raw[:10]
+        if 'T' in raw or ' ' in raw[10:]:
+            # Full timestamp supplied — keep clock (still normalize bare midnights).
+            dt = DashaCalculator._as_dt(raw)
+            if dt.hour or dt.minute or dt.second or dt.microsecond:
+                return dt
+            return dt.replace(hour=12, minute=0, second=0, microsecond=0)
+        return datetime.strptime(date_part, '%Y-%m-%d').replace(
+            hour=12, minute=0, second=0, microsecond=0
+        )
+
+    def pick_current_period(
+        self,
+        periods: List[Dict[str, Any]],
+        target_date: datetime,
+        *,
+        half_open: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Return the period containing target_date, marking it current if needed."""
+        if not periods:
+            return None
+        marked = next((p for p in periods if p.get('current')), None)
+        if marked:
+            return marked
+        for p in periods:
+            start, end = self._period_bounds(p)
+            if half_open:
+                hit = start <= target_date < end
+            else:
+                hit = start <= target_date <= end
+            if hit:
+                p['current'] = True
+                return p
+        return None
 
     def calculate_current_dashas(
         self,

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import { useAstrology } from '../../context/AstrologyContext';
@@ -28,6 +28,14 @@ const STATE_LABELS = {
   dasha_connected: 'Period connected',
   transit_only: 'Background influence',
   dormant: 'Not active',
+};
+
+const STATE_LABELS_SHORT = {
+  fully_reinforced: 'Strong',
+  dasha_transit_activated: 'Active',
+  dasha_connected: 'Period',
+  transit_only: 'Background',
+  dormant: 'Quiet',
 };
 
 const STATE_EXPLANATIONS = {
@@ -86,6 +94,18 @@ const formatDate = (value, options = { day: 'numeric', month: 'short' }) => {
 const sentence = (value) => String(value || '')
   .replaceAll('_', ' ')
   .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+/** LLM/cache may return a string, null, or array for list fields. */
+const asStringList = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+  return [];
+};
 
 const reasonDescription = (reason) => {
   const facts = reason?.facts || {};
@@ -184,10 +204,16 @@ const chartIdFrom = (birthData) => birthData?.chart_id || birthData?.birth_chart
 
 const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { birthData, chartData } = useAstrology();
+  const initialAsOf = (() => {
+    const fromQuery = searchParams.get('asOf');
+    if (fromQuery && /^\d{4}-\d{2}-\d{2}$/.test(fromQuery)) return fromQuery;
+    return localToday();
+  })();
   const [showBirthModal, setShowBirthModal] = useState(false);
-  const [asOf, setAsOf] = useState(localToday);
-  const [draftDate, setDraftDate] = useState(localToday);
+  const [asOf, setAsOf] = useState(initialAsOf);
+  const [draftDate, setDraftDate] = useState(initialAsOf);
   const [horizonDays, setHorizonDays] = useState(90);
   const [draftHorizonDays, setDraftHorizonDays] = useState(90);
   const [result, setResult] = useState(null);
@@ -493,7 +519,7 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
                             aria-label={`House ${houseNumber}, ${HOUSE_LABELS[houseNumber]}, ${STATE_LABELS[house?.state] || 'Dormant'}`}
                           >
                             <strong>H{houseNumber}</strong>
-                            <span>{STATE_LABELS[house?.state] || 'Dormant'}</span>
+                            <span>{STATE_LABELS_SHORT[house?.state] || 'Quiet'}</span>
                             <i
                               className={`activation-outcome-dot activation-outcome--${house?.outcome?.tone || 'neutral'}`}
                               aria-hidden="true"
@@ -678,7 +704,7 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
                             <div className="chart-manifestation-alternatives">
                               <h4>What you may notice</h4>
                               <p>{item.summary}</p>
-                              <ul>{(item.possibilities || []).map((possibility) => <li key={possibility}>{possibility}</li>)}</ul>
+                              <ul>{asStringList(item.possibilities).map((possibility) => <li key={possibility}>{possibility}</li>)}</ul>
                             </div>
                             <details>
                               <summary>Why your chart points to this</summary>
@@ -686,18 +712,18 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
                                 {(item.house_roles || []).map((role) => (
                                   <section key={`reason-${role.native_house}-${role.relative_house}`}>
                                     <h4>House {role.native_house}: {role.role}</h4>
-                                    {(role.dasha_connections || []).map((reason) => <p key={reason}>{reason}.</p>)}
-                                    {(role.transit_connections || []).map((reason) => <p key={reason}>{reason}.</p>)}
+                                    {asStringList(role.dasha_connections).map((reason) => <p key={reason}>{reason}.</p>)}
+                                    {asStringList(role.transit_connections).map((reason) => <p key={reason}>{reason}.</p>)}
                                     <p><strong>This house suggests:</strong> {OUTCOME_LABELS[role.outcome_tone] || sentence(role.outcome_tone)}</p>
                                   </section>
                                 ))}
                               </div>
-                              <ul>{(item.rationale || []).map((reason) => <li key={reason}>{reason}</li>)}</ul>
+                              <ul>{asStringList(item.rationale).map((reason) => <li key={reason}>{reason}</li>)}</ul>
                               <div className="chart-manifestation-factors">
                                 {[
-                                  ['What helps', item.helpful_reasons || []],
-                                  ['Mixed signals', item.mixed_reasons || []],
-                                  ['What adds pressure', item.pressure_reasons || []],
+                                  ['What helps', asStringList(item.helpful_reasons)],
+                                  ['Mixed signals', asStringList(item.mixed_reasons)],
+                                  ['What adds pressure', asStringList(item.pressure_reasons)],
                                 ].map(([label, reasons]) => reasons.length ? (
                                   <section key={label}>
                                     <h4>{label}</h4>

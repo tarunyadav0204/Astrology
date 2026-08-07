@@ -1,0 +1,69 @@
+.desk-pos {
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  background: #fffcf8;
+}
+
+.desk-pos--empty {
+  display: grid;
+  place-items: center;
+  color: #6b5c54;
+  font-size: 0.72rem;
+  padding: 0.75rem;
+}
+
+.desk-pos__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.62rem;
+  line-height: 1.25;
+}
+
+.desk-pos__table th,
+.desk-pos__table td {
+  padding: 0.22rem 0.28rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(70, 45, 35, 0.08);
+  white-space: nowrap;
+}
+
+.desk-pos__table th {
+  position: sticky;
+  top: 0;
+  background: #f3ebe3;
+  color: #6b5c54;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 0.55rem;
+  z-index: 1;
+}
+
+.desk-pos__table td strong {
+  font-weight: 800;
+  color: #1f1714;
+}
+
+.desk-pos__table td i {
+  font-style: normal;
+  margin-left: 0.2rem;
+  padding: 0 0.2rem;
+  border-radius: 3px;
+  background: rgba(245, 158, 11, 0.18);
+  color: #92400e;
+  font-size: 0.52rem;
+  font-weight: 800;
+}
+
+.desk-pos__table tr.is-ex td {
+  color: #166534;
+}
+
+.desk-pos__table tr.is-db td {
+  color: #9f1239;
+}
+
+.desk-pos__table tbody tr:hover td {
+  background: rgba(159, 18, 57, 0.04);
+}

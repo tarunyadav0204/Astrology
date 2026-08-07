@@ -1,0 +1,271 @@
+.house-insight-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  background: rgba(20, 12, 10, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.house-insight-panel {
+  width: min(520px, 100%);
+  max-height: min(88vh, 820px);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  background: #fffcf8;
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -12px 40px rgba(40, 20, 10, 0.22);
+  color: #1f1714;
+  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+.house-insight-handle {
+  width: 42px;
+  height: 4px;
+  margin: 0.45rem auto 0;
+  border-radius: 999px;
+  background: rgba(70, 45, 35, 0.18);
+}
+
+.house-insight-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.55rem 0.9rem 0.7rem;
+  border-bottom: 1px solid rgba(70, 45, 35, 0.1);
+}
+
+.house-insight-badge {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 10px;
+  background: #9f1239;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.house-insight-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.house-insight-head p {
+  margin: 0.1rem 0 0;
+  color: #9f1239;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.house-insight-close {
+  border: 0;
+  background: transparent;
+  color: #6b5c54;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.house-insight-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 0.55rem 0.9rem 0.9rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.house-insight-sec {
+  padding: 0.55rem 0.65rem;
+  border-radius: 12px;
+  background: rgba(70, 45, 35, 0.035);
+}
+
+.house-insight-sec--warn { background: rgba(249, 115, 22, 0.08); }
+.house-insight-sec--danger { background: rgba(220, 38, 38, 0.07); }
+.house-insight-sec--read { background: rgba(249, 115, 22, 0.06); }
+.house-insight-sec--related { background: rgba(37, 99, 235, 0.06); }
+
+.house-insight-sec h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6b5c54;
+}
+
+.house-insight-sec p,
+.house-insight-sec li {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #1f1714;
+}
+
+.house-insight-sec ul {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.house-insight-verdict-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.house-insight-verdict-row h3 {
+  margin: 0;
+}
+
+.house-insight-verdict-row em {
+  font-style: normal;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #7c2d12;
+}
+
+.house-insight-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
+.house-insight-grid div {
+  padding: 0.35rem 0.45rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.house-insight-grid em,
+.house-insight-note {
+  display: block;
+  font-style: normal;
+  color: #6b5c54;
+  font-size: 0.66rem;
+}
+
+.house-insight-grid strong {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.78rem;
+}
+
+.house-insight-note {
+  margin-top: 0.35rem !important;
+}
+
+.house-insight-chip-row,
+.house-insight-occupant {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.45rem;
+  align-items: start;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid rgba(70, 45, 35, 0.06);
+}
+
+.house-insight-chip-row:last-child,
+.house-insight-occupant:last-child {
+  border-bottom: 0;
+}
+
+.house-insight-occupant strong {
+  display: grid;
+  place-items: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  border-radius: 8px;
+  background: rgba(159, 18, 57, 0.1);
+  color: #9f1239;
+  font-size: 0.72rem;
+}
+
+.house-insight-occupant b,
+.house-insight-chip-row strong {
+  font-size: 0.78rem;
+}
+
+.house-insight-occupant span,
+.house-insight-chip-row span {
+  display: block;
+  color: #6b5c54;
+  font-size: 0.68rem;
+  margin-top: 0.1rem;
+}
+
+.house-insight-occupant i {
+  font-style: normal;
+  margin-left: 0.3rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.14);
+  color: #92400e;
+  font-size: 0.58rem;
+  font-weight: 750;
+}
+
+.house-insight-empty,
+.house-insight-status {
+  color: #6b5c54;
+  font-size: 0.74rem;
+}
+
+.house-insight-status--err {
+  color: #9f1239;
+}
+
+.house-insight-actions {
+  display: flex;
+  gap: 0.45rem;
+  padding: 0.7rem 0.9rem calc(0.7rem + env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(70, 45, 35, 0.1);
+  background: #fffcf8;
+}
+
+.house-insight-actions button {
+  flex: 1;
+  min-height: 40px;
+  border: 1px solid rgba(70, 45, 35, 0.14);
+  border-radius: 10px;
+  background: #f3ebe3;
+  color: #1f1714;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.house-insight-actions__primary {
+  background: #9f1239 !important;
+  border-color: #9f1239 !important;
+  color: #fff !important;
+}
+
+@media (min-width: 900px) {
+  .house-insight-overlay {
+    align-items: center;
+    padding: 1rem;
+  }
+
+  .house-insight-panel {
+    border-radius: 16px;
+    max-height: min(86vh, 760px);
+  }
+
+  .house-insight-handle {
+    display: none;
+  }
+}

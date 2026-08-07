@@ -17,7 +17,7 @@ function AshtakavargaToolPage({ user, onLogout, onAdminClick, onLogin }) {
   const [showBirthModal, setShowBirthModal] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const transitDate = useMemo(() => new Date().toISOString().split('T')[0], []);
-  const initialActiveTab = location.state?.initialActiveTab || 'sarva';
+  const initialActiveTab = location.state?.initialActiveTab || 'matrix';
 
   const handleBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {

@@ -113,7 +113,36 @@ function AshtakavargaProgressState({ title, description, hint, compact = false, 
   );
 }
 
-const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate, variant = 'modal', onLogin, initialActiveTab = 'sarva' }) => {
+const MATRIX_PLANETS = [
+  { key: 'Sun', abbr: 'Su' },
+  { key: 'Moon', abbr: 'Mo' },
+  { key: 'Mars', abbr: 'Ma' },
+  { key: 'Mercury', abbr: 'Me' },
+  { key: 'Jupiter', abbr: 'Ju' },
+  { key: 'Venus', abbr: 'Ve' },
+  { key: 'Saturn', abbr: 'Sa' },
+];
+
+function binduAt(bindus, signIndex) {
+  if (bindus == null) return 0;
+  if (Array.isArray(bindus)) return Number(bindus[signIndex]) || 0;
+  const v = bindus[signIndex] ?? bindus[String(signIndex)];
+  return Number(v) || 0;
+}
+
+function bavTone(count) {
+  if (count >= 4) return 'high';
+  if (count >= 2) return 'mid';
+  return 'low';
+}
+
+function savTone(count) {
+  if (count >= 30) return 'strong';
+  if (count <= 25) return 'weak';
+  return 'average';
+}
+
+const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate, variant = 'modal', onLogin, initialActiveTab = 'matrix' }) => {
   const { credits, fetchBalance } = useCredits();
   const [ashtakavargaData, setAshtakavargaData] = useState(null);
   const [transitData, setTransitData] = useState(null);
@@ -193,7 +222,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
 
   useEffect(() => {
     if (!isOpen) return;
-    setActiveTab(initialActiveTab || 'sarva');
+    setActiveTab(initialActiveTab || 'matrix');
   }, [initialActiveTab, isOpen]);
 
   useEffect(() => {
@@ -372,6 +401,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
     }
 
     const baseTabs = [
+      { id: 'matrix', label: 'Matrix' },
       { id: 'sarva', label: 'SAV' },
       { id: 'individual', label: 'BAV' },
     ];
@@ -395,7 +425,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
   useEffect(() => {
     if (viewMode !== 'transit') return;
     if (['recommendations', 'events', 'analysis'].includes(activeTab)) {
-      setActiveTab('sarva');
+      setActiveTab('matrix');
     }
   }, [viewMode, activeTab]);
 
@@ -781,7 +811,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
         {!lifePredictions ? (
           <>
             <div className="ashtakavarga-life-hero">
-              <p className="ashtakavarga-life-hero__eyebrow">Dots of Destiny</p>
+              <p className="ashtakavarga-life-hero__eyebrow">Life analysis</p>
               <p className="ashtakavarga-life-hero__teaser">
                 AI reading from your Sarvashtakavarga, houses, transits, and dasha — grounded in bindus from your chart.
               </p>
@@ -805,7 +835,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
                   title={lifePredictionsCacheChecking ? 'Checking cache' : 'Generating reading'}
                   description={
                     lifePredictionsCacheChecking
-                      ? 'Looking for a saved Dots of Destiny reading for this profile…'
+                      ? 'Looking for a saved Life Analysis reading for this profile…'
                       : 'Running the model on your bindus, houses, transits, and dasha. This may take up to a minute.'
                   }
                   hint={lifePredictionsCacheChecking ? 'Almost there…' : 'Safe to keep this tab open'}
@@ -833,7 +863,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
                 <p className="ashtakavarga-life-results-sub">
                   {lifePredictions?.methodology ||
                     lifePredictions?.predictions?.methodology ||
-                    "Vinay Aditya's Dots of Destiny"}
+                    'Vinay Aditya · Ashtakavarga'}
                 </p>
                 {lifePredictions?.cached ? (
                   <p className="ashtakavarga-life-results-cached">
@@ -854,6 +884,136 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
             <div className="ashtakavarga-life-results-body">{renderLifePredictionsSections(pred)}</div>
           </>
         )}
+      </div>
+    );
+  };
+
+  const renderBinduMatrix = () => {
+    if (viewMode === 'birth' && !ashtakavargaData) return null;
+    if (viewMode === 'transit' && !transitData) {
+      return transitLoading ? (
+        <AshtakavargaProgressState
+          title="Loading transit Ashtakavarga"
+          description="Computing transit positions and bindus for your selected date…"
+        />
+      ) : (
+        <div className="loading">
+          <p>Could not load transit data.</p>
+        </div>
+      );
+    }
+
+    const data = viewMode === 'transit' ? transitData?.transit_ashtakavarga : ashtakavargaData?.ashtakavarga;
+    if (!data) return null;
+
+    const { individual_charts = {}, sarvashtakavarga, total_bindus, lagna_chart } = data;
+    const title = viewMode === 'transit'
+      ? `Transit bindu matrix (${selectedDate})`
+      : 'Birth bindu matrix';
+
+    const rows = Array.from({ length: 12 }, (_, i) => {
+      const house = i + 1;
+      let signIndex = savHouseNumbersFromAsc.findIndex((h) => h === house);
+      if (signIndex < 0) signIndex = i;
+      return { house, signIndex, signName: signNames[signIndex] };
+    });
+
+    const planetTotals = MATRIX_PLANETS.map(({ key }) => {
+      const chart = individual_charts[key];
+      if (chart?.total != null) return Number(chart.total) || 0;
+      if (!chart?.bindus) return 0;
+      return Array.from({ length: 12 }, (_, si) => binduAt(chart.bindus, si)).reduce((a, b) => a + b, 0);
+    });
+
+    const lagnaBindus = lagna_chart?.bindus;
+    const lagnaTotal = lagna_chart
+      ? (lagna_chart.total != null
+        ? Number(lagna_chart.total) || 0
+        : Array.from({ length: 12 }, (_, si) => binduAt(lagnaBindus, si)).reduce((a, b) => a + b, 0))
+      : null;
+
+    const savTotal = total_bindus != null
+      ? Number(total_bindus) || 0
+      : Array.from({ length: 12 }, (_, si) => binduAt(sarvashtakavarga, si)).reduce((a, b) => a + b, 0);
+
+    return (
+      <div className="av-matrix" aria-label="House by planet bindu matrix">
+        <header className="av-matrix__head">
+          <h3>{title}</h3>
+          <p>
+            Houses from lagna · BAV columns · SAV total
+            {savTotal ? ` · ${savTotal} bindus` : ''}
+          </p>
+        </header>
+        <div className="av-matrix__scroll">
+          <table className="av-matrix__table">
+            <thead>
+              <tr>
+                <th scope="col" className="av-matrix__sticky">H</th>
+                <th scope="col" className="av-matrix__sign">Sign</th>
+                {MATRIX_PLANETS.map((p) => (
+                  <th key={p.key} scope="col" title={p.key}>{p.abbr}</th>
+                ))}
+                {lagna_chart ? <th scope="col" title="Lagna BAV">La</th> : null}
+                <th scope="col" className="av-matrix__sav" title="Sarvashtakavarga">SAV</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const sav = binduAt(sarvashtakavarga, row.signIndex);
+                return (
+                  <tr key={row.house}>
+                    <th scope="row" className="av-matrix__sticky">{row.house}</th>
+                    <td className="av-matrix__sign">{row.signName.slice(0, 3)}</td>
+                    {MATRIX_PLANETS.map((p) => {
+                      const count = binduAt(individual_charts[p.key]?.bindus, row.signIndex);
+                      return (
+                        <td
+                          key={p.key}
+                          className={`av-matrix__cell av-matrix__cell--${bavTone(count)}`}
+                          title={`${p.key} in ${row.signName} (H${row.house}): ${count}`}
+                        >
+                          {count}
+                        </td>
+                      );
+                    })}
+                    {lagna_chart ? (
+                      <td
+                        className={`av-matrix__cell av-matrix__cell--${bavTone(binduAt(lagnaBindus, row.signIndex))}`}
+                        title={`Lagna in ${row.signName} (H${row.house})`}
+                      >
+                        {binduAt(lagnaBindus, row.signIndex)}
+                      </td>
+                    ) : null}
+                    <td
+                      className={`av-matrix__sav av-matrix__cell--${savTone(sav)}`}
+                      title={`SAV for ${row.signName} (H${row.house}): ${sav}`}
+                    >
+                      {sav}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr>
+                <th scope="row" className="av-matrix__sticky" colSpan={2}>Σ</th>
+                {planetTotals.map((total, idx) => (
+                  <td key={MATRIX_PLANETS[idx].key}>{total}</td>
+                ))}
+                {lagna_chart ? <td>{lagnaTotal}</td> : null}
+                <td className="av-matrix__sav">{savTotal}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div className="av-matrix__legend" aria-hidden="true">
+          <span className="av-matrix__cell--high">BAV 4+</span>
+          <span className="av-matrix__cell--mid">BAV 2–3</span>
+          <span className="av-matrix__cell--low">BAV 0–1</span>
+          <span className="av-matrix__cell--strong">SAV 30+</span>
+          <span className="av-matrix__cell--weak">SAV ≤25</span>
+        </div>
       </div>
     );
   };
@@ -1242,8 +1402,8 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
             <div className="ashtakavarga-credit-confirm-dialog" onClick={(e) => e.stopPropagation()}>
               <h3 id="ashtakavarga-credit-title">
                 {lifePredictionsCreditModalMode === 'regenerate'
-                  ? 'Regenerate Dots of Destiny?'
-                  : 'Dots of Destiny reading'}
+                  ? 'Regenerate life analysis?'
+                  : 'Life analysis reading'}
               </h3>
               <p className="ashtakavarga-credit-confirm-desc">
                 {lifePredictionsCreditModalMode === 'regenerate'
@@ -1351,6 +1511,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
           renderSarvashtakavarga()
         ) : (
           <>
+            {activeTab === 'matrix' && renderBinduMatrix()}
             {activeTab === 'sarva' && renderSarvashtakavarga()}
             {activeTab === 'individual' && renderIndividualCharts()}
             {activeTab === 'recommendations' && renderTransitRecommendations()}

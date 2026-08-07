@@ -27,6 +27,7 @@ import RegisterForm from '../Auth/RegisterForm';
 import AuthModalShell from '../Auth/AuthModalShell';
 import { showToast } from '../../utils/toast';
 import TrustBanner from '../TrustBanner/TrustBanner';
+import KpTodayHome from '../Home/KpTodayHome';
 import './AstroRoshniHomepage.css';
 import './sectionIntro.css';
 import './search-section.css';
@@ -1283,6 +1284,19 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
             </div>
           </button>
+          <KpTodayHome
+            user={user}
+            birthData={birthData}
+            onLogin={onLogin}
+            onNeedBirth={() => {
+              if (!user) {
+                onLogin();
+                return;
+              }
+              setBirthFormContext('changeNative');
+              setShowBirthFormModal(true);
+            }}
+          />
           <div className="life-categories-grid">
             <div className="life-category" onClick={() => user ? navigate('/career-guidance') : onLogin()}>
               <div className="category-icon">💼</div>
@@ -1334,73 +1348,36 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             </div>
           </div>
           
-          {/* Full-width Ask Astrologer Banner */}
-          <div className="ask-astrologer-banner">
-            <div className="banner-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div className="banner-icon">💬</div>
-                <div className="banner-text">
-                  <h3>Deep Vedic Analysis</h3>
-                  <p>Get profound insights from ancient wisdom • Expert guidance • Personalized predictions</p>
-                </div>
-              </div>
-              <button 
-                className="ask-tara-prominent-btn"
-                onClick={() => user ? navigate('/chat?app=1') : onLogin()}
-                style={{
-                  background: 'white',
-                  color: '#e91e63',
-                  border: '0px solid transparent !important',
-                  outline: 'none !important',
-                  boxSizing: 'border-box',
-                  padding: '12px 24px',
-                  borderRadius: '25px',
-                  fontWeight: 'bold',
-                  fontSize: '16px',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 15px rgba(233, 30, 99, 0.3)',
-                  animation: 'bounce 2s infinite',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.background = '#e91e63';
-                  e.target.style.color = 'white';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.background = 'white';
-                  e.target.style.color = '#e91e63';
-                }}
-              >
-                ⭐ Ask Tara Now
-              </button>
+          {/* Ask Tara promo */}
+          <div
+            className="tara-promo"
+            onClick={() => (user ? navigate('/chat?app=1') : onLogin())}
+            role="link"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (user) navigate('/chat?app=1');
+                else onLogin();
+              }
+            }}
+          >
+            <div className="tara-promo__copy">
+              <p className="tara-promo__eyebrow">AI chat · Vedic guidance</p>
+              <h3 className="tara-promo__title">Deep Vedic analysis</h3>
+              <p className="tara-promo__desc">
+                Chart-based insights from classical Jyotish — clear guidance and personalised predictions with Tara.
+              </p>
             </div>
-            <style>
-              {`
-                .ask-tara-prominent-btn {
-                  border: none !important;
-                  outline: none !important;
-                }
-                .ask-tara-prominent-btn:focus {
-                  border: none !important;
-                  outline: none !important;
-                }
-                .ask-tara-prominent-btn:active {
-                  border: none !important;
-                  outline: none !important;
-                }
-                @keyframes bounce {
-                  0%, 20%, 50%, 80%, 100% {
-                    transform: translateY(0);
-                  }
-                  40% {
-                    transform: translateY(-10px);
-                  }
-                  60% {
-                    transform: translateY(-5px);
-                  }
-                }
-              `}
-            </style>
+            <ul className="tara-promo__points" aria-label="What you get">
+              <li>Expert-style reading</li>
+              <li>Personalised answers</li>
+              <li>Instant chat</li>
+            </ul>
+            <span className="tara-promo__cta">
+              Ask Tara
+              <span aria-hidden="true">→</span>
+            </span>
           </div>
         </div>
       </section>
@@ -1538,25 +1515,33 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       */}
 
       {/* Karma Analysis Section */}
-      <section className="karma-analysis-section">
+      <section className="karma-analysis-section" aria-labelledby="karma-promo-heading">
         <div className="container">
-          <div className="karma-cosmic-card" onClick={() => navigate('/karma-analysis')} role="link" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && navigate('/karma-analysis')}>
-            <div className="karma-cosmic-glow"></div>
-            <div className="karma-cosmic-content">
-              <div className="karma-om-symbol">🕉️</div>
-              <h2 className="karma-title">Past Life Karma Analysis</h2>
-              <p className="karma-subtitle">Discover Your Soul's Eternal Journey</p>
-              <div className="karma-features">
-                <span>✨ Akashic Records Access</span>
-                <span>🔮 Past Life Patterns</span>
-                <span>⚖️ Karmic Debts & Blessings</span>
-                <span>🌟 Soul Purpose Revelation</span>
-              </div>
-              <div className="karma-cta">
-                <span className="karma-badge">AI-Powered Deep Analysis</span>
-                <span className="karma-arrow">→</span>
-              </div>
+          <div
+            className="karma-promo"
+            onClick={() => navigate('/karma-analysis')}
+            role="link"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && navigate('/karma-analysis')}
+          >
+            <div className="karma-promo__copy">
+              <p className="karma-promo__eyebrow">Vedic · Past life</p>
+              <h2 id="karma-promo-heading" className="karma-promo__title">
+                Past life karma analysis
+              </h2>
+              <p className="karma-promo__desc">
+                Classical Jyotish reading of karmic patterns from Navamsa, Shashtiamsa, the 12th house, and Rahu–Ketu.
+              </p>
             </div>
+            <ul className="karma-promo__points" aria-label="What you get">
+              <li>Karmic patterns</li>
+              <li>Debts &amp; strengths</li>
+              <li>Soul themes</li>
+            </ul>
+            <span className="karma-promo__cta">
+              Open analysis
+              <span aria-hidden="true">→</span>
+            </span>
           </div>
         </div>
       </section>

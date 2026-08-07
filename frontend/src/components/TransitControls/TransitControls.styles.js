@@ -2,6 +2,7 @@ import styled from 'styled-components';
 import { APP_CONFIG } from '../../config/app.config';
 
 export const ControlsContainer = styled.div`
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -14,7 +15,7 @@ export const ControlsContainer = styled.div`
 `;
 
 export const DateDisplay = styled.div.withConfig({
-  shouldForwardProp: (prop) => !['$variant'].includes(prop),
+  shouldForwardProp: (prop) => !['$variant', '$clickable'].includes(prop),
 })`
   font-size: 0.8rem;
   font-weight: 600;
@@ -28,12 +29,47 @@ export const DateDisplay = styled.div.withConfig({
   border: 1px solid ${({ $variant }) => ($variant === 'light' ? 'rgba(194, 24, 91, 0.14)' : 'rgba(255, 255, 255, 0.2)')};
   backdrop-filter: blur(10px);
   box-shadow: ${({ $variant }) => ($variant === 'light' ? '0 8px 16px rgba(194, 24, 91, 0.06)' : 'none')};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  font: inherit;
+  line-height: 1.2;
+
+  ${({ $clickable }) =>
+    $clickable &&
+    `
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+
+    &:hover {
+      filter: brightness(0.98);
+      box-shadow: 0 2px 8px rgba(40, 20, 10, 0.12);
+    }
+
+    &:focus-visible {
+      outline: 2px solid #c2185b;
+      outline-offset: 2px;
+    }
+  `}
   
   @media (max-width: 768px) {
     font-size: 0.7rem;
     min-width: 60px;
     padding: 0.25rem 0.4rem;
   }
+`;
+
+export const DatePickerInput = styled.input`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
 `;
 
 export const ButtonGroup = styled.div`

@@ -1,82 +1,110 @@
 import React, { useState } from 'react';
 import NorthIndianChart from '../../Charts/NorthIndianChart';
 import SouthIndianChart from '../../Charts/SouthIndianChart';
+import './KPChart.css';
 
-const KPChart = ({ chartData, birthData }) => {
+/** Which Placidus house a longitude falls in (1–12). */
+function houseFromLongitude(longitude, houses) {
+  const lon = ((Number(longitude) % 360) + 360) % 360;
+  for (let i = 1; i <= 12; i += 1) {
+    const currentCusp = Number(houses.find((h) => h.number === i)?.cusp_longitude) || 0;
+    const nextHouse = i === 12 ? 1 : i + 1;
+    const nextCusp = Number(houses.find((h) => h.number === nextHouse)?.cusp_longitude) || 0;
+
+    if (currentCusp < nextCusp) {
+      if (lon >= currentCusp && lon < nextCusp) return i;
+    } else if (lon >= currentCusp || lon < nextCusp) {
+      return i;
+    }
+  }
+  return 1;
+}
+
+const KPChart = ({ chartData, birthData, deskMode = false }) => {
   const [chartStyle, setChartStyle] = useState('north');
   
   if (!chartData || !chartData.houses || !chartData.planets) {
     return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '200px',
-        color: '#dc3545',
-        fontSize: '1rem',
-        background: 'white',
-        borderRadius: '12px',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.1)'
-      }}>
+      <div className={deskMode ? 'kp-chart-empty kp-chart-empty--desk' : 'kp-chart-empty'}>
         Chart data not available
       </div>
     );
   }
 
-  // Get ascendant sign from 1st house cusp
-  const ascendantLongitude = chartData.houses.find(h => h.number === 1)?.cusp_longitude || 0;
-  
-  // Transform data for North/South Indian charts
+  const ascendantLongitude = chartData.houses.find((h) => h.number === 1)?.cusp_longitude || 0;
+
+  // Placidus houses can share a zodiac sign (and skip others). Planet glyphs must
+  // be keyed by house number — never by sign — or they render in every house
+  // whose cusp falls in that same sign.
   const transformedData = {
     planets: {},
-    houses: {}
+    houses: [],
+    ascendant: ascendantLongitude,
   };
 
-  // Add planets based on house cusps (bhav chalit style)
-  chartData.planets.forEach(planet => {
-    const longitude = planet.longitude;
-    
-    // Find which house this planet falls into based on house cusps
-    let houseNumber = 1;
-    for (let i = 1; i <= 12; i++) {
-      const currentCusp = chartData.houses.find(h => h.number === i)?.cusp_longitude || 0;
-      const nextHouse = i === 12 ? 1 : i + 1;
-      const nextCusp = chartData.houses.find(h => h.number === nextHouse)?.cusp_longitude || 0;
-      
-      // Check if planet falls in this house
-      if (currentCusp < nextCusp) {
-        if (longitude >= currentCusp && longitude < nextCusp) {
-          houseNumber = i;
-          break;
-        }
-      } else { // House crosses 0 degrees
-        if (longitude >= currentCusp || longitude < nextCusp) {
-          houseNumber = i;
-          break;
-        }
-      }
-    }
-    
-    // Place planet in the house it occupies, not its zodiac sign
-    const ascendantSign = Math.floor(ascendantLongitude / 30);
-    const planetHouseSign = (ascendantSign + houseNumber - 1) % 12;
-    
+  chartData.planets.forEach((planet) => {
+    // Ascendant is shown via the ASC marker; skip the duplicate "As" glyph.
+    if (planet.name === 'Ascendant') return;
+
+    const longitude = Number(planet.longitude) || 0;
+    const houseNumber = houseFromLongitude(longitude, chartData.houses);
+
     transformedData.planets[planet.name] = {
-      longitude: longitude,
-      sign: planetHouseSign, // Use house-based sign, not zodiac sign
+      longitude,
+      // Real zodiac sign (for nakshatra/degree helpers)
+      sign: Math.floor(longitude / 30) % 12,
+      // Occupied Placidus house — North/South charts place by this when set
+      house: houseNumber,
       degree: longitude % 30,
-      retrograde: false
+      retrograde: !!planet.retrograde,
     };
   });
 
-  // Add houses as object with house numbers as keys
-  chartData.houses.forEach(house => {
+  chartData.houses.forEach((house) => {
     transformedData.houses[house.number - 1] = {
       longitude: house.cusp_longitude,
-      sign: Math.floor(house.cusp_longitude / 30),
-      degree: house.cusp_longitude % 30
+      sign: Math.floor(house.cusp_longitude / 30) % 12,
+      degree: house.cusp_longitude % 30,
     };
   });
+
+  const chartEl = chartStyle === 'north' ? (
+    <NorthIndianChart 
+      chartData={transformedData}
+      chartType="kp"
+      birthData={birthData}
+      showDegreeNakshatra={!deskMode}
+      showFooterHint={false}
+      deskMode={deskMode}
+    />
+  ) : (
+    <SouthIndianChart 
+      chartData={transformedData}
+      chartType="kp"
+      birthData={birthData}
+      showDegreeNakshatra={!deskMode}
+      showFooterHint={false}
+      deskMode={deskMode}
+    />
+  );
+
+  if (deskMode) {
+    return (
+      <div className="kp-chart-container kp-chart-container--desk">
+        <button
+          type="button"
+          className="kp-chart-desk-toggle"
+          onClick={() => setChartStyle((prev) => (prev === 'north' ? 'south' : 'north'))}
+          title="North / South Indian"
+        >
+          {chartStyle === 'north' ? 'N' : 'S'}
+        </button>
+        <div className="kp-chart-desk-canvas">
+          {chartEl}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -116,21 +144,7 @@ const KPChart = ({ chartData, birthData }) => {
         </button>
       </div>
       
-      {chartStyle === 'north' ? (
-        <NorthIndianChart 
-          chartData={transformedData}
-          chartType="kp"
-          birthData={birthData}
-          showDegreeNakshatra={true}
-        />
-      ) : (
-        <SouthIndianChart 
-          chartData={transformedData}
-          chartType="kp"
-          birthData={birthData}
-          showDegreeNakshatra={true}
-        />
-      )}
+      {chartEl}
     </div>
   );
 };

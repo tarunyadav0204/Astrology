@@ -263,6 +263,14 @@ export const apiService = {
     const response = await apiClient.post(getEndpoint('/panchang/calculate-panchang'), birthData);
     return response.data;
   },
+
+  /** Janma pañcāṅga at birth moment (tithi, vāra, nakṣatra, yoga, karaṇa). */
+  calculateBirthPanchang: async (birthData) => {
+    const response = await apiClient.post(getEndpoint('/panchang/calculate-birth-panchang'), {
+      birth_data: birthData,
+    });
+    return response.data;
+  },
   
   calculateFriendship: async (birthData) => {
     const response = await apiClient.post(getEndpoint('/calculate-friendship'), birthData);
@@ -628,5 +636,115 @@ export const apiService = {
       `${getEndpoint('/chat/monthly-events/cached-years')}?birth_chart_id=${encodeURIComponent(String(birthChartId))}`
     );
     return response.data;
-  }
+  },
+
+  getKpFructification: async (payload) => {
+    const response = await apiClient.post(getEndpoint('/kp/fructification'), payload);
+    return response.data;
+  },
+
+  getKpChart: async (payload) => {
+    const response = await apiClient.post(getEndpoint('/kp/chart'), payload);
+    return response.data;
+  },
+
+  getKpRulingPlanets: async (payload) => {
+    const response = await apiClient.post(getEndpoint('/kp/ruling-planets'), payload);
+    return response.data;
+  },
+
+  getHouseInsight: async ({ birthData, houseNum, chartId = 'lagna', transitDate }) => {
+    const dateStr = String(birthData?.date || '').includes('T')
+      ? String(birthData.date).split('T')[0]
+      : birthData?.date;
+    let timeStr = String(birthData?.time || '');
+    if (timeStr.includes('T')) timeStr = timeStr.split('T')[1]?.slice(0, 5) || timeStr;
+    else timeStr = timeStr.slice(0, 5);
+    const response = await apiClient.post(getEndpoint('/chart-house-insight'), {
+      birth_data: {
+        name: birthData?.name || 'Native',
+        date: dateStr,
+        time: timeStr,
+        latitude: parseFloat(birthData?.latitude),
+        longitude: parseFloat(birthData?.longitude),
+        place: birthData?.place || 'Unknown',
+      },
+      house_num: houseNum,
+      chart_id: chartId,
+      transit_date: transitDate || new Date().toISOString().split('T')[0],
+    });
+    return response.data;
+  },
+
+  calculateMudakkuAnalysis: async (chartData) => {
+    const response = await apiClient.post(getEndpoint('/mudakku-analysis'), { chart_data: chartData });
+    return response.data;
+  },
+
+  calculateGandantaAnalysis: async (chartData) => {
+    const response = await apiClient.post(getEndpoint('/gandanta-analysis'), { chart_data: chartData });
+    return response.data;
+  },
+
+  getYogas: async (birthData) => {
+    const dateStr = String(birthData?.date || '').includes('T')
+      ? String(birthData.date).split('T')[0]
+      : birthData?.date;
+    let timeStr = String(birthData?.time || '');
+    if (timeStr.includes('T')) timeStr = timeStr.split('T')[1]?.slice(0, 5) || timeStr;
+    else timeStr = timeStr.slice(0, 5);
+    const response = await apiClient.post(getEndpoint('/yogas/'), {
+      name: birthData?.name || 'Native',
+      date: dateStr,
+      time: timeStr,
+      place: birthData?.place || 'Unknown',
+      latitude: birthData?.latitude != null ? parseFloat(birthData.latitude) : undefined,
+      longitude: birthData?.longitude != null ? parseFloat(birthData.longitude) : undefined,
+      timezone: birthData?.timezone,
+      gender: birthData?.gender,
+    });
+    return response.data;
+  },
+
+  calculateKarkamsaChart: async (chartData, atmakaraka) => {
+    const response = await apiClient.post(getEndpoint('/karkamsa-chart'), {
+      chart_data: chartData,
+      atmakaraka,
+    });
+    return response.data;
+  },
+
+  calculateSwamsaChart: async (chartData, atmakaraka) => {
+    const response = await apiClient.post(getEndpoint('/swamsa-chart'), {
+      chart_data: chartData,
+      atmakaraka,
+    });
+    return response.data;
+  },
+
+  calculateJaiminiSpecialLagnas: async (chartData, atmakaraka, d9Chart = null) => {
+    const response = await apiClient.post(getEndpoint('/jaimini-special-lagnas'), {
+      chart_data: chartData,
+      atmakaraka,
+      d9_chart: d9Chart,
+    });
+    return response.data;
+  },
+
+  calculateSniperPoints: async (chartData, d3Chart = null, d9Chart = null) => {
+    const response = await apiClient.post(getEndpoint('/sniper-points'), {
+      chart_data: chartData,
+      d3_chart: d3Chart,
+      d9_chart: d9Chart,
+    });
+    return response.data;
+  },
+
+  calculatePushkaraAnalysis: async (chartData, d9Chart = null) => {
+    const response = await apiClient.post(getEndpoint('/pushkara-analysis'), {
+      chart_data: chartData,
+      d9_chart: d9Chart,
+    });
+    return response.data;
+  },
 };

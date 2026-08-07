@@ -28,6 +28,65 @@ class InauspiciousTimesRequest(BaseModel):
     latitude: float
     longitude: float
 
+
+class BirthPanchangRequest(BaseModel):
+    birth_data: dict
+
+
+def _format_anga_response(basic_panchang: dict) -> dict:
+    """Shared frontend-shaped anga payload from calculator output."""
+    return {
+        'tithi': {
+            'number': basic_panchang['tithi']['number'],
+            'name': basic_panchang['tithi']['name'],
+            'paksha': basic_panchang['tithi']['paksha'],
+            'lord': basic_panchang['tithi'].get('lord'),
+            'start_time': basic_panchang['tithi'].get('start_time'),
+            'end_time': basic_panchang['tithi'].get('end_time'),
+            'elapsed': basic_panchang['tithi'].get('elapsed_degrees', basic_panchang['tithi'].get('elapsed', 0)),
+            'duration': 12.0,
+        },
+        'vara': {
+            'number': basic_panchang['vara']['number'],
+            'name': basic_panchang['vara']['name'],
+            'lord': basic_panchang['vara'].get('lord'),
+            'deity': basic_panchang['vara'].get('deity'),
+            'favorable_activities': basic_panchang['vara'].get('favorable_activities', []),
+            'lucky_color': basic_panchang['vara'].get('lucky_color'),
+        },
+        'nakshatra': {
+            'number': basic_panchang['nakshatra']['number'],
+            'name': basic_panchang['nakshatra']['name'],
+            'lord': basic_panchang['nakshatra'].get('lord'),
+            'deity': basic_panchang['nakshatra'].get('deity'),
+            'nature': basic_panchang['nakshatra'].get('nature'),
+            'pada': basic_panchang['nakshatra'].get('pada'),
+            'career_focus': basic_panchang['nakshatra'].get('career_focus'),
+            'start_time': basic_panchang['nakshatra'].get('start_time'),
+            'end_time': basic_panchang['nakshatra'].get('end_time'),
+        },
+        'yoga': {
+            'number': basic_panchang['yoga']['number'],
+            'name': basic_panchang['yoga']['name'],
+            'effect': basic_panchang['yoga'].get('effect'),
+            'quality': basic_panchang['yoga'].get('quality'),
+            'recommended_activities': basic_panchang['yoga'].get('recommended_activities'),
+            'spiritual_practice': basic_panchang['yoga'].get('spiritual_practice'),
+            'start_time': basic_panchang['yoga'].get('start_time'),
+            'end_time': basic_panchang['yoga'].get('end_time'),
+        },
+        'karana': {
+            'number': basic_panchang['karana']['number'],
+            'name': basic_panchang['karana']['name'],
+            'nature': basic_panchang['karana'].get('nature'),
+            'effect': basic_panchang['karana'].get('effect'),
+            'duration': basic_panchang['karana'].get('duration'),
+            'suitable_activities': basic_panchang['karana'].get('suitable_activities'),
+            'business_suitable': basic_panchang['karana'].get('business_suitable'),
+        },
+    }
+
+
 @router.post("/calculate-panchang")
 async def calculate_panchang(request: PanchangRequest):
     try:
@@ -75,58 +134,7 @@ async def calculate_panchang(request: PanchangRequest):
         )
         
         # Transform to frontend-expected format
-        panchang_data = {
-            'tithi': {
-                'number': basic_panchang['tithi']['number'],
-                'name': basic_panchang['tithi']['name'],
-                'paksha': basic_panchang['tithi']['paksha'],
-                'lord': 'Moon',  # Tithi lord is always Moon
-                'start_time': basic_panchang['tithi'].get('start_time'),
-                'end_time': basic_panchang['tithi'].get('end_time'),
-                'elapsed': basic_panchang['tithi'].get('elapsed_degrees', 0),
-                'duration': 12.0  # Tithi duration in degrees
-            },
-            'vara': {
-                'number': basic_panchang['vara']['number'],
-                'name': basic_panchang['vara']['name'],
-                'deity': 'Surya',  # Default deity
-                'favorable_activities': ['General activities'],
-                'lucky_color': '#FFD700'  # Default golden color
-            },
-            'nakshatra': {
-                'number': basic_panchang['nakshatra']['number'],
-                'name': basic_panchang['nakshatra']['name'],
-                'lord': basic_panchang['nakshatra'].get('lord'),
-                'deity': basic_panchang['nakshatra'].get('deity'),
-                'nature': basic_panchang['nakshatra'].get('nature'),
-                'pada': basic_panchang['nakshatra'].get('pada'),
-                'career_focus': basic_panchang['nakshatra'].get('career_focus'),
-                'symbol': '⭐',
-                'guna': 'Sattva',
-                'compatible_nakshatras': [],
-                'start_time': basic_panchang['nakshatra'].get('start_time'),
-                'end_time': basic_panchang['nakshatra'].get('end_time')
-            },
-            'yoga': {
-                'number': basic_panchang['yoga']['number'],
-                'name': basic_panchang['yoga']['name'],
-                'effect': basic_panchang['yoga'].get('effect'),
-                'quality': basic_panchang['yoga'].get('quality'),
-                'recommended_activities': basic_panchang['yoga'].get('recommended_activities'),
-                'spiritual_practice': basic_panchang['yoga'].get('spiritual_practice'),
-                'start_time': basic_panchang['yoga'].get('start_time'),
-                'end_time': basic_panchang['yoga'].get('end_time')
-            },
-            'karana': {
-                'number': basic_panchang['karana']['number'],
-                'name': basic_panchang['karana']['name'],
-                'nature': basic_panchang['karana'].get('nature'),
-                'effect': basic_panchang['karana'].get('effect'),
-                'duration': basic_panchang['karana'].get('duration'),
-                'suitable_activities': basic_panchang['karana'].get('suitable_activities'),
-                'business_suitable': basic_panchang['karana'].get('business_suitable')
-            }
-        }
+        panchang_data = _format_anga_response(basic_panchang)
         
         # Merge with sunrise/sunset data
         result = {**panchang_data, **sunrise_sunset_data}
@@ -140,6 +148,29 @@ async def calculate_panchang(request: PanchangRequest):
         raise HTTPException(status_code=422, detail=f"Invalid data format: {str(e)}")
     except Exception as e:
         print(f"[ERROR] Exception in panchang calculation: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/calculate-birth-panchang")
+async def calculate_birth_panchang(request: BirthPanchangRequest):
+    """Janma pañcāṅga at birth moment (not sunrise daily panchang)."""
+    try:
+        birth_data = request.birth_data or {}
+        if birth_data.get('latitude') is None or birth_data.get('longitude') is None:
+            raise HTTPException(status_code=422, detail="Missing latitude or longitude in birth_data")
+        basic = panchang_calc.calculate_birth_panchang(birth_data)
+        return {
+            **_format_anga_response(basic),
+            'reference': 'birth_moment',
+            'ayanamsa': basic.get('ayanamsa'),
+        }
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Invalid data format: {str(e)}")
+    except Exception as e:
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

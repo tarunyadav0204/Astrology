@@ -10,7 +10,6 @@ const HouseContextMenu = ({
   onMakeAscendant,
   onShowAspects,
   onHouseAnalysis,
-  onHouseSignifications,
   onHouseStrength
 }) => {
   const menuRef = useRef(null);
@@ -52,18 +51,11 @@ const HouseContextMenu = ({
       description: 'Highlight aspects to this house'
     },
     {
-      icon: '📊',
-      label: 'House Analysis',
+      icon: '📋',
+      label: 'House Insights',
       action: onHouseAnalysis,
-      description: 'Detailed house analysis'
+      description: 'Reading, factors, Ashtakavarga & more'
     },
-    {
-      icon: '🌟',
-      label: 'Significations',
-      action: onHouseSignifications,
-      description: 'What this house represents'
-    },
-
   ];
 
   const handleItemClick = (action) => {

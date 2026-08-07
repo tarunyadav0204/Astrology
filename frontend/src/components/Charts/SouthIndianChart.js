@@ -4,15 +4,22 @@ import { CHART_CONFIG } from '../../config/dashboard.config';
 import { apiService } from '../../services/apiService';
 import HouseContextMenu from './HouseContextMenu';
 import HouseAnalysisModal from './HouseAnalysisModal';
+import HouseInsightPopup from './HouseInsightPopup';
+import ChartOverlayActions from './ChartOverlayActions';
+import { resolveChartId } from '../../utils/chartIds';
 
 const SouthIndianChart = ({
   chartData,
   birthData,
+  chartType = 'lagna',
+  division,
   showDegreeNakshatra = true,
   chartRefHighlight = null,
   showFooterHint = true,
+  deskMode = false,
 }) => {
   const { signs, planets } = CHART_CONFIG;
+  const chartId = resolveChartId(chartType, division);
   const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, text: '' });
   const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, planet: null, rashi: null, type: null });
   const [houseContextMenu, setHouseContextMenu] = useState({ show: false, x: 0, y: 0, houseNumber: null, signName: null });
@@ -22,10 +29,15 @@ const SouthIndianChart = ({
   const [customAscendant, setCustomAscendant] = useState(null);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [houseAnalysisModal, setHouseAnalysisModal] = useState({ show: false, houseNumber: null, signName: null });
-  const [houseSignificationsModal, setHouseSignificationsModal] = useState({ show: false, houseNumber: null, signName: null });
   const [aspectsHighlight, setAspectsHighlight] = useState({ show: false, houseNumber: null });
   const [houseStrengthModal, setHouseStrengthModal] = useState({ show: false, houseNumber: null, signName: null });
   const [chartRefHighlightState, setChartRefHighlightState] = useState(null);
+  const [houseInsight, setHouseInsight] = useState({
+    show: false,
+    houseNumber: null,
+    signName: null,
+    rashiIndex: null,
+  });
   
   // Handle chart reference highlighting from chat
   useEffect(() => {
@@ -232,20 +244,36 @@ const SouthIndianChart = ({
     });
   };
 
+  const openHouseInsight = (rashiIndex, houseNumber) => {
+    const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+    setHouseContextMenu({ show: false, x: 0, y: 0, houseNumber: null, signName: null });
+    setHouseInsight({
+      show: true,
+      houseNumber,
+      signName: rashiNames[rashiIndex],
+      rashiIndex,
+    });
+  };
+
   const handleRashiClick = (e, rashiIndex, houseNumber) => {
     e.stopPropagation();
     if (e.type === 'contextmenu') {
       e.preventDefault();
     }
     const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
-    
+
+    if (e.type === 'click' || e.type === 'touchstart') {
+      e.preventDefault();
+      openHouseInsight(rashiIndex, houseNumber);
+      return;
+    }
+
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    
     const isMobile = window.innerWidth <= 768;
     const relativeX = Math.min(clientX, window.innerWidth - 220);
     const relativeY = isMobile ? Math.max(200, clientY) : Math.max(50, clientY);
-    
+
     setHouseContextMenu({
       show: true,
       x: relativeX,
@@ -344,25 +372,39 @@ const SouthIndianChart = ({
   };
 
   const handleHouseAnalysis = (houseNumber, signName) => {
-    setHouseAnalysisModal({ show: true, houseNumber, signName });
-  };
-
-  const handleHouseSignifications = (houseNumber, signName) => {
-    setHouseSignificationsModal({ show: true, houseNumber, signName });
+    const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+    const rashiIndex = rashiNames.indexOf(signName);
+    openHouseInsight(rashiIndex >= 0 ? rashiIndex : 0, houseNumber);
   };
 
   const handleHouseStrength = (houseNumber, signName) => {
     setHouseStrengthModal({ show: true, houseNumber, signName });
   };
 
+  const getNakshatraPada = (longitude) => {
+    const lon = ((longitude % 360) + 360) % 360;
+    return Math.floor((lon % 13.333333) / 3.333333) + 1;
+  };
+
   const getPlanetsInSign = (signIndex) => {
     if (!chartData.planets || signIndex === -1) return [];
     
     const planetsInSign = [];
+    const useHousePlacement = Object.values(chartData.planets).some(
+      (data) => data && typeof data.house === 'number'
+    );
     
     // Add regular planets (exclude InduLagna as it's handled separately)
     Object.entries(chartData.planets)
-      .filter(([name, data]) => data.sign === signIndex && name !== 'InduLagna')
+      .filter(([name, data]) => {
+        if (!data || name === 'InduLagna') return false;
+        if (useHousePlacement && typeof data.house === 'number') {
+          // Place in the South-Indian sign cell of this Placidus house's cusp
+          const cuspSign = chartData.houses?.[data.house - 1]?.sign;
+          return cuspSign === signIndex;
+        }
+        return data.sign === signIndex;
+      })
       .forEach(([name, data]) => {
         const planetNames = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Gulika', 'Mandi'];
         const planetIndex = planetNames.indexOf(name);
@@ -372,20 +414,33 @@ const SouthIndianChart = ({
           degree: data.degree ? data.degree.toFixed(2) : '0.00',
           nakshatra: getNakshatra(data.longitude),
           shortNakshatra: getShortNakshatra(data.longitude),
-          formattedDegree: formatDegreeDMS(data.degree || 0)
+          formattedDegree: formatDegreeDMS(data.degree || 0),
+          retrograde: !!data.retrograde,
+          pada: getNakshatraPada(data.longitude || 0),
         });
       });
     
     // Add InduLagna if it's in this sign
-    if (chartData.planets?.InduLagna && chartData.planets.InduLagna.sign === signIndex) {
-      planetsInSign.push({
-        symbol: 'IL',
-        name: 'InduLagna',
-        degree: chartData.planets.InduLagna.degree ? chartData.planets.InduLagna.degree.toFixed(2) : '0.00',
-        nakshatra: getNakshatra(chartData.planets.InduLagna.longitude || 0),
-        shortNakshatra: getShortNakshatra(chartData.planets.InduLagna.longitude || 0),
-        formattedDegree: formatDegreeDMS(chartData.planets.InduLagna.degree || 0)
-      });
+    if (chartData.planets?.InduLagna) {
+      const indu = chartData.planets.InduLagna;
+      let induHere = false;
+      if (useHousePlacement && typeof indu.house === 'number') {
+        induHere = chartData.houses?.[indu.house - 1]?.sign === signIndex;
+      } else {
+        induHere = indu.sign === signIndex;
+      }
+      if (induHere) {
+        planetsInSign.push({
+          symbol: 'IL',
+          name: 'InduLagna',
+          degree: indu.degree ? indu.degree.toFixed(2) : '0.00',
+          nakshatra: getNakshatra(indu.longitude || 0),
+          shortNakshatra: getShortNakshatra(indu.longitude || 0),
+          formattedDegree: formatDegreeDMS(indu.degree || 0),
+          retrograde: !!indu.retrograde,
+          pada: getNakshatraPada(indu.longitude || 0),
+        });
+      }
     }
     
     return planetsInSign;
@@ -399,61 +454,25 @@ const SouthIndianChart = ({
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      {(highlightedPlanet || customAscendant !== null || aspectsHighlight.show) && (
-        <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 10, display: 'flex', gap: '4px' }}>
-          {highlightedPlanet && (
-            <button
-              onClick={clearHighlight}
-              style={{
-                padding: '4px 8px',
-                fontSize: '12px',
-                background: '#e91e63',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Clear
-            </button>
-          )}
-          {customAscendant !== null && (
-            <button
-              onClick={resetAscendant}
-              style={{
-                padding: '4px 8px',
-                fontSize: '12px',
-                background: '#ff6f00',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Reset
-            </button>
-          )}
-          {aspectsHighlight.show && (
-            <button
-              onClick={() => setAspectsHighlight({ show: false, houseNumber: null })}
-              style={{
-                padding: '4px 8px',
-                fontSize: '12px',
-                background: '#2196f3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Clear Aspects
-            </button>
-          )}
-        </div>
-      )}
+      <ChartOverlayActions
+        deskMode={deskMode}
+        highlightedPlanet={highlightedPlanet}
+        onClearHighlight={clearHighlight}
+        customAscendant={customAscendant}
+        onResetAscendant={resetAscendant}
+        aspectsHighlight={aspectsHighlight}
+        onClearAspects={() => setAspectsHighlight({ show: false, houseNumber: null })}
+      />
       <svg 
-        viewBox="0 0 340 360"
-        style={{ 
+        viewBox={deskMode || !showFooterHint ? '0 0 340 340' : '0 0 340 360'}
+        style={deskMode ? {
+          width: '100%',
+          height: '100%',
+          minHeight: 0,
+          maxWidth: '100%',
+          maxHeight: '100%',
+          display: 'block',
+        } : { 
           width: '100%', 
           height: window.innerWidth <= 768 ? 'auto' : '100%',
           minHeight: window.innerWidth <= 768 ? '380px' : '320px',
@@ -501,7 +520,7 @@ const SouthIndianChart = ({
       {/* Instruction text */}
       {showFooterHint ? (
         <text x="170" y="350" fontSize="9" fill="#666" textAnchor="middle" fontStyle="italic">
-          Hover or touch planets to see Nakshatra and degree
+          Click any house for insights · Hover planets for degree
         </text>
       ) : null}
       
@@ -514,17 +533,31 @@ const SouthIndianChart = ({
           <g key={index}>
             {pos.sign !== -1 && (
               <>
+                {/* Full-cell hit area */}
+                <rect
+                  x={pos.x}
+                  y={pos.y}
+                  width={pos.width}
+                  height={pos.height}
+                  fill="transparent"
+                  style={{ cursor: 'pointer' }}
+                  onClick={(e) => handleRashiClick(e, pos.sign, houseNumber)}
+                  onContextMenu={(e) => handleRashiClick(e, pos.sign, houseNumber)}
+                />
+
                 {/* Chart reference highlighting from chat */}
                 {chartRefHighlightState?.type === 'house' && parseInt(chartRefHighlightState.value) === houseNumber && (
                   <rect x={pos.x + 2} y={pos.y + 2} width={pos.width - 4} height={pos.height - 4}
-                        fill="rgba(76, 175, 80, 0.3)" stroke="#4caf50" strokeWidth="3" strokeDasharray="6,3">
+                        fill="rgba(76, 175, 80, 0.3)" stroke="#4caf50" strokeWidth="3" strokeDasharray="6,3"
+                        style={{ pointerEvents: 'none' }}>
                     <animate attributeName="opacity" values="0.8;0.4;0.8" dur="2s" repeatCount="indefinite"/>
                   </rect>
                 )}
                 
                 {chartRefHighlightState?.type === 'sign' && pos.sign === parseInt(chartRefHighlightState.value) - 1 && (
                   <rect x={pos.x + 2} y={pos.y + 2} width={pos.width - 4} height={pos.height - 4}
-                        fill="rgba(156, 39, 176, 0.3)" stroke="#9c27b0" strokeWidth="3" strokeDasharray="4,2">
+                        fill="rgba(156, 39, 176, 0.3)" stroke="#9c27b0" strokeWidth="3" strokeDasharray="4,2"
+                        style={{ pointerEvents: 'none' }}>
                     <animate attributeName="opacity" values="0.7;0.3;0.7" dur="1.8s" repeatCount="indefinite"/>
                   </rect>
                 )}
@@ -533,24 +566,13 @@ const SouthIndianChart = ({
                       fontSize="12" 
                       fill={customAscendant === pos.sign ? "#e91e63" : "#333"} 
                       fontWeight={customAscendant === pos.sign ? "900" : "bold"}
-                      style={{ cursor: 'pointer' }}
-                      onContextMenu={(e) => handleRashiClick(e, pos.sign, houseNumber)}
-                      onClick={(e) => {
-                        if (window.innerWidth <= 768) {
-                          handleRashiClick(e, pos.sign, houseNumber);
-                        }
-                      }}
-                      onTouchStart={(e) => {
-                        if (window.innerWidth <= 768) {
-                          handleRashiClick(e, pos.sign, houseNumber);
-                        }
-                      }}>
+                      style={{ pointerEvents: 'none' }}>
                   {houseNumber}
                 </text>
                 
                 {/* Ascendant marker for house 1 */}
                 {houseNumber === 1 && (
-                  <g>
+                  <g style={{ pointerEvents: 'none' }}>
                     <text x={pos.x + pos.width - 8} y={pos.y + pos.height - 20} 
                           fontSize="9" fill="#e91e63" fontWeight="900" textAnchor="end">
                       ASC
@@ -567,7 +589,8 @@ const SouthIndianChart = ({
                 {/* Sign name */}
                 <text x={pos.x + pos.width - 8} y={pos.y + 18} 
                       fontSize="10" fill="#666"
-                      textAnchor="end">
+                      textAnchor="end"
+                      style={{ pointerEvents: 'none' }}>
                   {signs[pos.sign]}
                 </text>
                 
@@ -597,7 +620,8 @@ const SouthIndianChart = ({
                                 fill="none" 
                                 stroke={aspectingPlanet.isPositive ? '#4caf50' : '#f44336'} 
                                 strokeWidth="1.5" 
-                                strokeDasharray="2,1"/>
+                                strokeDasharray="2,1"
+                                style={{ pointerEvents: 'none' }}/>
                       )}
                       
                       {/* Chart reference planet highlighting */}
@@ -607,7 +631,8 @@ const SouthIndianChart = ({
                                 fill="rgba(255, 107, 53, 0.4)" 
                                 stroke="#ff6b35" 
                                 strokeWidth="2" 
-                                strokeDasharray="3,1">
+                                strokeDasharray="3,1"
+                                style={{ pointerEvents: 'none' }}>
                           <animate attributeName="r" values="10;15;10" dur="1.5s" repeatCount="indefinite"/>
                           <animate attributeName="opacity" values="0.8;0.3;0.8" dur="1.5s" repeatCount="indefinite"/>
                         </circle>
@@ -629,22 +654,16 @@ const SouthIndianChart = ({
                             const offsetY = fontSize + 2;
                             setTooltip({ show: true, x: planetX + offsetX, y: planetY - offsetY, text: tooltipText });
                           }}
-                          onMouseLeave={(e) => {
+                          onMouseLeave={() => {
                             if (isTouchDevice) return;
                             setTooltip({ show: false, x: 0, y: 0, text: '' });
                           }}
+                          onClick={(e) => handleRashiClick(e, pos.sign, houseNumber)}
                           onTouchStart={(e) => {
                             setIsTouchDevice(true);
-                            const tooltipText = `${planet.name}: ${formatDegreeDMS(parseFloat(planet.degree))} in ${planet.nakshatra}`;
-                            const rect = e.currentTarget.closest('svg').getBoundingClientRect();
-                            const isRightSide = pos.x >= 150;
-                            const offsetX = isRightSide ? -120 : 10;
-                            const fontSize = totalPlanets > 4 ? 7 : totalPlanets > 2 ? 9 : totalPlanets > 1 ? 10 : 13;
-                            const offsetY = fontSize + 2;
-                            setTooltip({ show: true, x: e.touches[0].clientX - rect.left + offsetX, y: e.touches[0].clientY - rect.top - offsetY, text: tooltipText });
-                            setTimeout(() => setTooltip({ show: false, x: 0, y: 0, text: '' }), 2000);
+                            handleRashiClick(e, pos.sign, houseNumber);
                           }}
-                          onContextMenu={(e) => handlePlanetRightClick(e, planet)}>
+                          onContextMenu={(e) => handleRashiClick(e, pos.sign, houseNumber)}>
                         {getPlanetSymbolWithStatus(planet)}
                       </text>
                       {/* Degree and Nakshatra combined */}
@@ -656,7 +675,8 @@ const SouthIndianChart = ({
                               fontWeight="500"
                               textAnchor="middle"
                               style={{ cursor: 'pointer' }}
-                            onContextMenu={(e) => handlePlanetRightClick(e, planet)}>
+                            onClick={(e) => handleRashiClick(e, pos.sign, houseNumber)}
+                            onContextMenu={(e) => handleRashiClick(e, pos.sign, houseNumber)}>
                           {planet.formattedDegree} {planet.shortNakshatra}
                         </text>
                       )}
@@ -700,7 +720,6 @@ const SouthIndianChart = ({
         onMakeAscendant={handleMakeAscendant}
         onShowAspects={handleShowAspects}
         onHouseAnalysis={handleHouseAnalysis}
-        onHouseSignifications={handleHouseSignifications}
         onHouseStrength={handleHouseStrength}
       />
       
@@ -780,37 +799,22 @@ const SouthIndianChart = ({
         }}
       />
 
-      {/* House Significations Modal */}
-      {houseSignificationsModal.show && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 10000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }} onClick={() => setHouseSignificationsModal({ show: false, houseNumber: null, signName: null })}>
-          <div style={{
-            backgroundColor: 'white', borderRadius: '12px', padding: '20px',
-            maxWidth: '500px', width: '90%', maxHeight: '80vh', overflow: 'auto'
-          }} onClick={e => e.stopPropagation()}>
-            <h3>House {houseSignificationsModal.houseNumber} Significations ({houseSignificationsModal.signName})</h3>
-            <p>{{
-              1: "Self, personality, appearance, health, vitality, general well-being",
-              2: "Wealth, family, speech, food, values, accumulated resources",
-              3: "Siblings, courage, communication, short journeys, skills",
-              4: "Mother, home, property, education, happiness, emotional foundation",
-              5: "Children, creativity, intelligence, romance, speculation",
-              6: "Enemies, diseases, debts, service, obstacles, daily work",
-              7: "Spouse, partnerships, business, public relations, marriage",
-              8: "Longevity, transformation, occult, inheritance, sudden events",
-              9: "Father, guru, dharma, fortune, higher learning, spirituality",
-              10: "Career, reputation, authority, social status, achievements",
-              11: "Gains, friends, elder siblings, aspirations, income",
-              12: "Losses, expenses, foreign lands, spirituality, liberation"
-            }[houseSignificationsModal.houseNumber]}</p>
-            <button onClick={() => setHouseSignificationsModal({ show: false, houseNumber: null, signName: null })} 
-                    style={{ marginTop: '15px', padding: '8px 16px', backgroundColor: '#e91e63', color: 'white', border: 'none', borderRadius: '6px' }}>Close</button>
-          </div>
-        </div>
-      )}
+      <HouseInsightPopup
+        isOpen={houseInsight.show}
+        onClose={() => setHouseInsight({ show: false, houseNumber: null, signName: null, rashiIndex: null })}
+        houseNumber={houseInsight.houseNumber}
+        signName={houseInsight.signName}
+        rashiIndex={houseInsight.rashiIndex}
+        chartData={chartData}
+        birthData={birthData}
+        chartId={chartId}
+        planetsInHouse={
+          houseInsight.rashiIndex != null
+            ? getPlanetsInSign(houseInsight.rashiIndex)
+            : []
+        }
+        onMakeAscendant={handleMakeAscendant}
+      />
 
       {/* House Strength Modal */}
       {houseStrengthModal.show && (

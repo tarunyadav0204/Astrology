@@ -66,6 +66,9 @@ function FullHamburgerMenuItems({
     <div className="mobile-menu-section-label">Birth Chart</div>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { onBirthChartAction('create'); onClose(); }}>✨ Create birth chart</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { onBirthChartAction('select'); onClose(); }}>👤 Select birth chart</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas'); onClose(); }}>📊 Charts & dashas</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas/kp'); onClose(); }}>🪐 KP Desk</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas/activations'); onClose(); }}>✦ What’s activated</button>
 
     <div className="mobile-menu-section-label">Your Life</div>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/career-guidance'); onClose(); }}>💼 Your Career</button>
@@ -186,9 +189,10 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
   const openDropdown = (dropdownName, event) => {
     clearDropdownCloseTimer();
     const rect = event.currentTarget.getBoundingClientRect();
+    // position:fixed uses viewport coords — do not add scrollY or the menu jumps down when scrolled.
     setDropdownPosition({
-      top: rect.bottom + window.scrollY,
-      left: rect.left
+      top: rect.bottom + 4,
+      left: rect.left,
     });
     setActiveDropdown(dropdownName);
   };
@@ -362,6 +366,9 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
           >
             <button type="button" onClick={() => { applyBirthChartIntent('create'); setActiveDropdown(null); }}>✨ Create birth chart</button>
             <button type="button" onClick={() => { applyBirthChartIntent('select'); setActiveDropdown(null); }}>👤 Select birth chart</button>
+            <button type="button" onClick={() => { navigate('/charts-dashas'); setActiveDropdown(null); }}>📊 Charts & dashas</button>
+            <button type="button" onClick={() => { navigate('/charts-dashas/kp'); setActiveDropdown(null); }}>🪐 KP Desk</button>
+            <button type="button" onClick={() => { navigate('/charts-dashas/activations'); setActiveDropdown(null); }}>✦ What’s activated</button>
           </div>
         )}
 
@@ -596,6 +603,9 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
         >
           <button type="button" onClick={() => { applyBirthChartIntent('create'); setActiveDropdown(null); }}>✨ Create birth chart</button>
           <button type="button" onClick={() => { applyBirthChartIntent('select'); setActiveDropdown(null); }}>👤 Select birth chart</button>
+          <button type="button" onClick={() => { navigate('/charts-dashas'); setActiveDropdown(null); }}>📊 Charts & dashas</button>
+          <button type="button" onClick={() => { navigate('/charts-dashas/kp'); setActiveDropdown(null); }}>🪐 KP Desk</button>
+          <button type="button" onClick={() => { navigate('/charts-dashas/activations'); setActiveDropdown(null); }}>✦ What’s activated</button>
         </div>
       )}
 

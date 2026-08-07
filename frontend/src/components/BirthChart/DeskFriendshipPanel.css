@@ -1,0 +1,153 @@
+.desk-friend {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  background: #fffcf8;
+  gap: 0;
+}
+
+.desk-friend--status {
+  display: grid;
+  place-items: center;
+  color: #6b5c54;
+  font-size: 0.72rem;
+  padding: 0.75rem;
+}
+
+.desk-friend__modes {
+  display: flex;
+  gap: 0.15rem;
+  padding: 0.3rem 0.35rem;
+  border-bottom: 1px solid rgba(70, 45, 35, 0.1);
+  background: #f8f2eb;
+}
+
+.desk-friend__modes button {
+  border: 1px solid transparent;
+  background: transparent;
+  color: #6b5c54;
+  border-radius: 5px;
+  min-height: 22px;
+  padding: 0 0.45rem;
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.desk-friend__modes button.is-active {
+  background: #fff;
+  border-color: rgba(159, 18, 57, 0.28);
+  color: #9f1239;
+  box-shadow: 0 1px 3px rgba(40, 20, 10, 0.08);
+}
+
+.desk-friend__scroll {
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.desk-friend__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.desk-friend__table th,
+.desk-friend__table td {
+  padding: 0.28rem 0.2rem;
+  text-align: center;
+  border-bottom: 1px solid rgba(70, 45, 35, 0.08);
+  border-right: 1px solid rgba(70, 45, 35, 0.05);
+  white-space: nowrap;
+}
+
+.desk-friend__table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f3ebe3;
+  color: #6b5c54;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  font-size: 0.58rem;
+  text-transform: uppercase;
+}
+
+.desk-friend__corner {
+  min-width: 1.6rem;
+}
+
+.desk-friend__table tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+  color: #1f1714;
+  font-weight: 800;
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.desk-friend__cell {
+  font-weight: 750;
+}
+
+.desk-friend__cell--bf {
+  background: rgba(61, 107, 79, 0.14);
+  color: #3d6b4f;
+}
+
+.desk-friend__cell--f {
+  background: rgba(61, 107, 79, 0.08);
+  color: #3d6b4f;
+}
+
+.desk-friend__cell--n {
+  background: rgba(138, 106, 40, 0.1);
+  color: #8a6a28;
+}
+
+.desk-friend__cell--e {
+  background: rgba(138, 58, 58, 0.08);
+  color: #8a3a3a;
+}
+
+.desk-friend__cell--ge {
+  background: rgba(138, 58, 58, 0.16);
+  color: #7f1d1d;
+}
+
+.desk-friend__cell--self {
+  background: rgba(70, 45, 35, 0.04);
+  color: #6b5c54;
+}
+
+.desk-friend__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.35rem 0.4rem 0.2rem;
+  border-top: 1px solid rgba(70, 45, 35, 0.1);
+  background: #f8f2eb;
+  font-size: 0.55rem;
+  font-weight: 700;
+}
+
+.desk-friend__legend span {
+  padding: 0.12rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid rgba(70, 45, 35, 0.1);
+}
+
+.desk-friend__note {
+  margin: 0;
+  padding: 0.15rem 0.45rem 0.35rem;
+  font-size: 0.55rem;
+  color: #6b5c54;
+  background: #f8f2eb;
+}

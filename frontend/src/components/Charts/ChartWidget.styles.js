@@ -16,6 +16,16 @@ export const WidgetContainer = styled.div`
       box-shadow: none;
       background: #fff;
     `}
+
+  ${({ $deskMode }) =>
+    $deskMode &&
+    css`
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      background: transparent;
+      min-height: 0;
+    `}
   
   @media (max-width: 768px) {
     min-height: 350px;
@@ -161,6 +171,16 @@ export const ChartContainer = styled.div`
       background: #fff;
       padding: 0.15rem 0.2rem 0.35rem;
     `}
+
+  ${({ $deskMode }) =>
+    $deskMode &&
+    css`
+      border-radius: 0;
+      background: transparent;
+      padding: 0;
+      min-height: 0;
+      overflow: hidden;
+    `}
   
   svg {
     width: 100%;
@@ -168,6 +188,18 @@ export const ChartContainer = styled.div`
     max-width: 100%;
     max-height: 100%;
     min-height: 300px;
+
+    ${({ $deskMode }) =>
+      $deskMode &&
+      css`
+        min-height: 0 !important;
+        width: auto !important;
+        height: auto !important;
+        max-width: 100%;
+        max-height: 100%;
+        aspect-ratio: 1;
+        flex: 0 1 auto;
+      `}
   }
   
   @media (max-width: 768px) {

@@ -118,6 +118,7 @@ const BirthFormModal = lazy(() => import('./components/BirthForm/BirthFormModal'
 const BirthChartCreationPage = lazy(() => import('./components/BirthChart/BirthChartCreationPage'));
 const ChartsDashasWorkspacePage = lazy(() => import('./components/BirthChart/ChartsDashasWorkspacePage'));
 const ActivationExplorerPage = lazy(() => import('./components/BirthChart/ActivationExplorerPage'));
+const KPDeskPage = lazy(() => import('./components/KP/KPDeskPage'));
 const Dashboard = lazy(() => import('./components/Dashboard/Dashboard'));
 const PredictionsPage = lazy(() => import('./components/PredictionsPage/PredictionsPage'));
 const PanchangPage = lazy(() => import('./components/Panchang/PanchangPage'));
@@ -160,7 +161,12 @@ const BlogDashboard = lazy(() => import('./components/Blog/BlogDashboard'));
 function FloatingChatButtonUnlessOnChatPage({ user, onRequireLogin }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  if (pathname === '/chat' || pathname === '/speech-chat' || pathname.startsWith('/tools/')) return null;
+  if (
+    pathname === '/chat'
+    || pathname === '/speech-chat'
+    || pathname.startsWith('/tools/')
+    || pathname.startsWith('/charts-dashas')
+  ) return null;
   const handleOpenChat = () => {
     if (user) {
       navigate('/chat?app=1');
@@ -695,6 +701,27 @@ function App() {
                   authView={authView}
                   setAuthView={setAuthView}
                   description="Sign in to inspect the deterministic activation ledger for your saved birth chart."
+                  onAuthenticated={handleLogin}
+                />
+              </>
+            } />
+            <Route path="/charts-dashas/kp" element={
+              <>
+                <KPDeskPage
+                  user={user}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                />
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to open the KP desk for your saved birth chart."
                   onAuthenticated={handleLogin}
                 />
               </>

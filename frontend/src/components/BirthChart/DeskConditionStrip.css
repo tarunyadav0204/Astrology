@@ -1,0 +1,90 @@
+.desk-cond--strip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  flex: 1 1 100%;
+  border-top: 1px solid rgba(70, 45, 35, 0.14);
+  padding-top: 0.3rem;
+  margin-top: 0.05rem;
+}
+
+.desk-cond__label {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b5c54;
+}
+
+.desk-cond__chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.28rem;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.desk-cond__chips::-webkit-scrollbar {
+  display: none;
+}
+
+.desk-cond__chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28rem;
+  flex-shrink: 0;
+  padding: 0.12rem 0.4rem;
+  border-radius: 5px;
+  border: 1px solid rgba(70, 45, 35, 0.12);
+  background: #fff;
+  white-space: nowrap;
+}
+
+.desk-cond__chip em {
+  font-style: normal;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #6b5c54;
+}
+
+.desk-cond__chip strong {
+  font-size: 0.66rem;
+  font-weight: 750;
+  color: #1f1714;
+}
+
+.desk-cond__chip--warn {
+  border-color: rgba(138, 58, 58, 0.28);
+  background: rgba(138, 58, 58, 0.06);
+}
+
+.desk-cond__chip--warn strong {
+  color: #8a3a3a;
+}
+
+.desk-cond__chip--good {
+  border-color: rgba(61, 107, 79, 0.28);
+  background: rgba(61, 107, 79, 0.08);
+}
+
+.desk-cond__chip--good strong {
+  color: #3d6b4f;
+}
+
+.desk-cond__chip--war {
+  border-color: rgba(180, 83, 9, 0.35);
+  background: rgba(180, 83, 9, 0.08);
+}
+
+.desk-cond__chip--war strong {
+  color: #b45309;
+}
+
+.desk-cond--empty {
+  opacity: 0.45;
+}
