@@ -31,7 +31,7 @@
 
 .pdm__back,
 .pdm__link,
-.pdm__native,
+.pdm__change-native,
 .pdm__hub button,
 .pdm__pills button,
 .pdm__dx-scroll button,
@@ -72,6 +72,7 @@
 }
 
 .pdm__native {
+  display: block;
   align-self: start;
   max-width: 100%;
   overflow: hidden;
@@ -80,7 +81,31 @@
   font-size: 0.62rem;
   font-weight: 700;
   color: var(--pdm-muted);
-  padding: 0;
+}
+
+.pdm__change-native {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 0.55rem;
+  border-color: var(--pdm-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--pdm-ink);
+  font-size: 0.7rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(40, 20, 10, 0.04);
+}
+
+@media (max-width: 390px) {
+  .pdm__change-native {
+    padding-inline: 0.42rem;
+    font-size: 0.65rem;
+  }
+
+  .pdm__native {
+    max-width: 6rem;
+  }
 }
 
 .pdm__hub {
@@ -167,6 +192,14 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.pdm__pills--charts {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.3rem;
+  overflow: visible;
+  padding-bottom: 0.55rem;
+}
+
 .pdm__pills button,
 .pdm__more-tabs button,
 .pdm__dx-scroll button {
@@ -178,6 +211,12 @@
   font-size: 0.7rem;
   font-weight: 800;
   color: var(--pdm-muted);
+}
+
+.pdm__pills--charts button {
+  min-width: 0;
+  width: 100%;
+  padding: 0.34rem 0.15rem;
 }
 
 .pdm__pills button.is-active,

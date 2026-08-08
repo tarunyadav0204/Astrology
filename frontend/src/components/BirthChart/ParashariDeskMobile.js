@@ -24,13 +24,6 @@ const HUB_TABS = [
   { id: 'more', label: 'More' },
 ];
 
-const CHART_PILLS = [
-  { id: 'lagna', label: 'D1', title: 'Lagna' },
-  { id: 'navamsa', label: 'D9', title: 'Navamsa' },
-  { id: 'divisional', label: 'Dx', title: 'Divisional' },
-  { id: 'transit', label: 'Tr', title: 'Transit' },
-];
-
 const MORE_TABS = [
   { id: 'house', label: 'House' },
   { id: 'positions', label: 'Pos' },
@@ -101,10 +94,29 @@ export default function ParashariDeskMobile({
   const navigate = useNavigate();
   const [hubTab, setHubTab] = useState('chart');
   const [chartPill, setChartPill] = useState('lagna');
-  const [metaOpen, setMetaOpen] = useState(false);
+  const [metaOpen, setMetaOpen] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const showAsOf = hubTab === 'chart' || hubTab === 'dasha' || hubTab === 'act';
+
+  const mobileChartOptions = useMemo(() => {
+    const divisionals = (divisionalOptions || []).map((option) => ({
+      ...option,
+      id: `division-${option.value}`,
+      mode: option.value === 9 ? 'navamsa' : 'divisional',
+    }));
+    const jaimini = (jaiminiOptions || []).map((option) => ({
+      ...option,
+      id: `division-${option.value}`,
+      mode: 'divisional',
+    }));
+    return [
+      { id: 'lagna', shortLabel: 'D1', label: 'Lagna', mode: 'lagna' },
+      ...divisionals,
+      ...jaimini,
+      { id: 'transit', shortLabel: 'Tr', label: 'Transit', mode: 'transit' },
+    ];
+  }, [divisionalOptions, jaiminiOptions]);
 
   const activeChart = useMemo(() => {
     if (chartPill === 'lagna') {
@@ -160,10 +172,11 @@ export default function ParashariDeskMobile({
           <button type="button" className="pdm__back" onClick={() => navigate('/')}>←</button>
           <div className="pdm__brand-wrap">
             <strong className="pdm__brand">Parashari</strong>
-            <button type="button" className="pdm__native" onClick={onChangeNative}>
-              {birthData?.name || 'Native'}
-            </button>
+            <span className="pdm__native">{birthData?.name || 'Native'}</span>
           </div>
+          <button type="button" className="pdm__change-native" onClick={onChangeNative}>
+            Change native
+          </button>
           <button type="button" className="pdm__link" onClick={() => navigate('/charts-dashas/kp')}>KP</button>
           <button type="button" className="pdm__link" onClick={() => navigate('/charts-dashas/nadi')}>Nadi</button>
         </div>
@@ -197,51 +210,29 @@ export default function ParashariDeskMobile({
       <div className="pdm__body">
         {hubTab === 'chart' ? (
           <section className="pdm__pane pdm__pane--chart">
-            <div className="pdm__pills" role="tablist" aria-label="Chart type">
-              {CHART_PILLS.map((pill) => (
+            <div className="pdm__pills pdm__pills--charts" role="tablist" aria-label="Chart type">
+              {mobileChartOptions.map((pill) => {
+                const isActive = pill.mode === 'divisional'
+                  ? chartPill === 'divisional' && selectedDx === pill.value
+                  : chartPill === pill.mode;
+                return (
                 <button
                   key={pill.id}
                   type="button"
                   role="tab"
-                  title={pill.title}
-                  aria-selected={chartPill === pill.id}
-                  className={chartPill === pill.id ? 'is-active' : ''}
-                  onClick={() => setChartPill(pill.id)}
+                  title={pill.label}
+                  aria-selected={isActive}
+                  className={isActive ? 'is-active' : ''}
+                  onClick={() => {
+                    if (pill.value != null) onSelectedDxChange?.(pill.value);
+                    setChartPill(pill.mode);
+                  }}
                 >
-                  {pill.id === 'divisional'
-                    ? (selectedDivisionalChart?.shortLabel || 'Dx')
-                    : pill.label}
+                  {pill.shortLabel}
                 </button>
-              ))}
+                );
+              })}
             </div>
-
-            {chartPill === 'divisional' ? (
-              <div className="pdm__dx-scroll" aria-label="Divisional charts">
-                {(divisionalOptions || []).map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={selectedDx === option.value ? 'is-active' : ''}
-                    onClick={() => onSelectedDxChange?.(option.value)}
-                    title={option.label}
-                  >
-                    {option.shortLabel}
-                  </button>
-                ))}
-                <span className="pdm__dx-sep" aria-hidden />
-                {(jaiminiOptions || []).map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={selectedDx === option.value ? 'is-active' : ''}
-                    onClick={() => onSelectedDxChange?.(option.value)}
-                    title={option.label}
-                  >
-                    {option.shortLabel}
-                  </button>
-                ))}
-              </div>
-            ) : null}
 
             <div className="pdm__chart">
               <ChartWidget
@@ -311,7 +302,7 @@ export default function ParashariDeskMobile({
               error={activationError}
               asOfDate={asOfDate}
               onJumpToDate={onAsOfChange}
-              layout="focus"
+              layout="mobile"
               onOpenFull={() => navigate(`/charts-dashas/activations?asOf=${formatAsOfIso(asOfDate)}`)}
             />
           </section>

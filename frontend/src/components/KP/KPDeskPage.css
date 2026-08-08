@@ -48,6 +48,11 @@
   min-width: 0;
 }
 
+.kp-desk-mobile-hub,
+.kp-desk-mobile-pills {
+  display: none;
+}
+
 .kp-desk-bar__center {
   flex: 1 1 auto;
   justify-content: center;
@@ -805,12 +810,222 @@
 }
 
 @media (max-width: 760px) {
+  .kp-desk {
+    display: block;
+    height: auto;
+    min-height: 100dvh;
+    max-height: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: #f3ebe3;
+  }
+
   .kp-desk-bar {
-    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.45rem;
+    row-gap: 0.6rem;
+    padding: max(0.65rem, env(safe-area-inset-top)) 0.7rem 0.65rem;
+    background: rgba(255, 252, 248, 0.96);
+    backdrop-filter: blur(8px);
+  }
+
+  .kp-desk-bar__left,
+  .kp-desk-bar__right {
+    order: 1;
+  }
+
+  .kp-desk-bar__left {
+    gap: 0.4rem;
+  }
+
+  .kp-desk-bar__brand {
+    color: var(--kp-accent);
+    font-size: 0.88rem;
+  }
+
+  .kp-desk-bar__back {
+    min-height: 26px;
+    padding: 0 0.3rem;
+  }
+
+  .kp-desk-bar__left > .kp-desk-bar__back:nth-of-type(2),
+  .kp-desk-bar__center > .kp-desk-bar__now--ghost {
+    display: none;
+  }
+
+  .kp-desk-bar__center {
+    order: 3;
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+    padding-top: 0.05rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .kp-desk-bar__center > * {
+    flex: 0 0 auto;
+  }
+
+  .kp-desk-field > span {
+    display: none;
+  }
+
+  .kp-desk-field input[type="date"] {
+    width: 8rem;
+  }
+
+  .kp-desk-field input[type="time"] {
+    width: 5.3rem;
+  }
+
+  .kp-desk-bar__right button {
+    max-width: 7.5rem;
+    min-height: 26px;
+    white-space: nowrap;
+  }
+
+  .kp-desk-mobile-hub {
+    order: 2;
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.3rem;
+    margin-top: 0.05rem;
+  }
+
+  .kp-desk-mobile-hub button,
+  .kp-desk-mobile-pills button {
+    border: 1px solid var(--kp-line);
+    background: #fff;
+    color: var(--kp-muted);
+    border-radius: 8px;
+    min-height: 40px;
+    padding: 0.45rem 0.25rem;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 800;
+  }
+
+  .kp-desk-mobile-hub button.is-active,
+  .kp-desk-mobile-pills button.is-active {
+    color: var(--kp-accent);
+    background: var(--kp-accent-soft);
+    border-color: rgba(159, 18, 57, 0.3);
+  }
+
+  .kp-desk-rp {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    min-height: 42px;
+    margin: 0.65rem 0.7rem 0;
+    padding: 0.4rem 0.5rem;
+    border: 0;
+    border-radius: 11px;
+    scrollbar-width: none;
+  }
+
+  .kp-desk-rp::-webkit-scrollbar,
+  .kp-desk-bar__center::-webkit-scrollbar {
+    display: none;
+  }
+
+  .kp-desk-rp__group {
+    flex: 0 0 auto;
   }
 
   .kp-desk-grid {
-    grid-template-columns: 1fr;
+    display: block;
+    padding: 0.7rem 0.7rem 1.25rem;
+  }
+
+  .kp-desk-grid > .kp-desk-panel {
+    display: none;
+    min-height: 0;
+  }
+
+  .kp-desk-grid > .kp-desk-panel.is-mobile-active {
+    display: grid;
+  }
+
+  .kp-desk-mobile-pills {
+    display: flex;
+    gap: 0.35rem;
+    margin-bottom: 0.65rem;
+  }
+
+  .kp-desk-mobile-pills button {
+    border-radius: 999px;
+    padding: 0.28rem 0.65rem;
+  }
+
+  .kp-desk-panel--chart.is-mobile-active {
+    height: calc(100dvw - 1.4rem);
+    max-height: 440px;
+    border-color: rgba(70, 45, 35, 0.1);
+    border-radius: 12px;
+    background: #fffaf6;
+    box-shadow: 0 3px 14px rgba(65, 42, 32, 0.07);
+  }
+
+  .kp-desk-panel--chart .kp-desk-panel__head {
+    min-height: 34px;
+    padding: 0.38rem 0.6rem;
+    background: #fffaf6;
+  }
+
+  .kp-desk-panel--chart .kp-desk-panel__head h2 {
+    color: var(--kp-accent);
+    letter-spacing: 0.045em;
+  }
+
+  .kp-desk-panel--chart .kp-desk-chart {
+    padding: 0.35rem;
+  }
+
+  .kp-desk-panel--chart .kp-chart-container--desk {
+    padding: 0;
+  }
+
+  .kp-desk-panel--chart .kp-chart-desk-canvas {
+    padding: 0.15rem;
+  }
+
+  .kp-desk-panel--chart .kp-chart-desk-canvas svg > rect:first-of-type {
+    fill: #fffaf6;
+    stroke: #8f6b5b;
+    stroke-width: 2px;
+  }
+
+  .kp-desk-panel--chart .kp-chart-desk-canvas svg > polygon:first-of-type {
+    stroke: #aa725c;
+    stroke-width: 2px;
+  }
+
+  .kp-desk-panel--chart .kp-chart-desk-canvas svg > line {
+    stroke: #d3aa98;
+    stroke-width: 1.5px;
+  }
+
+  .kp-desk-panel--chart .kp-chart-desk-toggle {
+    top: 0.45rem;
+    right: 0.45rem;
+    min-width: 30px;
+    min-height: 28px;
+    border-radius: 7px;
+    background: rgba(255, 250, 246, 0.94);
+    color: var(--kp-accent);
+  }
+
+  .kp-desk-panel--planets.is-mobile-active,
+  .kp-desk-panel--cusps.is-mobile-active,
+  .kp-desk-panel--sigs.is-mobile-active {
+    min-height: calc(100dvh - 10.5rem);
   }
 
   .kp-desk-fruct {
@@ -818,6 +1033,6 @@
   }
 
   .kp-desk-bar__native {
-    max-width: 140px;
+    display: none;
   }
 }

@@ -151,6 +151,8 @@ function KPDeskPage({ user, onLogin }) {
   const [error, setError] = useState('');
   const [selectedPlanet, setSelectedPlanet] = useState('Moon');
   const [sigPanel, setSigPanel] = useState('house');
+  const [mobileTab, setMobileTab] = useState('chart');
+  const [mobileTable, setMobileTable] = useState('planets');
 
   const hasChart = Boolean(
     birthData?.date && birthData?.time && birthData?.latitude != null && birthData?.longitude != null
@@ -364,6 +366,18 @@ function KPDeskPage({ user, onLogin }) {
           <button type="button" onClick={() => (user ? setShowBirthModal(true) : onLogin?.())}>Change native</button>
           {!user ? <button type="button" className="kp-desk-bar__primary" onClick={onLogin}>Sign in</button> : null}
         </div>
+        <nav className="kp-desk-mobile-hub" role="tablist" aria-label="KP desk sections">
+          {[
+            ['chart', 'Chart'],
+            ['tables', 'Tables'],
+            ['sigs', 'Sigs'],
+            ['predict', 'Predict'],
+          ].map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-selected={mobileTab === id} className={mobileTab === id ? 'is-active' : ''} onClick={() => setMobileTab(id)}>
+              {label}
+            </button>
+          ))}
+        </nav>
       </header>
 
       {!user ? (
@@ -412,7 +426,13 @@ function KPDeskPage({ user, onLogin }) {
           </div>
 
           <div className="kp-desk-grid">
-            <section className="kp-desk-panel kp-desk-panel--chart">
+            {mobileTab === 'tables' ? (
+              <div className="kp-desk-mobile-pills" role="tablist" aria-label="KP tables">
+                <button type="button" className={mobileTable === 'planets' ? 'is-active' : ''} onClick={() => setMobileTable('planets')}>Planets</button>
+                <button type="button" className={mobileTable === 'cusps' ? 'is-active' : ''} onClick={() => setMobileTable('cusps')}>Cusps</button>
+              </div>
+            ) : null}
+            <section className={`kp-desk-panel kp-desk-panel--chart${mobileTab === 'chart' ? ' is-mobile-active' : ''}`}>
               <header className="kp-desk-panel__head"><h2>KP Chart</h2><span>{viewLabel}</span></header>
               <div className="kp-desk-chart">
                 {chartWidget.houses.length ? (
@@ -423,7 +443,7 @@ function KPDeskPage({ user, onLogin }) {
               </div>
             </section>
 
-            <section className="kp-desk-panel kp-desk-panel--planets">
+            <section className={`kp-desk-panel kp-desk-panel--planets${mobileTab === 'tables' && mobileTable === 'planets' ? ' is-mobile-active' : ''}`}>
               <header className="kp-desk-panel__head">
                 <h2>Planets</h2>
                 <span>{viewLabel} · click → 4-step</span>
@@ -460,7 +480,7 @@ function KPDeskPage({ user, onLogin }) {
               </div>
             </section>
 
-            <section className="kp-desk-panel kp-desk-panel--cusps">
+            <section className={`kp-desk-panel kp-desk-panel--cusps${mobileTab === 'tables' && mobileTable === 'cusps' ? ' is-mobile-active' : ''}`}>
               <header className="kp-desk-panel__head"><h2>Cusps</h2><span>{viewLabel}</span></header>
               <div className="kp-desk-table-wrap">
                 <table className="kp-desk-table">
@@ -490,7 +510,7 @@ function KPDeskPage({ user, onLogin }) {
               </div>
             </section>
 
-            <section className="kp-desk-panel kp-desk-panel--sigs">
+            <section className={`kp-desk-panel kp-desk-panel--sigs${mobileTab === 'sigs' ? ' is-mobile-active' : ''}`}>
               <header className="kp-desk-panel__head">
                 <h2>Significators</h2>
                 <span>{viewLabel}</span>
@@ -573,7 +593,7 @@ function KPDeskPage({ user, onLogin }) {
               </div>
             </section>
 
-            <section className="kp-desk-panel kp-desk-panel--fruct">
+            <section className={`kp-desk-panel kp-desk-panel--fruct${mobileTab === 'predict' ? ' is-mobile-active' : ''}`}>
               <header className="kp-desk-panel__head">
                 <h2>Predictions</h2>
                 <div className="kp-desk-toggle kp-desk-toggle--sm" role="tablist" aria-label="Prediction scope">

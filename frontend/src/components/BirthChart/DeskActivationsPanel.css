@@ -1271,3 +1271,100 @@
   min-height: 1.5rem;
   padding: 0.18rem 0.3rem;
 }
+
+/* Phone detail drill-in: preserve the timeline position behind a modal sheet. */
+.desk-act__sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.desk-act__sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(31, 23, 20, 0.48);
+  backdrop-filter: blur(2px);
+  cursor: pointer;
+}
+
+.desk-act__sheet-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 560px);
+  height: min(86dvh, 760px);
+  padding-bottom: env(safe-area-inset-bottom);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--da-line);
+  border-bottom: 0;
+  border-radius: 18px 18px 0 0;
+  background: #f8f2eb;
+  box-shadow: 0 -16px 48px rgba(31, 23, 20, 0.24);
+  animation: desk-act-sheet-in 180ms ease-out;
+}
+
+.desk-act__sheet-head {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem 0.85rem 0.55rem;
+  border-bottom: 1px solid var(--da-line);
+  background: rgba(255, 252, 248, 0.98);
+}
+
+.desk-act__sheet-head::before {
+  content: "";
+  position: absolute;
+  top: 0.38rem;
+  left: 50%;
+  width: 2.4rem;
+  height: 0.22rem;
+  border-radius: 999px;
+  background: rgba(107, 92, 84, 0.28);
+  transform: translateX(-50%);
+}
+
+.desk-act__sheet-head strong {
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.desk-act__sheet-head button {
+  justify-self: end;
+  border: 0;
+  background: transparent;
+  color: var(--da-accent);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.desk-act--mobile .desk-act__sheet-card .desk-act__detail {
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
+  padding: 0.7rem 0.75rem 1rem;
+  border: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@keyframes desk-act-sheet-in {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desk-act__sheet-card { animation: none; }
+}

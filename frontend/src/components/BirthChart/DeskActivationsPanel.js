@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import './DeskActivationsPanel.css';
 
 const PLANET_ABBR = {
@@ -277,12 +277,27 @@ export default function DeskActivationsPanel({
   asOfDate,
   onJumpToDate,
   onOpenFull,
-  layout = 'dock', // dock | focus | expanded
+  layout = 'dock', // dock | focus | expanded | mobile
 }) {
   const [lens, setLens] = useState('timeline'); // timeline | focus | map
   const [presetId, setPresetId] = useState('career');
   const [customHouses, setCustomHouses] = useState(() => new Set([6, 10, 3]));
   const [selected, setSelected] = useState(null); // { house, windowStart, windowEnd, transitSignature }
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  useEffect(() => {
+    if (layout !== 'mobile' || !detailOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setDetailOpen(false);
+    };
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [detailOpen, layout]);
 
   const asOf = asOfKey(asOfDate);
   const rows = result?.house_activations || [];
@@ -389,6 +404,7 @@ export default function DeskActivationsPanel({
       windowEnd: row.window?.end_date,
       transitSignature: row.window?.transit_signature,
     });
+    if (layout === 'mobile') setDetailOpen(true);
     if (syncAsOf) jump(row.window?.start_date);
   };
 
@@ -604,7 +620,7 @@ export default function DeskActivationsPanel({
 
   return (
     <div
-      className={`desk-act${layout === 'focus' ? ' desk-act--focus' : ''}${layout === 'expanded' ? ' desk-act--expanded' : ''}`}
+      className={`desk-act${layout === 'focus' || layout === 'mobile' ? ' desk-act--focus' : ''}${layout === 'expanded' ? ' desk-act--expanded' : ''}${layout === 'mobile' ? ' desk-act--mobile' : ''}`}
       data-lens={lens}
     >
       <div className="desk-act__toolbar">
@@ -862,6 +878,7 @@ export default function DeskActivationsPanel({
                       if (row) selectRow(row, { syncAsOf: true });
                       else {
                         setSelected({ house: houseNum, windowStart: currentWindow?.start_date });
+                        if (layout === 'mobile') setDetailOpen(true);
                       }
                     }}
                     title={`H${houseNum} ${HOUSE_LABELS[houseNum]} · ${STATE_META[state]?.short}: ${STATE_META[state]?.meaning || ''} · ${TONE_META[tone]?.short}`}
@@ -887,7 +904,28 @@ export default function DeskActivationsPanel({
         ) : null}
       </div>
 
-      {detailAside}
+      {layout === 'mobile' ? (
+        detailOpen && detailAside ? (
+          <div className="desk-act__sheet" role="dialog" aria-modal="true" aria-label="Activation details">
+            <button
+              type="button"
+              className="desk-act__sheet-backdrop"
+              aria-label="Close activation details"
+              onClick={() => setDetailOpen(false)}
+            />
+            <div className="desk-act__sheet-card">
+              <header className="desk-act__sheet-head">
+                <span aria-hidden />
+                <strong>Activation details</strong>
+                <button type="button" onClick={() => setDetailOpen(false)} aria-label="Close activation details">
+                  Close
+                </button>
+              </header>
+              {detailAside}
+            </div>
+          </div>
+        ) : null
+      ) : detailAside}
       </div>
     </div>
   );

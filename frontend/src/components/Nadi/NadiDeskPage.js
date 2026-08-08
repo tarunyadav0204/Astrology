@@ -115,6 +115,8 @@ export default function NadiDeskPage({ user, onLogin }) {
   const [selectedActivationId, setSelectedActivationId] = useState(null);
   const [manualHighlight, setManualHighlight] = useState(null);
   const [transitPlanets, setTransitPlanets] = useState(null);
+  const [mobileTab, setMobileTab] = useState('chart');
+  const [mobileChart, setMobileChart] = useState('d1');
   const seoData = generatePageSEO('chartsDashasWorkspace', { path: '/charts-dashas/nadi' });
   const hasChart = Boolean(birthData && chartData);
 
@@ -276,6 +278,26 @@ export default function NadiDeskPage({ user, onLogin }) {
             {user ? (hasChart ? 'Change native' : 'Select chart') : 'Sign in'}
           </button>
         </div>
+        <nav className="nadi-desk__mobile-hub" role="tablist" aria-label="Nadi desk sections">
+          {[
+            ['chart', 'Chart'],
+            ['links', 'Links'],
+            ['act', 'Act'],
+            ['more', 'More'],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={mobileTab === id}
+              className={mobileTab === id ? 'is-active' : ''}
+              onClick={() => setMobileTab(id)}
+            >
+              {label}
+              {id === 'act' && activations.length ? <em>{activations.length}</em> : null}
+            </button>
+          ))}
+        </nav>
       </header>
 
       {!user ? (
@@ -292,6 +314,12 @@ export default function NadiDeskPage({ user, onLogin }) {
         </div>
       ) : (
         <div className="nadi-desk__body">
+          {mobileTab === 'chart' ? (
+            <div className="nadi-desk__mobile-pills" role="tablist" aria-label="Chart type">
+              <button type="button" className={mobileChart === 'd1' ? 'is-active' : ''} onClick={() => setMobileChart('d1')}>D1</button>
+              <button type="button" className={mobileChart === 'transit' ? 'is-active' : ''} onClick={() => setMobileChart('transit')}>Transit</button>
+            </div>
+          ) : null}
           <div className="nadi-desk__tools">
             <div className="nadi-desk__clock">
               <span>As-of</span>
@@ -342,7 +370,7 @@ export default function NadiDeskPage({ user, onLogin }) {
           </div>
 
           {(desk?.karaka_readout || []).length ? (
-            <div className="nadi-desk__karaka-row" aria-label="Jeeva Karma Kalatra">
+            <div className={`nadi-desk__karaka-row${mobileTab === 'links' ? ' is-mobile-active' : ''}`} aria-label="Jeeva Karma Kalatra">
               {desk.karaka_readout.map((row) => {
                 const isActive = Boolean(
                   manualHighlight?.length
@@ -399,7 +427,7 @@ export default function NadiDeskPage({ user, onLogin }) {
           ) : null}
 
           <div className="nadi-desk__grid">
-            <section className="nadi-desk__panel nadi-desk__panel--d1">
+            <section className={`nadi-desk__panel nadi-desk__panel--d1${mobileTab === 'chart' && mobileChart === 'd1' ? ' is-mobile-active' : ''}`}>
               <header>
                 <strong>D1</strong>
                 <em>Natal</em>
@@ -420,7 +448,7 @@ export default function NadiDeskPage({ user, onLogin }) {
               </div>
             </section>
 
-            <section className="nadi-desk__panel nadi-desk__panel--tr">
+            <section className={`nadi-desk__panel nadi-desk__panel--tr${mobileTab === 'chart' && mobileChart === 'transit' ? ' is-mobile-active' : ''}`}>
               <header>
                 <strong>Transit</strong>
                 <em>{formatAsOfIso(asOfDate)}</em>
@@ -442,7 +470,7 @@ export default function NadiDeskPage({ user, onLogin }) {
               </div>
             </section>
 
-            <aside className="nadi-desk__panel nadi-desk__panel--ledger">
+            <aside className={`nadi-desk__panel nadi-desk__panel--ledger${mobileTab === 'act' ? ' is-mobile-active' : ''}`}>
               <header>
                 <strong>Activations</strong>
                 <em>Trine · 2nd · 12th · 7th</em>
@@ -481,7 +509,7 @@ export default function NadiDeskPage({ user, onLogin }) {
               </ul>
             </aside>
 
-            <section className="nadi-desk__panel nadi-desk__panel--links">
+            <section className={`nadi-desk__panel nadi-desk__panel--links${mobileTab === 'links' ? ' is-mobile-active' : ''}`}>
               <header>
                 <strong>Link graph</strong>
                 <em>BNN connections</em>
@@ -525,7 +553,7 @@ export default function NadiDeskPage({ user, onLogin }) {
               )}
             </section>
 
-            <section className="nadi-desk__panel nadi-desk__panel--tri">
+            <section className={`nadi-desk__panel nadi-desk__panel--tri${mobileTab === 'more' ? ' is-mobile-active' : ''}`}>
               <header>
                 <strong>Purushartha</strong>
                 <em>Trikonas</em>
@@ -547,7 +575,7 @@ export default function NadiDeskPage({ user, onLogin }) {
               </div>
             </section>
 
-            <section className="nadi-desk__panel nadi-desk__panel--ages">
+            <section className={`nadi-desk__panel nadi-desk__panel--ages${mobileTab === 'more' ? ' is-mobile-active' : ''}`}>
               <header>
                 <strong>Age progression</strong>
                 <em>Planet ages + nakṣatra milestones</em>
@@ -584,7 +612,7 @@ export default function NadiDeskPage({ user, onLogin }) {
               </div>
             </section>
 
-            <aside className="nadi-desk__panel nadi-desk__panel--detail">
+            <aside className={`nadi-desk__panel nadi-desk__panel--detail${mobileTab === 'act' ? ' is-mobile-active' : ''}`}>
               <header>
                 <strong>Detail</strong>
                 <em>Selected yoga</em>

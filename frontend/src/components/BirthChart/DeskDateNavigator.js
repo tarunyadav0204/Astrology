@@ -3,7 +3,7 @@ import './DeskDateNavigator.css';
 
 /**
  * Compact as-of stepper (mobile ChartsHub / CascadingDasha pattern).
- * ‹D · date · D› with optional ±H and Today reset.
+ * Year/month/day steppers with optional ±H and Today reset.
  */
 export default function DeskDateNavigator({
   date,
@@ -20,8 +20,19 @@ export default function DeskDateNavigator({
 
   const shift = (amount, unit = 'day') => {
     const next = new Date(safe);
-    if (unit === 'hour') next.setHours(next.getHours() + amount);
-    else next.setDate(next.getDate() + amount);
+    if (unit === 'hour') {
+      next.setHours(next.getHours() + amount);
+    } else if (unit === 'month' || unit === 'year') {
+      // Clamp month/year jumps so Jan 31 → Feb 28/29 instead of spilling into March.
+      const wantedDay = next.getDate();
+      next.setDate(1);
+      if (unit === 'month') next.setMonth(next.getMonth() + amount);
+      else next.setFullYear(next.getFullYear() + amount);
+      const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+      next.setDate(Math.min(wantedDay, lastDay));
+    } else {
+      next.setDate(next.getDate() + amount);
+    }
     emit(next);
   };
 
@@ -51,6 +62,23 @@ export default function DeskDateNavigator({
 
   return (
     <div className="desk-date-nav">
+      <div className="desk-date-nav__row desk-date-nav__row--jump" aria-label="Month and year navigation">
+        <button type="button" className="desk-date-nav__step" onClick={() => shift(-1, 'year')} title="Previous year">
+          ‹Y
+        </button>
+        <button type="button" className="desk-date-nav__step" onClick={() => shift(-1, 'month')} title="Previous month">
+          ‹M
+        </button>
+        <span className="desk-date-nav__period">
+          {safe.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+        </span>
+        <button type="button" className="desk-date-nav__step" onClick={() => shift(1, 'month')} title="Next month">
+          M›
+        </button>
+        <button type="button" className="desk-date-nav__step" onClick={() => shift(1, 'year')} title="Next year">
+          Y›
+        </button>
+      </div>
       <div className="desk-date-nav__row">
         <button type="button" className="desk-date-nav__step" onClick={() => shift(-1)} title="Previous day">
           ‹D

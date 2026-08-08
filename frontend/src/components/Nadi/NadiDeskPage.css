@@ -32,6 +32,11 @@
   min-width: 0;
 }
 
+.nadi-desk__mobile-hub,
+.nadi-desk__mobile-pills {
+  display: none;
+}
+
 .nadi-desk__back,
 .nadi-desk__bar-right button,
 .nadi-desk__chip,
@@ -660,20 +665,150 @@
 }
 
 @media (max-width: 720px) {
+  .nadi-desk {
+    min-height: 100dvh;
+  }
+
   .nadi-desk__bar {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.45rem;
+    row-gap: 0.6rem;
+    padding: max(0.65rem, env(safe-area-inset-top)) 0.7rem 0.65rem;
+    background: rgba(255, 252, 248, 0.96);
+    backdrop-filter: blur(8px);
+  }
+
+  .nadi-desk__bar-left {
+    gap: 0.4rem;
+  }
+
+  .nadi-desk__back {
+    font-size: 0;
+  }
+
+  .nadi-desk__back::before {
+    content: "←";
+    font-size: 0.82rem;
+  }
+
+  .nadi-desk__sub,
+  .nadi-desk__bar-center {
+    display: none;
+  }
+
+  .nadi-desk__native {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nadi-desk__bar-right button {
+    max-width: 7rem;
+    white-space: nowrap;
+  }
+
+  .nadi-desk__mobile-hub {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.3rem;
+    margin-top: 0.05rem;
+  }
+
+  .nadi-desk__mobile-hub button,
+  .nadi-desk__mobile-pills button {
+    position: relative;
+    border: 1px solid var(--nd-line);
+    background: #fff;
+    color: var(--nd-muted);
+    border-radius: 8px;
+    min-height: 40px;
+    padding: 0.45rem 0.25rem;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 800;
+  }
+
+  .nadi-desk__mobile-hub button.is-active,
+  .nadi-desk__mobile-pills button.is-active {
+    color: var(--nd-accent);
+    background: #fff1f2;
+    border-color: rgba(159, 18, 57, 0.3);
+  }
+
+  .nadi-desk__mobile-hub em {
+    position: absolute;
+    top: 0.08rem;
+    right: 0.22rem;
+    min-width: 1rem;
+    border-radius: 999px;
+    background: var(--nd-accent);
+    color: #fff;
+    font-size: 0.52rem;
+    font-style: normal;
+  }
+
+  .nadi-desk__body {
+    gap: 0.65rem;
+    padding: 0.75rem 0.7rem 1.25rem;
+  }
+
+  .nadi-desk__mobile-pills {
+    display: flex;
+    gap: 0.35rem;
+    margin-bottom: 0.05rem;
+  }
+
+  .nadi-desk__mobile-pills button {
+    border-radius: 999px;
+    padding: 0.28rem 0.65rem;
+  }
+
+  .nadi-desk__tools {
+    gap: 0.6rem 0.45rem;
+    padding: 0.65rem;
+    border-radius: 11px;
+  }
+
+  .nadi-desk__clock {
+    width: 100%;
+  }
+
+  .nadi-desk__moon {
+    flex: 1;
   }
 
   .nadi-desk__grid {
     grid-template-columns: 1fr;
-    grid-template-areas:
-      "d1"
-      "tr"
-      "ledger"
-      "detail"
-      "links"
-      "tri"
-      "ages";
+    grid-template-areas: none;
+    gap: 0.45rem;
+  }
+
+  .nadi-desk__grid > .nadi-desk__panel,
+  .nadi-desk__karaka-row {
+    display: none;
+  }
+
+  .nadi-desk__grid > .nadi-desk__panel.is-mobile-active {
+    display: flex;
+    grid-area: auto;
+  }
+
+  .nadi-desk__karaka-row.is-mobile-active {
+    display: grid;
+  }
+
+  .nadi-desk__chart {
+    width: 100%;
+    aspect-ratio: 1;
+    min-height: 0;
+  }
+
+  .nadi-desk__chart > * {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
   }
 
   .nadi-desk__topics {

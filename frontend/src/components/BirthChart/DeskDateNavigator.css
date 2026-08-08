@@ -16,6 +16,24 @@
   opacity: 0.95;
 }
 
+.desk-date-nav__row--jump {
+  gap: 0.24rem;
+}
+
+.desk-date-nav__row--jump .desk-date-nav__step {
+  min-width: 2rem;
+  padding-inline: 0.3rem;
+}
+
+.desk-date-nav__period {
+  flex: 1 1 auto;
+  min-width: 6.8rem;
+  text-align: center;
+  color: #6b5c54;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
 .desk-date-nav__step,
 .desk-date-nav__today,
 .desk-date-nav__value,
