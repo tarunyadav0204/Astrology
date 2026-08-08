@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# Deployment marker: keep backend releases in sync with frontend workspace updates.
 import asyncio
 import secrets
 import uuid
