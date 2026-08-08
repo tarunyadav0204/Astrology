@@ -2,7 +2,8 @@ import asyncio
 import json
 import logging
 import os
-from typing import Any, Dict
+import re
+from typing import Any, Dict, Set
 
 import google.generativeai as genai
 
@@ -16,6 +17,112 @@ GATE_INTENTS = {
     "relationship_setup",
     "partnership_offer",
 }
+
+# Short replies that are still answering a pending gate (do not abandon).
+_SHORT_GATE_REPLY_RE = re.compile(
+    r"^(yes|no|ok|okay|sure|continue|proceed|haan|hanji|nahi|ji|theek|"
+    r"selected\s*chart|my\s*chart|single\s*chart|partnership|"
+    r"start(\s+partnership)?|go\s+ahead)\b",
+    re.IGNORECASE,
+)
+
+_TOPIC_PATTERNS: Dict[str, re.Pattern[str]] = {
+    "career": re.compile(
+        r"\b("
+        r"job|career|office|project|promotion|resign(?:ation)?|layoff|transfer|"
+        r"salary|employer|naukri|naukari|business\s+change|job\s+change|"
+        r"career\s+change|new\s+job|work\s+change|internship|appraisal|"
+        r"काम|नौकरी|करियर|प्रमोशन"
+        r")\b",
+        re.IGNORECASE,
+    ),
+    "relationship": re.compile(
+        r"\b("
+        r"marry|marriage|married|partner|spouse|wife|husband|boyfriend|girlfriend|"
+        r"fiancé|fiance|compatibility|relationship|engagement|shaadi|vivah|"
+        r"pati|patni|शादी|विवाह|पत्नी|पति|रिश्ता"
+        r")\b",
+        re.IGNORECASE,
+    ),
+    "health": re.compile(
+        r"\b("
+        r"health|illness|disease|hospital|surgery|diagnosis|recovery|tabiyat|"
+        r"बीमारी|स्वास्थ्य|इलाज"
+        r")\b",
+        re.IGNORECASE,
+    ),
+    "wealth": re.compile(
+        r"\b("
+        r"wealth|money|finance|income|investment|loan|debt|property|dhan|"
+        r"पैसे|धन|कर्ज|संपत्ति"
+        r")\b",
+        re.IGNORECASE,
+    ),
+    "education": re.compile(
+        r"\b("
+        r"education|college|university|exam|studies|admission|degree|"
+        r"पढ़ाई|परीक्षा|कॉलेज"
+        r")\b",
+        re.IGNORECASE,
+    ),
+    "progeny": re.compile(
+        r"\b("
+        r"child|children|pregnancy|conceive|baby|son|daughter|santaan|"
+        r"बच्चा|संतान|गर्भ"
+        r")\b",
+        re.IGNORECASE,
+    ),
+}
+
+_RELATIONSHIP_GATE_INTENTS = frozenset({"partnership_offer", "relationship_setup"})
+# Life areas that should never stay trapped behind a marriage/partnership gate.
+_HARD_SWITCH_TOPICS = frozenset({"career", "health", "wealth", "education"})
+
+
+def _topic_tags(text: str) -> Set[str]:
+    raw = str(text or "")
+    return {name for name, pattern in _TOPIC_PATTERNS.items() if pattern.search(raw)}
+
+
+def should_abandon_pending_gate_for_new_question(
+    user_message: str,
+    pending_gate: Dict[str, Any] | None,
+) -> bool:
+    """
+    Safety net: if the latest message is clearly a new life-area question
+    unrelated to the pending native gate, abandon the gate.
+
+    Used so a stuck partnership/marriage offer cannot trap a career (etc.) ask.
+    """
+    msg = str(user_message or "").strip()
+    if len(msg) < 12:
+        return False
+    if _SHORT_GATE_REPLY_RE.search(msg) and len(msg) < 48:
+        return False
+
+    pending = pending_gate if isinstance(pending_gate, dict) else {}
+    intent = str(pending.get("intent_gate") or "").strip()
+    if intent not in GATE_INTENTS or intent == "none":
+        return False
+
+    msg_topics = _topic_tags(msg)
+    if not msg_topics:
+        return False
+
+    original = str(pending.get("original_question") or "").strip()
+    original_topics = _topic_tags(original)
+
+    if intent in _RELATIONSHIP_GATE_INTENTS:
+        hard = msg_topics & _HARD_SWITCH_TOPICS
+        # Pure career/health/wealth/education ask while partnership gate is open.
+        if hard and "relationship" not in msg_topics:
+            return True
+        return False
+
+    if original_topics and msg_topics.isdisjoint(original_topics):
+        return True
+
+    return False
 
 
 def _compact_birth_details(birth_details: Dict[str, Any] | None) -> Dict[str, Any]:
@@ -307,6 +414,14 @@ Return ONLY valid JSON:
             if partner_name and partner_date and partner_time and partner_place:
                 return {"action": "start_partnership", "reason": "partner_birth_details_already_present"}
 
+        # Deterministic escape hatch before the LLM — do not trap career/etc. behind a marriage gate.
+        if should_abandon_pending_gate_for_new_question(user_message, pending_gate):
+            return {
+                "action": "treat_as_new_question",
+                "confidence": "high",
+                "reason": "unrelated_life_area_vs_pending_gate",
+            }
+
         prompt = f"""
 You are resolving a pending astrology chat gate reply.
 
@@ -319,8 +434,16 @@ STRICT RULES:
 - Work semantically across languages.
 - Do not depend on yes/no keywords.
 - Do not ask a fresh astrology clarification here.
-- Prefer treating the message as a gate reply when it is plausibly continuing that exact gate.
-- Use `treat_as_new_question` only when the user clearly moved to a fresh unrelated question.
+- Prefer treating the message as a gate reply when it is plausibly continuing that exact gate
+  (choosing an option, giving partner birth details, clarifying relation order, or restating the same relationship question).
+- Use `treat_as_new_question` when the user clearly moved to a fresh unrelated life-area question.
+  Examples that MUST be treat_as_new_question while a marriage/partnership gate is pending:
+  - job / career / office / project / promotion questions
+  - health / illness questions
+  - wealth / money / property questions
+  - education / exam questions
+  - child / pregnancy questions (unless the pending gate itself was about progeny)
+- Never keep a partnership/marriage gate alive for a career or job-change question.
 - Return only JSON.
 
 Selected chart:
@@ -387,6 +510,19 @@ Return only JSON:
                 "treat_as_new_question",
             }:
                 action = "repeat_gate"
+            # Second pass: if the model clung to the gate but the message is clearly a new topic, abandon.
+            if action in {
+                "repeat_gate",
+                "need_partner_birth_details",
+                "need_relationship_context",
+                "need_other_person_chart",
+                "start_partnership",
+            } and should_abandon_pending_gate_for_new_question(user_message, pending_gate):
+                return {
+                    "action": "treat_as_new_question",
+                    "confidence": "high",
+                    "reason": "override_unrelated_life_area_vs_pending_gate",
+                }
             return {
                 "action": action,
                 "confidence": str(raw.get("confidence") or "low").strip().lower(),

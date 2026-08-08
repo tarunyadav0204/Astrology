@@ -1938,26 +1938,16 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 conn.commit()
                 return response
             elif resolved_action == "treat_as_new_question":
-                refreshed_gate = dict(pending_gate_metadata)
-                existing_message = str(refreshed_gate.get("user_message") or "").strip()
-                if not existing_message:
-                    existing_message = (
-                        "Please choose one of the options below to continue."
-                    )
-                refreshed_gate["user_message"] = existing_message
-                response = _create_native_gate_response(
-                    conn,
-                    session_id=session_id,
-                    question=question,
-                    gate_metadata=refreshed_gate,
-                    assistant_content=build_subject_gate_message(refreshed_gate),
-                    client_request_id=client_request_id,
-                    userid=current_user.userid,
-                    nudge_id=nudge_id,
-                    chat_tier=effective_chat_tier,
-                )
+                # Fresh unrelated question — abandon the stuck gate and continue
+                # into normal chat with this message as the new ask.
+                _clear_pending_native_gate(conn, session_id)
                 conn.commit()
-                return response
+                _chat_log_event(
+                    "native_gate_abandoned",
+                    session_id=session_id,
+                    action="treat_as_new_question",
+                    reason=resolved_gate.get("reason"),
+                )
 
         cur = execute(
             conn,

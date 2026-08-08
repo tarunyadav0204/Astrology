@@ -1,0 +1,388 @@
+.pdm {
+  --pdm-ink: #1f1714;
+  --pdm-muted: #6b5c54;
+  --pdm-line: rgba(70, 45, 35, 0.12);
+  --pdm-accent: #9f1239;
+  --pdm-panel: #fffcf8;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: #f3ebe3;
+  color: var(--pdm-ink);
+  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+.pdm__chrome {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgba(255, 252, 248, 0.96);
+  border-bottom: 1px solid var(--pdm-line);
+  backdrop-filter: blur(8px);
+}
+
+.pdm__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.55rem;
+  min-width: 0;
+}
+
+.pdm__back,
+.pdm__link,
+.pdm__native,
+.pdm__hub button,
+.pdm__pills button,
+.pdm__dx-scroll button,
+.pdm__meta-toggle,
+.pdm__more-tabs button,
+.pdm__sheet-card header button,
+.pdm__sheet-more,
+.pdm__act-cta {
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pdm__back,
+.pdm__link {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--pdm-muted);
+  padding: 0.2rem 0.35rem;
+  border-radius: 6px;
+}
+
+.pdm__brand-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.pdm__brand {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--pdm-accent);
+  line-height: 1.1;
+}
+
+.pdm__native {
+  align-self: start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--pdm-muted);
+  padding: 0;
+}
+
+.pdm__hub {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.2rem;
+  padding: 0 0.45rem 0.4rem;
+}
+
+.pdm__hub button {
+  position: relative;
+  padding: 0.35rem 0.2rem;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--pdm-muted);
+  background: #fff;
+  border-color: var(--pdm-line);
+}
+
+.pdm__hub button.is-active {
+  color: var(--pdm-accent);
+  background: #fff1f2;
+  border-color: rgba(159, 18, 57, 0.3);
+}
+
+.pdm__hub button em {
+  position: absolute;
+  top: 0.1rem;
+  right: 0.25rem;
+  font-style: normal;
+  font-size: 0.55rem;
+  font-weight: 800;
+  min-width: 1rem;
+  padding: 0.05rem 0.25rem;
+  border-radius: 999px;
+  background: var(--pdm-accent);
+  color: #fff;
+}
+
+.pdm__asof {
+  padding: 0 0.45rem 0.45rem;
+}
+
+.pdm__body {
+  flex: 1;
+  min-height: 0;
+  padding: 0.45rem 0.55rem 1.1rem;
+}
+
+.pdm__pane {
+  min-height: 0;
+}
+
+.pdm__pane--dasha,
+.pdm__pane--act {
+  min-height: calc(100dvh - 11rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.pdm__pane--act .desk-act--focus {
+  min-height: 0;
+  flex: 1;
+}
+
+.pdm__pane--act .desk-act--focus .desk-act__split,
+.pdm__pane--act .desk-act--focus .desk-act__workspace {
+  grid-template-columns: 1fr !important;
+  grid-template-rows: auto minmax(220px, 1fr);
+}
+
+.pdm__pane--act .desk-act--focus .desk-act__state-key {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pdm__pills,
+.pdm__more-tabs,
+.pdm__dx-scroll {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pdm__pills button,
+.pdm__more-tabs button,
+.pdm__dx-scroll button {
+  flex: 0 0 auto;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--pdm-line);
+  background: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--pdm-muted);
+}
+
+.pdm__pills button.is-active,
+.pdm__more-tabs button.is-active,
+.pdm__dx-scroll button.is-active {
+  background: #fff1f2;
+  border-color: rgba(159, 18, 57, 0.32);
+  color: var(--pdm-accent);
+}
+
+.pdm__dx-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--pdm-line);
+  margin: 0 0.15rem;
+}
+
+.pdm__chart {
+  aspect-ratio: 1;
+  width: 100%;
+  max-width: min(100%, 440px);
+  margin: 0 auto;
+  background: var(--pdm-panel);
+  border: 1px solid var(--pdm-line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.pdm__chart .chart-widget,
+.pdm__chart svg {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.pdm__act-cta {
+  width: 100%;
+  margin-top: 0.55rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(159, 18, 57, 0.28);
+  background: linear-gradient(135deg, #9f1239 0%, #be123c 100%);
+  color: #fff;
+  text-align: left;
+}
+
+.pdm__act-cta strong {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.pdm__act-cta em {
+  display: block;
+  margin-top: 0.1rem;
+  font-style: normal;
+  font-size: 0.68rem;
+  opacity: 0.9;
+  font-weight: 650;
+}
+
+.pdm__act-cta i {
+  font-style: normal;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.pdm__meta-toggle {
+  width: 100%;
+  margin-top: 0.45rem;
+  padding: 0.4rem;
+  border-radius: 8px;
+  border: 1px solid var(--pdm-line);
+  background: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--pdm-muted);
+}
+
+.pdm__meta {
+  margin-top: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.45rem;
+  border-radius: 10px;
+  background: var(--pdm-panel);
+  border: 1px solid var(--pdm-line);
+}
+
+.pdm__more-body {
+  margin-top: 0.4rem;
+  padding: 0.45rem;
+  border-radius: 10px;
+  background: var(--pdm-panel);
+  border: 1px solid var(--pdm-line);
+  min-height: 240px;
+}
+
+.pdm__house-pick {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.3rem;
+  margin-bottom: 0.45rem;
+}
+
+.pdm__house-pick button {
+  border: 1px solid var(--pdm-line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.4rem 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--pdm-muted);
+  cursor: pointer;
+}
+
+.pdm__house-pick button.is-active {
+  background: #fff1f2;
+  border-color: rgba(159, 18, 57, 0.35);
+  color: var(--pdm-accent);
+}
+
+.pdm__goto-chart {
+  margin-top: 0.55rem;
+  border: 1px solid rgba(159, 18, 57, 0.28);
+  background: #fff1f2;
+  color: var(--pdm-accent);
+  border-radius: 8px;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pdm__sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.pdm__sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(31, 23, 20, 0.45);
+  cursor: pointer;
+}
+
+.pdm__sheet-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 560px);
+  max-height: min(78dvh, 640px);
+  display: flex;
+  flex-direction: column;
+  background: var(--pdm-panel);
+  border-radius: 16px 16px 0 0;
+  border: 1px solid var(--pdm-line);
+  box-shadow: 0 -10px 40px rgba(31, 23, 20, 0.18);
+  overflow: hidden;
+}
+
+.pdm__sheet-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--pdm-line);
+  background: #f8f2eb;
+}
+
+.pdm__sheet-card header strong {
+  font-size: 0.85rem;
+}
+
+.pdm__sheet-card header button {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--pdm-muted);
+  padding: 0.2rem 0.4rem;
+}
+
+.pdm__sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.5rem 0.65rem;
+}
+
+.pdm__sheet-more {
+  margin: 0.35rem 0.65rem 0.75rem;
+  padding: 0.55rem;
+  border-radius: 8px;
+  background: #fff1f2;
+  border: 1px solid rgba(159, 18, 57, 0.25);
+  color: var(--pdm-accent);
+  font-size: 0.75rem;
+  font-weight: 800;
+}

@@ -279,3 +279,56 @@
     display: none;
   }
 }
+
+/* Mobile hub: one dasha level at a time (CascadingDasha-style) */
+.desk-dasha--mobile {
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.desk-dasha--mobile .desk-dasha__meta {
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.desk-dasha--mobile .desk-dasha__level-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0 0.15rem 0.35rem;
+  overflow-x: auto;
+}
+
+.desk-dasha--mobile .desk-dasha__level-tabs button {
+  flex: 0 0 auto;
+  border: 1px solid rgba(70, 45, 35, 0.14);
+  background: #fff;
+  border-radius: 999px;
+  padding: 0.22rem 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #6b5c54;
+  cursor: pointer;
+}
+
+.desk-dasha--mobile .desk-dasha__level-tabs button.is-active {
+  background: #fff1f2;
+  border-color: rgba(159, 18, 57, 0.35);
+  color: #9f1239;
+}
+
+.desk-dasha--mobile .desk-dasha__body {
+  flex: 1;
+  min-height: 0;
+}
+
+.desk-dasha--mobile .desk-dasha__cols {
+  grid-template-columns: 1fr !important;
+  height: 100%;
+  min-height: 280px;
+}
+
+.desk-dasha--mobile .desk-dasha__list {
+  max-height: min(55vh, 420px);
+}

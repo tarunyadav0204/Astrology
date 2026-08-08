@@ -36,6 +36,9 @@ export default function DeskHouseInsight({
   selection,
   asOfDate,
   chartId = 'lagna',
+  emptyTitle = 'Click a house on D1 / D9 / Dx / Transit',
+  emptyHint = 'Lord · tenants · AV · drishti · verdict for that bhāva',
+  emptyAction = null,
 }) {
   const [insight, setInsight] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -116,8 +119,9 @@ export default function DeskHouseInsight({
   if (!houseNumber) {
     return (
       <div className="desk-hi desk-hi--empty">
-        <p>Click a house on D1 / D9 / Dx / Transit</p>
-        <span>Lord · tenants · AV · drishti · verdict for that bhāva</span>
+        <p>{emptyTitle}</p>
+        <span>{emptyHint}</span>
+        {emptyAction}
       </div>
     );
   }

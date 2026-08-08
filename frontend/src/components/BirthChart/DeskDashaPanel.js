@@ -325,13 +325,23 @@ async function normalizeChara(data, birthData, asOf) {
  * Working-desk dasha view with Vimshottari / Yogini / Kalachakra / Chara.
  * Click a period to jump the shared as-of clock.
  */
-const DeskDashaPanel = ({ birthData, chartData, asOfDate, onJumpToDate, system, onSystemChange }) => {
+const DeskDashaPanel = ({
+  birthData,
+  chartData,
+  asOfDate,
+  onJumpToDate,
+  system,
+  onSystemChange,
+  layout = 'desk', // desk | mobile
+}) => {
   const [view, setView] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [mobileLevelKey, setMobileLevelKey] = useState(null);
   const listRefs = useRef({});
   const activeSystem = system || 'vimshottari';
   const setSystem = onSystemChange || (() => {});
+  const isMobile = layout === 'mobile';
 
   // Full as-of (date+time) so ±H / time picker reloads the cascade.
   const asOfKey = useMemo(
@@ -421,13 +431,24 @@ const DeskDashaPanel = ({ birthData, chartData, asOfDate, onJumpToDate, system, 
   );
 
   useEffect(() => {
-    levels.forEach((level) => {
+    if (!isMobile || !levels.length) return;
+    if (!mobileLevelKey || !levels.some((level) => level.key === mobileLevelKey)) {
+      const currentLevel = [...levels].reverse().find((level) => level.rows.some((r) => r.current));
+      setMobileLevelKey((currentLevel || levels[0]).key);
+    }
+  }, [isMobile, levels, mobileLevelKey]);
+
+  useEffect(() => {
+    const keys = isMobile
+      ? levels.filter((level) => level.key === mobileLevelKey)
+      : levels;
+    keys.forEach((level) => {
       const el = listRefs.current[level.key];
       if (!el) return;
       const current = el.querySelector('[data-current="true"]');
       if (current) current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     });
-  }, [levels]);
+  }, [levels, isMobile, mobileLevelKey]);
 
   const handleSelect = (period) => {
     if (!onJumpToDate) return;
@@ -437,9 +458,12 @@ const DeskDashaPanel = ({ birthData, chartData, asOfDate, onJumpToDate, system, 
   };
 
   const systemMeta = SYSTEMS.find((s) => s.id === activeSystem);
+  const visibleLevels = isMobile
+    ? levels.filter((level) => level.key === (mobileLevelKey || levels[0]?.key))
+    : levels;
 
   return (
-    <div className="desk-dasha">
+    <div className={`desk-dasha${isMobile ? ' desk-dasha--mobile' : ''}`}>
       <div className="desk-dasha__meta">
         <div className="desk-dasha__path" title={`Current ${systemMeta?.full || ''} stack at as-of`}>
           {path.length ? (
@@ -484,21 +508,39 @@ const DeskDashaPanel = ({ birthData, chartData, asOfDate, onJumpToDate, system, 
         </div>
       </div>
 
+      {isMobile && levels.length > 1 ? (
+        <div className="desk-dasha__level-tabs" role="tablist" aria-label="Dasha level">
+          {levels.map((level) => (
+            <button
+              key={level.key}
+              type="button"
+              role="tab"
+              aria-selected={mobileLevelKey === level.key}
+              className={mobileLevelKey === level.key ? 'is-active' : ''}
+              onClick={() => setMobileLevelKey(level.key)}
+              title={level.full}
+            >
+              {level.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {error ? (
         <div className="desk-dasha__error">{error}</div>
       ) : (
         <div
-          className={`desk-dasha__body${levels.length <= 2 ? ' desk-dasha__body--with-sp' : ''}`}
+          className={`desk-dasha__body${(!isMobile && levels.length <= 2) ? ' desk-dasha__body--with-sp' : ''}`}
         >
           <div
             className="desk-dasha__cols"
             role="table"
             aria-label={`${systemMeta?.full || 'Dasha'} periods`}
-            style={{
+            style={isMobile ? undefined : {
               gridTemplateColumns: `repeat(${Math.max(levels.length, 1)}, minmax(0, ${levels.length <= 2 ? '240px' : '1fr'}))`,
             }}
           >
-            {levels.map((level) => (
+            {visibleLevels.map((level) => (
               <div key={level.key} className="desk-dasha__col" role="rowgroup">
                 <div className="desk-dasha__col-head" title={level.full}>
                   <span>{level.label}</span>
@@ -544,7 +586,7 @@ const DeskDashaPanel = ({ birthData, chartData, asOfDate, onJumpToDate, system, 
               </div>
             ))}
           </div>
-          {levels.length <= 2 && chartData ? (
+          {!isMobile && levels.length <= 2 && chartData ? (
             <DeskSpecialPoints birthData={birthData} chartData={chartData} variant="panel" />
           ) : null}
         </div>

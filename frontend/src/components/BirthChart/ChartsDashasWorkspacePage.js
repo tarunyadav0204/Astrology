@@ -18,10 +18,32 @@ import DeskHouseInsight from './DeskHouseInsight';
 import DeskStrengthStrip from './DeskStrengthStrip';
 import DeskActivationsPanel from './DeskActivationsPanel';
 import DeskToolModals from './DeskToolModals';
+import ParashariDeskMobile from './ParashariDeskMobile';
 import { useAstrology } from '../../context/AstrologyContext';
 import { generatePageSEO } from '../../config/seo.config';
 import { apiService } from '../../services/apiService';
 import './ChartsDashasWorkspacePage.css';
+
+const MOBILE_DESK_MQ = '(max-width: 900px)';
+
+function useMobileDesk() {
+  const [isMobile, setIsMobile] = useState(() => (
+    typeof window !== 'undefined' ? window.matchMedia(MOBILE_DESK_MQ).matches : false
+  ));
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const mq = window.matchMedia(MOBILE_DESK_MQ);
+    const onChange = () => setIsMobile(mq.matches);
+    onChange();
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else mq.addListener(onChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', onChange);
+      else mq.removeListener(onChange);
+    };
+  }, []);
+  return isMobile;
+}
 
 const DIVISIONAL_CHART_OPTIONS = [
   { value: 2, shortLabel: 'D2', label: 'Hora' },
@@ -69,6 +91,7 @@ const ChartsDashasWorkspacePage = ({
   onOpenRegister,
 }) => {
   const navigate = useNavigate();
+  const isMobileDesk = useMobileDesk();
   const { birthData, chartData, setBirthData } = useAstrology();
   const [showBirthModal, setShowBirthModal] = useState(false);
   const [birthModalTab, setBirthModalTab] = useState('saved');
@@ -86,6 +109,10 @@ const ChartsDashasWorkspacePage = ({
   const [houseSelection, setHouseSelection] = useState(null);
   const seoData = generatePageSEO('chartsDashasWorkspace', { path: '/charts-dashas' });
   const hasChart = Boolean(birthData && chartData);
+
+  useEffect(() => {
+    if (isMobileDesk) setActivationsFocus(false);
+  }, [isMobileDesk]);
 
   const selectedDivisionalChart = useMemo(() => {
     if (selectedDx === 'karkamsa' || selectedDx === 'swamsa') {
@@ -195,7 +222,7 @@ const ChartsDashasWorkspacePage = ({
   };
 
   return (
-    <div className="parashari-desk">
+    <div className={`parashari-desk${isMobileDesk ? ' parashari-desk--mobile' : ''}`}>
       <SEOHead
         title={seoData.title}
         description={seoData.description}
@@ -204,6 +231,7 @@ const ChartsDashasWorkspacePage = ({
         structuredData={structuredData}
       />
 
+      {!isMobileDesk || !user || !hasChart ? (
       <header className="parashari-desk-bar">
         <div className="parashari-desk-bar__left">
           <button type="button" className="parashari-desk-bar__back" onClick={() => navigate('/')}>← Home</button>
@@ -258,6 +286,7 @@ const ChartsDashasWorkspacePage = ({
           ) : null}
         </div>
       </header>
+      ) : null}
 
       {!user ? (
         <div className="parashari-desk-empty">
@@ -276,6 +305,31 @@ const ChartsDashasWorkspacePage = ({
             Create / select chart
           </button>
         </div>
+      ) : isMobileDesk ? (
+        <ParashariDeskMobile
+          birthData={birthData}
+          chartData={chartData}
+          asOfDate={asOfDate}
+          onAsOfChange={setAsOfDate}
+          selectedDx={selectedDx}
+          onSelectedDxChange={setSelectedDx}
+          divisionalOptions={DIVISIONAL_CHART_OPTIONS}
+          jaiminiOptions={JAIMINI_CHART_OPTIONS}
+          selectedDivisionalChart={selectedDivisionalChart}
+          dxChartType={dxChartType}
+          dashaSystem={dashaSystem}
+          onDashaSystemChange={setDashaSystem}
+          activationLedger={activationLedger}
+          activationLoading={activationLoading}
+          activationError={activationError}
+          activationNowCount={activationNowCount}
+          analysisTab={analysisTab}
+          onAnalysisTabChange={setAnalysisTab}
+          houseSelection={houseSelection}
+          onHouseSelect={handleHouseSelect}
+          onOpenTool={setActiveTool}
+          onChangeNative={() => openBirthModal('saved')}
+        />
       ) : (
         <div className="parashari-desk-body">
           {/* Shared tools — keeps all four chart cells equal */}

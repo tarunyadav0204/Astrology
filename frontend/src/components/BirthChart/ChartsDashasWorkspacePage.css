@@ -20,6 +20,16 @@
   box-sizing: border-box;
 }
 
+/* Phone hub — ChartsHub-style ParashariDeskMobile takes over */
+.parashari-desk--mobile {
+  display: block;
+  height: auto;
+  min-height: 100dvh;
+  max-height: none;
+  overflow: visible;
+  background: #f3ebe3;
+}
+
 .parashari-desk *,
 .parashari-desk *::before,
 .parashari-desk *::after {
