@@ -47,19 +47,18 @@ export const FormContainer = styled.div`
   max-width: 100%;
   margin: 0 auto;
   padding: 0;
-  background: #ffffff;
-  border-radius: 0;
+  background: transparent;
+  border-radius: 18px;
   position: relative;
   overflow: visible;
-  animation: ${fadeIn} 0.4s ease-out;
+  animation: ${fadeIn} 0.25s ease-out;
 
   h2 {
-    color: #1e1b4b; /* Deep Indigo */
-    font-size: 24px;
-    font-weight: 700;
-    margin-bottom: 8px;
-    text-align: center;
-    letter-spacing: -0.5px;
+    color: #2d1b22;
+    font-size: 18px;
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: -0.2px;
   }
 `;
 
@@ -73,47 +72,52 @@ export const TabContainer = styled.div`
 
 export const TabNavigation = styled.div`
   display: flex;
-  background: #f1f5f9; /* Slate 100 */
-  border-radius: 0;
-  padding: 6px;
-  margin-bottom: 32px;
+  gap: 6px;
+  background: #f5eae5;
+  border-radius: 14px;
+  padding: 5px;
+  margin: 16px 24px 18px;
   position: relative;
-  z-index: 20; /* High Z-index to fix click issues */
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
+  z-index: 20;
+  border: 1px solid rgba(105, 55, 63, 0.08);
+
+  @media (max-width: 560px) {
+    margin: 14px 16px;
+  }
 `;
 
 export const TabButton = styled.button.withConfig({
   shouldForwardProp: (prop) => !['isFirst', 'isLast', 'active'].includes(prop)
 })`
   flex: 1;
-  padding: 12px 20px;
+  min-height: 42px;
+  padding: 9px 16px;
   border: none;
-  border-radius: 0;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 15px;
-  font-weight: 600;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 14px;
+  font-weight: 750;
+  transition: all 0.2s ease;
   position: relative;
   z-index: 21;
   
   /* Active State */
   ${props => props.active ? css`
-    background: white;
-    color: #ea580c; /* Orange 600 */
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    transform: scale(1);
+    background: #ffffff;
+    color: #9f1239;
+    box-shadow: 0 4px 14px rgba(84, 38, 49, 0.1);
   ` : css`
     background: transparent;
-    color: #64748b; /* Slate 500 */
+    color: #725f63;
     &:hover {
-      color: #334155;
+      color: #3f2930;
+      background: rgba(255,255,255,0.48);
     }
   `}
 `;
 
 export const TabContent = styled.div`
-  height: 600px;
-  min-height: 600px;
+  min-height: 0;
   overflow: visible;
   position: relative;
   z-index: 3;
@@ -122,13 +126,13 @@ export const TabContent = styled.div`
 // --- Form Fields & Inputs ---
 
 export const FormField = styled.div`
-  margin-bottom: 20px;
+  margin: 0;
   position: relative;
   
   .error {
-    color: #ef4444;
-    font-size: 12px;
-    margin-top: 6px;
+    color: #b4233c;
+    font-size: 11px;
+    margin-top: 5px;
     font-weight: 500;
     display: flex;
     align-items: center;
@@ -143,45 +147,47 @@ export const FormField = styled.div`
 
 export const Label = styled.label`
   display: block;
-  margin-bottom: 8px;
-  color: #334155; /* Slate 700 */
-  font-weight: 600;
-  font-size: 14px;
+  margin-bottom: 6px;
+  color: #49363c;
+  font-weight: 750;
+  font-size: 12px;
+  letter-spacing: 0.01em;
 `;
 
 const inputStyles = css`
   width: 100%;
-  padding: 14px 16px;
-  border: 2px solid #e2e8f0; /* Slate 200 */
-  border-radius: 0;
-  font-size: 15px;
-  color: #1e293b;
-  background: #f8fafc;
+  min-height: 46px;
+  padding: 11px 13px;
+  border: 1px solid #daccc7;
+  border-radius: 11px;
+  font-size: 14px;
+  color: #2d1b22;
+  background: #fffdfb;
   transition: all 0.2s ease;
   
   &::placeholder {
-    color: #94a3b8;
+    color: #9a898d;
   }
 
   &:hover {
-    border-color: #cbd5e1;
+    border-color: #bfa8a1;
     background: white;
   }
 
   &:focus {
     outline: none;
-    border-color: #f97316; /* Orange 500 */
+    border-color: #b53a5d;
     background: white;
-    box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.1);
+    box-shadow: 0 0 0 3px rgba(181, 58, 93, 0.11);
   }
 
   ${props => props.error && css`
-    border-color: #ef4444;
-    background: #fef2f2;
+    border-color: #c73b52;
+    background: #fff7f7;
     
     &:focus {
-      border-color: #ef4444;
-      box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
+      border-color: #c73b52;
+      box-shadow: 0 0 0 3px rgba(199, 59, 82, 0.1);
     }
   `}
 `;
@@ -203,7 +209,7 @@ export const Select = styled.select`
 // --- Search & Autocomplete ---
 
 export const SearchInput = styled(Input)`
-  margin-bottom: 16px;
+  margin-bottom: 0;
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'/%3e%3c/svg%3e");
   background-repeat: no-repeat;
   background-position: left 14px center;
@@ -217,32 +223,32 @@ export const AutocompleteContainer = styled.div`
 
 export const SuggestionList = styled.ul`
   position: absolute;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + 6px);
   top: auto;
   left: 0;
   right: 0;
   background: white;
-  border-radius: 0;
-  padding: 8px;
+  border-radius: 12px;
+  padding: 6px;
   list-style: none;
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e2e8f0;
+  border: 1px solid #daccc7;
   z-index: 2000;
   max-height: min(240px, 40vh);
   overflow-y: auto;
 `;
 
 export const SuggestionItem = styled.li`
-  padding: 10px 14px;
-  border-radius: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
   color: #475569;
   transition: all 0.15s;
 
   &:hover {
-    background: #f1f5f9;
-    color: #0f172a;
+    background: #fff1ed;
+    color: #7f1838;
   }
 `;
 
@@ -250,27 +256,36 @@ export const SuggestionItem = styled.li`
 
 export const Button = styled.button`
   width: 100%;
-  padding: 16px 24px;
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); /* Orange gradient */
+  min-height: 48px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #a71945 0%, #c54a43 100%);
   color: white;
   border: none;
-  border-radius: 0;
-  font-size: 16px;
-  font-weight: 600;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
-  margin-top: 12px;
+  box-shadow: 0 8px 20px rgba(159, 18, 57, 0.2);
+  margin-top: 0;
   position: relative;
   overflow: hidden;
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(249, 115, 22, 0.4);
+    box-shadow: 0 12px 26px rgba(159, 18, 57, 0.28);
   }
 
   &:active {
     transform: translateY(0);
+  }
+
+  &:disabled {
+    background: #d9cbc7;
+    color: #8b7a7e;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
   }
   
   /* Subtle Shine Effect */
@@ -295,9 +310,10 @@ export const Button = styled.button`
 // --- Charts List ---
 
 export const ChartsList = styled.div`
-  height: 500px;
+  min-height: 120px;
+  max-height: min(52vh, 480px);
   overflow-y: auto;
-  padding-right: 4px;
+  padding: 2px 4px 2px 2px;
 
   /* Custom Scrollbar */
   &::-webkit-scrollbar {
@@ -308,7 +324,7 @@ export const ChartsList = styled.div`
   }
   &::-webkit-scrollbar-thumb {
     background: #cbd5e1;
-    border-radius: 0;
+    border-radius: 999px;
   }
   &::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
@@ -320,9 +336,9 @@ export const LoadMoreButton = styled.button`
   margin-top: 12px;
   padding: 12px 16px;
   border: none;
-  border-radius: 0;
-  background: rgba(0, 0, 0, 0.06);
-  color: #1e293b;
+  border-radius: 10px;
+  background: #f3e7e2;
+  color: #5c3b43;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -339,11 +355,11 @@ export const LoadMoreButton = styled.button`
 `;
 
 export const ChartItem = styled.div`
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 0;
-  padding: 16px;
-  margin-bottom: 12px;
+  background: #fffdfb;
+  border: 1px solid #e4d7d1;
+  border-radius: 14px;
+  padding: 13px 14px;
+  margin-bottom: 9px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -351,27 +367,21 @@ export const ChartItem = styled.div`
   cursor: pointer;
 
   &:hover {
-    border-color: #fb923c;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    border-color: #c66a78;
+    box-shadow: 0 8px 20px rgba(79, 38, 48, 0.08);
     transform: translateY(-1px);
   }
 
   strong {
     display: block;
-    color: #1e293b;
-    font-size: 16px;
+    color: #332127;
+    font-size: 14px;
     margin-bottom: 4px;
   }
 
   small {
-    color: #64748b;
-    font-size: 13px;
+    color: #79676b;
+    font-size: 11px;
   }
 
-  /* Buttons inside item */
-  button {
-    opacity: 0.8;
-    transition: 0.2s;
-    &:hover { opacity: 1; transform: scale(1.05); }
-  }
 `;

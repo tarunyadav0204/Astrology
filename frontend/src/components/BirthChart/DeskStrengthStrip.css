@@ -106,3 +106,134 @@
   color: #6b5c54;
   white-space: nowrap;
 }
+
+.desk-str--mobile {
+  gap: 0.45rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.desk-str--mobile .desk-str__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border: 1px solid rgba(70, 45, 35, 0.12);
+  border-radius: 10px;
+  background: #fffcf8;
+}
+
+.desk-str--mobile .desk-str__label {
+  justify-self: start;
+  min-height: 28px;
+  padding: 0 0.5rem;
+  border: 0;
+  background: transparent;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  text-align: left;
+}
+
+.desk-str--mobile .desk-str__label::after {
+  content: "  ›";
+  font-size: 0.85rem;
+}
+
+.desk-str--mobile .desk-str__meta {
+  align-self: center;
+  padding: 0.18rem 0.4rem;
+  border-radius: 999px;
+  background: #f3ebe3;
+  font-size: 0.62rem;
+}
+
+.desk-str--mobile .desk-str__chips {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.28rem;
+  width: 100%;
+  overflow: visible;
+}
+
+.desk-str--mobile .desk-str__chip {
+  min-width: 0;
+  min-height: 42px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  padding: 0.28rem 0.1rem;
+  border-radius: 7px;
+  text-align: center;
+}
+
+.desk-str--mobile .desk-str__chip em {
+  font-size: 0.62rem;
+}
+
+.desk-str--mobile .desk-str__chip strong {
+  max-width: 100%;
+  font-size: 0.78rem;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.desk-str__tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.desk-str__tools button {
+  min-width: 0;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 0.08rem 0.45rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(159, 18, 57, 0.2);
+  border-radius: 10px;
+  background: linear-gradient(145deg, #fff 0%, #fff7f8 100%);
+  color: #1f1714;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 2px 7px rgba(57, 36, 29, 0.05);
+}
+
+.desk-str__tools button > span {
+  grid-row: 1 / -1;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(159, 18, 57, 0.1);
+  color: #9f1239;
+  font-size: 1rem;
+}
+
+.desk-str__tools button strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #9f1239;
+  font-size: 0.7rem;
+  font-weight: 850;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desk-str__tools button em {
+  color: #6b5c54;
+  font-size: 0.57rem;
+  font-style: normal;
+  font-weight: 650;
+  line-height: 1.1;
+}

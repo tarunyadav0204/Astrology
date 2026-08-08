@@ -39,7 +39,9 @@ export default function DeskStrengthStrip({
   birthData,
   chartData,
   onOpenTool,
+  layout = 'strip',
 }) {
+  const isMobile = layout === 'mobile';
   const [dig, setDig] = useState(null);
   const [sb, setSb] = useState(null);
 
@@ -91,7 +93,7 @@ export default function DeskStrengthStrip({
   const sbWeak = sb?.summary?.weakest?.[0];
 
   return (
-    <div className="desk-str" aria-label="Dignity and Shadbala summary">
+    <div className={`desk-str${isMobile ? ' desk-str--mobile' : ''}`} aria-label="Dignity and Shadbala summary">
       <div className="desk-str__row">
         <button
           type="button"
@@ -99,7 +101,7 @@ export default function DeskStrengthStrip({
           onClick={() => onOpenTool?.('dignities')}
           title="Open planetary dignities"
         >
-          Dig
+          {isMobile ? 'Planetary dignity' : 'Dig'}
         </button>
         <div className="desk-str__chips">
           {digChips.map((c) => (
@@ -129,7 +131,7 @@ export default function DeskStrengthStrip({
           onClick={() => onOpenTool?.('shadbala')}
           title="Open Shadbala"
         >
-          SB
+          {isMobile ? 'Shadbala strength' : 'SB'}
         </button>
         <div className="desk-str__chips">
           {sbChips.map((c) => (
@@ -151,6 +153,21 @@ export default function DeskStrengthStrip({
           </span>
         ) : null}
       </div>
+
+      {isMobile ? (
+        <div className="desk-str__tools" aria-label="Additional strength tools">
+          <button type="button" onClick={() => onOpenTool?.('ashtakavarga')}>
+            <span aria-hidden>▦</span>
+            <strong>Ashtakavarga</strong>
+            <em>SAV &amp; BAV bindus</em>
+          </button>
+          <button type="button" onClick={() => onOpenTool?.('karakas')}>
+            <span aria-hidden>◇</span>
+            <strong>Chara Karakas</strong>
+            <em>Planetary roles</em>
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

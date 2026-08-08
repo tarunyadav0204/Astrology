@@ -441,71 +441,29 @@ const BirthForm = ({
 
   const headerTitle = isPickMode
     ? (pickModeTitle || 'Select Saved Chart')
-    : (activeTab === 'new' ? 'Enter Birth Details' : 'Select Saved Chart');
+    : (activeTab === 'new' ? 'Create Birth Chart' : 'Select Saved Chart');
   const headerSubtitle = isPickMode
     ? (pickModeDescription || 'Choose from your previously saved birth charts')
     : (activeTab === 'new'
-      ? 'Please provide birth information to generate chart'
+      ? 'Add accurate birth information to generate your Vedic chart'
       : 'Choose from your previously saved birth charts');
 
   return (
     <TabContainer key="fixed-tabs-v2">
       {onClose && (
-        <div style={{
-          padding: '24px 70px 20px 24px',
-          borderBottom: '1px solid #e2e8f0',
-          background: '#f8fafc',
-          position: 'relative',
-          borderRadius: 0
-        }}>
-          <h2 style={{
-            margin: '0 0 8px 0',
-            color: '#1e1b4b',
-            fontSize: '24px',
-            fontWeight: '700',
-            textAlign: 'center'
-          }}>
-            {headerTitle}
-          </h2>
-          <p style={{
-            margin: 0,
-            color: '#64748b',
-            fontSize: '14px',
-            textAlign: 'center',
-            fontWeight: '400'
-          }}>
-            {headerSubtitle}
-          </p>
+        <div className="birth-form-shell__header">
+          <span className="birth-form-shell__eyebrow">
+            {isPickMode ? 'Your charts' : 'Birth chart workspace'}
+          </span>
+          <h2>{headerTitle}</h2>
+          <p>{headerSubtitle}</p>
           <button
+            type="button"
+            className="birth-form-shell__close"
             onClick={onClose}
-            style={{
-              position: 'absolute',
-              top: '20px',
-              right: '20px',
-              background: '#f1f5f9',
-              border: 'none',
-              fontSize: '20px',
-              color: '#64748b',
-              cursor: 'pointer',
-              width: '36px',
-              height: '36px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 0,
-              transition: 'all 0.2s ease',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.background = '#e2e8f0';
-              e.target.style.color = '#1e293b';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = '#f1f5f9';
-              e.target.style.color = '#64748b';
-            }}
+            aria-label="Close birth chart dialog"
           >
-            ×
+            <span aria-hidden>×</span>
           </button>
         </div>
       )}
@@ -517,7 +475,7 @@ const BirthForm = ({
             active={activeTab === 'new'}
             isFirst={true}
           >
-            📝 New Chart
+            <span aria-hidden>＋</span> New Chart
           </TabButton>
           <TabButton
             type="button"
@@ -525,21 +483,22 @@ const BirthForm = ({
             active={activeTab === 'saved'}
             isLast={true}
           >
-            📊 Saved Charts
+            <span aria-hidden>▤</span> Saved Charts
           </TabButton>
         </TabNavigation>
       )}
 
       {/* Tab Content */}
       {!isPickMode && activeTab === 'new' ? (
-        <TabContent style={{ height: 'fit-content', overflow: 'visible' }}>
-        <FormContainer style={{ flex: 1, overflow: 'visible', height: 'fit-content' }}>
-          <div style={{ position: 'relative', zIndex: 3, padding: '0px 24px 16px 24px' }}>
-          <h2>
-            {prefilledData ? 'Marriage Analysis - Enter Details' : 'Birth Details'}
-          </h2>
+        <TabContent>
+        <FormContainer>
+          <div className="birth-form-panel">
+          <div className="birth-form-panel__intro">
+            <p>Use the exact birth time and select a place from search for an accurate chart.</p>
+            <span className="birth-form-panel__required">* Required</span>
+          </div>
           {prefilledData && (
-            <div style={{ marginBottom: '15px', padding: '10px', background: 'rgba(76, 175, 80, 0.1)', border: '1px solid #4caf50', borderRadius: 0, color: '#4caf50', fontSize: '0.9rem' }}>
+            <div className="birth-form-notice birth-form-notice--success">
               ✓ Form pre-filled from homepage. Please verify and complete the details.
             </div>
           )}
@@ -552,9 +511,9 @@ const BirthForm = ({
               return false;
             }
             handleSubmit(e);
-          }}>
-        <FormField>
-          <Label>{FORM_FIELDS.name.label}</Label>
+          }} className="birth-form-grid">
+        <FormField className="birth-form-field birth-form-field--name">
+          <Label>{FORM_FIELDS.name.label}{FORM_FIELDS.name.required ? ' *' : ''}</Label>
           <Input
             type="text"
             name="name"
@@ -566,7 +525,7 @@ const BirthForm = ({
           {errors.name && <span className="error">{errors.name}</span>}
         </FormField>
 
-        <FormField>
+        <FormField className="birth-form-field birth-form-field--gender">
           <Label>Gender</Label>
           <Select
             name="gender"
@@ -579,8 +538,8 @@ const BirthForm = ({
           </Select>
         </FormField>
 
-        <FormField>
-          <Label>{FORM_FIELDS.date.label}</Label>
+        <FormField className="birth-form-field">
+          <Label>{FORM_FIELDS.date.label}{FORM_FIELDS.date.required ? ' *' : ''}</Label>
           <Input
             type="date"
             name="date"
@@ -593,8 +552,8 @@ const BirthForm = ({
           {errors.date && <span className="error">{errors.date}</span>}
         </FormField>
 
-        <FormField>
-          <Label>{FORM_FIELDS.time.label}</Label>
+        <FormField className="birth-form-field">
+          <Label>{FORM_FIELDS.time.label}{FORM_FIELDS.time.required ? ' *' : ''}</Label>
           <Input
             type="time"
             name="time"
@@ -605,7 +564,7 @@ const BirthForm = ({
           {errors.time && <span className="error">{errors.time}</span>}
         </FormField>
 
-        <FormField>
+        <FormField className="birth-form-field birth-form-field--place">
           <Label>{FORM_FIELDS.place.label} *</Label>
           <AutocompleteContainer>
             <Input
@@ -619,9 +578,7 @@ const BirthForm = ({
               onBlur={() => {
                 setTimeout(() => setShowSuggestions(false), 200);
               }}
-              style={{
-                borderColor: formData.latitude && formData.longitude ? '#4caf50' : (errors.place ? '#f44336' : '#ddd')
-              }}
+              className={formData.latitude && formData.longitude ? 'is-confirmed' : ''}
             />
             {showSuggestions && suggestions.length > 0 && (
               <SuggestionList>
@@ -635,33 +592,29 @@ const BirthForm = ({
                 ))}
               </SuggestionList>
             )}
-            {formData.place && (!formData.latitude || formData.latitude === null) && (
-              <div style={{ color: '#f44336', fontSize: '12px', marginTop: '4px', fontWeight: '500' }}>
-                ⚠️ You must select from suggestions - manual entry will not work
+            {formData.place && (!formData.latitude || formData.latitude === null) && !errors.place && (
+              <div className="birth-form-location-status birth-form-location-status--warning">
+                Select a result from the suggestions to confirm this location.
               </div>
             )}
             {formData.latitude && formData.longitude && (
-              <div style={{ color: '#4caf50', fontSize: '12px', marginTop: '4px' }}>
-                ✓ Location confirmed: {formData.latitude.toFixed(4)}, {formData.longitude.toFixed(4)}
+              <div className="birth-form-location-status birth-form-location-status--success">
+                ✓ Location confirmed
               </div>
             )}
           </AutocompleteContainer>
           {errors.place && <span className="error">{errors.place}</span>}
         </FormField>
 
-        <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+        <div className="birth-form-actions">
           <Button 
             type="submit"
             disabled={!formData.latitude || !formData.longitude || formData.latitude === null || formData.longitude === null}
-            style={{
-              opacity: (!formData.latitude || !formData.longitude || formData.latitude === null || formData.longitude === null) ? 0.5 : 1,
-              cursor: (!formData.latitude || !formData.longitude || formData.latitude === null || formData.longitude === null) ? 'not-allowed' : 'pointer'
-            }}
           >
             {editingChart ? 'Update Chart' : prefilledData ? 'Generate Marriage Analysis' : 'Calculate Birth Chart'}
           </Button>
           {editingChart && (
-            <Button type="button" onClick={cancelEdit} style={{ background: '#6c757d' }}>
+            <Button type="button" onClick={cancelEdit} className="birth-form-button--secondary">
               Cancel
             </Button>
           )}
@@ -671,50 +624,74 @@ const BirthForm = ({
         </FormContainer>
         </TabContent>
       ) : (
-        <div style={{ padding: '10px', height: '600px', display: 'flex', flexDirection: 'column' }}>
-          <SearchInput
-            type="text"
-            placeholder="Search by name..."
-            value={searchQuery}
-            onChange={handleSearchChange}
-            style={{ marginBottom: '10px', flexShrink: 0 }}
-          />
+        <div className="saved-charts-panel">
+          <div className="saved-charts-panel__toolbar">
+            <SearchInput
+              type="search"
+              aria-label="Search saved charts"
+              placeholder="Search saved charts by name"
+              value={searchQuery}
+              onChange={handleSearchChange}
+            />
+            <span className="saved-charts-panel__count">
+              {chartsTotal || existingCharts.length} {(chartsTotal || existingCharts.length) === 1 ? 'chart' : 'charts'}
+            </span>
+          </div>
           {chartsListLoading && existingCharts.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
-              Loading charts...
+            <div className="saved-charts-state">
+              <span className="saved-charts-state__loader" aria-hidden />
+              Loading your charts…
             </div>
           ) : null}
-          <ChartsList style={{ flex: 1, minHeight: 0, height: 'auto' }}>
+          <ChartsList>
             {existingCharts.map(chart => (
-              <ChartItem key={chart.id}>
-                <div onClick={() => selectExistingChart(chart)} style={{ flex: 1, cursor: 'pointer' }}>
-                  <strong>{chart.name}</strong><br/>
-                  {chart.date} at {chart.time}<br/>
-                  <small>Created: {new Date(chart.created_at).toLocaleDateString()}</small>
-                </div>
+              <ChartItem key={chart.id} className="saved-chart-card">
+                <button
+                  type="button"
+                  className="saved-chart-main"
+                  onClick={() => selectExistingChart(chart)}
+                  aria-label={`Open chart for ${chart.name}`}
+                >
+                  <span className="saved-chart-avatar" aria-hidden>
+                    {String(chart.name || '?').trim().charAt(0).toUpperCase()}
+                  </span>
+                  <span className="saved-chart-copy">
+                    <strong>{chart.name}</strong>
+                    <span>{chart.date} · {chart.time}</span>
+                    <small>{chart.place || 'Birth place not saved'}</small>
+                  </span>
+                  <span className="saved-chart-open" aria-hidden>→</span>
+                </button>
                 {!isPickMode && (
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div className="saved-chart-actions">
                     <button
                       type="button"
+                      className="saved-chart-action saved-chart-action--edit"
                       onClick={(e) => { e.stopPropagation(); editChart(chart); setActiveTab('new'); }}
-                      style={{ padding: '4px 8px', fontSize: '12px', background: '#ff6f00', color: 'white', border: 'none', borderRadius: 0, cursor: 'pointer' }}
+                      aria-label={`Edit ${chart.name}`}
                     >
                       Edit
                     </button>
                     <button
                       type="button"
+                      className="saved-chart-action saved-chart-action--delete"
                       onClick={(e) => { e.stopPropagation(); deleteChart(chart.id); }}
-                      style={{ padding: '4px 8px', fontSize: '12px', background: '#e91e63', color: 'white', border: 'none', borderRadius: 0, cursor: 'pointer' }}
+                      aria-label={`Delete ${chart.name}`}
                     >
                       Delete
                     </button>
                   </div>
                 )}
+                <span className="saved-chart-created">
+                  Saved {new Date(chart.created_at).toLocaleDateString()}
+                </span>
               </ChartItem>
             ))}
             {!chartsListLoading && existingCharts.length === 0 && (
-              <div style={{ textAlign: 'center', color: '#64748b', padding: '1rem' }}>
-                {searchQuery ? 'No charts found' : 'No saved charts'}
+              <div className="saved-charts-state saved-charts-state--empty">
+                <span aria-hidden>{searchQuery ? '⌕' : '◇'}</span>
+                <strong>{searchQuery ? 'No matching charts' : 'No saved charts yet'}</strong>
+                <p>{searchQuery ? 'Try a different name.' : 'Create a new chart to see it here.'}</p>
               </div>
             )}
           </ChartsList>

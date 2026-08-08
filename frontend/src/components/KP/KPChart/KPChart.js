@@ -20,8 +20,20 @@ function houseFromLongitude(longitude, houses) {
   return 1;
 }
 
-const KPChart = ({ chartData, birthData, deskMode = false }) => {
-  const [chartStyle, setChartStyle] = useState('north');
+const KPChart = ({
+  chartData,
+  birthData,
+  deskMode = false,
+  chartStyle: controlledChartStyle,
+  onChartStyleChange,
+}) => {
+  const [internalChartStyle, setInternalChartStyle] = useState('north');
+  const chartStyle = controlledChartStyle ?? internalChartStyle;
+  const toggleChartStyle = () => {
+    const nextStyle = chartStyle === 'north' ? 'south' : 'north';
+    if (onChartStyleChange) onChartStyleChange(nextStyle);
+    else setInternalChartStyle(nextStyle);
+  };
   
   if (!chartData || !chartData.houses || !chartData.planets) {
     return (
@@ -94,7 +106,7 @@ const KPChart = ({ chartData, birthData, deskMode = false }) => {
         <button
           type="button"
           className="kp-chart-desk-toggle"
-          onClick={() => setChartStyle((prev) => (prev === 'north' ? 'south' : 'north'))}
+          onClick={toggleChartStyle}
           title="North / South Indian"
         >
           {chartStyle === 'north' ? 'N' : 'S'}
@@ -128,7 +140,7 @@ const KPChart = ({ chartData, birthData, deskMode = false }) => {
           </div>
         </div>
         <button
-          onClick={() => setChartStyle(prev => prev === 'north' ? 'south' : 'north')}
+          onClick={toggleChartStyle}
           style={{
             padding: '8px 16px',
             fontSize: '12px',

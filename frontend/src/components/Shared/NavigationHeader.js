@@ -66,7 +66,8 @@ function FullHamburgerMenuItems({
     <div className="mobile-menu-section-label">Birth Chart</div>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { onBirthChartAction('create'); onClose(); }}>✨ Create birth chart</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { onBirthChartAction('select'); onClose(); }}>👤 Select birth chart</button>
-    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas'); onClose(); }}>📊 Charts & dashas</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas'); onClose(); }}>📊 Parashari Desk</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas/nadi'); onClose(); }}>🧭 Nadi Desk</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas/kp'); onClose(); }}>🪐 KP Desk</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas/activations'); onClose(); }}>✦ What’s activated</button>
 
@@ -366,7 +367,8 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
           >
             <button type="button" onClick={() => { applyBirthChartIntent('create'); setActiveDropdown(null); }}>✨ Create birth chart</button>
             <button type="button" onClick={() => { applyBirthChartIntent('select'); setActiveDropdown(null); }}>👤 Select birth chart</button>
-            <button type="button" onClick={() => { navigate('/charts-dashas'); setActiveDropdown(null); }}>📊 Charts & dashas</button>
+            <button type="button" onClick={() => { navigate('/charts-dashas'); setActiveDropdown(null); }}>📊 Parashari Desk</button>
+            <button type="button" onClick={() => { navigate('/charts-dashas/nadi'); setActiveDropdown(null); }}>🧭 Nadi Desk</button>
             <button type="button" onClick={() => { navigate('/charts-dashas/kp'); setActiveDropdown(null); }}>🪐 KP Desk</button>
             <button type="button" onClick={() => { navigate('/charts-dashas/activations'); setActiveDropdown(null); }}>✦ What’s activated</button>
           </div>
@@ -603,7 +605,8 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
         >
           <button type="button" onClick={() => { applyBirthChartIntent('create'); setActiveDropdown(null); }}>✨ Create birth chart</button>
           <button type="button" onClick={() => { applyBirthChartIntent('select'); setActiveDropdown(null); }}>👤 Select birth chart</button>
-          <button type="button" onClick={() => { navigate('/charts-dashas'); setActiveDropdown(null); }}>📊 Charts & dashas</button>
+          <button type="button" onClick={() => { navigate('/charts-dashas'); setActiveDropdown(null); }}>📊 Parashari Desk</button>
+          <button type="button" onClick={() => { navigate('/charts-dashas/nadi'); setActiveDropdown(null); }}>🧭 Nadi Desk</button>
           <button type="button" onClick={() => { navigate('/charts-dashas/kp'); setActiveDropdown(null); }}>🪐 KP Desk</button>
           <button type="button" onClick={() => { navigate('/charts-dashas/activations'); setActiveDropdown(null); }}>✦ What’s activated</button>
         </div>

@@ -99,7 +99,7 @@ function parseGandanta(payload) {
 /**
  * Compact planetary-condition strip: combust, R, VG, yuddha, baladi, Gandanta.
  */
-export default function DeskConditionStrip({ birthData, chartData }) {
+export default function DeskConditionStrip({ birthData, chartData, label = 'Cond' }) {
   const [d9, setD9] = useState(null);
   const [gandanta, setGandanta] = useState({ byPlanet: {}, lagna: null });
 
@@ -222,14 +222,14 @@ export default function DeskConditionStrip({ birthData, chartData }) {
   if (!chips.length) {
     return (
       <div className="desk-cond desk-cond--strip desk-cond--empty" aria-hidden="true">
-        <span className="desk-cond__label">Cond</span>
+        <span className="desk-cond__label">{label}</span>
       </div>
     );
   }
 
   return (
     <div className="desk-cond desk-cond--strip" aria-label="Planetary conditions">
-      <span className="desk-cond__label">Cond</span>
+      <span className="desk-cond__label">{label}</span>
       <div className="desk-cond__chips">
         {chips.map((c) => (
           <span key={c.key} className={`desk-cond__chip desk-cond__chip--${c.tone}`} title={c.title}>

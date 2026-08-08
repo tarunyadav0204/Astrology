@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import SEOHead from '../SEO/SEOHead';
 import ChartWidget from '../Charts/ChartWidget';
@@ -91,6 +91,7 @@ const ChartsDashasWorkspacePage = ({
   onOpenRegister,
 }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isMobileDesk = useMobileDesk();
   const { birthData, chartData, setBirthData } = useAstrology();
   const [showBirthModal, setShowBirthModal] = useState(false);
@@ -329,6 +330,7 @@ const ChartsDashasWorkspacePage = ({
           onHouseSelect={handleHouseSelect}
           onOpenTool={setActiveTool}
           onChangeNative={() => openBirthModal('saved')}
+          initialHubTab={searchParams.get('tab')}
         />
       ) : (
         <div className="parashari-desk-body">

@@ -626,9 +626,9 @@ export default function DeskActivationsPanel({
       <div className="desk-act__toolbar">
         <div className="desk-act__lenses" role="tablist" aria-label="Activation lens">
           {[
-            { id: 'timeline', label: 'Timeline' },
-            { id: 'focus', label: 'Focus' },
-            { id: 'map', label: 'Map' },
+            { id: 'timeline', label: 'Timeline', icon: '↝' },
+            { id: 'focus', label: 'Focus', icon: '◎' },
+            { id: 'map', label: 'Map', icon: '▦' },
           ].map((item) => (
             <button
               key={item.id}
@@ -638,7 +638,12 @@ export default function DeskActivationsPanel({
               className={lens === item.id ? 'is-active' : ''}
               onClick={() => setLens(item.id)}
             >
-              {item.label}
+              {layout === 'mobile' ? (
+                <>
+                  <span className="desk-act__lens-icon" aria-hidden>{item.icon}</span>
+                  <span className="desk-act__lens-label">{item.label}</span>
+                </>
+              ) : item.label}
             </button>
           ))}
         </div>

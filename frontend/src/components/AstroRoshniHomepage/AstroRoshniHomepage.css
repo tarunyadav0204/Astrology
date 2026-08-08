@@ -586,6 +586,17 @@
   max-width: 1120px;
 }
 
+.core-tools-section--life {
+  width: 100%;
+  max-width: var(--life-categories-content-width);
+  margin: 0 auto 24px;
+  border-radius: 20px;
+  position: relative;
+  z-index: 10;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
 .vedic-tools-header {
   text-align: center;
   margin-bottom: 28px;
@@ -5947,7 +5958,7 @@
 }
 
 .astro-tools-hub-grid--desks {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -6030,6 +6041,11 @@
 .astro-tools-hub-card--parashari .astro-tools-hub-card__icon {
   background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
   color: #c2410c;
+}
+
+.astro-tools-hub-card--dasha .astro-tools-hub-card__icon {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
 }
 
 .astro-tools-hub-card--nadi .astro-tools-hub-card__icon {

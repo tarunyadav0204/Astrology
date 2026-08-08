@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ChartWidget from '../Charts/ChartWidget';
 import DeskDateNavigator from './DeskDateNavigator';
@@ -25,13 +25,13 @@ const HUB_TABS = [
 ];
 
 const MORE_TABS = [
-  { id: 'house', label: 'House' },
-  { id: 'positions', label: 'Pos' },
-  { id: 'yogas', label: 'Yogas' },
-  { id: 'friends', label: 'Friends' },
-  { id: 'lords', label: 'Lords' },
-  { id: 'aspects', label: 'Aspects' },
-  { id: 'meta', label: 'Meta' },
+  { id: 'house', label: 'House', icon: '⌂' },
+  { id: 'positions', label: 'Pos', icon: '☷' },
+  { id: 'yogas', label: 'Yogas', icon: '✦' },
+  { id: 'friends', label: 'Friends', icon: '↔' },
+  { id: 'lords', label: 'Lords', icon: '♔' },
+  { id: 'aspects', label: 'Aspects', icon: '◎' },
+  { id: 'meta', label: 'Meta', icon: '⋯' },
 ];
 
 const SIGN_NAMES = [
@@ -90,33 +90,72 @@ export default function ParashariDeskMobile({
   onHouseSelect,
   onOpenTool,
   onChangeNative,
+  initialHubTab,
 }) {
   const navigate = useNavigate();
-  const [hubTab, setHubTab] = useState('chart');
+  const requestedHubTab = HUB_TABS.some((tab) => tab.id === initialHubTab)
+    ? initialHubTab
+    : 'chart';
+  const [hubTab, setHubTab] = useState(requestedHubTab);
   const [chartPill, setChartPill] = useState('lagna');
   const [metaOpen, setMetaOpen] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const chartNavRef = useRef(null);
+  const moreNavRef = useRef(null);
 
-  const showAsOf = hubTab === 'chart' || hubTab === 'dasha' || hubTab === 'act';
+  useEffect(() => {
+    setHubTab(requestedHubTab);
+  }, [requestedHubTab]);
+
+  const showAsOf = (hubTab === 'chart' && chartPill === 'transit')
+    || hubTab === 'dasha'
+    || hubTab === 'act';
 
   const mobileChartOptions = useMemo(() => {
     const divisionals = (divisionalOptions || []).map((option) => ({
       ...option,
       id: `division-${option.value}`,
       mode: option.value === 9 ? 'navamsa' : 'divisional',
+      icon: {
+        2: '💰', 3: '👫', 4: '🏡', 7: '👶', 9: '💎', 10: '💼',
+        12: '👪', 16: '🚗', 20: '🙏', 24: '📚', 27: '⭐', 30: '⚠️',
+        40: '🍀', 45: '🎭', 60: '⏳',
+      }[option.value] || '◇',
     }));
     const jaimini = (jaiminiOptions || []).map((option) => ({
       ...option,
       id: `division-${option.value}`,
       mode: 'divisional',
+      icon: option.value === 'karkamsa' ? '🎯' : '🕉️',
     }));
+    const navamsa = divisionals.find((option) => option.value === 9);
+    const otherDivisionals = divisionals.filter((option) => option.value !== 9);
     return [
-      { id: 'lagna', shortLabel: 'D1', label: 'Lagna', mode: 'lagna' },
-      ...divisionals,
+      { id: 'lagna', shortLabel: 'D1', label: 'Lagna', mode: 'lagna', icon: '🏠' },
+      ...(navamsa ? [navamsa] : []),
+      { id: 'transit', shortLabel: 'Tr', label: 'Transit', mode: 'transit', icon: '🪐' },
       ...jaimini,
-      { id: 'transit', shortLabel: 'Tr', label: 'Transit', mode: 'transit' },
+      ...otherDivisionals,
     ];
   }, [divisionalOptions, jaiminiOptions]);
+
+  useEffect(() => {
+    if (hubTab !== 'chart') return;
+    const nav = chartNavRef.current;
+    const active = nav?.querySelector('.is-active');
+    if (!nav || !active) return;
+    const left = active.offsetLeft - ((nav.clientWidth - active.clientWidth) / 2);
+    nav.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+  }, [hubTab, chartPill, selectedDx]);
+
+  useEffect(() => {
+    if (hubTab !== 'more') return;
+    const nav = moreNavRef.current;
+    const active = nav?.querySelector('.is-active');
+    if (!nav || !active) return;
+    const left = active.offsetLeft - ((nav.clientWidth - active.clientWidth) / 2);
+    nav.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+  }, [hubTab, analysisTab]);
 
   const activeChart = useMemo(() => {
     if (chartPill === 'lagna') {
@@ -210,30 +249,6 @@ export default function ParashariDeskMobile({
       <div className="pdm__body">
         {hubTab === 'chart' ? (
           <section className="pdm__pane pdm__pane--chart">
-            <div className="pdm__pills pdm__pills--charts" role="tablist" aria-label="Chart type">
-              {mobileChartOptions.map((pill) => {
-                const isActive = pill.mode === 'divisional'
-                  ? chartPill === 'divisional' && selectedDx === pill.value
-                  : chartPill === pill.mode;
-                return (
-                <button
-                  key={pill.id}
-                  type="button"
-                  role="tab"
-                  title={pill.label}
-                  aria-selected={isActive}
-                  className={isActive ? 'is-active' : ''}
-                  onClick={() => {
-                    if (pill.value != null) onSelectedDxChange?.(pill.value);
-                    setChartPill(pill.mode);
-                  }}
-                >
-                  {pill.shortLabel}
-                </button>
-                );
-              })}
-            </div>
-
             <div className="pdm__chart">
               <ChartWidget
                 title={activeChart.title}
@@ -277,6 +292,38 @@ export default function ParashariDeskMobile({
                 <DeskSpecialLagnas birthData={birthData} chartData={chartData} />
               </div>
             ) : null}
+
+            <nav className="pdm__chart-nav" aria-label="Chart browser">
+              <div
+                ref={chartNavRef}
+                className="pdm__pills pdm__pills--charts"
+                role="tablist"
+                aria-label="Chart type"
+              >
+                {mobileChartOptions.map((pill) => {
+                  const isActive = pill.mode === 'divisional'
+                    ? chartPill === 'divisional' && selectedDx === pill.value
+                    : chartPill === pill.mode;
+                  return (
+                    <button
+                      key={pill.id}
+                      type="button"
+                      role="tab"
+                      title={pill.label}
+                      aria-selected={isActive}
+                      className={isActive ? 'is-active' : ''}
+                      onClick={() => {
+                        if (pill.value != null) onSelectedDxChange?.(pill.value);
+                        setChartPill(pill.mode);
+                      }}
+                    >
+                      <span className="pdm__chart-tab-icon" aria-hidden>{pill.icon}</span>
+                      <span className="pdm__chart-tab-label">{pill.shortLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </nav>
           </section>
         ) : null}
 
@@ -313,25 +360,16 @@ export default function ParashariDeskMobile({
             <DeskStrengthStrip
               birthData={birthData}
               chartData={chartData}
-              onOpenTool={onOpenTool}
+              onOpenTool={(toolId) => {
+                if (toolId === 'ashtakavarga') {
+                  navigate('/tools/ashtakavarga');
+                  return;
+                }
+                onOpenTool?.(toolId);
+              }}
+              layout="mobile"
             />
-            <div className="pdm__more-tabs" role="tablist" aria-label="Analysis">
-              {MORE_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={analysisTab === tab.id || (tab.id === 'meta' && analysisTab === 'meta')}
-                  className={(tab.id === 'meta' ? analysisTab === 'meta' : analysisTab === tab.id) ? 'is-active' : ''}
-                  onClick={() => onAnalysisTabChange?.(tab.id)}
-                >
-                  {tab.id === 'house' && houseSelection?.houseNumber
-                    ? `H${houseSelection.houseNumber}`
-                    : tab.label}
-                </button>
-              ))}
-            </div>
-            <div className="pdm__more-body">
+            <div className={`pdm__more-body${analysisTab === 'meta' ? ' pdm__more-body--meta' : ''}`}>
               {analysisTab === 'house' ? (
                 <>
                   {housePicker}
@@ -365,14 +403,43 @@ export default function ParashariDeskMobile({
               ) : analysisTab === 'aspects' ? (
                 <DeskAspectsPanel chartData={chartData} />
               ) : (
-                <div className="pdm__meta">
+                <div className="pdm__meta pdm__meta--overview">
                   <DeskBirthPanchang birthData={birthData} />
                   <DeskSpecialPoints birthData={birthData} chartData={chartData} variant="strip" />
-                  <DeskConditionStrip birthData={birthData} chartData={chartData} />
+                  <DeskConditionStrip
+                    birthData={birthData}
+                    chartData={chartData}
+                    label="Planetary conditions"
+                  />
                   <DeskSpecialLagnas birthData={birthData} chartData={chartData} />
                 </div>
               )}
             </div>
+
+            <nav className="pdm__more-nav" aria-label="Analysis browser">
+              <div ref={moreNavRef} className="pdm__more-tabs" role="tablist" aria-label="Analysis">
+                {MORE_TABS.map((tab) => {
+                  const isActive = analysisTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      className={isActive ? 'is-active' : ''}
+                      onClick={() => onAnalysisTabChange?.(tab.id)}
+                    >
+                      <span className="pdm__more-tab-icon" aria-hidden>{tab.icon}</span>
+                      <span className="pdm__more-tab-label">
+                        {tab.id === 'house' && houseSelection?.houseNumber
+                          ? `H${houseSelection.houseNumber}`
+                          : tab.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </nav>
           </section>
         ) : null}
       </div>

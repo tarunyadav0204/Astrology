@@ -401,9 +401,9 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
     }
 
     const baseTabs = [
-      { id: 'matrix', label: 'Matrix' },
-      { id: 'sarva', label: 'SAV' },
-      { id: 'individual', label: 'BAV' },
+      { id: 'matrix', label: 'Matrix', icon: '▦' },
+      { id: 'sarva', label: 'SAV', icon: 'Σ' },
+      { id: 'individual', label: 'BAV', icon: '◫' },
     ];
 
     if (viewMode === 'transit') {
@@ -411,7 +411,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
     }
 
     if (chartType === 'lagna') {
-      return [...baseTabs, { id: 'analysis', label: 'Predictions' }];
+      return [...baseTabs, { id: 'analysis', label: 'Predictions', icon: '✦' }];
     }
     if (chartType === 'navamsa') {
       return [...baseTabs, { id: 'analysis', label: short('Marriage Analysis', 'Marriage') }];
@@ -1437,6 +1437,11 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
       onClick={variant === 'modal' ? (e) => e.stopPropagation() : undefined}
     >
       <div className="modal-header">
+        {variant === 'page' ? (
+          <button type="button" className="close-btn" onClick={onClose} aria-label="Back">
+            ← Back
+          </button>
+        ) : null}
         <h2>Ashtakavarga Analysis - {chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart</h2>
         <div className="header-controls">
           <div className="view-mode-toggle">
@@ -1470,9 +1475,9 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
               className="date-picker"
             />
           )}
-          <button type="button" className="close-btn" onClick={onClose} aria-label={variant === 'page' ? 'Back' : 'Close'}>
-            ×
-          </button>
+          {variant === 'modal' ? (
+            <button type="button" className="close-btn" onClick={onClose} aria-label="Close">×</button>
+          ) : null}
         </div>
       </div>
 
@@ -1487,7 +1492,12 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
               className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
             >
-              {tab.label}
+              {variant === 'page' && isMobileLayout ? (
+                <>
+                  <span className="av-tab-icon" aria-hidden>{tab.icon || '•'}</span>
+                  <span className="av-tab-label">{tab.label}</span>
+                </>
+              ) : tab.label}
             </button>
           ))}
         </div>

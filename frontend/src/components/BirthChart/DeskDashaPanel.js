@@ -337,7 +337,6 @@ const DeskDashaPanel = ({
   const [view, setView] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [mobileLevelKey, setMobileLevelKey] = useState(null);
   const listRefs = useRef({});
   const activeSystem = system || 'vimshottari';
   const setSystem = onSystemChange || (() => {});
@@ -431,24 +430,20 @@ const DeskDashaPanel = ({
   );
 
   useEffect(() => {
-    if (!isMobile || !levels.length) return;
-    if (!mobileLevelKey || !levels.some((level) => level.key === mobileLevelKey)) {
-      const currentLevel = [...levels].reverse().find((level) => level.rows.some((r) => r.current));
-      setMobileLevelKey((currentLevel || levels[0]).key);
-    }
-  }, [isMobile, levels, mobileLevelKey]);
-
-  useEffect(() => {
-    const keys = isMobile
-      ? levels.filter((level) => level.key === mobileLevelKey)
-      : levels;
-    keys.forEach((level) => {
+    levels.forEach((level) => {
       const el = listRefs.current[level.key];
       if (!el) return;
       const current = el.querySelector('[data-current="true"]');
-      if (current) current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      if (current) {
+        if (isMobile) {
+          const left = current.offsetLeft - ((el.clientWidth - current.clientWidth) / 2);
+          el.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+        } else {
+          current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }
     });
-  }, [levels, isMobile, mobileLevelKey]);
+  }, [levels, isMobile]);
 
   const handleSelect = (period) => {
     if (!onJumpToDate) return;
@@ -458,10 +453,6 @@ const DeskDashaPanel = ({
   };
 
   const systemMeta = SYSTEMS.find((s) => s.id === activeSystem);
-  const visibleLevels = isMobile
-    ? levels.filter((level) => level.key === (mobileLevelKey || levels[0]?.key))
-    : levels;
-
   return (
     <div className={`desk-dasha${isMobile ? ' desk-dasha--mobile' : ''}`}>
       <div className="desk-dasha__meta">
@@ -501,30 +492,13 @@ const DeskDashaPanel = ({
                 title={s.full}
                 onClick={() => setSystem(s.id)}
               >
-                {s.label}
+                <span>{s.label}</span>
+                {isMobile ? <small>{s.full}</small> : null}
               </button>
             ))}
           </div>
         </div>
       </div>
-
-      {isMobile && levels.length > 1 ? (
-        <div className="desk-dasha__level-tabs" role="tablist" aria-label="Dasha level">
-          {levels.map((level) => (
-            <button
-              key={level.key}
-              type="button"
-              role="tab"
-              aria-selected={mobileLevelKey === level.key}
-              className={mobileLevelKey === level.key ? 'is-active' : ''}
-              onClick={() => setMobileLevelKey(level.key)}
-              title={level.full}
-            >
-              {level.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
 
       {error ? (
         <div className="desk-dasha__error">{error}</div>
@@ -540,7 +514,7 @@ const DeskDashaPanel = ({
               gridTemplateColumns: `repeat(${Math.max(levels.length, 1)}, minmax(0, ${levels.length <= 2 ? '240px' : '1fr'}))`,
             }}
           >
-            {visibleLevels.map((level) => (
+            {levels.map((level) => (
               <div key={level.key} className="desk-dasha__col" role="rowgroup">
                 <div className="desk-dasha__col-head" title={level.full}>
                   <span>{level.label}</span>

@@ -23,7 +23,7 @@ function AshtakavargaToolPage({ user, onLogout, onAdminClick, onLogin }) {
     if (typeof window !== 'undefined' && window.history.length > 1) {
       navigate(-1);
     } else {
-      navigate('/');
+      navigate('/charts-dashas?tab=more');
     }
   };
 
@@ -42,6 +42,10 @@ function AshtakavargaToolPage({ user, onLogout, onAdminClick, onLogin }) {
         onChangeNative={() => setShowBirthModal(true)}
         onHomeClick={() => navigate('/')}
       />
+      <div className="ashtakavarga-tool-mobile-bar">
+        <button type="button" onClick={handleBack} aria-label="Back to previous screen">← Back</button>
+        <strong>Ashtakavarga</strong>
+      </div>
       {birthData ? (
         <AshtakavargaModal
           variant="page"

@@ -153,6 +153,7 @@ function KPDeskPage({ user, onLogin }) {
   const [sigPanel, setSigPanel] = useState('house');
   const [mobileTab, setMobileTab] = useState('chart');
   const [mobileTable, setMobileTable] = useState('planets');
+  const [kpChartStyle, setKpChartStyle] = useState('north');
 
   const hasChart = Boolean(
     birthData?.date && birthData?.time && birthData?.latitude != null && birthData?.longitude != null
@@ -366,19 +367,30 @@ function KPDeskPage({ user, onLogin }) {
           <button type="button" onClick={() => (user ? setShowBirthModal(true) : onLogin?.())}>Change native</button>
           {!user ? <button type="button" className="kp-desk-bar__primary" onClick={onLogin}>Sign in</button> : null}
         </div>
+      </header>
+
+      {user && hasChart ? (
         <nav className="kp-desk-mobile-hub" role="tablist" aria-label="KP desk sections">
           {[
-            ['chart', 'Chart'],
-            ['tables', 'Tables'],
-            ['sigs', 'Sigs'],
-            ['predict', 'Predict'],
-          ].map(([id, label]) => (
-            <button key={id} type="button" role="tab" aria-selected={mobileTab === id} className={mobileTab === id ? 'is-active' : ''} onClick={() => setMobileTab(id)}>
-              {label}
+            { id: 'chart', label: 'Chart', icon: '◇' },
+            { id: 'tables', label: 'Tables', icon: '☷' },
+            { id: 'sigs', label: 'Significators', icon: '✦' },
+            { id: 'predict', label: 'Predictions', icon: '◎' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={mobileTab === tab.id}
+              className={mobileTab === tab.id ? 'is-active' : ''}
+              onClick={() => setMobileTab(tab.id)}
+            >
+              <span className="kp-desk-mobile-hub__icon" aria-hidden>{tab.icon}</span>
+              <span className="kp-desk-mobile-hub__label">{tab.label}</span>
             </button>
           ))}
         </nav>
-      </header>
+      ) : null}
 
       {!user ? (
         <div className="kp-desk-empty">
@@ -433,10 +445,28 @@ function KPDeskPage({ user, onLogin }) {
               </div>
             ) : null}
             <section className={`kp-desk-panel kp-desk-panel--chart${mobileTab === 'chart' ? ' is-mobile-active' : ''}`}>
-              <header className="kp-desk-panel__head"><h2>KP Chart</h2><span>{viewLabel}</span></header>
+              <header className="kp-desk-panel__head">
+                <h2>KP Chart</h2>
+                <span>{viewLabel}</span>
+                <button
+                  type="button"
+                  className="kp-desk-panel__style-toggle"
+                  onClick={() => setKpChartStyle((style) => (style === 'north' ? 'south' : 'north'))}
+                  aria-label={`Switch to ${kpChartStyle === 'north' ? 'South' : 'North'} Indian chart`}
+                  title="North / South Indian"
+                >
+                  {kpChartStyle === 'north' ? 'N' : 'S'}
+                </button>
+              </header>
               <div className="kp-desk-chart">
                 {chartWidget.houses.length ? (
-                  <KPChart chartData={chartWidget} birthData={birthData} deskMode />
+                  <KPChart
+                    chartData={chartWidget}
+                    birthData={birthData}
+                    deskMode
+                    chartStyle={kpChartStyle}
+                    onChartStyleChange={setKpChartStyle}
+                  />
                 ) : (
                   <div className="kp-desk-muted">{loading || fructLoading ? 'Loading…' : 'No chart'}</div>
                 )}
@@ -514,10 +544,10 @@ function KPDeskPage({ user, onLogin }) {
               <header className="kp-desk-panel__head">
                 <h2>Significators</h2>
                 <span>{viewLabel}</span>
-                <div className="kp-desk-toggle kp-desk-toggle--sm">
-                  <button type="button" className={sigPanel === 'house' ? 'is-active' : ''} onClick={() => setSigPanel('house')}>H-Sig</button>
-                  <button type="button" className={sigPanel === 'planet' ? 'is-active' : ''} onClick={() => setSigPanel('planet')}>P-Sig</button>
-                  <button type="button" className={sigPanel === 'steps' ? 'is-active' : ''} onClick={() => setSigPanel('steps')}>4-Step</button>
+                <div className="kp-desk-toggle kp-desk-toggle--sm" role="tablist" aria-label="Significator view">
+                  <button type="button" role="tab" aria-selected={sigPanel === 'house'} className={sigPanel === 'house' ? 'is-active' : ''} onClick={() => setSigPanel('house')}>Houses</button>
+                  <button type="button" role="tab" aria-selected={sigPanel === 'planet'} className={sigPanel === 'planet' ? 'is-active' : ''} onClick={() => setSigPanel('planet')}>Planets</button>
+                  <button type="button" role="tab" aria-selected={sigPanel === 'steps'} className={sigPanel === 'steps' ? 'is-active' : ''} onClick={() => setSigPanel('steps')}>4-Step</button>
                 </div>
               </header>
               <div className="kp-desk-sigs">

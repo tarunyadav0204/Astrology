@@ -53,6 +53,10 @@
   background: var(--av-bg);
 }
 
+.ashtakavarga-tool-mobile-bar {
+  display: none;
+}
+
 .ashtakavarga-tool-empty {
   flex: 1 1 0%;
   min-height: 0;
@@ -218,6 +222,18 @@
 .ashtakavarga-modal.ashtakavarga-modal--embedded .modal-header h2 {
   color: var(--av-ink);
   font-weight: 750;
+}
+
+.ashtakavarga-modal.ashtakavarga-modal--embedded .close-btn {
+  width: auto;
+  min-width: 68px;
+  padding: 0 0.65rem;
+  border: 1px solid var(--av-line);
+  background: #fff;
+  color: var(--av-accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .header-controls {
@@ -2095,5 +2111,170 @@
   .ashtakavarga-tool-page {
     max-width: min(1120px, calc(100vw - 72px));
     padding: 20px 36px 40px;
+  }
+}
+
+/* Full-page mobile tool: context stays at the top; analysis sections live in
+   a persistent thumb-friendly bottom navigation. */
+@media (max-width: 768px) {
+  .ashtakavarga-tool-page-root {
+    padding-top: 0;
+  }
+
+  .ashtakavarga-tool-page-root > .main-header {
+    display: none;
+  }
+
+  .ashtakavarga-tool-mobile-bar {
+    position: relative;
+    z-index: 70;
+    flex: 0 0 auto;
+    min-height: calc(54px + env(safe-area-inset-top, 0px));
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 0.65rem;
+    padding: calc(0.55rem + env(safe-area-inset-top, 0px)) 0.75rem 0.55rem;
+    border-bottom: 1px solid var(--av-line);
+    background: rgba(255, 252, 248, 0.98);
+    box-shadow: 0 2px 10px rgba(57, 36, 29, 0.07);
+  }
+
+  .ashtakavarga-tool-mobile-bar button {
+    min-height: 36px;
+    padding: 0 0.65rem;
+    border: 1px solid var(--av-line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--av-accent);
+    font: inherit;
+    font-size: 0.74rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .ashtakavarga-tool-mobile-bar strong {
+    align-self: center;
+    overflow: hidden;
+    color: var(--av-ink);
+    font-size: 1rem;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ashtakavarga-tool-page-root .ashtakavarga-modal.ashtakavarga-modal--embedded .modal-header {
+    display: block;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .ashtakavarga-tool-page-root .ashtakavarga-modal.ashtakavarga-modal--embedded .modal-header > .close-btn,
+  .ashtakavarga-tool-page-root .ashtakavarga-modal.ashtakavarga-modal--embedded .modal-header h2 {
+    display: none;
+  }
+
+  .ashtakavarga-tool-page-root .ashtakavarga-modal.ashtakavarga-modal--embedded .header-controls {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+  }
+
+  .ashtakavarga-tool-page-root .view-mode-toggle {
+    flex: 1 1 auto;
+  }
+
+  .ashtakavarga-tool-page-root .view-mode-toggle button {
+    flex: 1 1 0;
+    min-height: 34px;
+    font-size: 0.7rem;
+  }
+
+  .ashtakavarga-tool-page-root .date-picker {
+    flex: 0 0 auto;
+    min-height: 34px;
+    font-size: 0.68rem;
+  }
+
+  .ashtakavarga-tool-page-root .ashtakavarga-modal.ashtakavarga-modal--embedded .modal-tabs {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0.38rem 0.55rem calc(0.38rem + env(safe-area-inset-bottom, 0px));
+    border: 0;
+    border-top: 1px solid var(--av-line);
+    overflow: hidden;
+    background: rgba(255, 252, 248, 0.97);
+    box-shadow: 0 -8px 26px rgba(57, 36, 29, 0.11);
+    backdrop-filter: blur(12px);
+  }
+
+  .ashtakavarga-tool-page-root .ashtakavarga-modal.ashtakavarga-modal--embedded .tab-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 7rem;
+    min-height: 3.2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.08rem;
+    padding: 0.25rem 0.2rem;
+    border: 0;
+    border-radius: 14px;
+    margin: 0;
+    background: transparent;
+  }
+
+  .ashtakavarga-tool-page-root .ashtakavarga-modal.ashtakavarga-modal--embedded .tab-btn.active {
+    border: 0;
+    background: rgba(159, 18, 57, 0.1);
+    color: var(--av-accent);
+    box-shadow: inset 0 0 0 1px rgba(159, 18, 57, 0.08);
+  }
+
+  .ashtakavarga-tool-page-root .av-tab-icon {
+    font-size: 1.05rem;
+    line-height: 1;
+  }
+
+  .ashtakavarga-tool-page-root .av-tab-label {
+    font-size: 0.6rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .ashtakavarga-tool-page-root .ashtakavarga-modal.ashtakavarga-modal--embedded .modal-content {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+    touch-action: pan-x pan-y;
+  }
+
+  .ashtakavarga-tool-page-root .av-matrix__scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    touch-action: pan-x pan-y;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(159, 18, 57, 0.34) transparent;
+  }
+
+  .ashtakavarga-tool-page-root .av-matrix__scroll::-webkit-scrollbar {
+    width: 3px;
+    height: 3px;
+  }
+
+  .ashtakavarga-tool-page-root .av-matrix__scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .ashtakavarga-tool-page-root .av-matrix__scroll::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(159, 18, 57, 0.34);
   }
 }

@@ -26,8 +26,11 @@ const ChartWidget = ({
   selectedHouseNumber = null,
   highlightedPlanets = null,
   highlightedHouseNumbers = null,
+  chartStyle: controlledChartStyle,
+  onChartStyleChange = null,
 }) => {
-  const [chartStyle, setChartStyle] = useState(defaultStyle || 'north');
+  const [internalChartStyle, setInternalChartStyle] = useState(defaultStyle || 'north');
+  const chartStyle = controlledChartStyle ?? internalChartStyle;
   const [showAshtakavarga, setShowAshtakavarga] = useState(false);
   const [showMaximized, setShowMaximized] = useState(false);
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(!deskMode);
@@ -41,16 +44,18 @@ const ChartWidget = ({
 
   // Update chart style when defaultStyle prop changes
   useEffect(() => {
-    if (defaultStyle) {
-      setChartStyle(defaultStyle);
+    if (defaultStyle && controlledChartStyle == null) {
+      setInternalChartStyle(defaultStyle);
     }
-  }, [defaultStyle]);
+  }, [defaultStyle, controlledChartStyle]);
   const [divisionalData, setDivisionalData] = useState(null);
   const [transitChartData, setTransitChartData] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const toggleStyle = () => {
-    setChartStyle(prev => prev === 'north' ? 'south' : 'north');
+    const nextStyle = chartStyle === 'north' ? 'south' : 'north';
+    if (onChartStyleChange) onChartStyleChange(nextStyle);
+    else setInternalChartStyle(nextStyle);
   };
   
   // Fetch divisional chart data from backend when needed
