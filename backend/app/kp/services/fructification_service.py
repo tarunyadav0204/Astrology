@@ -1,12 +1,12 @@
 """KP houses-giving-results for today / this hour.
 
-Algorithm (product-agreed):
-  Base eligible   = natal houses signified by current AD or PD (MD alone is not enough)
-  Today eligible  = Base ∩ Sookshma houses
-  Hour eligible   = Base ∩ Sookshma ∩ Prana houses
-                    (soft fallback without Prana if empty)
-  Today results   = Today eligible ∩ day ruling planets (Day Lord + Moon Star Lord)
-  Hour results    = Hour eligible ∩ moment ruling planets (Asc/Moon star+sub + Day Lord)
+Algorithm (topic-neutral KP activation):
+  Period support  = weighted natal houses signified by MD / AD / PD / Sookshma
+                    (+ Prana for the hour); MD is context, finer lords carry more weight
+  RP confirmation = orthodox day/Moon RPs for day checkpoints and full Asc/Moon RPs
+                    for the selected hour; RPs strengthen rather than veto a period result
+  Today results   = houses reaching primary strength at any checkpoint across the local day
+  Hour results    = houses reaching primary strength at the selected moment
   Today ⊇ Hour    = any house giving results this hour is also counted for today
                     (hour is part of the day; Asc/Moon sub can confirm what day RPs miss)
   Manifestations  = one combined theme per subject (self/spouse/mother/father)
@@ -41,17 +41,40 @@ KP_MANIFESTATION_SUBJECTS = ("self", "spouse", "mother", "father")
 DUSTHANA = {6, 8, 12}
 FULFILLMENT = {11}
 
-DAY_RP_KEYS = ("day_lord", "moon_star_lord")
+DAY_RP_KEYS = ("day_lord", "moon_sign_lord", "moon_star_lord")
 HOUR_RP_KEYS = (
     "day_lord",
+    "asc_sign_lord",
     "asc_star_lord",
     "asc_sub_lord",
+    "moon_sign_lord",
     "moon_star_lord",
     "moon_sub_lord",
 )
 
+PERIOD_WEIGHTS = {
+    "mahadasha": 0.5,
+    "antardasha": 1.2,
+    "pratyantardasha": 1.4,
+    "sookshma": 1.6,
+    "prana": 1.8,
+}
+
+RP_ROLE_WEIGHTS = {
+    "day_lord": 0.4,
+    "asc_sign_lord": 0.6,
+    "asc_star_lord": 0.9,
+    "asc_sub_lord": 0.65,
+    "moon_sign_lord": 0.55,
+    "moon_star_lord": 0.85,
+    "moon_sub_lord": 0.65,
+}
+
+PRIMARY_SCORE = {"today": 3.0, "hour": 4.0}
+
 RP_ROLE_LABELS = {
     "day_lord": "Day Lord",
+    "asc_sign_lord": "Ascendant Sign Lord",
     "moon_star_lord": "Moon Star Lord",
     "moon_sign_lord": "Moon Sign Lord",
     "asc_star_lord": "Ascendant Star Lord",
@@ -134,35 +157,23 @@ def _tone_evidence(
     has_fulfillment = bool(fulfillment_hit)
     has_dusthana = bool(dusthana_hit)
 
-    if house in DUSTHANA:
-        tone = Polarity.MIXED.value if has_fulfillment else Polarity.CHALLENGING.value
-        reason = (
-            f"H{house} is a dusthana; activating RPs also link 11 → mixed."
-            if has_fulfillment
-            else f"H{house} is a dusthana and activating RPs do not bring 11 → challenging."
-        )
-    elif has_dusthana and has_fulfillment:
+    # This endpoint is intentionally topic-neutral. H6/H8/H12 can be constructive
+    # for employment, competition, research, inheritance, foreign residence, etc.;
+    # do not call them adverse without a user-selected matter and its house group.
+    if has_dusthana and has_fulfillment:
         tone = Polarity.MIXED.value
         reason = (
-            f"Activating RPs link both fulfilment (H{', H'.join(map(str, fulfillment_hit))}) "
-            f"and dusthana (H{', H'.join(map(str, dusthana_hit))}) → mixed."
+            f"The activation links fulfilment H{', H'.join(map(str, fulfillment_hit))} "
+            f"with context-sensitive H{', H'.join(map(str, dusthana_hit))} → mixed."
         )
-    elif has_dusthana:
-        tone = Polarity.CHALLENGING.value
-        reason = (
-            f"Activating RPs also signify dusthana H{', H'.join(map(str, dusthana_hit))} "
-            f"without H11 → challenging."
-        )
-    elif has_fulfillment or house in {1, 2, 4, 5, 7, 9, 10, 11}:
+    elif has_fulfillment:
         tone = Polarity.SUPPORTIVE.value
-        reason = (
-            f"Activating RPs link H11 → supportive."
-            if has_fulfillment
-            else f"H{house} is treated as a constructive life area and no dusthana link → supportive."
-        )
+        reason = "Activating planets also signify H11, giving a fulfilment confirmation."
     else:
         tone = Polarity.NEUTRAL.value
-        reason = "No clear fulfilment or dusthana signal from activating RPs → neutral."
+        reason = (
+            "Tone remains neutral until a life topic supplies its conducive and opposing house groups."
+        )
 
     return {
         "tone": tone,
@@ -236,6 +247,9 @@ def _build_house_calculation(
     eligible: Set[int],
     scope: str,
     prana_fallback: bool,
+    activation_score: float = 0.0,
+    period_support: Sequence[Mapping[str, Any]] = (),
+    rp_confirmation: Sequence[Mapping[str, Any]] = (),
 ) -> Dict[str, Any]:
     dasha_hits = _dasha_hits_for_house(
         house, md=md, ad=ad, pd=pd, sk=sk, pr=pr, planet_sigs=planet_sigs
@@ -254,34 +268,28 @@ def _build_house_calculation(
     ]
     anchor_set = {str(a) for a in anchors if a}
     anchored_by = [p for p in activating_rps if p in anchor_set]
-    multi_rp = len(list(dict.fromkeys(activating_rps))) >= 2
-    if multi_rp:
-        tier_reason = f"Signified by {len(activating_rps)} ruling planets → primary."
-    elif anchored_by:
-        tier_reason = (
-            f"Signified by anchor RP {', '.join(anchored_by)} "
-            f"({'Moon Star Lord' if scope == 'today' else 'Asc/Moon Star Lord'}) → primary."
-        )
-    else:
-        tier_reason = "Only non-anchor RP (e.g. Day Lord alone) → secondary / background."
+    period_score = sum(float(row.get("weight") or 0) for row in period_support)
+    rp_score = sum(float(row.get("weight") or 0) for row in rp_confirmation)
+    tier_reason = (
+        f"Weighted score {activation_score:.2f} "
+        f"(period {period_score:.2f} + RP confirmation {rp_score:.2f}); "
+        f"primary threshold is {PRIMARY_SCORE[scope]:.1f}."
+    )
 
     tone_info = _tone_evidence(house, activating_rps, planet_sigs)
 
-    gate_lines = [
-        f"Base (AD∪PD): {'pass' if in_base else 'fail'}"
-        f" — AD {ad or '—'} houses {sorted(planet_sigs.get(ad, []))}; "
-        f"PD {pd or '—'} houses {sorted(planet_sigs.get(pd, []))}.",
-        f"Sookshma gate ({sk or '—'}): {'pass' if in_sk else 'fail'}"
-        f" — houses {sorted(planet_sigs.get(sk, []))}.",
-    ]
+    support_text = ", ".join(
+        f"{DASHA_LEVEL_LABELS.get(str(row.get('level')), row.get('level'))} "
+        f"{row.get('planet')} (+{float(row.get('weight') or 0):.2f})"
+        for row in period_support
+    ) or "none"
+    gate_lines = [f"Period support for H{house}: {support_text}."]
     if scope == "hour":
         gate_lines.append(
-            f"Prana gate ({pr or '—'}): {'pass' if in_pr else 'fail'}"
-            f" — houses {sorted(planet_sigs.get(pr, []))}."
-            + (" Soft fallback used (Prana empty after Sookshma)." if prana_fallback and in_eligible and not in_pr else "")
+            f"Prana {pr or '—'} {'supports' if in_pr else 'does not directly support'} H{house}."
         )
     gate_lines.append(
-        f"Dasha-eligible for {scope}: {'yes' if in_eligible else 'no'} → {sorted(eligible)}."
+        f"Fine-period support for {scope}: {'yes' if in_eligible else 'no'}."
     )
 
     steps = [
@@ -313,10 +321,13 @@ def _build_house_calculation(
         },
         {
             "step": 3,
-            "title": "Strength tier",
+            "title": "Weighted strength tier",
             "passed": tier == "primary",
             "detail": tier_reason,
             "tier": tier,
+            "activation_score": activation_score,
+            "period_score": period_score,
+            "rp_score": rp_score,
             "anchors": sorted(anchor_set),
             "anchored_by": anchored_by,
         },
@@ -335,8 +346,8 @@ def _build_house_calculation(
 
     summary_bits = [
         f"H{house} is {tier} for {scope}",
-        "because it passed the dasha gate" if in_eligible else "but failed the dasha gate",
-        f"and is triggered by {', '.join(activating_rps) or 'no RP'}",
+        f"with weighted period support {period_score:.2f}",
+        f"and RP confirmation {rp_score:.2f}",
         f"with {tone_info['tone']} tone",
     ]
     return {
@@ -398,6 +409,82 @@ def _tier_houses(
     return primary, secondary
 
 
+def _score_houses(
+    *,
+    planet_sigs: Mapping[str, Sequence[int]],
+    period_planets: Mapping[str, str],
+    role_map: Mapping[str, str],
+    rp_keys: Sequence[str],
+    scope: str,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Set[int]]:
+    """Rank topic-neutral house activation without using RPs as a hard veto.
+
+    A house needs a fine-period connection (AD/PD/Sookshma, or Prana for hour)
+    to become primary. MD contributes context but cannot produce a prediction by
+    itself. Repeated RP roles add confirmation in the orthodox KP spirit.
+    """
+    period_hits: Dict[int, List[Dict[str, Any]]] = {}
+    for level, planet in period_planets.items():
+        if level == "prana" and scope != "hour":
+            continue
+        weight = PERIOD_WEIGHTS.get(level, 0.0)
+        for house in planet_sigs.get(planet, []):
+            period_hits.setdefault(int(house), []).append({
+                "level": level,
+                "planet": planet,
+                "weight": weight,
+            })
+
+    rp_hits: Dict[int, List[Dict[str, Any]]] = {}
+    for role in rp_keys:
+        planet = str(role_map.get(role) or "").strip()
+        if not planet:
+            continue
+        weight = RP_ROLE_WEIGHTS.get(role, 0.0)
+        for house in planet_sigs.get(planet, []):
+            rp_hits.setdefault(int(house), []).append({
+                "role": role,
+                "planet": planet,
+                "weight": weight,
+            })
+
+    primary: List[Dict[str, Any]] = []
+    secondary: List[Dict[str, Any]] = []
+    eligible: Set[int] = set()
+    fine_levels = {"antardasha", "pratyantardasha", "sookshma"}
+    if scope == "hour":
+        fine_levels.add("prana")
+
+    for house in sorted(set(period_hits) | set(rp_hits)):
+        periods = period_hits.get(house, [])
+        confirmations = rp_hits.get(house, [])
+        active_levels = {hit["level"] for hit in periods}
+        has_fine_period = bool(active_levels & fine_levels)
+        if not has_fine_period:
+            # RP-only and MD-only houses are context, not a current prediction.
+            continue
+        eligible.add(house)
+        period_score = sum(float(hit["weight"]) for hit in periods)
+        rp_score = sum(float(hit["weight"]) for hit in confirmations)
+        score = round(period_score + rp_score, 2)
+        activating_rps = list(dict.fromkeys(hit["planet"] for hit in confirmations))
+        row = {
+            "house": house,
+            "tier": "primary" if score >= PRIMARY_SCORE[scope] else "secondary",
+            "activation_score": score,
+            "period_score": round(period_score, 2),
+            "rp_score": round(rp_score, 2),
+            "period_support": periods,
+            "rp_confirmation": confirmations,
+            "activating_rps": activating_rps,
+        }
+        (primary if row["tier"] == "primary" else secondary).append(row)
+
+    primary.sort(key=lambda row: (-float(row["activation_score"]), int(row["house"])))
+    secondary.sort(key=lambda row: (-float(row["activation_score"]), int(row["house"])))
+    return primary, secondary, eligible
+
+
 def _enrich_house_rows(
     rows: List[Dict[str, Any]],
     *,
@@ -442,6 +529,9 @@ def _enrich_house_rows(
             eligible=eligible,
             scope=scope,
             prana_fallback=prana_fallback,
+            activation_score=float(row.get("activation_score") or 0),
+            period_support=list(row.get("period_support") or []),
+            rp_confirmation=list(row.get("rp_confirmation") or []),
         )
     return rows
 
@@ -460,9 +550,11 @@ def _hour_ruling_planets(rp: Mapping[str, Any]) -> Dict[str, str]:
     moon = rp.get("moon") or {}
     return {
         "day_lord": str(rp.get("day_lord") or ""),
+        "asc_sign_lord": str(asc.get("sign_lord") or ""),
         "asc_star_lord": str(asc.get("star_lord") or ""),
         "asc_sub_lord": str(asc.get("sub_lord") or ""),
         "moon_star_lord": str(moon.get("star_lord") or ""),
+        "moon_sign_lord": str(moon.get("sign_lord") or ""),
         "moon_sub_lord": str(moon.get("sub_lord") or ""),
     }
 
@@ -663,14 +755,11 @@ def analyze_window(
     sk_houses = set(_houses_for_planets([sk], planet_sigs))
     pr_houses = set(_houses_for_planets([pr], planet_sigs))
 
+    # Retained for transparent diagnostics and backwards-compatible payload keys;
+    # ranking below no longer requires an identical house at every dasha level.
     today_eligible = base_eligible & sk_houses
     hour_eligible = today_eligible & pr_houses
     prana_fallback = False
-    if scope == "hour" and not hour_eligible and today_eligible:
-        hour_eligible = set(today_eligible)
-        prana_fallback = True
-
-    eligible = today_eligible if scope == "today" else hour_eligible
 
     if scope == "today":
         role_map = _day_ruling_planets(ruling_planets)
@@ -685,10 +774,19 @@ def analyze_window(
     rp_houses = _houses_for_planets(rp_planets, planet_sigs)
     anchor_list = [a for a in anchors if a]
 
-    primary, secondary = _tier_houses(
-        candidate_houses=rp_houses,
-        eligible=eligible,
-        primary_anchors=anchor_list,
+    period_planets = {
+        "mahadasha": md,
+        "antardasha": ad,
+        "pratyantardasha": pd,
+        "sookshma": sk,
+        "prana": pr,
+    }
+    primary, secondary, eligible = _score_houses(
+        planet_sigs=planet_sigs,
+        period_planets=period_planets,
+        role_map=role_map,
+        rp_keys=rp_keys,
+        scope=scope,
     )
     enrich_kwargs = dict(
         planet_sigs=planet_sigs,
@@ -712,9 +810,9 @@ def analyze_window(
     calculation = {
         "title": f"How {scope} houses are identified",
         "formula": (
-            "Base(AD∪PD) ∩ Sookshma ∩ RulingPlanets(day)"
+            "Weighted MD→AD→PD→Sookshma + day/Moon RP confirmation"
             if scope == "today"
-            else "Base(AD∪PD) ∩ Sookshma ∩ Prana ∩ RulingPlanets(hour)"
+            else "Weighted MD→AD→PD→Sookshma→Prana + moment RP confirmation"
         ),
         "steps": [
             {
@@ -750,20 +848,12 @@ def analyze_window(
             },
             {
                 "step": 3,
-                "title": "Dasha eligibility gate",
+                "title": "Weighted period support",
                 "detail": (
-                    f"Base houses (AD∪PD, MD alone ignored) = {sorted(base_eligible)}. "
-                    f"After Sookshma = {sorted(today_eligible)}."
-                    + (
-                        f" After Prana = {sorted(today_eligible & pr_houses)}"
-                        + (
-                            " (fallback to Sookshma set because Prana intersection was empty)."
-                            if prana_fallback
-                            else "."
-                        )
-                        if scope == "hour"
-                        else ""
-                    )
+                    "MD supplies context; AD, PD and Sookshma carry progressively stronger "
+                    "result support"
+                    + (", with Prana added for hour-level timing." if scope == "hour" else ".")
+                    + f" Houses with fine-period support = {sorted(eligible)}."
                 ),
                 "eligible_houses": sorted(eligible),
                 "prana_fallback": prana_fallback if scope == "hour" else False,
@@ -772,9 +862,9 @@ def analyze_window(
                 "step": 4,
                 "title": f"Ruling planets for {scope}",
                 "detail": (
-                    "Day uses Day Lord + Moon Star Lord. "
+                    "Day uses Day Lord + Moon Sign/Star Lords. "
                     if scope == "today"
-                    else "Hour uses Day Lord + Asc Star/Sub + Moon Star/Sub. "
+                    else "Hour uses Day Lord + Asc Sign/Star/Sub + Moon Sign/Star/Sub. "
                 )
                 + f"Active RP planets: {', '.join(rp_planets) or 'none'}.",
                 "ruling_planets_used": dict(role_map),
@@ -787,9 +877,10 @@ def analyze_window(
             },
             {
                 "step": 5,
-                "title": "Intersection → fructifying houses",
+                "title": "Score → fructifying houses",
                 "detail": (
-                    f"Eligible ∩ RP houses, then tiered. "
+                    "Ruling planets confirm and strengthen period-supported houses; they do not veto them. "
+                    f"Primary threshold {PRIMARY_SCORE[scope]:.1f}. "
                     f"Primary: {[r['house'] for r in primary]}. "
                     f"Secondary: {[r['house'] for r in secondary]}."
                 ),
@@ -811,6 +902,9 @@ def analyze_window(
             "prana_planet": pr,
             "prana_houses": sorted(pr_houses),
             "eligible_houses": sorted(eligible),
+            "legacy_exact_intersection": sorted(
+                today_eligible if scope == "today" else hour_eligible
+            ),
             "prana_fallback": prana_fallback if scope == "hour" else False,
         },
         "calculation": calculation,
@@ -912,6 +1006,81 @@ def _merge_hour_primaries_into_today(
     return out
 
 
+def _aggregate_today_checkpoints(
+    checkpoints: Sequence[Tuple[datetime, Mapping[str, Any]]],
+    *,
+    selected_block: Dict[str, Any],
+    as_of: datetime,
+    dasha: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Union primary daily indications across local-day checkpoints.
+
+    The home card promises a day view, so a single query-time Moon/Sookshma
+    snapshot is insufficient. Checkpoints keep the contract inexpensive and
+    deterministic while covering changes through the day. Exact-hour analysis
+    is still computed separately and merged afterward.
+    """
+    primary_by_house: Dict[int, Dict[str, Any]] = {}
+    secondary_by_house: Dict[int, Dict[str, Any]] = {}
+    active_at: Dict[int, List[str]] = {}
+
+    for moment, block in checkpoints:
+        label = moment.strftime("%H:%M")
+        for row in block.get("houses_giving_results") or []:
+            house = int(row["house"])
+            active_at.setdefault(house, []).append(label)
+            previous = primary_by_house.get(house)
+            if previous is None or float(row.get("activation_score") or 0) > float(previous.get("activation_score") or 0):
+                primary_by_house[house] = dict(row)
+            secondary_by_house.pop(house, None)
+        for row in block.get("houses_secondary") or []:
+            house = int(row["house"])
+            if house in primary_by_house:
+                continue
+            previous = secondary_by_house.get(house)
+            if previous is None or float(row.get("activation_score") or 0) > float(previous.get("activation_score") or 0):
+                secondary_by_house[house] = dict(row)
+
+    for house, row in primary_by_house.items():
+        row["active_checkpoints"] = list(dict.fromkeys(active_at.get(house) or []))
+        row["day_aggregate"] = True
+
+    primary_rows = sorted(
+        primary_by_house.values(),
+        key=lambda row: (-float(row.get("activation_score") or 0), int(row["house"])),
+    )
+    secondary_rows = sorted(
+        secondary_by_house.values(),
+        key=lambda row: (-float(row.get("activation_score") or 0), int(row["house"])),
+    )
+
+    out = dict(selected_block)
+    out["houses_giving_results"] = primary_rows
+    out["houses_secondary"] = secondary_rows
+    out["day_checkpoints"] = [moment.strftime("%H:%M") for moment, _ in checkpoints]
+    calculation = dict(out.get("calculation") or {})
+    steps = list(calculation.get("steps") or [])
+    steps.append({
+        "step": len(steps) + 1,
+        "title": "Whole-day checkpoint scan",
+        "detail": (
+            "Today is the union of primary houses found across local-time checkpoints "
+            f"{', '.join(out['day_checkpoints'])}; the selected hour is checked separately."
+        ),
+        "primary_houses": [int(row["house"]) for row in primary_rows],
+    })
+    calculation["steps"] = steps
+    calculation["formula"] = "Whole-day weighted period support + Moon/day RP confirmation"
+    out["calculation"] = calculation
+    out["manifestations_deterministic"] = _build_deterministic_manifestations(
+        scope="today",
+        primary_houses=primary_rows,
+        as_of=as_of,
+        dasha=dasha,
+    )
+    return out
+
+
 async def compute_fructification(
     *,
     birth_date: str,
@@ -944,7 +1113,7 @@ async def compute_fructification(
         timezone or "",
     )
 
-    today = analyze_window(
+    selected_today = analyze_window(
         planet_sigs=planet_sigs,
         dasha=dasha,
         ruling_planets=ruling_planets,
@@ -957,6 +1126,35 @@ async def compute_fructification(
         ruling_planets=ruling_planets,
         scope="hour",
         as_of=as_of,
+    )
+    checkpoint_moments = [as_of.replace(hour=hour_value, minute=0, second=0, microsecond=0) for hour_value in range(0, 24, 3)]
+    checkpoint_moments.append(as_of)
+    unique_moments = sorted({moment.strftime("%Y-%m-%dT%H:%M"): moment for moment in checkpoint_moments}.values())
+    checkpoint_blocks: List[Tuple[datetime, Mapping[str, Any]]] = []
+    for moment in unique_moments:
+        if moment == as_of:
+            checkpoint_blocks.append((moment, selected_today))
+            continue
+        moment_dasha = DashaCalculator().calculate_current_dashas(birth_for_dasha, moment)
+        moment_rps = KPCalculations.get_ruling_planets(
+            moment.strftime("%Y-%m-%d"),
+            moment.strftime("%H:%M:%S"),
+            latitude,
+            longitude,
+            timezone or "",
+        )
+        checkpoint_blocks.append((moment, analyze_window(
+            planet_sigs=planet_sigs,
+            dasha=moment_dasha,
+            ruling_planets=moment_rps,
+            scope="today",
+            as_of=moment,
+        )))
+    today = _aggregate_today_checkpoints(
+        checkpoint_blocks,
+        selected_block=selected_today,
+        as_of=as_of,
+        dasha=dasha,
     )
     today = _merge_hour_primaries_into_today(today, hour, as_of=as_of, dasha=dasha)
 

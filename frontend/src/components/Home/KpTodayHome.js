@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiService } from '../../services/apiService';
 import './KpTodayHome.css';
 
-const CACHE_PREFIX = 'kp_today_home_web_v1:';
+const CACHE_PREFIX = 'kp_today_home_web_v2:';
 const MAX_PAGES = 5;
 const BULLETS_PER_PAGE = 4;
 

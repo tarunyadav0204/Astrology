@@ -2,15 +2,16 @@ from datetime import datetime
 
 from app.kp.services.fructification_service import (
     analyze_window,
+    _aggregate_today_checkpoints,
     _build_deterministic_manifestations,
     _tone_for_house,
     _tier_houses,
 )
 
 
-def test_tone_dusthana_without_fulfillment_is_challenging():
+def test_topic_neutral_tone_does_not_call_dusthana_challenging():
     planet_sigs = {"Venus": [6, 8], "Moon": [6]}
-    assert _tone_for_house(6, ["Venus", "Moon"], planet_sigs) == "challenging"
+    assert _tone_for_house(6, ["Venus", "Moon"], planet_sigs) == "neutral"
 
 
 def test_tone_with_fulfillment_and_dusthana_is_mixed():
@@ -33,7 +34,7 @@ def test_tier_anchor_alone_is_primary_day_lord_alone_secondary():
     assert [r["house"] for r in secondary] == [10]
 
 
-def test_analyze_window_intersects_dasha_and_rps():
+def test_analyze_window_scores_period_support_and_rps():
     planet_sigs = {
         "Saturn": [10, 11],
         "Mercury": [2, 11],
@@ -64,13 +65,15 @@ def test_analyze_window_intersects_dasha_and_rps():
     )
     houses = [r["house"] for r in today["houses_giving_results"]]
     assert houses == [2, 11]
-    assert today["dasha_gate"]["eligible_houses"] == [2, 11]
+    assert today["dasha_gate"]["eligible_houses"] == [2, 6, 11]
+    assert [r["house"] for r in today["houses_secondary"]] == [6]
     how = today["houses_giving_results"][0]["how"]
     assert how["summary"]
+    assert today["houses_giving_results"][0]["activation_score"] >= 3.0
 
 
-def test_today_absorbs_hour_houses_day_rps_missed():
-    """Asc star can confirm hour houses that Day Lord + Moon star alone miss."""
+def test_period_supported_today_houses_are_not_vetoed_by_missing_day_rps():
+    """RPs increase confidence but no longer erase strong period support."""
     from app.kp.services.fructification_service import _merge_hour_primaries_into_today
 
     planet_sigs = {
@@ -109,14 +112,42 @@ def test_today_absorbs_hour_houses_day_rps_missed():
         scope="hour",
         as_of=as_of,
     )
-    assert [r["house"] for r in today["houses_giving_results"]] == []
+    assert [r["house"] for r in today["houses_giving_results"]] == [1, 7]
     assert [r["house"] for r in hour["houses_giving_results"]] == [1, 7]
+    assert all(row["rp_score"] == 0 for row in today["houses_giving_results"])
+    assert all(row["rp_score"] > 0 for row in hour["houses_giving_results"])
 
     merged = _merge_hour_primaries_into_today(today, hour, as_of=as_of, dasha=dasha)
     assert [r["house"] for r in merged["houses_giving_results"]] == [1, 7]
-    assert merged["hour_houses_absorbed"] == [1, 7]
-    assert all(r.get("included_from_hour") for r in merged["houses_giving_results"])
-    assert len(merged["manifestations_deterministic"]) == 4
+    assert "hour_houses_absorbed" not in merged
+
+
+def test_today_checkpoint_aggregation_keeps_home_contract():
+    as_of = datetime(2026, 8, 5, 10, 0, 0)
+    morning = {
+        "scope": "today",
+        "ruling_planets_used": {},
+        "calculation": {"steps": []},
+        "houses_giving_results": [
+            {"house": 2, "tone": "supportive", "activation_score": 3.4, "activating_rps": ["Moon"]},
+        ],
+        "houses_secondary": [],
+    }
+    evening = {
+        **morning,
+        "houses_giving_results": [
+            {"house": 10, "tone": "neutral", "activation_score": 3.8, "activating_rps": ["Saturn"]},
+        ],
+    }
+    result = _aggregate_today_checkpoints(
+        [(as_of.replace(hour=6), morning), (as_of.replace(hour=18), evening)],
+        selected_block=morning,
+        as_of=as_of,
+        dasha={},
+    )
+    assert {row["house"] for row in result["houses_giving_results"]} == {2, 10}
+    assert result["day_checkpoints"] == ["06:00", "18:00"]
+    assert len(result["manifestations_deterministic"]) == 4
 
 
 def test_manifestations_cover_all_subjects_for_cache_sharing():
