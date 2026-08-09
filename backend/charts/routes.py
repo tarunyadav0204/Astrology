@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import Dict, Any, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import traceback
 import time
@@ -21,6 +21,11 @@ from calculators.mudakku_calculator import MudakkuCalculator
 from calculators.indu_lagna_calculator import InduLagnaCalculator
 from calculators.jaimini_chart_calculator import JaiminiChartCalculator
 from charts.house_insight_service import build_house_insight
+from charts.double_transit_service import (
+    DoubleTransitCalculationError,
+    DoubleTransitInputError,
+    calculate_double_transits,
+)
 from birth_charts.schema import (
     ensure_birth_chart_family_columns,
     normalize_chart_relation,
@@ -1128,6 +1133,51 @@ async def calculate_indu_lagna(request: dict, current_user: User = Depends(get_c
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/double-transits")
+async def calculate_double_transit_browser(
+    request: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """Return exact Jupiter–Saturn joint house-activation intervals.
+
+    This endpoint is isolated from the rest of the Parashari desk: calculation
+    failure is explicit and cannot degrade chart, dasha or activation APIs.
+    Request dates are inclusive civil dates; interval boundaries are returned
+    as second-precision UTC timestamps.
+    """
+    del current_user  # Authentication is required; user data is not read here.
+    try:
+        chart_data = request.get("chart_data")
+        if not isinstance(chart_data, dict):
+            raise DoubleTransitInputError("chart_data is required")
+        start_text = str(request.get("start_date") or "")
+        end_text = str(request.get("end_date") or "")
+        try:
+            start = datetime.strptime(start_text, "%Y-%m-%d")
+            inclusive_end = datetime.strptime(end_text, "%Y-%m-%d")
+        except ValueError as exc:
+            raise DoubleTransitInputError("start_date and end_date must use YYYY-MM-DD") from exc
+        if start.year < 1800 or inclusive_end.year > 2399:
+            raise DoubleTransitInputError(
+                "Exact bundled ephemeris coverage is 1800-01-01 through 2399-12-31"
+            )
+        result = calculate_double_transits(
+            chart_data,
+            start,
+            inclusive_end + timedelta(days=1),
+            include_aspect_only=bool(request.get("include_aspect_only", True)),
+        )
+        return {"success": True, **result}
+    except DoubleTransitInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except DoubleTransitCalculationError as exc:
+        logger.exception("Double-transit ephemeris calculation failed")
+        raise HTTPException(
+            status_code=503,
+            detail="Double-transit ephemeris calculation failed; no fallback result was produced.",
+        ) from exc
 
 @router.post("/karkamsa-chart")
 async def calculate_karkamsa_chart(

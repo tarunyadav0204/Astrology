@@ -78,6 +78,9 @@
 .desk-sp__chip--mb strong { color: #7f1d1d; }
 .desk-sp__chip--push { border-color: rgba(21, 128, 61, 0.35); }
 .desk-sp__chip--push strong { color: #15803d; }
+.desk-sp__chip--mudakku { border-color: rgba(194, 65, 12, 0.38); background: rgba(251, 146, 60, 0.07); }
+.desk-sp__chip--mudakku strong { color: #c2410c; }
+.desk-sp__chip--mudakku em { color: #9a3412; }
 .desk-sp__chip--gandanta { border-color: rgba(127, 29, 29, 0.4); background: rgba(127, 29, 29, 0.06); }
 .desk-sp__chip--gandanta strong { color: #7f1d1d; }
 .desk-sp__chip--gandanta em { color: #991b1b; }
@@ -163,6 +166,8 @@
 .desk-sp__item--bb strong { color: #0369a1; }
 .desk-sp__item--mb strong { color: #7f1d1d; }
 .desk-sp__item--push strong { color: #15803d; }
+.desk-sp__item--mudakku { border-color: rgba(194, 65, 12, 0.25); background: rgba(251, 146, 60, 0.06); }
+.desk-sp__item--mudakku strong { color: #c2410c; }
 .desk-sp__item--gandanta { border-color: rgba(127, 29, 29, 0.28); background: rgba(127, 29, 29, 0.05); }
 .desk-sp__item--gandanta strong { color: #7f1d1d; }
 

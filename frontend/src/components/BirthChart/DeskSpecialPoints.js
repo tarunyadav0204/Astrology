@@ -75,6 +75,7 @@ const DeskSpecialPoints = ({ birthData, chartData, variant = 'strip' }) => {
   const [sniper, setSniper] = useState(null);
   const [pushkara, setPushkara] = useState(null);
   const [gandanta, setGandanta] = useState(null);
+  const [mudakku, setMudakku] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -84,17 +85,19 @@ const DeskSpecialPoints = ({ birthData, chartData, variant = 'strip' }) => {
       setSniper(null);
       setPushkara(null);
       setGandanta(null);
+      setMudakku(null);
       return undefined;
     }
     let cancelled = false;
     (async () => {
       try {
-        const [yogiRes, badhakaRes, sniperRes, d9Res, ganRes] = await Promise.all([
+        const [yogiRes, badhakaRes, sniperRes, d9Res, ganRes, mudakkuRes] = await Promise.all([
           apiService.calculateYogi(birthData),
           apiService.calculateBadhakaMaraka(chartData).catch(() => null),
           apiService.calculateSniperPoints(chartData).catch(() => null),
           apiService.calculateDivisionalChart(birthData, 9).catch(() => null),
           apiService.calculateGandantaAnalysis(chartData).catch(() => null),
+          apiService.calculateMudakkuAnalysis(chartData).catch(() => null),
         ]);
         let push = null;
         if (d9Res?.divisional_chart) {
@@ -106,6 +109,11 @@ const DeskSpecialPoints = ({ birthData, chartData, variant = 'strip' }) => {
         setSniper(sniperRes?.sniper_points || sniperRes || null);
         setPushkara(push?.pushkara_analysis || push || null);
         setGandanta(ganRes?.gandanta_analysis || ganRes?.data?.gandanta_analysis || ganRes || null);
+        setMudakku(
+          mudakkuRes?.mudakku_analysis
+          || mudakkuRes?.data?.mudakku_analysis
+          || null
+        );
         setError(null);
       } catch (err) {
         if (!cancelled) setError(err?.message || 'Failed to load special points');
@@ -193,6 +201,28 @@ const DeskSpecialPoints = ({ birthData, chartData, variant = 'strip' }) => {
       });
     }
 
+    const mudakkuNakshatra = mudakku?.mudakku_nakshatra;
+    if (mudakkuNakshatra?.name) {
+      const mudakkuRashi = mudakku.mudakku_rashi
+        || mudakku?.mudakku_point?.sign_name;
+      const detailParts = [
+        `Mudakku Nakshatra: ${mudakkuNakshatra.name}`,
+        mudakkuNakshatra.lord ? `Nakshatra lord: ${mudakkuNakshatra.lord}` : null,
+        mudakkuRashi ? `Rashi: ${mudakkuRashi}` : null,
+        mudakku.mudakku_rashi_lord ? `Rashi lord: ${mudakku.mudakku_rashi_lord}` : null,
+        mudakku?.sun_nakshatra?.name ? `Sun Nakshatra: ${mudakku.sun_nakshatra.name}` : null,
+        mudakku.count_to_mula != null ? `Count to Mula: ${mudakku.count_to_mula}` : null,
+        mudakku.is_split_nakshatra ? 'First-sign rule applied for split nakshatra' : null,
+      ].filter(Boolean);
+      list.push({
+        key: 'mudakku',
+        label: 'Mudakku Nakshatra',
+        value: [mudakkuNakshatra.name, signAbbr(mudakkuRashi)].filter(Boolean).join(' · '),
+        tone: 'mudakku',
+        title: detailParts.join(' · '),
+      });
+    }
+
     const ganRows = gandanta?.planets_in_gandanta || gandanta?.planetary_gandanta || [];
     const ganEntries = ganRows
       .map((row) => {
@@ -251,7 +281,7 @@ const DeskSpecialPoints = ({ birthData, chartData, variant = 'strip' }) => {
     }
 
     return list;
-  }, [yogi, badhaka, sniper, pushkara, gandanta, chartData]);
+  }, [yogi, badhaka, sniper, pushkara, gandanta, mudakku, chartData]);
 
   if (error) {
     return <div className={`desk-sp desk-sp--${variant} desk-sp--error`}>{error}</div>;

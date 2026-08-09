@@ -220,6 +220,10 @@
   flex: 1;
 }
 
+.pdm__pane--act .desk-act--mobile[data-lens="double"] {
+  flex: 0 0 auto;
+}
+
 .pdm__pane--act .desk-act--focus .desk-act__split,
 .pdm__pane--act .desk-act--focus .desk-act__workspace {
   grid-template-columns: 1fr !important;
@@ -395,10 +399,14 @@
   width: 100%;
   max-width: min(100%, 440px);
   margin: 0 auto;
-  background: var(--pdm-panel);
+  background: #fff;
   border: 1px solid var(--pdm-line);
   border-radius: 10px;
   overflow: hidden;
+}
+
+.pdm__chart svg > rect:first-of-type {
+  fill: #fff !important;
 }
 
 .pdm__chart .chart-widget,

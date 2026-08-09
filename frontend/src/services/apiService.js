@@ -693,6 +693,16 @@ export const apiService = {
     return response.data;
   },
 
+  getDoubleTransits: async ({ chartData, startDate, endDate, includeAspectOnly = true }) => {
+    const response = await apiClient.post(getEndpoint('/double-transits'), {
+      chart_data: chartData,
+      start_date: startDate,
+      end_date: endDate,
+      include_aspect_only: includeAspectOnly,
+    });
+    return response.data;
+  },
+
   calculateGandantaAnalysis: async (chartData) => {
     const response = await apiClient.post(getEndpoint('/gandanta-analysis'), { chart_data: chartData });
     return response.data;

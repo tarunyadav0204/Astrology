@@ -377,6 +377,11 @@
 .nadi-desk__chart {
   padding: 0.35rem;
   min-height: 240px;
+  background: #fff;
+}
+
+.nadi-desk__chart svg > rect:first-of-type {
+  fill: #fff !important;
 }
 
 .nadi-desk__state-key {

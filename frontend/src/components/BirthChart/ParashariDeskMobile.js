@@ -97,6 +97,7 @@ export default function ParashariDeskMobile({
     ? initialHubTab
     : 'chart';
   const [hubTab, setHubTab] = useState(requestedHubTab);
+  const [activationLens, setActivationLens] = useState('timeline');
   const [chartPill, setChartPill] = useState('lagna');
   const [metaOpen, setMetaOpen] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -107,9 +108,13 @@ export default function ParashariDeskMobile({
     setHubTab(requestedHubTab);
   }, [requestedHubTab]);
 
+  useEffect(() => {
+    if (hubTab !== 'act') setActivationLens('timeline');
+  }, [hubTab]);
+
   const showAsOf = (hubTab === 'chart' && chartPill === 'transit')
     || hubTab === 'dasha'
-    || hubTab === 'act';
+    || (hubTab === 'act' && activationLens !== 'double');
 
   const mobileChartOptions = useMemo(() => {
     const divisionals = (divisionalOptions || []).map((option) => ({
@@ -347,8 +352,11 @@ export default function ParashariDeskMobile({
               result={activationLedger}
               loading={activationLoading}
               error={activationError}
+              birthData={birthData}
+              chartData={chartData}
               asOfDate={asOfDate}
               onJumpToDate={onAsOfChange}
+              onLensChange={setActivationLens}
               layout="mobile"
               onOpenFull={() => navigate(`/charts-dashas/activations?asOf=${formatAsOfIso(asOfDate)}`)}
             />

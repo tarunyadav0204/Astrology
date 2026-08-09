@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './DeskActivationsPanel.css';
+import DeskDoubleTransitBrowser from './DeskDoubleTransitBrowser';
 
 const PLANET_ABBR = {
   Sun: 'Su', Moon: 'Mo', Mars: 'Ma', Mercury: 'Me',
@@ -274,16 +275,23 @@ export default function DeskActivationsPanel({
   result,
   loading,
   error,
+  birthData,
+  chartData,
   asOfDate,
   onJumpToDate,
   onOpenFull,
+  onLensChange,
   layout = 'dock', // dock | focus | expanded | mobile
 }) {
-  const [lens, setLens] = useState('timeline'); // timeline | focus | map
+  const [lens, setLens] = useState('timeline'); // timeline | focus | map | double
   const [presetId, setPresetId] = useState('career');
   const [customHouses, setCustomHouses] = useState(() => new Set([6, 10, 3]));
   const [selected, setSelected] = useState(null); // { house, windowStart, windowEnd, transitSignature }
   const [detailOpen, setDetailOpen] = useState(false);
+
+  useEffect(() => {
+    onLensChange?.(lens);
+  }, [lens, onLensChange]);
 
   useEffect(() => {
     if (layout !== 'mobile' || !detailOpen) return undefined;
@@ -424,29 +432,32 @@ export default function DeskActivationsPanel({
     setPresetId('custom');
   };
 
-  if (loading && !result) {
+  if (lens !== 'double' && loading && !result) {
     return (
       <div className="desk-act desk-act--status">
         <strong>Reading activation ledger</strong>
         <span>MD → AD → PD natal links with transit triggers</span>
+        <button type="button" className="desk-act__status-action" onClick={() => setLens('double')}>Open Double Transit</button>
       </div>
     );
   }
 
-  if (error) {
+  if (lens !== 'double' && error) {
     return (
       <div className="desk-act desk-act--status desk-act--err">
         <strong>Activation ledger unavailable</strong>
         <span>{error}</span>
+        <button type="button" className="desk-act__status-action" onClick={() => setLens('double')}>Open isolated Double Transit</button>
       </div>
     );
   }
 
-  if (!rows.length) {
+  if (lens !== 'double' && !rows.length) {
     return (
       <div className="desk-act desk-act--status">
         <strong>No activation windows</strong>
         <span>Extend horizon or verify dasha/transit calculation for this chart</span>
+        <button type="button" className="desk-act__status-action" onClick={() => setLens('double')}>Open Double Transit</button>
       </div>
     );
   }
@@ -629,6 +640,7 @@ export default function DeskActivationsPanel({
             { id: 'timeline', label: 'Timeline', icon: '↝' },
             { id: 'focus', label: 'Focus', icon: '◎' },
             { id: 'map', label: 'Map', icon: '▦' },
+            { id: 'double', label: 'Double Transit', mobileLabel: 'Double', icon: '♃♄' },
           ].map((item) => (
             <button
               key={item.id}
@@ -641,13 +653,13 @@ export default function DeskActivationsPanel({
               {layout === 'mobile' ? (
                 <>
                   <span className="desk-act__lens-icon" aria-hidden>{item.icon}</span>
-                  <span className="desk-act__lens-label">{item.label}</span>
+                  <span className="desk-act__lens-label">{item.mobileLabel || item.label}</span>
                 </>
               ) : item.label}
             </button>
           ))}
         </div>
-        <div className="desk-act__meta">
+        {lens !== 'double' ? <div className="desk-act__meta">
           <span title="As-of date">{formatDay(asOf)}</span>
           <span title="Horizon end">{formatDay(result?.horizon_end)}</span>
           {onOpenFull ? (
@@ -655,10 +667,10 @@ export default function DeskActivationsPanel({
               Full
             </button>
           ) : null}
-        </div>
+        </div> : null}
       </div>
 
-      <div className="desk-act__state-key" aria-label="Activation state meanings">
+      {lens !== 'double' ? <div className="desk-act__state-key" aria-label="Activation state meanings">
         {STATE_LEGEND.map((state) => (
           <span
             key={state}
@@ -669,9 +681,9 @@ export default function DeskActivationsPanel({
             <em>{STATE_META[state].hint}</em>
           </span>
         ))}
-      </div>
+      </div> : null}
 
-      {currentWindow ? (
+      {lens !== 'double' && currentWindow ? (
         <div className="desk-act__dasha" title="Current Vimśottari stack at as-of">
           <em>Now</em>
           <strong>{dashaPath(currentWindow)}</strong>
@@ -907,9 +919,17 @@ export default function DeskActivationsPanel({
             </div>
           </div>
         ) : null}
+
+        {lens === 'double' ? (
+          <DeskDoubleTransitBrowser
+            birthData={birthData}
+            chartData={chartData}
+            onJumpToDate={layout === 'mobile' ? undefined : onJumpToDate}
+          />
+        ) : null}
       </div>
 
-      {layout === 'mobile' ? (
+      {lens !== 'double' && (layout === 'mobile' ? (
         detailOpen && detailAside ? (
           <div className="desk-act__sheet" role="dialog" aria-modal="true" aria-label="Activation details">
             <button
@@ -930,7 +950,7 @@ export default function DeskActivationsPanel({
             </div>
           </div>
         ) : null
-      ) : detailAside}
+      ) : detailAside)}
       </div>
     </div>
   );

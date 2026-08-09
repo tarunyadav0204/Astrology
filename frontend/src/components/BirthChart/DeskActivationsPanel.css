@@ -44,6 +44,21 @@
   color: var(--da-accent);
 }
 
+.desk-act__status-action {
+  justify-self: center;
+  min-height: 2rem;
+  margin-top: .35rem;
+  border: 1px solid rgba(159, 18, 57, .3);
+  border-radius: 5px;
+  padding: 0 .7rem;
+  background: #fff;
+  color: var(--da-accent);
+  font: inherit;
+  font-size: .68rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .desk-act__toolbar {
   flex: 0 0 auto;
   display: flex;
@@ -1043,6 +1058,26 @@
   border-right: 1px solid var(--da-line);
 }
 
+.desk-act--expanded .desk-dt {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+/* The Double Transit browser owns its two-column result layout. Do not pass it
+   through the expanded activation ledger's three-column display:contents grid. */
+.desk-act--expanded[data-lens="double"] .desk-act__workspace,
+.desk-act--expanded[data-lens="double"] .desk-act__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.desk-act--expanded[data-lens="double"] .desk-dt {
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
+}
+
 .desk-act--expanded .desk-act__detail {
   grid-column: 3;
   grid-row: 1;
@@ -1436,6 +1471,34 @@
   min-height: 0;
   height: auto;
   padding: 0.45rem;
+}
+
+/* Double Transit is a page-length mobile browser. Let the Parashari screen
+   perform the only vertical scroll so its header, filters and cards move as
+   one continuous document instead of creating a list-within-page scroller. */
+.desk-act--mobile[data-lens="double"] {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
+
+.desk-act--mobile[data-lens="double"] .desk-act__workspace,
+.desk-act--mobile[data-lens="double"] .desk-act__body,
+.desk-act--mobile[data-lens="double"] .desk-act__body > .desk-dt {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+/* Keep native vertical scrolling active when a swipe begins on an activation
+   card/button instead of the empty space between list items. */
+.desk-act--mobile .desk-act__list,
+.desk-act--mobile .desk-act__list > *,
+.desk-act--mobile .desk-act__list button,
+.desk-act--mobile .desk-act__window,
+.desk-act--mobile .desk-act__window * {
+  touch-action: pan-y;
 }
 
 @keyframes desk-act-sheet-in {

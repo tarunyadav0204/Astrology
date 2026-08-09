@@ -31,6 +31,12 @@
   min-width: 0;
   height: 100%;
   overflow: hidden;
+  background: #fff;
+}
+
+.nadi-dashboard .chart-item svg > rect:first-of-type,
+.nadi-mobile .chart-content svg > rect:first-of-type {
+  fill: #fff !important;
 }
 
 /* Force chart diagrams to match header width and use full height */
