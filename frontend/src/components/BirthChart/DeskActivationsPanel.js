@@ -85,6 +85,36 @@ function formatRange(start, end) {
   return `${formatDay(start)}–${formatDay(end)}`;
 }
 
+function formatMoment(value) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function confirmationMeta(row) {
+  if (row.kind === 'exact_degree_return') {
+    return [
+      `±${row.orb_degrees}° orb`,
+      `exact ${formatMoment(row.exact_at)}`,
+      row.pass_sequence,
+    ].filter(Boolean).join(' · ');
+  }
+  if (row.kind === 'exact_nakshatra_return') {
+    return `${row.nakshatra_lord} ruled · natal pada ${row.natal_pada} · transit pada ${row.transit_pada}`;
+  }
+  if (row.kind === 'repeated_natal_relationship') {
+    const suffix = row.aspect_number === 1 ? 'st' : row.aspect_number === 2 ? 'nd' : row.aspect_number === 3 ? 'rd' : 'th';
+    return `Natal H${row.natal_house} → ${row.aspect_number === 1 ? 'conjunction' : `${row.aspect_number}${suffix} aspect`} → ${row.target_planet}`;
+  }
+  if (row.natal_house != null && row.transit_house != null) {
+    return `Natal H${row.natal_house} · transit H${row.transit_house}`;
+  }
+  return '';
+}
+
 function boundaryLabels(changes, { hideHorizon = true } = {}) {
   return (changes || [])
     .filter((change) => {
@@ -288,9 +318,13 @@ export default function DeskActivationsPanel({
   const [customHouses, setCustomHouses] = useState(() => new Set([6, 10, 3]));
   const [selected, setSelected] = useState(null); // { house, windowStart, windowEnd, transitSignature }
   const [detailOpen, setDetailOpen] = useState(false);
+  const [detailPercent, setDetailPercent] = useState(45);
+  const [detailMaximized, setDetailMaximized] = useState(false);
+  const [legendExpanded, setLegendExpanded] = useState(false);
 
   useEffect(() => {
     onLensChange?.(lens);
+    setDetailMaximized(false);
   }, [lens, onLensChange]);
 
   useEffect(() => {
@@ -413,6 +447,7 @@ export default function DeskActivationsPanel({
       transitSignature: row.window?.transit_signature,
     });
     if (layout === 'mobile') setDetailOpen(true);
+    if (layout === 'focus') setDetailPercent((current) => Math.max(current, 45));
     if (syncAsOf) jump(row.window?.start_date);
   };
 
@@ -430,6 +465,41 @@ export default function DeskActivationsPanel({
       return next;
     });
     setPresetId('custom');
+  };
+
+  const resizeDetail = (event) => {
+    if (layout !== 'focus' || detailMaximized) return;
+    event.preventDefault();
+    const workspace = event.currentTarget.parentElement;
+    const bounds = workspace.getBoundingClientRect();
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMove = (moveEvent) => {
+      const percent = ((bounds.bottom - moveEvent.clientY) / bounds.height) * 100;
+      setDetailPercent(Math.min(70, Math.max(30, percent)));
+    };
+    const onUp = () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
+  const resizeDetailWithKeyboard = (event) => {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    setDetailPercent((current) => Math.min(
+      70,
+      Math.max(30, current + (event.key === 'ArrowUp' ? 5 : -5))
+    ));
   };
 
   if (lens !== 'double' && loading && !result) {
@@ -472,16 +542,28 @@ export default function DeskActivationsPanel({
               <em>Timing window</em>
               <strong>{formatRange(detailWindow.start_date, detailWindow.end_date)}</strong>
               <span>{dashaPath(detailWindow)}</span>
-              {onJumpToDate && detailWindow.start_date && detailWindow.start_date !== asOf ? (
-                <button
-                  type="button"
-                  className="desk-act__asof"
-                  onClick={() => jump(detailWindow.start_date)}
-                  title={`Set desk as-of to ${detailWindow.start_date}`}
-                >
-                  Set as-of
-                </button>
-              ) : null}
+              <div className="desk-act__detail-actions">
+                {onJumpToDate && detailWindow.start_date && detailWindow.start_date !== asOf ? (
+                  <button
+                    type="button"
+                    className="desk-act__asof"
+                    onClick={() => jump(detailWindow.start_date)}
+                    title={`Set desk as-of to ${detailWindow.start_date}`}
+                  >
+                    Set as-of
+                  </button>
+                ) : null}
+                {layout === 'focus' ? (
+                  <button
+                    type="button"
+                    className="desk-act__detail-expand"
+                    onClick={() => setDetailMaximized((current) => !current)}
+                    title={detailMaximized ? 'Return to the activation timeline' : 'Use the full activation column for timing details'}
+                  >
+                    {detailMaximized ? '← Back to timeline' : 'Expand details'}
+                  </button>
+                ) : null}
+              </div>
             </div>
             <BoundaryReasons
               openedBy={detailWindow.opened_by}
@@ -566,6 +648,23 @@ export default function DeskActivationsPanel({
             </div>
           ) : null}
 
+          {(detailRow.transit_confirmations || []).length ? (
+            <div className="desk-act__detail-block desk-act__confirmations">
+              <em>Transit confirmations</em>
+              <ul>
+                {detailRow.transit_confirmations.map((row, index) => (
+                  <li key={`${row.kind}-${row.planet}-${row.target_planet || ''}-${row.exact_at || index}`}>
+                    <span className={`desk-act__confirmation-icon desk-act__confirmation-icon--${row.kind}`} aria-hidden="true">✓</span>
+                    <span>
+                      <strong>{row.label}</strong>
+                      {confirmationMeta(row) ? <small>{confirmationMeta(row)}</small> : null}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           <div className="desk-act__detail-outcome">
             <em>Result direction for H{detailRow.house}</em>
             <div className="desk-act__outcome-head">
@@ -631,8 +730,9 @@ export default function DeskActivationsPanel({
 
   return (
     <div
-      className={`desk-act${layout === 'focus' || layout === 'mobile' ? ' desk-act--focus' : ''}${layout === 'expanded' ? ' desk-act--expanded' : ''}${layout === 'mobile' ? ' desk-act--mobile' : ''}`}
+      className={`desk-act${layout === 'focus' || layout === 'mobile' ? ' desk-act--focus' : ''}${layout === 'expanded' ? ' desk-act--expanded' : ''}${layout === 'mobile' ? ' desk-act--mobile' : ''}${detailMaximized && layout === 'focus' ? ' desk-act--detail-maximized' : ''}`}
       data-lens={lens}
+      style={layout === 'focus' ? { '--da-detail-percent': `${detailPercent}%` } : undefined}
     >
       <div className="desk-act__toolbar">
         <div className="desk-act__lenses" role="tablist" aria-label="Activation lens">
@@ -670,18 +770,40 @@ export default function DeskActivationsPanel({
         </div> : null}
       </div>
 
-      {lens !== 'double' ? <div className="desk-act__state-key" aria-label="Activation state meanings">
-        {STATE_LEGEND.map((state) => (
-          <span
-            key={state}
-            title={STATE_META[state].meaning}
-          >
-            <i className={`desk-act__swatch desk-act__swatch--${state}`} />
-            <strong>{STATE_META[state].short}</strong>
-            <em>{STATE_META[state].hint}</em>
-          </span>
-        ))}
-      </div> : null}
+      {lens !== 'double' ? (
+        <div className={`desk-act__state-key${legendExpanded ? ' is-expanded' : ''}`} aria-label="Activation state meanings">
+          <div className="desk-act__state-key-summary">
+            <div className="desk-act__state-key-items">
+              {STATE_LEGEND.map((state) => (
+                <span key={state} title={STATE_META[state].meaning}>
+                  <i className={`desk-act__swatch desk-act__swatch--${state}`} />
+                  <strong>{STATE_META[state].short}</strong>
+                </span>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="desk-act__state-key-toggle"
+              aria-expanded={legendExpanded}
+              onClick={() => setLegendExpanded((current) => !current)}
+            >
+              {legendExpanded ? 'Hide meanings' : 'What do these mean?'}
+              <i aria-hidden>{legendExpanded ? '⌃' : '⌄'}</i>
+            </button>
+          </div>
+          {legendExpanded ? (
+            <div className="desk-act__state-key-details">
+              {STATE_LEGEND.map((state) => (
+                <span key={`meaning-${state}`}>
+                  <i className={`desk-act__swatch desk-act__swatch--${state}`} />
+                  <strong>{STATE_META[state].short}</strong>
+                  <em>{STATE_META[state].hint}</em>
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {lens !== 'double' && currentWindow ? (
         <div className="desk-act__dasha" title="Current Vimśottari stack at as-of">
@@ -950,7 +1072,29 @@ export default function DeskActivationsPanel({
             </div>
           </div>
         ) : null
-      ) : detailAside)}
+      ) : detailAside ? (
+        <>
+          {layout === 'focus' ? (
+            <div
+              className="desk-act__detail-resizer"
+              role="separator"
+              aria-label="Resize timing window details"
+              aria-orientation="horizontal"
+              aria-valuemin="30"
+              aria-valuemax="70"
+              aria-valuenow={Math.round(detailPercent)}
+              tabIndex={detailMaximized ? -1 : 0}
+              onPointerDown={resizeDetail}
+              onKeyDown={resizeDetailWithKeyboard}
+              onDoubleClick={() => setDetailPercent(45)}
+              title="Drag to resize · Double-click to reset"
+            >
+              <span aria-hidden />
+            </div>
+          ) : null}
+          {detailAside}
+        </>
+      ) : null)}
       </div>
     </div>
   );

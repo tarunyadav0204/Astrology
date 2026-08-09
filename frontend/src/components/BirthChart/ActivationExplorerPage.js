@@ -341,8 +341,9 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
   ));
   const directDashaPlanets = new Set((selectedHouse?.natal_connections || []).map((row) => row.planet));
   const cooperativeCarriers = carriers.filter((planet) => !directDashaPlanets.has(planet));
-  const repeatedDashaPlanets = unique((selectedHouse?.evidence || [])
-    .filter((row) => row.provider === 'transit_natal_ledger' && row.facts?.same_planet_natal_repetition)
+  const transitConfirmations = selectedHouse?.transit_confirmations || [];
+  const repeatedDashaPlanets = unique(transitConfirmations
+    .filter((row) => ['natal_sign_return', 'own_natal_aspect'].includes(row.kind))
     .map((row) => row.planet));
   const timingTransitConnections = (selectedHouse?.transit_connections || [])
     .filter((row) => row.timing_trigger)
@@ -619,6 +620,18 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
                                   : `${timingTransitConnections.join('; ')}. These transits bring attention here, although the active period planet is not also repeating its natal position.`
                                 : 'No strong transit trigger was found.'}
                             </p>
+                            {transitConfirmations.length ? (
+                              <ul className="activation-confirmation-list">
+                                {transitConfirmations.map((row, index) => (
+                                  <li key={`${row.kind}-${row.planet}-${row.target_planet || ''}-${row.exact_at || index}`}>
+                                    <strong>{row.label}</strong>
+                                    {row.kind === 'exact_degree_return' ? (
+                                      <small>±{row.orb_degrees}° orb · {row.pass_sequence}</small>
+                                    ) : null}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
                           </article>
                         </div>
                       </div>

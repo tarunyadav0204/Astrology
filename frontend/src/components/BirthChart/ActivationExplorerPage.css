@@ -824,6 +824,37 @@
   line-height: 1.5;
 }
 
+.activation-confirmation-list {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activation-confirmation-list li {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #efd7df;
+  border-radius: 9px;
+  background: #fff8fa;
+}
+
+.activation-confirmation-list strong,
+.activation-confirmation-list small {
+  display: block;
+}
+
+.activation-confirmation-list strong {
+  color: #4b303a;
+  font-size: 0.78rem;
+}
+
+.activation-confirmation-list small {
+  margin-top: 0.18rem;
+  color: #82727a;
+  font-size: 0.68rem;
+}
+
 .activation-fact-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

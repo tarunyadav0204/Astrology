@@ -41,7 +41,7 @@ from .nakshatra_transit import (
 from .primitives import aspected_houses, ruled_houses
 
 
-HOUSE_ACTIVATION_POLICY_VERSION = "5.1.0"
+HOUSE_ACTIVATION_POLICY_VERSION = "5.2.0"
 DASHA_LEVEL_ORDER = {"MD": 0, "AD": 1, "PD": 2}
 
 
@@ -177,6 +177,96 @@ def _transit_relations_to_house(
     if house in aspected_houses(planet, transit_house):
         relations.append("aspect")
     return tuple(relations)
+
+
+def _aspect_number(source_house: int, target_house: int) -> int:
+    return ((int(target_house) - int(source_house)) % 12) + 1
+
+
+def _ordinal(value: int) -> str:
+    if 10 <= value % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(value % 10, "th")
+    return f"{value}{suffix}"
+
+
+def _repeated_natal_relationships(
+    chart: Dict[str, Any],
+    transit_states: Dict[str, Dict[str, Any]],
+    dasha_planets: Set[str],
+    levels_by_planet: Dict[str, Set[str]],
+) -> Tuple[Dict[str, Any], ...]:
+    """Exact same pair + same conjunction/aspect geometry, repeated in transit.
+
+    The other planet remains at its natal position.  Requiring the same aspect
+    number prevents a generic new contact from being described as a repeated
+    natal relationship.
+    """
+    rows: List[Dict[str, Any]] = []
+    for planet in sorted(dasha_planets):
+        natal = chart["planets"].get(planet)
+        transit = transit_states.get(planet)
+        if natal is None or transit is None:
+            continue
+        natal_house = int(natal["house"])
+        transit_house = int(transit["house"])
+        for target, target_natal in sorted(chart["planets"].items()):
+            if target == planet:
+                continue
+            target_house = int(target_natal["house"])
+            natal_aspect = _aspect_number(natal_house, target_house)
+            transit_aspect = _aspect_number(transit_house, target_house)
+            if natal_aspect != transit_aspect:
+                continue
+            if natal_aspect == 1:
+                relation = "conjunction"
+            elif target_house in aspected_houses(planet, natal_house):
+                relation = "aspect"
+            else:
+                continue
+            rows.append({
+                "planet": planet,
+                "target_planet": target,
+                "relation": relation,
+                "aspect_number": natal_aspect,
+                "natal_house": natal_house,
+                "transit_house": transit_house,
+                "target_natal_house": target_house,
+                "dasha_levels": tuple(sorted(
+                    levels_by_planet.get(planet, ()), key=DASHA_LEVEL_ORDER.get
+                )),
+            })
+    return tuple(rows)
+
+
+def _return_passes_in_window(
+    calculation: CalculationContext,
+    window: PredictionWindow,
+    planets: Set[str],
+) -> Tuple[Dict[str, Any], ...]:
+    rows: List[Dict[str, Any]] = []
+    for planet in sorted(planets):
+        for event in calculation.transit_return_passes.get(planet, ()):
+            event_start = str(event["start_at"])[:10]
+            event_end = str(event["end_at"])[:10]
+            if event_start <= window.end_date and event_end >= window.start_date:
+                rows.append(dict(event))
+    return tuple(rows)
+
+
+def _append_confirmation(
+    confirmations: List[Dict[str, Any]], row: Dict[str, Any]
+) -> None:
+    key = (
+        row.get("kind"), row.get("planet"), row.get("target_planet"),
+        row.get("exact_at"), row.get("label"),
+    )
+    if not any((
+        item.get("kind"), item.get("planet"), item.get("target_planet"),
+        item.get("exact_at"), item.get("label"),
+    ) == key for item in confirmations):
+        confirmations.append(row)
 
 
 def _sun_contacts_house(sun_house: int, target_house: int) -> bool:
@@ -532,6 +622,9 @@ class HouseActivationEngine:
         levels_by_planet: Dict[str, Set[str]] = {}
         for level, planet in levels:
             levels_by_planet.setdefault(planet, set()).add(level)
+        repeated_relationships = _repeated_natal_relationships(
+            chart, transit_states, dasha_planets, levels_by_planet
+        )
 
         # Per dasha lord: self-contact and Sun add-on (lord fully awake).
         self_contact_planets: Set[str] = set()
@@ -560,6 +653,7 @@ class HouseActivationEngine:
             carrier_planets: Set[str] = set()
             transit_hit_planets: Set[str] = set()
             transit_connections: List[Dict[str, Any]] = []
+            transit_confirmations: List[Dict[str, Any]] = []
             trigger_planets: Set[str] = set()
 
             for level, planet in levels:
@@ -655,6 +749,22 @@ class HouseActivationEngine:
                             f"{transit_house}:{natal_house}"
                         ),
                     ))
+                    _append_confirmation(transit_confirmations, {
+                        "kind": (
+                            "natal_sign_return"
+                            if transit_house == natal_house
+                            else "own_natal_aspect"
+                        ),
+                        "label": (
+                            f"{planet} returned to natal sign"
+                            if transit_house == natal_house
+                            else f"{planet} aspects its natal position"
+                        ),
+                        "planet": planet,
+                        "natal_house": natal_house,
+                        "transit_house": transit_house,
+                        "dasha_levels": planet_levels,
+                    })
                 if planet in sun_activated_planets and sun_house is not None:
                     contacts_natal = _sun_contacts_house(sun_house, natal_house)
                     contacts_transit = _sun_contacts_house(sun_house, transit_house)
@@ -709,6 +819,76 @@ class HouseActivationEngine:
                         f"dasha-relationship:{row.first_level}:{row.first_planet}:"
                         f"{row.second_level}:{row.second_planet}:"
                         f"{','.join(row.relations)}"
+                    ),
+                ))
+
+            # A strict exact-longitude pass is confirmatory.  Its ±1° interval
+            # can span more than one daily transit slice, so surface it in each
+            # overlapping ledger window without using it to open a new house.
+            for return_pass in _return_passes_in_window(
+                calculation, window, carrier_planets
+            ):
+                planet = str(return_pass["planet"])
+                planet_levels = tuple(sorted(
+                    levels_by_planet.get(planet, ()), key=DASHA_LEVEL_ORDER.get
+                ))
+                label = (
+                    f"{planet} exact natal longitude return · "
+                    f"{return_pass['pass_label']}"
+                )
+                confirmation = {
+                    "kind": "exact_degree_return",
+                    "label": label,
+                    "dasha_levels": planet_levels,
+                    **return_pass,
+                }
+                _append_confirmation(transit_confirmations, confirmation)
+                evidence.append(_evidence(
+                    window=window,
+                    provider="transit_exact_return_ledger",
+                    rule_id="dasha_lord_exact_natal_longitude_return",
+                    planet=planet,
+                    house=house,
+                    importance=Importance.CONFIRMATORY,
+                    facts={**return_pass, "dasha_levels": planet_levels},
+                    key=(
+                        f"transit-exact-return:{planet}:"
+                        f"{return_pass['exact_at']}"
+                    ),
+                ))
+
+            # Repeat only the same natal planet pair with the same conjunction
+            # or exact graha-drishti number; a generic new contact is excluded.
+            for repetition in repeated_relationships:
+                if repetition["planet"] not in carrier_planets:
+                    continue
+                relation = str(repetition["relation"])
+                planet = str(repetition["planet"])
+                target = str(repetition["target_planet"])
+                label = (
+                    f"{planet} repeats natal conjunction with {target}"
+                    if relation == "conjunction"
+                    else (
+                        f"{planet} repeats natal {_ordinal(repetition['aspect_number'])}-house "
+                        f"aspect to {target}"
+                    )
+                )
+                _append_confirmation(transit_confirmations, {
+                    "kind": "repeated_natal_relationship",
+                    "label": label,
+                    **repetition,
+                })
+                evidence.append(_evidence(
+                    window=window,
+                    provider="transit_natal_relationship_ledger",
+                    rule_id="dasha_lord_repeats_exact_natal_relationship",
+                    planet=planet,
+                    house=house,
+                    importance=Importance.CONFIRMATORY,
+                    facts=dict(repetition),
+                    key=(
+                        f"transit-natal-repeat:{planet}:{target}:"
+                        f"{relation}:{repetition['aspect_number']}"
                     ),
                 ))
 
@@ -768,6 +948,20 @@ class HouseActivationEngine:
                         f"{resonance['transit_nakshatra']['index']}"
                     ),
                 ))
+                if is_exact_return:
+                    _append_confirmation(transit_confirmations, {
+                        "kind": "exact_nakshatra_return",
+                        "label": (
+                            f"{planet} exact nakshatra return · "
+                            f"{resonance['natal_nakshatra']['name']}"
+                        ),
+                        "planet": planet,
+                        "nakshatra": resonance["natal_nakshatra"]["name"],
+                        "nakshatra_lord": lord,
+                        "natal_pada": resonance["natal_nakshatra"]["pada"],
+                        "transit_pada": resonance["transit_nakshatra"]["pada"],
+                        "dasha_levels": planet_levels,
+                    })
 
             fully_awake = (
                 carrier_planets & (self_contact_planets | sun_activated_planets)
@@ -932,6 +1126,7 @@ class HouseActivationEngine:
                 dasha_relationships=relevant_relationships,
                 trigger_planets=tuple(sorted(trigger_planets | fully_awake)),
                 timing_triggers=tuple(timing_triggers),
+                transit_confirmations=tuple(transit_confirmations),
                 evidence=tuple(evidence),
             ))
         return tuple(results)

@@ -4,7 +4,14 @@
   --nd-line: rgba(70, 45, 35, 0.12);
   --nd-accent: #9f1239;
   --nd-panel: #fffcf8;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
   background: #f3ebe3;
   color: var(--nd-ink);
   font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
@@ -18,8 +25,8 @@
   padding: 0.45rem 0.75rem;
   background: #fffcf8;
   border-bottom: 1px solid var(--nd-line);
-  position: sticky;
-  top: 0;
+  min-height: 42px;
+  position: relative;
   z-index: 20;
 }
 
@@ -111,25 +118,33 @@
 }
 
 .nadi-desk__body {
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
-  padding: 0.55rem 0.75rem 1rem;
+  gap: 0.42rem;
+  padding: 0.42rem 0.55rem 0.5rem;
+  overflow: hidden;
 }
 
 .nadi-desk__tools {
+  flex: 0 0 auto;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 0.55rem 0.85rem;
-  padding: 0.45rem 0.55rem;
+  gap: 0.45rem 0.65rem;
+  min-height: 40px;
+  padding: 0.28rem 0.45rem;
   background: var(--nd-panel);
   border: 1px solid var(--nd-line);
-  border-radius: 8px;
+  border-radius: 7px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
 
 .nadi-desk__clock,
 .nadi-desk__moon {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 0.35rem;
@@ -178,7 +193,8 @@
   display: inline-flex;
   gap: 0.2rem;
   margin-left: auto;
-  flex-wrap: wrap;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
 }
 
 .nadi-desk__topics--links {
@@ -186,17 +202,19 @@
 }
 
 .nadi-desk__karaka-row {
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.45rem;
+  gap: 0.35rem;
+  min-height: 0;
 }
 
 .nadi-desk__karaka-card {
   text-align: left;
   border: 1px solid var(--nd-line);
   background: #fff;
-  border-radius: 8px;
-  padding: 0.4rem 0.5rem 0.45rem;
+  border-radius: 7px;
+  padding: 0.28rem 0.42rem 0.32rem;
   cursor: pointer;
   color: inherit;
   font: inherit;
@@ -212,7 +230,7 @@
   display: flex;
   justify-content: space-between;
   gap: 0.35rem;
-  margin-bottom: 0.15rem;
+  margin-bottom: 0.05rem;
 }
 
 .nadi-desk__karaka-card header strong {
@@ -227,7 +245,7 @@
 }
 
 .nadi-desk__karaka-card > p {
-  margin: 0 0 0.3rem;
+  margin: 0 0 0.18rem;
   font-size: 0.58rem;
   font-weight: 650;
   color: var(--nd-muted);
@@ -236,14 +254,14 @@
 .nadi-desk__karaka-card dl {
   margin: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.12rem 0.35rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.12rem 0.28rem;
 }
 
 .nadi-desk__karaka-card dl div {
   display: grid;
-  grid-template-columns: 2.2rem 1fr;
-  gap: 0.2rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.18rem;
   align-items: baseline;
 }
 
@@ -323,13 +341,17 @@
 }
 
 .nadi-desk__grid {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
   display: grid;
   grid-template-columns: minmax(220px, 0.9fr) minmax(220px, 0.9fr) minmax(260px, 1.1fr);
+  grid-template-rows: minmax(0, 1.2fr) minmax(0, 0.68fr) minmax(0, 0.78fr);
   grid-template-areas:
     "d1 tr ledger"
     "links tri detail"
     "ages ages detail";
-  gap: 0.55rem;
+  gap: 0.42rem;
   align-items: stretch;
 }
 
@@ -346,18 +368,20 @@
   min-height: 0;
   background: var(--nd-panel);
   border: 1px solid var(--nd-line);
-  border-radius: 8px;
+  border-radius: 7px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
 .nadi-desk__panel > header {
+  flex: 0 0 auto;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.4rem;
-  padding: 0.35rem 0.5rem;
+  min-height: 29px;
+  padding: 0.25rem 0.42rem;
   border-bottom: 1px solid var(--nd-line);
   background: #f8f2eb;
 }
@@ -375,9 +399,32 @@
 }
 
 .nadi-desk__chart {
-  padding: 0.35rem;
-  min-height: 240px;
+  flex: 1 1 0;
+  min-height: 0;
+  padding: 0.2rem;
   background: #fff;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.nadi-desk__chart > *,
+.nadi-desk__chart > div,
+.nadi-desk__chart [class*="Widget"] {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.nadi-desk__chart svg {
+  width: auto !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
 }
 
 .nadi-desk__chart svg > rect:first-of-type {
@@ -386,9 +433,9 @@
 
 .nadi-desk__state-key {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.15rem;
-  padding: 0.35rem 0.45rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.25rem 0.35rem;
   border-bottom: 1px solid var(--nd-line);
   background: #faf6f1;
 }
@@ -396,7 +443,7 @@
 .nadi-desk__state-key span {
   display: flex;
   align-items: baseline;
-  gap: 0.3rem;
+  gap: 0.22rem;
   font-size: 0.52rem;
   color: var(--nd-muted);
 }
@@ -407,8 +454,7 @@
 }
 
 .nadi-desk__state-key em {
-  font-style: normal;
-  font-weight: 600;
+  display: none;
 }
 
 .nadi-desk__swatch {
@@ -423,14 +469,18 @@
 .nadi-desk__swatch--promise { background: rgba(180, 83, 9, 0.65); }
 
 .nadi-desk__act-list {
+  flex: 1 1 0;
+  min-height: 0;
   list-style: none;
   margin: 0;
-  padding: 0.35rem;
+  padding: 0.28rem;
   overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  max-height: 420px;
+  max-height: none;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 
 .nadi-desk__act {
@@ -439,7 +489,7 @@
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 0.15rem 0.4rem;
-  padding: 0.35rem 0.4rem;
+  padding: 0.3rem 0.38rem;
   border-radius: 6px;
   border: 1px solid var(--nd-line);
   background: #fff;
@@ -474,17 +524,22 @@
 .nadi-desk__act--promise i { color: #b45309; }
 
 .nadi-desk__planet-tabs {
+  flex: 0 0 auto;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.2rem;
-  padding: 0.35rem 0.45rem;
+  flex-wrap: nowrap;
+  gap: 0;
+  padding: 0;
   border-bottom: 1px solid var(--nd-line);
+  background: #faf6f1;
 }
 
 .nadi-desk__planet-tabs button {
-  min-width: 1.8rem;
-  padding: 0.18rem 0.3rem;
-  border-radius: 5px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 28px;
+  padding: 0.12rem 0.18rem;
+  border-right: 1px solid rgba(70, 45, 35, 0.08);
+  border-radius: 0;
   font-size: 0.62rem;
   font-weight: 800;
   color: var(--nd-muted);
@@ -493,7 +548,8 @@
 .nadi-desk__planet-tabs button.is-active {
   background: #fff1f2;
   color: var(--nd-accent);
-  border-color: rgba(159, 18, 57, 0.25);
+  border-color: rgba(159, 18, 57, 0.18);
+  box-shadow: inset 0 -2px 0 var(--nd-accent);
 }
 
 .nadi-desk__planet-full {
@@ -501,10 +557,14 @@
 }
 
 .nadi-desk__link-card {
-  padding: 0.45rem 0.55rem 0.6rem;
+  flex: 1 1 0;
+  min-height: 0;
+  padding: 0.35rem 0.45rem;
   display: flex;
   flex-direction: column;
-  gap: 0.28rem;
+  gap: 0.18rem;
+  overflow: auto;
+  scrollbar-width: thin;
 }
 
 .nadi-desk__link-head {
@@ -519,10 +579,18 @@
 
 .nadi-desk__link-row {
   display: grid;
-  grid-template-columns: 3.2rem 1fr;
+  grid-template-columns: 3.2rem minmax(0, 1fr);
   gap: 0.35rem;
   align-items: baseline;
+  min-height: 24px;
+  padding: 0.12rem 0;
+  border-top: 1px solid rgba(70, 45, 35, 0.07);
   font-size: 0.64rem;
+}
+
+.nadi-desk__link-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .nadi-desk__link-row em {
@@ -534,14 +602,19 @@
 }
 
 .nadi-desk__trikonas {
+  flex: 1 1 0;
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.35rem;
-  padding: 0.4rem;
+  gap: 0.28rem;
+  padding: 0.32rem;
+  overflow: auto;
+  scrollbar-width: thin;
 }
 
 .nadi-desk__tri {
-  padding: 0.35rem 0.4rem;
+  min-height: 0;
+  padding: 0.28rem 0.35rem;
   border-radius: 6px;
   border: 1px solid var(--nd-line);
   background: #fff;
@@ -568,30 +641,76 @@
 .nadi-desk__tri--quiet { opacity: 0.75; }
 
 .nadi-desk__ages {
+  flex: 1 1 0;
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1.2fr;
-  gap: 0.55rem;
-  padding: 0.45rem 0.55rem 0.6rem;
+  gap: 0.42rem;
+  padding: 0.32rem 0.42rem 0.38rem;
+  overflow: hidden;
+}
+
+.nadi-desk__age-table {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nadi-desk__age-table-head {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 2.3rem 2.3rem minmax(0, 1fr);
+  gap: 0.3rem;
+  margin-top: 0.18rem;
+  padding: 0.1rem 0.2rem;
+  border-bottom: 1px solid var(--nd-line);
+  color: var(--nd-muted);
+  font-size: 0.48rem;
+  font-weight: 800;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.nadi-desk__age-table--milestones .nadi-desk__age-table-head {
+  grid-template-columns: 2.3rem minmax(0, 1fr) auto;
+}
+
+.nadi-desk__age-table-head span:last-child {
+  text-align: right;
 }
 
 .nadi-desk__ages ul {
+  flex: 1 1 0;
+  min-height: 0;
   list-style: none;
   margin: 0.25rem 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  max-height: 180px;
+  max-height: none;
   overflow: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 
 .nadi-desk__ages li {
   display: grid;
-  grid-template-columns: 1.6rem 2.2rem 1fr;
+  grid-template-columns: 2.3rem 2.3rem minmax(0, 1fr);
   gap: 0.3rem;
   font-size: 0.58rem;
   padding: 0.12rem 0.2rem;
   border-radius: 4px;
+}
+
+.nadi-desk__age-table--milestones li {
+  grid-template-columns: 2.3rem minmax(0, 1fr) auto;
+}
+
+.nadi-desk__ages li > * {
+  min-width: 0;
 }
 
 .nadi-desk__ages li.is-current {
@@ -607,11 +726,15 @@
 }
 
 .nadi-desk__detail {
+  flex: 1 1 0;
+  min-height: 0;
   padding: 0.45rem 0.55rem 0.65rem;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
   overflow: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 
 .nadi-desk__detail-head {
@@ -665,23 +788,35 @@
   font-weight: 650;
 }
 
-@media (max-width: 1100px) {
-  .nadi-desk__grid {
-    grid-template-columns: 1fr 1fr;
-    grid-template-areas:
-      "d1 tr"
-      "ledger ledger"
-      "links tri"
-      "ages ages"
-      "detail detail";
-  }
+.nadi-desk__tools::-webkit-scrollbar,
+.nadi-desk__act-list::-webkit-scrollbar,
+.nadi-desk__link-card::-webkit-scrollbar,
+.nadi-desk__trikonas::-webkit-scrollbar,
+.nadi-desk__ages ul::-webkit-scrollbar,
+.nadi-desk__detail::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
 }
 
-@media (max-width: 720px) {
+.nadi-desk__tools::-webkit-scrollbar-thumb,
+.nadi-desk__act-list::-webkit-scrollbar-thumb,
+.nadi-desk__link-card::-webkit-scrollbar-thumb,
+.nadi-desk__trikonas::-webkit-scrollbar-thumb,
+.nadi-desk__ages ul::-webkit-scrollbar-thumb,
+.nadi-desk__detail::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(107, 92, 84, 0.35);
+}
+
+@media (max-width: 900px) {
   .nadi-desk {
+    display: block;
+    height: auto;
+    max-height: none;
     min-height: 100dvh;
     padding-bottom: calc(4.35rem + env(safe-area-inset-bottom, 0px));
     overflow-x: hidden;
+    overflow-y: visible;
   }
 
   .nadi-desk__bar {
@@ -692,6 +827,8 @@
     padding: max(0.65rem, env(safe-area-inset-top)) 0.7rem 0.65rem;
     background: rgba(255, 252, 248, 0.96);
     backdrop-filter: blur(8px);
+    position: sticky;
+    top: 0;
   }
 
   .nadi-desk__bar-left {
@@ -800,6 +937,7 @@
   }
 
   .nadi-desk__body {
+    overflow: visible;
     gap: 0.65rem;
     padding: 0.75rem 0.7rem 1.25rem;
   }
@@ -857,6 +995,9 @@
   }
 
   .nadi-desk__tools {
+    flex-wrap: wrap;
+    min-height: 0;
+    overflow: visible;
     gap: 0.6rem 0.45rem;
     padding: 0.65rem;
     border-radius: 11px;
@@ -964,6 +1105,9 @@
   }
 
   .nadi-desk__grid {
+    flex: none;
+    min-height: 0;
+    overflow: visible;
     grid-template-columns: 1fr;
     grid-template-areas: none;
     gap: 0.45rem;
@@ -1008,6 +1152,7 @@
   }
 
   .nadi-desk__karaka-card dl {
+    grid-template-columns: 1fr 1fr;
     gap: 0.45rem;
   }
 
@@ -1274,6 +1419,19 @@
     overflow: visible;
   }
 
+  .nadi-desk__age-table-head,
+  .nadi-desk__age-table--milestones .nadi-desk__age-table-head {
+    grid-template-columns: 2.6rem minmax(0, 1fr) auto;
+    gap: 0.55rem;
+    margin-top: 0.45rem;
+    padding: 0.25rem 0.55rem;
+    font-size: 0.58rem;
+  }
+
+  .nadi-desk__age-table {
+    overflow: visible;
+  }
+
   .nadi-desk__ages li {
     grid-template-columns: 2.6rem minmax(0, 1fr) auto;
     align-items: center;
@@ -1284,6 +1442,10 @@
     background: #faf6f1;
     font-size: 0.78rem;
     line-height: 1.3;
+  }
+
+  .nadi-desk__age-table--milestones li {
+    grid-template-columns: 2.6rem minmax(0, 1fr) auto;
   }
 
   .nadi-desk__ages li strong {

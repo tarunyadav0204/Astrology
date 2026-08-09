@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from .errors import PredictionInputError
 
 
-SCHEMA_VERSION = "prediction_engine.v21"
+SCHEMA_VERSION = "prediction_engine.v22"
 
 
 class EvidenceStatus(str, Enum):
@@ -251,6 +251,7 @@ class HouseActivation:
     trigger_planets: Sequence[str]
     timing_triggers: Sequence[Dict[str, Any]]
     evidence: Sequence[Evidence]
+    transit_confirmations: Sequence[Dict[str, Any]] = ()
 
     def to_dict(self, *, include_evidence: bool = True) -> Dict[str, Any]:
         value = asdict(self)

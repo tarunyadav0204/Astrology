@@ -178,7 +178,8 @@ def _generate_activation_dossier(payload: ActivationExplorerRequest, chart: Dict
             trace=payload.trace,
             exploration_mode=True,
             language=payload.language,
-        )
+        ),
+        include_exact_transit_returns=True,
     )
     response = result.to_dict(include_evidence=payload.trace)
     response["chart"] = {

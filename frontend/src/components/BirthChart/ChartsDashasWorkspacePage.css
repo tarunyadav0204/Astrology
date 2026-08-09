@@ -341,11 +341,11 @@
 }
 
 /*
- * Activations focus: left ≈ former dasha width (D1 | Transit + dashas),
+ * Activations focus: D1 | D9 | Transit above dashas,
  * right = full-height activations column.
  */
 .parashari-desk-grid--act-focus {
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 1.2fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.35fr);
   grid-template-rows: minmax(0, 1.05fr) minmax(0, 1fr);
 }
 
@@ -354,18 +354,23 @@
   grid-row: 1;
 }
 
-.parashari-desk-grid--act-focus .parashari-desk-panel--transit {
+.parashari-desk-grid--act-focus .parashari-desk-panel--d9 {
   grid-column: 2;
   grid-row: 1;
 }
 
+.parashari-desk-grid--act-focus .parashari-desk-panel--transit {
+  grid-column: 3;
+  grid-row: 1;
+}
+
 .parashari-desk-grid--act-focus .parashari-desk-panel--dasha {
-  grid-column: 1 / 3;
+  grid-column: 1 / 4;
   grid-row: 2;
 }
 
 .parashari-desk-grid--act-focus .parashari-desk-panel--activations {
-  grid-column: 3;
+  grid-column: 4;
   grid-row: 1 / 3;
   grid-template-rows: minmax(0, 1fr);
   padding: 0;
@@ -558,12 +563,13 @@
   .parashari-desk-panel--analysis { grid-column: 1 / -1; grid-row: 4; min-height: 220px; }
 
   .parashari-desk-grid--act-focus {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-rows: minmax(0, 0.9fr) minmax(0, 0.95fr) minmax(0, 1.1fr);
   }
 
   .parashari-desk-grid--act-focus .parashari-desk-panel--d1 { grid-column: 1; grid-row: 1; }
-  .parashari-desk-grid--act-focus .parashari-desk-panel--transit { grid-column: 2; grid-row: 1; }
+  .parashari-desk-grid--act-focus .parashari-desk-panel--d9 { grid-column: 2; grid-row: 1; }
+  .parashari-desk-grid--act-focus .parashari-desk-panel--transit { grid-column: 3; grid-row: 1; }
   .parashari-desk-grid--act-focus .parashari-desk-panel--dasha { grid-column: 1 / -1; grid-row: 2; }
   .parashari-desk-grid--act-focus .parashari-desk-panel--activations {
     grid-column: 1 / -1;

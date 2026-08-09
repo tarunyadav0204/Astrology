@@ -19,6 +19,7 @@ class CalculationContext:
     transit_states_by_signature: Dict[str, Dict[str, Dict[str, Any]]]
     divisional_charts: Dict[str, Dict[str, Any]]
     daily_transit_states: Dict[str, Dict[str, Dict[str, Any]]] = field(default_factory=dict)
+    transit_return_passes: Dict[str, Sequence[Dict[str, Any]]] = field(default_factory=dict)
     natal_promises: Sequence[Dict[str, Any]] = ()
     validated_yogas: Sequence[Dict[str, Any]] = ()
 

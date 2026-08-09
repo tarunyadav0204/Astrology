@@ -622,8 +622,11 @@ export default function NadiDeskPage({ user, onLogin }) {
                 <em>Planet ages + nakṣatra milestones</em>
               </header>
               <div className="nadi-desk__ages">
-                <div>
+                <div className="nadi-desk__age-table">
                   <em>Planet ages</em>
+                  <div className="nadi-desk__age-table-head" aria-hidden="true">
+                    <span>Planet</span><span>Age</span><span>Status</span>
+                  </div>
                   <ul>
                     {(desk?.planet_ages || []).map((row) => (
                       <li key={row.planet} className={`is-${row.status}`}>
@@ -634,8 +637,11 @@ export default function NadiDeskPage({ user, onLogin }) {
                     ))}
                   </ul>
                 </div>
-                <div>
+                <div className="nadi-desk__age-table nadi-desk__age-table--milestones">
                   <em>Nakṣatra milestones</em>
+                  <div className="nadi-desk__age-table-head" aria-hidden="true">
+                    <span>Age</span><span>Nakṣatra</span><span>Planets</span>
+                  </div>
                   <ul>
                     {(desk?.nakshatra_milestones || []).map((row) => (
                       <li key={row.age} className={`is-${row.status}`}>

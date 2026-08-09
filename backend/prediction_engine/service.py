@@ -55,7 +55,12 @@ class PredictionService:
         self.registry = registry or build_default_registry()
         self.engine = PredictionEngine(self.registry)
 
-    def generate(self, request: PredictionRequest) -> PredictionResult:
+    def generate(
+        self,
+        request: PredictionRequest,
+        *,
+        include_exact_transit_returns: bool = False,
+    ) -> PredictionResult:
         profile = get_profile(request.profile)
         # horizon_days is a count including as_of; a 90-day request must not
         # silently calculate 91 inclusive calendar dates.
@@ -64,5 +69,6 @@ class PredictionService:
             request.birth,
             request.as_of,
             horizon_end,
+            include_exact_transit_returns=include_exact_transit_returns,
         )
         return self.engine.generate(request, calculation, profile)

@@ -485,8 +485,11 @@ def build_calculation_context(
     birth: BirthChartInput,
     start: date,
     end: date,
+    *,
+    include_exact_transit_returns: bool = False,
 ) -> CalculationContext:
     from .natal_promise import build_natal_promises
+    from .transit_returns import build_exact_natal_return_passes
 
     try:
         chart = ChartCalculator({}).calculate_chart(
@@ -510,6 +513,11 @@ def build_calculation_context(
         raise PredictionCalculationError("Natal Parashari context calculation failed") from exc
 
     windows, states_by_signature, daily_states = _build_windows(birth, chart, start, end)
+    transit_return_passes = (
+        build_exact_natal_return_passes(chart, windows, daily_states, start, end)
+        if include_exact_transit_returns
+        else {}
+    )
     return CalculationContext(
         birth=birth,
         chart=chart,
@@ -521,6 +529,7 @@ def build_calculation_context(
         transit_states_by_signature=states_by_signature,
         divisional_charts=divisional_charts,
         daily_transit_states=daily_states,
+        transit_return_passes=transit_return_passes,
         natal_promises=natal_promises,
         validated_yogas=validated_yogas,
     )

@@ -247,7 +247,7 @@ const ChartsDashasWorkspacePage = ({
             type="button"
             className={`parashari-desk-chip parashari-desk-chip--activations${activationsFocus ? ' is-active' : ''}`}
             onClick={() => setActivationsFocus((open) => !open)}
-            title={activationsFocus ? 'Close activations focus (Esc)' : 'Open activations with D1, Transit and dashas'}
+            title={activationsFocus ? 'Close activations focus (Esc)' : 'Open activations with D1, D9, Transit and dashas'}
             aria-pressed={activationsFocus}
           >
             {activationsFocus ? 'Close activations' : 'Activations'}
@@ -411,31 +411,29 @@ const ChartsDashasWorkspacePage = ({
               </div>
             </section>
 
-            {!activationsFocus ? (
-              <section className="parashari-desk-panel parashari-desk-panel--d9">
-                <header className="parashari-desk-panel__head">
-                  <div className="parashari-desk-panel__titles">
-                    <h2>D9</h2>
-                    <span>Navamsa</span>
-                  </div>
-                  <em className="parashari-desk-panel__hint">Click a house for insight dock</em>
-                </header>
-                <div className="parashari-desk-chart">
-                  <ChartWidget
-                    title="D9"
-                    chartType="navamsa"
-                    chartData={chartData}
-                    birthData={birthData}
-                    defaultStyle="north"
-                    showFooterHint={false}
-                    embedInDashboard
-                    deskMode
-                    onHouseSelect={handleHouseSelect}
-                    selectedHouseNumber={houseSelection?.houseNumber}
-                  />
+            <section className="parashari-desk-panel parashari-desk-panel--d9">
+              <header className="parashari-desk-panel__head">
+                <div className="parashari-desk-panel__titles">
+                  <h2>D9</h2>
+                  <span>Navamsa</span>
                 </div>
-              </section>
-            ) : null}
+                <em className="parashari-desk-panel__hint">Click a house for insight dock</em>
+              </header>
+              <div className="parashari-desk-chart">
+                <ChartWidget
+                  title="D9"
+                  chartType="navamsa"
+                  chartData={chartData}
+                  birthData={birthData}
+                  defaultStyle="north"
+                  showFooterHint={false}
+                  embedInDashboard
+                  deskMode
+                  onHouseSelect={handleHouseSelect}
+                  selectedHouseNumber={houseSelection?.houseNumber}
+                />
+              </div>
+            </section>
 
             {!activationsFocus ? (
               <section className="parashari-desk-panel parashari-desk-panel--div">
