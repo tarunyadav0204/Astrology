@@ -104,9 +104,9 @@ export const SEO_CONFIG = {
     },
     
     dailyHoroscope: {
-      title: "Daily Horoscope - Today's Predictions for All Zodiac Signs | AstroRoshni",
-      description: "Read your daily horoscope predictions for love, career, health and finance. Accurate daily astrology forecasts for all 12 zodiac signs.",
-      keywords: "daily horoscope, today horoscope, zodiac predictions, astrology forecast, daily predictions"
+      title: "Horoscope by Zodiac Sign | Daily, Weekly, Monthly & Yearly | AstroRoshni",
+      description: "Explore Western tropical Sun-sign forecasts for all 12 zodiac signs, with daily, weekly, monthly and yearly themes for love, career, wellbeing and money.",
+      keywords: "daily horoscope, weekly horoscope, monthly horoscope, yearly horoscope, Western tropical horoscope, Sun sign forecast, zodiac predictions"
     },
 
     kundliMatching: {
@@ -122,9 +122,9 @@ export const SEO_CONFIG = {
     },
 
     birthChartCreation: {
-      title: "AI Kundli Generator | Free Janam Kundli Online & Accurate Kundli Prediction | AstroRoshni",
-      description: "Use AstroRoshni's AI Kundli Generator to create your free Janam Kundli online with date, time, and place of birth. Get instant Vedic Kundli analysis, horoscope and Kundli insights, dosha analysis, and accurate AI-backed Kundli prediction.",
-      keywords: "Free Janam Kundli Generator, Instant Kundli Report Generator, Free Horoscope and Kundli, Online Kundli by Date of Birth, Horoscope and kundli, Free Janam Kundli online, AI Kundli Prediction, Accurate kundli prediction, Kundli maker, Instant Kundli Report, Vedic Kundli Analysis, AI Janam Kundli, Kundli Dosha Analysis",
+      title: "Free Kundli Generator – Create Janam Kundli Online | AstroRoshni",
+      description: "Create and save your Vedic Janam Kundli using your exact birth date, time and place. Explore Lagna, planets, rashis, nakshatras, divisional charts and dasha timing.",
+      keywords: "free Kundli generator, Janam Kundli online, Vedic birth chart, Kundli by date of birth, Lagna chart, nakshatra, Navamsa, dasha timing, AI Kundli interpretation",
     },
 
     chartsDashasWorkspace: {
@@ -225,14 +225,14 @@ export const SEO_CONFIG = {
 
     advancedCourses: {
       title: "Advanced Vedic Astrology Courses | AstroRoshni",
-      description: "Deep-dive courses on dashas, divisional charts, prediction techniques, and professional Jyotish.",
-      keywords: "advanced astrology course, vedic astrology training, jyotish course"
+      description: "Study advanced Vedic astrology through structured paths in dashas, transits, relationships, health, wealth, remedies, and multi-system synthesis.",
+      keywords: "advanced astrology course, vedic astrology training, jyotish course, dasha course, predictive astrology"
     },
 
     mythsVsReality: {
       title: "Astrology Myths vs Reality — Facts About Jyotish | AstroRoshni",
-      description: "Separate fact from fiction in Vedic astrology with evidence-based explanations.",
-      keywords: "astrology myths, vedic astrology facts, jyotish science"
+      description: "A careful guide to astrology myths covering astronomy, precession, free will, scientific evidence, confirmation bias, wellbeing, and Sun-sign horoscopes.",
+      keywords: "astrology myths, vedic astrology facts, jyotish science, sidereal zodiac precession, astrology misconceptions"
     },
 
     ashtakavarga: {

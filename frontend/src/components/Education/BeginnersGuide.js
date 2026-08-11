@@ -1,298 +1,269 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import NavigationHeader from '../Shared/NavigationHeader';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import './BeginnersGuide.css';
 
-const BeginnersGuide = ({
-  user: propUser = null,
-  onLogout,
-  onAdminClick,
-  onLogin,
-}) => {
-  const navigate = useNavigate();
-  const [user, setUser] = useState(propUser);
+const PROGRESS_STORAGE_KEY = 'astroroshni-beginners-guide-progress';
+
+const LESSONS = [
+  {
+    id: 1,
+    title: 'What is Astrology?',
+    duration: '5 min read',
+    level: 'Foundation',
+    content: 'Understand what astrology studies, where the Vedic tradition begins, and how it differs from Western systems.',
+    topics: ['Definition of astrology', 'Historical background', 'Vedic and Western systems', 'Core principles'],
+  },
+  {
+    id: 2,
+    title: 'The Zodiac Signs',
+    duration: '8 min read',
+    level: 'Foundation',
+    content: 'Meet the twelve rashis through their elements, qualities, ruling planets, and characteristic ways of expression.',
+    topics: ['Twelve zodiac signs', 'Four elements', 'Ruling planets', 'Sign characteristics'],
+  },
+  {
+    id: 3,
+    title: 'Understanding Your Birth Chart',
+    duration: '10 min read',
+    level: 'Foundation',
+    content: 'Learn how signs, planets, houses, and the ascendant come together in the map of a single moment.',
+    topics: ['Birth chart basics', 'Twelve houses', 'Planet positions', 'Ascendant and rising sign'],
+  },
+  {
+    id: 4,
+    title: 'The Planets and Their Meanings',
+    duration: '12 min read',
+    level: 'Foundation',
+    content: 'Explore the nine grahas in Vedic astrology and the roles they play in temperament, experience, and timing.',
+    topics: ['Sun, Moon, and Mars', 'Mercury, Jupiter, and Venus', 'Saturn, Rahu, and Ketu', 'Planetary influences'],
+  },
+  {
+    id: 5,
+    title: 'The 12 Houses Explained',
+    duration: '15 min read',
+    level: 'Interpretation',
+    content: 'Connect each house to a distinct area of life, then see how house lords and planetary placements modify it.',
+    topics: ['House meanings', 'Areas of life', 'House lords', 'Planetary placements'],
+  },
+  {
+    id: 6,
+    title: 'Aspects and Conjunctions',
+    duration: '10 min read',
+    level: 'Interpretation',
+    content: 'See how planets influence one another through conjunctions and aspects, creating the chart’s relationships.',
+    topics: ['Planetary aspects', 'Conjunctions', 'Support and pressure', 'Reading combinations'],
+  },
+  {
+    id: 7,
+    title: 'Nakshatras — Lunar Mansions',
+    duration: '12 min read',
+    level: 'Interpretation',
+    content: 'Discover the twenty-seven nakshatras and the finer emotional, karmic, and timing detail they contribute.',
+    topics: ['Twenty-seven nakshatras', 'Nakshatra lords', 'The pada system', 'Core characteristics'],
+  },
+  {
+    id: 8,
+    title: 'Dasha Systems',
+    duration: '15 min read',
+    level: 'Timing',
+    content: 'Begin working with planetary periods and understand how dashas help place chart promises on a timeline.',
+    topics: ['Vimshottari dasha', 'Planetary periods', 'Sub-periods', 'Timing events'],
+  },
+];
+
+const BeginnersGuide = ({ user, onLogout, onAdminClick, onLogin }) => {
+  const [completedLessons, setCompletedLessons] = useState(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(PROGRESS_STORAGE_KEY) || '[]');
+      return new Set(Array.isArray(saved) ? saved : []);
+    } catch {
+      return new Set();
+    }
+  });
 
   useEffect(() => {
-    if (propUser) {
-      setUser(propUser);
-    } else {
-      try {
-        const token = localStorage.getItem('token');
-        const saved = localStorage.getItem('user');
-        if (token && saved) {
-          setUser(JSON.parse(saved));
-        } else {
-          setUser(null);
-        }
-      } catch {
-        setUser(null);
-      }
-    }
-  }, [propUser]);
-  const lessons = [
-    {
-      id: 1,
-      title: "What is Astrology?",
-      duration: "5 min read",
-      level: "Beginner",
-      content: "Astrology is the study of celestial movements and their influence on human affairs. Learn the fundamental concepts and history of this ancient practice.",
-      topics: ["Definition of Astrology", "Historical Background", "Vedic vs Western Systems", "Basic Principles"],
-      completed: false
-    },
-    {
-      id: 2,
-      title: "The Zodiac Signs",
-      duration: "8 min read",
-      level: "Beginner",
-      content: "Discover the 12 zodiac signs, their characteristics, elements, and ruling planets. Understanding signs is fundamental to astrology.",
-      topics: ["12 Zodiac Signs", "Elements (Fire, Earth, Air, Water)", "Ruling Planets", "Sign Characteristics"],
-      completed: false
-    },
-    {
-      id: 3,
-      title: "Understanding Your Birth Chart",
-      duration: "10 min read",
-      level: "Beginner",
-      content: "Learn how to read a birth chart, including houses, planets, and aspects. Your birth chart is your cosmic blueprint.",
-      topics: ["Birth Chart Basics", "12 Houses", "Planet Positions", "Ascendant/Rising Sign"],
-      completed: false
-    },
-    {
-      id: 4,
-      title: "The Planets and Their Meanings",
-      duration: "12 min read",
-      level: "Beginner",
-      content: "Explore the nine planets in Vedic astrology and their significance in your life and personality.",
-      topics: ["Sun, Moon, Mars", "Mercury, Jupiter, Venus", "Saturn, Rahu, Ketu", "Planetary Influences"],
-      completed: false
-    },
-    {
-      id: 5,
-      title: "The 12 Houses Explained",
-      duration: "15 min read",
-      level: "Intermediate",
-      content: "Deep dive into the 12 houses of astrology and what each represents in different areas of your life.",
-      topics: ["House Meanings", "Life Areas", "House Lords", "Planetary Placements"],
-      completed: false
-    },
-    {
-      id: 6,
-      title: "Aspects and Conjunctions",
-      duration: "10 min read",
-      level: "Intermediate",
-      content: "Learn about planetary aspects, conjunctions, and how planets influence each other in your chart.",
-      topics: ["Planetary Aspects", "Conjunctions", "Trines & Squares", "Aspect Meanings"],
-      completed: false
-    },
-    {
-      id: 7,
-      title: "Nakshatras (Lunar Mansions)",
-      duration: "12 min read",
-      level: "Intermediate",
-      content: "Understand the 27 Nakshatras and their role in Vedic astrology for deeper personality insights.",
-      topics: ["27 Nakshatras", "Nakshatra Lords", "Pada System", "Characteristics"],
-      completed: false
-    },
-    {
-      id: 8,
-      title: "Dasha Systems",
-      duration: "15 min read",
-      level: "Advanced",
-      content: "Introduction to planetary periods (Dashas) and how they influence timing of events in your life.",
-      topics: ["Vimshottari Dasha", "Planetary Periods", "Sub-periods", "Timing Events"],
-      completed: false
-    }
-  ];
+    window.localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify([...completedLessons]));
+  }, [completedLessons]);
 
-  const [completedLessons, setCompletedLessons] = React.useState(new Set());
+  const totalMinutes = useMemo(
+    () => LESSONS.reduce((total, lesson) => total + Number.parseInt(lesson.duration, 10), 0),
+    []
+  );
+  const progressPercentage = Math.round((completedLessons.size / LESSONS.length) * 100);
 
   const toggleLessonComplete = (lessonId) => {
-    const newCompleted = new Set(completedLessons);
-    if (newCompleted.has(lessonId)) {
-      newCompleted.delete(lessonId);
-    } else {
-      newCompleted.add(lessonId);
-    }
-    setCompletedLessons(newCompleted);
+    setCompletedLessons((current) => {
+      const next = new Set(current);
+      if (next.has(lessonId)) next.delete(lessonId);
+      else next.add(lessonId);
+      return next;
+    });
   };
-
-  const progressPercentage = (completedLessons.size / lessons.length) * 100;
 
   return (
     <div className="beginners-guide-page">
-      <SEOHead 
+      <SEOHead
         title="Beginner's Guide to Astrology - Learn Vedic Astrology Basics | AstroRoshni"
         description="Complete beginner's guide to astrology with step-by-step lessons. Learn zodiac signs, birth charts, planets, houses and Vedic astrology fundamentals."
         keywords="astrology for beginners, learn astrology, vedic astrology basics, zodiac signs guide, birth chart tutorial, astrology lessons"
         canonical="https://astroroshni.com/beginners-guide/"
         structuredData={{
-          "@context": "https://schema.org",
-          "@type": "Course",
-          "name": "Beginner's Guide to Astrology",
-          "description": "Complete astrology course for beginners covering zodiac signs, birth charts, planets and Vedic astrology",
-          "provider": { "@type": "Organization", "name": "AstroRoshni" },
-          "courseMode": "online",
-          "educationalLevel": "Beginner"
+          '@context': 'https://schema.org',
+          '@type': 'Course',
+          name: "Beginner's Guide to Vedic Astrology",
+          description: 'A free, step-by-step introduction to zodiac signs, birth charts, planets, houses, nakshatras, and dasha timing.',
+          provider: { '@type': 'Organization', name: 'AstroRoshni', url: 'https://astroroshni.com/' },
+          courseMode: 'online',
+          educationalLevel: 'Beginner',
+          isAccessibleForFree: true,
+          numberOfCredits: LESSONS.length,
         }}
       />
-      <NavigationHeader 
-        onPeriodChange={() => {}}
-        showZodiacSelector={false}
-        zodiacSigns={[]}
-        selectedZodiac={''}
-        onZodiacChange={() => {}}
+
+      <ModernNavigationHeader
+        sticky
         user={user}
-        onAdminClick={user ? onAdminClick : () => {}}
-        onLogout={user ? onLogout : () => {}}
-        onLogin={user ? undefined : onLogin || (() => navigate('/'))}
-        showLoginButton={!user}
+        onLogin={onLogin}
+        onLogout={onLogout}
+        onAdminClick={onAdminClick}
       />
-      <div className="container">
-        <header className="page-header">
-          <h1>🎓 Beginner's Guide to Astrology</h1>
-          <p>Start your astrology journey with step-by-step lessons</p>
+
+      <main className="beginners-guide-main">
+        <header className="beginners-guide-hero">
+          <div className="beginners-guide-hero__copy">
+            <p className="beginners-guide-eyebrow">Vedic astrology · Start here</p>
+            <h1>Learn the sky.<br /><em>Read the pattern.</em></h1>
+            <p className="beginners-guide-hero__lead">
+              A calm, structured introduction to signs, planets, houses, nakshatras, and timing—built to help you understand a chart rather than memorise jargon.
+            </p>
+            <div className="beginners-guide-hero__actions">
+              <a href="#curriculum" className="beginners-guide-primary">Begin with lesson one <span aria-hidden>↓</span></a>
+              <Link to="/ai-kundli-generator" className="beginners-guide-secondary">Create your chart <span aria-hidden>↗</span></Link>
+            </div>
+          </div>
+
+          <div className="beginners-guide-orbit" aria-hidden="true">
+            <span className="beginners-guide-orbit__ring beginners-guide-orbit__ring--outer"></span>
+            <span className="beginners-guide-orbit__ring beginners-guide-orbit__ring--inner"></span>
+            <span className="beginners-guide-orbit__center">आरम्भ<small>Begin</small></span>
+            <i className="beginners-guide-orbit__planet beginners-guide-orbit__planet--one"></i>
+            <i className="beginners-guide-orbit__planet beginners-guide-orbit__planet--two"></i>
+          </div>
+
+          <dl className="beginners-guide-hero__facts">
+            <div><dt>Lessons</dt><dd>{String(LESSONS.length).padStart(2, '0')}</dd></div>
+            <div><dt>Reading time</dt><dd>{totalMinutes} min</dd></div>
+            <div><dt>Level</dt><dd>First principles</dd></div>
+          </dl>
         </header>
 
-        <div className="progress-section">
-          <div className="progress-header">
-            <h3>Your Learning Progress</h3>
-            <span className="progress-text">{completedLessons.size} of {lessons.length} lessons completed</span>
+        <section className="beginners-guide-progress" aria-labelledby="learning-progress-title">
+          <div>
+            <p className="beginners-guide-section-label">Your path</p>
+            <h2 id="learning-progress-title">Learning progress</h2>
           </div>
-          <div className="progress-bar">
-            <div className="progress-fill" style={{width: `${progressPercentage}%`}}></div>
+          <div className="beginners-guide-progress__status">
+            <span>{completedLessons.size} of {LESSONS.length} lessons complete</span>
+            <strong>{progressPercentage}%</strong>
           </div>
-          <div className="progress-percentage">{Math.round(progressPercentage)}%</div>
-        </div>
+          <div
+            className="beginners-guide-progress__track"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow={progressPercentage}
+            aria-label={`${progressPercentage}% complete`}
+          >
+            <span style={{ width: `${progressPercentage}%` }}></span>
+          </div>
+          <p>Your progress is saved on this device.</p>
+        </section>
 
-        <div className="lessons-grid">
-          {lessons.map(lesson => (
-            <div key={lesson.id} className={`lesson-card ${completedLessons.has(lesson.id) ? 'completed' : ''}`}>
-              <div className="lesson-header">
-                <div className="lesson-number">Lesson {lesson.id}</div>
-                <div className="lesson-level">{lesson.level}</div>
-                <div className="lesson-duration">{lesson.duration}</div>
-              </div>
-              
-              <h3 className="lesson-title">{lesson.title}</h3>
-              <p className="lesson-description">{lesson.content}</p>
-              
-              <div className="lesson-topics">
-                <h4>What You'll Learn:</h4>
-                <ul>
-                  {lesson.topics.map((topic, index) => (
-                    <li key={index}>{topic}</li>
-                  ))}
-                </ul>
-              </div>
+        <section className="beginners-guide-curriculum" id="curriculum" aria-labelledby="curriculum-title">
+          <div className="beginners-guide-heading">
+            <p className="beginners-guide-section-label">The curriculum</p>
+            <h2 id="curriculum-title">Eight ideas.<br /><em>One connected system.</em></h2>
+            <p>Move in order for a strong foundation, or open the idea you need today. Each lesson ends with concepts you can locate in a real chart.</p>
+          </div>
 
-              <div className="lesson-actions">
-                <button 
-                  className="start-lesson-btn"
-                  onClick={() => navigate(`/lesson/${lesson.id}`)}
-                >
-                  {completedLessons.has(lesson.id) ? 'Review Lesson' : 'Start Lesson'}
-                </button>
-                <button 
-                  className={`complete-btn ${completedLessons.has(lesson.id) ? 'completed' : ''}`}
-                  onClick={() => toggleLessonComplete(lesson.id)}
-                >
-                  {completedLessons.has(lesson.id) ? '✓ Completed' : 'Mark Complete'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <section className="learning-resources">
-          <h2>📖 Additional Learning Resources</h2>
-          <div className="resources-grid">
-            <div className="resource-card">
-              <h3>🔤 Astrology Glossary</h3>
-              <p>Essential terms and definitions for beginners</p>
-              <ul>
-                <li>Ascendant - Your rising sign</li>
-                <li>Conjunction - Planets close together</li>
-                <li>Transit - Current planetary movements</li>
-                <li>Retrograde - Apparent backward motion</li>
-              </ul>
-            </div>
-            <div className="resource-card">
-              <h3>🎯 Practice Exercises</h3>
-              <p>Hands-on activities to reinforce learning</p>
-              <ul>
-                <li>Identify your Sun, Moon, Rising signs</li>
-                <li>Locate planets in your birth chart</li>
-                <li>Practice reading house meanings</li>
-                <li>Calculate your current Dasha period</li>
-              </ul>
-            </div>
-            <div className="resource-card">
-              <h3>📚 Recommended Books</h3>
-              <p>Essential reading for astrology students</p>
-              <ul>
-                <li>Light on Life by Hart de Fouw</li>
-                <li>Astrology for the Soul by Jan Spiller</li>
-                <li>The Only Astrology Book You'll Ever Need</li>
-                <li>Vedic Astrology by David Frawley</li>
-              </ul>
-            </div>
+          <div className="beginners-guide-lessons">
+            {LESSONS.map((lesson) => {
+              const isCompleted = completedLessons.has(lesson.id);
+              return (
+                <article key={lesson.id} className={`beginners-guide-lesson${isCompleted ? ' is-complete' : ''}`}>
+                  <div className="beginners-guide-lesson__index">{String(lesson.id).padStart(2, '0')}</div>
+                  <div className="beginners-guide-lesson__body">
+                    <div className="beginners-guide-lesson__meta">
+                      <span>{lesson.level}</span><span>{lesson.duration}</span>
+                    </div>
+                    <h3>{lesson.title}</h3>
+                    <p>{lesson.content}</p>
+                    <ul aria-label={`Topics in ${lesson.title}`}>
+                      {lesson.topics.map((topic) => <li key={topic}>{topic}</li>)}
+                    </ul>
+                  </div>
+                  <div className="beginners-guide-lesson__actions">
+                    <Link className="beginners-guide-lesson__open" to={`/lesson/${lesson.id}`}>
+                      {isCompleted ? 'Review lesson' : 'Open lesson'} <span aria-hidden>↗</span>
+                    </Link>
+                    <button
+                      type="button"
+                      className="beginners-guide-lesson__complete"
+                      aria-pressed={isCompleted}
+                      onClick={() => toggleLessonComplete(lesson.id)}
+                    >
+                      <span aria-hidden>{isCompleted ? '✓' : '+'}</span>{isCompleted ? 'Completed' : 'Mark complete'}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </section>
 
-        <section className="next-steps">
-          <h2>🚀 Ready for More?</h2>
-          <div className="next-steps-grid">
-            <div className="next-step-card">
-              <h3>📊 Practice with Your Chart</h3>
-              <p>Apply what you've learned to your own birth chart</p>
-              <button className="next-step-btn" onClick={() => navigate('/birth-details')}>
-                Get My Chart
-              </button>
-            </div>
-            <div className="next-step-card">
-              <h3>📚 Advanced Courses</h3>
-              <p>Take your knowledge to the next level</p>
-              <button className="next-step-btn" onClick={() => navigate('/advanced-courses')}>
-                View Courses
-              </button>
-            </div>
-            <div className="next-step-card">
-              <h3>💬 Ask Questions</h3>
-              <p>Get personalized guidance from experts</p>
-              <button className="next-step-btn" onClick={() => navigate('/chat?app=1')}>
-                Start Chat
-              </button>
-            </div>
+        <section className="beginners-guide-practice" aria-labelledby="practice-title">
+          <div className="beginners-guide-heading beginners-guide-heading--inverse">
+            <p className="beginners-guide-section-label">Turn theory into recognition</p>
+            <h2 id="practice-title">Study your own chart<br /><em>as you learn.</em></h2>
+            <p>Astrology becomes clearer when every new idea has somewhere real to land. Use a saved Kundli to identify placements, then ask Tara how the pieces combine.</p>
+          </div>
+          <div className="beginners-guide-practice__actions">
+            <Link to="/ai-kundli-generator">Create or choose Kundli <span aria-hidden>↗</span></Link>
+            <Link to="/chat?app=1">Ask Tara about my chart <span aria-hidden>↗</span></Link>
           </div>
         </section>
 
-        <section className="study-tips">
-          <h2>💡 Study Tips for Success</h2>
-          <div className="tips-grid">
-            <div className="tip-card">
-              <div className="tip-icon">📅</div>
-              <h4>Study Regularly</h4>
-              <p>Dedicate 15-20 minutes daily to astrology study for best results</p>
-            </div>
-            <div className="tip-card">
-              <div className="tip-icon">📝</div>
-              <h4>Take Notes</h4>
-              <p>Keep a journal of your observations and chart interpretations</p>
-            </div>
-            <div className="tip-card">
-              <div className="tip-icon">🤝</div>
-              <h4>Practice with Others</h4>
-              <p>Study friends' and family charts to gain experience</p>
-            </div>
-            <div className="tip-card">
-              <div className="tip-icon">🔍</div>
-              <h4>Start Simple</h4>
-              <p>Master the basics before moving to advanced techniques</p>
-            </div>
+        <section className="beginners-guide-resources" aria-labelledby="resources-title">
+          <div className="beginners-guide-heading">
+            <p className="beginners-guide-section-label">Keep beside you</p>
+            <h2 id="resources-title">A learner’s toolkit</h2>
+          </div>
+          <div className="beginners-guide-resources__grid">
+            <article>
+              <span>01</span><h3>Essential vocabulary</h3>
+              <dl><div><dt>Ascendant</dt><dd>Your rising sign</dd></div><div><dt>Conjunction</dt><dd>Planets placed closely together</dd></div><div><dt>Transit</dt><dd>Current planetary movement</dd></div><div><dt>Retrograde</dt><dd>Apparent backward motion</dd></div></dl>
+            </article>
+            <article>
+              <span>02</span><h3>Practice prompts</h3>
+              <ul><li>Identify your Sun, Moon, and rising sign</li><li>Locate every graha in your birth chart</li><li>Connect each house to an area of life</li><li>Find your current dasha period</li></ul>
+            </article>
+            <article>
+              <span>03</span><h3>Reference shelf</h3>
+              <ul><li><cite>Light on Life</cite> · Hart de Fouw</li><li><cite>Astrology for the Soul</cite> · Jan Spiller</li><li><cite>The Only Astrology Book You’ll Ever Need</cite></li><li><cite>Vedic Astrology</cite> · David Frawley</li></ul>
+            </article>
           </div>
         </section>
-      </div>
+
+        <section className="beginners-guide-next" aria-labelledby="next-title">
+          <div>
+            <p className="beginners-guide-section-label">Continue learning</p>
+            <h2 id="next-title">Ready to go deeper?</h2>
+          </div>
+          <Link to="/advanced-courses">Explore advanced courses <span aria-hidden>↗</span></Link>
+        </section>
+      </main>
     </div>
   );
 };

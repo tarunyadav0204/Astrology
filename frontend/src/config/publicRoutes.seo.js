@@ -15,7 +15,18 @@ export const NAKSHATRA_SLUGS = [
   'dhanishta', 'shatabhisha', 'purva-bhadrapada', 'uttara-bhadrapada', 'revati',
 ];
 
-const HOROSCOPE_PERIODS = ['daily', 'weekly', 'monthly'];
+const LESSON_SEO = {
+  1: ['What is Astrology?', 'Understand astrology as an interpretive tradition and distinguish Vedic chart interpretation from astronomy.'],
+  2: ['The Zodiac Signs', 'Learn the twelve zodiac signs through element, modality, and planetary rulership.'],
+  3: ['Understanding Your Birth Chart', 'Learn how ascendant, houses, signs, planets, and house lords combine in a Vedic birth chart.'],
+  4: ['The Planets and Their Meanings', 'Meet the nine Vedic grahas and learn how planetary roles change through lordship, dignity, and placement.'],
+  5: ['The 12 Houses Explained', 'Understand the twelve Vedic astrology houses and the areas of life each bhava represents.'],
+  6: ['Aspects and Conjunctions', 'Learn how conjunctions and Parashari planetary aspects connect planets and houses.'],
+  7: ['Nakshatras — Lunar Mansions', 'Understand the twenty-seven nakshatras, their lords, padas, symbols, and role in Vedic astrology.'],
+  8: ['Dasha Systems', 'Learn how Vimshottari dasha periods organise astrological timing and activate natal chart promise.'],
+};
+
+const HOROSCOPE_PERIODS = ['daily', 'weekly', 'monthly', 'yearly'];
 // Static GCS directory pages serve the trailing-slash URL as the canonical 200.
 const DIRECTORY_CANONICAL_PATHS = new Set([
   '/about',
@@ -65,6 +76,8 @@ export function getPrerenderPaths({ year = new Date().getFullYear(), blogSlugs =
     '/education',
     '/progeny-analysis',
   ];
+
+  Object.keys(LESSON_SEO).forEach((lessonId) => paths.push(`/lesson/${lessonId}`));
 
   HOROSCOPE_PERIODS.forEach((p) => paths.push(`/horoscope/${p}`));
   NAKSHATRA_SLUGS.forEach((n) => paths.push(`/nakshatra/${n}/${year}`));
@@ -147,8 +160,31 @@ export const PUBLIC_ROUTE_SEO_RULES = [
   },
   { path: '/policy', pageKey: 'policy' },
   { path: '/terms', pageKey: 'terms' },
+  {
+    path: '/account/delete',
+    noIndex: true,
+    resolve: () => ({
+      title: 'Delete Your AstroRoshni Account',
+      description:
+        'Permanently delete your AstroRoshni account and associated personal data, or learn how to remove individual conversations.',
+      canonical: `${SITE_URL}/account/delete/`,
+    }),
+  },
   { path: '/calendar-2026', pageKey: 'calendar2026' },
   { path: '/beginners-guide', pageKey: 'beginnersGuide' },
+  {
+    path: '/lesson/:lessonId',
+    resolve: ({ lessonId }) => {
+      const lesson = LESSON_SEO[lessonId];
+      if (!lesson) return { noIndex: true };
+      return generatePageSEO('beginnersGuide', {
+        path: `/lesson/${lessonId}/`,
+        title: `${lesson[0]} — Vedic Astrology Lesson ${lessonId} | AstroRoshni`,
+        description: lesson[1],
+        keywords: `${lesson[0]}, learn vedic astrology, jyotish lesson, astrology for beginners`,
+      });
+    },
+  },
   { path: '/advanced-courses', pageKey: 'advancedCourses' },
   { path: '/myths-vs-reality', pageKey: 'mythsVsReality' },
   { path: '/horoscope/:period', pageKey: 'dailyHoroscope' },

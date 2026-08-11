@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import SubscriptionPlanCard from './SubscriptionPlanCard';
 import CreditsModal from '../Credits/CreditsModal';
 import { useCredits } from '../../context/CreditContext';
@@ -222,28 +221,31 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
 
   return (
     <div className="subscription-page">
-      <Helmet>
-        <title>{isAstrologerPlan ? 'Astrologer License' : 'VIP Membership'} — AstroRoshni</title>
-        <meta name="robots" content="noindex, nofollow" />
-      </Helmet>
-      <NavigationHeader
-        compact
+      <ModernNavigationHeader
+        sticky
         user={user}
         onLogout={onLogout}
         onAdminClick={onAdminClick}
         onLogin={onLogin}
-        showLoginButton={!isLoggedIn}
-        onHomeClick={() => navigate('/')}
-        onCreditsClick={openCreditsModal}
       />
 
       <main className="subscription-page-main">
         <header className="subscription-page-hero">
-          <h1>{isAstrologerPlan ? 'Astrologer License' : 'VIP membership'}</h1>
-          <p>{isAstrologerPlan
-            ? 'Unlock professional chart activation, timing and whole-chart manifestation tools for ₹100 per month.'
-            : 'VIP lowers what you pay in credits for each feature. Your monthly fee keeps that discount active—you still buy credits separately when you’re ready to use the app.'}
-          </p>
+          <p className="subscription-page-kicker">{isAstrologerPlan ? 'Professional tools' : 'AstroRoshni membership'}</p>
+          <div className="subscription-page-hero__body">
+            <div>
+              <h1>{isAstrologerPlan ? 'Astrologer License' : <>Deeper guidance,<br /><em>better value.</em></>}</h1>
+              <p>{isAstrologerPlan
+                ? 'Unlock professional chart activation, timing and whole-chart manifestation tools for ₹100 per month.'
+                : 'VIP lowers the credit price of chats, analyses, muhurats, and other premium readings. Choose your saving level; buy credits only when you need them.'}
+              </p>
+            </div>
+            <div className="subscription-page-hero__proof" aria-label="Membership highlights">
+              <div><strong>Monthly</strong><span>Flexible membership</span></div>
+              <div><strong>Instant</strong><span>Member pricing</span></div>
+              <div><strong>Separate</strong><span>Credits stay in your control</span></div>
+            </div>
+          </div>
         </header>
 
         <section className="subscription-card subscription-card--info" aria-label="How membership works">

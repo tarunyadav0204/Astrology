@@ -1,19 +1,25 @@
 .activation-explorer-page {
+  --activation-strong: var(--color-brand);
+  --activation-active: color-mix(in srgb, var(--color-brand) 72%, var(--color-accent));
+  --activation-connected: color-mix(in srgb, var(--color-brand) 24%, var(--color-surface));
+  --activation-background: color-mix(in srgb, var(--color-info) 16%, var(--color-surface));
+  --activation-quiet: var(--color-surface-muted);
   min-height: 100vh;
   max-width: 100%;
   overflow-x: clip;
   background:
-    radial-gradient(circle at 8% 8%, rgba(249, 115, 22, 0.09), transparent 26rem),
-    radial-gradient(circle at 92% 18%, rgba(194, 24, 91, 0.08), transparent 28rem),
-    linear-gradient(180deg, #fffaf7 0%, #fff4f6 48%, #fff9fb 100%);
-  color: #211a2a;
+    radial-gradient(circle at 8% 8%, color-mix(in srgb, var(--color-accent) 12%, transparent), transparent 26rem),
+    radial-gradient(circle at 92% 18%, color-mix(in srgb, var(--color-brand) 10%, transparent), transparent 28rem),
+    var(--color-canvas);
+  color: var(--color-text);
+  font-family: var(--font-body);
 }
 
 .activation-explorer-main {
-  width: min(1120px, calc(100% - 2rem));
+  width: min(1240px, calc(100% - 2rem));
   max-width: 100%;
   margin: 0 auto;
-  padding: 1.1rem 0 3.5rem;
+  padding: clamp(1.25rem, 3vw, 2.5rem) 0 var(--space-section);
   box-sizing: border-box;
 }
 
@@ -1276,4 +1282,479 @@
 @media (prefers-reduced-motion: reduce) {
   .activation-spinner { animation-duration: 1.8s; }
   .activation-house { transition: none; }
+}
+
+/* Shared semantic theme layer -------------------------------------------------
+ * These page-scoped rules intentionally sit after the legacy declarations so
+ * every view (house ledger, manifestations, trace and reasons dialog) follows
+ * the active AstroRoshni theme without changing calculation behaviour.
+ */
+.activation-explorer-page .activation-explorer-header {
+  position: relative;
+  margin-bottom: var(--space-5);
+  padding: clamp(1.5rem, 4vw, 3.75rem);
+  overflow: hidden;
+  border: 1px solid var(--color-cosmic-line);
+  border-radius: var(--radius-xl);
+  color: var(--color-cosmic-text);
+  background:
+    radial-gradient(circle at 88% 8%, var(--color-cosmic-glow), transparent 24rem),
+    linear-gradient(135deg, var(--color-cosmic-surface), var(--color-cosmic-surface-raised));
+  box-shadow: var(--shadow-card);
+}
+
+.activation-explorer-page .activation-explorer-header::after {
+  content: '';
+  position: absolute;
+  width: clamp(13rem, 30vw, 25rem);
+  aspect-ratio: 1;
+  top: -48%;
+  right: -5%;
+  border: 1px solid var(--color-cosmic-line-strong);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 3rem color-mix(in srgb, var(--color-accent) 5%, transparent),
+    0 0 0 7rem color-mix(in srgb, var(--color-accent) 3%, transparent);
+  pointer-events: none;
+}
+
+.activation-explorer-page .activation-explorer-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+.activation-explorer-page .activation-explorer-back {
+  color: var(--color-accent-soft);
+}
+
+.activation-explorer-page .activation-explorer-title-row h1 {
+  color: var(--color-cosmic-text);
+  font-family: var(--font-display);
+  font-size: clamp(2.8rem, 6vw, 5.8rem);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 0.95;
+}
+
+.activation-explorer-page .activation-explorer-kicker,
+.activation-explorer-page .activation-section-heading span,
+.activation-explorer-page .activation-trace-header p,
+.activation-explorer-page .activation-selected-heading > div:first-child > span,
+.activation-explorer-page .activation-alternative-list article > div span,
+.activation-explorer-page .activation-person-group > h4 {
+  color: var(--color-brand);
+}
+
+.activation-explorer-page .activation-explorer-header .activation-explorer-kicker {
+  color: var(--color-accent-soft);
+}
+
+.activation-explorer-page .activation-explorer-title-row > div > p:last-child {
+  color: var(--color-cosmic-text-muted);
+}
+
+.activation-explorer-page .activation-chart-identity {
+  color: var(--color-cosmic-text);
+  border-color: var(--color-cosmic-line);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-cosmic-surface-raised) 88%, transparent);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+}
+
+.activation-explorer-page .activation-chart-identity span {
+  color: var(--color-cosmic-text);
+}
+
+.activation-explorer-page .activation-chart-identity small {
+  color: var(--color-cosmic-text-muted);
+}
+
+.activation-explorer-page .activation-chart-identity strong {
+  color: var(--color-accent-soft);
+}
+
+.activation-explorer-page .activation-controls {
+  position: static;
+  top: auto;
+  z-index: auto;
+  padding: 0.9rem 1rem;
+  border-color: var(--color-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface-raised) 92%, transparent);
+  box-shadow: var(--shadow-sm);
+}
+
+.activation-explorer-page .activation-controls label,
+.activation-explorer-page .activation-trace-selection label {
+  color: var(--color-text-muted);
+}
+
+.activation-explorer-page .activation-controls input,
+.activation-explorer-page .activation-controls select,
+.activation-explorer-page .activation-trace-selection select {
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+  background: var(--color-surface);
+}
+
+.activation-explorer-page .activation-controls input:focus,
+.activation-explorer-page .activation-controls select:focus,
+.activation-explorer-page .activation-trace-selection select:focus {
+  outline: none;
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus) 18%, transparent);
+}
+
+.activation-explorer-page .activation-primary-button,
+.activation-explorer-page .activation-error button,
+.activation-explorer-page .activation-trace-header button {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.activation-explorer-page .activation-primary-button:hover:not(:disabled),
+.activation-explorer-page .activation-error button:hover,
+.activation-explorer-page .activation-trace-header button:hover {
+  color: var(--color-on-brand);
+  background: var(--color-brand-hover);
+}
+
+.activation-explorer-page .activation-view-toggle {
+  background: var(--color-surface-muted);
+}
+
+.activation-explorer-page .activation-view-toggle button {
+  color: var(--color-text-muted);
+}
+
+.activation-explorer-page .activation-view-toggle button.is-active {
+  color: var(--color-brand);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-sm);
+}
+
+.activation-explorer-page .activation-state-panel,
+.activation-explorer-page .activation-loading,
+.activation-explorer-page .activation-timeline-section,
+.activation-explorer-page .activation-house-panel,
+.activation-explorer-page .activation-house-detail,
+.activation-explorer-page .activation-combinations,
+.activation-explorer-page .activation-trace,
+.activation-explorer-page .chart-manifestation-card,
+.activation-explorer-page .chart-manifestation-house-reasoning section,
+.activation-explorer-page .chart-manifestation-factors section,
+.activation-explorer-page .chart-manifestation-houses div,
+.activation-explorer-page .activation-reason-group,
+.activation-explorer-page .activation-alternative-list article {
+  color: var(--color-text);
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.activation-explorer-page .activation-state-panel,
+.activation-explorer-page .activation-loading,
+.activation-explorer-page .activation-timeline-section,
+.activation-explorer-page .activation-house-panel,
+.activation-explorer-page .activation-house-detail,
+.activation-explorer-page .activation-combinations,
+.activation-explorer-page .activation-trace,
+.activation-explorer-page .chart-manifestation-card {
+  border-radius: var(--radius-lg);
+}
+
+.activation-explorer-page .activation-state-panel h2,
+.activation-explorer-page .activation-loading strong,
+.activation-explorer-page .activation-section-heading h2,
+.activation-explorer-page .activation-selected-heading h2,
+.activation-explorer-page .activation-trace-header h2,
+.activation-explorer-page .activation-house-detail h3,
+.activation-explorer-page .chart-manifestation-card h3,
+.activation-explorer-page .chart-manifestation-card h4,
+.activation-explorer-page .activation-reasons-dialog h2,
+.activation-explorer-page .activation-reason-group h3,
+.activation-explorer-page .activation-alternative-list article > div strong,
+.activation-explorer-page .activation-trigger-grid article strong,
+.activation-explorer-page .activation-trace-meta strong,
+.activation-explorer-page .activation-fact-row strong {
+  color: var(--color-text);
+}
+
+.activation-explorer-page .activation-section-heading h2,
+.activation-explorer-page .activation-selected-heading h2,
+.activation-explorer-page .activation-trace-header h2 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.activation-explorer-page .activation-state-panel p,
+.activation-explorer-page .activation-loading span,
+.activation-explorer-page .activation-section-heading p,
+.activation-explorer-page .activation-selected-heading p,
+.activation-explorer-page .chart-manifestation-card > header span,
+.activation-explorer-page .chart-manifestation-houses small,
+.activation-explorer-page .chart-manifestation-house-reasoning p,
+.activation-explorer-page .chart-manifestation-factors p,
+.activation-explorer-page .chart-manifestation-empty p,
+.activation-explorer-page .activation-causal-chain article p,
+.activation-explorer-page .activation-trigger-grid article p,
+.activation-explorer-page .activation-alternative-list article p,
+.activation-explorer-page .activation-confirmation-list small,
+.activation-explorer-page .activation-trace-selection p,
+.activation-explorer-page .activation-trace td small,
+.activation-explorer-page .activation-reasons-dialog header p,
+.activation-explorer-page .activation-reason-group article small,
+.activation-explorer-page .activation-reason-group article p,
+.activation-explorer-page .activation-component-list li,
+.activation-explorer-page .activation-reasons-note,
+.activation-explorer-page .activation-combination-row small {
+  color: var(--color-text-muted);
+}
+
+.activation-explorer-page .activation-dasha-summary {
+  color: var(--color-cosmic-text);
+  border: 1px solid var(--color-cosmic-line);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--color-cosmic-surface), var(--color-cosmic-surface-raised));
+  box-shadow: var(--shadow-card);
+}
+
+.activation-explorer-page .activation-dasha-summary > div:first-child span {
+  color: var(--color-cosmic-text-muted);
+}
+
+.activation-explorer-page .activation-dasha-summary b {
+  color: var(--color-accent-soft);
+}
+
+.activation-explorer-page .activation-summary-meta span {
+  color: var(--color-cosmic-text);
+  border-color: var(--color-cosmic-line);
+  background: color-mix(in srgb, var(--color-cosmic-text) 7%, transparent);
+}
+
+.activation-explorer-page .activation-timeline-window,
+.activation-explorer-page .activation-causal-chain article,
+.activation-explorer-page .activation-confirmation-list li,
+.activation-explorer-page .activation-fact-row > span,
+.activation-explorer-page .activation-trace-meta span,
+.activation-explorer-page .activation-empty-copy,
+.activation-explorer-page .activation-diagnostics {
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+  background: var(--color-surface-muted);
+}
+
+.activation-explorer-page .activation-timeline-window.is-current,
+.activation-explorer-page .activation-causal-chain article.is-confirmed,
+.activation-explorer-page .activation-causal-chain article:first-child {
+  border-color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 9%, var(--color-surface));
+}
+
+.activation-explorer-page .activation-timeline-window span,
+.activation-explorer-page .activation-legend,
+.activation-explorer-page .activation-band,
+.activation-explorer-page .activation-window-picker button,
+.activation-explorer-page .activation-fact-row > span,
+.activation-explorer-page .activation-trace-meta span,
+.activation-explorer-page .activation-trace th,
+.activation-explorer-page .activation-combination-row,
+.activation-explorer-page .activation-empty-copy {
+  color: var(--color-text-muted);
+}
+
+.activation-explorer-page .activation-timeline-why,
+.activation-explorer-page .activation-factor-summary button,
+.activation-explorer-page .chart-manifestation-card summary,
+.activation-explorer-page .activation-combination-row > span,
+.activation-explorer-page .activation-diagnostics summary,
+.activation-explorer-page .activation-trace td code {
+  color: var(--color-brand);
+}
+
+.activation-explorer-page .activation-house--fully_reinforced {
+  color: var(--color-on-brand);
+  background: var(--activation-strong);
+}
+
+.activation-explorer-page .activation-house--fully_reinforced span,
+.activation-explorer-page .activation-house--dasha_transit_activated span {
+  color: inherit;
+  opacity: 0.8;
+}
+
+.activation-explorer-page .activation-house--dasha_transit_activated {
+  color: var(--color-on-brand);
+  background: var(--activation-active);
+}
+
+.activation-explorer-page .activation-house--dasha_connected {
+  color: var(--color-text);
+  background: var(--activation-connected);
+}
+
+.activation-explorer-page .activation-house--transit_only {
+  color: var(--color-text);
+  background: var(--activation-background);
+}
+
+.activation-explorer-page .activation-house--dormant {
+  color: var(--color-text-subtle);
+  background: var(--activation-quiet);
+}
+
+.activation-explorer-page .activation-house.is-selected {
+  border-color: var(--color-accent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--color-accent) 30%, transparent),
+    var(--shadow-sm);
+}
+
+.activation-explorer-page .legend-full { background: var(--activation-strong); }
+.activation-explorer-page .legend-active { background: var(--activation-active); }
+.activation-explorer-page .legend-connected { background: var(--activation-connected); }
+.activation-explorer-page .legend-background { background: var(--activation-background); }
+
+.activation-explorer-page .activation-band,
+.activation-explorer-page .activation-window-picker button,
+.activation-explorer-page .activation-reason-group h3 span {
+  border-color: var(--color-border);
+  background: var(--color-surface-muted);
+}
+
+.activation-explorer-page .activation-band--strong {
+  color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 14%, var(--color-surface));
+}
+
+.activation-explorer-page .activation-band--moderate,
+.activation-explorer-page .activation-rule-note,
+.activation-explorer-page .activation-trigger-grid article {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 35%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface));
+}
+
+.activation-explorer-page .activation-window-picker button.is-active {
+  color: var(--color-on-brand);
+  border-color: var(--color-brand);
+  background: var(--color-brand);
+}
+
+.activation-explorer-page .activation-causal-chain article > span {
+  color: var(--color-text-inverse);
+  background: var(--color-surface-inverse-raised);
+}
+
+.activation-explorer-page .activation-confirmation-list strong,
+.activation-explorer-page .activation-legend > strong,
+.activation-explorer-page .activation-reason-group article strong {
+  color: var(--color-text);
+}
+
+.activation-explorer-page .activation-reasons-backdrop {
+  z-index: var(--z-modal);
+  background: var(--color-overlay);
+}
+
+.activation-explorer-page .activation-reasons-dialog {
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-modal);
+}
+
+.activation-explorer-page .activation-reasons-dialog header > button {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+}
+
+.activation-explorer-page .activation-reason-group article,
+.activation-explorer-page .activation-combination-row,
+.activation-explorer-page .activation-selected-heading,
+.activation-explorer-page .chart-manifestation-card details,
+.activation-explorer-page .chart-manifestation-factors section > div + div,
+.activation-explorer-page .activation-trace td {
+  border-color: var(--color-border);
+}
+
+.activation-explorer-page .activation-trigger-grid article span,
+.activation-explorer-page .activation-trigger-grid article strong {
+  color: var(--color-warning);
+}
+
+.activation-explorer-page .activation-trace-table-wrap {
+  border-color: var(--color-border);
+}
+
+.activation-explorer-page .activation-trace th {
+  background: var(--color-surface-muted);
+}
+
+.activation-explorer-page .activation-diagnostics pre {
+  color: var(--color-text-inverse);
+  background: var(--color-surface-inverse);
+}
+
+.activation-explorer-page .activation-error {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 36%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger) 10%, var(--color-surface));
+}
+
+.activation-explorer-page .activation-error p {
+  color: var(--color-danger);
+}
+
+.activation-explorer-page .activation-spinner {
+  border-color: var(--color-border);
+  border-top-color: var(--color-brand);
+}
+
+.activation-explorer-page .chart-manifestation-card--supportive {
+  --manifestation-tone: var(--color-success);
+}
+
+.activation-explorer-page .chart-manifestation-card--mixed {
+  --manifestation-tone: var(--color-warning);
+}
+
+.activation-explorer-page .chart-manifestation-card--challenging {
+  --manifestation-tone: var(--color-danger);
+}
+
+.activation-explorer-page .activation-outcome--supportive { background: var(--color-success); }
+.activation-explorer-page .activation-outcome--mixed { background: var(--color-warning); }
+.activation-explorer-page .activation-outcome--challenging { background: var(--color-danger); }
+.activation-explorer-page .activation-outcome--neutral {
+  background: var(--color-info);
+}
+
+.activation-explorer-page .activation-reason-group--supportive { border-top-color: var(--color-success); }
+.activation-explorer-page .activation-reason-group--mixed { border-top-color: var(--color-warning); }
+.activation-explorer-page .activation-reason-group--challenging { border-top-color: var(--color-danger); }
+
+@media (max-width: 767px) {
+  .activation-explorer-page .activation-explorer-main {
+    width: min(100% - 1rem, 1240px);
+    padding-top: 0.75rem;
+  }
+
+  .activation-explorer-page .activation-explorer-header {
+    padding: 1.4rem 1.15rem;
+    border-radius: var(--radius-lg);
+  }
+
+  .activation-explorer-page .activation-explorer-title-row h1 {
+    font-size: clamp(2.5rem, 13vw, 4rem);
+  }
+
+  .activation-explorer-page .activation-controls {
+    position: static;
+  }
 }

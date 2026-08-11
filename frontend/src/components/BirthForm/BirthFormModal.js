@@ -12,6 +12,7 @@ const BirthFormModal = ({
   description,
   prefilledData,
   defaultActiveTab = 'saved',
+  onRequireAuth,
 }) => {
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -57,6 +58,7 @@ const BirthFormModal = ({
             prefilledData={prefilledData}
             onClose={onClose}
             defaultActiveTab={defaultActiveTab}
+            onRequireAuth={onRequireAuth}
           />
         </div>
       </div>

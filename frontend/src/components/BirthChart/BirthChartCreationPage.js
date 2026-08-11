@@ -1,143 +1,132 @@
-import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import NavigationHeader from '../Shared/NavigationHeader';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import SEOHead from '../SEO/SEOHead';
-import ChartWidget from '../Charts/ChartWidget';
 import { useAstrology } from '../../context/AstrologyContext';
 import { generatePageSEO } from '../../config/seo.config';
-import '../Analysis/AnalysisDetailPage.css';
-import './ChartsDashasWorkspacePage.css';
+import './BirthChartCreationPage.css';
 
 const FAQ_ITEMS = [
   {
-    question: 'What is a birth chart or Kundli?',
-    answer:
-      'A birth chart, also called a Kundli or Janam Kundli, is a map of the sky at your exact birth time and place. In Vedic astrology it shows the Lagna, planets, houses, rashis, nakshatras, yogas, and the timing framework used for deeper prediction.',
+    question: 'What is a Janam Kundli or birth chart?',
+    answer: 'A Janam Kundli is a Vedic map of the sky for your exact birth date, time, and place. It establishes the Lagna, houses, planetary positions, rashis, nakshatras, divisional charts, and timing framework used for personalized interpretation.',
   },
   {
-    question: 'Which details are needed to create a birth chart?',
-    answer:
-      'You need your birth date, accurate birth time, and birth place. These are used to calculate the Ascendant, Moon nakshatra, planetary degrees, house cusps, divisional charts, and dasha timing.',
+    question: 'Which details do I need to create my Kundli?',
+    answer: 'You need your name, birth date, accurate birth time, and birth place. Select the place from search so the chart can use the correct coordinates and timezone.',
   },
   {
-    question: 'Why is exact birth time important?',
-    answer:
-      'Even a small time difference can change the Ascendant, house positions, navamsa placement, and timing layers. That is why accurate birth time improves the quality of a Vedic birth chart reading.',
+    question: 'Why does an accurate birth time matter?',
+    answer: 'Birth time determines the Ascendant and house framework. Even a small difference can affect house positions, divisional charts, and timing layers, so use the most reliable recorded time available.',
   },
   {
-    question: 'What do I get after creating my birth chart on AstroRoshni?',
-    answer:
-      'Once your chart is created, you can reuse it across life-event predictions, chat, marriage analysis, career analysis, health analysis, wealth analysis, progeny analysis, education analysis, Panchang-linked guidance, and other chart-based tools.',
+    question: 'Is Kundli creation free?',
+    answer: 'Creating and saving a birth chart is free. Some deeper reports and AI conversations may use credits, but your saved Kundli remains available across supported AstroRoshni tools.',
   },
   {
-    question: 'Does AstroRoshni create only a basic chart?',
-    answer:
-      'No. AstroRoshni uses the main birth chart together with divisional charts, dasha timing, transits, yogas, and strength measures so your chart can support much richer analysis than a simple one-page Kundli summary.',
+    question: 'Where is AI used?',
+    answer: 'The birth chart itself is calculated from astronomical and Vedic astrology rules. AI is used later to help synthesize the calculated chart into readable, chart-aware guidance; it does not invent the planetary positions.',
   },
   {
-    question: 'Can I save multiple birth charts?',
-    answer:
-      'Yes. Your account can keep saved birth charts so you can switch between your own chart and charts for family or other people when using supported tools.',
+    question: 'Can I save more than one Kundli?',
+    answer: 'Yes. You can keep multiple saved charts and switch between your own Kundli and charts created for family members or other people when using supported features.',
   },
   {
-    question: 'Can I create a chart first and analyze later?',
-    answer:
-      'Yes. That is exactly the point of this page. You can create and save the chart first, then use it later for reports, matching, timing, and AI chat without re-entering the same birth details each time.',
-  },
-  {
-    question: 'Is creating a birth chart free?',
-    answer:
-      'Creating and saving the birth chart itself is part of your account workflow. Some deeper personalized reports or chat flows may use credits later, but the chart-creation step is the foundation for everything else.',
-  },
-  {
-    question: 'Is my birth data private?',
-    answer:
-      'Your birth details are stored on your account so you can reuse them in chart-based tools. They are not shown publicly on this page, and they are used only for your astrology features inside AstroRoshni.',
+    question: 'How does AstroRoshni protect my birth data?',
+    answer: 'Your birth details are stored in your account for private reuse across AstroRoshni features. They are not displayed publicly on this landing page.',
   },
 ];
 
-const METHOD_CARDS = [
-  ['Birth details', 'Your date, time, and place of birth are used to calculate the exact chart rather than giving a generic zodiac-only reading.'],
-  ['Lagna and houses', 'The engine calculates Ascendant and all 12 houses so each life area can be read through a proper Vedic framework.'],
-  ['Planetary positions', 'Planets are placed by sign, degree, nakshatra, and house to build the full reading foundation.'],
-  ['Divisional charts', 'Higher-order charts like D9, D10, D24, D30, and D7 help AstroRoshni go beyond surface-level interpretation.'],
-  ['Dashas and timing', 'Your chart becomes usable for prediction because dasha sequences and current transits can be read against it.'],
-  ['Reusable workspace', 'Once saved, the same chart can be selected again across reports, matching, and AI astrology chat.'],
+const CHART_OUTPUTS = [
+  ['01', 'Lagna and 12 houses', 'The Ascendant and house framework that anchors every life-area reading.'],
+  ['02', 'Grahas by sign and degree', 'Planetary placements with rashi, house, degree, and motion.'],
+  ['03', 'Nakshatra and pada', 'The lunar-mansion detail used for temperament and timing.'],
+  ['04', 'Divisional charts', 'Including Navamsa and the specialist vargas used by deeper analysis.'],
+  ['05', 'Dasha timeline', 'Planetary periods that place natal promise into time.'],
+  ['06', 'Reusable chart context', 'One saved Kundli for reports, matching, tools, and Tara.'],
 ];
 
-const REPORT_ITEMS = [
-  'Create and save your Janam Kundli / birth chart',
-  'Use one saved chart across multiple astrology tools',
-  'Switch between saved charts later',
-  'Enable chart-aware AI astrology chat',
-  'Unlock life-area reports like career, marriage, health, and wealth',
-  'Support timing analysis with dasha and transits',
-  'Build a reusable account-level astrology workspace',
-  'Avoid re-entering birth details every time',
+const RELATED_TOOLS = [
+  ['/charts-dashas', 'Charts & dashas', 'Inspect the main chart, divisional charts, strengths, and planetary periods.'],
+  ['/kundli-matching', 'Kundli matching', 'Compare two complete birth charts for relationship compatibility.'],
+  ['/career-guidance', 'Career analysis', 'Read vocation, professional strengths, timing, and development themes.'],
+  ['/life-events', 'Life events', 'Explore year and month-level themes through chart-aware timing.'],
+  ['/ashtakavarga', 'Ashtakavarga', 'Study house and transit support through classical point analysis.'],
+  ['/chat?app=1', 'Ask Tara', 'Discuss your questions using the selected Kundli as context.'],
 ];
 
-const buildChartPanelTitle = (eyebrow, heading) => (
-  <div className="charts-dashas-widget-title">
-    <span>{eyebrow}</span>
-    <strong>{heading}</strong>
-  </div>
-);
-
-const BirthChartCreationPage = ({
-  user,
-  onLogout,
-  onAdminClick,
-  onLogin,
-  onOpenRegister,
-}) => {
-  const navigate = useNavigate();
-  const { birthData, chartData } = useAstrology();
+const BirthChartCreationPage = ({ user, onLogout, onAdminClick, onLogin, onOpenRegister }) => {
+  const { birthData } = useAstrology();
+  const resultsRef = useRef(null);
   const [showBirthModal, setShowBirthModal] = useState(false);
   const [birthModalTab, setBirthModalTab] = useState('new');
+  const [pendingBirthDraft, setPendingBirthDraft] = useState(null);
+  const [resumeAfterAuth, setResumeAfterAuth] = useState(false);
+  const [chartCreated, setChartCreated] = useState(false);
   const seoData = generatePageSEO('birthChartCreation', { path: '/ai-kundli-generator/' });
 
-  const structuredData = useMemo(
-    () => ({
-      '@context': 'https://schema.org',
-      '@graph': [
-        {
-          '@type': 'Service',
-          name: 'Birth Chart Creation',
-          description: seoData.description,
-          provider: { '@type': 'Organization', name: 'AstroRoshni' },
-          areaServed: 'Worldwide',
-        },
-        {
-          '@type': 'BreadcrumbList',
-          itemListElement: [
-            { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://astroroshni.com/' },
-            { '@type': 'ListItem', position: 2, name: 'AI Kundli Generator', item: seoData.canonical },
-          ],
-        },
-        {
-          '@type': 'FAQPage',
-          mainEntity: FAQ_ITEMS.map((item) => ({
-            '@type': 'Question',
-            name: item.question,
-            acceptedAnswer: { '@type': 'Answer', text: item.answer },
-          })),
-        },
-      ],
-    }),
-    [seoData.canonical, seoData.description]
-  );
+  useEffect(() => {
+    if (!user || !resumeAfterAuth || !pendingBirthDraft) return;
+    setBirthModalTab('new');
+    setShowBirthModal(true);
+    setResumeAfterAuth(false);
+  }, [pendingBirthDraft, resumeAfterAuth, user]);
+
+  const structuredData = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Service',
+        name: 'Free Janam Kundli Generator',
+        description: seoData.description,
+        provider: { '@type': 'Organization', name: 'AstroRoshni', url: 'https://astroroshni.com/' },
+        areaServed: 'Worldwide',
+        isRelatedTo: { '@type': 'SoftwareApplication', name: 'AstroRoshni' },
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://astroroshni.com/' },
+          { '@type': 'ListItem', position: 2, name: 'Free Kundli Generator', item: seoData.canonical },
+        ],
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: FAQ_ITEMS.map((item) => ({
+          '@type': 'Question',
+          name: item.question,
+          acceptedAnswer: { '@type': 'Answer', text: item.answer },
+        })),
+      },
+    ],
+  }), [seoData.canonical, seoData.description]);
 
   const openBirthModal = (tab = 'new') => {
+    if (tab === 'saved' && !user) {
+      (onLogin || onOpenRegister)?.();
+      return;
+    }
     setBirthModalTab(tab);
     setShowBirthModal(true);
   };
 
+  const requireAccountToSave = (draft) => {
+    setPendingBirthDraft(draft);
+    setResumeAfterAuth(true);
+    setShowBirthModal(false);
+    (onOpenRegister || onLogin)?.();
+  };
+
+  const completeBirthChart = () => {
+    setPendingBirthDraft(null);
+    setResumeAfterAuth(false);
+    setShowBirthModal(false);
+    setChartCreated(true);
+  };
+
   return (
-    <div
-      className="analysis-detail-page analysis-detail-page--career"
-      style={{ '--analysis-hero-image': `url(${process.env.PUBLIC_URL || ''}/images/software/birth-chart.png)` }}
-    >
+    <div className="kundli-generator-page">
       <SEOHead
         title={seoData.title}
         description={seoData.description}
@@ -146,227 +135,171 @@ const BirthChartCreationPage = ({
         structuredData={structuredData}
       />
 
-      <NavigationHeader
-        compact
-        showZodiacSelector={false}
+      <ModernNavigationHeader
         user={user}
-        onAdminClick={onAdminClick}
+        onLogin={onLogin}
         onLogout={onLogout}
-        onLogin={!user ? onLogin : undefined}
-        showLoginButton={!user}
-        birthData={birthData}
-        onCreateBirthChart={() => navigate('/ai-kundli-generator')}
-        onSelectBirthChart={
-          user
-            ? () => openBirthModal('saved')
-            : () => onLogin?.()
-        }
+        onAdminClick={onAdminClick}
       />
 
-      <main className="analysis-detail-main">
-        <header className="analysis-detail-hero">
-          <div className="analysis-detail-hero__inner">
-            <button type="button" className="analysis-detail-back" onClick={() => navigate('/')}>
-              ← Home
-            </button>
-            <p className="analysis-detail-kicker">Vedic birth chart setup</p>
-            <h1 className="analysis-detail-title">
-              <span className="analysis-detail-title__icon" aria-hidden>✨</span>
-              Create Birth Chart
-            </h1>
-            <p className="analysis-detail-blurb">
-              Create your Janam Kundli with date, time, and place of birth so AstroRoshni can use the same saved chart
-              across predictions, reports, matching, and AI astrology chat.
+      <main className="kundli-generator-main">
+        <header className="kundli-generator-hero">
+          <div className="kundli-generator-hero__copy">
+            <p className="kundli-generator-eyebrow">Free Kundli generator · Vedic birth chart</p>
+            <h1>Create your <em>Janam Kundli.</em></h1>
+            <p className="kundli-generator-hero__lead">
+              Calculate a precise Vedic birth chart from your birth date, time, and place. Save it once, then use the
+              same Kundli across AstroRoshni’s reports, matching, timing tools, and chart-aware conversations.
             </p>
-            <div className="career-detail-hero-actions">
-              <button
-                type="button"
-                className="career-detail-primary"
-                onClick={() => (user ? openBirthModal('new') : onLogin?.())}
-              >
-                {user ? 'Create birth chart now' : 'Sign in to create chart'}
+            <div className="kundli-generator-actions">
+              <button type="button" className="kundli-generator-primary" onClick={() => openBirthModal('new')}>
+                Create free Kundli <span aria-hidden>↗</span>
               </button>
-              <button
-                type="button"
-                className="career-detail-secondary"
-                onClick={() => (user ? openBirthModal('saved') : (onOpenRegister || onLogin)?.())}
-              >
-                {user ? 'Select saved chart' : 'Create free account'}
-              </button>
+              {user ? (
+                <button type="button" className="kundli-generator-secondary" onClick={() => openBirthModal('saved')}>
+                  Select saved Kundli
+                </button>
+              ) : (
+                <button type="button" className="kundli-generator-secondary" onClick={() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' })}>
+                  See what you receive
+                </button>
+              )}
             </div>
-            <div className="career-detail-proof" aria-label="Birth chart workflow coverage">
-              <span>Birth date, time, and place</span>
-              <span>Lagna, grahas, houses, rashis</span>
-              <span>Saved chart reuse across tools</span>
-            </div>
+            <p className="kundli-generator-privacy"><span aria-hidden>●</span> Free chart creation · Private account storage · No credits required</p>
           </div>
+
+          <div className="kundli-generator-visual" aria-label="Illustration of a calculated Vedic Kundli">
+            <div className="kundli-generator-orbit kundli-generator-orbit--outer"></div>
+            <div className="kundli-generator-orbit kundli-generator-orbit--inner"></div>
+            <div className="kundli-generator-chart" aria-hidden>
+              <span className="kundli-generator-chart__axis kundli-generator-chart__axis--one"></span>
+              <span className="kundli-generator-chart__axis kundli-generator-chart__axis--two"></span>
+              <b className="kundli-generator-chart__lagna">Lagna<small>17° 46′</small></b>
+              <i className="kundli-generator-chart__sun">SU</i>
+              <i className="kundli-generator-chart__moon">MO</i>
+              <i className="kundli-generator-chart__jupiter">JU</i>
+              <i className="kundli-generator-chart__saturn">SA</i>
+            </div>
+            <div className="kundli-generator-visual__caption"><span>Calculated chart</span><strong>Sidereal Vedic foundation</strong></div>
+          </div>
+
+          <dl className="kundli-generator-hero__facts">
+            <div><dt>Input</dt><dd>Date · time · place</dd></div>
+            <div><dt>Foundation</dt><dd>Lagna · grahas · rashis</dd></div>
+            <div><dt>Reuse</dt><dd>One chart · every reading</dd></div>
+          </dl>
         </header>
 
-        <div className="analysis-detail-body">
-          <section className="career-detail-intro" aria-label="Birth chart creation workflow">
-            <div className="career-detail-section-heading">
-              <p>Birth chart engine</p>
-              <h2>What AstroRoshni prepares when you create a birth chart</h2>
-            </div>
-            <div className="career-detail-method-grid">
-              {METHOD_CARDS.map(([title, body]) => (
-                <article key={title}>
-                  <h3>{title}</h3>
-                  <p>{body}</p>
-                </article>
-              ))}
-            </div>
+        {chartCreated && (
+          <section className="kundli-generator-success" aria-live="polite">
+            <div><span>Chart ready</span><strong>{birthData?.name || 'Your Kundli'} is now selected across AstroRoshni.</strong></div>
+            <Link to="/charts-dashas">Open charts & dashas <span aria-hidden>↗</span></Link>
           </section>
+        )}
 
-          {!user ? (
-            <div className="analysis-detail-empty">
-              <div className="analysis-detail-empty__card">
-                <span className="analysis-detail-empty__icon" aria-hidden>🪐</span>
-                <h2>Sign in to save your chart</h2>
-                <p>
-                  This page explains the workflow publicly for search and sharing, but saving the actual birth chart
-                  happens inside your account so you can reuse it later across AstroRoshni tools.
-                </p>
-                <div className="analysis-detail-empty__actions">
-                  <button type="button" className="analysis-detail-empty__cta" onClick={() => onLogin?.()}>
-                    Sign in
-                  </button>
-                  <button
-                    type="button"
-                    className="analysis-detail-empty__cta analysis-detail-empty__cta--secondary"
-                    onClick={() => (onOpenRegister || onLogin)?.()}
-                  >
-                    Create account
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="analysis-detail-empty">
-              <div className="analysis-detail-empty__card">
-                <span className="analysis-detail-empty__icon" aria-hidden>📊</span>
-                <h2>Create or select your chart</h2>
-                <p>
-                  You are signed in. Create a new birth chart now or pick a saved one to start using it in reports,
-                  matching, chat, and timing tools.
-                </p>
-                <div className="analysis-detail-empty__actions">
-                  <button type="button" className="analysis-detail-empty__cta" onClick={() => openBirthModal('new')}>
-                    Create new chart
-                  </button>
-                  <button
-                    type="button"
-                    className="analysis-detail-empty__cta analysis-detail-empty__cta--secondary"
-                    onClick={() => openBirthModal('saved')}
-                  >
-                    Select saved chart
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+        <section className="kundli-generator-results" ref={resultsRef} aria-labelledby="kundli-results-title">
+          <div className="kundli-generator-heading">
+            <p className="kundli-generator-section-label">Inside your chart</p>
+            <h2 id="kundli-results-title">More than a <em>Sun-sign summary.</em></h2>
+            <p>Your Kundli becomes the calculation foundation for personalized astrology throughout AstroRoshni.</p>
+          </div>
+          <div className="kundli-generator-output-grid">
+            {CHART_OUTPUTS.map(([number, title, body]) => (
+              <article key={number}><span>{number}</span><h3>{title}</h3><p>{body}</p></article>
+            ))}
+          </div>
+        </section>
 
-          <section className="career-detail-report-scope" aria-label="Birth chart benefits">
-            <div>
-              <p className="career-detail-eyebrow">Saved chart workspace</p>
-              <h2>Why create the birth chart first</h2>
-              <p>
-                A saved birth chart turns AstroRoshni into a reusable astrology workspace. Instead of entering your
-                birth details repeatedly, you create the chart once and then use it in multiple analysis flows, timing
-                tools, compatibility checks, and AI conversations.
-              </p>
-            </div>
-            <ul>
-              {REPORT_ITEMS.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
+        <section className="kundli-generator-process" aria-labelledby="kundli-process-title">
+          <div>
+            <p className="kundli-generator-section-label">Three simple steps</p>
+            <h2 id="kundli-process-title">From birth details to a <em>reusable chart.</em></h2>
+          </div>
+          <ol>
+            <li><span>01</span><div><h3>Enter accurate details</h3><p>Add the recorded birth date and time, then select the birth place from search.</p></div></li>
+            <li><span>02</span><div><h3>Calculate and save</h3><p>AstroRoshni calculates the Vedic chart and securely associates it with your account.</p></div></li>
+            <li><span>03</span><div><h3>Use it everywhere</h3><p>Select the saved Kundli in analyses, compatibility, reports, timing tools, and Tara.</p></div></li>
+          </ol>
+          <button type="button" className="kundli-generator-primary" onClick={() => openBirthModal('new')}>
+            Start your Kundli <span aria-hidden>↗</span>
+          </button>
+        </section>
 
-          {user && birthData && chartData ? (
-            <section className="charts-dashas-section" aria-label="Chart previews">
-              <div className="career-detail-section-heading">
-                <p>Live preview</p>
-                <h2>Your saved chart can already power charts and dasha tools</h2>
-              </div>
-              <div className="charts-dashas-grid charts-dashas-grid--top">
-                <article className="charts-dashas-card charts-dashas-card--widget-only">
-                  <ChartWidget
-                    title={buildChartPanelTitle('Lagna / D1', 'Main birth chart')}
-                    chartType="lagna"
-                    chartData={chartData}
-                    birthData={birthData}
-                    defaultStyle="north"
-                    showFooterHint={false}
-                  />
-                </article>
+        <section className="kundli-generator-ai" aria-labelledby="kundli-ai-title">
+          <div className="kundli-generator-ai__mark" aria-hidden><span>AR</span><small>Chart intelligence</small></div>
+          <div>
+            <p className="kundli-generator-section-label">Calculation first · interpretation second</p>
+            <h2 id="kundli-ai-title">Astronomy establishes the positions. <em>AI helps explain them.</em></h2>
+            <p>
+              AstroRoshni does not ask an AI model to invent your planets. The chart engine calculates the astronomical
+              positions and Vedic layers first. AI-assisted interpretation can then synthesize those established
+              calculations into clearer language and practical guidance.
+            </p>
+          </div>
+        </section>
 
-                <article className="charts-dashas-card charts-dashas-card--widget-only">
-                  <ChartWidget
-                    title={buildChartPanelTitle('D9', 'Navamsa preview')}
-                    chartType="navamsa"
-                    chartData={chartData}
-                    birthData={birthData}
-                    defaultStyle="north"
-                    showFooterHint={false}
-                  />
-                </article>
-              </div>
-              <div className="form-buttons" style={{ marginTop: '14px', justifyContent: 'center' }}>
-                <button
-                  type="button"
-                  className="analysis-detail-empty__cta"
-                  onClick={() => navigate('/charts-dashas')}
-                >
-                  Open charts & dashas workspace
-                </button>
-              </div>
-            </section>
-          ) : null}
+        <section className="kundli-generator-tools" aria-labelledby="kundli-tools-title">
+          <div className="kundli-generator-heading">
+            <p className="kundli-generator-section-label">One Kundli · many paths</p>
+            <h2 id="kundli-tools-title">Create once, then <em>go deeper.</em></h2>
+            <p>These destinations use or extend the chart foundation you create here.</p>
+          </div>
+          <div className="kundli-generator-tool-grid">
+            {RELATED_TOOLS.map(([to, title, body], index) => (
+              <Link to={to} key={to}><span>{String(index + 1).padStart(2, '0')}</span><h3>{title}</h3><p>{body}</p><i aria-hidden>↗</i></Link>
+            ))}
+          </div>
+        </section>
 
-          <section className="career-detail-seo-copy" aria-label="Birth chart explanation">
-            <article>
-              <h2>Birth chart creation is the foundation of personalized astrology</h2>
-              <p>
-                A Vedic birth chart is more than a sun-sign summary. It gives AstroRoshni the exact reference point
-                needed to read houses, planetary strengths, yogas, nakshatras, divisional charts, dasha sequences, and
-                transits in a way that is actually specific to you.
-              </p>
-            </article>
-            <article>
-              <h2>Create once, then reuse across reports, chat, and matching</h2>
-              <p>
-                Once the chart is saved, it becomes the chart context for later tools. That is why creating the birth
-                chart first is useful even if your real goal is career, marriage, wealth, health, education, progeny,
-                or AI astrology chat.
-              </p>
-            </article>
-          </section>
+        <section className="kundli-generator-trust" aria-labelledby="kundli-trust-title">
+          <div>
+            <p className="kundli-generator-section-label">Your data stays personal</p>
+            <h2 id="kundli-trust-title">Birth details are private chart context—not public profile information.</h2>
+          </div>
+          <p>Your saved birth data is used so you can return to the same chart across AstroRoshni. Review how information is handled in our <Link to="/policy">Privacy Policy</Link>, or remove your account and associated data from <Link to="/account/delete">Delete account</Link>.</p>
+        </section>
 
-          <section className="career-detail-faq" aria-label="Birth chart FAQ">
-            <h2>Birth Chart FAQ</h2>
-            <div className="career-detail-faq-grid">
-              {FAQ_ITEMS.map((item) => (
-                <article key={item.question}>
-                  <h3>{item.question}</h3>
-                  <p>{item.answer}</p>
-                </article>
-              ))}
-            </div>
-          </section>
-        </div>
+        <section className="kundli-generator-faq" aria-labelledby="kundli-faq-title">
+          <div className="kundli-generator-heading">
+            <p className="kundli-generator-section-label">Kundli questions</p>
+            <h2 id="kundli-faq-title">Before you <em>begin.</em></h2>
+            <p>The practical details behind creating, saving, and using your chart.</p>
+          </div>
+          <div className="kundli-generator-faq__list">
+            {FAQ_ITEMS.map((item, index) => (
+              <details key={item.question} open={index === 0}>
+                <summary><span>{String(index + 1).padStart(2, '0')}</span>{item.question}<i aria-hidden>+</i></summary>
+                <p>{item.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
+        <section className="kundli-generator-final" aria-labelledby="kundli-final-title">
+          <p className="kundli-generator-section-label">Your chart begins here</p>
+          <h2 id="kundli-final-title">One precise Kundli.<br /><em>A lifetime of context.</em></h2>
+          <button type="button" className="kundli-generator-primary" onClick={() => openBirthModal('new')}>
+            Create free Kundli <span aria-hidden>↗</span>
+          </button>
+        </section>
       </main>
 
-      {user ? (
-        <BirthFormModal
-          isOpen={showBirthModal}
-          onClose={() => setShowBirthModal(false)}
-          onSubmit={() => setShowBirthModal(false)}
-          defaultActiveTab={birthModalTab}
-          title="Birth Chart — Enter details"
-          description="Please provide your birth information to create and save your Vedic birth chart."
-        />
-      ) : null}
+      <footer className="kundli-generator-footer">
+        <Link to="/">AstroRoshni</Link>
+        <p>Vedic chart calculation and chart-aware guidance.</p>
+        <nav aria-label="Kundli page footer"><Link to="/about">About</Link><Link to="/contact">Contact</Link><Link to="/policy">Privacy</Link><Link to="/terms">Terms</Link></nav>
+      </footer>
+
+      <BirthFormModal
+        isOpen={showBirthModal}
+        onClose={() => setShowBirthModal(false)}
+        onSubmit={completeBirthChart}
+        onRequireAuth={!user ? requireAccountToSave : undefined}
+        title="Choose your Kundli"
+        description="Create a new Vedic birth chart or select one you saved earlier"
+        prefilledData={pendingBirthDraft ? { person1: pendingBirthDraft } : undefined}
+        defaultActiveTab={birthModalTab}
+      />
     </div>
   );
 };

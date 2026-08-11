@@ -1,58 +1,58 @@
 import React from 'react';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import './AboutUs.css';
 
-const AboutUs = ({ user, onLogout, onLogin }) => {
+const AboutUs = ({ user, onLogout, onLogin, onAdminClick }) => {
   const stats = [
-    { label: 'Specialized Calculators', value: '84+' },
-    { label: 'Analytical Systems', value: '75+' },
+    { label: 'Analysis layers & calculators', value: '90+' },
+    { label: 'Astrological traditions synthesized', value: '4' },
     { label: 'Calculation Accuracy', value: '99.9%' },
     { label: 'Active Users', value: '50k+' },
   ];
 
   const corePillars = [
     {
-      icon: '🔬',
+      icon: '01',
       title: "The Vedic Physics Engine",
-      desc: "Unlike standard apps, AstroRoshni uses a proprietary synthesis engine that processes 84+ specialized calculators simultaneously, including Shodashvarga (D1-D60) and Nadi links."
+      desc: "AstroRoshni uses a proprietary synthesis engine that processes 90+ analysis layers and calculators, including Shodashvarga (D1-D60) and Nadi links."
     },
     {
-      icon: '🛡️',
+      icon: '02',
       title: "Root-to-Fruit Logic",
       desc: "Our 'Double Confirmation' protocol cross-references physical potential (D1) with internal strength (D9), ensuring predictions are mathematically derived, not just generated."
     },
     {
-      icon: '⚡',
+      icon: '03',
       title: "Real-Time Transit Triggers",
       desc: "We track planetary transits within 0.1° of your natal placements to identify the exact month of 'Life Pivot Points' and karmic activations."
     },
     {
-      icon: '📊',
+      icon: '04',
       title: "Ashtakavarga Oracle System",
       desc: "Advanced Sarvashtakavarga and Bhinnashtakavarga calculations filter transit predictions through house strength analysis, preventing false promises of 'great years' that turn mediocre."
     },
     {
-      icon: '🎯',
+      icon: '05',
       title: "Sniper Points Technology",
       desc: "Proprietary Mrityu Bhaga calculator identifies exact degrees of vulnerability in D1, D3, and D9 charts, enabling month-level precision for health and crisis timing."
     },
     {
-      icon: '🔄',
+      icon: '06',
       title: "Multi-Dasha Synthesis",
       desc: "Simultaneous analysis of Vimshottari, Chara, Yogini, Kalachakra, and Shoola dashas creates nuanced predictions where other systems disagree, revealing complex life patterns."
     },
     {
-      icon: '🌟',
+      icon: '07',
       title: "Jaimini Full System",
       desc: "Complete Rashi Drishti analysis with Atmakaraka-Amatyakaraka yogas, Arudha Lagna calculations, and sign-based aspects that reveal hidden connections missed by planetary aspects alone."
     },
     {
-      icon: '💎',
+      icon: '08',
       title: "Nadi Linkage Matrix",
       desc: "Bhrigu Nandi Nadi connections between planets define the exact nature of events - Saturn+Mars links indicate technical careers, Venus+Ketu shows delayed but spiritual marriages."
     },
     {
-      icon: '🔮',
+      icon: '09',
       title: "Sudarshana Triple View",
       desc: "Every prediction is verified from Lagna (body), Moon (mind), and Sun (soul) perspectives using the ancient Sudarshana Chakra method for 360-degree accuracy."
     }
@@ -60,19 +60,22 @@ const AboutUs = ({ user, onLogout, onLogin }) => {
 
   return (
     <div className="about-page">
-      <NavigationHeader 
+      <ModernNavigationHeader
+        sticky
         user={user}
         onLogout={onLogout}
         onLogin={onLogin}
+        onAdminClick={onAdminClick}
         showLoginButton={!user}
       />
       {/* Hero Section */}
       <section className="about-hero">
         <div className="container">
-          <h1>The Science Behind <span className="highlight">AstroRoshni</span></h1>
+          <p className="about-eyebrow">About AstroRoshni</p>
+          <h1>Ancient systems.<br /><span className="highlight">One clear synthesis.</span></h1>
           <p className="hero-subtitle">
-            World's first high-precision analytical engine for Vedic Astrology, 
-            driven by 84+ deterministic algorithms.
+            A high-precision analytical engine for Vedic astrology, driven by 90+ calculation
+            and interpretation layers.
           </p>
         </div>
       </section>
@@ -101,13 +104,17 @@ const AboutUs = ({ user, onLogout, onLogin }) => {
                 Our engine, <strong>Tara</strong>, doesn't just chat—she calculates.
               </p>
               <p>
-                By integrating Parashari, Jaimini, Nadi, and Financial systems, 
+                By synthesizing Parashari, Nadi, Jaimini, and KP systems,
                 we provide a 360-degree view of your karma, health, and wealth 
                 from three simultaneous perspectives: the Ascendant, Moon, and Sun.
               </p>
             </div>
             <div className="philosophy-visual">
-              <div className="engine-placeholder">84+ Calculators Active</div>
+              <div className="engine-placeholder">
+                <span>How Tara thinks</span>
+                <strong>Parashari · Nadi<br />Jaimini · KP</strong>
+                <small>One answer, cross-checked through the complete chart</small>
+              </div>
             </div>
           </div>
         </div>
@@ -152,7 +159,7 @@ const AboutUs = ({ user, onLogout, onLogin }) => {
       <section className="trust-transparency">
         <div className="container">
           <div className="trust-card">
-            <div className="trust-badge">🔒</div>
+            <div className="trust-badge">PRIVATE BY DESIGN</div>
             <h2>Trust & Transparency</h2>
             <p>
               AstroRoshni is committed to ethical astrology and complete privacy. We never predict exact 

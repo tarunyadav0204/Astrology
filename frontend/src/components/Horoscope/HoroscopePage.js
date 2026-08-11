@@ -1,529 +1,226 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import NavigationHeader from '../Shared/NavigationHeader';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import { API_BASE_URL } from '../../config';
-import { generatePageSEO } from '../../config/seo.config';
 import './HoroscopePage.css';
 
-const HoroscopePage = () => {
+const ZODIAC_SIGNS = [
+  ['aries', '♈', 'Aries'], ['taurus', '♉', 'Taurus'], ['gemini', '♊', 'Gemini'],
+  ['cancer', '♋', 'Cancer'], ['leo', '♌', 'Leo'], ['virgo', '♍', 'Virgo'],
+  ['libra', '♎', 'Libra'], ['scorpio', '♏', 'Scorpio'], ['sagittarius', '♐', 'Sagittarius'],
+  ['capricorn', '♑', 'Capricorn'], ['aquarius', '♒', 'Aquarius'], ['pisces', '♓', 'Pisces'],
+].map(([name, symbol, displayName]) => ({ name, symbol: `${symbol}\uFE0E`, displayName }));
+
+const PERIODS = [
+  ['daily', 'Today'], ['weekly', 'This week'], ['monthly', 'This month'], ['yearly', 'This year'],
+].map(([key, label]) => ({ key, label }));
+
+const PERIOD_LABELS = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' };
+const VALID_PERIODS = new Set(PERIODS.map((period) => period.key));
+const VALID_SIGNS = new Set(ZODIAC_SIGNS.map((sign) => sign.name));
+
+const clampPercent = (value) => Math.max(0, Math.min(100, Number(value) || 0));
+
+const MetricBar = ({ label, value }) => (
+  <div className="horoscope-metric">
+    <div><span>{label}</span><strong>{clampPercent(value)}%</strong></div>
+    <div className="horoscope-metric__track"><span style={{ width: `${clampPercent(value)}%` }}></span></div>
+  </div>
+);
+
+const HoroscopePage = ({ user, onLogin, onLogout, onAdminClick }) => {
+  const { period: pathPeriod } = useParams();
   const location = useLocation();
-  
-  // Get URL parameters
-  const urlParams = new URLSearchParams(location.search);
-  const periodParam = urlParams.get('period') || 'daily';
-  const signParam = urlParams.get('sign') || 'aries';
-  
-  const [selectedPeriod, setSelectedPeriod] = useState(periodParam);
-  const [selectedZodiac, setSelectedZodiac] = useState(signParam);
+  const navigate = useNavigate();
+  const query = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const period = VALID_PERIODS.has(pathPeriod) ? pathPeriod : 'daily';
+  const querySign = query.get('sign');
+  const selectedZodiac = VALID_SIGNS.has(querySign) ? querySign : 'aries';
+  const currentZodiac = ZODIAC_SIGNS.find((sign) => sign.name === selectedZodiac) || ZODIAC_SIGNS[0];
   const [horoscopeData, setHoroscopeData] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const zodiacSigns = [
-    { name: 'aries', symbol: '♈', displayName: 'Aries' },
-    { name: 'taurus', symbol: '♉', displayName: 'Taurus' },
-    { name: 'gemini', symbol: '♊', displayName: 'Gemini' },
-    { name: 'cancer', symbol: '♋', displayName: 'Cancer' },
-    { name: 'leo', symbol: '♌', displayName: 'Leo' },
-    { name: 'virgo', symbol: '♍', displayName: 'Virgo' },
-    { name: 'libra', symbol: '♎', displayName: 'Libra' },
-    { name: 'scorpio', symbol: '♏', displayName: 'Scorpio' },
-    { name: 'sagittarius', symbol: '♐', displayName: 'Sagittarius' },
-    { name: 'capricorn', symbol: '♑', displayName: 'Capricorn' },
-    { name: 'aquarius', symbol: '♒', displayName: 'Aquarius' },
-    { name: 'pisces', symbol: '♓', displayName: 'Pisces' }
-  ];
-
-  const periods = [
-    { key: 'daily', label: 'Daily', icon: '📅' },
-    { key: 'weekly', label: 'Weekly', icon: '📊' },
-    { key: 'monthly', label: 'Monthly', icon: '🗓️' },
-    { key: 'yearly', label: 'Yearly', icon: '📆' }
-  ];
-
-  // Update state when URL parameters change
-  useEffect(() => {
-    const urlParams = new URLSearchParams(location.search);
-    const periodParam = urlParams.get('period');
-    const signParam = urlParams.get('sign');
-    
-    if (periodParam && periodParam !== selectedPeriod) {
-      setSelectedPeriod(periodParam);
-    }
-    if (signParam && signParam !== selectedZodiac) {
-      setSelectedZodiac(signParam);
-    }
-  }, [location.search]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
-    fetchHoroscope();
-  }, [selectedPeriod, selectedZodiac]);
-
-  const fetchHoroscope = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/horoscope/${selectedPeriod}/${selectedZodiac}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      setHoroscopeData(data);
-    } catch (error) {
-      console.error('Error fetching horoscope:', error);
+    const controller = new AbortController();
+    const loadHoroscope = async () => {
+      setLoading(true);
+      setError('');
       setHoroscopeData(null);
-    } finally {
-      setLoading(false);
-    }
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/horoscope/${period}/${selectedZodiac}`, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Horoscope service returned ${response.status}`);
+        setHoroscopeData(await response.json());
+      } catch (requestError) {
+        if (requestError.name !== 'AbortError') setError('The forecast could not be loaded right now.');
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    };
+    loadHoroscope();
+    return () => controller.abort();
+  }, [period, selectedZodiac, retryKey]);
+
+  useEffect(() => { window.scrollTo(0, 0); }, [period]);
+
+  const selectPeriod = (nextPeriod) => {
+    navigate(`/horoscope/${nextPeriod}${selectedZodiac === 'aries' ? '' : `?sign=${selectedZodiac}`}`);
   };
 
-  const getCurrentZodiac = () => zodiacSigns.find(z => z.name === selectedZodiac);
+  const selectSign = (nextSign) => {
+    navigate(`/horoscope/${period}${nextSign === 'aries' ? '' : `?sign=${nextSign}`}`);
+  };
 
-  const currentZodiac = getCurrentZodiac();
-  const seoData = generatePageSEO('dailyHoroscope', { 
-    path: `/horoscope/${selectedPeriod}`,
-    title: `${currentZodiac?.displayName} ${selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} Horoscope | AstroRoshni`,
-    description: `Read your ${selectedPeriod} ${currentZodiac?.displayName} horoscope predictions for love, career, health and finance. Accurate astrology forecasts updated daily.`
-  });
+  const periodLabel = PERIOD_LABELS[period];
+  const canonical = `https://astroroshni.com/horoscope/${period}/`;
+  const summary = horoscopeData?.daily_summary || horoscopeData?.weekly_summary || horoscopeData?.monthly_summary || horoscopeData?.yearly_summary;
+  const prediction = horoscopeData?.prediction || {};
+
+  const highlights = [
+    ['Energy', horoscopeData?.todays_energy],
+    ['Best time', horoscopeData?.best_time],
+    ['Key focus', horoscopeData?.key_focus],
+    ['Use care with', horoscopeData?.what_to_avoid],
+    ['Supportive element', horoscopeData?.lucky_element],
+    ['Moon phase', horoscopeData?.moon_timing && `${horoscopeData.moon_timing.phase}${horoscopeData.moon_timing.phase_meaning ? ` · ${horoscopeData.moon_timing.phase_meaning}` : ''}`],
+  ].filter(([, value]) => value);
+
+  const lifeAreas = [
+    ['Relationships', prediction.love], ['Career & work', prediction.career], ['Health & wellbeing', prediction.health],
+    ['Money & resources', prediction.finance], ['Learning', prediction.education], ['Inner life', prediction.spirituality],
+  ].filter(([, value]) => value);
+
+  const cosmicMetrics = horoscopeData?.cosmic_weather ? [
+    ['Energy level', horoscopeData.cosmic_weather.energy_level],
+    ['Manifestation power', horoscopeData.cosmic_weather.manifestation_power],
+    ['Intuition strength', horoscopeData.cosmic_weather.intuition_strength],
+    ['Relationship harmony', horoscopeData.cosmic_weather.relationship_harmony],
+  ].filter(([, value]) => value !== undefined && value !== null) : [];
+
+  const planetaryInfluences = prediction?.detailed_analysis?.planetary_influences || [];
+  const challenges = prediction?.detailed_analysis?.challenges || [];
+  const opportunities = prediction?.detailed_analysis?.opportunities || [];
+
+  const actionItems = horoscopeData?.action_plan ? [
+    ['Primary focus', horoscopeData.action_plan.primary_focus],
+    ['Optimal timing', horoscopeData.action_plan.optimal_timing],
+    ['Daily practices', horoscopeData.action_plan.daily_practices],
+    ['Growth opportunities', horoscopeData.action_plan.growth_opportunities],
+    ['Balance strategies', horoscopeData.action_plan.balance_strategies],
+    ['Reflection practice', horoscopeData.action_plan.manifestation_techniques],
+  ].filter(([, value]) => value) : [];
 
   return (
     <div className="horoscope-page">
-      <SEOHead 
-        title={seoData.title}
-        description={seoData.description}
-        keywords={`${currentZodiac?.displayName.toLowerCase()} horoscope, ${selectedPeriod} horoscope, ${currentZodiac?.displayName.toLowerCase()} predictions, astrology forecast`}
-        canonical={seoData.canonical}
+      <SEOHead
+        title={`${currentZodiac.displayName} ${periodLabel} Horoscope | AstroRoshni`}
+        description={`Read the ${periodLabel.toLowerCase()} ${currentZodiac.displayName} tropical Sun-sign horoscope for relationships, work, wellbeing, money, timing, and practical focus.`}
+        keywords={`${currentZodiac.displayName.toLowerCase()} horoscope, ${period} horoscope, tropical astrology forecast, sun sign horoscope`}
+        canonical={canonical}
         structuredData={{
-          "@context": "https://schema.org",
-          "@type": "Article",
-          "headline": seoData.title,
-          "description": seoData.description,
-          "author": { "@type": "Organization", "name": "AstroRoshni" },
-          "publisher": { "@type": "Organization", "name": "AstroRoshni" }
+          '@context': 'https://schema.org',
+          '@type': 'Article',
+          headline: `${currentZodiac.displayName} ${periodLabel} Horoscope`,
+          description: `${periodLabel} tropical Sun-sign forecast for ${currentZodiac.displayName}.`,
+          mainEntityOfPage: canonical,
+          author: { '@type': 'Organization', name: 'AstroRoshni' },
+          publisher: { '@type': 'Organization', name: 'AstroRoshni', url: 'https://astroroshni.com/' },
         }}
       />
-      <NavigationHeader compact={true} onPeriodChange={setSelectedPeriod} />
-      
-      <div className="container">
-        <div className="horoscope-header">
-          <h1>🔮 Detailed Horoscope</h1>
-          <p>Comprehensive astrological insights powered by Western tropical astrology</p>
-        </div>
 
-        <div className="period-selector">
-          {periods.map(period => (
-            <button
-              key={period.key}
-              className={`period-btn ${selectedPeriod === period.key ? 'active' : ''}`}
-              onClick={() => setSelectedPeriod(period.key)}
-            >
-              {period.icon} {period.label}
-            </button>
-          ))}
-        </div>
+      <ModernNavigationHeader sticky user={user} onLogin={onLogin} onLogout={onLogout} onAdminClick={onAdminClick} />
 
-        <div className="zodiac-selector">
-          {zodiacSigns.map(sign => (
-            <button
-              key={sign.name}
-              className={`zodiac-btn ${selectedZodiac === sign.name ? 'active' : ''}`}
-              onClick={() => setSelectedZodiac(sign.name)}
-              title={sign.displayName}
-            >
-              <div className="zodiac-symbol">{sign.symbol}</div>
-              <div className="zodiac-name">{sign.displayName}</div>
-            </button>
-          ))}
-        </div>
+      <main className="horoscope-main">
+        <header className="horoscope-hero">
+          <div className="horoscope-hero__copy">
+            <p className="horoscope-eyebrow">Tropical Sun-sign forecast · {periodLabel}</p>
+            <h1>{currentZodiac.displayName},<br /><em>meet the moment.</em></h1>
+            <p className="horoscope-hero__lead">A broad forecast based on your tropical Sun sign and current planetary aspects. For chart-aware Vedic guidance, use your complete Kundli with Tara.</p>
+          </div>
+          <div className="horoscope-hero__sign" aria-hidden><span>{currentZodiac.symbol}</span><small>{currentZodiac.displayName}</small></div>
+          <nav className="horoscope-periods" aria-label="Forecast period">
+            {PERIODS.map((item) => <button key={item.key} type="button" aria-pressed={period === item.key} onClick={() => selectPeriod(item.key)}><span>{item.label}</span><small>{item.key}</small></button>)}
+          </nav>
+        </header>
+
+        <section className="horoscope-sign-picker" aria-labelledby="choose-sign-title">
+          <div><p className="horoscope-section-label">Choose a Sun sign</p><h2 id="choose-sign-title">Twelve signs,<br /><em>one current sky.</em></h2></div>
+          <div className="horoscope-zodiac-grid">
+            {ZODIAC_SIGNS.map((sign, index) => (
+              <button key={sign.name} type="button" aria-pressed={selectedZodiac === sign.name} onClick={() => selectSign(sign.name)} title={`${sign.displayName} horoscope`}>
+                <small>{String(index + 1).padStart(2, '0')}</small><span aria-hidden>{sign.symbol}</span><strong>{sign.displayName}</strong>
+              </button>
+            ))}
+          </div>
+        </section>
 
         {loading ? (
-          <div className="loading-container">
-            <div className="loading-spinner"></div>
-            <p>Loading your cosmic insights...</p>
-          </div>
+          <section className="horoscope-state" aria-live="polite"><span className="horoscope-state__spinner" aria-hidden></span><p>Reading the current planetary pattern…</p></section>
+        ) : error ? (
+          <section className="horoscope-state horoscope-state--error" role="alert"><p className="horoscope-section-label">Forecast unavailable</p><h2>The sky is still there.<br />The connection is not.</h2><p>{error} Please try again in a moment.</p><button type="button" onClick={() => setRetryKey((value) => value + 1)}>Try again <span aria-hidden>↻</span></button></section>
         ) : horoscopeData ? (
-          <div className="horoscope-content">
-            {(horoscopeData.daily_summary || horoscopeData.weekly_summary || horoscopeData.monthly_summary) && (
-              <div className="daily-summary-banner">
-                <div className="summary-emoji">
-                  {horoscopeData.daily_summary?.emoji || horoscopeData.weekly_summary?.emoji || horoscopeData.monthly_summary?.emoji}
-                </div>
-                <div className="summary-content">
-                  <div className="summary-theme">
-                    {horoscopeData.daily_summary?.theme || horoscopeData.weekly_summary?.theme || horoscopeData.monthly_summary?.theme}
-                  </div>
-                  <div className="summary-essence">
-                    {horoscopeData.daily_summary?.essence || horoscopeData.weekly_summary?.essence || horoscopeData.monthly_summary?.essence}
-                  </div>
-                </div>
+          <div className="horoscope-reading">
+            <section className="horoscope-overview" aria-labelledby="forecast-title">
+              <div className="horoscope-overview__heading">
+                <p className="horoscope-section-label">{horoscopeData.date || periodLabel} · {horoscopeData.calculation_system === 'western_tropical_ephemeris' ? 'Western tropical ephemeris' : 'Tropical astrology'}</p>
+                <h2 id="forecast-title">{summary?.theme || `${currentZodiac.displayName} ${periodLabel} outlook`}</h2>
+                {summary?.essence && <p>{summary.essence}</p>}
               </div>
-            )}
-            
-            <div className="horoscope-title">
-              <div className="zodiac-info">
-                <span className="zodiac-symbol">{getCurrentZodiac()?.symbol}</span>
-                <div>
-                  <h2>{getCurrentZodiac()?.displayName} {selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} Horoscope</h2>
-                  <div className="horoscope-meta">
-                    <span>Lucky Number: {horoscopeData.lucky_number}</span>
-                    <span>Lucky Color: {horoscopeData.lucky_color}</span>
-                    <span>Rating: {'⭐'.repeat(horoscopeData.rating)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="overall-prediction-hero">
-              <div className="prediction-header">
-                <div className="cosmic-icon">🌟</div>
-                <h3>Overall Cosmic Forecast</h3>
-                <div className="period-badge">{selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} Outlook</div>
-              </div>
-              
-              <div className="prediction-content">
-                <div className="prediction-text">
-                  <div className="opening-quote">"</div>
-                  <p>{horoscopeData.prediction?.overall}</p>
-                  <div className="closing-quote">"</div>
-                </div>
-                
-                <div className="prediction-highlights">
-                  {horoscopeData.todays_energy && (
-                    <div className="highlight-item">
-                      <div className="highlight-icon">🌟</div>
-                      <div className="highlight-text">
-                        <strong>Today's Energy</strong>
-                        <span>{horoscopeData.todays_energy}</span>
-                      </div>
-                    </div>
-                  )}
-                  {horoscopeData.best_time && (
-                    <div className="highlight-item">
-                      <div className="highlight-icon">⏰</div>
-                      <div className="highlight-text">
-                        <strong>Best Time</strong>
-                        <span>{horoscopeData.best_time}</span>
-                      </div>
-                    </div>
-                  )}
-                  {horoscopeData.key_focus && (
-                    <div className="highlight-item">
-                      <div className="highlight-icon">🎯</div>
-                      <div className="highlight-text">
-                        <strong>Key Focus</strong>
-                        <span>{horoscopeData.key_focus}</span>
-                      </div>
-                    </div>
-                  )}
-                  {horoscopeData.what_to_avoid && (
-                    <div className="highlight-item">
-                      <div className="highlight-icon">⚠️</div>
-                      <div className="highlight-text">
-                        <strong>What to Avoid</strong>
-                        <span>{horoscopeData.what_to_avoid}</span>
-                      </div>
-                    </div>
-                  )}
-                  {horoscopeData.lucky_element && (
-                    <div className="highlight-item">
-                      <div className="highlight-icon">🍀</div>
-                      <div className="highlight-text">
-                        <strong>Lucky Element</strong>
-                        <span>{horoscopeData.lucky_element}</span>
-                      </div>
-                    </div>
-                  )}
-                  {horoscopeData.moon_timing && (
-                    <div className="highlight-item">
-                      <div className="highlight-icon">🌙</div>
-                      <div className="highlight-text">
-                        <strong>Moon Phase</strong>
-                        <span>{horoscopeData.moon_timing.phase} - {horoscopeData.moon_timing.phase_meaning}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="cosmic-elements">
-                <div className="floating-star star-1">✨</div>
-                <div className="floating-star star-2">⭐</div>
-                <div className="floating-star star-3">🌟</div>
-                <div className="cosmic-wave"></div>
-              </div>
-            </div>
+              <dl className="horoscope-overview__meta">
+                <div><dt>Lucky number</dt><dd>{horoscopeData.lucky_number ?? '—'}</dd></div>
+                <div><dt>Lucky colour</dt><dd>{horoscopeData.lucky_color || '—'}</dd></div>
+                <div><dt>Forecast tone</dt><dd>{horoscopeData.rating ? `${horoscopeData.rating} / 5` : 'Balanced'}</dd></div>
+              </dl>
+              {prediction.overall && <blockquote>{prediction.overall}</blockquote>}
+              {highlights.length > 0 && <div className="horoscope-highlights">{highlights.map(([label, value], index) => <article key={label}><span>{String(index + 1).padStart(2, '0')}</span><h3>{label}</h3><p>{value}</p></article>)}</div>}
+            </section>
 
             {horoscopeData.daily_actions && (
-              <div className="daily-actions-section">
-                <h3>🎯 Daily Action Plan</h3>
-                <div className="actions-grid">
-                  <div className="actions-list">
-                    <h4>✅ Priority Actions</h4>
-                    <ul>
-                      {horoscopeData.daily_actions.actions.map((action, index) => (
-                        <li key={index}>{action}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="avoid-item">
-                    <h4>⚠️ Avoid Today</h4>
-                    <p>{horoscopeData.daily_actions.avoid}</p>
-                  </div>
-                </div>
-              </div>
+              <section className="horoscope-actions" aria-labelledby="daily-actions-title">
+                <div><p className="horoscope-section-label">Practical focus</p><h2 id="daily-actions-title">What to carry into the day.</h2></div>
+                <div><ul>{horoscopeData.daily_actions.actions?.map((action) => <li key={action}>{action}</li>)}</ul>{horoscopeData.daily_actions.avoid && <p><strong>Use care with</strong>{horoscopeData.daily_actions.avoid}</p>}</div>
+              </section>
             )}
 
             {horoscopeData.energy_forecast && (
-              <div className="energy-forecast-section">
-                <h3>⚡ Energy Forecast</h3>
-                <div className="energy-timeline">
-                  <div className="energy-period">
-                    <div className="period-label">Morning</div>
-                    <div className="energy-bar">
-                      <div className="energy-fill" style={{width: `${horoscopeData.energy_forecast.morning}%`}}></div>
-                    </div>
-                    <div className="energy-value">{horoscopeData.energy_forecast.morning}%</div>
-                  </div>
-                  <div className="energy-period">
-                    <div className="period-label">Afternoon</div>
-                    <div className="energy-bar">
-                      <div className="energy-fill" style={{width: `${horoscopeData.energy_forecast.afternoon}%`}}></div>
-                    </div>
-                    <div className="energy-value">{horoscopeData.energy_forecast.afternoon}%</div>
-                  </div>
-                  <div className="energy-period">
-                    <div className="period-label">Evening</div>
-                    <div className="energy-bar">
-                      <div className="energy-fill" style={{width: `${horoscopeData.energy_forecast.evening}%`}}></div>
-                    </div>
-                    <div className="energy-value">{horoscopeData.energy_forecast.evening}%</div>
-                  </div>
-                </div>
-                <p className="peak-time">Peak Energy: {horoscopeData.energy_forecast.peak_time}</p>
-              </div>
+              <section className="horoscope-energy" aria-labelledby="energy-title">
+                <div><p className="horoscope-section-label">Energy rhythm</p><h2 id="energy-title">The day,<br /><em>in three movements.</em></h2><p>Peak indicated around {horoscopeData.energy_forecast.peak_time || 'the strongest part of the day'}.</p></div>
+                <div><MetricBar label="Morning" value={horoscopeData.energy_forecast.morning} /><MetricBar label="Afternoon" value={horoscopeData.energy_forecast.afternoon} /><MetricBar label="Evening" value={horoscopeData.energy_forecast.evening} /></div>
+              </section>
             )}
 
-            <div className="predictions-grid">
-              <div className="prediction-card">
-                <h3>💕 Love & Relationships</h3>
-                <p>{horoscopeData.prediction?.love}</p>
-              </div>
-              <div className="prediction-card">
-                <h3>💼 Career & Business</h3>
-                <p>{horoscopeData.prediction?.career}</p>
-              </div>
-              <div className="prediction-card">
-                <h3>🏥 Health & Wellness</h3>
-                <p>{horoscopeData.prediction?.health}</p>
-              </div>
-              <div className="prediction-card">
-                <h3>💰 Finance & Money</h3>
-                <p>{horoscopeData.prediction?.finance}</p>
-              </div>
-              <div className="prediction-card">
-                <h3>📚 Education & Learning</h3>
-                <p>{horoscopeData.prediction?.education}</p>
-              </div>
-              <div className="prediction-card">
-                <h3>🕉️ Spirituality & Faith</h3>
-                <p>{horoscopeData.prediction?.spirituality}</p>
-              </div>
-            </div>
-
-            {horoscopeData.intuitive_insights && (
-              <div className="intuitive-insights-section">
-                <h3>🔮 Intuitive Insights</h3>
-                <div className="insights-grid">
-                  <div className="insight-card">
-                    <h4>🌌 Psychic Sensitivity</h4>
-                    <div className="sensitivity-meter">
-                      <div className="sensitivity-fill" style={{width: `${horoscopeData.intuitive_insights.psychic_sensitivity}%`}}></div>
-                    </div>
-                    <span>{horoscopeData.intuitive_insights.psychic_sensitivity}%</span>
-                  </div>
-                  <div className="insight-card">
-                    <h4>✨ Synchronicity Level</h4>
-                    <div className="sensitivity-meter">
-                      <div className="sensitivity-fill" style={{width: `${horoscopeData.intuitive_insights.synchronicity_level}%`}}></div>
-                    </div>
-                    <span>{horoscopeData.intuitive_insights.synchronicity_level}%</span>
-                  </div>
-                  <div className="insight-card">
-                    <h4>🌙 Dream Significance</h4>
-                    <p>{horoscopeData.intuitive_insights.dream_significance}</p>
-                  </div>
-                  <div className="insight-card signs-to-watch">
-                    <h4>🔍 Signs to Watch</h4>
-                    {horoscopeData.intuitive_insights.signs_to_watch && horoscopeData.intuitive_insights.signs_to_watch.signs ? (
-                      <div className="signs-guidance">
-                        <p className="signs-overview">{horoscopeData.intuitive_insights.signs_to_watch.overview}</p>
-                        <div className="signs-list">
-                          {horoscopeData.intuitive_insights.signs_to_watch.signs.map((signInfo, index) => (
-                            <div key={index} className="sign-watch-item">
-                              <div className="sign-header">
-                                <strong>{signInfo.sign}</strong>
-                                <span className="sign-reason">{signInfo.reason}</span>
-                              </div>
-                              <div className="sign-details">
-                                <div className="what-to-watch">
-                                  <strong>Watch for:</strong> {signInfo.what_to_watch}
-                                </div>
-                                <div className="symbols-info">
-                                  <strong>Symbols:</strong> {signInfo.symbols.symbols.join(', ')}
-                                </div>
-                                <div className="colors-info">
-                                  <strong>Colors:</strong> {signInfo.symbols.colors.join(', ')}
-                                </div>
-                                <div className="how-to-use">
-                                  <strong>How to use:</strong> {signInfo.how_to_use}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="watch-methods">
-                          <h5>How to Watch for These Signs:</h5>
-                          <ul>
-                            {horoscopeData.intuitive_insights.signs_to_watch.methods.map((method, index) => (
-                              <li key={index}>{method}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    ) : (
-                      <p>{typeof horoscopeData.intuitive_insights.signs_to_watch === 'string' ? horoscopeData.intuitive_insights.signs_to_watch : 'Watch for meaningful synchronicities today'}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
+            {lifeAreas.length > 0 && (
+              <section className="horoscope-life-areas" aria-labelledby="life-areas-title">
+                <div className="horoscope-heading"><p className="horoscope-section-label">Across life</p><h2 id="life-areas-title">Where the pattern<br /><em>may be felt.</em></h2><p>Read each area as broad Sun-sign guidance rather than a personalised birth-chart judgement.</p></div>
+                <div className="horoscope-life-grid">{lifeAreas.map(([title, value], index) => <article key={title}><span>{String(index + 1).padStart(2, '0')}</span><h3>{title}</h3><p>{value}</p></article>)}</div>
+              </section>
             )}
 
-            {horoscopeData.prediction?.detailed_analysis && (
-              <div className="comprehensive-analysis">
-                <h3>🔍 Comprehensive 360° Analysis</h3>
-                
-                {horoscopeData.cosmic_weather && (
-                  <div className="cosmic-weather">
-                    <h4>🌌 Current Cosmic Weather</h4>
-                    <div className="weather-grid">
-                      <div className="weather-item">
-                        <span className="weather-label">Energy Level</span>
-                        <div className="weather-bar">
-                          <div className="weather-fill" style={{width: `${horoscopeData.cosmic_weather.energy_level}%`}}></div>
-                        </div>
-                        <span className="weather-value">{horoscopeData.cosmic_weather.energy_level}%</span>
-                      </div>
-                      <div className="weather-item">
-                        <span className="weather-label">Manifestation Power</span>
-                        <div className="weather-bar">
-                          <div className="weather-fill" style={{width: `${horoscopeData.cosmic_weather.manifestation_power}%`}}></div>
-                        </div>
-                        <span className="weather-value">{horoscopeData.cosmic_weather.manifestation_power}%</span>
-                      </div>
-                      <div className="weather-item">
-                        <span className="weather-label">Intuition Strength</span>
-                        <div className="weather-bar">
-                          <div className="weather-fill" style={{width: `${horoscopeData.cosmic_weather.intuition_strength}%`}}></div>
-                        </div>
-                        <span className="weather-value">{horoscopeData.cosmic_weather.intuition_strength}%</span>
-                      </div>
-                      <div className="weather-item">
-                        <span className="weather-label">Relationship Harmony</span>
-                        <div className="weather-bar">
-                          <div className="weather-fill" style={{width: `${horoscopeData.cosmic_weather.relationship_harmony}%`}}></div>
-                        </div>
-                        <span className="weather-value">{horoscopeData.cosmic_weather.relationship_harmony}%</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="analysis-section">
-                  <h4>🪐 Planetary Influences & Aspects</h4>
-                  <div className="planetary-influences">
-                    {horoscopeData.prediction.detailed_analysis.planetary_influences?.map((planet, index) => (
-                      <div key={index} className="planet-influence-detailed">
-                        <div className="planet-header">
-                          <strong>{planet.planet}</strong>
-                          <span className="strength">{planet.strength}%</span>
-                        </div>
-                        <p className="influence-desc">{planet.influence}</p>
-                        {planetary_signs && planetary_signs[planet.planet] ? <p className="sign-info"><strong>Sign:</strong> {planetary_signs[planet.planet].sign} | <strong>Aspect:</strong> {planet.aspect}</p> : planet.sign && <p className="sign-info"><strong>Sign:</strong> {planet.sign} | <strong>Aspect:</strong> {planet.aspect}</p>}
-                        {planet.orb && <p className="orb-info"><strong>Orb:</strong> {planet.orb}</p>}
-                        {planet.effect && <p className="effect-info"><strong>Effect:</strong> {planet.effect}</p>}
-                        <div className="strength-bar">
-                          <div className="strength-fill" style={{width: `${planet.strength}%`}}></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {(horoscopeData.prediction.detailed_analysis.challenges || horoscopeData.prediction.detailed_analysis.opportunities) && (
-                  <div className="challenges-opportunities">
-                    {horoscopeData.prediction.detailed_analysis.challenges && (
-                      <div className="analysis-section">
-                        <h4>⚠️ Challenges to Navigate</h4>
-                        <ul>
-                          {horoscopeData.prediction.detailed_analysis.challenges.map((challenge, index) => (
-                            <li key={index}>{challenge}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {horoscopeData.prediction.detailed_analysis.opportunities && (
-                      <div className="analysis-section">
-                        <h4>🌟 Golden Opportunities</h4>
-                        <ul>
-                          {horoscopeData.prediction.detailed_analysis.opportunities.map((opportunity, index) => (
-                            <li key={index}>{opportunity}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+            {(cosmicMetrics.length > 0 || planetaryInfluences.length > 0) && (
+              <section className="horoscope-detail" aria-labelledby="detail-title">
+                <div className="horoscope-heading horoscope-heading--inverse"><p className="horoscope-section-label">Under the forecast</p><h2 id="detail-title">The aspects shaping<br /><em>the reading.</em></h2></div>
+                {cosmicMetrics.length > 0 && <div className="horoscope-detail__metrics">{cosmicMetrics.map(([label, value]) => <MetricBar key={label} label={label} value={value} />)}</div>}
+                {planetaryInfluences.length > 0 && <div className="horoscope-planets">{planetaryInfluences.map((planet, index) => <article key={`${planet.planet}-${index}`}><div><span>{String(index + 1).padStart(2, '0')}</span><strong>{planet.planet}</strong><small>{planet.sign || planet.aspect || 'Current influence'}</small></div><p>{planet.influence || planet.effect}</p>{planet.strength !== undefined && <MetricBar label="Relative strength" value={planet.strength} />}</article>)}</div>}
+                {(challenges.length > 0 || opportunities.length > 0) && <div className="horoscope-contrast">{challenges.length > 0 && <article><span>Navigate carefully</span><ul>{challenges.map((item) => <li key={item}>{item}</li>)}</ul></article>}{opportunities.length > 0 && <article><span>Use constructively</span><ul>{opportunities.map((item) => <li key={item}>{item}</li>)}</ul></article>}</div>}
+              </section>
             )}
 
-            {horoscopeData.action_plan && (
-              <div className="action-items">
-                <h3>📋 Personalized Action Plan</h3>
-                <div className="actions-grid">
-                  <div className="action-card priority-high">
-                    <h4>🎯 Primary Focus Areas</h4>
-                    <p>{horoscopeData.action_plan.primary_focus}</p>
-                  </div>
-                  <div className="action-card priority-medium">
-                    <h4>⏰ Optimal Timing</h4>
-                    <p>{horoscopeData.action_plan.optimal_timing}</p>
-                  </div>
-                  <div className="action-card priority-high">
-                    <h4>🔮 Daily Practices</h4>
-                    <p>{horoscopeData.action_plan.daily_practices}</p>
-                  </div>
-                  <div className="action-card priority-medium">
-                    <h4>🌱 Growth Opportunities</h4>
-                    <p>{horoscopeData.action_plan.growth_opportunities}</p>
-                  </div>
-                  <div className="action-card priority-low">
-                    <h4>⚖️ Balance Strategies</h4>
-                    <p>{horoscopeData.action_plan.balance_strategies}</p>
-                  </div>
-                  <div className="action-card priority-high">
-                    <h4>💫 Manifestation Techniques</h4>
-                    <p>{horoscopeData.action_plan.manifestation_techniques}</p>
-                  </div>
-                </div>
-              </div>
+            {actionItems.length > 0 && (
+              <section className="horoscope-plan" aria-labelledby="action-plan-title">
+                <div className="horoscope-heading"><p className="horoscope-section-label">Action plan</p><h2 id="action-plan-title">Turn the forecast<br /><em>into a considered day.</em></h2></div>
+                <div className="horoscope-plan__grid">{actionItems.map(([title, value], index) => <article key={title}><span>{String(index + 1).padStart(2, '0')}</span><h3>{title}</h3><p>{value}</p></article>)}</div>
+              </section>
             )}
           </div>
-        ) : (
-          <div className="error-message">
-            <h3>Unable to load horoscope data</h3>
-            <p>Please check your connection and try again.</p>
-          </div>
-        )}
-      </div>
+        ) : null}
+
+        <section className="horoscope-personal" aria-labelledby="personal-title">
+          <div><p className="horoscope-section-label">Beyond the Sun sign</p><h2 id="personal-title">Your complete chart tells a different story.</h2><p>This page uses Western tropical Sun-sign astrology. Tara’s personalised readings use your saved Kundli and synthesize Parashari, Nadi, Jaimini, and KP astrology across 90+ calculation and interpretation layers.</p></div>
+          <div><Link to="/ai-kundli-generator">Create or choose Kundli <span aria-hidden>↗</span></Link><Link to="/chat?app=1">Ask Tara <span aria-hidden>↗</span></Link></div>
+        </section>
+      </main>
     </div>
   );
 };

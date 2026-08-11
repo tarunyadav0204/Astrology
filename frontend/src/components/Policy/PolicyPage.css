@@ -1,0 +1,58 @@
+.policy-document ol {
+  max-width: 55rem;
+  margin: 0;
+  padding-left: 1.4rem;
+}
+
+.policy-document ol li::marker {
+  color: var(--color-brand);
+  font-family: var(--font-mono);
+  font-weight: 800;
+}
+
+.policy-section-note {
+  display: inline-flex;
+  margin: calc(-1 * var(--space-2)) 0 var(--space-5) !important;
+  padding: 0.45rem 0.75rem;
+  color: var(--color-brand) !important;
+  background: color-mix(in srgb, var(--color-brand) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-brand) 24%, transparent);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs) !important;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.policy-section--processing,
+.policy-section--rights {
+  background: color-mix(in srgb, var(--color-brand) 7%, var(--color-surface));
+}
+
+.policy-section--secure {
+  background: color-mix(in srgb, var(--color-success) 7%, var(--color-surface));
+}
+
+.policy-section--ai {
+  background: color-mix(in srgb, var(--color-info) 7%, var(--color-surface));
+}
+
+.policy-callout {
+  max-width: 55rem;
+  margin: 0 0 var(--space-5);
+  padding: var(--space-5);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  border-left: 4px solid var(--color-brand);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.policy-section--secure .policy-callout { border-left-color: var(--color-success); }
+.policy-section--ai .policy-callout { border-left-color: var(--color-info); }
+.policy-callout > strong { display: block; margin-bottom: var(--space-3); color: var(--color-text); font-family: var(--font-display); font-size: clamp(1.6rem, 3vw, 2.4rem); font-weight: 400; }
+.policy-callout p { margin-bottom: var(--space-3); }
+
+@media (max-width: 680px) {
+  .policy-callout { padding: 1.25rem; border-radius: var(--radius-md); }
+}

@@ -19,6 +19,7 @@ const BirthForm = ({
   showCloseButton,
   onClose,
   defaultActiveTab = 'saved',
+  onRequireAuth,
 }) => {
   const isPickMode = Boolean(onChartPick);
   const { birthData, setBirthData, setChartData, setLoading, setError } = useAstrology();
@@ -380,6 +381,11 @@ const BirthForm = ({
       return false;
     }
 
+    if (!localStorage.getItem('token') && onRequireAuth) {
+      onRequireAuth({ ...formData });
+      return true;
+    }
+
     setLoading(true);
     
     try {
@@ -423,14 +429,20 @@ const BirthForm = ({
           yogiData: yogiData
         };
         
-        setBirthData(birthData);
+        const createdBirthData = {
+          ...formData,
+          ...(enhancedChartData?.birth_chart_id ? { chart_id: enhancedChartData.birth_chart_id } : {}),
+        };
+        setBirthData(createdBirthData);
         setChartData(enhancedChartData);
         toast.success('Birth chart calculated successfully!');
-        onSubmit(birthData);
+        onSubmit?.(createdBirthData);
       }
     } catch (error) {
       setError(error.message);
       toast.error(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 

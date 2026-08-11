@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import { useAstrology } from '../../context/AstrologyContext';
 import { apiService } from '../../services/apiService';
-import '../Analysis/AnalysisDetailPage.css';
 import './ActivationExplorerPage.css';
 
 const HOUSE_LABELS = {
@@ -369,18 +368,13 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
   };
 
   return (
-    <div className="analysis-detail-page activation-explorer-page">
-      <NavigationHeader
-        compact
-        showZodiacSelector={false}
+    <div className="activation-explorer-page">
+      <ModernNavigationHeader
+        sticky
         user={user}
         onAdminClick={onAdminClick}
         onLogout={onLogout}
-        onLogin={!user ? onLogin : undefined}
-        showLoginButton={!user}
-        birthData={birthData}
-        onCreateBirthChart={() => navigate('/ai-kundli-generator')}
-        onSelectBirthChart={user ? () => setShowBirthModal(true) : () => onLogin?.()}
+        onLogin={onLogin}
       />
 
       <main className="activation-explorer-main">

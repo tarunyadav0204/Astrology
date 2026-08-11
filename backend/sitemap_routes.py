@@ -71,6 +71,7 @@ async def generate_sitemap():
         ('/horoscope/daily', 'daily', '0.8'),
         ('/horoscope/weekly', 'weekly', '0.7'),
         ('/horoscope/monthly', 'monthly', '0.7'),
+        ('/horoscope/yearly', 'monthly', '0.7'),
     ]
     
     sitemap_xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'

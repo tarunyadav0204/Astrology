@@ -13,8 +13,6 @@ const SECTION_LINKS = [
   ['method', 'How it works'],
   ['clarity', 'Explore'],
   ['tools', 'Vedic tools'],
-  ['discover', 'Discover'],
-  ['journal', 'Learn'],
 ];
 
 const ModernNavigationHeader = ({
@@ -33,6 +31,8 @@ const ModernNavigationHeader = ({
   const { theme, themes, setTheme } = useTheme();
   const accountMenuRef = useRef(null);
   const themeMenuRef = useRef(null);
+  const discoverMenuRef = useRef(null);
+  const learnMenuRef = useRef(null);
   const mobileMenuRef = useRef(null);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showBirthFormModal, setShowBirthFormModal] = useState(false);
@@ -44,7 +44,7 @@ const ModernNavigationHeader = ({
   useEffect(() => {
     const closeMenus = (event) => {
       const isEscape = event.type === 'keydown' && event.key === 'Escape';
-      [accountMenuRef, themeMenuRef, mobileMenuRef].forEach((menuRef) => {
+      [accountMenuRef, themeMenuRef, discoverMenuRef, learnMenuRef, mobileMenuRef].forEach((menuRef) => {
         const menu = menuRef.current;
         if (!menu?.open) return;
         if (isEscape || (event.type === 'pointerdown' && !menu.contains(event.target))) {
@@ -65,6 +65,8 @@ const ModernNavigationHeader = ({
   const closeMenus = () => {
     accountMenuRef.current?.removeAttribute('open');
     themeMenuRef.current?.removeAttribute('open');
+    discoverMenuRef.current?.removeAttribute('open');
+    learnMenuRef.current?.removeAttribute('open');
     mobileMenuRef.current?.removeAttribute('open');
   };
 
@@ -105,6 +107,24 @@ const ModernNavigationHeader = ({
 
           <nav className="mh-nav__links" aria-label="Site sections">
             {SECTION_LINKS.map(([id, label]) => <a key={id} href={sectionHref(id)}>{label}</a>)}
+            <details className="mh-nav-menu" ref={discoverMenuRef}>
+              <summary>Discover</summary>
+              <div className="mh-nav-menu__panel" onClick={closeMenus}>
+                <a href={sectionHref('discover')}><span>Discover overview</span><small>Explore AstroRoshni</small></a>
+                <Link to="/ai-kundli-generator"><span>Create Kundli</span><small>Calculate and save your Vedic chart</small></Link>
+                <Link to="/horoscope/daily"><span>Horoscope</span><small>Daily to yearly Sun-sign forecasts</small></Link>
+              </div>
+            </details>
+            <details className="mh-nav-menu" ref={learnMenuRef}>
+              <summary>Learn</summary>
+              <div className="mh-nav-menu__panel mh-nav-menu__panel--learn" onClick={closeMenus}>
+                <a href={sectionHref('journal')}><span>Learning overview</span><small>Start with the essentials</small></a>
+                <Link to="/beginners-guide"><span>Beginner’s guide</span><small>Eight foundational lessons</small></Link>
+                <Link to="/advanced-courses"><span>Advanced courses</span><small>Go deeper into interpretation</small></Link>
+                <Link to="/myths-vs-reality"><span>Myths vs reality</span><small>Separate tradition from misconception</small></Link>
+                <Link to="/lesson/1"><span>Start lesson one</span><small>What is astrology?</small></Link>
+              </div>
+            </details>
             <Link to="/panchang">Panchang</Link>
           </nav>
 
@@ -181,6 +201,16 @@ const ModernNavigationHeader = ({
             <summary aria-label="Open menu"><span></span><span></span></summary>
             <div className="mh-mobile-menu__panel" onClick={closeMenus}>
               {SECTION_LINKS.map(([id, label]) => <a key={id} href={sectionHref(id)}>{label}</a>)}
+              <span className="mh-mobile-menu__label">Discover</span>
+              <a href={sectionHref('discover')}>Discover overview</a>
+              <Link to="/ai-kundli-generator">Create Kundli</Link>
+              <Link to="/horoscope/daily">Horoscope</Link>
+              <span className="mh-mobile-menu__label">Learn</span>
+              <a href={sectionHref('journal')}>Learning overview</a>
+              <Link to="/beginners-guide">Beginner’s guide</Link>
+              <Link to="/advanced-courses">Advanced courses</Link>
+              <Link to="/myths-vs-reality">Myths vs reality</Link>
+              <Link to="/lesson/1">Start lesson one</Link>
               <Link to="/panchang">Panchang</Link>
               <button type="button" onClick={askTara}>Ask Tara</button>
               <button type="button" onClick={() => openBirthForm('new')}>Create Kundli</button>

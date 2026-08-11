@@ -360,9 +360,9 @@ const ModernAstroRoshniHomepage = ({
             </p>
             <div className="mh-hero__actions">
               <button className="mh-primary-button" type="button" onClick={askTara}>Ask Tara <span aria-hidden>↗</span></button>
-              <button className="mh-secondary-button" type="button" onClick={() => navigate('/ai-kundli-generator')}>
+              <Link className="mh-secondary-button" to="/ai-kundli-generator">
                 Create free Kundli
-              </button>
+              </Link>
             </div>
             <div className="mh-proof-line" aria-label="Calculation credentials">
               <span>Swiss Ephemeris</span><i></i><span>90+ analysis layers</span><i></i><span>Four-system synthesis</span>
@@ -398,7 +398,7 @@ const ModernAstroRoshniHomepage = ({
               <button type="button" onClick={() => navigate('/muhurat-finder')}>
                 <span>02</span><strong>Muhurat Finder</strong><p>Find a considered window for important beginnings.</p><i aria-hidden>↗</i>
               </button>
-              <button type="button" onClick={() => navigate('/horoscope?period=daily')}>
+              <button type="button" onClick={() => navigate('/horoscope/daily')}>
                 <span>03</span><strong>Daily Horoscope</strong><p>A quick Sun-sign view before your deeper chart reading.</p><i aria-hidden>↗</i>
               </button>
             </div>

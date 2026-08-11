@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import { authService } from '../../services/authService';
 import './OrderManagementPage.css';
 
@@ -171,24 +171,24 @@ export default function OrderManagementPage({ user, onLogin, onLogout, onAdminCl
         <title>Order Management - AstroRoshni</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
-      <NavigationHeader
-        compact
+      <ModernNavigationHeader
+        sticky
         user={user}
         onLogout={onLogout}
         onAdminClick={onAdminClick}
         onLogin={onLogin}
-        showLoginButton={!isLoggedIn}
-        onHomeClick={() => navigate('/')}
       />
 
       <main className="order-management-main">
         <header className="order-management-hero">
           <p className="order-management-kicker">Billing center</p>
-          <h1>Manage your AstroRoshni orders</h1>
-          <p>
-            View credit purchases, current membership status, payment references, and billing support
-            options for purchases made on AstroRoshni.
-          </p>
+          <div className="order-management-hero__body">
+            <h1>Your orders,<br /><em>clearly kept.</em></h1>
+            <p>
+              View credit purchases, membership status, payment references, and support options in one
+              private billing record.
+            </p>
+          </div>
         </header>
 
         {!isLoggedIn && (

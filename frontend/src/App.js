@@ -597,28 +597,87 @@ function App() {
               )
             } />
             <Route path="/beginners-guide" element={
-              <BeginnersGuide
-                user={user}
-                onLogout={user ? handleLogout : undefined}
-                onAdminClick={user ? handleAdminClick : undefined}
-              />
+              <>
+                <BeginnersGuide
+                  user={user}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                />
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to save Kundlis, ask Tara questions, and continue your Vedic astrology learning with your own chart."
+                  onAuthenticated={handleLogin}
+                />
+              </>
             } />
             <Route path="/advanced-courses" element={
-              <AdvancedCourses
-                user={user}
-                onLogout={user ? handleLogout : undefined}
-                onAdminClick={user ? handleAdminClick : undefined}
-              />
+              <>
+                <AdvancedCourses
+                  user={user}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                />
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to use your saved Kundli while studying advanced timing, analysis, and multi-system chart synthesis."
+                  onAuthenticated={handleLogin}
+                />
+              </>
             } />
             <Route path="/myths-vs-reality" element={
-              <MythsVsReality
-                user={user}
-                onLogout={user ? handleLogout : undefined}
-                onAdminClick={user ? handleAdminClick : undefined}
-              />
+              <>
+                <MythsVsReality
+                  user={user}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                />
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to explore Vedic astrology with your own chart while keeping interpretation, evidence, and responsible limits clear."
+                  onAuthenticated={handleLogin}
+                />
+              </>
             } />
-            <Route path="/horoscope/:period" element={<HoroscopePage />} />
-            <Route path="/horoscope" element={<HoroscopePage />} />
+            <Route path="/horoscope/:period" element={
+              <>
+                <HoroscopePage
+                  user={user}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={() => { setAuthView('login'); setShowLoginModal(true); }}
+                />
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to move beyond Sun-sign forecasts and use your complete saved Kundli with Tara."
+                  onAuthenticated={handleLogin}
+                />
+              </>
+            } />
+            <Route path="/horoscope" element={<Navigate to="/horoscope/daily" replace />} />
             <Route path="/birth-chart" element={<Navigate to="/ai-kundli-generator" replace />} />
             <Route path="/ai-kundli-generator" element={
               <>
@@ -846,11 +905,25 @@ function App() {
               </>
             } />
             <Route path="/lesson/:lessonId" element={
-              <LessonPage
-                user={user}
-                onLogout={user ? handleLogout : undefined}
-                onAdminClick={user ? handleAdminClick : undefined}
-              />
+              <>
+                <LessonPage
+                  user={user}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                />
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to study with your saved Kundli and carry your learning into AstroRoshni’s chart tools."
+                  onAuthenticated={handleLogin}
+                />
+              </>
             } />
           <Route path="/nakshatras" element={
             <NakshatraListPage
@@ -1206,8 +1279,8 @@ function App() {
               />
             }
           />
-          <Route path="/policy" element={<PolicyPage />} />
-          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/policy" element={<PolicyPage user={user} onLogout={handleLogout} onLogin={() => setShowLoginModal(true)} onAdminClick={handleAdminClick} />} />
+          <Route path="/terms" element={<TermsPage user={user} onLogout={handleLogout} onLogin={() => setShowLoginModal(true)} onAdminClick={handleAdminClick} />} />
           <Route
             path="/account/delete"
             element={
@@ -1215,6 +1288,7 @@ function App() {
                 <DeleteAccountPage
                   user={user}
                   onLogout={handleLogout}
+                  onAdminClick={handleAdminClick}
                   onLogin={() => {
                     setAuthView('login');
                     setShowLoginModal(true);
@@ -1279,7 +1353,7 @@ function App() {
               </>
             }
           />
-          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/contact" element={<ContactPage user={user} onLogout={handleLogout} onLogin={() => setShowLoginModal(true)} onAdminClick={handleAdminClick} />} />
           <Route
             path="/subscription"
             element={
@@ -1302,7 +1376,7 @@ function App() {
               />
             }
           />
-          <Route path="/about" element={<AboutUs />} />
+          <Route path="/about" element={<AboutUs user={user} onLogout={handleLogout} onLogin={() => setShowLoginModal(true)} onAdminClick={handleAdminClick} />} />
           <Route path="/calendar-2026" element={
             <Calendar2026
               user={user}

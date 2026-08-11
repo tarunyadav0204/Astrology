@@ -1,0 +1,158 @@
+.kundli-generator-page { min-height: 100vh; color: var(--color-text); background: radial-gradient(circle at 86% 24rem, var(--color-cosmic-glow), transparent 34rem), var(--color-canvas); font-family: var(--font-body); }
+.kundli-generator-page *, .kundli-generator-page *::before, .kundli-generator-page *::after { box-sizing: border-box; }
+.kundli-generator-main { width: min(100% - (2 * var(--page-gutter)), var(--content-wide)); margin: 0 auto; padding: var(--space-6) 0 var(--space-section); }
+.kundli-generator-eyebrow, .kundli-generator-section-label { margin: 0; color: var(--color-brand); font-size: var(--text-xs); font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; }
+
+.kundli-generator-hero { position: relative; isolation: isolate; min-height: 43rem; display: grid; grid-template-columns: minmax(0, 1.06fr) minmax(19rem, 0.64fr); grid-template-rows: 1fr auto; gap: clamp(2rem, 5vw, 5rem); align-items: center; padding: clamp(2rem, 6vw, 5.5rem); overflow: hidden; color: var(--color-text-inverse); background: var(--color-surface-inverse); border: 1px solid var(--color-border-inverse); border-radius: var(--radius-xl); box-shadow: var(--shadow-card); }
+.kundli-generator-hero::before { content: ''; position: absolute; z-index: -2; width: 42rem; aspect-ratio: 1; top: 42%; right: -18rem; translate: 0 -50%; border: 1px solid var(--color-cosmic-line-strong); border-radius: 50%; box-shadow: 0 0 0 6rem var(--color-cosmic-glow), 0 0 0 13rem color-mix(in srgb, var(--color-brand) 4%, transparent); }
+.kundli-generator-hero__copy { position: relative; z-index: 2; }
+.kundli-generator-hero .kundli-generator-eyebrow { color: var(--color-accent-soft); }
+.kundli-generator-hero h1 { max-width: 60rem; margin: var(--space-4) 0 var(--space-5); color: var(--color-text-inverse); font-family: var(--font-display); font-size: clamp(4.4rem, 8vw, 8.6rem); font-weight: 400; letter-spacing: -0.072em; line-height: 0.86; }
+.kundli-generator-hero h1 em, .kundli-generator-heading h2 em, .kundli-generator-process h2 em, .kundli-generator-ai h2 em, .kundli-generator-final h2 em { color: var(--color-accent-soft); font-weight: 400; }
+.kundli-generator-hero__lead { max-width: 48rem; margin: 0; color: var(--color-text-inverse-muted); font-size: clamp(1rem, 1.35vw, 1.18rem); line-height: 1.72; }
+.kundli-generator-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-6); }
+.kundli-generator-primary, .kundli-generator-secondary { min-height: 3.2rem; display: inline-flex; align-items: center; justify-content: space-between; gap: var(--space-7); padding: 0.75rem 1.25rem; border-radius: var(--radius-pill); font: inherit; font-size: var(--text-sm); font-weight: 800; cursor: pointer; }
+.kundli-generator-primary { color: var(--color-on-brand); background: var(--color-brand); border: 1px solid var(--color-brand); }
+.kundli-generator-secondary { color: var(--color-text-inverse); background: transparent; border: 1px solid var(--color-border-inverse); }
+.kundli-generator-privacy { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-4) 0 0; color: var(--color-text-inverse-muted); font-size: var(--text-xs); }
+.kundli-generator-privacy span { color: var(--color-success); font-size: 0.65rem; }
+
+.kundli-generator-visual { position: relative; width: min(100%, 25rem); aspect-ratio: 1; display: grid; place-content: center; justify-self: center; }
+.kundli-generator-orbit { position: absolute; border: 1px solid var(--color-cosmic-line-strong); border-radius: 50%; }
+.kundli-generator-orbit--outer { inset: 0; }
+.kundli-generator-orbit--inner { inset: 13%; border-style: dashed; }
+.kundli-generator-chart { position: relative; width: 14rem; aspect-ratio: 1; overflow: hidden; background: color-mix(in srgb, var(--color-cosmic-center) 88%, transparent); border: 1px solid var(--color-cosmic-line-strong); rotate: 45deg; box-shadow: 0 0 4rem var(--color-cosmic-glow); }
+.kundli-generator-chart::before, .kundli-generator-chart::after, .kundli-generator-chart__axis { content: ''; position: absolute; inset: 0; border: 1px solid var(--color-cosmic-line); }
+.kundli-generator-chart::before { translate: -50% -50%; }
+.kundli-generator-chart::after { translate: 50% 50%; }
+.kundli-generator-chart__axis--one { rotate: 90deg; }
+.kundli-generator-chart__axis--two { rotate: 0deg; }
+.kundli-generator-chart b, .kundli-generator-chart i { position: absolute; z-index: 2; display: grid; place-items: center; color: var(--color-accent-soft); rotate: -45deg; font-style: normal; font-weight: 500; }
+.kundli-generator-chart b { inset: 36%; font-family: var(--font-display); font-size: 1.25rem; }
+.kundli-generator-chart b small { color: var(--color-text-inverse-muted); font-family: var(--font-body); font-size: 0.5rem; }
+.kundli-generator-chart i { width: 2rem; aspect-ratio: 1; background: var(--color-surface-inverse-raised); border: 1px solid var(--color-border-inverse); border-radius: 50%; font-size: 0.65rem; }
+.kundli-generator-chart__sun { top: 13%; left: 44%; }
+.kundli-generator-chart__moon { right: 12%; top: 45%; }
+.kundli-generator-chart__jupiter { bottom: 12%; left: 44%; }
+.kundli-generator-chart__saturn { left: 12%; top: 45%; }
+.kundli-generator-visual__caption { position: absolute; right: 0; bottom: 1.3rem; display: grid; gap: 0.15rem; padding: 0.7rem 0.9rem; text-align: right; background: color-mix(in srgb, var(--color-surface-inverse) 88%, transparent); border-right: 2px solid var(--color-accent-soft); }
+.kundli-generator-visual__caption span { color: var(--color-text-inverse-muted); font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.kundli-generator-visual__caption strong { color: var(--color-text-inverse); font-family: var(--font-display); font-size: 0.95rem; font-weight: 400; }
+.kundli-generator-hero__facts { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; border-top: 1px solid var(--color-border-inverse); border-left: 1px solid var(--color-border-inverse); }
+.kundli-generator-hero__facts div { padding: var(--space-4); border-right: 1px solid var(--color-border-inverse); border-bottom: 1px solid var(--color-border-inverse); }
+.kundli-generator-hero__facts dt { color: var(--color-text-inverse-muted); font-size: var(--text-xs); letter-spacing: 0.1em; text-transform: uppercase; }
+.kundli-generator-hero__facts dd { margin: var(--space-2) 0 0; color: var(--color-accent-soft); font-family: var(--font-display); font-size: clamp(1.25rem, 2vw, 1.7rem); }
+
+.kundli-generator-success { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); margin-top: var(--space-5); padding: var(--space-4) var(--space-5); color: var(--color-text-inverse); background: var(--color-success); border-radius: var(--radius-lg); }
+.kundli-generator-success div { display: grid; gap: 0.25rem; }
+.kundli-generator-success span { font-size: var(--text-xs); font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.kundli-generator-success a { color: inherit; font-weight: 800; text-decoration: none; }
+
+.kundli-generator-results, .kundli-generator-tools, .kundli-generator-faq { scroll-margin-top: 9rem; margin-top: var(--space-5); padding: clamp(1.5rem, 5vw, 4.5rem); background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-sm); }
+.kundli-generator-heading { display: grid; grid-template-columns: minmax(13rem, 0.34fr) minmax(0, 1fr); gap: var(--space-3) var(--space-7); align-items: start; }
+.kundli-generator-heading .kundli-generator-section-label { grid-row: 1 / span 2; }
+.kundli-generator-heading h2, .kundli-generator-process h2, .kundli-generator-ai h2, .kundli-generator-final h2 { margin: 0; color: var(--color-text); font-family: var(--font-display); font-size: clamp(3.2rem, 6.4vw, 6.3rem); font-weight: 400; letter-spacing: -0.06em; line-height: 0.9; }
+.kundli-generator-heading h2 em, .kundli-generator-process h2 em { color: var(--color-brand); }
+.kundli-generator-heading > p:last-child { max-width: 43rem; margin: 0; color: var(--color-text-muted); line-height: 1.7; }
+.kundli-generator-output-grid, .kundli-generator-tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--space-7); border-top: 1px solid var(--color-border-strong); border-left: 1px solid var(--color-border-strong); }
+.kundli-generator-output-grid article { min-height: 16rem; padding: var(--space-5); border-right: 1px solid var(--color-border-strong); border-bottom: 1px solid var(--color-border-strong); }
+.kundli-generator-output-grid article > span, .kundli-generator-tool-grid > a > span { color: var(--color-brand); font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 800; }
+.kundli-generator-output-grid h3, .kundli-generator-tool-grid h3 { margin: clamp(3rem, 6vw, 5rem) 0 var(--space-3); color: var(--color-text); font-family: var(--font-display); font-size: 1.7rem; font-weight: 400; line-height: 1.08; }
+.kundli-generator-output-grid p, .kundli-generator-tool-grid p { margin: 0; color: var(--color-text-muted); line-height: 1.65; }
+
+.kundli-generator-process { display: grid; grid-template-columns: minmax(18rem, 0.72fr) minmax(0, 1.28fr); gap: clamp(2rem, 6vw, 7rem); align-items: start; margin-top: var(--space-5); padding: clamp(1.5rem, 5vw, 4.5rem); background: var(--color-surface-muted); border: 1px solid var(--color-border); border-radius: var(--radius-xl); }
+.kundli-generator-process > div:first-child { position: sticky; top: 9rem; }
+.kundli-generator-process h2 { margin-top: var(--space-4); font-size: clamp(3rem, 5vw, 5rem); }
+.kundli-generator-process ol { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--color-border-strong); }
+.kundli-generator-process li { display: grid; grid-template-columns: 3rem 1fr; gap: var(--space-4); padding: var(--space-5) 0; border-bottom: 1px solid var(--color-border-strong); }
+.kundli-generator-process li > span { color: var(--color-brand); font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 800; }
+.kundli-generator-process h3 { margin: 0 0 var(--space-2); color: var(--color-text); font-family: var(--font-display); font-size: 1.65rem; font-weight: 400; }
+.kundli-generator-process li p { margin: 0; color: var(--color-text-muted); line-height: 1.65; }
+.kundli-generator-process > .kundli-generator-primary { grid-column: 2; justify-self: start; }
+
+.kundli-generator-ai { display: grid; grid-template-columns: minmax(16rem, 0.4fr) minmax(0, 1fr); gap: clamp(2rem, 6vw, 7rem); align-items: center; margin-top: var(--space-5); padding: clamp(2rem, 6vw, 5.5rem); color: var(--color-text-inverse); background: var(--color-surface-inverse); border: 1px solid var(--color-border-inverse); border-radius: var(--radius-xl); box-shadow: var(--shadow-card); }
+.kundli-generator-ai__mark { width: min(100%, 18rem); aspect-ratio: 1; display: grid; place-content: center; justify-self: center; text-align: center; background: var(--color-cosmic-center); border: 1px solid var(--color-cosmic-line-strong); border-radius: 50%; box-shadow: 0 0 0 3rem var(--color-cosmic-glow); }
+.kundli-generator-ai__mark span { color: var(--color-accent-soft); font-family: var(--font-display); font-size: 4rem; }
+.kundli-generator-ai__mark small { margin-top: var(--space-2); color: var(--color-text-inverse-muted); font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; }
+.kundli-generator-ai .kundli-generator-section-label { color: var(--color-accent-soft); }
+.kundli-generator-ai h2 { margin-top: var(--space-4); color: var(--color-text-inverse); font-size: clamp(3rem, 5.4vw, 5.5rem); }
+.kundli-generator-ai > div:last-child > p:last-child { max-width: 48rem; margin: var(--space-5) 0 0; color: var(--color-text-inverse-muted); line-height: 1.75; }
+
+.kundli-generator-tool-grid > a { position: relative; min-height: 17rem; padding: var(--space-5); color: inherit; border-right: 1px solid var(--color-border-strong); border-bottom: 1px solid var(--color-border-strong); text-decoration: none; }
+.kundli-generator-tool-grid > a i { position: absolute; top: var(--space-5); right: var(--space-5); color: var(--color-brand); font-style: normal; }
+.kundli-generator-tool-grid h3 { margin-top: clamp(3rem, 6vw, 5rem); }
+
+.kundli-generator-trust { display: grid; grid-template-columns: minmax(18rem, 0.8fr) minmax(0, 1.2fr); gap: clamp(2rem, 6vw, 7rem); align-items: end; margin-top: var(--space-5); padding: clamp(1.5rem, 5vw, 4.5rem); background: var(--color-surface-muted); border: 1px solid var(--color-border); border-radius: var(--radius-xl); }
+.kundli-generator-trust h2 { margin: var(--space-3) 0 0; color: var(--color-text); font-family: var(--font-display); font-size: clamp(2.5rem, 4.6vw, 4.5rem); font-weight: 400; letter-spacing: -0.05em; line-height: 0.96; }
+.kundli-generator-trust > p { margin: 0; color: var(--color-text-muted); line-height: 1.75; }
+.kundli-generator-trust a { color: var(--color-brand); font-weight: 800; }
+
+.kundli-generator-faq__list { margin-top: var(--space-7); border-top: 1px solid var(--color-border-strong); }
+.kundli-generator-faq details { border-bottom: 1px solid var(--color-border-strong); }
+.kundli-generator-faq summary { display: grid; grid-template-columns: 3rem 1fr auto; gap: var(--space-4); align-items: center; padding: var(--space-5) 0; color: var(--color-text); font-family: var(--font-display); font-size: clamp(1.25rem, 2vw, 1.7rem); cursor: pointer; list-style: none; }
+.kundli-generator-faq summary::-webkit-details-marker { display: none; }
+.kundli-generator-faq summary span { color: var(--color-brand); font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 800; }
+.kundli-generator-faq summary i { width: 2.2rem; aspect-ratio: 1; display: grid; place-content: center; color: var(--color-brand); border: 1px solid var(--color-border-strong); border-radius: 50%; font-family: var(--font-body); font-style: normal; transition: rotate var(--motion-fast) ease; }
+.kundli-generator-faq details[open] summary i { rotate: 45deg; }
+.kundli-generator-faq details > p { max-width: 54rem; margin: 0 0 var(--space-5) 4rem; color: var(--color-text-muted); line-height: 1.75; }
+
+.kundli-generator-final { margin-top: var(--space-5); padding: clamp(3rem, 8vw, 8rem); text-align: center; color: var(--color-text-inverse); background: var(--color-surface-inverse); border: 1px solid var(--color-border-inverse); border-radius: var(--radius-xl); }
+.kundli-generator-final .kundli-generator-section-label { color: var(--color-accent-soft); }
+.kundli-generator-final h2 { margin: var(--space-4) auto var(--space-7); color: var(--color-text-inverse); }
+.kundli-generator-final .kundli-generator-primary { margin: 0 auto; }
+
+.kundli-generator-footer { width: min(100% - (2 * var(--page-gutter)), var(--content-wide)); display: grid; grid-template-columns: 1fr auto auto; gap: var(--space-5); align-items: center; margin: 0 auto; padding: var(--space-6) 0; color: var(--color-text-muted); border-top: 1px solid var(--color-border); font-size: var(--text-sm); }
+.kundli-generator-footer > a { color: var(--color-text); font-family: var(--font-display); font-size: 1.5rem; text-decoration: none; }
+.kundli-generator-footer p { margin: 0; }
+.kundli-generator-footer nav { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.kundli-generator-footer nav a { color: var(--color-text-muted); text-decoration: none; }
+
+.kundli-generator-page a:focus-visible, .kundli-generator-page button:focus-visible, .kundli-generator-page summary:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+@media (hover: hover) {
+  .kundli-generator-primary:hover { filter: brightness(1.08); }
+  .kundli-generator-secondary:hover { border-color: var(--color-accent-soft); }
+  .kundli-generator-tool-grid > a:hover { background: var(--color-surface-muted); }
+  .kundli-generator-footer a:hover { color: var(--color-brand); }
+}
+
+@media (max-width: 960px) {
+  .kundli-generator-hero { grid-template-columns: 1fr; min-height: auto; }
+  .kundli-generator-visual { position: absolute; z-index: -1; width: 24rem; right: -7rem; top: 4rem; opacity: 0.4; }
+  .kundli-generator-output-grid, .kundli-generator-tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kundli-generator-process, .kundli-generator-ai, .kundli-generator-trust { grid-template-columns: 1fr; }
+  .kundli-generator-process > div:first-child { position: static; }
+  .kundli-generator-process > .kundli-generator-primary { grid-column: 1; }
+  .kundli-generator-ai__mark { width: 13rem; justify-self: start; }
+  .kundli-generator-footer { grid-template-columns: 1fr auto; }
+  .kundli-generator-footer p { grid-column: 1 / -1; grid-row: 2; }
+}
+
+@media (max-width: 700px) {
+  .kundli-generator-main { width: min(100% - 1rem, var(--content-wide)); padding-top: 0.75rem; }
+  .kundli-generator-hero { display: block; padding: 1.5rem; border-radius: var(--radius-lg); }
+  .kundli-generator-hero h1 { font-size: clamp(3.7rem, 17vw, 5.5rem); }
+  .kundli-generator-hero__lead { max-width: 28rem; }
+  .kundli-generator-actions { display: grid; }
+  .kundli-generator-primary, .kundli-generator-secondary { width: 100%; }
+  .kundli-generator-visual { width: 22rem; right: -12rem; top: 7rem; opacity: 0.32; }
+  .kundli-generator-hero__facts { grid-template-columns: 1fr; margin-top: var(--space-6); }
+  .kundli-generator-hero__facts div { display: flex; align-items: baseline; justify-content: space-between; padding: 0.7rem 0; border-right: 0; }
+  .kundli-generator-hero__facts dd { margin: 0; font-size: 1.1rem; text-align: right; }
+  .kundli-generator-results, .kundli-generator-tools, .kundli-generator-faq, .kundli-generator-process, .kundli-generator-ai, .kundli-generator-trust, .kundli-generator-final { padding: 1.5rem; border-radius: var(--radius-lg); }
+  .kundli-generator-heading { grid-template-columns: 1fr; }
+  .kundli-generator-heading .kundli-generator-section-label { grid-row: auto; }
+  .kundli-generator-heading h2, .kundli-generator-process h2, .kundli-generator-ai h2, .kundli-generator-final h2 { font-size: clamp(3rem, 14vw, 4.6rem); }
+  .kundli-generator-output-grid, .kundli-generator-tool-grid { grid-template-columns: 1fr; }
+  .kundli-generator-output-grid article, .kundli-generator-tool-grid > a { min-height: 13rem; }
+  .kundli-generator-ai__mark { position: absolute; width: 13rem; right: -6rem; opacity: 0.24; }
+  .kundli-generator-ai { position: relative; overflow: hidden; }
+  .kundli-generator-faq summary { grid-template-columns: 2rem 1fr auto; gap: var(--space-2); }
+  .kundli-generator-faq details > p { margin-left: 2rem; }
+  .kundli-generator-success { display: grid; }
+  .kundli-generator-footer { width: min(100% - 2rem, var(--content-wide)); grid-template-columns: 1fr; }
+  .kundli-generator-footer p { grid-column: 1; grid-row: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kundli-generator-faq summary i { transition: none; }
+}
