@@ -284,7 +284,7 @@ fi
 
 if [ -f "${WATCHDOG_INSTALLER}" ]; then
   echo "🛟 Ensuring runtime watchdog service is installed..."
-  sudo APP_USER="${APP_USER}" APP_DIR="${APP_ROOT}" bash "${WATCHDOG_INSTALLER}"
+  sudo APP_USER="${APP_USER}" APP_DIR="${APP_ROOT}" START_RUNTIME_WATCHDOG="false" bash "${WATCHDOG_INSTALLER}"
   deploy_timing "runtime watchdog install/apply finished"
 else
   echo "⚠️ Runtime watchdog installer missing: ${WATCHDOG_INSTALLER}"
@@ -659,7 +659,10 @@ else
 fi
 
 # --- Phase 5: keep local watchdog disabled; MIG autohealing is the single recovery owner ---
-echo "⏭️ Leaving local backend watchdog disabled (MIG autohealing owns recovery)"
+# Reassert this at the end as a safety net for older units or interrupted prior
+# deploys. Merely killing restart_server.sh is insufficient with Restart=always.
+sudo systemctl disable --now astroroshni-watchdog.service 2>/dev/null || true
+echo "⏭️ Local backend watchdog disabled (MIG autohealing owns recovery)"
 cd "${APP_ROOT}"
 deploy_timing "watchdog disabled"
 
