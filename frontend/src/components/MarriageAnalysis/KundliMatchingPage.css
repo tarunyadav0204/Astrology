@@ -1,15 +1,16 @@
-/* Fixed compact header — same offset as AnalysisDetailPage / AstroVastu */
+/* Kundli Matching follows the shared semantic theme contract. */
 .kundli-matching-page {
   min-height: 100vh;
   box-sizing: border-box;
-  padding-top: calc(80px + env(safe-area-inset-top, 0px));
-  background: #f8fafc;
+  color: var(--color-text);
+  background: var(--color-canvas);
+  font-family: var(--font-body);
 }
 
 .kundli-matching-main {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 16px 20px 56px;
+  padding: clamp(24px, 3vw, 44px) var(--page-gutter) var(--space-section);
 }
 
 .kundli-matching-hero {
@@ -915,10 +916,6 @@
 }
 
 @media (max-width: 600px) {
-  .kundli-matching-page {
-    padding-top: calc(72px + env(safe-area-inset-top, 0px));
-  }
-
   .kundli-matching-main {
     padding: 12px 14px 40px;
   }
@@ -997,5 +994,373 @@
   .btn-premium-secondary {
     width: 100%;
     text-align: center;
+  }
+}
+
+/* Semantic theme layer. Kept page-scoped so the legacy marriage tab remains unchanged. */
+.kundli-matching-page .kundli-matching-back {
+  color: var(--color-brand);
+}
+
+.kundli-matching-page .kundli-matching-back:hover {
+  color: var(--color-brand-hover);
+}
+
+.kundli-matching-page .kundli-matching-hero h1,
+.kundli-matching-page .kundli-matching-proof strong,
+.kundli-matching-page .kundli-matching-trust-card h2,
+.kundli-matching-page .kundli-matching-seo h2,
+.kundli-matching-page .kundli-matching-faq h2,
+.kundli-matching-page .kundli-matching-seo h3,
+.kundli-matching-page .kundli-matching-faq h3,
+.kundli-matching-page .kundli-result-hero h2,
+.kundli-matching-page .kundli-result-trust strong,
+.kundli-matching-page .kundli-result-card h4,
+.kundli-matching-page .kundli-timing-panel h3,
+.kundli-matching-page .kundli-section-heading h3,
+.kundli-matching-page .kundli-person-support h4,
+.kundli-matching-page .kundli-evidence-item strong,
+.kundli-matching-page .partner-header h4,
+.kundli-matching-page .score-number,
+.kundli-matching-page .partner-info h4,
+.kundli-matching-page .guna-score-card h3,
+.kundli-matching-page .compatibility-report h3 {
+  color: var(--color-text);
+}
+
+.kundli-matching-page .kundli-matching-hero h1,
+.kundli-matching-page .kundli-matching-seo h2,
+.kundli-matching-page .kundli-matching-faq h2,
+.kundli-matching-page .kundli-result-hero h2 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+}
+
+.kundli-matching-page .kundli-matching-hero h1 {
+  font-size: clamp(2.7rem, 5.4vw, 5.4rem);
+  line-height: 0.95;
+}
+
+.kundli-matching-page .kundli-matching-sub,
+.kundli-matching-page .kundli-matching-proof span,
+.kundli-matching-page .kundli-matching-trust-card p,
+.kundli-matching-page .kundli-matching-seo p,
+.kundli-matching-page .kundli-matching-faq p,
+.kundli-matching-page .kundli-result-hero p,
+.kundli-matching-page .kundli-timing-panel p,
+.kundli-matching-page .kundli-person-support p,
+.kundli-matching-page .kundli-result-card p,
+.kundli-matching-page .kundli-evidence-item p,
+.kundli-matching-page .kundli-result-trust span,
+.kundli-matching-page .kundli-result-trust p,
+.kundli-matching-page .kundli-person-support span,
+.kundli-matching-page .kundli-evidence-item > span,
+.kundli-matching-page .birth-details,
+.kundli-matching-page .birth-place,
+.kundli-matching-page .koot-name,
+.kundli-matching-page .koot-description,
+.kundli-matching-page .interpretation-text,
+.kundli-matching-page .status-label,
+.kundli-matching-page .no-charts {
+  color: var(--color-text-muted);
+}
+
+.kundli-matching-page .kundli-matching-eyebrow,
+.kundli-matching-page .kundli-result-eyebrow,
+.kundli-matching-page .kundli-premium-eyebrow,
+.kundli-matching-page .interpretation-header,
+.kundli-matching-page .saved-charts-dropdown h5,
+.kundli-matching-page .kundli-premium-subblock strong {
+  color: var(--color-brand);
+}
+
+.kundli-matching-page .kundli-matching-panel,
+.kundli-matching-page .partner-section,
+.kundli-matching-page .kundli-matching-proof div,
+.kundli-matching-page .kundli-matching-trust-card,
+.kundli-matching-page .kundli-matching-seo article,
+.kundli-matching-page .kundli-matching-faq article,
+.kundli-matching-page .kundli-result-score-block,
+.kundli-matching-page .kundli-result-trust article,
+.kundli-matching-page .kundli-result-card,
+.kundli-matching-page .kundli-timing-panel,
+.kundli-matching-page .kundli-person-support,
+.kundli-matching-page .partner-card-top,
+.kundli-matching-page .guna-score-card,
+.kundli-matching-page .compatibility-report,
+.kundli-matching-page .chart-item,
+.kundli-matching-page .koot-interpretation {
+  color: var(--color-text);
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.kundli-matching-page .kundli-matching-panel {
+  margin-top: var(--space-6);
+  padding: clamp(18px, 3vw, 34px);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+}
+
+.kundli-matching-page .partner-section,
+.kundli-matching-page .kundli-matching-trust-card,
+.kundli-matching-page .kundli-matching-seo article,
+.kundli-matching-page .kundli-matching-faq article,
+.kundli-matching-page .kundli-result-card,
+.kundli-matching-page .kundli-person-support,
+.kundli-matching-page .kundli-result-trust article,
+.kundli-matching-page .kundli-timing-panel,
+.kundli-matching-page .kundli-result-hero {
+  border-radius: var(--radius-lg);
+}
+
+.kundli-matching-page .kundli-matching-hero-grid {
+  min-height: 420px;
+  padding: clamp(28px, 5vw, 64px);
+  border-color: var(--color-border-inverse);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(90deg,
+      color-mix(in srgb, var(--color-cosmic-surface) 98%, transparent) 0%,
+      color-mix(in srgb, var(--color-cosmic-surface) 92%, transparent) 52%,
+      color-mix(in srgb, var(--color-cosmic-surface) 48%, transparent) 100%),
+    var(--kundli-hero-image) right center / contain no-repeat,
+    var(--color-cosmic-surface);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.kundli-matching-page .kundli-matching-hero-grid h1 {
+  color: var(--color-cosmic-text);
+}
+
+.kundli-matching-page .kundli-matching-hero-grid .kundli-matching-sub {
+  color: var(--color-cosmic-text-muted);
+}
+
+.kundli-matching-page .kundli-matching-hero-grid .kundli-matching-eyebrow {
+  color: var(--color-accent-soft);
+}
+
+.kundli-matching-page .kundli-matching-proof div {
+  background: color-mix(in srgb, var(--color-cosmic-surface-raised) 88%, transparent);
+  border-color: var(--color-cosmic-line);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+}
+
+.kundli-matching-page .kundli-matching-proof strong {
+  color: var(--color-cosmic-text);
+  font-family: var(--font-display);
+  font-weight: 500;
+}
+
+.kundli-matching-page .kundli-matching-proof span {
+  color: var(--color-cosmic-text-muted);
+}
+
+.kundli-matching-page .kundli-matching-primary-link,
+.kundli-matching-page .btn-analyze,
+.kundli-matching-page .btn-premium-primary,
+.kundli-matching-page .btn-premium-buy-credits,
+.kundli-matching-page .overall-compatibility-score {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-color: transparent;
+  box-shadow: var(--shadow-sm);
+}
+
+.kundli-matching-page .kundli-matching-primary-link:hover,
+.kundli-matching-page .btn-analyze:hover:not(:disabled),
+.kundli-matching-page .btn-premium-primary:hover:not(:disabled),
+.kundli-matching-page .btn-premium-buy-credits:hover {
+  color: var(--color-on-brand);
+  background: var(--color-brand-hover);
+  box-shadow: var(--shadow-card);
+}
+
+.kundli-matching-page .kundli-matching-secondary-link,
+.kundli-matching-page .btn-select-chart,
+.kundli-matching-page .btn-premium-secondary,
+.kundli-matching-page .btn-new-analysis,
+.kundli-matching-page .btn-reset {
+  color: var(--color-brand);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  box-shadow: none;
+}
+
+.kundli-matching-page .kundli-matching-secondary-link:hover,
+.kundli-matching-page .btn-select-chart:hover,
+.kundli-matching-page .btn-premium-secondary:hover:not(:disabled),
+.kundli-matching-page .btn-new-analysis:hover,
+.kundli-matching-page .btn-reset:hover {
+  color: var(--color-on-brand);
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+}
+
+.kundli-matching-page .partner-header,
+.kundli-matching-page .form-actions,
+.kundli-matching-page .kundli-premium-subblock {
+  border-color: var(--color-border);
+}
+
+.kundli-matching-page .form-group label {
+  color: var(--color-text);
+}
+
+.kundli-matching-page .form-group input,
+.kundli-matching-page .suggestion-list,
+.kundli-matching-page .saved-charts-dropdown,
+.kundli-matching-page .koot-item,
+.kundli-matching-page .kundli-person-metrics div,
+.kundli-matching-page .kundli-evidence-item,
+.kundli-matching-page .partners-summary-top {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+}
+
+.kundli-matching-page .form-group input::placeholder {
+  color: var(--color-text-subtle);
+}
+
+.kundli-matching-page .form-group input:focus {
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus) 18%, transparent);
+}
+
+.kundli-matching-page .suggestion-item,
+.kundli-matching-page .chart-item {
+  border-color: var(--color-border);
+}
+
+.kundli-matching-page .suggestion-item:hover,
+.kundli-matching-page .chart-item:hover {
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border-color: var(--color-brand);
+}
+
+.kundli-matching-page .btn-analyze:disabled {
+  color: var(--color-text-subtle);
+  background: var(--color-surface-muted);
+}
+
+.kundli-matching-page .kundli-premium-card {
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+  background: linear-gradient(135deg, var(--color-surface-raised), var(--color-surface-muted));
+  box-shadow: var(--shadow-sm);
+}
+
+.kundli-matching-page .kundli-premium-card h3,
+.kundli-matching-page .kundli-premium-card p,
+.kundli-matching-page .kundli-premium-list,
+.kundli-matching-page .kundli-premium-section ul,
+.kundli-matching-page .kundli-premium-subblock ul {
+  color: var(--color-text);
+}
+
+.kundli-matching-page .kundli-premium-cost,
+.kundli-matching-page .guna-effective-pill {
+  color: var(--color-brand);
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+}
+
+.kundli-matching-page .kundli-premium-verdict,
+.kundli-matching-page .kundli-premium-section,
+.kundli-matching-page .kundli-premium-final,
+.kundli-matching-page .kundli-result-hero,
+.kundli-matching-page .kundli-next-window {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+}
+
+.kundli-matching-page .kundli-premium-section h4,
+.kundli-matching-page .kundli-next-window span,
+.kundli-matching-page .kundli-next-window strong,
+.kundli-matching-page .kundli-result-score-block strong,
+.kundli-matching-page .kundli-person-metrics strong,
+.kundli-matching-page .guna-effective-pill {
+  color: var(--color-brand);
+}
+
+.kundli-matching-page .kundli-premium-error,
+.kundli-matching-page .compatibility-error,
+.kundli-matching-page .critical-issues {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
+}
+
+.kundli-matching-page .kundli-premium-error p,
+.kundli-matching-page .critical-issues h4,
+.kundli-matching-page .critical-issues ul {
+  color: var(--color-danger);
+}
+
+.kundli-matching-page .kundli-result-card--supportive,
+.kundli-matching-page .koot-exception,
+.kundli-matching-page .recommendation-card.positive {
+  background: color-mix(in srgb, var(--color-success) 10%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-success) 32%, var(--color-border));
+}
+
+.kundli-matching-page .koot-exception p {
+  color: var(--color-success);
+}
+
+.kundli-matching-page .kundli-result-card--challenging,
+.kundli-matching-page .remedies-section {
+  background: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-warning) 32%, var(--color-border));
+}
+
+.kundli-matching-page .kundli-result-card--neutral {
+  background: color-mix(in srgb, var(--color-info) 9%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-info) 30%, var(--color-border));
+}
+
+.kundli-matching-page .loading-spinner {
+  border-color: var(--color-border);
+  border-top-color: var(--color-brand);
+}
+
+@media (max-width: 900px) {
+  .kundli-matching-page .kundli-matching-hero-grid {
+    background:
+      linear-gradient(180deg,
+        color-mix(in srgb, var(--color-cosmic-surface) 98%, transparent),
+        color-mix(in srgb, var(--color-cosmic-surface) 90%, transparent)),
+      var(--kundli-hero-image) right bottom / 280px auto no-repeat,
+      var(--color-cosmic-surface);
+  }
+}
+
+@media (max-width: 600px) {
+  .kundli-matching-page .kundli-matching-main {
+    padding: 18px 14px 44px;
+  }
+
+  .kundli-matching-page .kundli-matching-hero-grid {
+    min-height: 0;
+    padding: 24px 20px;
+    background:
+      linear-gradient(180deg,
+        color-mix(in srgb, var(--color-cosmic-surface) 98%, transparent),
+        color-mix(in srgb, var(--color-cosmic-surface) 93%, transparent)),
+      var(--kundli-hero-image) right bottom / 190px auto no-repeat,
+      var(--color-cosmic-surface);
+  }
+
+  .kundli-matching-page .kundli-matching-hero h1 {
+    font-size: clamp(2.35rem, 13vw, 3.4rem);
   }
 }

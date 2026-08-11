@@ -551,9 +551,9 @@ class EventWindowEngine:
                 ),
                 "qualification_summary": (
                     f"{definition.anchor.label} is shown through "
-                    f"{', '.join(f'H{row['house']}' for row in anchor['evidence'])}; "
+                    f"{', '.join('H{}'.format(row['house']) for row in anchor['evidence'])}; "
                     f"{definition.transition.label.lower()} is shown through "
-                    f"{', '.join(f'H{row['house']}' for row in transition['evidence'])}. "
+                    f"{', '.join('H{}'.format(row['house']) for row in transition['evidence'])}. "
                     + (
                         f"H{', H'.join(str(row['house']) for row in outcome['evidence'])} adds "
                         f"{definition.outcome.label.lower()}. "

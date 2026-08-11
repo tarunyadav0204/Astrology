@@ -464,6 +464,12 @@ class AshtakvargaOracle:
                         f"  • House {item['house']} ({item['sign']}): current {item['current']}, natal {item['natal']}, delta {item['delta']:+d}\n"
                     )
 
+            # Keep newline-bearing fallback literals outside the f-string
+            # expressions for compatibility with the production Python 3.11
+            # runtime (PEP 701 support only arrives in Python 3.12).
+            focus_house_prompt = focus_house_text or "- No focused house snapshot available.\n"
+            focus_bav_prompt = focus_bav_text or "- No focused BAV snapshot available.\n"
+
             # CONSTRUCTION THE PROMPT
             prompt = f"""
 You are an expert Vedic Astrologer specializing in Ashtakavarga. 
@@ -498,10 +504,10 @@ PLANET DELIVERY (BAV) SNAPSHOT:
 {bav_text}
 
 QUESTION-FOCUSED HOUSE SNAPSHOT:
-{focus_house_text or "- No focused house snapshot available.\n"}
+{focus_house_prompt}
 
 QUESTION-FOCUSED BAV SNAPSHOT:
-{focus_bav_text or "- No focused BAV snapshot available.\n"}
+{focus_bav_prompt}
 
 INSTRUCTIONS:
 1. Give a grounded Ashtakavarga reading, not a horoscope slogan.

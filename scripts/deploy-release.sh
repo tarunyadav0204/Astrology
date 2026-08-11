@@ -335,6 +335,17 @@ else
 fi
 deploy_timing "backend pip (or skip) finished"
 
+# Validate every backend module before touching the running service. This keeps
+# the currently healthy process serving traffic when a release contains a
+# syntax error that would otherwise only surface after port 8001 is stopped.
+echo "🧪 Validating backend Python syntax..."
+if ! "${VENV_PYTHON}" "${APP_ROOT}/scripts/check_backend_syntax.py" "${APP_ROOT}/backend"; then
+  echo "❌ Backend syntax validation failed; existing backend was left running"
+  exit 1
+fi
+echo "✅ Backend Python syntax valid"
+deploy_timing "backend syntax validation finished"
+
 # Apply schema changes before restarting either API or chat workers. Every listed
 # runtime migration is idempotent because each MIG instance executes this deploy.
 echo "🗃️ Applying runtime database migrations..."

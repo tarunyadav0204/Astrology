@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import CreditsModal from '../Credits/CreditsModal';
 import CompatibilityAnalysis from './CompatibilityAnalysis';
-import { useAstrology } from '../../context/AstrologyContext';
 import './KundliMatchingPage.css';
 
 const faqItems = [
@@ -142,12 +141,10 @@ const KundliMatchingPage = ({
   user,
   onLogout,
   onAdminClick,
-  onLogin,
-  showLoginButton = true
+  onLogin
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { birthData } = useAstrology();
   const [showCreditsModal, setShowCreditsModal] = useState(false);
 
   useEffect(() => {
@@ -174,17 +171,12 @@ const KundliMatchingPage = ({
         canonical="https://astroroshni.com/kundli-matching/"
         structuredData={structuredData}
       />
-      <NavigationHeader
-        compact
-        showZodiacSelector={false}
+      <ModernNavigationHeader
+        sticky
         user={user}
         onAdminClick={handleAdmin}
         onLogout={onLogout}
-        birthData={birthData}
-        onChangeNative={() => navigate('/')}
-        onCreditsClick={() => setShowCreditsModal(true)}
         onLogin={onLogin}
-        showLoginButton={showLoginButton}
       />
       <main className="kundli-matching-main">
         <header className="kundli-matching-hero" id="kundli-matching-tool">

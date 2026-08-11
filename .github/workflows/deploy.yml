@@ -166,6 +166,14 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
 
+      - name: Set up production Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate backend Python syntax
+        run: python scripts/check_backend_syntax.py backend
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
