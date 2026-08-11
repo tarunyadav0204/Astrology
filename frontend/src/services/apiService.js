@@ -243,6 +243,17 @@ export const apiService = {
     return response.data;
   },
 
+  getEventWindows: async ({ birthChartId, birthData, eventKey, year, includeDeveloping = false }) => {
+    const response = await apiClient.post(getEndpoint('/prediction-engine/event-windows'), {
+      birth_chart_id: birthChartId || null,
+      birth_data: birthChartId ? null : birthData,
+      event_key: eventKey,
+      year,
+      include_developing: includeDeveloping,
+    });
+    return response.data;
+  },
+
   getNadiDesk: async ({ birthData, chartData, asOf, transitPlanets }) => {
     const response = await apiClient.post(getEndpoint('/nadi-desk'), {
       birth_data: birthData,

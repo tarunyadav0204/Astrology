@@ -1,9 +1,9 @@
 .desk-dasha {
-  --dd-ink: #1f1714;
-  --dd-muted: #6b5c54;
-  --dd-line: rgba(70, 45, 35, 0.12);
-  --dd-accent: #9f1239;
-  --dd-current: #fff1f2;
+  --dd-ink: var(--color-text);
+  --dd-muted: var(--color-text-muted);
+  --dd-line: color-mix(in srgb, var(--color-text) 12%, transparent);
+  --dd-accent: var(--color-brand);
+  --dd-current: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface));
   height: 100%;
   min-height: 0;
   display: grid;
@@ -68,7 +68,7 @@
   border: 1px solid var(--dd-line);
   border-radius: 6px;
   overflow: hidden;
-  background: #fff;
+  background: var(--color-surface-raised);
 }
 
 .desk-dasha__systems button {
@@ -93,11 +93,11 @@
 
 .desk-dasha__systems button.is-active {
   background: var(--dd-accent);
-  color: #fff;
+  color: var(--color-on-brand);
 }
 
 .desk-dasha__systems button:hover:not(.is-active) {
-  background: rgba(159, 18, 57, 0.06);
+  background: color-mix(in srgb, var(--color-brand) 6%, transparent);
   color: var(--dd-ink);
 }
 
@@ -153,7 +153,7 @@
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  background: #fffcf8;
+  background: var(--color-surface);
 }
 
 .desk-dasha__col-head {
@@ -163,7 +163,7 @@
   gap: 0.25rem;
   padding: 0.28rem 0.4rem;
   border-bottom: 1px solid var(--dd-line);
-  background: #f7f1ea;
+  background: var(--color-canvas-subtle);
 }
 
 .desk-dasha__col-head span {
@@ -205,7 +205,7 @@
   margin: 0;
   padding: 0.22rem 0.4rem 0.26rem;
   border: 0;
-  border-bottom: 1px solid rgba(70, 45, 35, 0.06);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 6%, transparent);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -214,7 +214,7 @@
 }
 
 .desk-dasha__row:hover {
-  background: rgba(159, 18, 57, 0.04);
+  background: color-mix(in srgb, var(--color-brand) 4%, transparent);
 }
 
 .desk-dasha__row.is-current {
@@ -317,7 +317,7 @@
   border-radius: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  background: rgba(255, 252, 248, 0.97);
+  background: color-mix(in srgb, var(--color-surface) 97%, transparent);
   box-shadow: 0 -8px 26px rgba(57, 36, 29, 0.11);
   backdrop-filter: blur(12px);
   scrollbar-width: none;
@@ -358,9 +358,9 @@
 }
 
 .desk-dasha--mobile .desk-dasha__systems button.is-active {
-  background: rgba(159, 18, 57, 0.1);
+  background: color-mix(in srgb, var(--color-brand) 10%, transparent);
   color: var(--dd-accent);
-  box-shadow: inset 0 0 0 1px rgba(159, 18, 57, 0.08);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand) 8%, transparent);
 }
 
 .desk-dasha--mobile .desk-dasha__cols {
@@ -380,7 +380,7 @@
   border: 1px solid var(--dd-line);
   border-radius: 8px;
   overflow: hidden;
-  background: #fffcf8;
+  background: var(--color-surface);
 }
 
 .desk-dasha--mobile .desk-dasha__col-head {
@@ -418,7 +418,7 @@
   padding: 0.3rem 0.25rem;
   border: 1px solid var(--dd-line);
   border-radius: 6px;
-  background: #f7f1ea;
+  background: var(--color-canvas-subtle);
   text-align: center;
   scroll-snap-align: center;
 }
@@ -448,7 +448,7 @@
 
 .desk-dasha--mobile .desk-dasha__row.is-current .desk-dasha__planet,
 .desk-dasha--mobile .desk-dasha__row.is-current .desk-dasha__range {
-  color: #fff;
+  color: var(--color-on-brand);
 }
 
 .desk-dasha--mobile .desk-dasha__bar {
@@ -458,5 +458,5 @@
 }
 
 .desk-dasha--mobile .desk-dasha__bar i {
-  background: #fff;
+  background: var(--color-surface-raised);
 }

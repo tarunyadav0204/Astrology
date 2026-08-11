@@ -4,7 +4,7 @@
   gap: 0.4rem;
   min-width: 0;
   flex: 1 1 100%;
-  border-top: 1px solid rgba(70, 45, 35, 0.14);
+  border-top: 1px solid color-mix(in srgb, var(--color-text) 14%, transparent);
   padding-top: 0.3rem;
   margin-top: 0.05rem;
 }
@@ -15,7 +15,7 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #6b5c54;
+  color: var(--color-text-muted);
 }
 
 .desk-cond__chips {
@@ -38,8 +38,8 @@
   flex-shrink: 0;
   padding: 0.12rem 0.4rem;
   border-radius: 5px;
-  border: 1px solid rgba(70, 45, 35, 0.12);
-  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+  background: var(--color-surface-raised);
   white-space: nowrap;
 }
 
@@ -49,13 +49,13 @@
   font-weight: 800;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: #6b5c54;
+  color: var(--color-text-muted);
 }
 
 .desk-cond__chip strong {
   font-size: 0.66rem;
   font-weight: 750;
-  color: #1f1714;
+  color: var(--color-text);
 }
 
 .desk-cond__chip--warn {
@@ -64,11 +64,11 @@
 }
 
 .desk-cond__chip--warn strong {
-  color: #8a3a3a;
+  color: var(--color-danger);
 }
 
 .desk-cond__chip--warn em {
-  color: #991b1b;
+  color: var(--color-danger);
 }
 
 .desk-cond__chip--good {
@@ -77,7 +77,7 @@
 }
 
 .desk-cond__chip--good strong {
-  color: #3d6b4f;
+  color: var(--color-success);
 }
 
 .desk-cond__chip--war {
@@ -86,7 +86,7 @@
 }
 
 .desk-cond__chip--war strong {
-  color: #b45309;
+  color: var(--color-warning);
 }
 
 .desk-cond--empty {

@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
-import CreditsModal from '../Credits/CreditsModal';
 import SEOHead from '../SEO/SEOHead';
 import UniversalAIInsights from '../Shared/UniversalAIInsights';
 import { useAstrology } from '../../context/AstrologyContext';
@@ -21,7 +20,7 @@ const PAGE_META = {
     kicker: 'Vedic career astrology',
     blurb:
       'Find your suitable profession, job or business direction, D10 career strength, Amatyakaraka work function, and career timing from your birth chart.',
-    icon: '💼',
+    icon: 'D10',
     pdf: null
   },
   health: {
@@ -31,7 +30,7 @@ const PAGE_META = {
     kicker: 'Vedic health astrology',
     blurb:
       'Understand constitution, vitality, sensitive body systems, D30 Trimsamsa signals, stress and sleep patterns, health timing windows, and preventive wellness guidance from your birth chart.',
-    icon: '🏥',
+    icon: 'D30',
     pdf: HealthReportPDF
   },
   wealth: {
@@ -41,7 +40,7 @@ const PAGE_META = {
     kicker: 'Vedic wealth astrology',
     blurb:
       'Understand wealth promise, income sources, Dhana yogas, cashflow, savings, assets, risk patterns, career-to-money links, and wealth timing from your birth chart.',
-    icon: '💰',
+    icon: 'D2',
     pdf: WealthReportPDF
   },
   marriage: {
@@ -51,7 +50,7 @@ const PAGE_META = {
     kicker: 'Vedic marriage astrology',
     blurb:
       'Understand marriage promise, spouse nature, D9 Navamsa maturity, Darakaraka, Upapada Lagna, relationship timing, harmony, and friction factors from your birth chart.',
-    icon: '💍',
+    icon: 'D9',
     pdf: MarriageReportPDF
   },
   progeny: {
@@ -61,7 +60,7 @@ const PAGE_META = {
     kicker: 'Vedic progeny astrology',
     blurb:
       'Understand children promise, D1 5th house support, D7 Saptamsa strength, Jupiter, fertility sphuta, family expansion timing, obstacles, remedies, and parenting guidance from your birth chart.',
-    icon: '👶',
+    icon: 'D7',
     pdf: null
   },
   education: {
@@ -71,7 +70,7 @@ const PAGE_META = {
     kicker: 'Vedic education astrology',
     blurb:
       'Discover learning potential, subject fit, academic strengths, D24 education indicators, exam support, higher study promise, and study guidance from your birth chart.',
-    icon: '🎓',
+    icon: 'D24',
     pdf: EducationReportPDF
   }
 };
@@ -518,7 +517,6 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
   const navigate = useNavigate();
   const { chartData, birthData } = useAstrology();
   const [showBirthModal, setShowBirthModal] = useState(false);
-  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [birthModalTab, setBirthModalTab] = useState('saved');
 
   const meta = PAGE_META[analysisType];
@@ -582,12 +580,20 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
     if (onAdminClick) onAdminClick();
   };
 
+  const canonicalUrl = `https://astroroshni.com${meta.path}`;
+  const webpageId = `${canonicalUrl}#webpage`;
+  const applicationId = `${canonicalUrl}#application`;
+  const serviceId = `${canonicalUrl}#service`;
+  const faqId = `${canonicalUrl}#faq`;
+  const breadcrumbId = `${canonicalUrl}#breadcrumb`;
+
   const structuredData = isSeoEnriched
     ? {
         '@context': 'https://schema.org',
         '@graph': [
           {
             '@type': 'WebApplication',
+            '@id': applicationId,
             name: isHealth
               ? 'AstroRoshni Health Analysis by Date of Birth'
               : isEducation
@@ -599,7 +605,7 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
                     : isMarriage
                       ? 'AstroRoshni Marriage Analysis by Date of Birth'
                       : 'AstroRoshni Career Analysis by Date of Birth',
-            url: `https://astroroshni.com${meta.path}`,
+            url: canonicalUrl,
             applicationCategory: 'LifestyleApplication',
             operatingSystem: 'Web',
             description: seoData.description,
@@ -611,6 +617,7 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
           },
           {
             '@type': 'Service',
+            '@id': serviceId,
             name: meta.headline,
             serviceType: isHealth
               ? 'Vedic health astrology report'
@@ -624,11 +631,12 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
                       ? 'Vedic marriage astrology report'
                       : 'Vedic career astrology report',
             description: seoData.description,
-            provider: { '@type': 'Organization', name: 'AstroRoshni' },
+            provider: { '@type': 'Organization', '@id': 'https://astroroshni.com/#organization', name: 'AstroRoshni' },
             areaServed: 'Worldwide'
           },
           {
             '@type': 'FAQPage',
+            '@id': faqId,
             mainEntity: activeFaqItems.map((item) => ({
               '@type': 'Question',
               name: item.question,
@@ -640,6 +648,7 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
           },
           {
             '@type': 'BreadcrumbList',
+            '@id': breadcrumbId,
             itemListElement: [
               {
                 '@type': 'ListItem',
@@ -651,9 +660,26 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
                 '@type': 'ListItem',
                 position: 2,
                 name: isProgeny ? 'Progeny Analysis' : isWealth ? 'Wealth Analysis' : isEducation ? 'Education Analysis' : isHealth ? 'Health Analysis' : isMarriage ? 'Marriage Analysis' : 'Career Guidance',
-                item: `https://astroroshni.com${meta.path}`
+                item: canonicalUrl
               }
             ]
+          },
+          {
+            '@type': 'WebPage',
+            '@id': webpageId,
+            url: canonicalUrl,
+            name: seoData.title,
+            description: seoData.description,
+            inLanguage: 'en',
+            isPartOf: {
+              '@type': 'WebSite',
+              '@id': 'https://astroroshni.com/#website',
+              name: 'AstroRoshni',
+              url: 'https://astroroshni.com/'
+            },
+            breadcrumb: { '@id': breadcrumbId },
+            about: { '@id': serviceId },
+            mainEntity: [{ '@id': serviceId }, { '@id': applicationId }, { '@id': faqId }]
           }
         ]
       }
@@ -667,7 +693,7 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
 
   return (
     <div
-      className={`analysis-detail-page ${isCareer ? 'analysis-detail-page--career' : ''} ${isMarriage ? 'analysis-detail-page--marriage' : ''} ${isHealth ? 'analysis-detail-page--health' : ''} ${isEducation ? 'analysis-detail-page--education' : ''} ${isWealth ? 'analysis-detail-page--wealth' : ''} ${isProgeny ? 'analysis-detail-page--progeny' : ''}`}
+      className={`analysis-detail-page analysis-detail-page--themed ${isCareer ? 'analysis-detail-page--career' : ''} ${isMarriage ? 'analysis-detail-page--marriage' : ''} ${isHealth ? 'analysis-detail-page--health' : ''} ${isEducation ? 'analysis-detail-page--education' : ''} ${isWealth ? 'analysis-detail-page--wealth' : ''} ${isProgeny ? 'analysis-detail-page--progeny' : ''}`}
       style={isSeoEnriched ? { '--analysis-hero-image': `url(${process.env.PUBLIC_URL || ''}/images/software/birth-chart.png)` } : undefined}
     >
       <SEOHead
@@ -676,42 +702,15 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
         keywords={seoData.keywords}
         canonical={seoData.canonical}
         structuredData={structuredData}
+        themeColor="#210b17"
       />
 
-      <NavigationHeader
-        compact
-        showZodiacSelector={false}
+      <ModernNavigationHeader
+        sticky
         user={user}
         onAdminClick={handleAdminClick}
         onLogout={onLogout}
-        onLogin={!user ? onLogin : undefined}
-        showLoginButton={!user}
-        birthData={birthData}
-        onChangeNative={
-          !user
-            ? () => onLogin?.()
-            : (mode) => {
-                setBirthModalTab(mode === 'create' ? 'new' : 'saved');
-                setShowBirthModal(true);
-              }
-        }
-        onCreateBirthChart={
-          !user
-            ? () => onLogin?.()
-            : () => {
-                setBirthModalTab('new');
-                setShowBirthModal(true);
-              }
-        }
-        onSelectBirthChart={
-          !user
-            ? () => onLogin?.()
-            : () => {
-                setBirthModalTab('saved');
-                setShowBirthModal(true);
-              }
-        }
-        onCreditsClick={() => setShowCreditsModal(true)}
+        onLogin={onLogin}
       />
 
       <main className="analysis-detail-main">
@@ -748,10 +747,10 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
 
         <div className="analysis-detail-body">
           {isSeoEnriched && (
-            <section className="career-detail-intro" aria-label={`${analysisLabel} report coverage`}>
+            <section className="career-detail-intro" aria-labelledby={`${analysisSlug}-method-heading`}>
               <div className="career-detail-section-heading">
                 <p>{analysisLabel} report engine</p>
-                <h2>
+                <h2 id={`${analysisSlug}-method-heading`}>
                   {isProgeny
                     ? 'What AstroRoshni checks before giving progeny guidance'
                     : isWealth
@@ -766,8 +765,9 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
                 </h2>
               </div>
               <div className="career-detail-method-grid">
-                {activeMethodCards.map(([title, body]) => (
+                {activeMethodCards.map(([title, body], index) => (
                   <article key={title}>
+                    <span className="career-detail-method-number" aria-hidden>{String(index + 1).padStart(2, '0')}</span>
                     <h3>{title}</h3>
                     <p>{body}</p>
                   </article>
@@ -831,10 +831,10 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
 
           {isSeoEnriched && (
             <>
-              <section className="career-detail-report-scope" aria-label={`${analysisLabel} report sections`}>
+              <section className="career-detail-report-scope" aria-labelledby={`${analysisSlug}-report-heading`}>
                 <div>
                   <p className="career-detail-eyebrow">Personalised report</p>
-                  <h2>
+                  <h2 id={`${analysisSlug}-report-heading`}>
                     {isProgeny
                       ? 'Built for compassionate family guidance, not medical claims'
                       : isWealth
@@ -1000,14 +1000,14 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
                 </article>
               </section>
 
-              <section className="career-detail-faq" aria-label={`${analysisLabel} analysis FAQ`}>
-                <h2>{analysisLabel} Analysis FAQ</h2>
+              <section className="career-detail-faq" aria-labelledby={`${analysisSlug}-faq-heading`}>
+                <h2 id={`${analysisSlug}-faq-heading`}>{analysisLabel} Analysis FAQ</h2>
                 <div className="career-detail-faq-grid">
-                  {activeFaqItems.map((item) => (
-                    <article key={item.question}>
-                      <h3>{item.question}</h3>
+                  {activeFaqItems.map((item, index) => (
+                    <details key={item.question} open={index === 0}>
+                      <summary>{item.question}</summary>
                       <p>{item.answer}</p>
-                    </article>
+                    </details>
                   ))}
                 </div>
               </section>
@@ -1026,7 +1026,6 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
           description="Please provide your birth information to generate your personalized analysis."
         />
       ) : null}
-      <CreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} onLogin={onLogin} />
     </div>
   );
 };

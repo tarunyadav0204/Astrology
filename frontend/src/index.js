@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
+import { ThemeProvider } from './theme';
 
 /**
  * After a dev-server restart or new build, an open tab can still run an old main bundle
@@ -67,16 +68,17 @@ function hasAuthToken() {
 const rootElement = document.getElementById('root');
 const prerendered = rootElement?.hasChildNodes();
 const tokenPresent = hasAuthToken();
+const themedApp = <ThemeProvider><App /></ThemeProvider>;
 
 if (prerendered && !tokenPresent) {
   // Crawlers / logged-out: static HTML matches first paint when App starts with loading=false (see App.js).
-  ReactDOM.hydrateRoot(rootElement, <App />, {
+  ReactDOM.hydrateRoot(rootElement, themedApp, {
     onRecoverableError: () => {},
   });
 } else if (prerendered && tokenPresent) {
   // Logged-in HTML cannot match prerender (always logged-out homepage). Hydrating would mis-bind handlers / user.
   rootElement.textContent = '';
-  ReactDOM.createRoot(rootElement).render(<App />);
+  ReactDOM.createRoot(rootElement).render(themedApp);
 } else {
-  ReactDOM.createRoot(rootElement).render(<App />);
+  ReactDOM.createRoot(rootElement).render(themedApp);
 }

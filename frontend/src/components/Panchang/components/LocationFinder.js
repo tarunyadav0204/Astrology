@@ -449,6 +449,27 @@ const LocationFinder = ({ isOpen, onClose, onLocationSelect, currentLocation }) 
     }
   }, [searchTerm]);
 
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) setSearchTerm('');
+  }, [isOpen]);
+
   const handleLocationSelect = (location) => {
     onLocationSelect({
       name: location.name,
@@ -459,51 +480,106 @@ const LocationFinder = ({ isOpen, onClose, onLocationSelect, currentLocation }) 
     onClose();
   };
 
+  const isCurrentLocation = (location) => {
+    if (!currentLocation) return false;
+    if (currentLocation.name === location.name) return true;
+
+    const latitude = Number(currentLocation.latitude);
+    const longitude = Number(currentLocation.longitude);
+    return Number.isFinite(latitude)
+      && Number.isFinite(longitude)
+      && Math.abs(latitude - location.latitude) < 0.01
+      && Math.abs(longitude - location.longitude) < 0.01;
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="location-finder-overlay">
-      <div className="location-finder-modal">
-        <div className="modal-header">
-          <h3>Select Location</h3>
-          <button className="close-btn" onClick={onClose}>×</button>
-        </div>
+    <div
+      className="location-finder-overlay"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        className="location-finder-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="location-finder-title"
+      >
+        <header className="location-finder__header">
+          <div className="location-finder__heading">
+            <span className="location-finder__eyebrow">Local sky reference</span>
+            <h2 id="location-finder-title">Choose your place.</h2>
+            <p>Timing is calculated from the sunrise and coordinates at this location.</p>
+          </div>
+          <button className="location-finder__close" type="button" onClick={onClose} aria-label="Close location finder">
+            <span aria-hidden="true">×</span>
+          </button>
+          <div className="location-finder__orbit" aria-hidden="true">
+            <span />
+          </div>
+        </header>
         
-        <div className="search-section">
+        <div className="location-finder__search-section">
+          <label htmlFor="location-finder-search">Search city or region</label>
+          <div className="location-finder__search-control">
+            <span className="location-finder__search-icon" aria-hidden="true" />
           <input
+            id="location-finder-search"
             type="text"
-            placeholder="Search for a city..."
+            placeholder="Try Delhi, London or New York"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
+            className="location-finder__search-input"
             autoFocus
           />
+            {searchTerm && (
+              <button type="button" onClick={() => setSearchTerm('')} aria-label="Clear location search">Clear</button>
+            )}
+          </div>
+          <div className="location-finder__result-summary" aria-live="polite">
+            <span>{searchTerm ? 'Matching places' : 'Popular places worldwide'}</span>
+            <strong>{filteredLocations.length}</strong>
+          </div>
         </div>
 
-        <div className="locations-list">
+        <div className="location-finder__locations" role="listbox" aria-label="Available locations">
           {filteredLocations.map((location, index) => (
-            <div
-              key={index}
-              className={`location-item ${currentLocation.name === location.name ? 'current' : ''}`}
+            <button
+              type="button"
+              key={`${location.name}-${index}`}
+              className={`location-finder__item ${isCurrentLocation(location) ? 'is-current' : ''}`}
               onClick={() => handleLocationSelect(location)}
+              role="option"
+              aria-selected={isCurrentLocation(location)}
             >
-              <div className="location-name">{location.name}</div>
-              <div className="location-coords">
-                {location.latitude.toFixed(2)}°, {location.longitude.toFixed(2)}°
-              </div>
-              {currentLocation.name === location.name && (
-                <div className="current-badge">Current</div>
-              )}
-            </div>
+              <span className="location-finder__marker" aria-hidden="true" />
+              <span className="location-finder__place">
+                <strong>{location.name}</strong>
+                <small>{location.latitude.toFixed(2)}° · {location.longitude.toFixed(2)}°</small>
+              </span>
+              <span className="location-finder__select-state">
+                {isCurrentLocation(location) ? 'Selected' : 'Choose'}
+              </span>
+            </button>
           ))}
           
           {filteredLocations.length === 0 && (
-            <div className="no-results">
-              No locations found for "{searchTerm}"
-            </div>
+            <div className="location-finder__empty">
+              <span aria-hidden="true">⌖</span>
+              <strong>No matching place</strong>
+              <p>Try a broader city, state, or country name.</p>
+              <button type="button" onClick={() => setSearchTerm('')}>View all locations</button>
+              </div>
           )}
         </div>
-      </div>
+
+        <footer className="location-finder__footer">
+          <span className="location-finder__live-dot" aria-hidden="true" />
+          Coordinates set the local sunrise and planetary timing reference.
+        </footer>
+      </section>
     </div>
   );
 };

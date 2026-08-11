@@ -174,7 +174,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
   };
 
   return (
-    <div style={{
+    <div className="auth-form auth-form--register" style={{
       boxSizing: 'border-box',
       width: '100%',
       maxWidth: 'min(400px, 100%)',
@@ -186,13 +186,13 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
       backdropFilter: 'blur(20px)',
       border: '2px solid rgba(255, 255, 255, 0.3)'
     }}>
-      <h2 style={{
+      <h2 className="auth-form__title" style={{
         textAlign: 'center',
         color: '#e91e63',
         marginBottom: '2rem',
         fontWeight: '700'
       }}>
-        🌟 Join AstroRoshni
+        <span className="auth-form__title-icon" aria-hidden>🌟</span> Join AstroRoshni
       </h2>
 
       <form onSubmit={handleSubmit} autoComplete="off">
@@ -336,6 +336,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
           <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', width: '100%', minWidth: 0 }}>
             <button
               type="button"
+              className="auth-form__secondary-action"
               onClick={handleSendOtp}
               disabled={sendingOtp || loading}
               style={{
@@ -383,7 +384,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
             />
             <button
               type="button"
-              className="register-otp-verify"
+              className="register-otp-verify auth-form__secondary-action"
               onClick={handleVerifyOtp}
               disabled={!otpSent || verifyingOtp || loading}
               style={{
@@ -413,6 +414,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
 
         <button
           type="submit"
+          className="auth-form__primary"
           disabled={loading || !otpVerified}
           style={{
             width: '100%',
@@ -435,6 +437,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
           Already have an account?{' '}
           <button
             type="button"
+            className="auth-form__text-button"
             onClick={onSwitchToLogin}
             style={{
               background: 'none',

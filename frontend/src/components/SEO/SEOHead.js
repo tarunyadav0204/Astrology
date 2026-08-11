@@ -9,7 +9,8 @@ const SEOHead = ({
   ogImage = "https://astroroshni.com/images/astroroshni-og-image.jpg",
   twitterImage = "https://astroroshni.com/images/astroroshni-twitter-image.jpg",
   structuredData = null,
-  noIndex = false
+  noIndex = false,
+  themeColor = "#e91e63"
 }) => {
   const defaultStructuredData = {
     "@context": "https://schema.org",
@@ -34,7 +35,7 @@ const SEOHead = ({
       <meta name="robots" content={noIndex ? "noindex, nofollow" : "index, follow"} />
       <meta name="author" content="AstroRoshni" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <meta name="theme-color" content="#e91e63" />
+      <meta name="theme-color" content={themeColor} />
       <link rel="canonical" href={canonical} />
       
       {/* Open Graph / Facebook */}

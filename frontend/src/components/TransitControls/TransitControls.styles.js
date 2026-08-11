@@ -15,20 +15,20 @@ export const ControlsContainer = styled.div`
 `;
 
 export const DateDisplay = styled.div.withConfig({
-  shouldForwardProp: (prop) => !['$variant', '$clickable'].includes(prop),
+  shouldForwardProp: (prop) => !['$variant', '$clickable', '$textColor'].includes(prop),
 })`
   font-size: 0.8rem;
   font-weight: 600;
-  color: ${({ $variant }) => ($variant === 'light' ? '#7a2850' : '#ffffff')};
+  color: ${({ $variant, $textColor }) => $textColor || ($variant === 'light' ? 'var(--color-text)' : 'var(--color-text-inverse)')};
   min-width: 80px;
   text-align: center;
   text-shadow: ${({ $variant }) => ($variant === 'light' ? 'none' : '0 2px 10px rgba(0, 0, 0, 0.3)')};
   padding: 0.3rem 0.6rem;
-  background: ${({ $variant }) => ($variant === 'light' ? 'rgba(255, 255, 255, 0.92)' : 'rgba(255, 255, 255, 0.15)')};
+  background: ${({ $variant }) => ($variant === 'light' ? 'var(--color-surface-raised)' : 'color-mix(in srgb, var(--color-text-inverse) 12%, transparent)')};
   border-radius: 15px;
-  border: 1px solid ${({ $variant }) => ($variant === 'light' ? 'rgba(194, 24, 91, 0.14)' : 'rgba(255, 255, 255, 0.2)')};
+  border: 1px solid ${({ $variant }) => ($variant === 'light' ? 'var(--color-border)' : 'var(--color-border-inverse)')};
   backdrop-filter: blur(10px);
-  box-shadow: ${({ $variant }) => ($variant === 'light' ? '0 8px 16px rgba(194, 24, 91, 0.06)' : 'none')};
+  box-shadow: ${({ $variant }) => ($variant === 'light' ? 'var(--shadow-sm)' : 'none')};
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -49,7 +49,7 @@ export const DateDisplay = styled.div.withConfig({
     }
 
     &:focus-visible {
-      outline: 2px solid #c2185b;
+      outline: 2px solid var(--color-focus);
       outline-offset: 2px;
     }
   `}
@@ -73,22 +73,22 @@ export const DatePickerInput = styled.input`
 `;
 
 export const TimeInput = styled.input.withConfig({
-  shouldForwardProp: (prop) => !['$variant'].includes(prop),
+  shouldForwardProp: (prop) => !['$variant', '$textColor'].includes(prop),
 })`
   font: inherit;
   font-size: 0.72rem;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
-  color: ${({ $variant }) => ($variant === 'light' ? '#7a2850' : '#ffffff')};
+  color: ${({ $variant, $textColor }) => $textColor || ($variant === 'light' ? 'var(--color-text)' : 'var(--color-text-inverse)')};
   min-width: 5.2rem;
   padding: 0.22rem 0.35rem;
   border-radius: 12px;
-  border: 1px solid ${({ $variant }) => ($variant === 'light' ? 'rgba(194, 24, 91, 0.14)' : 'rgba(255, 255, 255, 0.2)')};
-  background: ${({ $variant }) => ($variant === 'light' ? 'rgba(255, 255, 255, 0.92)' : 'rgba(255, 255, 255, 0.15)')};
-  box-shadow: ${({ $variant }) => ($variant === 'light' ? '0 6px 14px rgba(194, 24, 91, 0.06)' : 'none')};
+  border: 1px solid ${({ $variant }) => ($variant === 'light' ? 'var(--color-border)' : 'var(--color-border-inverse)')};
+  background: ${({ $variant }) => ($variant === 'light' ? 'var(--color-surface-raised)' : 'color-mix(in srgb, var(--color-text-inverse) 12%, transparent)')};
+  box-shadow: ${({ $variant }) => ($variant === 'light' ? 'var(--shadow-sm)' : 'none')};
 
   &:focus-visible {
-    outline: 2px solid #c2185b;
+    outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
 
@@ -109,36 +109,37 @@ export const ButtonGroup = styled.div`
 `;
 
 export const NavButton = styled.button.withConfig({
-  shouldForwardProp: (prop) => !['primary', '$variant'].includes(prop),
+  shouldForwardProp: (prop) => !['primary', '$variant', '$textColor'].includes(prop),
 })`
   padding: 0.25rem 0.4rem;
   border: none;
   background: ${({ primary, $variant }) => {
-    if (primary) return $variant === 'light' ? '#f59e0b' : 'rgba(255, 193, 7, 0.9)';
-    return 'rgba(255, 255, 255, 0.96)';
+    if (primary) return $variant === 'light' ? 'var(--transit-primary-color, var(--color-brand))' : 'var(--color-accent-soft)';
+    return $variant === 'light' ? 'var(--color-surface-raised)' : 'color-mix(in srgb, var(--color-text-inverse) 12%, transparent)';
   }};
-  color: ${({ primary, $variant }) => {
-    if (primary) return '#ffffff';
-    return $variant === 'light' ? '#f97316' : '#ff7043';
+  color: ${({ primary, $variant, $textColor }) => {
+    if (primary) return $variant === 'light' ? 'var(--color-on-brand)' : 'var(--color-on-accent)';
+    if ($textColor) return $textColor;
+    return $variant === 'light' ? 'var(--color-brand)' : 'var(--color-accent-soft)';
   }};
   border-radius: 12px;
   cursor: pointer;
   font-size: 0.65rem;
   font-weight: 600;
   transition: all 0.3s ease;
-  box-shadow: ${({ $variant }) => ($variant === 'light' ? '0 6px 14px rgba(194, 24, 91, 0.08)' : '0 2px 8px rgba(0, 0, 0, 0.1)')};
+  box-shadow: ${({ $variant }) => ($variant === 'light' ? 'var(--shadow-sm)' : 'none')};
   backdrop-filter: blur(10px);
   min-width: 28px;
   min-height: 28px;
-  border: ${({ $variant }) => ($variant === 'light' ? '1px solid rgba(194, 24, 91, 0.12)' : 'none')};
+  border: ${({ $variant }) => ($variant === 'light' ? '1px solid var(--color-border)' : '1px solid var(--color-border-inverse)')};
 
   &:hover {
     background: ${({ primary, $variant }) => {
-      if (primary) return $variant === 'light' ? '#f59e0b' : 'rgba(255, 193, 7, 1)';
-      return 'rgba(255, 255, 255, 1)';
+      if (primary) return $variant === 'light' ? 'var(--transit-primary-color, var(--color-brand-hover))' : 'var(--color-accent)';
+      return $variant === 'light' ? 'var(--color-canvas-subtle)' : 'color-mix(in srgb, var(--color-text-inverse) 18%, transparent)';
     }};
     transform: translateY(-1px);
-    box-shadow: ${({ $variant }) => ($variant === 'light' ? '0 10px 18px rgba(194, 24, 91, 0.12)' : '0 4px 12px rgba(0, 0, 0, 0.15)')};
+    box-shadow: ${({ $variant }) => ($variant === 'light' ? 'var(--shadow-card)' : 'none')};
   }
 
   @media (max-width: 768px) {

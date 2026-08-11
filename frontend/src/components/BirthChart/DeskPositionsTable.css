@@ -2,13 +2,13 @@
   min-height: 0;
   height: 100%;
   overflow: auto;
-  background: #fffcf8;
+  background: var(--color-surface);
 }
 
 .desk-pos--empty {
   display: grid;
   place-items: center;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   font-size: 0.72rem;
   padding: 0.75rem;
 }
@@ -24,15 +24,15 @@
 .desk-pos__table td {
   padding: 0.22rem 0.28rem;
   text-align: left;
-  border-bottom: 1px solid rgba(70, 45, 35, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
   white-space: nowrap;
 }
 
 .desk-pos__table th {
   position: sticky;
   top: 0;
-  background: #f3ebe3;
-  color: #6b5c54;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
   font-weight: 750;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -42,7 +42,7 @@
 
 .desk-pos__table td strong {
   font-weight: 800;
-  color: #1f1714;
+  color: var(--color-text);
 }
 
 .desk-pos__table td i {
@@ -50,20 +50,20 @@
   margin-left: 0.2rem;
   padding: 0 0.2rem;
   border-radius: 3px;
-  background: rgba(245, 158, 11, 0.18);
-  color: #92400e;
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  color: var(--color-warning);
   font-size: 0.52rem;
   font-weight: 800;
 }
 
 .desk-pos__table tr.is-ex td {
-  color: #166534;
+  color: var(--color-success);
 }
 
 .desk-pos__table tr.is-db td {
-  color: #9f1239;
+  color: var(--color-brand);
 }
 
 .desk-pos__table tbody tr:hover td {
-  background: rgba(159, 18, 57, 0.04);
+  background: color-mix(in srgb, var(--color-brand) 4%, transparent);
 }

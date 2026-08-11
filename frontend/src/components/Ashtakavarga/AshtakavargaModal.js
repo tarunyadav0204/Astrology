@@ -1437,12 +1437,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
       onClick={variant === 'modal' ? (e) => e.stopPropagation() : undefined}
     >
       <div className="modal-header">
-        {variant === 'page' ? (
-          <button type="button" className="close-btn" onClick={onClose} aria-label="Back">
-            ← Back
-          </button>
-        ) : null}
-        <h2>Ashtakavarga Analysis - {chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart</h2>
+        <h2>{variant === 'page' ? 'Bindu analysis' : 'Ashtakavarga Analysis'} · {chartType.charAt(0).toUpperCase() + chartType.slice(1)} chart</h2>
         <div className="header-controls">
           <div className="view-mode-toggle">
             <button

@@ -29,6 +29,7 @@ from contextlib import asynccontextmanager
 from collections import defaultdict
 from utils.timezone_service import parse_timezone_offset
 from utils.calendar_date import parse_calendar_date_y_m_d
+from public_sky import calculate_current_sky
 from utils.account_deletion_bigquery import (
     AccountDeletionBackupError,
     backup_user_deletion_to_bigquery,
@@ -831,6 +832,7 @@ class AppConfigResponse(BaseModel):
     min_ios_build_number: int
     app_update_release_notes: str = ""
     home_banner: Optional[dict] = None
+    modern_homepage_enabled: bool = False
 
 
 @app.get("/api/app/config", response_model=AppConfigResponse)
@@ -844,6 +846,7 @@ async def get_app_config() -> AppConfigResponse:
       - admin_settings.min_ios_build_number or MIN_IOS_BUILD_NUMBER
       - admin_settings.app_update_release_notes (optional; shown on forced update screen)
       - admin_settings.home_screen_banner_json (optional home announcement banner)
+      - admin_settings.modern_homepage_enabled (public web homepage rollout switch)
 
     Set values to 0 (or leave unset) to disable forced updates.
     """
@@ -864,12 +867,19 @@ async def get_app_config() -> AppConfigResponse:
     notes_setting = get_setting("app_update_release_notes")
     release_notes = (notes_setting or "").strip()
     home_banner = get_home_screen_banner()
+    modern_homepage_enabled = (get_setting("modern_homepage_enabled") or "").strip().lower() in {
+        "1",
+        "true",
+        "on",
+        "yes",
+    }
 
     return AppConfigResponse(
         min_android_version_code=min_android,
         min_ios_build_number=min_ios,
         app_update_release_notes=release_notes,
         home_banner=home_banner,
+        modern_homepage_enabled=modern_homepage_enabled,
     )
 
 # Configure timeout for long-running requests (Gemini AI takes 30-60 seconds)
@@ -3524,6 +3534,21 @@ async def analyze_transits(request: TransitRequest):
         "transit_date": request.transit_date,
         "activations": activations
     }
+
+
+@app.get("/api/public/current-sky")
+async def get_public_current_sky():
+    """Live Lahiri sidereal positions for public, non-personalized displays."""
+    try:
+        return JSONResponse(
+            content=calculate_current_sky(),
+            headers={
+                "Cache-Control": "public, max-age=300, stale-while-revalidate=3600",
+            },
+        )
+    except Exception as exc:
+        print(f"[public-sky] calculation failed: {exc}")
+        raise HTTPException(status_code=503, detail="Current sky is temporarily unavailable")
 
 @app.post("/api/calculate-transits")
 async def calculate_transits(request: TransitRequest):

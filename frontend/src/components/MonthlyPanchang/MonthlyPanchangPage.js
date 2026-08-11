@@ -1,7 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
+import LocationFinder from '../Panchang/components/LocationFinder';
+import SEOHead from '../SEO/SEOHead';
+import { generatePageSEO } from '../../config/seo.config';
 import './MonthlyPanchangPage.css';
+
+const MONTHLY_FAQS = [
+  {
+    question: 'What does a monthly Panchang show?',
+    answer: 'A monthly Panchang brings daily tithi, nakshatra, paksha, sunrise, sunset, Moon sign and festival information into one calendar so you can compare dates before opening the complete daily reading.'
+  },
+  {
+    question: 'Why are monthly Panchang timings location dependent?',
+    answer: 'Sunrise, sunset and several daily periods change with latitude, longitude and timezone. Selecting your location keeps the calendar aligned with the sky where you are.'
+  },
+  {
+    question: 'Can I use this calendar to choose a Muhurat?',
+    answer: 'Use the month view to shortlist promising dates, then open the full daily Panchang to compare Rahu Kaal, Choghadiya, Hora and special Muhurat windows for that date.'
+  }
+];
 
 const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLoginButton }) => {
   const navigate = useNavigate();
@@ -10,7 +28,8 @@ const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, 
   const [monthlyData, setMonthlyData] = useState(null);
   const [selectedDayData, setSelectedDayData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [location] = useState({ latitude: 28.6139, longitude: 77.2090 }); // Default Delhi
+  const [location, setLocation] = useState({ name: 'New Delhi, India', latitude: 28.6139, longitude: 77.2090 });
+  const [showLocationFinder, setShowLocationFinder] = useState(false);
 
   useEffect(() => {
     if (!propUser) {
@@ -35,7 +54,7 @@ const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, 
 
   useEffect(() => {
     fetchMonthlyData();
-  }, [selectedDate]);
+  }, [selectedDate, location.latitude, location.longitude]);
 
   const fetchMonthlyData = async () => {
     setLoading(true);
@@ -59,6 +78,8 @@ const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, 
           if (todayData) {
             setSelectedDayData(todayData);
           }
+        } else {
+          setSelectedDayData(data.days?.find(Boolean) || null);
         }
       }
     } catch (error) {
@@ -76,10 +97,12 @@ const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, 
   };
 
   const handleDayClick = (dayData) => {
-    if (dayData) {
-      const dateStr = dayData.date;
-      navigate(`/panchang?date=${dateStr}`);
-    }
+    if (dayData) setSelectedDayData(dayData);
+  };
+
+  const goToCurrentMonth = () => {
+    setSelectedDate(new Date());
+    setSelectedDayData(null);
   };
 
   const renderCalendar = () => {
@@ -94,7 +117,7 @@ const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, 
     
     // Empty cells for days before month starts
     for (let i = 0; i < firstDay; i++) {
-      calendarDays.push(<div key={`empty-${i}`} className="calendar-day empty"></div>);
+      calendarDays.push(<div key={`empty-${i}`} className="calendar-day empty" aria-hidden="true"></div>);
     }
     
     // Days of the month
@@ -104,10 +127,13 @@ const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, 
       const isSelected = selectedDayData && selectedDayData.day === day;
       
       calendarDays.push(
-        <div
+        <button
+          type="button"
           key={day}
           className={`calendar-day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`}
           onClick={() => handleDayClick(dayData)}
+          disabled={!dayData}
+          aria-label={`View Panchang for ${monthNames[month]} ${day}, ${year}`}
         >
           <div className="day-number">{day}</div>
           {dayData && (
@@ -132,7 +158,7 @@ const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, 
               )}
             </div>
           )}
-        </div>
+        </button>
       );
     }
     
@@ -162,7 +188,9 @@ const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, 
               day: 'numeric' 
             })}</h2>
             <div className="download-ics">
-              <button className="ics-btn">📅 ICS File Download</button>
+              <button className="ics-btn" type="button" onClick={() => navigate(`/panchang?date=${data.date}`)}>
+                Open daily Panchang <span aria-hidden>↗</span>
+              </button>
             </div>
           </div>
         </div>
@@ -352,11 +380,52 @@ const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, 
     }
   };
 
+  const seoData = generatePageSEO('monthlyPanchang', { path: '/monthly-panchang/' });
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebApplication',
+        name: 'Monthly Panchang Calendar',
+        description: seoData.description,
+        applicationCategory: 'LifestyleApplication',
+        operatingSystem: 'Web',
+        url: seoData.canonical
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: MONTHLY_FAQS.map((item) => ({
+          '@type': 'Question',
+          name: item.question,
+          acceptedAnswer: { '@type': 'Answer', text: item.answer }
+        }))
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://astroroshni.com/' },
+          { '@type': 'ListItem', position: 2, name: 'Daily Panchang', item: 'https://astroroshni.com/panchang/' },
+          { '@type': 'ListItem', position: 3, name: 'Monthly Panchang', item: seoData.canonical }
+        ]
+      }
+    ]
+  };
+
+  const festivalDayCount = monthlyData?.days?.filter((day) => day.festivals?.length > 0).length || 0;
+  const monthLabel = `${monthNames[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`;
+
   return (
-    <div className="monthly-panchang-page">
-      <NavigationHeader 
-        compact={true}
-        showZodiacSelector={false}
+    <div className="monthly-panchang-page monthly-panchang-page--themed">
+      <SEOHead
+        title={seoData.title}
+        description={seoData.description}
+        keywords={seoData.keywords}
+        canonical={seoData.canonical}
+        structuredData={structuredData}
+        themeColor="#210b17"
+      />
+      <ModernNavigationHeader
+        sticky
         user={user}
         onAdminClick={handleAdminClick}
         onLogout={onLogout || (() => {
@@ -368,20 +437,58 @@ const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, 
         onLogin={onLogin || (() => navigate('/'))}
         showLoginButton={showLoginButton}
       />
-      <div className="page-header">
-        <h1>Monthly Panchang</h1>
-        <p>Complete Vedic calendar with daily panchang details</p>
-      </div>
 
-      <div className="panchang-container">
-        {/* Calendar Section */}
-        <div className="calendar-section">
+      <main className="monthly-main">
+        <header className="monthly-hero">
+          <div className="monthly-hero__copy">
+            <button type="button" className="monthly-back-link" onClick={() => navigate('/panchang')}>
+              <span aria-hidden>←</span> Daily Panchang
+            </button>
+            <span className="monthly-eyebrow">The month at a glance · {location.name}</span>
+            <h1>Plan with the<br /><em>lunar rhythm.</em></h1>
+            <p>
+              Compare tithi, nakshatra, Moon sign, sunrise and festivals across the whole month,
+              then open any date for its complete timing map.
+            </p>
+          </div>
+          <div className="monthly-hero__month" aria-hidden="true">
+            <span>{monthNames[selectedDate.getMonth()]}</span>
+            <strong>{selectedDate.getFullYear()}</strong>
+            <div className="monthly-moon-track">
+              <i></i><i></i><i></i><i></i><i></i>
+            </div>
+          </div>
+          <div className="monthly-hero__proof">
+            <span><strong>{new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate()}</strong> calendar days</span>
+            <span><strong>{festivalDayCount || '—'}</strong> festival dates</span>
+            <span><strong>Local</strong> sunrise timings</span>
+          </div>
+        </header>
+
+        <section className="monthly-toolbar" aria-label="Month and location controls">
+          <div>
+            <span className="monthly-eyebrow">Calendar controls</span>
+            <p>Choose your month and place. Every day recalculates together.</p>
+          </div>
+          <div className="monthly-toolbar__actions">
+            <button type="button" onClick={goToCurrentMonth}>This month</button>
+            <button type="button" onClick={() => setShowLocationFinder(true)}>
+              {location.name} <span aria-hidden>↗</span>
+            </button>
+          </div>
+        </section>
+
+        <div className="monthly-workspace">
+          <section className="calendar-section" aria-labelledby="monthly-calendar-title">
           <div className="calendar-header">
-            <button className="nav-btn" onClick={() => handleDateChange(-1)}>
+            <button type="button" className="nav-btn" aria-label="Previous month" onClick={() => handleDateChange(-1)}>
               ‹
             </button>
-            <h2>{monthNames[selectedDate.getMonth()]} {selectedDate.getFullYear()}</h2>
-            <button className="nav-btn" onClick={() => handleDateChange(1)}>
+            <div>
+              <span className="monthly-eyebrow">Monthly Panchang</span>
+              <h2 id="monthly-calendar-title">{monthLabel}</h2>
+            </div>
+            <button type="button" className="nav-btn" aria-label="Next month" onClick={() => handleDateChange(1)}>
               ›
             </button>
           </div>
@@ -403,13 +510,52 @@ const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, 
               renderCalendar()
             )}
           </div>
+          </section>
+
+          <aside className="details-section" aria-label="Selected date details">
+            {renderDetailedPanel()}
+          </aside>
         </div>
 
-        {/* Detailed Panel */}
-        <div className="details-section">
-          {renderDetailedPanel()}
-        </div>
-      </div>
+        <section className="monthly-explainer" aria-labelledby="monthly-guide-title">
+          <div className="monthly-explainer__intro">
+            <span className="monthly-eyebrow">Plan before you decide</span>
+            <h2 id="monthly-guide-title">A wider view of Vedic time.</h2>
+            <p>
+              A month view is best for comparison. Use it to notice changing paksha, lunar milestones,
+              festival dates and nakshatra patterns before studying the exact Muhurat of a shortlisted day.
+            </p>
+          </div>
+          <div className="monthly-method-grid">
+            <article><span>01</span><h3>Scan the lunar cycle</h3><p>Compare tithi and paksha across the month to understand waxing and waning lunar phases.</p></article>
+            <article><span>02</span><h3>Shortlist dates</h3><p>Use nakshatra, Moon sign and festival context to identify dates worth examining more closely.</p></article>
+            <article><span>03</span><h3>Open the full day</h3><p>Confirm local Rahu Kaal, Hora, Choghadiya and special Muhurat windows on the daily Panchang.</p></article>
+          </div>
+        </section>
+
+        <section className="monthly-faq" aria-labelledby="monthly-faq-title">
+          <span className="monthly-eyebrow">Questions</span>
+          <h2 id="monthly-faq-title">Monthly Panchang FAQs</h2>
+          <div>
+            {MONTHLY_FAQS.map((item, index) => (
+              <details key={item.question} open={index === 0}>
+                <summary>{item.question}<span aria-hidden>+</span></summary>
+                <p>{item.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      <LocationFinder
+        isOpen={showLocationFinder}
+        onClose={() => setShowLocationFinder(false)}
+        onLocationSelect={(nextLocation) => {
+          setLocation(nextLocation);
+          setShowLocationFinder(false);
+        }}
+        currentLocation={location}
+      />
     </div>
   );
 };

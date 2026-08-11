@@ -273,7 +273,7 @@ function KpTodayReaderModal({ open, reader, loading, onClose, onOpenFull }) {
 /**
  * Homepage daily KP predictions — teaser card + centered reader (not a swipe carousel).
  */
-export default function KpTodayHome({ user, birthData, onLogin, onNeedBirth }) {
+export default function KpTodayHome({ user, birthData, onLogin, onNeedBirth, displayMode = 'modal' }) {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -282,6 +282,7 @@ export default function KpTodayHome({ user, birthData, onLogin, onNeedBirth }) {
   const requestIdRef = useRef(0);
   const hasDataRef = useRef(false);
   const birthDetailsRef = useRef(birthData);
+  const inlineRailRef = useRef(null);
   birthDetailsRef.current = birthData;
 
   const birthKey = useMemo(() => {
@@ -414,6 +415,16 @@ export default function KpTodayHome({ user, birthData, onLogin, onNeedBirth }) {
     navigate('/charts-dashas/activations');
   };
 
+  const moveInlineRail = (direction) => {
+    const rail = inlineRailRef.current;
+    if (!rail) return;
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    rail.scrollBy({
+      left: direction * Math.max(280, rail.clientWidth * 0.72),
+      behavior: reduceMotion ? 'auto' : 'smooth',
+    });
+  };
+
   if (!user) {
     return (
       <button type="button" className="kp-today-teaser kp-today-teaser--guest" onClick={onLogin}>
@@ -451,6 +462,86 @@ export default function KpTodayHome({ user, birthData, onLogin, onNeedBirth }) {
   }
 
   if (!ready) return null;
+
+  if (displayMode === 'inline') {
+    const isPreparing = !data && !error;
+    const inlinePages = data ? (reader?.pages || []) : [];
+    const inlineSummary = inlinePages[0]?.summary || '';
+    const inlineCards = inlinePages.length
+      ? [
+          ...(inlineSummary
+            ? [{ id: 'overview', label: 'Day overview', text: inlineSummary, overview: true }]
+            : []),
+          ...inlinePages
+            .flatMap((page) => page.bullets || [])
+            .filter((text) => text && text !== inlineSummary)
+            .map((text, index) => ({
+              id: `insight-${index}`,
+              label: 'What may unfold',
+              text,
+              overview: false,
+            })),
+        ]
+      : [];
+    return (
+      <section className={`kp-today-inline kp-today-inline--${tone}`} aria-labelledby="kp-today-inline-title">
+        <header className="kp-today-inline__header">
+          <div>
+            <span className="kp-today-inline__eyebrow">Today · {formatShortDate(new Date())}</span>
+            <h3 id="kp-today-inline-title">
+              {isPreparing ? 'Preparing your day…' : reader?.headline || 'Your day is ready'}
+            </h3>
+          </div>
+          <div className="kp-today-inline__header-actions">
+            {!isPreparing ? (
+              <span className={`kp-today-tone kp-today-tone--${tone}`}>
+                {TONE_LABELS[tone] || 'Steady'}
+              </span>
+            ) : null}
+            {inlineCards.length > 1 ? (
+              <div className="kp-today-inline__arrows" aria-label="Daily insight carousel controls">
+                <button type="button" onClick={() => moveInlineRail(-1)} aria-label="Previous daily insights">←</button>
+                <button type="button" onClick={() => moveInlineRail(1)} aria-label="Next daily insights">→</button>
+              </div>
+            ) : null}
+          </div>
+        </header>
+
+        {error && !data ? (
+          <button type="button" className="kp-today-inline__error" onClick={load}>
+            <strong>Today&rsquo;s reading could not be loaded.</strong>
+            <span>{error}</span>
+            <em>Try again →</em>
+          </button>
+        ) : (
+          <div className="kp-today-inline__rail" ref={inlineRailRef} aria-label="All of today's personalized insights">
+            {isPreparing ? (
+              [1, 2, 3].map((index) => (
+                <article className="kp-today-inline__card kp-today-inline__card--loading" key={index} aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </article>
+              ))
+            ) : (
+              inlineCards.map((card, cardIndex) => (
+                <article className={`kp-today-inline__card ${card.overview ? 'kp-today-inline__card--overview' : ''}`} key={card.id}>
+                  <div className="kp-today-inline__card-top">
+                    <span>{String(cardIndex + 1).padStart(2, '0')}</span>
+                    <small>{card.label}</small>
+                  </div>
+                  <p className={card.overview ? 'kp-today-inline__summary' : 'kp-today-inline__insight'}>{card.text}</p>
+                </article>
+              ))
+            )}
+          </div>
+        )}
+
+        <footer className="kp-today-inline__footer">
+          <span>All available themes are shown above. Swipe or use the arrows to move between cards.</span>
+          <button type="button" onClick={openFull}>Open timing workspace <span aria-hidden="true">↗</span></button>
+        </footer>
+      </section>
+    );
+  }
 
   return (
     <>

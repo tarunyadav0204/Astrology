@@ -657,14 +657,6 @@ const InvestorHomepage = () => {
         </div>
       </section>
 
-      {/* Live Chat Widget */}
-      <div className="live-chat-widget">
-        <button className="chat-widget-btn">
-          💬 Ask Question Now
-          <span className="chat-pulse"></span>
-        </button>
-      </div>
-
       {/* Consultation Section */}
       <section className="consultation-section">
         <div className="container">

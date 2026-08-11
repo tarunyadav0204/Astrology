@@ -2,8 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useCredits } from '../../context/CreditContext';
 import { useAstrology } from '../../context/AstrologyContext';
-import NavigationHeader from '../Shared/NavigationHeader';
-import NativeSelector from '../Shared/NativeSelector';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import SEOHead from '../SEO/SEOHead';
 import { generatePageSEO } from '../../config/seo.config';
@@ -16,7 +15,6 @@ const KarmaAnalysis = ({
   onLogin,
   onLogout,
   onAdminClick,
-  showLoginButton = true,
 }) => {
   const { credits, refreshBalance } = useCredits();
   const { chartData, birthData } = useAstrology();
@@ -281,7 +279,8 @@ const KarmaAnalysis = ({
     if (!chartData || !birthData) {
       return (
         <div className="karma-start">
-          <div className="om-symbol-large">🕉️</div>
+          <div className="karma-orbit-mark" aria-hidden="true"><span>ॐ</span></div>
+          <p className="karma-state-label">Chart required</p>
           <h2 className="karma-tool-h2">Start your chart-based report</h2>
           <p>Sign in and enter birth details (date, time, place) to generate your personalised karma analysis.</p>
           <button type="button" className="start-button" onClick={handleGetStarted}>
@@ -294,12 +293,10 @@ const KarmaAnalysis = ({
     if (loading) {
       return (
         <div className="karma-loading">
-          <div className="cosmic-loader">
-            <div className="om-symbol">🕉️</div>
-          </div>
-          <div className="spinner" />
-          <h2>Accessing Akashic Records</h2>
-          <p>{showProgress ? "Analyzing your soul's journey through time..." : 'This is taking longer than usual...'}</p>
+          <div className="karma-loading-orbit" aria-hidden="true"><span>कर्म</span></div>
+          <p className="karma-state-label">Calculation in progress</p>
+          <h2>Reading your karmic pattern</h2>
+          <p>{showProgress ? 'Synthesizing chart layers, nodes, houses, and timing…' : 'This is taking longer than usual…'}</p>
           {showProgress && (
             <div className="progress-container">
               <div className="progress-bar">
@@ -315,8 +312,9 @@ const KarmaAnalysis = ({
     if (error) {
       return (
         <div className="karma-error">
-          <div className="error-icon">⚠️</div>
-          <h2>Unable to Access Records</h2>
+          <span className="karma-error-code" aria-hidden="true">!</span>
+          <p className="karma-state-label">Reading interrupted</p>
+          <h2>We could not complete the analysis</h2>
           <p>{error}</p>
           <button type="button" className="retry-button" onClick={() => { setError(null); checkExistingAnalysis(); }}>
             Try Again
@@ -329,7 +327,8 @@ const KarmaAnalysis = ({
       return (
         <>
           <div className="karma-start">
-            <div className="om-symbol-large">🕉️</div>
+            <div className="karma-orbit-mark" aria-hidden="true"><span>ॐ</span></div>
+            <p className="karma-state-label">Chart ready</p>
             <h2 className="karma-tool-h2">Ready for your report</h2>
             <p>Chart loaded for {birthData.name || 'selected native'}. Run the analysis when you are ready.</p>
             <button type="button" className="start-button" onClick={handleStartAnalysis}>
@@ -356,9 +355,9 @@ const KarmaAnalysis = ({
       <>
         <div className="karma-content" aria-live="polite">
           <div className="karma-title-section">
-            <div className="om-header">🕉️</div>
+            <p className="karma-state-label">Private · Chart-grounded</p>
             <h2 className="karma-tool-h2">Your past life karma report</h2>
-            <p>Personalised from your birth chart — not indexed publicly</p>
+            <p>Personalised for {birthData?.name || 'your selected chart'} and never indexed publicly.</p>
           </div>
 
           {Object.entries(sections).map(([title, content], index) => (
@@ -366,9 +365,8 @@ const KarmaAnalysis = ({
           ))}
 
           <div className="karma-footer">
-            <div className="footer-icon">✨</div>
-            <div className="footer-text">Analyzed by AstroRoshni</div>
-            <div className="footer-subtext">Artificial Intelligence</div>
+            <div className="footer-text">Synthesised by AstroRoshni</div>
+            <div className="footer-subtext">Parashari · Nadi · Jaimini · KP</div>
           </div>
         </div>
 
@@ -395,21 +393,15 @@ const KarmaAnalysis = ({
         ogImage={seoData.ogImage}
         twitterImage={seoData.twitterImage}
         structuredData={buildKarmaStructuredData()}
+        themeColor="#210b17"
       />
 
-      <NavigationHeader
-        compact
-        showZodiacSelector={false}
+      <ModernNavigationHeader
+        sticky
         user={user}
         onLogin={onLogin}
         onLogout={onLogout}
         onAdminClick={onAdminClick}
-        showLoginButton={showLoginButton}
-        birthData={birthData}
-        onChangeNative={() => {
-          setBirthFormDefaultTab('saved');
-          setShowBirthFormModal(true);
-        }}
       />
 
       <div className="karma-page-wrap">
@@ -418,18 +410,28 @@ const KarmaAnalysis = ({
         <section id="karma-tool" className="karma-tool-section" aria-labelledby="karma-tool-heading">
           <div className="karma-container karma-container--tool">
             <div className="karma-header">
-              <h2 id="karma-tool-heading" className="karma-tool-page-title">
-                🕉️ Personalised karma report
-              </h2>
+              <div>
+                <p className="karma-tool-kicker">Your private reading</p>
+                <h2 id="karma-tool-heading" className="karma-tool-page-title">
+                  Personalised karma analysis
+                </h2>
+              </div>
               {birthData && (
-                <>
-                  <NativeSelector
-                    birthData={birthData}
-                    onNativeChange={() => {
+                <div className="karma-native-actions">
+                  <button
+                    type="button"
+                    className="karma-native-button"
+                    onClick={() => {
                       setBirthFormDefaultTab('saved');
                       setShowBirthFormModal(true);
                     }}
-                  />
+                  >
+                    <span>
+                      <small>Reading for</small>
+                      <strong>{birthData.name || 'Selected native'}</strong>
+                    </span>
+                    <span aria-hidden="true">Change ↗</span>
+                  </button>
                   {analysis && (
                     <button
                       type="button"
@@ -437,10 +439,10 @@ const KarmaAnalysis = ({
                       onClick={handleRegenerate}
                       title="Regenerate"
                     >
-                      ↻
+                      Regenerate
                     </button>
                   )}
-                </>
+                </div>
               )}
             </div>
             {renderToolInner()}
@@ -465,17 +467,18 @@ const KarmaAnalysis = ({
 };
 
 const CreditModal = ({ onClose, onConfirm, credits, cost, title }) => (
-  <div className="modal-overlay" onClick={onClose}>
-    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-      <h3>{title}</h3>
-      <p>This will use {cost} credits</p>
-      <p className="modal-balance">Your balance: {credits} credits</p>
-      <div className="modal-buttons">
-        <button type="button" className="modal-button" onClick={onClose}>
+  <div className="karma-modal-overlay" onClick={onClose}>
+    <div className="karma-modal" role="dialog" aria-modal="true" aria-labelledby="karma-credit-title" onClick={(e) => e.stopPropagation()}>
+      <p className="karma-modal-kicker">Confirm reading</p>
+      <h3 id="karma-credit-title">{title}</h3>
+      <p>This personalised calculation will use <strong>{cost} credits</strong>.</p>
+      <p className="karma-modal-balance">Your balance: {credits} credits</p>
+      <div className="karma-modal-buttons">
+        <button type="button" className="karma-modal-button" onClick={onClose}>
           Cancel
         </button>
-        <button type="button" className="modal-button modal-button-primary" onClick={onConfirm}>
-          Confirm
+        <button type="button" className="karma-modal-button karma-modal-button-primary" onClick={onConfirm}>
+          Confirm &amp; begin
         </button>
       </div>
     </div>
@@ -484,7 +487,6 @@ const CreditModal = ({ onClose, onConfirm, credits, cost, title }) => (
 
 const KarmaCard = ({ title, content, index }) => {
   const [expanded, setExpanded] = useState(true);
-  const icons = ['🕉️', '🌟', '🎯', '⚖️', '💎', '🔱', '👪', '🦋', '🙏', '⏳', '🕉️'];
   const isIntroduction = title === 'Introduction';
 
   const escapeHtml = (text) =>
@@ -503,13 +505,13 @@ const KarmaCard = ({ title, content, index }) => {
 
   return (
     <div className={`karma-card ${isIntroduction ? 'karma-card-intro' : ''}`}>
-      <div className="karma-card-header" onClick={() => setExpanded(!expanded)} role="button" tabIndex={0}>
+      <button type="button" className="karma-card-header" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>
         <div className={`karma-icon-circle ${isIntroduction ? 'intro-icon' : ''}`}>
-          {icons[index % icons.length]}
+          {String(index + 1).padStart(2, '0')}
         </div>
         <h3>{title}</h3>
-        <span className="expand-icon">{expanded ? '▼' : '▶'}</span>
-      </div>
+        <span className="expand-icon" aria-hidden="true">{expanded ? '−' : '+'}</span>
+      </button>
       {expanded && (
         <div className="karma-card-content">
           <div className="content-divider" />

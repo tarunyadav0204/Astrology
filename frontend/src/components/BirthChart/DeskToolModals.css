@@ -15,10 +15,10 @@
   max-height: min(86vh, 780px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  background: #fffcf8;
+  background: var(--color-surface);
   border-radius: 14px;
   box-shadow: 0 18px 48px rgba(40, 20, 10, 0.25);
-  color: #1f1714;
+  color: var(--color-text);
   overflow: hidden;
 }
 
@@ -28,8 +28,8 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.75rem 0.9rem;
-  border-bottom: 1px solid rgba(70, 45, 35, 0.1);
-  background: #f8f2eb;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  background: var(--color-canvas-subtle);
 }
 
 .desk-tool-modal__head h3 {
@@ -41,7 +41,7 @@
 .desk-tool-modal__head button {
   border: 0;
   background: transparent;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   font-size: 1.35rem;
   line-height: 1;
   cursor: pointer;
@@ -55,18 +55,18 @@
 
 .desk-tool-modal__status {
   margin: 0;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   font-size: 0.78rem;
 }
 
 .desk-tool-modal__status--err {
-  color: #9f1239;
+  color: var(--color-brand);
 }
 
 .desk-tool-modal__meta {
   margin: 0 0 0.65rem;
   font-size: 0.7rem;
-  color: #6b5c54;
+  color: var(--color-text-muted);
 }
 
 .desk-tool-summary {
@@ -88,7 +88,7 @@
   font-size: 0.58rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #6b5c54;
+  color: var(--color-text-muted);
 }
 
 .desk-tool-summary strong {
@@ -106,27 +106,27 @@
 .desk-tool-card {
   padding: 0.55rem 0.6rem;
   border-radius: 10px;
-  border: 1px solid rgba(70, 45, 35, 0.1);
-  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  background: var(--color-surface-raised);
   display: grid;
   gap: 0.15rem;
 }
 
 .desk-tool-card strong {
   font-size: 0.78rem;
-  color: #9f1239;
+  color: var(--color-brand);
 }
 
 .desk-tool-card span {
   font-size: 0.82rem;
   font-weight: 750;
-  color: #1f1714;
+  color: var(--color-text);
 }
 
 .desk-tool-card em {
   font-style: normal;
   font-size: 0.65rem;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   line-height: 1.3;
 }
 

@@ -347,6 +347,8 @@ export default function NadiDeskPage({ user, onLogin }) {
                 onChange={setAsOfDate}
                 onResetToToday={() => setAsOfDate(new Date())}
                 variant="light"
+                textColor="var(--color-text)"
+                primaryColor="var(--color-brand)"
               />
             </div>
             <div className="nadi-desk__moon" title="Chandrakala-style Moon anchor">

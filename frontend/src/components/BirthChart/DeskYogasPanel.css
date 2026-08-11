@@ -3,19 +3,19 @@
   height: 100%;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  background: #fffcf8;
+  background: var(--color-surface);
 }
 
 .desk-yogas--status {
   display: grid;
   place-items: center;
   padding: 0.75rem;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   font-size: 0.72rem;
 }
 
 .desk-yogas--err {
-  color: #9f1239;
+  color: var(--color-brand);
 }
 
 .desk-yogas__filters {
@@ -23,14 +23,14 @@
   flex-wrap: wrap;
   gap: 0.25rem;
   padding: 0.35rem 0.4rem;
-  border-bottom: 1px solid rgba(70, 45, 35, 0.1);
-  background: #f8f2eb;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  background: var(--color-canvas-subtle);
 }
 
 .desk-yogas__filters button {
-  border: 1px solid rgba(70, 45, 35, 0.12);
-  background: #fff;
-  color: #6b5c54;
+  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
   border-radius: 999px;
   padding: 0.15rem 0.45rem;
   font: inherit;
@@ -40,9 +40,9 @@
 }
 
 .desk-yogas__filters button.is-active {
-  background: #9f1239;
-  border-color: #9f1239;
-  color: #fff;
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  color: var(--color-on-brand);
 }
 
 .desk-yogas__list {
@@ -59,7 +59,7 @@
   padding: 0.4rem 0.45rem;
   border-radius: 8px;
   background: rgba(70, 45, 35, 0.035);
-  border: 1px solid rgba(70, 45, 35, 0.06);
+  border: 1px solid color-mix(in srgb, var(--color-text) 6%, transparent);
 }
 
 .desk-yogas__row {
@@ -71,7 +71,7 @@
 
 .desk-yogas__row strong {
   font-size: 0.72rem;
-  color: #1f1714;
+  color: var(--color-text);
 }
 
 .desk-yogas__cat {
@@ -79,7 +79,7 @@
   font-weight: 750;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: #9f1239;
+  color: var(--color-brand);
 }
 
 .desk-yogas__row em {
@@ -87,10 +87,10 @@
   margin-left: auto;
   font-size: 0.55rem;
   font-weight: 700;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   padding: 0.1rem 0.3rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.8);
+  background: color-mix(in srgb, var(--color-surface-raised) 80%, transparent);
 }
 
 .desk-yogas__planets {
@@ -105,13 +105,13 @@
   font-weight: 700;
   padding: 0.1rem 0.3rem;
   border-radius: 4px;
-  background: rgba(159, 18, 57, 0.08);
-  color: #7f1d1d;
+  background: color-mix(in srgb, var(--color-brand) 8%, transparent);
+  color: var(--color-danger);
 }
 
 .desk-yogas__list p {
   margin: 0.25rem 0 0;
   font-size: 0.62rem;
   line-height: 1.35;
-  color: #6b5c54;
+  color: var(--color-text-muted);
 }

@@ -3,14 +3,14 @@
   height: 100%;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
-  background: #fffcf8;
+  background: var(--color-surface);
   gap: 0;
 }
 
 .desk-friend--status {
   display: grid;
   place-items: center;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   font-size: 0.72rem;
   padding: 0.75rem;
 }
@@ -19,14 +19,14 @@
   display: flex;
   gap: 0.15rem;
   padding: 0.3rem 0.35rem;
-  border-bottom: 1px solid rgba(70, 45, 35, 0.1);
-  background: #f8f2eb;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  background: var(--color-canvas-subtle);
 }
 
 .desk-friend__modes button {
   border: 1px solid transparent;
   background: transparent;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   border-radius: 5px;
   min-height: 22px;
   padding: 0 0.45rem;
@@ -37,9 +37,9 @@
 }
 
 .desk-friend__modes button.is-active {
-  background: #fff;
-  border-color: rgba(159, 18, 57, 0.28);
-  color: #9f1239;
+  background: var(--color-surface-raised);
+  border-color: color-mix(in srgb, var(--color-brand) 28%, transparent);
+  color: var(--color-brand);
   box-shadow: 0 1px 3px rgba(40, 20, 10, 0.08);
 }
 
@@ -60,7 +60,7 @@
 .desk-friend__table td {
   padding: 0.28rem 0.2rem;
   text-align: center;
-  border-bottom: 1px solid rgba(70, 45, 35, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
   border-right: 1px solid rgba(70, 45, 35, 0.05);
   white-space: nowrap;
 }
@@ -69,8 +69,8 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #f3ebe3;
-  color: #6b5c54;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
   font-weight: 800;
   letter-spacing: 0.03em;
   font-size: 0.58rem;
@@ -85,8 +85,8 @@
   position: sticky;
   left: 0;
   z-index: 1;
-  background: #fff;
-  color: #1f1714;
+  background: var(--color-surface-raised);
+  color: var(--color-text);
   font-weight: 800;
   font-size: 0.58rem;
   text-transform: uppercase;
@@ -99,12 +99,12 @@
 
 .desk-friend__cell--bf {
   background: rgba(61, 107, 79, 0.14);
-  color: #3d6b4f;
+  color: var(--color-success);
 }
 
 .desk-friend__cell--f {
   background: rgba(61, 107, 79, 0.08);
-  color: #3d6b4f;
+  color: var(--color-success);
 }
 
 .desk-friend__cell--n {
@@ -114,17 +114,17 @@
 
 .desk-friend__cell--e {
   background: rgba(138, 58, 58, 0.08);
-  color: #8a3a3a;
+  color: var(--color-danger);
 }
 
 .desk-friend__cell--ge {
   background: rgba(138, 58, 58, 0.16);
-  color: #7f1d1d;
+  color: var(--color-danger);
 }
 
 .desk-friend__cell--self {
   background: rgba(70, 45, 35, 0.04);
-  color: #6b5c54;
+  color: var(--color-text-muted);
 }
 
 .desk-friend__legend {
@@ -132,8 +132,8 @@
   flex-wrap: wrap;
   gap: 0.25rem;
   padding: 0.35rem 0.4rem 0.2rem;
-  border-top: 1px solid rgba(70, 45, 35, 0.1);
-  background: #f8f2eb;
+  border-top: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  background: var(--color-canvas-subtle);
   font-size: 0.55rem;
   font-weight: 700;
 }
@@ -141,13 +141,13 @@
 .desk-friend__legend span {
   padding: 0.12rem 0.35rem;
   border-radius: 4px;
-  border: 1px solid rgba(70, 45, 35, 0.1);
+  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
 }
 
 .desk-friend__note {
   margin: 0;
   padding: 0.15rem 0.45rem 0.35rem;
   font-size: 0.55rem;
-  color: #6b5c54;
-  background: #f8f2eb;
+  color: var(--color-text-muted);
+  background: var(--color-canvas-subtle);
 }

@@ -423,10 +423,10 @@ const BirthForm = ({
           yogiData: yogiData
         };
         
-        setBirthData(formData);
+        setBirthData(birthData);
         setChartData(enhancedChartData);
         toast.success('Birth chart calculated successfully!');
-        onSubmit(formData);
+        onSubmit(birthData);
       }
     } catch (error) {
       setError(error.message);

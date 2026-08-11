@@ -31,6 +31,8 @@ const TransitControls = ({
   onChange,
   onResetToToday,
   variant = 'default',
+  textColor,
+  primaryColor,
   /** When true, show HH:MM and ±H — used by Parashari desk shared clock */
   showTime = false,
 }) => {
@@ -124,7 +126,7 @@ const TransitControls = ({
   const timeLabel = formatLocalTimeForInput(date);
 
   return (
-    <ControlsContainer>
+    <ControlsContainer style={primaryColor ? { '--transit-primary-color': primaryColor } : undefined}>
       <DatePickerInput
         ref={dateInputRef}
         type="date"
@@ -137,6 +139,7 @@ const TransitControls = ({
         as="button"
         type="button"
         $variant={variant}
+        $textColor={textColor}
         $clickable
         onClick={openDatePicker}
         onDoubleClick={(e) => {
@@ -155,6 +158,7 @@ const TransitControls = ({
           value={timeLabel}
           onChange={handleNativeTimeChange}
           $variant={variant}
+          $textColor={textColor}
           title="As-of time"
           aria-label={`As-of time ${timeLabel}`}
         />
@@ -164,36 +168,36 @@ const TransitControls = ({
         {isMobile ? (
           <>
             {showTime ? (
-              <NavButton $variant={variant} onClick={() => handleDateChange('sub', 'hour')}>‹H</NavButton>
+              <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('sub', 'hour')}>‹H</NavButton>
             ) : null}
-            <NavButton $variant={variant} onClick={() => handleDateChange('sub', 'month')}>‹M</NavButton>
-            <NavButton $variant={variant} onClick={() => handleDateChange('sub', 'day')}>‹D</NavButton>
-            <NavButton $variant={variant} onClick={resetToToday} primary>Now</NavButton>
-            <NavButton $variant={variant} onClick={() => handleDateChange('add', 'day')}>D›</NavButton>
-            <NavButton $variant={variant} onClick={() => handleDateChange('add', 'month')}>M›</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('sub', 'month')}>‹M</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('sub', 'day')}>‹D</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={resetToToday} primary>Now</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('add', 'day')}>D›</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('add', 'month')}>M›</NavButton>
             {showTime ? (
-              <NavButton $variant={variant} onClick={() => handleDateChange('add', 'hour')}>H›</NavButton>
+              <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('add', 'hour')}>H›</NavButton>
             ) : null}
           </>
         ) : (
           <>
-            <NavButton $variant={variant} onClick={() => handleDateChange('sub', 'year')}>‹‹Y</NavButton>
-            <NavButton $variant={variant} onClick={() => handleDateChange('sub', 'month')}>‹M</NavButton>
-            <NavButton $variant={variant} onClick={() => handleDateChange('sub', 'week')}>‹W</NavButton>
-            <NavButton $variant={variant} onClick={() => handleDateChange('sub', 'day')}>‹D</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('sub', 'year')}>‹‹Y</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('sub', 'month')}>‹M</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('sub', 'week')}>‹W</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('sub', 'day')}>‹D</NavButton>
             {showTime ? (
-              <NavButton $variant={variant} onClick={() => handleDateChange('sub', 'hour')}>‹H</NavButton>
+              <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('sub', 'hour')}>‹H</NavButton>
             ) : null}
 
-            <NavButton $variant={variant} onClick={resetToToday} primary>Now</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={resetToToday} primary>Now</NavButton>
 
             {showTime ? (
-              <NavButton $variant={variant} onClick={() => handleDateChange('add', 'hour')}>H›</NavButton>
+              <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('add', 'hour')}>H›</NavButton>
             ) : null}
-            <NavButton $variant={variant} onClick={() => handleDateChange('add', 'day')}>D›</NavButton>
-            <NavButton $variant={variant} onClick={() => handleDateChange('add', 'week')}>W›</NavButton>
-            <NavButton $variant={variant} onClick={() => handleDateChange('add', 'month')}>M›</NavButton>
-            <NavButton $variant={variant} onClick={() => handleDateChange('add', 'year')}>Y››</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('add', 'day')}>D›</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('add', 'week')}>W›</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('add', 'month')}>M›</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('add', 'year')}>Y››</NavButton>
           </>
         )}
       </ButtonGroup>

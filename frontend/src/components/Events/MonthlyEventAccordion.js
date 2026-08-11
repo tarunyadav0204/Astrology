@@ -89,7 +89,7 @@ export default function MonthlyEventAccordion({ data, yearLabel, onDiveDeep }) {
       >
         <span className="monthly-event-accordion__month">{monthTitle}</span>
         <span className="monthly-event-accordion__chevron" aria-hidden>
-          {expanded ? '▴' : '▾'}
+          {expanded ? '−' : '+'}
         </span>
       </button>
 
@@ -132,7 +132,7 @@ export default function MonthlyEventAccordion({ data, yearLabel, onDiveDeep }) {
                         className="monthly-event-accordion__why-toggle"
                         onClick={() => toggleReason(index)}
                       >
-                        {openReasons[index] ? 'Hide Why' : 'Show Why'} {openReasons[index] ? '▴' : '▾'}
+                        {openReasons[index] ? 'Hide astrological basis' : 'Show astrological basis'}
                       </button>
                       {openReasons[index] && (
                         <p className="monthly-event-accordion__reasoning">
@@ -169,7 +169,7 @@ export default function MonthlyEventAccordion({ data, yearLabel, onDiveDeep }) {
                   )}
                   {event.start_date && event.end_date && (
                     <p className="monthly-event-accordion__dates">
-                      📅 {event.start_date} → {event.end_date}
+                      {event.start_date} → {event.end_date}
                     </p>
                   )}
                 </div>
@@ -179,7 +179,7 @@ export default function MonthlyEventAccordion({ data, yearLabel, onDiveDeep }) {
 
           <div className="monthly-event-accordion__actions">
             <button type="button" className="monthly-event-accordion__btn monthly-event-accordion__btn--chat" onClick={openChatWithMonth}>
-              💬 Ask Tara about this month
+              Ask Tara about this month
             </button>
             {onDiveDeep && (
               <button
@@ -187,7 +187,7 @@ export default function MonthlyEventAccordion({ data, yearLabel, onDiveDeep }) {
                 className="monthly-event-accordion__btn monthly-event-accordion__btn--secondary"
                 onClick={() => onDiveDeep(data)}
               >
-                🔭 Explore this month in depth
+                Explore this month in depth
               </button>
             )}
           </div>

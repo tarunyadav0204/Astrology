@@ -6,6 +6,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
+from threading import Lock
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -36,6 +37,8 @@ from .homepage_prompts import HOMEPAGE_PROMPT_KEYS, HomepagePromptRepository
 from .profiles import get_profile
 from .service import PredictionService
 from .manifestation_synthesis import synthesize_manifestations
+from .event_windows import EVENT_DEFINITIONS, EventWindowEngine
+from .primitives import build_calculation_context
 
 
 logger = logging.getLogger(__name__)
@@ -63,6 +66,10 @@ _FOMO_CLEANUP_INTERVAL_SECONDS = 60 * 60
 _FOMO_CLEANUP_RETRY_SECONDS = 5 * 60
 _FOMO_CLEANUP_LOCK = asyncio.Lock()
 _fomo_cleanup_next_at = 0.0
+_EVENT_WINDOW_CACHE_TTL_SECONDS = 30 * 60
+_EVENT_WINDOW_CACHE_MAXIMUM = 12
+_event_window_cache: Dict[tuple, tuple[float, Dict[str, Any]]] = {}
+_event_window_cache_lock = Lock()
 
 
 class FomoGenerationInProgress(RuntimeError):
@@ -82,6 +89,22 @@ class ActivationExplorerRequest(BaseModel):
     def require_chart_source(self):
         if self.birth_chart_id is None and not self.birth_data:
             raise ValueError("birth_chart_id or birth_data is required")
+        return self
+
+
+class EventWindowRequest(BaseModel):
+    birth_chart_id: Optional[int] = None
+    birth_data: Optional[Dict[str, Any]] = None
+    event_key: str = "job_change"
+    year: int = Field(ge=1900, le=2200)
+    include_developing: bool = False
+
+    @model_validator(mode="after")
+    def validate_request(self):
+        if self.birth_chart_id is None and not self.birth_data:
+            raise ValueError("birth_chart_id or birth_data is required")
+        if self.event_key not in EVENT_DEFINITIONS:
+            raise ValueError(f"Unsupported event focus: {self.event_key}")
         return self
 
 
@@ -236,6 +259,100 @@ async def get_activation_explorer(
         raise HTTPException(
             status_code=500,
             detail="Activation calculation failed. No fallback result was generated.",
+        ) from exc
+
+
+def _generate_event_window_search(payload: EventWindowRequest, chart: Dict[str, Any]) -> Dict[str, Any]:
+    birth = BirthChartInput.from_mapping(_normalise_birth_data(chart))
+    cache_key = (
+        birth.birth_chart_id, birth.date, birth.time, birth.latitude, birth.longitude,
+        str(birth.timezone), payload.year, payload.event_key, payload.include_developing,
+    )
+    now = time.monotonic()
+    with _event_window_cache_lock:
+        cached = _event_window_cache.get(cache_key)
+        if cached and now - cached[0] <= _EVENT_WINDOW_CACHE_TTL_SECONDS:
+            return {**cached[1], "cache_hit": True}
+        if cached:
+            _event_window_cache.pop(cache_key, None)
+    start = date(payload.year, 1, 1)
+    end = date(payload.year, 12, 31)
+    request = PredictionRequest(
+        birth=birth,
+        as_of=start,
+        horizon_days=(end - start).days + 1,
+        maximum_candidates=100,
+        trace=False,
+        exploration_mode=True,
+        subjects=("self",),
+    )
+    # Build strict ephemeris/dasha state once.  Both the house ledger and the
+    # higher-level event resolver consume the same immutable context.
+    calculation = build_calculation_context(
+        birth,
+        start,
+        end,
+        include_exact_transit_returns=True,
+    )
+    result = PredictionService().generate_from_context(request, calculation)
+    response = EventWindowEngine().resolve(
+        event_key=payload.event_key,
+        calculation=calculation,
+        activations=result.house_activations,
+        include_developing=payload.include_developing,
+    )
+    response.update({
+        "year": payload.year,
+        "as_of": start.isoformat(),
+        "horizon_end": end.isoformat(),
+        "chart": {
+            "id": birth.birth_chart_id,
+            "name": birth.name,
+            "date": birth.date,
+            "time": birth.time,
+            "place": birth.place,
+        },
+        "cache_hit": False,
+    })
+    with _event_window_cache_lock:
+        if len(_event_window_cache) >= _EVENT_WINDOW_CACHE_MAXIMUM:
+            oldest_key = min(_event_window_cache, key=lambda key: _event_window_cache[key][0])
+            _event_window_cache.pop(oldest_key, None)
+        _event_window_cache[cache_key] = (now, response)
+    return response
+
+
+@router.post("/event-windows")
+async def get_event_windows(
+    payload: EventWindowRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Search one calendar year with an auditable, event-specific definition."""
+    try:
+        require_entitlement(current_user, ASTROLOGER_TOOLS_ENTITLEMENT)
+        chart = (
+            _load_owned_birth_chart(payload.birth_chart_id, current_user.userid)
+            if payload.birth_chart_id is not None
+            else dict(payload.birth_data or {})
+        )
+        return await run_in_threadpool(_generate_event_window_search, payload, chart)
+    except HTTPException:
+        raise
+    except PredictionEngineError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception(
+            "Event-window calculation failed for user=%s chart=%s event=%s year=%s",
+            current_user.userid,
+            payload.birth_chart_id,
+            payload.event_key,
+            payload.year,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Event-window calculation failed. No fallback result was generated.",
         ) from exc
 
 

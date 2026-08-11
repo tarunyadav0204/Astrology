@@ -3088,64 +3088,6 @@
   margin-top: 15px;
 }
 
-/* Live Chat Widget */
-.live-chat-widget {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 1000;
-}
-
-.chat-widget-btn {
-  background: var(--ar-fab-gradient);
-  color: #1a1020;
-  border: none;
-  padding: 15px 20px;
-  border-radius: 30px;
-  cursor: pointer;
-  font-weight: bold;
-  box-shadow: 0 6px 24px rgba(255, 215, 0, 0.4), 0 2px 10px rgba(150, 27, 72, 0.2);
-  position: relative;
-  animation: chatPulse 2.5s ease-in-out infinite, colorSwitch 5s ease-in-out infinite;
-}
-
-.chat-text-full {
-  display: inline;
-}
-
-.chat-text-short {
-  display: none;
-}
-
-.chat-pulse {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  width: 12px;
-  height: 12px;
-  background: #4caf50;
-  border-radius: 50%;
-  animation: pulse 1s infinite;
-}
-
-@keyframes chatPulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-}
-
-@keyframes colorSwitch {
-  0%, 100% {
-    background: linear-gradient(135deg, #ffd700, #ffed4e, #ffc107);
-    color: #1a1a2e;
-    box-shadow: 0 8px 32px rgba(255, 215, 0, 0.5), 0 2px 12px rgba(150, 27, 72, 0.15);
-  }
-  50% {
-    background: var(--ar-gradient-rose);
-    color: white;
-    box-shadow: 0 8px 32px rgba(109, 18, 52, 0.45), 0 2px 12px rgba(150, 27, 72, 0.25);
-  }
-}
-
 /* Footer */
 .main-footer {
   background: var(--ar-accent-gradient);
@@ -3732,24 +3674,6 @@
   .horoscope-section,
   .consultation-section {
     padding: 40px 0;
-  }
-  
-  .live-chat-widget {
-    bottom: 15px;
-    right: 15px;
-  }
-  
-  .chat-widget-btn {
-    padding: 10px 14px;
-    font-size: 0.75rem;
-  }
-  
-  .chat-text-full {
-    display: none;
-  }
-  
-  .chat-text-short {
-    display: inline;
   }
   
   .vip-card {

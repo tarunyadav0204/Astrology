@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
-import NativeSelector from '../Shared/NativeSelector';
 import CreditsModal from '../Credits/CreditsModal';
 import SEOHead from '../SEO/SEOHead';
 import { useAstrology } from '../../context/AstrologyContext';
@@ -17,15 +16,15 @@ const START_YEAR_FALLBACK = 1950;
 const END_YEAR = 2100;
 
 const LOADING_MESSAGES = [
-  { icon: '🌟', text: 'Analyzing planetary positions...' },
-  { icon: '🔮', text: 'Calculating dasha periods...' },
-  { icon: '✨', text: 'Examining transit patterns...' },
-  { icon: '🌙', text: 'Consulting the cosmic calendar...' },
-  { icon: '⭐', text: 'Mapping celestial influences...' },
-  { icon: '🪐', text: 'Decoding planetary alignments...' },
-  { icon: '💫', text: 'Synthesizing astrological insights...' },
-  { icon: '🎯', text: 'Identifying key life events...' },
-  { icon: '✅', text: 'Finalizing your predictions...' }
+  { icon: '01', text: 'Reading planetary positions…' },
+  { icon: '02', text: 'Calculating dasha periods…' },
+  { icon: '03', text: 'Examining transit patterns…' },
+  { icon: '04', text: 'Mapping the selected period…' },
+  { icon: '05', text: 'Connecting life-area activations…' },
+  { icon: '06', text: 'Checking Parashari timing…' },
+  { icon: '07', text: 'Synthesizing Nadi and Jaimini signals…' },
+  { icon: '08', text: 'Identifying key life events…' },
+  { icon: '09', text: 'Finalizing your timeline…' }
 ];
 
 const lifeEventsMethodCards = [
@@ -130,6 +129,17 @@ function extractBirthYear(data) {
   }
   return null;
 }
+
+const TimelineNative = ({ birthData, onChange, compact = false }) => (
+  <div className={`events-timeline__native ${compact ? 'is-compact' : ''}`}>
+    <div>
+      <span>Reading for</span>
+      <strong>{birthData?.name || 'Selected native'}</strong>
+      {!compact && <small>{birthData?.date} · {birthData?.place}</small>}
+    </div>
+    <button type="button" onClick={onChange}>Change chart <span aria-hidden="true">↗</span></button>
+  </div>
+);
 
 export default function EventsTimelinePage({
   user: propUser,
@@ -645,8 +655,6 @@ export default function EventsTimelinePage({
     }
   };
 
-  const openCredits = () => setShowCreditsPurchaseModal(true);
-
   const yearLabel = String(selectedYear);
   const monthlyPredictions = timelineData?.monthly_predictions || [];
   const macroTrends = (timelineData?.macro_trends || []).filter((trend) => {
@@ -673,6 +681,7 @@ export default function EventsTimelinePage({
         description={seoData.description}
         keywords={seoData.keywords}
         canonical={seoData.canonical}
+        themeColor="#210b17"
         structuredData={{
           '@context': 'https://schema.org',
           '@graph': [
@@ -729,18 +738,12 @@ export default function EventsTimelinePage({
         }}
       />
 
-      <NavigationHeader
-        compact
-        showZodiacSelector={false}
+      <ModernNavigationHeader
+        sticky
         user={user}
         onLogout={onLogout}
         onAdminClick={onAdminClick}
         onLogin={onLogin}
-        showLoginButton={!user}
-        onCreditsClick={openCredits}
-        birthData={birthData}
-        onChangeNative={() => setShowBirthModal(true)}
-        onHomeClick={() => navigate('/')}
       />
 
       <div className="events-timeline__shell">
@@ -749,13 +752,13 @@ export default function EventsTimelinePage({
             ← Back
           </button>
           <div className="events-timeline__hero-text">
-            <p className="events-timeline__kicker">What will manifest</p>
+            <p className="events-timeline__kicker">Your life in motion · Vedic timing</p>
             <h1 className="events-timeline__title">
               {analysisStarted
                 ? readingMode === 'monthly'
                   ? `Deep dive · ${monthLabel(selectedMonth)} ${yearLabel}`
                   : `Your year · ${yearLabel}`
-                : 'Major life events'}
+                : <>Your life, <em>through time.</em></>}
             </h1>
             <p className="events-timeline__subtitle">
               {analysisStarted
@@ -771,10 +774,16 @@ export default function EventsTimelinePage({
                 onClick={() => setShowRegenerateModal(true)}
                 title="Regenerate"
               >
-                ↻
+                Regenerate
               </button>
             </div>
           )}
+          <div className="events-timeline__hero-visual" aria-hidden="true">
+            <span>Now</span><i></i><span>{yearLabel}</span><i></i><span>Next</span>
+          </div>
+          <div className="events-timeline__hero-proof" aria-label="Timing methods">
+            <span>Vimshottari</span><span>Parashari</span><span>Nadi</span><span>Jaimini</span>
+          </div>
         </header>
 
         {!hasBirthCore ? (
@@ -789,7 +798,7 @@ export default function EventsTimelinePage({
           <div className="events-timeline__results">
             {hasBirthCore && (
               <div className="events-timeline__native-row events-timeline__native-row--compact">
-                <NativeSelector birthData={birthData} onNativeChange={() => setShowBirthModal(true)} />
+                <TimelineNative birthData={birthData} compact onChange={() => setShowBirthModal(true)} />
               </div>
             )}
 
@@ -863,7 +872,7 @@ export default function EventsTimelinePage({
 
                 <div className="events-timeline__footer-actions">
                   <button type="button" className="events-timeline__secondary" onClick={() => navigate('/chat?app=1')}>
-                    Open Tara chat
+                    Ask Tara about this timeline
                   </button>
                   <button
                     type="button"
@@ -912,7 +921,7 @@ export default function EventsTimelinePage({
         ) : (
           <section className="events-timeline__setup">
             <div className="events-timeline__native-row">
-              <NativeSelector birthData={birthData} onNativeChange={() => setShowBirthModal(true)} />
+              <TimelineNative birthData={birthData} onChange={() => setShowBirthModal(true)} />
             </div>
 
             <div className="events-timeline__mode-toggle" role="tablist" aria-label="Reading mode">
@@ -1023,10 +1032,10 @@ export default function EventsTimelinePage({
             <div className="events-timeline__features">
               <h3 className="events-timeline__features-title">What’s included</h3>
               <ul className="events-timeline__features-list">
-                <li>✓ {readingMode === 'yearly' ? 'Twelve monthly forecasts' : 'One month deep dive'}</li>
-                <li>✓ Major life events & timing hints</li>
-                <li>✓ Classic Vedic methods: Parashari, Nadi, Jaimini</li>
-                <li>✓ Continue the conversation in Tara chat</li>
+                <li>{readingMode === 'yearly' ? 'Twelve monthly forecasts' : 'One month deep dive'}</li>
+                <li>Major life events and timing signals</li>
+                <li>Combined Parashari, Nadi, Jaimini, and KP synthesis</li>
+                <li>Continue the reading with Tara</li>
               </ul>
             </div>
 
@@ -1036,7 +1045,7 @@ export default function EventsTimelinePage({
             </div>
 
             <button type="button" className="events-timeline__cta events-timeline__cta--wide" onClick={handleContinue}>
-              {readingMode === 'yearly' ? 'Continue' : `Generate ${monthLabel(selectedMonth)} ${selectedYear}`}
+              {readingMode === 'yearly' ? `Build ${selectedYear} timeline` : `Generate ${monthLabel(selectedMonth)} ${selectedYear}`}
             </button>
           </section>
         )}
@@ -1052,8 +1061,9 @@ export default function EventsTimelinePage({
           </div>
 
           <div className="events-timeline-seo__method-grid">
-            {lifeEventsMethodCards.map(([title, body]) => (
+            {lifeEventsMethodCards.map(([title, body], index) => (
               <article key={title}>
+                <span aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
                 <h3>{title}</h3>
                 <p>{body}</p>
               </article>
@@ -1101,11 +1111,11 @@ export default function EventsTimelinePage({
         <section className="events-timeline-faq" aria-label="Life events timeline FAQ">
           <h2>Life Events Timeline FAQ</h2>
           <div className="events-timeline-faq__grid">
-            {lifeEventsFaqItems.map((item) => (
-              <article key={item.question}>
-                <h3>{item.question}</h3>
+            {lifeEventsFaqItems.map((item, index) => (
+              <details key={item.question} open={index === 0}>
+                <summary>{item.question}</summary>
                 <p>{item.answer}</p>
-              </article>
+              </details>
             ))}
           </div>
         </section>
@@ -1120,6 +1130,7 @@ export default function EventsTimelinePage({
             aria-labelledby="evt-credit-title"
             onClick={(e) => e.stopPropagation()}
           >
+            <p className="events-timeline-modal__kicker">Confirm reading</p>
             <h3 id="evt-credit-title">Confirm credits</h3>
             <p>
               This uses <strong>{eventsCost}</strong> credits for{' '}
@@ -1150,6 +1161,7 @@ export default function EventsTimelinePage({
             aria-labelledby="evt-regen-title"
             onClick={(e) => e.stopPropagation()}
           >
+            <p className="events-timeline-modal__kicker">Fresh calculation</p>
             <h3 id="evt-regen-title">Regenerate predictions?</h3>
             <p>
               A fresh run will charge <strong>{eventsCost}</strong> credits again for {selectedYear}

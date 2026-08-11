@@ -281,7 +281,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
 
   if (showForgotPassword) {
     return (
-      <div style={{
+      <div className="auth-form auth-form--reset" style={{
         maxWidth: '400px',
         margin: '0 auto',
         padding: '2rem',
@@ -291,13 +291,13 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
         backdropFilter: 'blur(20px)',
         border: '2px solid rgba(255, 255, 255, 0.3)'
       }}>
-        <h2 style={{
+        <h2 className="auth-form__title" style={{
           textAlign: 'center',
           color: '#e91e63',
           marginBottom: '2rem',
           fontWeight: '700'
         }}>
-          🔐 Reset Password
+          <span className="auth-form__title-icon" aria-hidden>🔐</span> Reset Password
         </h2>
 
         {resetStep === 1 ? (
@@ -355,6 +355,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
             ) : null}
             <button
               type="submit"
+              className="auth-form__primary"
               disabled={loading}
               style={{
                 width: '100%',
@@ -405,6 +406,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
             </div>
             <button
               type="submit"
+              className="auth-form__primary"
               disabled={loading}
               style={{
                 width: '100%',
@@ -470,6 +472,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
             </div>
             <button
               type="button"
+              className="auth-form__primary"
               disabled={loading}
               // Prevent iOS/PWA from stealing the tap when the keyboard dismisses.
               onMouseDown={(e) => e.preventDefault()}
@@ -497,6 +500,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
         <p style={{ textAlign: 'center', color: '#666' }}>
           <button
             type="button"
+            className="auth-form__text-button"
             onClick={() => {
               setShowForgotPassword(false);
               setResetStep(1);
@@ -521,7 +525,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
   }
 
   return (
-    <div style={{
+    <div className="auth-form auth-form--login" style={{
       maxWidth: '400px',
       margin: '0 auto',
       padding: '2rem',
@@ -531,13 +535,13 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
       backdropFilter: 'blur(20px)',
       border: '2px solid rgba(255, 255, 255, 0.3)'
     }}>
-      <h2 style={{
+      <h2 className="auth-form__title" style={{
         textAlign: 'center',
         color: '#e91e63',
         marginBottom: '2rem',
         fontWeight: '700'
       }}>
-        ✨ Login to {getAppName()}
+        <span className="auth-form__title-icon" aria-hidden>✨</span> Login to {getAppName()}
       </h2>
 
       <form onSubmit={handleSubmit}>
@@ -594,6 +598,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
             />
             <button
               type="button"
+              className="auth-form__password-toggle"
               onClick={() => setShowPassword(!showPassword)}
               style={{
                 position: 'absolute',
@@ -614,6 +619,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
 
         <button
           type="submit"
+          className="auth-form__primary"
           disabled={loading}
           style={{
             width: '100%',
@@ -635,6 +641,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
         {biometricSupported && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && (
           <button
             type="button"
+            className="auth-form__biometric"
             onClick={handleBiometricLogin}
             disabled={loading}
             style={{
@@ -662,6 +669,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
         <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
           <button
             type="button"
+            className="auth-form__text-button"
             onClick={() => setShowForgotPassword(true)}
             style={{
               background: 'none',
@@ -681,6 +689,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
           Don't have an account?{' '}
           <button
             type="button"
+            className="auth-form__text-button"
             onClick={onSwitchToRegister}
             style={{
               background: 'none',

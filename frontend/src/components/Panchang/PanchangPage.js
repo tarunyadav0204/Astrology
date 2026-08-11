@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import PanchangHeader from './components/PanchangHeader';
 import LocationFinder from './components/LocationFinder';
 import CorePanchangElements from './components/CorePanchangElements';
@@ -253,17 +253,17 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
   };
 
   return (
-    <div className="panchang-page">
+    <div className="panchang-page panchang-page--themed">
       <SEOHead 
         title={seoData.title}
         description={seoData.description}
         keywords={seoData.keywords}
         canonical={seoData.canonical}
         structuredData={structuredData}
+        themeColor="#210b17"
       />
-      <NavigationHeader 
-        compact={true}
-        showZodiacSelector={false}
+      <ModernNavigationHeader
+        sticky
         user={user}
         onAdminClick={handleAdminClick}
         onLogout={onLogout || (() => {
@@ -277,18 +277,59 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
       />
 
       <div className="panchang-content">
-        <div className="container">
-          
-          <PanchangHeader
-            selectedDate={selectedDate}
-            onDateChange={handleDateChange}
-            location={location}
-            onLocationChange={handleLocationChange}
-            calendarSystem={calendarSystem}
-            onCalendarSystemChange={handleCalendarSystemChange}
-            festivals={festivals}
-            showMonthlyLink={true}
-          />
+        <div className="panchang-container">
+          <header className="panchang-editorial-hero">
+            <div className="panchang-editorial-copy">
+              <button type="button" className="panchang-back-link" onClick={() => navigate('/')}>
+                <span aria-hidden>←</span> Home
+              </button>
+              <span className="panchang-editorial-eyebrow">The Vedic day · Live local timings</span>
+              <h1>Today has a rhythm.<br /><em>Read it.</em></h1>
+              <p>
+                See the five limbs of the day together with sunrise, lunar movement,
+                Rahu Kaal and auspicious windows calculated for your location.
+              </p>
+            </div>
+
+            <div className="panchang-day-orbit" aria-hidden="true">
+              <span className="panchang-orbit-ring panchang-orbit-ring--outer"></span>
+              <span className="panchang-orbit-ring panchang-orbit-ring--inner"></span>
+              <span className="panchang-orbit-dot panchang-orbit-dot--one"></span>
+              <span className="panchang-orbit-dot panchang-orbit-dot--two"></span>
+              <div className="panchang-orbit-center">
+                <small>{selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}</small>
+                <strong>{selectedDate.getDate()}</strong>
+                <span>{selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+              </div>
+              <span className="panchang-orbit-label panchang-orbit-label--tithi">Tithi</span>
+              <span className="panchang-orbit-label panchang-orbit-label--star">Nakshatra</span>
+              <span className="panchang-orbit-label panchang-orbit-label--yoga">Yoga</span>
+              <span className="panchang-orbit-label panchang-orbit-label--karana">Karana</span>
+            </div>
+
+            <div className="panchang-hero-proof">
+              <span><strong>01</strong> Local sunrise</span>
+              <span><strong>05</strong> Panchang limbs</span>
+              <span><strong>Live</strong> Muhurat windows</span>
+            </div>
+          </header>
+
+          <section className="panchang-control-deck" aria-label="Panchang date and location">
+            <div className="panchang-control-intro">
+              <span className="panchang-eyebrow">Set your sky</span>
+              <p>Change the date or location and every timing below updates together.</p>
+            </div>
+            <PanchangHeader
+              selectedDate={selectedDate}
+              onDateChange={handleDateChange}
+              location={location}
+              onLocationChange={handleLocationChange}
+              calendarSystem={calendarSystem}
+              onCalendarSystemChange={handleCalendarSystemChange}
+              festivals={festivals}
+              showMonthlyLink={true}
+            />
+          </section>
 
           {loading && (
             <div className="panchang-inline-loading" role="status">
@@ -382,8 +423,9 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
             </div>
 
             <div className="panchang-guide-grid">
-              {PANCHANG_GUIDE_CARDS.map((card) => (
+              {PANCHANG_GUIDE_CARDS.map((card, index) => (
                 <article className="panchang-guide-card" key={card.title}>
+                  <span className="panchang-guide-number">{String(index + 1).padStart(2, '0')}</span>
                   <h3>{card.title}</h3>
                   <p>{card.body}</p>
                 </article>
@@ -418,11 +460,11 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
               <h2 id="panchang-faq-title">Daily Panchang FAQs</h2>
             </div>
             <div className="panchang-faq-grid">
-              {PANCHANG_FAQS.map((item) => (
-                <article className="panchang-faq-card" key={item.question}>
-                  <h3>{item.question}</h3>
+              {PANCHANG_FAQS.map((item, index) => (
+                <details className="panchang-faq-card" key={item.question} open={index === 0}>
+                  <summary>{item.question}<span aria-hidden>+</span></summary>
                   <p>{item.answer}</p>
-                </article>
+                </details>
               ))}
             </div>
           </section>

@@ -15,23 +15,39 @@ const KarmaAnalysisLanding = ({ onGetStarted }) => {
   return (
     <article className="karma-landing" id="karma-guide">
       <header className="karma-landing-hero">
-        <p className="karma-landing-eyebrow">Vedic astrology · Past life · Karmic patterns</p>
-        <h1 className="karma-landing-h1">Past Life Karma Analysis from Your Birth Chart</h1>
-        <p className="karma-landing-lead">
-          Understand past-life themes, karmic debts, and spiritual lessons using classical Jyotish—Navamsa (D9),
-          Shashtiamsa (D60), the 12th house, Saturn, and Rahu–Ketu—calculated for your exact date, time, and place
-          of birth. Read the guide below, then get your personalised AI-assisted report on AstroRoshni.
-        </p>
-        <button type="button" className="karma-landing-cta" onClick={onGetStarted}>
-          Get your personalised karma report
-        </button>
-        <p className="karma-landing-cta-note">
-          Sign in, save your birth chart, and run the analysis in the tool below.{' '}
-          <a href="#karma-tool">Jump to tool ↓</a>
-        </p>
+        <div className="karma-hero-copy">
+          <p className="karma-landing-eyebrow">The karmic archive · Personalised Jyotish</p>
+          <h1 className="karma-landing-h1">What follows you <em>into this life?</em></h1>
+          <p className="karma-landing-lead">
+            Understand past-life themes, karmic debts, and spiritual lessons using classical Jyotish—Navamsa (D9),
+            Shashtiamsa (D60), the 12th house, Saturn, and Rahu–Ketu—calculated for your exact date, time, and place
+            of birth. Read the guide below, then get your personalised AI-assisted report on AstroRoshni.
+          </p>
+          <div className="karma-hero-actions">
+            <button type="button" className="karma-landing-cta" onClick={onGetStarted}>
+              Read my karmic pattern <span aria-hidden="true">↗</span>
+            </button>
+            <a className="karma-hero-text-link" href="#karma-method">See the method ↓</a>
+          </div>
+          <p className="karma-landing-cta-note">
+            Private to your account · Calculated from your saved birth chart
+          </p>
+        </div>
+        <div className="karma-hero-orbit" aria-hidden="true">
+          <span className="karma-orbit-label karma-orbit-label--d1">D1</span>
+          <span className="karma-orbit-label karma-orbit-label--d9">D9</span>
+          <span className="karma-orbit-label karma-orbit-label--d60">D60</span>
+          <span className="karma-orbit-center">कर्म</span>
+        </div>
+        <div className="karma-hero-proof" aria-label="Analysis foundations">
+          <div><strong>3</strong><span>chart layers</span></div>
+          <div><strong>12th</strong><span>moksha house</span></div>
+          <div><strong>4</strong><span>classical systems</span></div>
+        </div>
       </header>
 
       <section className="karma-landing-section" aria-labelledby="karma-what-heading">
+        <p className="karma-section-eyebrow">Begin with the meaning</p>
         <h2 id="karma-what-heading">What is past life karma in Vedic astrology?</h2>
         <p>
           Karma in Sanskrit means action and its consequences. Vedic astrology (Jyotish) does not claim to show a
@@ -47,7 +63,8 @@ const KarmaAnalysisLanding = ({ onGetStarted }) => {
         </p>
       </section>
 
-      <section className="karma-landing-section" aria-labelledby="karma-how-heading">
+      <section id="karma-method" className="karma-landing-section karma-method-section" aria-labelledby="karma-how-heading">
+        <p className="karma-section-eyebrow">The method</p>
         <h2 id="karma-how-heading">How AstroRoshni analyses your karma</h2>
         <ol className="karma-landing-steps">
           <li>
@@ -77,6 +94,7 @@ const KarmaAnalysisLanding = ({ onGetStarted }) => {
       </section>
 
       <section className="karma-landing-section" aria-labelledby="karma-report-heading">
+        <p className="karma-section-eyebrow">Inside your reading</p>
         <h2 id="karma-report-heading">What your personalised report includes</h2>
         <ul className="karma-landing-report-grid">
           {KARMA_REPORT_SECTIONS.map((item) => (
@@ -94,6 +112,7 @@ const KarmaAnalysisLanding = ({ onGetStarted }) => {
       </section>
 
       <section className="karma-landing-section karma-landing-sample" aria-labelledby="karma-sample-heading">
+        <p className="karma-section-eyebrow">An illustrative passage</p>
         <h2 id="karma-sample-heading">Sample tone of interpretation (illustrative)</h2>
         <blockquote cite={KARMA_CANONICAL}>
           <p>{KARMA_SAMPLE_EXCERPT}</p>
@@ -104,15 +123,16 @@ const KarmaAnalysisLanding = ({ onGetStarted }) => {
       </section>
 
       <section className="karma-landing-section" aria-labelledby="karma-faq-heading">
+        <p className="karma-section-eyebrow">Before you begin</p>
         <h2 id="karma-faq-heading">Frequently asked questions</h2>
-        <dl className="karma-landing-faq">
+        <div className="karma-landing-faq">
           {KARMA_FAQ.map((item) => (
-            <React.Fragment key={item.question}>
-              <dt>{item.question}</dt>
-              <dd>{item.answer}</dd>
-            </React.Fragment>
+            <details key={item.question}>
+              <summary>{item.question}</summary>
+              <p>{item.answer}</p>
+            </details>
           ))}
-        </dl>
+        </div>
       </section>
 
       <section className="karma-landing-section karma-landing-trust">
@@ -124,7 +144,7 @@ const KarmaAnalysisLanding = ({ onGetStarted }) => {
         </p>
         <p>
           <Link to="/about">About AstroRoshni</Link> · <Link to="/policy">Privacy Policy</Link> ·{' '}
-          <Link to="/terms">Terms &amp; Conditions</Link>
+          <Link to="/terms">Terms &amp; Conditions</Link> ·{' '}
           <Link to="/contact">Contact</Link>
         </p>
       </section>

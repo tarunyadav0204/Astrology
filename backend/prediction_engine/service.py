@@ -61,7 +61,6 @@ class PredictionService:
         *,
         include_exact_transit_returns: bool = False,
     ) -> PredictionResult:
-        profile = get_profile(request.profile)
         # horizon_days is a count including as_of; a 90-day request must not
         # silently calculate 91 inclusive calendar dates.
         horizon_end = request.as_of + timedelta(days=request.horizon_days - 1)
@@ -71,4 +70,13 @@ class PredictionService:
             horizon_end,
             include_exact_transit_returns=include_exact_transit_returns,
         )
-        return self.engine.generate(request, calculation, profile)
+        return self.generate_from_context(request, calculation)
+
+    def generate_from_context(self, request: PredictionRequest, calculation) -> PredictionResult:
+        """Evaluate a prebuilt strict context for higher-level auditable tools.
+
+        Event-window searches use this boundary so a year of dasha/transit
+        calculations is constructed once and then shared with the house ledger
+        and event resolver.
+        """
+        return self.engine.generate(request, calculation, get_profile(request.profile))

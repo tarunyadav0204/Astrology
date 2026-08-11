@@ -2468,15 +2468,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         </div>
       </section>
 
-      {/* Live Chat Widget */}
-      <div className="live-chat-widget">
-        <button className="chat-widget-btn" onClick={() => user ? navigate('/chat?app=1') : onLogin()}>
-          <span className="chat-text-full">⭐ Ask Tara Now</span>
-          <span className="chat-text-short">⭐ Ask Tara</span>
-          <span className="chat-pulse"></span>
-        </button>
-      </div>
-
       {/* Consultation Section - Hidden for AstroRoshni */}
       {/* 
       <section className="consultation-section">

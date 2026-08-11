@@ -1,9 +1,9 @@
 .nadi-desk {
-  --nd-ink: #1f1714;
-  --nd-muted: #6b5c54;
-  --nd-line: rgba(70, 45, 35, 0.12);
-  --nd-accent: #9f1239;
-  --nd-panel: #fffcf8;
+  --nd-ink: var(--color-text);
+  --nd-muted: var(--color-text-muted);
+  --nd-line: color-mix(in srgb, var(--color-text) 12%, transparent);
+  --nd-accent: var(--color-brand);
+  --nd-panel: var(--color-surface);
   height: 100vh;
   height: 100dvh;
   max-height: 100vh;
@@ -12,9 +12,11 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
-  background: #f3ebe3;
+  background:
+    radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--color-accent) 12%, transparent), transparent 24rem),
+    var(--color-canvas);
   color: var(--nd-ink);
-  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-body);
 }
 
 .nadi-desk__bar {
@@ -22,10 +24,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.45rem 0.75rem;
-  background: #fffcf8;
-  border-bottom: 1px solid var(--nd-line);
-  min-height: 42px;
+  padding: 0.4rem 0.75rem;
+  color: var(--color-text-inverse);
+  background: var(--color-surface-inverse);
+  border-bottom: 1px solid var(--color-border-inverse);
+  box-shadow: var(--shadow-sm);
+  min-height: 48px;
   position: relative;
   z-index: 20;
 }
@@ -65,22 +69,36 @@
 .nadi-desk__bar-right button {
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--nd-muted);
+  color: var(--color-text-inverse-muted);
   padding: 0.2rem 0.4rem;
-  border-radius: 5px;
+  border: 1px solid var(--color-border-inverse);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-surface-inverse-raised) 78%, transparent);
+}
+
+.nadi-desk__back:hover,
+.nadi-desk__bar-right button:hover,
+.nadi-desk__back:focus-visible,
+.nadi-desk__bar-right button:focus-visible {
+  color: var(--color-on-accent);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-soft);
+  outline: 0;
 }
 
 .nadi-desk__brand {
-  font-size: 0.92rem;
-  font-weight: 800;
-  color: var(--nd-accent);
+  color: var(--color-accent-soft);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
 }
 
 .nadi-desk__sub,
 .nadi-desk__native {
   font-size: 0.62rem;
   font-weight: 700;
-  color: var(--nd-muted);
+  color: var(--color-text-inverse-muted);
 }
 
 .nadi-desk__chip {
@@ -88,21 +106,21 @@
   font-weight: 750;
   padding: 0.22rem 0.5rem;
   border-radius: 999px;
-  border: 1px solid var(--nd-line);
-  background: #fff;
-  color: var(--nd-muted);
+  border: 1px solid var(--color-border-inverse);
+  background: transparent;
+  color: var(--color-text-inverse-muted);
 }
 
 .nadi-desk__chip.is-active {
-  border-color: rgba(159, 18, 57, 0.35);
-  color: var(--nd-accent);
-  background: #fff1f2;
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
 }
 
 .nadi-desk__primary {
   border: 0;
   background: var(--nd-accent);
-  color: #fff;
+  color: var(--color-on-brand);
   border-radius: 6px;
   padding: 0.45rem 0.85rem;
   font-weight: 750;
@@ -121,8 +139,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.42rem;
-  padding: 0.42rem 0.55rem 0.5rem;
+  gap: 0.5rem;
+  padding: 0.5rem 0.55rem 0.55rem;
   overflow: hidden;
 }
 
@@ -136,7 +154,8 @@
   padding: 0.28rem 0.45rem;
   background: var(--nd-panel);
   border: 1px solid var(--nd-line);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
@@ -183,7 +202,7 @@
   margin-left: 0.25rem;
   padding: 0.08rem 0.35rem;
   border-radius: 999px;
-  background: #fff1f2;
+  background: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface));
   color: var(--nd-accent);
   font-weight: 800;
   font-size: 0.68rem;
@@ -212,8 +231,8 @@
 .nadi-desk__karaka-card {
   text-align: left;
   border: 1px solid var(--nd-line);
-  background: #fff;
-  border-radius: 7px;
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-sm);
   padding: 0.28rem 0.42rem 0.32rem;
   cursor: pointer;
   color: inherit;
@@ -221,8 +240,8 @@
 }
 
 .nadi-desk__karaka-card.is-active {
-  border-color: rgba(159, 18, 57, 0.4);
-  background: #fff1f2;
+  border-color: color-mix(in srgb, var(--color-brand) 40%, transparent);
+  background: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface));
   box-shadow: inset 3px 0 0 var(--nd-accent);
 }
 
@@ -287,48 +306,48 @@
   font-weight: 800;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  background: #f4ebe4;
+  background: var(--color-surface-muted);
   color: var(--nd-muted);
 }
 
 .nadi-desk__link-tag--trine {
   background: rgba(61, 107, 79, 0.12);
-  color: #2f6b45;
+  color: var(--color-success);
 }
 
 .nadi-desk__link-tag--next {
-  background: rgba(159, 18, 57, 0.1);
+  background: color-mix(in srgb, var(--color-brand) 10%, transparent);
   color: var(--nd-accent);
 }
 
 .nadi-desk__link-tag--prev {
   background: rgba(180, 83, 9, 0.12);
-  color: #b45309;
+  color: var(--color-warning);
 }
 
 .nadi-desk__link-tag--opposite {
   background: rgba(30, 64, 175, 0.1);
-  color: #1e40af;
+  color: var(--color-info);
 }
 
 .nadi-desk__topics button {
   font-size: 0.62rem;
   font-weight: 750;
   padding: 0.2rem 0.45rem;
-  border-radius: 5px;
+  border-radius: var(--radius-pill);
   color: var(--nd-muted);
 }
 
 .nadi-desk__topics button.is-active {
-  background: #fff;
-  border-color: rgba(159, 18, 57, 0.28);
-  color: var(--nd-accent);
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  color: var(--color-on-brand);
 }
 
 .nadi-desk__banner {
   padding: 0.4rem 0.6rem;
   border-radius: 6px;
-  background: #fff;
+  background: var(--color-surface-raised);
   border: 1px solid var(--nd-line);
   font-size: 0.7rem;
   color: var(--nd-muted);
@@ -336,7 +355,7 @@
 
 .nadi-desk__banner--err {
   border-color: rgba(138, 58, 58, 0.3);
-  color: #8a3a3a;
+  color: var(--color-danger);
   background: rgba(138, 58, 58, 0.06);
 }
 
@@ -351,7 +370,7 @@
     "d1 tr ledger"
     "links tri detail"
     "ages ages detail";
-  gap: 0.42rem;
+  gap: 0.5rem;
   align-items: stretch;
 }
 
@@ -368,7 +387,8 @@
   min-height: 0;
   background: var(--nd-panel);
   border: 1px solid var(--nd-line);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -383,12 +403,13 @@
   min-height: 29px;
   padding: 0.25rem 0.42rem;
   border-bottom: 1px solid var(--nd-line);
-  background: #f8f2eb;
+  background: var(--color-surface-muted);
 }
 
 .nadi-desk__panel > header strong {
   font-size: 0.72rem;
   font-weight: 800;
+  color: var(--color-brand);
 }
 
 .nadi-desk__panel > header em {
@@ -402,7 +423,7 @@
   flex: 1 1 0;
   min-height: 0;
   padding: 0.2rem;
-  background: #fff;
+  background: var(--color-surface);
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -428,8 +449,12 @@
 }
 
 .nadi-desk__chart svg > rect:first-of-type {
-  fill: #fff !important;
+  fill: var(--color-surface) !important;
 }
+
+.nadi-desk__chart svg [stroke="#111111"] { stroke: var(--color-text) !important; }
+.nadi-desk__chart svg :is([fill="#333"], [fill="#666"]) { fill: var(--color-text-muted) !important; }
+.nadi-desk__chart svg [fill="#9f1239"] { fill: var(--color-brand) !important; }
 
 .nadi-desk__state-key {
   display: grid;
@@ -437,7 +462,7 @@
   gap: 0.25rem;
   padding: 0.25rem 0.35rem;
   border-bottom: 1px solid var(--nd-line);
-  background: #faf6f1;
+  background: var(--color-canvas-subtle);
 }
 
 .nadi-desk__state-key span {
@@ -492,7 +517,7 @@
   padding: 0.3rem 0.38rem;
   border-radius: 6px;
   border: 1px solid var(--nd-line);
-  background: #fff;
+  background: var(--color-surface-raised);
 }
 
 .nadi-desk__act strong {
@@ -515,13 +540,13 @@
 }
 
 .nadi-desk__act.is-selected {
-  background: #fff1f2;
+  background: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface));
   box-shadow: inset 3px 0 0 var(--nd-accent);
 }
 
-.nadi-desk__act--strong i { color: #2f6b45; }
+.nadi-desk__act--strong i { color: var(--color-success); }
 .nadi-desk__act--active i { color: var(--nd-accent); }
-.nadi-desk__act--promise i { color: #b45309; }
+.nadi-desk__act--promise i { color: var(--color-warning); }
 
 .nadi-desk__planet-tabs {
   flex: 0 0 auto;
@@ -530,7 +555,7 @@
   gap: 0;
   padding: 0;
   border-bottom: 1px solid var(--nd-line);
-  background: #faf6f1;
+  background: var(--color-canvas-subtle);
 }
 
 .nadi-desk__planet-tabs button {
@@ -538,7 +563,7 @@
   min-width: 0;
   min-height: 28px;
   padding: 0.12rem 0.18rem;
-  border-right: 1px solid rgba(70, 45, 35, 0.08);
+  border-right: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
   border-radius: 0;
   font-size: 0.62rem;
   font-weight: 800;
@@ -546,9 +571,9 @@
 }
 
 .nadi-desk__planet-tabs button.is-active {
-  background: #fff1f2;
+  background: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface));
   color: var(--nd-accent);
-  border-color: rgba(159, 18, 57, 0.18);
+  border-color: color-mix(in srgb, var(--color-brand) 18%, transparent);
   box-shadow: inset 0 -2px 0 var(--nd-accent);
 }
 
@@ -617,7 +642,7 @@
   padding: 0.28rem 0.35rem;
   border-radius: 6px;
   border: 1px solid var(--nd-line);
-  background: #fff;
+  background: var(--color-surface-raised);
 }
 
 .nadi-desk__tri header {
@@ -714,7 +739,7 @@
 }
 
 .nadi-desk__ages li.is-current {
-  background: #fff1f2;
+  background: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface));
   font-weight: 800;
 }
 
@@ -753,9 +778,9 @@
   border-radius: 999px;
 }
 
-.nadi-desk__state--strong { color: #2f6b45; background: rgba(61, 107, 79, 0.12); }
-.nadi-desk__state--active { color: var(--nd-accent); background: rgba(159, 18, 57, 0.1); }
-.nadi-desk__state--promise { color: #b45309; background: rgba(180, 83, 9, 0.1); }
+.nadi-desk__state--strong { color: var(--color-success); background: rgba(61, 107, 79, 0.12); }
+.nadi-desk__state--active { color: var(--nd-accent); background: color-mix(in srgb, var(--color-brand) 10%, transparent); }
+.nadi-desk__state--promise { color: var(--color-warning); background: rgba(180, 83, 9, 0.1); }
 
 .nadi-desk__themes {
   margin: 0;
@@ -778,7 +803,7 @@
   font-weight: 650;
   padding: 0.15rem 0.25rem;
   border-radius: 4px;
-  background: #faf6f1;
+  background: var(--color-canvas-subtle);
 }
 
 .nadi-desk__empty-row {
@@ -825,8 +850,8 @@
     column-gap: 0.45rem;
     row-gap: 0.6rem;
     padding: max(0.65rem, env(safe-area-inset-top)) 0.7rem 0.65rem;
-    background: rgba(255, 252, 248, 0.96);
-    backdrop-filter: blur(8px);
+    background: color-mix(in srgb, var(--color-surface-inverse) 96%, transparent);
+    backdrop-filter: blur(14px);
     position: sticky;
     top: 0;
   }
@@ -878,8 +903,8 @@
     margin: 0;
     padding: 0.38rem 0.45rem calc(0.38rem + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--nd-line);
-    background: rgba(255, 252, 248, 0.97);
-    box-shadow: 0 -8px 26px rgba(57, 36, 29, 0.11);
+    background: color-mix(in srgb, var(--color-surface) 96%, transparent);
+    box-shadow: var(--shadow-card);
     backdrop-filter: blur(12px);
   }
 
@@ -905,8 +930,8 @@
 
   .nadi-desk__mobile-hub button.is-active {
     color: var(--nd-accent);
-    background: rgba(159, 18, 57, 0.1);
-    box-shadow: inset 0 0 0 1px rgba(159, 18, 57, 0.08);
+    background: color-mix(in srgb, var(--color-brand) 14%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand) 8%, transparent);
   }
 
   .nadi-desk__mobile-hub-icon {
@@ -931,7 +956,7 @@
     min-width: 1rem;
     border-radius: 999px;
     background: var(--nd-accent);
-    color: #fff;
+    color: var(--color-on-brand);
     font-size: 0.52rem;
     font-style: normal;
   }
@@ -953,8 +978,8 @@
     min-height: 42px;
     padding: 0.4rem 0.65rem;
     border: 1px solid var(--nd-line);
-    border-radius: 8px;
-    background: #fff;
+    border-radius: var(--radius-pill);
+    background: var(--color-surface-raised);
     color: var(--nd-muted);
     font: inherit;
     font-size: 0.76rem;
@@ -962,9 +987,9 @@
   }
 
   .nadi-desk__mobile-pills button.is-active {
-    color: var(--nd-accent);
-    background: #fff1f2;
-    border-color: rgba(159, 18, 57, 0.3);
+    color: var(--color-on-brand);
+    background: var(--color-brand);
+    border-color: var(--color-brand);
   }
 
   .nadi-desk__mobile-pills--more {
@@ -972,7 +997,7 @@
     overflow: hidden;
     border: 1px solid var(--nd-line);
     border-radius: 10px;
-    background: #f8f2eb;
+    background: var(--color-canvas-subtle);
   }
 
   .nadi-desk__mobile-pills--more button {
@@ -990,7 +1015,7 @@
   }
 
   .nadi-desk__mobile-pills--more button.is-active {
-    background: #fff8f4;
+    background: var(--color-surface);
     box-shadow: inset 0 -3px 0 var(--nd-accent);
   }
 
@@ -1000,7 +1025,7 @@
     overflow: visible;
     gap: 0.6rem 0.45rem;
     padding: 0.65rem;
-    border-radius: 11px;
+    border-radius: var(--radius-md);
   }
 
   .nadi-desk__tools--more {
@@ -1032,7 +1057,7 @@
     overflow-x: auto;
     border: 1px solid var(--nd-line);
     border-radius: 10px;
-    background: #f8f2eb;
+    background: var(--color-canvas-subtle);
     scrollbar-width: none;
   }
 
@@ -1054,7 +1079,7 @@
     min-width: 4.6rem;
     padding: 0 0.55rem;
     border-right: 1px solid var(--nd-line);
-    background: #eee3da;
+    background: var(--color-border);
     color: var(--nd-muted);
     font-size: 0.66rem;
     font-weight: 850;
@@ -1083,7 +1108,7 @@
 
   .nadi-desk__tools--links .nadi-desk__topics button.is-active,
   .nadi-desk__tools--act .nadi-desk__topics button.is-active {
-    background: #fff8f4;
+    background: var(--color-surface);
     box-shadow: inset 0 -3px 0 var(--nd-accent);
   }
 
@@ -1131,8 +1156,8 @@
 
   .nadi-desk__karaka-card {
     padding: 0.75rem;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(65, 42, 32, 0.05);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
   }
 
   .nadi-desk__karaka-card header {
@@ -1161,7 +1186,7 @@
     min-height: 38px;
     padding: 0.4rem 0.5rem;
     border-radius: 7px;
-    background: #faf6f1;
+    background: var(--color-canvas-subtle);
   }
 
   .nadi-desk__karaka-card dt {
@@ -1221,9 +1246,9 @@
     min-width: 30px;
     min-height: 30px;
     padding: 0 0.45rem;
-    border: 1px solid rgba(159, 18, 57, 0.24);
+    border: 1px solid color-mix(in srgb, var(--color-brand) 24%, transparent);
     border-radius: 7px;
-    background: #fff;
+    background: var(--color-surface-raised);
     color: var(--nd-accent);
     font: inherit;
     font-size: 0.72rem;
@@ -1233,9 +1258,9 @@
   }
 
   .nadi-desk__panel--links {
-    border-radius: 12px;
-    background: #fffaf6;
-    box-shadow: 0 3px 14px rgba(65, 42, 32, 0.07);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
   }
 
   .nadi-desk__panel--links > header {
@@ -1258,7 +1283,7 @@
     gap: 0;
     padding: 0;
     overflow-x: auto;
-    background: #f8f2eb;
+    background: var(--color-canvas-subtle);
     scrollbar-width: none;
   }
 
@@ -1275,7 +1300,7 @@
   }
 
   .nadi-desk__planet-tabs button.is-active {
-    background: #fff8f4;
+    background: var(--color-surface);
     box-shadow: inset 0 -3px 0 var(--nd-accent);
   }
 
@@ -1329,9 +1354,9 @@
 
   .nadi-desk__panel--tri,
   .nadi-desk__panel--ages {
-    border-radius: 12px;
-    background: #fffaf6;
-    box-shadow: 0 3px 14px rgba(65, 42, 32, 0.07);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
   }
 
   .nadi-desk__panel--tri > header,
@@ -1403,7 +1428,7 @@
     padding: 0.7rem;
     border: 1px solid var(--nd-line);
     border-radius: 9px;
-    background: #fff;
+    background: var(--color-surface-raised);
   }
 
   .nadi-desk__ages > div > em {
@@ -1439,7 +1464,7 @@
     min-height: 40px;
     padding: 0.45rem 0.55rem;
     border-radius: 7px;
-    background: #faf6f1;
+    background: var(--color-canvas-subtle);
     font-size: 0.78rem;
     line-height: 1.3;
   }
@@ -1460,7 +1485,7 @@
   .nadi-desk__ages li i {
     padding: 0.12rem 0.35rem;
     border-radius: 999px;
-    background: #f1e8df;
+    background: var(--color-surface-muted);
     font-size: 0.68rem;
     white-space: nowrap;
   }

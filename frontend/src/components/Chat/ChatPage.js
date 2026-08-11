@@ -5,7 +5,7 @@ import { scrollChatThreadAfterMessagesChange } from './chatScrollUtils';
 import ChatChartEssence from './ChatChartEssence';
 import ChatInput from './ChatInput';
 import BirthFormModal from '../BirthForm/BirthFormModal';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import { useAstrology } from '../../context/AstrologyContext';
 import { useCredits } from '../../context/CreditContext';
 import CreditsModal from '../Credits/CreditsModal';
@@ -1083,7 +1083,8 @@ const ChatPage = ({ onLogin }) => {
         if (!st?.openSingleChartChat) return;
 
         const q = typeof st.followUpQuestion === 'string' ? st.followUpQuestion.trim() : '';
-        analysisChatIntentRef.current = { question: q };
+        const queryContext = st.queryContext && typeof st.queryContext === 'object' ? st.queryContext : null;
+        analysisChatIntentRef.current = { question: q, queryContext };
 
         navigate(location.pathname, { replace: true, state: {} });
 
@@ -1104,6 +1105,7 @@ const ChatPage = ({ onLogin }) => {
         if (intent.question) {
             setPendingFollowUpQuestion(intent.question);
         }
+        setPendingFollowUpQueryContext(intent.queryContext || null);
         analysisChatIntentRef.current = null;
     }, [birthData]);
 
@@ -2383,13 +2385,10 @@ const ChatPage = ({ onLogin }) => {
 
     return (
         <>
-            <NavigationHeader
-                compact
-                variant="chat"
+            <ModernNavigationHeader
                 user={headerUser}
-                birthData={birthData}
-                onChangeNative={openBirthModalEmpty}
-                onCreditsClick={() => setShowCreditsModal(true)}
+                sticky
+                showNativeBar={false}
                 onLogout={() => {
                     localStorage.removeItem('token');
                     localStorage.removeItem('user');
@@ -2397,7 +2396,6 @@ const ChatPage = ({ onLogin }) => {
                     navigate('/');
                 }}
                 onLogin={() => (onLogin ? onLogin() : navigate('/login'))}
-                showLoginButton={!headerUser}
             />
             <FirstPurchaseOffer
                 offer={firstPurchaseOffer}
@@ -2406,14 +2404,14 @@ const ChatPage = ({ onLogin }) => {
                 onClaim={claimFirstPurchaseOffer}
                 onCloseModal={() => setFirstPurchaseOfferModalOpen(false)}
             />
-            <div className={`chat-page${wizardCompleted ? '' : ' chat-page--wizard'}`}>
+            <div className={`chat-page${wizardCompleted ? '' : ' chat-page--wizard'}${headerUser ? ' chat-page--with-user-header chat-page--with-user-header-compact' : ''}`}>
             <div className={`chat-header${wizardCompleted ? '' : ' chat-header--wizard'}`}>
                 {!wizardCompleted ? (
                     <div className="chat-wizard-flow">
                         <div className="chat-wizard-intro">
-                            <h1 className="chat-wizard-intro__title">AstroRoshni Guided Setup</h1>
+                            <h1 className="chat-wizard-intro__title">Begin with the right lens.</h1>
                             <p className="chat-wizard-intro__text">
-                                Choose your analysis type below. The chat unlocks only after you complete the guided steps.
+                                Choose the kind of consultation you need. Tara will prepare the correct charts and context before your conversation begins.
                             </p>
                         </div>
                         <div className="wizard-mode-grid">
@@ -2426,8 +2424,8 @@ const ChatPage = ({ onLogin }) => {
                                 setWizardStep(1);
                             }}
                         >
-                            <div className="wizard-mode-title">✨ Single Chart</div>
-                            <div className="wizard-mode-subtitle">Your birth chart + your life guidance</div>
+                            <div className="wizard-mode-title">Single chart</div>
+                            <div className="wizard-mode-subtitle">Your complete birth chart, life themes and timing.</div>
                         </button>
                         <button
                             type="button"
@@ -2438,8 +2436,8 @@ const ChatPage = ({ onLogin }) => {
                                 setWizardStep(1);
                             }}
                         >
-                            <div className="wizard-mode-title">💞 Partnership</div>
-                            <div className="wizard-mode-subtitle">Two charts + relationship insights</div>
+                            <div className="wizard-mode-title">Partnership</div>
+                            <div className="wizard-mode-subtitle">Two charts read together with relationship context.</div>
                         </button>
                         <button
                             type="button"
@@ -2450,8 +2448,8 @@ const ChatPage = ({ onLogin }) => {
                                 setWizardStep(1);
                             }}
                         >
-                            <div className="wizard-mode-title">🌍 Mundane</div>
-                            <div className="wizard-mode-subtitle">Global events + trend dynamics</div>
+                            <div className="wizard-mode-title">Mundane</div>
+                            <div className="wizard-mode-subtitle">Places, events and collective timing dynamics.</div>
                         </button>
                         </div>
                         <div className="wizard-step">
@@ -2893,25 +2891,7 @@ const ChatPage = ({ onLogin }) => {
                                         {birthData?.name || 'Consultation'}
                                     </span>
                                 ) : (
-                                    <button
-                                        type="button"
-                                        className="native-selector-chip chat-header-native-chip"
-                                        onClick={openBirthModalEmpty}
-                                        title="Change birth chart / native"
-                                        aria-haspopup="dialog"
-                                        aria-label={`Selected native ${birthData?.name || 'chart'}. Choose a different chart.`}
-                                    >
-                                        <span className="native-selector-chip__icon" aria-hidden="true">
-                                            👤
-                                        </span>
-                                        <span className="native-selector-chip__name">
-                                            {(birthData?.name && String(birthData.name).trim()) ||
-                                                'Select chart'}
-                                        </span>
-                                        <span className="native-selector-chip__chevron" aria-hidden="true">
-                                            ▾
-                                        </span>
-                                    </button>
+                                    <span className="chat-header-toolbar__title-focus">Ask Tara</span>
                                 )}
                             </h1>
                             {(isMundaneMode || isPartnershipMode) && (
@@ -2978,9 +2958,59 @@ const ChatPage = ({ onLogin }) => {
                 )}
             </div>
 
-            <div className="chat-container">
+            {wizardCompleted ? (
+                <aside className="chat-consultation-rail" aria-label="Consultation context">
+                    <div className="chat-consultation-rail__intro">
+                        <span className="chat-consultation-rail__eyebrow">Private consultation</span>
+                        <div className="chat-consultation-rail__mark" aria-hidden="true"><i>त</i></div>
+                        <h2>Ask Tara</h2>
+                        <p>One conversation, interpreted through your complete Vedic chart.</p>
+                    </div>
+
+                    <div className="chat-consultation-rail__context">
+                        <span>Reading for</span>
+                        <strong>
+                            {isPartnershipMode && wizardPrimaryChart && wizardSecondaryChart
+                                ? `${wizardPrimaryChart.name} & ${wizardSecondaryChart.name}`
+                                : isMundaneMode
+                                    ? (mundaneForm.country || 'Mundane context')
+                                    : (birthData?.name || 'Selected chart')}
+                        </strong>
+                        <small>
+                            {isPartnershipMode ? 'Partnership synthesis' : isMundaneMode ? 'Mundane astrology' : 'Single-chart consultation'}
+                        </small>
+                    </div>
+
+                    <div className="chat-consultation-rail__method">
+                        <span>How Tara reads</span>
+                        <p>Parashari, Nadi, Jaimini and KP are synthesized across 90+ calculation and interpretation layers.</p>
+                    </div>
+
+                    <div className="chat-consultation-rail__actions">
+                        <button type="button" onClick={() => {
+                            resetThreadForWizard(null);
+                            setWizardMode(null);
+                            setWizardStep(0);
+                        }}>
+                            New consultation
+                        </button>
+                        <button type="button" onClick={() => setShowCreditsModal(true)}>
+                            <span>Credits</span><strong>{credits}</strong>
+                        </button>
+                    </div>
+                </aside>
+            ) : null}
+
+            <main className="chat-container">
                 {wizardCompleted ? (
                     <div className="chat-thread">
+                        {messages.length === 0 ? (
+                            <section className="chat-thread-welcome" aria-labelledby="chat-thread-welcome-title">
+                                <span className="chat-thread-welcome__eyebrow">Your chart is ready</span>
+                                <h2 id="chat-thread-welcome-title">What would you like to understand?</h2>
+                                <p>Ask about a decision, relationship, life phase or timing. Tara will connect the relevant chart factors into one clear answer.</p>
+                            </section>
+                        ) : null}
                         {!isMundaneMode && isBirthChartReadyForChat(birthData) && (
                             <div className="message-bubble assistant chat-chart-essence-wrap">
                                 <div className="message-content chat-chart-essence-wrap__content">
@@ -3015,7 +3045,7 @@ const ChatPage = ({ onLogin }) => {
                         {/* Wizard UI is rendered inside the header. Keep the thread area empty to avoid confusion. */}
                     </div>
                 )}
-            </div>
+            </main>
 
             {/* No mode chosen yet — hide composer (premium row + placeholder) so setup stays the only focus */}
             {(wizardCompleted || wizardMode) && (

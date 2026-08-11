@@ -19,6 +19,7 @@ import DeskStrengthStrip from './DeskStrengthStrip';
 import DeskActivationsPanel from './DeskActivationsPanel';
 import DeskToolModals from './DeskToolModals';
 import ParashariDeskMobile from './ParashariDeskMobile';
+import ChartActivationKey from './ChartActivationKey';
 import { useAstrology } from '../../context/AstrologyContext';
 import { generatePageSEO } from '../../config/seo.config';
 import { apiService } from '../../services/apiService';
@@ -104,6 +105,7 @@ const ChartsDashasWorkspacePage = ({
   const [activationLedger, setActivationLedger] = useState(null);
   const [activationLoading, setActivationLoading] = useState(false);
   const [activationError, setActivationError] = useState(null);
+  const [showChartActivations, setShowChartActivations] = useState(true);
   const [analysisTab, setAnalysisTab] = useState('positions');
   const [activationsFocus, setActivationsFocus] = useState(false);
   const [activeTool, setActiveTool] = useState(null);
@@ -175,6 +177,26 @@ const ChartsDashasWorkspacePage = ({
       : rows.filter((row) => row.window?.start_date === rows[0]?.window?.start_date);
     return pool.filter((row) => !['transit_only', 'dormant'].includes(row.state)).length;
   }, [activationLedger, asOfDate]);
+
+  const activationHouseStates = useMemo(() => {
+    if (activationLoading) return {};
+    const rows = activationLedger?.house_activations || [];
+    const asOf = formatAsOfIso(asOfDate);
+    const stateRank = {
+      dasha_connected: 1,
+      dasha_transit_activated: 2,
+      fully_reinforced: 3,
+    };
+    return rows.reduce((states, row) => {
+      if (row.window?.start_date > asOf || row.window?.end_date < asOf) return states;
+      if (!stateRank[row.state]) return states;
+      const house = Number(row.house);
+      if (!house || stateRank[row.state] <= (stateRank[states[house]] || 0)) return states;
+      return { ...states, [house]: row.state };
+    }, {});
+  }, [activationLedger, activationLoading, asOfDate]);
+
+  const visibleActivationHouseStates = showChartActivations ? activationHouseStates : {};
 
   useEffect(() => {
     setHouseSelection(null);
@@ -324,6 +346,9 @@ const ChartsDashasWorkspacePage = ({
           activationLoading={activationLoading}
           activationError={activationError}
           activationNowCount={activationNowCount}
+          activationHouseStates={activationHouseStates}
+          showChartActivations={showChartActivations}
+          onShowChartActivationsChange={setShowChartActivations}
           analysisTab={analysisTab}
           onAnalysisTabChange={setAnalysisTab}
           houseSelection={houseSelection}
@@ -343,9 +368,16 @@ const ChartsDashasWorkspacePage = ({
                 onChange={setAsOfDate}
                 onResetToToday={() => setAsOfDate(new Date())}
                 variant="light"
+                textColor="var(--color-text)"
+                primaryColor="var(--color-brand)"
                 showTime
               />
             </div>
+            <ChartActivationKey
+              enabled={showChartActivations}
+              onToggle={setShowChartActivations}
+              loading={activationLoading}
+            />
             {!activationsFocus ? (
               <div className="parashari-desk-tools__divs" aria-label="Divisional chart">
                 <span className="parashari-desk-tools__label">
@@ -407,6 +439,7 @@ const ChartsDashasWorkspacePage = ({
                   deskMode
                   onHouseSelect={handleHouseSelect}
                   selectedHouseNumber={houseSelection?.houseNumber}
+                  activationHouseStates={visibleActivationHouseStates}
                 />
               </div>
             </section>
@@ -483,6 +516,7 @@ const ChartsDashasWorkspacePage = ({
                   deskMode
                   onHouseSelect={handleHouseSelect}
                   selectedHouseNumber={houseSelection?.houseNumber}
+                  activationHouseStates={visibleActivationHouseStates}
                 />
               </div>
             </section>

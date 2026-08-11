@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import { markdownToHtml } from '../../utils/blogMarkdown';
 import './BlogPost.css';
@@ -37,13 +37,31 @@ const ShareIcon = ({ type }) => {
     );
 };
 
-const BlogPost = () => {
+const BlogPost = ({ user, onLogin, onLogout, onAdminClick }) => {
     const { slug } = useParams();
     const [post, setPost] = useState(null);
     const [recentPosts, setRecentPosts] = useState([]);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [readingProgress, setReadingProgress] = useState(0);
+
+    useEffect(() => {
+        const updateReadingProgress = () => {
+            const article = document.querySelector('.blog-post');
+            if (!article) return setReadingProgress(0);
+            const start = article.offsetTop;
+            const distance = Math.max(1, article.offsetHeight - window.innerHeight);
+            setReadingProgress(Math.min(100, Math.max(0, ((window.scrollY - start) / distance) * 100)));
+        };
+        window.addEventListener('scroll', updateReadingProgress, { passive: true });
+        window.addEventListener('resize', updateReadingProgress);
+        updateReadingProgress();
+        return () => {
+            window.removeEventListener('scroll', updateReadingProgress);
+            window.removeEventListener('resize', updateReadingProgress);
+        };
+    }, [post]);
 
     useEffect(() => {
         fetchPost();
@@ -141,76 +159,90 @@ const BlogPost = () => {
         [post?.content]
     );
 
+    const readingMinutes = useMemo(() => {
+        const words = String(post?.content || '').replace(/<[^>]*>/g, ' ').trim().split(/\s+/).filter(Boolean).length;
+        return Math.max(1, Math.ceil(words / 220));
+    }, [post?.content]);
+
     if (loading) {
         return (
             <>
-                <NavigationHeader compact={true} />
-                <div className="blog-post-container" style={{paddingTop: '80px'}}>
-                <div className="loading">Loading post...</div>
-            </div>
-        </>
+                <ModernNavigationHeader sticky user={user} onLogin={onLogin} onLogout={onLogout} onAdminClick={onAdminClick} />
+                <main className="blog-post-state" aria-live="polite"><i aria-hidden /><p>Opening the journal…</p></main>
+            </>
         );
     }
 
     if (error || !post) {
         return (
             <>
-                <NavigationHeader compact={true} />
-                <div className="blog-post-container" style={{paddingTop: '80px'}}>
-                <div className="error">
+                <ModernNavigationHeader sticky user={user} onLogin={onLogin} onLogout={onLogout} onAdminClick={onAdminClick} />
+                <main className="blog-post-state" role="alert">
+                <div>
+                    <p>Journal</p>
                     <h2>Post Not Found</h2>
                     <p>The blog post you're looking for doesn't exist.</p>
                     <Link to="/blog" className="back-link">← Back to Blog</Link>
                 </div>
-            </div>
-        </>
+                </main>
+            </>
         );
     }
 
     return (
         <>
-            <SEOHead 
+            <div className="blog-post-page">
+            <SEOHead
                 title={`${post.title} | AstroRoshni Blog`}
                 description={post.excerpt || post.content.substring(0, 160)}
                 keywords={post.tags ? post.tags.join(', ') : 'vedic astrology, astrology blog'}
                 canonical={`https://astroroshni.com/blog/${post.slug}/`}
                 ogImage={post.featured_image || 'https://astroroshni.com/og-image.jpg'}
+                themeColor="#210b17"
                 structuredData={{
-                    "@context": "https://schema.org",
-                    "@type": "BlogPosting",
-                    "headline": post.title,
-                    "description": post.excerpt,
-                    "image": post.featured_image,
-                    "datePublished": post.created_at,
-                    "dateModified": post.updated_at,
-                    "author": {
-                        "@type": "Organization",
-                        "name": "AstroRoshni"
-                    },
-                    "publisher": {
-                        "@type": "Organization",
-                        "name": "AstroRoshni",
-                        "logo": {
-                            "@type": "ImageObject",
-                            "url": "https://astroroshni.com/logo.png"
+                    '@context': 'https://schema.org',
+                    '@graph': [
+                        {
+                            '@type': 'BlogPosting',
+                            headline: post.title,
+                            description: post.excerpt || post.content.substring(0, 160),
+                            ...(post.featured_image && { image: post.featured_image }),
+                            datePublished: post.created_at,
+                            dateModified: post.updated_at || post.created_at,
+                            mainEntityOfPage: `https://astroroshni.com/blog/${post.slug}/`,
+                            author: { '@type': 'Organization', name: 'AstroRoshni', url: SITE_ORIGIN },
+                            publisher: {
+                                '@type': 'Organization', name: 'AstroRoshni', url: SITE_ORIGIN,
+                                logo: { '@type': 'ImageObject', url: 'https://astroroshni.com/logo.png' }
+                            }
+                        },
+                        {
+                            '@type': 'BreadcrumbList',
+                            itemListElement: [
+                                { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_ORIGIN}/` },
+                                { '@type': 'ListItem', position: 2, name: 'Journal', item: `${SITE_ORIGIN}/blog/` },
+                                { '@type': 'ListItem', position: 3, name: post.title, item: `${SITE_ORIGIN}/blog/${post.slug}/` }
+                            ]
                         }
-                    }
+                    ]
                 }}
             />
-            <NavigationHeader compact={true} />
-            <div className="blog-post-container" style={{paddingTop: '80px'}}>
+            <ModernNavigationHeader sticky user={user} onLogin={onLogin} onLogout={onLogout} onAdminClick={onAdminClick} />
+            <div className="blog-reading-progress" aria-hidden="true"><span style={{ width: `${readingProgress}%` }} /></div>
+            <main className="blog-post-container">
             <div className="blog-post-layout">
             <article className="blog-post">
                 <header className="post-header">
                     <Link to="/blog" className="back-link">← Back to Blog</Link>
                     
                     <div className="post-meta">
-                        <time className="post-date">{formatDate(post.created_at)}</time>
+                        <time className="post-date" dateTime={post.created_at}>{formatDate(post.created_at)}</time>
                         {post.category && (
                             <Link to={`/blog?category=${encodeURIComponent(post.category)}`} className="post-category">
                                 {post.category}
                             </Link>
                         )}
+                        <span className="post-read-time">{readingMinutes} min read</span>
                     </div>
                     
                     <h1 className="post-title">{post.title}</h1>
@@ -329,6 +361,7 @@ const BlogPost = () => {
                     View All Posts
                 </Link>
             </div>
+            </main>
             </div>
         </>
     );

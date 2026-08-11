@@ -1,4 +1,5 @@
 @import './styles/brand-colors.css';
+@import './theme/tokens.css';
 
 * {
   box-sizing: border-box;
@@ -11,11 +12,11 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 html {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* Mobile viewport fix */
@@ -35,17 +36,17 @@ html {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(233, 30, 99, 0.1);
+  background: color-mix(in srgb, var(--color-brand) 10%, transparent);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--ar-gradient-rose);
+  background: var(--color-brand);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--ar-gradient-rose);
+  background: var(--color-brand-hover);
 }
 
 /* Tab navigation scrollbar hide */

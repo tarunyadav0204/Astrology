@@ -212,7 +212,7 @@
   padding: 0.05rem 0.3rem;
   border-radius: 999px;
   background: rgba(245, 158, 11, 0.14);
-  color: #92400e;
+  color: var(--color-warning);
   font-size: 0.58rem;
   font-weight: 750;
 }

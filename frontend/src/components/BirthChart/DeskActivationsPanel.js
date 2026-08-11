@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './DeskActivationsPanel.css';
 import DeskDoubleTransitBrowser from './DeskDoubleTransitBrowser';
+import { apiService } from '../../services/apiService';
 
 const PLANET_ABBR = {
   Sun: 'Su', Moon: 'Mo', Mars: 'Ma', Mercury: 'Me',
@@ -12,6 +13,52 @@ const HOUSE_LABELS = {
   5: 'Creativity', 6: 'Service', 7: 'Partnership', 8: 'Transformation',
   9: 'Dharma', 10: 'Career', 11: 'Gains', 12: 'Release',
 };
+
+const EVENT_FOCUS_META = {
+  job_change: {
+    label: 'Job change',
+    intro: 'Requires career + transition activation in the same dasha period. Natal wiring never vetoes the event.',
+    loading: 'Calculating one strict year of dasha, transit, D10 and exact-return evidence…',
+  },
+  health: {
+    label: 'Health',
+    intro: 'Looks for health attention plus pressure, treatment or rest indicators, then assesses recovery support. This is an astrological timing aid—not a diagnosis or substitute for medical care.',
+    loading: 'Calculating one strict year of dasha, transit, D30 and exact-return evidence…',
+  },
+};
+
+const EVENT_HOUSE_MEANINGS = {
+  job_change: {
+    2: 'Salary, accumulated resources and financial continuity after the transition.',
+    3: 'Initiative, applications, interviews, negotiation, movement or transfer.',
+    6: 'Employment, service, duties, colleagues and the day-to-day working environment.',
+    8: 'A break in continuity, restructuring, uncertainty or transformation of the existing role.',
+    10: 'Profession, responsibility, authority, public role and career status.',
+    11: 'Gain, fulfilment, recognition and the benefit received from the change.',
+    12: 'Release, resignation, separation, remote/foreign movement or leaving the present arrangement.',
+  },
+  health: {
+    1: 'The body, vitality and overall physical condition.',
+    5: 'Recovery support and release from sixth-house difficulty.',
+    6: 'Illness, treatment, health routines and the effort required to overcome a problem.',
+    8: 'Acute change, chronic concern, investigation or deeper intervention.',
+    11: 'Improvement, support and fulfilment of treatment.',
+    12: 'Rest, withdrawal, hospitalization, isolation or sustained recovery time.',
+  },
+};
+
+const HEALTH_HOUSE_LABELS = {
+  1: 'Body & vitality',
+  5: 'Recovery',
+  6: 'Health & treatment',
+  8: 'Deep intervention',
+  11: 'Improvement',
+  12: 'Rest & retreat',
+};
+
+function eventHouseLabel(eventKey, house) {
+  return eventKey === 'health' ? (HEALTH_HOUSE_LABELS[house] || HOUSE_LABELS[house]) : HOUSE_LABELS[house];
+}
 
 const STATE_META = {
   fully_reinforced: {
@@ -59,14 +106,6 @@ const TONE_META = {
   challenging: { short: 'Challenging', rank: 2 },
   neutral: { short: 'Neutral', rank: 1 },
 };
-
-const PRESETS = [
-  { id: 'career', label: 'Career', houses: [10, 6, 2], title: 'H10 · H6 · H2 — karma, service, resources' },
-  { id: 'job', label: 'Job change', houses: [6, 10, 3], title: 'H6 · H10 · H3 — service, status, courage/effort' },
-  { id: 'status', label: 'Status', houses: [10, 11], title: 'H10 · H11 — career recognition & gains' },
-  { id: 'wealth', label: 'Wealth', houses: [2, 11, 5], title: 'H2 · H11 · H5 — accumulation & speculative gains' },
-  { id: 'custom', label: 'Custom', houses: null, title: 'Pick houses H1–H12' },
-];
 
 const PREDICTIVE = new Set(['fully_reinforced', 'dasha_transit_activated', 'dasha_connected']);
 
@@ -297,6 +336,147 @@ function outcomeWeightSummary(outcome) {
   };
 }
 
+function EvidenceList({ items, empty }) {
+  if (!items?.length) return <span className="desk-act__event-evidence-empty">{empty}</span>;
+  return (
+    <ul className="desk-act__event-evidence-list">
+      {items.map((item, index) => <li key={`${String(item)}-${index}`}>{item}</li>)}
+    </ul>
+  );
+}
+
+function HouseGroupEvidence({ rows, eventKey }) {
+  if (!rows?.length) {
+    return <span className="desk-act__event-evidence-empty">No qualifying house in this group.</span>;
+  }
+  return (
+    <div className="desk-act__event-house-evidence">
+      {rows.map((row) => {
+        const natal = (row.natal_connections || []).map((link) => (
+          `${link.level || 'Dasha'} ${abbr(link.planet)} · ${relationLabel(link.relation)}`
+        ));
+        const transits = (row.transit_connections || [])
+          .filter((link) => link.timing_trigger)
+          .map((link) => (
+            `${abbr(link.planet)} ${relationLabel(link.relation)}${link.transit_house ? ` from H${link.transit_house}` : ''}`
+          ));
+        return (
+          <article key={`${row.house}-${row.state}`}>
+            <header>
+              <strong>H{row.house} {eventHouseLabel(eventKey, row.house)}</strong>
+              <span>{STATE_META[row.state]?.short || relationLabel(row.state)}</span>
+            </header>
+            <p className="desk-act__event-house-meaning">{EVENT_HOUSE_MEANINGS[eventKey]?.[row.house]}</p>
+            <p className="desk-act__event-state-meaning">
+              <strong>Why {STATE_META[row.state]?.short || 'active'}:</strong>{' '}
+              {STATE_META[row.state]?.meaning || 'This house participates in the event window.'}
+            </p>
+            <div className="desk-act__event-evidence-tags">
+              {(row.carriers || []).map((planet) => <b key={planet}>{abbr(planet)} carrier</b>)}
+              {(row.dasha_levels || []).map((level) => <i key={level}>{level}</i>)}
+            </div>
+            <div className="desk-act__event-evidence-columns">
+              <div><em>Dasha connection</em><EvidenceList items={natal} empty="No direct natal portfolio link" /></div>
+              <div><em>Transit timing</em><EvidenceList items={transits} empty="Opened by dasha; no direct transit hit" /></div>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function CalculationEvidence({ step, eventKey }) {
+  const evidence = step.evidence || {};
+  if (Array.isArray(evidence)) return <HouseGroupEvidence rows={evidence} eventKey={eventKey} />;
+
+  if (step.key === 'dasha_permission') {
+    const levelMeaning = {
+      MD: 'The long chapter and broad life agenda.',
+      AD: 'The active sub-period that channels the chapter.',
+      PD: 'The shorter delivery period used to narrow timing.',
+    };
+    return (
+      <div className="desk-act__event-dasha-evidence">
+        {['MD', 'AD', 'PD'].map((level) => (
+          <span key={level}>
+            <em>{level}</em><strong>{evidence[level] || '—'}</strong><small>{levelMeaning[level]}</small>
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  if (step.key === 'divisional_confirmation') {
+    return (
+      <div className="desk-act__event-confirmation-evidence">
+        <p>{evidence.explanation}</p>
+        <EvidenceList
+          items={(evidence.matches || []).map((match) => (
+            `${match.planet} connects to ${evidence.chart || 'the divisional chart'} H${match.house}${EVENT_HOUSE_MEANINGS[eventKey]?.[match.house] ? ` (${EVENT_HOUSE_MEANINGS[eventKey][match.house]})` : ''} by ${(match.relations || []).map(relationLabel).join(', ')}.`
+          ))}
+          empty={`No active dasha lord directly carries the selected ${evidence.chart || 'divisional'} houses.`}
+        />
+      </div>
+    );
+  }
+
+  if (step.key === 'independent_confirmation') {
+    const double = evidence.double_transit || {};
+    const exact = evidence.exact_and_repetition_confirmations || [];
+    const boundaries = evidence.dasha_boundaries || [];
+    const doublePlanetLines = double.planets ? ['Jupiter', 'Saturn'].map((planet) => {
+      const row = double.planets[planet] || {};
+      const contacts = row.contacted_focus_houses || row.contacted_career_houses || [];
+      const focusHouses = Object.keys(EVENT_HOUSE_MEANINGS[eventKey] || {}).map(Number);
+      return contacts.length
+        ? `${planet} from H${row.transit_house} contacts ${contacts.map((house) => `H${house}`).join(' and ')}.`
+        : `${planet} from H${row.transit_house || '—'} does not contact ${focusHouses.map((house) => `H${house}`).join('/')}.`;
+    }) : [];
+    return (
+      <div className="desk-act__event-confirmation-grid">
+        <article className={evidence.transit_reinforced ? 'is-confirmed' : ''}>
+          <strong>Dasha-lord transit</strong>
+          <span>{evidence.transit_reinforced ? 'A required event house receives a direct timing hit.' : 'No direct timing hit in this slice.'}</span>
+        </article>
+        <article className={double.passed ? 'is-confirmed' : ''}>
+          <strong>Jupiter–Saturn</strong>
+          <span>{double.explanation || 'No double-transit evidence.'}</span>
+          <EvidenceList items={doublePlanetLines} empty="Planet contact details are unavailable." />
+        </article>
+        <article className={boundaries.length ? 'is-confirmed' : ''}>
+          <strong>Dasha boundary</strong>
+          <EvidenceList items={boundaries.map((row) => row.label)} empty="No MD/AD/PD boundary opens this slice." />
+        </article>
+        <article className={exact.length ? 'is-confirmed' : ''}>
+          <strong>Exact and repeated contacts</strong>
+          <EvidenceList items={exact.map((row) => row.label)} empty="No exact return or repeated natal relationship in this slice." />
+        </article>
+      </div>
+    );
+  }
+
+  return <span className="desk-act__event-evidence-empty">No additional evidence rows.</span>;
+}
+
+function TimingBoundaryEvidence({ slices }) {
+  return (
+    <div className="desk-act__event-slice-list">
+      {(slices || []).map((slice, index) => {
+        const opens = boundaryLabels(slice.opened_by, { hideHorizon: false });
+        const closes = boundaryLabels(slice.closed_by, { hideHorizon: false });
+        return (
+          <article key={`${slice.start_date}-${slice.end_date}-${index}`}>
+            <header><strong>{formatRange(slice.start_date, slice.end_date)}</strong><b>{slice.score}/100</b></header>
+            {opens.length ? <span><em>Opens</em>{opens.join(' · ')}</span> : null}
+            {closes.length ? <span><em>Ends</em>{closes.join(' · ')}</span> : null}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
  * Desk activations: Now / Next timeline, focus house sets, H1–12 map.
  * Pure house-activation ledger (dasha + transit) from prediction engine.
@@ -314,17 +494,23 @@ export default function DeskActivationsPanel({
   layout = 'dock', // dock | focus | expanded | mobile
 }) {
   const [lens, setLens] = useState('timeline'); // timeline | focus | map | double
-  const [presetId, setPresetId] = useState('career');
-  const [customHouses, setCustomHouses] = useState(() => new Set([6, 10, 3]));
   const [selected, setSelected] = useState(null); // { house, windowStart, windowEnd, transitSignature }
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailPercent, setDetailPercent] = useState(45);
   const [detailMaximized, setDetailMaximized] = useState(false);
   const [legendExpanded, setLegendExpanded] = useState(false);
+  const [eventKey, setEventKey] = useState('job_change');
+  const [eventYear, setEventYear] = useState(() => (asOfDate || new Date()).getFullYear());
+  const [includeDeveloping, setIncludeDeveloping] = useState(false);
+  const [eventResult, setEventResult] = useState(null);
+  const [eventLoading, setEventLoading] = useState(false);
+  const [eventError, setEventError] = useState('');
+  const [eventFullScreen, setEventFullScreen] = useState(false);
 
   useEffect(() => {
     onLensChange?.(lens);
     setDetailMaximized(false);
+    if (lens !== 'focus') setEventFullScreen(false);
   }, [lens, onLensChange]);
 
   useEffect(() => {
@@ -341,14 +527,27 @@ export default function DeskActivationsPanel({
     };
   }, [detailOpen, layout]);
 
+  useEffect(() => {
+    if (!eventFullScreen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setEventFullScreen(false);
+    };
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [eventFullScreen]);
+
+  useEffect(() => {
+    setEventResult(null);
+    setEventError('');
+  }, [birthData?.chart_id, birthData?.birth_chart_id, birthData?.id, birthData?.date, birthData?.time]);
+
   const asOf = asOfKey(asOfDate);
   const rows = result?.house_activations || [];
-
-  const focusHouses = useMemo(() => {
-    const preset = PRESETS.find((p) => p.id === presetId);
-    if (preset?.houses) return preset.houses;
-    return [...customHouses].sort((a, b) => a - b);
-  }, [presetId, customHouses]);
 
   const windows = useMemo(() => uniqueWindows(rows), [rows]);
 
@@ -377,36 +576,6 @@ export default function DeskActivationsPanel({
       })
       .filter((entry) => entry.houses.length > 0);
   }, [windows, rows, asOf]);
-
-  const focusTimeline = useMemo(() => {
-    if (!focusHouses.length) return [];
-    const focusSet = new Set(focusHouses);
-    const relevant = rows.filter(
-      (row) => focusSet.has(row.house) && row.state !== 'dormant'
-    );
-    const byWindow = new Map();
-    relevant.forEach((row) => {
-      const key = windowKey(row.window);
-      if (!byWindow.has(key)) {
-        byWindow.set(key, { window: enrichWindow(row.window, windows), houses: [] });
-      }
-      byWindow.get(key).houses.push(row);
-    });
-    return [...byWindow.values()]
-      .map((entry) => ({
-        ...entry,
-        houses: sortHouses(entry.houses),
-        isCurrent: entry.window.start_date <= asOf && entry.window.end_date >= asOf,
-        isPast: entry.window.end_date < asOf,
-        isFuture: entry.window.start_date > asOf,
-      }))
-      .sort((a, b) => String(a.window.start_date).localeCompare(String(b.window.start_date)));
-  }, [rows, focusHouses, asOf, windows]);
-
-  const focusUpcoming = useMemo(
-    () => focusTimeline.filter((entry) => entry.isCurrent || entry.isFuture),
-    [focusTimeline]
-  );
 
   const selectedRow = useMemo(() => {
     if (!selected) return null;
@@ -439,6 +608,34 @@ export default function DeskActivationsPanel({
     if (next) onJumpToDate(next);
   };
 
+  const runEventFocus = async () => {
+    if (!birthData || eventLoading) return;
+    setEventLoading(true);
+    setEventError('');
+    try {
+      const data = await apiService.getEventWindows({
+        birthChartId: birthData.chart_id || birthData.birth_chart_id || birthData.id || null,
+        birthData,
+        eventKey,
+        year: Number(eventYear),
+        includeDeveloping,
+      });
+      setEventResult(data);
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setEventResult(null);
+      setEventError(
+        typeof detail === 'string'
+          ? detail
+          : err?.message || 'Could not calculate event windows'
+      );
+    } finally {
+      setEventLoading(false);
+    }
+  };
+
+  const eventMeta = EVENT_FOCUS_META[eventKey] || EVENT_FOCUS_META.job_change;
+
   const selectRow = (row, { syncAsOf = false } = {}) => {
     setSelected({
       house: row.house,
@@ -455,16 +652,6 @@ export default function DeskActivationsPanel({
     const row = houseRow || housesInWindow(rows, window).find((r) => PREDICTIVE.has(r.state));
     if (row) selectRow(row, { syncAsOf });
     else if (syncAsOf) jump(window.start_date);
-  };
-
-  const toggleCustomHouse = (house) => {
-    setCustomHouses((prev) => {
-      const next = new Set(prev);
-      if (next.has(house)) next.delete(house);
-      else next.add(house);
-      return next;
-    });
-    setPresetId('custom');
   };
 
   const resizeDetail = (event) => {
@@ -502,7 +689,7 @@ export default function DeskActivationsPanel({
     ));
   };
 
-  if (lens !== 'double' && loading && !result) {
+  if (lens !== 'double' && lens !== 'focus' && loading && !result) {
     return (
       <div className="desk-act desk-act--status">
         <strong>Reading activation ledger</strong>
@@ -512,7 +699,7 @@ export default function DeskActivationsPanel({
     );
   }
 
-  if (lens !== 'double' && error) {
+  if (lens !== 'double' && lens !== 'focus' && error) {
     return (
       <div className="desk-act desk-act--status desk-act--err">
         <strong>Activation ledger unavailable</strong>
@@ -522,7 +709,7 @@ export default function DeskActivationsPanel({
     );
   }
 
-  if (lens !== 'double' && !rows.length) {
+  if (lens !== 'double' && lens !== 'focus' && !rows.length) {
     return (
       <div className="desk-act desk-act--status">
         <strong>No activation windows</strong>
@@ -730,9 +917,12 @@ export default function DeskActivationsPanel({
 
   return (
     <div
-      className={`desk-act${layout === 'focus' || layout === 'mobile' ? ' desk-act--focus' : ''}${layout === 'expanded' ? ' desk-act--expanded' : ''}${layout === 'mobile' ? ' desk-act--mobile' : ''}${detailMaximized && layout === 'focus' ? ' desk-act--detail-maximized' : ''}`}
+      className={`desk-act${layout === 'focus' || layout === 'mobile' ? ' desk-act--focus' : ''}${layout === 'expanded' ? ' desk-act--expanded' : ''}${layout === 'mobile' ? ' desk-act--mobile' : ''}${detailMaximized && layout === 'focus' ? ' desk-act--detail-maximized' : ''}${eventFullScreen ? ' desk-act--event-fullscreen' : ''}`}
       data-lens={lens}
       style={layout === 'focus' ? { '--da-detail-percent': `${detailPercent}%` } : undefined}
+      role={eventFullScreen ? 'dialog' : undefined}
+      aria-modal={eventFullScreen ? 'true' : undefined}
+      aria-label={eventFullScreen ? 'Full-screen event focus' : undefined}
     >
       <div className="desk-act__toolbar">
         <div className="desk-act__lenses" role="tablist" aria-label="Activation lens">
@@ -759,7 +949,7 @@ export default function DeskActivationsPanel({
             </button>
           ))}
         </div>
-        {lens !== 'double' ? <div className="desk-act__meta">
+        {!['double', 'focus'].includes(lens) ? <div className="desk-act__meta">
           <span title="As-of date">{formatDay(asOf)}</span>
           <span title="Horizon end">{formatDay(result?.horizon_end)}</span>
           {onOpenFull ? (
@@ -770,7 +960,7 @@ export default function DeskActivationsPanel({
         </div> : null}
       </div>
 
-      {lens !== 'double' ? (
+      {!['double', 'focus'].includes(lens) ? (
         <div className={`desk-act__state-key${legendExpanded ? ' is-expanded' : ''}`} aria-label="Activation state meanings">
           <div className="desk-act__state-key-summary">
             <div className="desk-act__state-key-items">
@@ -805,7 +995,7 @@ export default function DeskActivationsPanel({
         </div>
       ) : null}
 
-      {lens !== 'double' && currentWindow ? (
+      {!['double', 'focus'].includes(lens) && currentWindow ? (
         <div className="desk-act__dasha" title="Current Vimśottari stack at as-of">
           <em>Now</em>
           <strong>{dashaPath(currentWindow)}</strong>
@@ -921,81 +1111,151 @@ export default function DeskActivationsPanel({
         ) : null}
 
         {lens === 'focus' ? (
-          <div className="desk-act__focus">
-            <div className="desk-act__presets" role="group" aria-label="House focus">
-              {PRESETS.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  className={presetId === preset.id ? 'is-active' : ''}
-                  title={preset.title}
-                  onClick={() => setPresetId(preset.id)}
+          <div className="desk-act__focus desk-act__event-focus">
+            <div className="desk-act__event-controls">
+              <label>
+                <span>Life event</span>
+                <select
+                  value={eventKey}
+                  onChange={(e) => {
+                    setEventKey(e.target.value);
+                    setEventResult(null);
+                    setEventError('');
+                  }}
                 >
-                  {preset.label}
-                </button>
-              ))}
+                  <option value="job_change">Job change</option>
+                  <option value="health">Health</option>
+                </select>
+              </label>
+              <label>
+                <span>Year</span>
+                <select value={eventYear} onChange={(e) => setEventYear(Number(e.target.value))}>
+                  {Array.from({ length: 201 }, (_, index) => 1900 + index).map((year) => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="desk-act__event-developing">
+                <input
+                  type="checkbox"
+                  checked={includeDeveloping}
+                  onChange={(e) => setIncludeDeveloping(e.target.checked)}
+                />
+                <span>Include developing</span>
+              </label>
+              <button
+                type="button"
+                className="desk-act__event-expand"
+                onClick={() => setEventFullScreen((open) => !open)}
+                title={eventFullScreen ? 'Close full view (Esc)' : 'Open Focus in full view'}
+              >
+                {eventFullScreen ? '✕ Close full view' : '⛶ Full view'}
+              </button>
+              <button type="button" className="desk-act__event-run" onClick={runEventFocus} disabled={eventLoading}>
+                {eventLoading ? 'Calculating…' : 'Find windows'}
+              </button>
             </div>
 
-            {presetId === 'custom' ? (
-              <div className="desk-act__custom" role="group" aria-label="Custom houses">
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((house) => (
-                  <button
-                    key={house}
-                    type="button"
-                    className={customHouses.has(house) ? 'is-active' : ''}
-                    onClick={() => toggleCustomHouse(house)}
-                  >
-                    {house}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="desk-act__focus-houses">
-                {focusHouses.map((h) => (
-                  <span key={h}>H{h} {HOUSE_LABELS[h]}</span>
-                ))}
-              </div>
-            )}
+            <div className="desk-act__event-intro">
+              <strong>{eventMeta.label} · dynamic event search</strong>
+              <span>{eventMeta.intro}</span>
+            </div>
 
-            <div className="desk-act__list desk-act__list--focus">
-              {focusUpcoming.length ? focusUpcoming.map(({ window, houses, isCurrent }) => (
-                <button
-                  key={`focus-${windowKey(window)}`}
-                  type="button"
-                  className={`desk-act__window${isCurrent ? ' is-current' : ''}${detailRow?.window?.start_date === window.start_date ? ' is-selected' : ''}`}
-                  onClick={() => selectWindow(window, houses[0], { syncAsOf: Boolean(isCurrent) })}
-                  title={`${dashaPath(window)} · ${formatRange(window.start_date, window.end_date)}`}
-                >
-                  <div className="desk-act__window-head">
-                    <strong>
-                      {isCurrent ? 'Now · ' : ''}
-                      {formatRange(window.start_date, window.end_date)}
-                    </strong>
-                    <span>{dashaPath(window)}</span>
-                  </div>
-                  <BoundaryReasons
-                    openedBy={window.opened_by}
-                    closedBy={window.closed_by}
-                    endDate={window.end_date}
-                  />
-                  <div className="desk-act__window-houses">
-                    {houses.map((row) => (
-                      <span
-                        key={`${row.house}-${row.state}`}
-                        className={`desk-act__pill desk-act__pill--${row.state} desk-act__pill--tone-${row.outcome?.tone || 'neutral'}`}
-                      >
-                        H{row.house}
-                        <i>{STATE_META[row.state]?.short}</i>
-                        <em>{TONE_META[row.outcome?.tone]?.short}</em>
-                      </span>
-                    ))}
-                  </div>
-                </button>
-              )) : (
-                <div className="desk-act__empty-note">
-                  Selected houses stay quiet through this horizon
-                </div>
-              )}
+            <div className="desk-act__event-results">
+              {eventError ? <div className="desk-act__event-error">{eventError}</div> : null}
+              {eventLoading ? (
+                <div className="desk-act__event-empty">{eventMeta.loading}</div>
+              ) : null}
+              {!eventLoading && eventResult ? (
+                <>
+                  <header className="desk-act__event-summary">
+                    <div>
+                      <strong>{eventResult.qualified_windows} qualified windows</strong>
+                      <span>{eventResult.evaluated_windows} timing slices evaluated · {eventResult.definition_version}</span>
+                    </div>
+                    <span className="desk-act__event-signature" title={eventResult.evidence_signature}>Trace {String(eventResult.evidence_signature || '').slice(0, 8)}</span>
+                  </header>
+                  {eventResult.windows?.length ? eventResult.windows.map((window) => (
+                    <article key={window.window_id} className={`desk-act__event-card desk-act__event-card--${window.strength}`}>
+                      <header>
+                        <div>
+                          <em>{window.strength}</em>
+                          <strong>{formatRange(window.start_date, window.end_date)}</strong>
+                          <span>{abbr(window.dasha?.mahadasha)} → {abbr(window.dasha?.antardasha)} → {abbr(window.dasha?.pratyantardasha)}</span>
+                        </div>
+                        <b>{window.score}/{window.maximum_score}</b>
+                      </header>
+                      <h4>{window.classification_label}</h4>
+                      <p>{window.summary}</p>
+                      <div className="desk-act__event-houses">
+                        {(window.activated_houses || []).map((house) => <span key={house}>H{house} {eventHouseLabel(eventKey, house)}</span>)}
+                      </div>
+                      {!eventFullScreen ? (
+                        <div className="desk-act__event-actions">
+                          <button type="button" onClick={() => jump(window.inspection_date || window.peak_date || window.start_date)}>
+                            Set as-of · {formatDay(window.inspection_date || window.peak_date || window.start_date)}
+                          </button>
+                        </div>
+                      ) : null}
+                      <details className="desk-act__event-trace">
+                        <summary>Show full calculation</summary>
+                        <div className="desk-act__event-calculation-overview">
+                          <div>
+                            <em>Why this qualified</em>
+                            <strong>{window.classification_label}</strong>
+                            <p>{window.qualification_summary || window.summary}</p>
+                          </div>
+                          <dl>
+                            <div>
+                              <dt>Rule completion</dt>
+                              <dd>{window.score}/{window.maximum_score}</dd>
+                              <small>A transparent rule score—not a statistical probability.</small>
+                            </div>
+                            <div>
+                              <dt>Timing precision</dt>
+                              <dd>{window.peak_date ? formatDay(window.peak_date) : 'Broad window'}</dd>
+                              <small>{window.peak_reason || 'No exact peak was isolated.'}</small>
+                            </div>
+                          </dl>
+                        </div>
+                        <div className="desk-act__event-trace-meta">
+                          <span>
+                            <b>{window.timing_slices?.length || 1} timing slices</b> mean that transit, nakṣatra or dasha facts changed inside one continuous event window.
+                          </span>
+                        </div>
+                        <details className="desk-act__event-slices">
+                          <summary>Show why the timing boundaries changed</summary>
+                          <TimingBoundaryEvidence slices={window.timing_slices} />
+                        </details>
+                        {(window.calculation_trace || []).map((step) => (
+                          <section key={step.key} className={step.passed ? 'is-passed' : 'is-not-passed'}>
+                            <header>
+                              <strong>{step.label}</strong>
+                              <span>{step.passed ? 'Passed' : (step.required ? 'Required · not met' : 'Not present')}</span>
+                              <b>+{step.score}/{step.maximum_score}</b>
+                            </header>
+                            <p>{step.description}</p>
+                            <CalculationEvidence step={step} eventKey={eventKey} />
+                          </section>
+                        ))}
+                        <details className="desk-act__event-technical">
+                          <summary>Technical reference</summary>
+                          <span>Window ID <b>{window.window_id}</b></span>
+                          <span>This stable identifier lets the same calculated window be audited across views.</span>
+                        </details>
+                      </details>
+                    </article>
+                  )) : (
+                    <div className="desk-act__event-empty">
+                      <strong>No qualified {String(eventResult.event_label || eventMeta.label).toLowerCase()} window in {eventResult.year}</strong>
+                      <span>The engine did not weaken the rules or generate a fallback result.</span>
+                    </div>
+                  )}
+                </>
+              ) : null}
+              {!eventLoading && !eventResult && !eventError ? (
+                <div className="desk-act__event-empty">Choose a year and run {eventMeta.label} to evaluate the complete event algorithm.</div>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -1051,7 +1311,7 @@ export default function DeskActivationsPanel({
         ) : null}
       </div>
 
-      {lens !== 'double' && (layout === 'mobile' ? (
+      {!['double', 'focus'].includes(lens) && (layout === 'mobile' ? (
         detailOpen && detailAside ? (
           <div className="desk-act__sheet" role="dialog" aria-modal="true" aria-label="Activation details">
             <button

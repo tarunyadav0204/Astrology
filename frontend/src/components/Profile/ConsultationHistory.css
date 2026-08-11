@@ -1,258 +1,148 @@
-/* All rules scoped to .consultation-history — avoids clashing with AdminChatHistory (same class names). */
-
-.consultation-history {
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.consultation-history .history-header {
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-.consultation-history .history-header h2 {
-  color: #d84315;
-  font-size: 2rem;
-  margin-bottom: 10px;
-}
-
-.consultation-history .history-header p {
-  color: #666;
-  font-size: 1.1rem;
-}
-
-.consultation-history .loading {
-  text-align: center;
-  padding: 50px;
-}
-
-.consultation-history .spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #ff6b35;
-  border-radius: 50%;
-  animation: consultation-history-spin 1s linear infinite;
-  margin: 0 auto 20px;
-}
-
-@keyframes consultation-history-spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-.consultation-history .no-history {
-  text-align: center;
-  padding: 60px 20px;
-  background: white;
-  border-radius: 15px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-}
-
-.consultation-history .no-history-icon {
-  font-size: 4rem;
-  margin-bottom: 20px;
-}
-
-.consultation-history .no-history h3 {
-  color: #d84315;
-  font-size: 1.5rem;
-  margin-bottom: 15px;
-}
-
-.consultation-history .no-history p {
-  color: #666;
-  font-size: 1.1rem;
-}
-
-.consultation-history .history-content {
+.consultation-history { width: 100%; color: var(--color-text); }
+.consultation-history__heading,
+.credit-ledger__heading {
   display: flex;
-  gap: 20px;
-  background: white;
-  border-radius: 15px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-}
-
-.consultation-history .sessions-list {
-  flex: 0 0 40%;
-  max-height: 600px;
-  overflow-y: auto;
-  border-right: 1px solid #f0f0f0;
-}
-
-.consultation-history .session-card {
-  padding: 20px;
-  border-bottom: 1px solid #f0f0f0;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.consultation-history .session-card:hover {
-  background: #fff3e0;
-}
-
-.consultation-history .session-card.active {
-  background: #ff6b35;
-  color: white;
-}
-
-.consultation-history .session-date {
-  font-weight: 600;
-  font-size: 0.9rem;
-  margin-bottom: 8px;
-  color: #d84315;
-}
-
-.consultation-history .session-card.active .session-date {
-  color: white;
-}
-
-.consultation-history .session-preview {
-  font-size: 0.9rem;
-  color: #666;
-  line-height: 1.4;
-}
-
-.consultation-history .session-card.active .session-preview {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.consultation-history .session-details {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.consultation-history .session-header {
-  display: flex;
+  align-items: end;
   justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fff3e0;
+  gap: var(--space-5);
+  margin-bottom: var(--space-4);
 }
 
-.consultation-history .session-header h3 {
-  margin: 0;
-  color: #d84315;
-  font-size: 1.2rem;
+.consultation-history__heading > div > span,
+.credit-ledger__heading > div > span {
+  color: var(--color-brand);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
-.consultation-history .close-btn {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
+.consultation-history__heading h3,
+.credit-ledger__heading h3 {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 3vw, 2.7rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
+
+.consultation-history__heading > button,
+.consultation-history .no-history > button {
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-4);
+  color: var(--color-on-brand);
+  background: var(--color-brand);
+  border: 1px solid var(--color-brand);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
   cursor: pointer;
-  color: #666;
-  padding: 5px;
 }
 
-.consultation-history .close-btn:hover {
-  color: #d84315;
+.consultation-history .loading,
+.consultation-history .no-history {
+  min-height: 24rem;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  padding: var(--space-7);
+  text-align: center;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
 }
 
-.consultation-history .messages-container {
-  flex: 1;
-  padding: 20px;
-  overflow-y: auto;
-  max-height: 500px;
+.consultation-history .loading p { color: var(--color-text-muted); }
+.consultation-history .spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-brand);
+  border-radius: 50%;
+  animation: consultation-history-spin 0.8s linear infinite;
 }
 
-.consultation-history .message {
-  margin-bottom: 20px;
-  display: flex;
-  flex-direction: column;
+@keyframes consultation-history-spin { to { transform: rotate(360deg); } }
+.consultation-history .no-history-icon,
+.consultation-history .session-placeholder > span {
+  width: 4.5rem;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--space-4);
+  color: var(--color-brand);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  font-family: var(--font-display);
+  font-size: 1.8rem;
 }
 
-.consultation-history .message.user {
-  align-items: flex-end;
+.consultation-history .no-history h3,
+.consultation-history .session-placeholder h3 { margin: 0; color: var(--color-text); font-family: var(--font-display); font-size: 2rem; font-weight: 400; }
+.consultation-history .no-history p,
+.consultation-history .session-placeholder p { max-width: 30rem; margin: var(--space-3) 0 var(--space-5); color: var(--color-text-muted); line-height: 1.65; }
+.consultation-history .history-content {
+  min-height: 34rem;
+  display: grid;
+  grid-template-columns: minmax(17rem, 0.35fr) minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
 }
 
-.consultation-history .message.assistant {
-  align-items: flex-start;
+.consultation-history .sessions-list { max-height: 42rem; overflow-y: auto; border-right: 1px solid var(--color-border); }
+.consultation-history .session-card {
+  position: relative;
+  width: 100%;
+  min-height: 7rem;
+  display: block;
+  padding: var(--space-5) 3.25rem var(--space-5) var(--space-5);
+  text-align: left;
+  color: var(--color-text);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  font: inherit;
+  cursor: pointer;
 }
 
-.consultation-history .message-content {
-  max-width: 80%;
-  padding: 12px 16px;
-  border-radius: 15px;
-  font-size: 0.9rem;
-  line-height: 1.6;
-  word-wrap: break-word;
-}
+.consultation-history .session-card:hover { background: var(--color-canvas-subtle); }
+.consultation-history .session-card.active { color: var(--color-text-inverse); background: var(--color-surface-inverse); }
+.consultation-history .session-date { color: var(--color-brand); font-size: var(--text-xs); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.consultation-history .session-preview { margin-top: var(--space-2); overflow: hidden; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.5; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.consultation-history .session-card.active .session-date { color: var(--color-accent-soft); }
+.consultation-history .session-card.active .session-preview { color: var(--color-text-inverse-muted); }
+.consultation-history .session-card__arrow { position: absolute; right: var(--space-5); top: 50%; translate: 0 -50%; color: var(--color-brand); }
+.consultation-history .session-card.active .session-card__arrow { color: var(--color-accent-soft); }
+.consultation-history .session-details { min-width: 0; display: flex; flex-direction: column; }
+.consultation-history .session-placeholder { display: grid; place-items: center; align-content: center; padding: var(--space-7); text-align: center; background: var(--color-canvas-subtle); }
+.consultation-history .session-placeholder > span { font-family: var(--font-mono); font-size: var(--text-sm); }
+.consultation-history .session-header { display: flex; align-items: center; justify-content: space-between; padding: var(--space-5); background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+.consultation-history .session-header h3 { margin: 0; color: var(--color-text); font-family: var(--font-display); font-size: var(--text-lg); font-weight: 400; }
+.consultation-history .close-btn { width: 2.5rem; height: 2.5rem; display: grid; place-items: center; color: var(--color-text-muted); background: transparent; border: 1px solid var(--color-border); border-radius: 50%; font-size: 1.25rem; cursor: pointer; }
+.consultation-history .messages-container { flex: 1; max-height: 36rem; padding: var(--space-5); overflow-y: auto; background: var(--color-canvas-subtle); }
+.consultation-history .message { display: flex; flex-direction: column; margin-bottom: var(--space-5); }
+.consultation-history .message.user { align-items: flex-end; }
+.consultation-history .message.assistant { align-items: flex-start; }
+.consultation-history .message-content { max-width: min(84%, 46rem); padding: var(--space-4) var(--space-5); overflow-wrap: break-word; border-radius: var(--radius-lg); font-size: var(--text-sm); line-height: 1.65; }
+.consultation-history .message.user .message-content { color: var(--color-on-brand); background: var(--color-brand); border-bottom-right-radius: var(--radius-sm); }
+.consultation-history .message.assistant .message-content { color: var(--color-text); background: var(--color-surface-raised); border: 1px solid var(--color-border); border-left: 3px solid var(--color-accent); border-bottom-left-radius: var(--radius-sm); box-shadow: var(--shadow-sm); }
+.consultation-history .message-content :is(p, li, div, span) { color: inherit; }
+.consultation-history .message-content h3,
+.consultation-history .message-content strong { color: inherit; }
+.consultation-history .message-time { margin-top: var(--space-1); padding: 0 var(--space-2); color: var(--color-text-subtle); font-size: var(--text-xs); }
 
-.consultation-history .message-content h3 {
-  color: #e91e63;
-  margin: 16px 0 8px 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.consultation-history .message-content strong {
-  color: #333;
-  font-weight: 600;
-}
-
-.consultation-history .message-content em {
-  color: #666;
-  font-style: italic;
-}
-
-.consultation-history .message.user .message-content {
-  background: #ff6b35;
-  color: white;
-  border-bottom-right-radius: 5px;
-}
-
-.consultation-history .message.assistant .message-content {
-  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
-  color: #333;
-  border-bottom-left-radius: 5px;
-  border-left: 4px solid #e91e63;
-}
-
-.consultation-history .message.assistant .message-content h3 {
-  color: #d84315;
-}
-
-.consultation-history .message-time {
-  font-size: 0.7rem;
-  color: #999;
-  margin-top: 5px;
-  padding: 0 5px;
-}
-
-@media (max-width: 768px) {
-  .consultation-history {
-    padding: 15px;
-  }
-
-  .consultation-history .history-content {
-    flex-direction: column;
-  }
-
-  .consultation-history .sessions-list {
-    flex: none;
-    max-height: 300px;
-    border-right: none;
-    border-bottom: 1px solid #f0f0f0;
-  }
-
-  .consultation-history .session-details {
-    flex: none;
-  }
-
-  .consultation-history .messages-container {
-    max-height: 400px;
-  }
-
-  .consultation-history .message-content {
-    max-width: 90%;
-  }
+@media (max-width: 760px) {
+  .consultation-history__heading { align-items: flex-start; flex-direction: column; }
+  .consultation-history .history-content { grid-template-columns: 1fr; border-radius: var(--radius-lg); }
+  .consultation-history .sessions-list { max-height: 18rem; border-right: 0; border-bottom: 1px solid var(--color-border); }
+  .consultation-history .session-placeholder { display: none; }
+  .consultation-history .session-details { min-height: 28rem; }
+  .consultation-history .messages-container { max-height: 30rem; padding: var(--space-3); }
+  .consultation-history .message-content { max-width: 90%; padding: var(--space-3) var(--space-4); }
 }

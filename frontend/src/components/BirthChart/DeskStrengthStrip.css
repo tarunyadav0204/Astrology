@@ -3,8 +3,8 @@
   flex-direction: column;
   gap: 0.18rem;
   padding: 0.25rem 0.35rem;
-  border-bottom: 1px solid rgba(70, 45, 35, 0.1);
-  background: #f8f2eb;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  background: var(--color-canvas-subtle);
   min-width: 0;
 }
 
@@ -17,9 +17,9 @@
 
 .desk-str__label {
   flex-shrink: 0;
-  border: 1px solid rgba(159, 18, 57, 0.22);
-  background: #fff;
-  color: #9f1239;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 22%, transparent);
+  background: var(--color-surface-raised);
+  color: var(--color-brand);
   border-radius: 4px;
   min-height: 18px;
   padding: 0 0.28rem;
@@ -32,7 +32,7 @@
 }
 
 .desk-str__label:hover {
-  background: #fff1f2;
+  background: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface));
 }
 
 .desk-str__chips {
@@ -56,8 +56,8 @@
   flex-shrink: 0;
   padding: 0.06rem 0.22rem;
   border-radius: 3px;
-  border: 1px solid rgba(70, 45, 35, 0.1);
-  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  background: var(--color-surface-raised);
   white-space: nowrap;
 }
 
@@ -65,14 +65,14 @@
   font-style: normal;
   font-size: 0.5rem;
   font-weight: 800;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   text-transform: uppercase;
 }
 
 .desk-str__chip strong {
   font-size: 0.58rem;
   font-weight: 750;
-  color: #1f1714;
+  color: var(--color-text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -82,7 +82,7 @@
 }
 
 .desk-str__chip--good strong {
-  color: #3d6b4f;
+  color: var(--color-success);
 }
 
 .desk-str__chip--warn {
@@ -91,7 +91,7 @@
 }
 
 .desk-str__chip--warn strong {
-  color: #8a3a3a;
+  color: var(--color-danger);
 }
 
 .desk-str__chip.is-combust strong {
@@ -103,7 +103,7 @@
   flex-shrink: 0;
   font-size: 0.52rem;
   font-weight: 750;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 
@@ -119,9 +119,9 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.4rem;
   padding: 0.5rem;
-  border: 1px solid rgba(70, 45, 35, 0.12);
+  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
   border-radius: 10px;
-  background: #fffcf8;
+  background: var(--color-surface);
 }
 
 .desk-str--mobile .desk-str__label {
@@ -144,7 +144,7 @@
   align-self: center;
   padding: 0.18rem 0.4rem;
   border-radius: 999px;
-  background: #f3ebe3;
+  background: var(--color-surface-muted);
   font-size: 0.62rem;
 }
 
@@ -199,8 +199,8 @@
   padding: 0.5rem 0.6rem;
   border: 1px solid rgba(159, 18, 57, 0.2);
   border-radius: 10px;
-  background: linear-gradient(145deg, #fff 0%, #fff7f8 100%);
-  color: #1f1714;
+  background: linear-gradient(145deg, var(--color-surface-raised) 0%, color-mix(in srgb, var(--color-brand) 4%, var(--color-surface)) 100%);
+  color: var(--color-text);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -214,15 +214,15 @@
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: rgba(159, 18, 57, 0.1);
-  color: #9f1239;
+  background: color-mix(in srgb, var(--color-brand) 10%, transparent);
+  color: var(--color-brand);
   font-size: 1rem;
 }
 
 .desk-str__tools button strong {
   min-width: 0;
   overflow: hidden;
-  color: #9f1239;
+  color: var(--color-brand);
   font-size: 0.7rem;
   font-weight: 850;
   line-height: 1.1;
@@ -231,7 +231,7 @@
 }
 
 .desk-str__tools button em {
-  color: #6b5c54;
+  color: var(--color-text-muted);
   font-size: 0.57rem;
   font-style: normal;
   font-weight: 650;

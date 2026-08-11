@@ -11,7 +11,7 @@ export const SEO_CONFIG = {
   },
   
   social: {
-    facebook: "https://www.facebook.com/astroroshni",
+    facebook: "https://www.facebook.com/AstroRoshni/",
     instagram: "https://www.instagram.com/astroroshni", 
     twitter: "https://twitter.com/astroroshni",
     youtube: "https://www.youtube.com/astroroshni"
@@ -281,7 +281,7 @@ export const SEO_CONFIG = {
         addressLocality: "Haryana",
       },
       sameAs: [
-        "https://www.facebook.com/astroroshni",
+        "https://www.facebook.com/AstroRoshni/",
         "https://www.instagram.com/astroroshniai",
         "https://twitter.com/astroroshni",
         "https://play.google.com/store/apps/details?id=com.astroroshni.mobile",
@@ -330,8 +330,8 @@ export const buildHomeAccuracyProofStructuredData = () => ({
           {
             "@type": "ListItem",
             "position": 1,
-            "name": "50+ Astrological Calculation Systems",
-            "description": "Tara processes over 50 astrological calculation systems simultaneously. By executing Sudarshana Chakra analysis, complete Ashtakavarga analysis, and Nadi Astrology links in real-time, the engine delivers unmatched accuracy through multi-layered synthesis."
+            "name": "90+ Astrological Analysis Layers and Calculators",
+            "description": "Tara processes over 90 astrological analysis layers and calculators, combining Parashari, Nadi, Jaimini, and KP astrology in one synthesis. Sudarshana Chakra, Ashtakavarga, divisional charts, significators, dashas, and planetary links are evaluated together rather than as isolated signals."
           },
           {
             "@type": "ListItem",
@@ -363,7 +363,7 @@ export const buildHomeAccuracyProofStructuredData = () => ({
           "name": "Is Tara AI astrology accurate?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Tara achieves unprecedented accuracy by processing over 50+ astrological calculation systems simultaneously. Powered by NASA-grade Swiss Ephemeris precision, Tara cross-references traditional Vedic texts with complex real-time variables like planetary war calculations, Neecha Bhanga analysis, and comprehensive yoga detection."
+            "text": "Tara processes over 90 astrological analysis layers and calculators in a combined synthesis of Parashari, Nadi, Jaimini, and KP astrology. Powered by Swiss Ephemeris precision, it cross-references the complete chart with variables such as planetary war calculations, Neecha Bhanga analysis, comprehensive yoga detection, dashas, and significators."
           }
         },
         {

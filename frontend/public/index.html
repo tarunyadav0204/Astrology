@@ -4,6 +4,26 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="theme-color" content="#e91e63" />
+  <script>
+    /* Apply the saved semantic theme before CSS/React to prevent a color flash. */
+    (function () {
+      try {
+        var allowed = ['heritage', 'midnight', 'clarity', 'monochrome'];
+        var saved = localStorage.getItem('astroroshni_theme');
+        var configured = '%REACT_APP_DEFAULT_THEME%';
+        var fallback = allowed.indexOf(configured) >= 0 ? configured : 'heritage';
+        var theme = allowed.indexOf(saved) >= 0 ? saved : fallback;
+        var colors = { heritage: '#210b17', midnight: '#100b17', clarity: '#265f56', monochrome: '#050505' };
+        var colorSchemes = { heritage: 'light', midnight: 'dark', clarity: 'light', monochrome: 'light' };
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.style.colorScheme = colorSchemes[theme];
+        var themeColor = document.querySelector('meta[name="theme-color"]');
+        if (themeColor) themeColor.setAttribute('content', colors[theme]);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'heritage');
+      }
+    })();
+  </script>
   <!-- Do NOT mark the marketing/CRA site as an installable web app.
        The only home-screen / PWA entry should be https://astroroshni.com/mobile/
        (Expo shell). Competing root installs open "/" and look like "the app opened the website". -->

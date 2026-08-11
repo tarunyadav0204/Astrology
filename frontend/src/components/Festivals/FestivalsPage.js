@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import { generatePageSEO } from '../../config/seo.config';
 import './FestivalsPage.css';
@@ -263,20 +263,6 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
     fetchPageData();
   }, [selectedDate, locationKey, userTimezone, location.lat, location.lon]);
 
-  useEffect(() => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocation({
-          lat: position.coords.latitude,
-          lon: position.coords.longitude,
-          name: 'Your Location',
-        });
-      },
-      () => {}
-    );
-  }, []);
-
   const searchFestivals = async () => {
     if (!searchTerm.trim()) return;
 
@@ -307,10 +293,10 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
   ];
 
   return (
-    <div className="festivals-page">
-      <SEOHead {...seoData} structuredData={structuredData} />
-      <NavigationHeader
-        compact
+    <div className="festivals-page festivals-page--themed">
+      <SEOHead {...seoData} structuredData={structuredData} themeColor="#210b17" />
+      <ModernNavigationHeader
+        sticky
         user={user}
         onLogout={onLogout}
         onAdminClick={onAdminClick}
@@ -321,11 +307,14 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
       <main className="festivals-shell">
         <section className="festivals-hero">
           <div className="festivals-hero__copy">
-            <span className="festivals-eyebrow">Hindu Festival Calendar</span>
-            <h1>Today’s Hindu Festivals, Vrats and Panchang Observances</h1>
+            <button type="button" className="festivals-back-link" onClick={() => navigate('/panchang')}>
+              <span aria-hidden>←</span> Panchang
+            </button>
+            <span className="festivals-eyebrow">Sacred observances · Location aware</span>
+            <h1>Keep time with<br /><em>what is sacred.</em></h1>
             <p>
-              Check sacred observances for the selected date with location-aware tithi, Panchang context,
-              vrat timings and festival significance.
+              Discover festivals and vrats through the local tithi, sunrise, parana window,
+              rituals and meaning that shape their observance.
             </p>
             <div className="festivals-hero__actions">
               <button type="button" className="festival-btn festival-btn--primary" onClick={() => navigate('/festivals/monthly')}>
@@ -337,13 +326,20 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
             </div>
           </div>
           <div className="festivals-hero__panel">
-            <span>Selected Date</span>
-            <strong>{selectedDateLabel}</strong>
-            <p>{location.name}</p>
-            <div className="festivals-hero__count">
-              <strong>{todayFestivals.length}</strong>
-              <span>{todayFestivals.length === 1 ? 'observance' : 'observances'}</span>
+            <div className="festival-date-orbit" aria-hidden="true">
+              <span>{formatDate(selectedDate, { weekday: 'long' })}</span>
+              <strong>{new Date(`${selectedDate}T12:00:00`).getDate()}</strong>
+              <small>{formatDate(selectedDate, { weekday: undefined, year: 'numeric', month: 'long', day: undefined })}</small>
             </div>
+            <div className="festivals-hero__meta">
+              <span>{location.name}</span>
+              <strong>{todayFestivals.length} {todayFestivals.length === 1 ? 'observance' : 'observances'}</strong>
+            </div>
+          </div>
+          <div className="festivals-hero__proof">
+            <span><strong>Tithi</strong> anchored</span>
+            <span><strong>Local</strong> sunrise</span>
+            <span><strong>Ritual</strong> guidance</span>
           </div>
         </section>
 
@@ -360,6 +356,9 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
           </div>
           <button type="button" className="festival-btn festival-btn--ghost" onClick={() => setShowTransits((value) => !value)}>
             {showTransits ? 'Hide Transits' : 'Show Transits'}
+          </button>
+          <button type="button" className="festival-btn festival-btn--ghost" onClick={() => setSelectedDate(todayIso())}>
+            Today
           </button>
         </section>
 
@@ -443,8 +442,9 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
             </p>
           </div>
           <div className="festival-guide-grid">
-            {GUIDE_CARDS.map(([title, body]) => (
+            {GUIDE_CARDS.map(([title, body], index) => (
               <article className="festival-guide-card" key={title}>
+                <span className="festival-guide-number">{String(index + 1).padStart(2, '0')}</span>
                 <h3>{title}</h3>
                 <p>{body}</p>
               </article>
@@ -458,11 +458,11 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
             <h2>Hindu Festival Calendar FAQs</h2>
           </div>
           <div className="festival-faq-grid">
-            {FESTIVAL_FAQS.map((item) => (
-              <article className="festival-faq-card" key={item.question}>
-                <h3>{item.question}</h3>
+            {FESTIVAL_FAQS.map((item, index) => (
+              <details className="festival-faq-card" key={item.question} open={index === 0}>
+                <summary>{item.question}<span aria-hidden>+</span></summary>
                 <p>{item.answer}</p>
-              </article>
+              </details>
             ))}
           </div>
         </section>

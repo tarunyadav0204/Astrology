@@ -357,6 +357,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [homepageFomoEnabled, setHomepageFomoEnabled] = useState(false);
   const [homepageFomoUserAllowlist, setHomepageFomoUserAllowlist] = useState('');
   const [homepageFomoSaving, setHomepageFomoSaving] = useState(false);
+  const [modernHomepageEnabled, setModernHomepageEnabled] = useState(false);
+  const [modernHomepageSaving, setModernHomepageSaving] = useState(false);
   const [chatWorkerModeEnabled, setChatWorkerModeEnabled] = useState(false);
   const [chatWorkerUserAllowlist, setChatWorkerUserAllowlist] = useState('');
   const [chatWorkerModeSaving, setChatWorkerModeSaving] = useState(false);
@@ -807,6 +809,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setChatSubjectGateUserAllowlist(data.chat_subject_gate_user_allowlist || '');
       setHomepageFomoEnabled(Boolean(data.homepage_fomo_enabled));
       setHomepageFomoUserAllowlist(data.homepage_fomo_user_allowlist || '');
+      const modernHomepageSetting = (data.settings || []).find((setting) => setting.key === 'modern_homepage_enabled');
+      setModernHomepageEnabled(['1', 'true', 'on', 'yes'].includes(String(modernHomepageSetting?.value || '').toLowerCase()));
       setChatWorkerModeEnabled(Boolean(data.chat_worker_mode_enabled));
       setChatWorkerUserAllowlist(data.chat_worker_user_allowlist || '');
       setFreeQuestionEnabled(data.free_question_enabled !== false);
@@ -1282,6 +1286,37 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert('Failed to save homepage FOMO setting.');
     } finally {
       setHomepageFomoSaving(false);
+    }
+  };
+
+  const handleSaveModernHomepageSetting = async () => {
+    setModernHomepageSaving(true);
+    try {
+      const response = await fetch('/api/admin/settings/modern_homepage_enabled', {
+        method: 'PUT',
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: 'modern_homepage_enabled',
+          value: modernHomepageEnabled ? 'true' : 'false',
+          description: 'Public rollout switch for the modern AstroRoshni homepage; false restores the legacy homepage',
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        alert(`Failed to save modern homepage setting: ${error.detail || 'check console'}`);
+        return;
+      }
+      alert(
+        modernHomepageEnabled
+          ? 'Modern homepage enabled. Visitors will receive it on their next homepage load.'
+          : 'Legacy homepage restored. Visitors will receive it on their next homepage load.'
+      );
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving modern homepage setting:', error);
+      alert('Failed to save modern homepage setting.');
+    } finally {
+      setModernHomepageSaving(false);
     }
   };
 
@@ -5717,6 +5752,37 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
             {settingsSubTab === 'featureFlags' && (
               <div className="settings-subtab-group">
+                <div className="settings-section">
+                  <h3>Homepage experience</h3>
+                  <p className="settings-hint">
+                    Switches the public homepage between the modern cinematic experience and the preserved legacy homepage.
+                    The legacy experience is always the fallback if configuration cannot be loaded.
+                  </p>
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <strong>Enable modern homepage</strong>
+                      <p>Turn this off to restore the original homepage on the next page load. Preview safely with <code>?homepage=modern</code>.</p>
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={modernHomepageEnabled}
+                        onChange={(event) => setModernHomepageEnabled(event.target.checked)}
+                      />
+                      <span className="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div className="form-buttons" style={{ marginTop: '12px' }}>
+                    <button
+                      type="button"
+                      className="create-btn"
+                      onClick={handleSaveModernHomepageSetting}
+                      disabled={modernHomepageSaving}
+                    >
+                      {modernHomepageSaving ? 'Saving…' : 'Save homepage experience'}
+                    </button>
+                  </div>
+                </div>
                 <div className="settings-section">
                   <h3>Homepage chart themes (FOMO)</h3>
                   <p className="settings-hint">

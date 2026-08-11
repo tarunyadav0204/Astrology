@@ -1254,7 +1254,6 @@ const MessageBubble = ({
                         ⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.
                     </div>
                 )}
-                {renderMessageToolbar('top')}
                 <div 
                     className="message-text enhanced-formatting"
                     onClick={(e) => {
@@ -1799,7 +1798,6 @@ const MessageBubble = ({
                     </div>
                 )}
 
-                {renderMessageToolbar('bottom')}
                 {message.showRestartButton && !showMessageToolbar && (
                     <button 
                         onClick={() => onRestartPolling && onRestartPolling(message.messageId)}
@@ -1825,8 +1823,11 @@ const MessageBubble = ({
                         <span></span>
                     </div>
                 )}
-                <div className="message-timestamp">
-                    {new Date(message.timestamp).toLocaleTimeString()}
+                <div className="message-footer">
+                    {renderMessageToolbar('bottom')}
+                    <div className="message-timestamp">
+                        {new Date(message.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                    </div>
                 </div>
             </div>
             

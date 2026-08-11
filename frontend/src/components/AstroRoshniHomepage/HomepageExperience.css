@@ -1,0 +1,27 @@
+.homepage-experience-loading {
+  width: 100%;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  color: var(--color-header-text);
+  background: var(--color-header-surface);
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+
+.homepage-experience-loading img {
+  border-radius: 11px;
+  filter: var(--theme-brand-image-filter, none);
+  animation: homepage-experience-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes homepage-experience-pulse {
+  50% { opacity: 0.5; transform: scale(0.96); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .homepage-experience-loading img { animation: none; }
+}

@@ -73,9 +73,13 @@ const CreditLedger = ({ user }) => {
 
   return (
     <div className="credit-ledger">
+      <header className="credit-ledger__heading">
+        <div><span>Balance activity</span><h3>Credit ledger</h3></div>
+        <p>Every earned and used credit, in one transparent record.</p>
+      </header>
       {transactions.length === 0 ? (
         <div className="no-transactions">
-          <div className="no-transactions-icon">📊</div>
+          <div className="no-transactions-icon" aria-hidden>CR</div>
           <h3>No Transactions Yet</h3>
           <p>Your credit transactions will appear here.</p>
         </div>

@@ -1,434 +1,521 @@
 .nakshatra-list-page {
   min-height: 100vh;
-  padding-top: calc(80px + env(safe-area-inset-top, 0px));
-  background:
-    linear-gradient(180deg, rgba(255, 247, 237, 0.95) 0%, rgba(248, 250, 252, 1) 42%, rgba(236, 253, 245, 0.72) 100%);
-  color: #172033;
-  box-sizing: border-box;
+  overflow-x: clip;
+  color: var(--color-text);
+  background: var(--color-canvas);
+  font-family: var(--font-body);
 }
 
 .nakshatra-list-main {
-  width: min(1180px, calc(100% - 32px));
+  width: min(var(--content-wide), 100%);
   margin: 0 auto;
-  padding: 28px 0 56px;
+  padding: 0 var(--page-gutter) var(--space-section);
 }
 
 .nakshatra-hero {
+  position: relative;
+  min-height: clamp(37rem, 72vh, 49rem);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.42fr);
-  gap: 24px;
-  align-items: stretch;
-  padding: 34px;
-  border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgba(63, 31, 13, 0.94) 0%, rgba(126, 34, 63, 0.9) 48%, rgba(15, 118, 110, 0.82) 100%),
-    var(--nakshatra-hero-image) right center / contain no-repeat;
-  box-shadow: 0 22px 54px rgba(63, 31, 13, 0.22);
+  grid-template-columns: minmax(0, 1fr) minmax(22rem, 0.72fr);
+  align-items: center;
+  gap: clamp(2rem, 7vw, 7rem);
+  margin: 0 calc(var(--page-gutter) * -1);
+  padding: clamp(5rem, 9vw, 8rem) var(--page-gutter);
   overflow: hidden;
+  color: var(--color-cosmic-text);
+  background:
+    radial-gradient(circle at 78% 50%, var(--color-cosmic-glow), transparent 31rem),
+    var(--color-cosmic-surface);
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
 
-.nakshatra-hero__copy {
-  max-width: 760px;
+.nakshatra-hero::before {
+  position: absolute;
+  inset: 1.1rem;
+  content: '';
+  pointer-events: none;
+  border: 1px solid var(--color-cosmic-line);
+  border-radius: var(--radius-xl);
+}
+
+.nakshatra-hero__copy,
+.nakshatra-hero__panel {
+  position: relative;
+  z-index: 1;
 }
 
 .nakshatra-eyebrow {
-  margin: 0 0 10px;
-  color: #fed7aa;
-  font-size: 0.78rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  color: var(--color-brand);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
 }
 
-.nakshatra-hero h1 {
-  margin: 0;
-  max-width: 720px;
-  color: #fff;
-  font-size: clamp(2.1rem, 5vw, 4.1rem);
-  line-height: 1;
-  letter-spacing: 0;
+.nakshatra-eyebrow > span {
+  width: 1.8rem;
+  height: 1px;
+  background: currentColor;
 }
 
-.nakshatra-hero p:not(.nakshatra-eyebrow) {
-  max-width: 710px;
-  margin: 18px 0 0;
-  color: #ffedd5;
-  font-size: 1.03rem;
+.nakshatra-hero .nakshatra-eyebrow {
+  color: var(--color-accent-soft);
+}
+
+.nakshatra-hero h1 {
+  max-width: 50rem;
+  margin: 0;
+  color: var(--color-cosmic-text);
+  font-family: var(--font-display);
+  font-size: clamp(4rem, 8.7vw, 8.6rem);
+  font-weight: 400;
+  line-height: 0.82;
+  letter-spacing: -0.06em;
+}
+
+.nakshatra-hero h1 em,
+.nakshatra-guide__intro h2 em {
+  color: var(--color-accent-soft);
+  font-weight: 400;
+}
+
+.nakshatra-hero__copy > p:not(.nakshatra-eyebrow) {
+  max-width: 40rem;
+  margin: 2rem 0 0;
+  color: var(--color-cosmic-text-muted);
+  font-size: clamp(1rem, 1.4vw, 1.15rem);
   line-height: 1.7;
 }
 
 .nakshatra-hero__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 24px;
+  gap: 0.75rem;
+  margin-top: 2rem;
 }
 
 .nakshatra-primary-link,
 .nakshatra-secondary-link {
+  min-height: var(--control-height-lg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  padding: 0 18px;
-  border-radius: 8px;
-  font-weight: 900;
+  padding: 0 1.5rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 800;
   text-decoration: none;
+  transition: transform var(--motion-fast), background var(--motion-fast);
 }
 
 .nakshatra-primary-link {
-  background: #f97316;
-  color: #fff;
-  box-shadow: 0 12px 28px rgba(249, 115, 22, 0.32);
+  color: var(--color-on-accent);
+  background: var(--color-accent-soft);
 }
 
 .nakshatra-secondary-link {
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  color: var(--color-cosmic-text);
+  border: 1px solid var(--color-cosmic-line-strong);
+}
+
+.nakshatra-primary-link:hover,
+.nakshatra-secondary-link:hover {
+  transform: translateY(-2px);
 }
 
 .nakshatra-hero__panel {
   display: grid;
-  gap: 12px;
-  align-content: center;
+  justify-items: center;
+  gap: 2.3rem;
 }
 
-.nakshatra-hero__panel div {
-  padding: 18px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(8px);
+.nakshatra-hero__orbit {
+  position: relative;
+  width: min(32vw, 26rem);
+  min-width: 19rem;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-cosmic-line-strong);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2.8rem var(--color-cosmic-glow),
+    0 0 0 5.6rem color-mix(in srgb, var(--color-cosmic-glow) 42%, transparent);
 }
 
-.nakshatra-hero__panel strong {
+.nakshatra-hero__orbit::before,
+.nakshatra-hero__orbit::after {
+  position: absolute;
+  inset: 13%;
+  content: '';
+  border: 1px solid var(--color-cosmic-line);
+  border-radius: 50%;
+}
+
+.nakshatra-hero__orbit::after {
+  inset: 29%;
+  background: var(--color-cosmic-surface-raised);
+  box-shadow: 0 0 3rem var(--color-cosmic-glow);
+}
+
+.nakshatra-hero__orbit-number {
+  position: relative;
+  z-index: 2;
+  color: var(--color-accent-soft);
+  font: 400 clamp(4rem, 8vw, 7rem)/1 var(--font-display);
+}
+
+.nakshatra-hero__orbit i {
+  position: absolute;
+  z-index: 3;
+  width: 0.65rem;
+  aspect-ratio: 1;
+  background: var(--color-accent-soft);
+  border-radius: 50%;
+  box-shadow: 0 0 1.2rem var(--color-accent);
+}
+
+.nakshatra-hero__orbit i:nth-of-type(1) { top: 5%; left: 32%; }
+.nakshatra-hero__orbit i:nth-of-type(2) { right: 2%; bottom: 37%; }
+.nakshatra-hero__orbit i:nth-of-type(3) { bottom: 13%; left: 17%; }
+
+.nakshatra-hero__facts {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--color-cosmic-line);
+  border-bottom: 1px solid var(--color-cosmic-line);
+}
+
+.nakshatra-hero__facts span {
+  padding: 1rem;
+  color: var(--color-cosmic-text-muted);
+  text-align: center;
+  font-size: 0.72rem;
+}
+
+.nakshatra-hero__facts span + span { border-left: 1px solid var(--color-cosmic-line); }
+.nakshatra-hero__facts strong {
   display: block;
-  color: #fff;
-  font-size: 1.65rem;
-  line-height: 1;
-}
-
-.nakshatra-hero__panel span {
-  display: block;
-  margin-top: 8px;
-  color: #ffedd5;
-  font-size: 0.9rem;
-  font-weight: 800;
+  margin-bottom: 0.35rem;
+  color: var(--color-cosmic-text);
+  font: 400 1.35rem/1 var(--font-display);
 }
 
 .nakshatra-controls {
+  position: sticky;
+  z-index: 20;
+  top: var(--modern-header-height, 4.5rem);
   display: flex;
   justify-content: space-between;
-  gap: 16px;
   align-items: end;
-  margin: 22px 0 14px;
-  padding: 18px;
-  border-radius: 8px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+  gap: 1rem;
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(15px);
 }
 
 .nakshatra-controls__label,
 .nakshatra-controls__meta {
   margin: 0;
-  color: #64748b;
-  font-size: 0.82rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
+  color: var(--color-text-subtle);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-}
-
-.nakshatra-controls__meta {
-  flex: 0 0 auto;
-  padding-bottom: 8px;
 }
 
 .nakshatra-filter-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
 }
 
 .nakshatra-filter {
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: #fff;
-  color: #334155;
-  font-weight: 800;
+  min-height: 2.3rem;
+  padding: 0 0.9rem;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
   cursor: pointer;
+  font-weight: 700;
 }
 
 .nakshatra-filter:hover,
 .nakshatra-filter.is-active {
-  border-color: #9f1239;
-  background: #fff1f2;
-  color: #9f1239;
+  color: var(--color-on-brand);
+  background: var(--color-brand);
+  border-color: var(--color-brand);
 }
 
 .nakshatra-api-notice {
-  margin: 0 0 14px;
-  padding: 12px 14px;
-  border-radius: 8px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  color: #854d0e;
-  font-weight: 700;
+  margin: 0 0 1.25rem;
+  padding: 0.9rem 1rem;
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-warning) 24%, transparent);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
 }
 
 .nakshatras-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  gap: 1px;
+  overflow: hidden;
+  background: var(--color-border);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
 }
 
-.nakshatra-card {
-  min-width: 0;
-}
+.nakshatra-card { min-width: 0; background: var(--color-surface); }
 
 .nakshatra-card button {
   position: relative;
-  display: grid;
   width: 100%;
-  min-height: 100%;
-  padding: 18px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #fff;
+  min-height: 32rem;
+  display: flex;
+  flex-direction: column;
+  padding: 1.8rem;
+  color: var(--color-text);
   text-align: left;
+  background: var(--color-surface);
+  border: 0;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
-  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+  font-family: var(--font-body);
+  transition: background var(--motion-standard), transform var(--motion-standard);
 }
 
 .nakshatra-card button:hover {
-  transform: translateY(-3px);
-  border-color: #fb923c;
-  box-shadow: 0 16px 34px rgba(154, 52, 18, 0.12);
+  z-index: 1;
+  background: var(--color-canvas-subtle);
+  transform: translateY(-0.25rem);
 }
 
 .nakshatra-card__number {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: #0f172a;
-  color: #fff;
-  font-weight: 900;
+  top: 1.7rem;
+  right: 1.7rem;
+  color: var(--color-text-subtle);
+  font: 500 var(--text-xs)/1 var(--font-mono);
+  letter-spacing: 0.15em;
 }
 
 .nakshatra-card__topline {
+  min-height: 2rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding-right: 42px;
+  gap: 0.4rem;
+  padding-right: 2rem;
 }
 
 .nakshatra-card__topline span {
-  display: inline-flex;
-  padding: 5px 8px;
-  border-radius: 999px;
-  background: #f8fafc;
-  color: #475569;
-  font-size: 0.74rem;
-  font-weight: 900;
+  padding: 0.38rem 0.65rem;
+  color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 8%, transparent);
+  border-radius: var(--radius-pill);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .nakshatra-card__name {
-  margin-top: 14px;
-  color: #7f1d1d;
-  font-size: 1.24rem;
-  font-weight: 950;
-  line-height: 1.15;
+  margin-top: 1.8rem;
+  color: var(--color-text);
+  font: 400 clamp(2rem, 3vw, 3rem)/0.95 var(--font-display);
+  letter-spacing: -0.035em;
 }
 
 .nakshatra-card__symbol {
-  margin-top: 6px;
-  color: #0f766e;
-  font-size: 0.88rem;
-  font-weight: 900;
+  margin-top: 0.75rem;
+  color: var(--color-accent);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .nakshatra-card__description {
-  margin-top: 12px;
-  color: #475569;
-  font-size: 0.92rem;
-  line-height: 1.55;
+  margin-top: 1.35rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.65;
 }
 
 .nakshatra-card__facts {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-  margin-top: 16px;
+  grid-template-columns: 0.75fr 1.25fr;
+  gap: 1px;
+  margin-top: auto;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border);
 }
 
 .nakshatra-card__facts span {
-  padding: 10px;
-  border-radius: 8px;
-  background: #f8fafc;
-  color: #1e293b;
-  font-size: 0.86rem;
-  font-weight: 800;
+  color: var(--color-text);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .nakshatra-card__facts small {
   display: block;
-  margin-bottom: 4px;
-  color: #64748b;
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
+  margin-bottom: 0.3rem;
+  color: var(--color-text-subtle);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .nakshatra-card__cta {
-  margin-top: 16px;
-  color: #be123c;
-  font-weight: 950;
+  margin-top: 1.25rem;
+  color: var(--color-brand);
+  font-size: var(--text-sm);
+  font-weight: 800;
 }
 
-.nakshatra-guide,
-.nakshatra-faq {
-  margin-top: 28px;
-}
+.nakshatra-card__cta::after { content: '  ↗'; }
 
 .nakshatra-guide {
-  padding: 24px;
-  border-radius: 8px;
-  border: 1px solid #fed7aa;
-  background: #fff7ed;
+  display: grid;
+  grid-template-columns: minmax(18rem, 0.7fr) minmax(0, 1.3fr);
+  gap: clamp(2rem, 6vw, 6rem);
+  margin: var(--space-section) calc(var(--page-gutter) * -1) 0;
+  padding: var(--space-section) var(--page-gutter);
+  color: var(--color-cosmic-text);
+  background: var(--color-cosmic-surface);
 }
 
-.nakshatra-guide .nakshatra-eyebrow {
-  color: #9a3412;
-}
+.nakshatra-guide .nakshatra-eyebrow { color: var(--color-accent-soft); }
 
 .nakshatra-guide__intro h2,
 .nakshatra-faq h2 {
   margin: 0;
-  color: #0f172a;
-  font-size: clamp(1.45rem, 3vw, 2rem);
-  line-height: 1.2;
+  font: 400 clamp(3rem, 6vw, 6rem)/0.9 var(--font-display);
+  letter-spacing: -0.05em;
 }
 
-.nakshatra-guide__intro p:not(.nakshatra-eyebrow) {
-  max-width: 820px;
-  margin: 12px 0 0;
-  color: #475569;
+.nakshatra-guide__intro > p:not(.nakshatra-eyebrow) {
+  margin: 1.5rem 0 0;
+  color: var(--color-cosmic-text-muted);
   line-height: 1.7;
 }
 
-.nakshatra-guide__grid,
-.nakshatra-faq__grid {
+.nakshatra-guide__grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 16px;
+  align-content: center;
 }
 
-.nakshatra-guide__grid article,
-.nakshatra-faq article {
-  padding: 18px;
-  border-radius: 8px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
+.nakshatra-guide__grid article {
+  position: relative;
+  padding: 1.6rem 0 1.6rem 3.5rem;
+  border-top: 1px solid var(--color-cosmic-line);
 }
 
-.nakshatra-guide__grid h3,
-.nakshatra-faq h3 {
-  margin: 0 0 8px;
-  color: #7f1d1d;
-  font-size: 1rem;
+.nakshatra-guide__grid article::before {
+  position: absolute;
+  left: 0;
+  color: var(--color-accent-soft);
+  content: '0' counter(list-item);
+  font: 500 var(--text-xs)/1 var(--font-mono);
 }
 
-.nakshatra-guide__grid p,
-.nakshatra-faq p {
+.nakshatra-guide__grid h3 {
+  margin: 0 0 0.5rem;
+  color: var(--color-cosmic-text);
+  font: 400 1.35rem/1.2 var(--font-display);
+}
+
+.nakshatra-guide__grid p {
   margin: 0;
-  color: #475569;
-  line-height: 1.6;
+  color: var(--color-cosmic-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.65;
 }
 
-.nakshatra-faq h2 {
-  text-align: center;
+.nakshatra-faq {
+  max-width: 64rem;
+  margin: var(--space-section) auto 0;
 }
 
-.nakshatra-faq__grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.nakshatra-faq .nakshatra-eyebrow { justify-content: center; }
+.nakshatra-faq h2 { color: var(--color-text); text-align: center; }
+.nakshatra-faq__grid { margin-top: 2.5rem; border-top: 1px solid var(--color-border); }
+
+.nakshatra-faq details { border-bottom: 1px solid var(--color-border); }
+.nakshatra-faq summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 0;
+  color: var(--color-text);
+  cursor: pointer;
+  list-style: none;
+  font: 400 1.15rem/1.35 var(--font-display);
+}
+.nakshatra-faq summary::-webkit-details-marker { display: none; }
+.nakshatra-faq summary span { color: var(--color-brand); transition: transform var(--motion-fast); }
+.nakshatra-faq details[open] summary span { transform: rotate(45deg); }
+.nakshatra-faq details p {
+  max-width: 50rem;
+  margin: -0.25rem 0 1.4rem;
+  color: var(--color-text-muted);
+  line-height: 1.7;
 }
 
-@media (max-width: 960px) {
-  .nakshatra-hero {
-    grid-template-columns: 1fr;
-  }
-
-  .nakshatra-hero__panel {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .nakshatras-grid,
-  .nakshatra-guide__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+@media (max-width: 1020px) {
+  .nakshatra-hero { grid-template-columns: 1fr; padding-top: 5.5rem; }
+  .nakshatra-hero__panel { grid-template-columns: minmax(15rem, 23rem) minmax(0, 1fr); }
+  .nakshatra-hero__orbit { width: 21rem; min-width: 0; }
+  .nakshatra-hero__facts { align-self: center; }
+  .nakshatras-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 720px) {
-  .nakshatra-list-main {
-    width: min(100% - 20px, 1180px);
-    padding-top: 14px;
-  }
-
+  .nakshatra-list-main { padding-inline: 1rem; }
   .nakshatra-hero {
-    padding: 24px 18px;
-    background:
-      linear-gradient(135deg, rgba(63, 31, 13, 0.96) 0%, rgba(126, 34, 63, 0.92) 58%, rgba(15, 118, 110, 0.82) 100%),
-      var(--nakshatra-hero-image) right bottom / 260px auto no-repeat;
+    min-height: 48rem;
+    margin-inline: -1rem;
+    padding: 4.5rem 1.25rem 3rem;
+    gap: 3rem;
   }
-
-  .nakshatra-controls,
-  .nakshatras-grid,
-  .nakshatra-guide__grid,
-  .nakshatra-faq__grid {
+  .nakshatra-hero::before { inset: 0.55rem; }
+  .nakshatra-hero h1 { font-size: clamp(3.7rem, 20vw, 5.3rem); }
+  .nakshatra-hero__copy > p:not(.nakshatra-eyebrow) { margin-top: 1.4rem; font-size: 0.92rem; }
+  .nakshatra-hero__actions { display: grid; }
+  .nakshatra-hero__panel { grid-template-columns: 1fr; gap: 2.3rem; }
+  .nakshatra-hero__orbit { width: 13rem; }
+  .nakshatra-hero__orbit-number { font-size: 4rem; }
+  .nakshatra-hero__facts span { padding: 0.85rem 0.35rem; font-size: 0.62rem; }
+  .nakshatra-hero__facts strong { font-size: 1.1rem; }
+  .nakshatra-controls { position: relative; top: auto; flex-direction: column; align-items: stretch; }
+  .nakshatra-filter-row { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 0.3rem; }
+  .nakshatra-filter { flex: 0 0 auto; }
+  .nakshatras-grid { grid-template-columns: 1fr; border-radius: var(--radius-lg); }
+  .nakshatra-card button { min-height: 29rem; padding: 1.45rem; }
+  .nakshatra-guide {
     grid-template-columns: 1fr;
+    margin-inline: -1rem;
+    padding: 4rem 1.25rem;
   }
+  .nakshatra-guide__intro h2,
+  .nakshatra-faq h2 { font-size: clamp(3rem, 15vw, 4.3rem); }
+  .nakshatra-guide__grid article { padding-left: 2.5rem; }
+}
 
-  .nakshatra-controls {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .nakshatra-controls__meta {
-    padding-bottom: 0;
-  }
-
+@media (prefers-reduced-motion: reduce) {
+  .nakshatra-card button,
   .nakshatra-primary-link,
-  .nakshatra-secondary-link {
-    width: 100%;
-  }
-
-  .nakshatra-hero__panel {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .nakshatra-hero__panel div {
-    padding: 12px 8px;
-  }
-
-  .nakshatra-hero__panel strong {
-    font-size: 1.1rem;
-  }
-
-  .nakshatra-hero__panel span {
-    font-size: 0.72rem;
-    line-height: 1.25;
-  }
+  .nakshatra-secondary-link { transition: none; }
 }

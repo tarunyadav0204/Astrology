@@ -365,13 +365,13 @@ const ChatInput = ({
     return (
         <div className="chat-input-container chat-composer">
             {!creditsLoading && useFreeQuestionEligible && (
-                <div className="credit-warning" style={{ background: 'rgba(34, 197, 94, 0.12)', borderColor: 'rgba(34, 197, 94, 0.35)' }}>
-                    <span style={{ color: '#166534' }}>Your first standard chart question is free. Premium uses credits.</span>
+                <div className="credit-warning credit-warning--success">
+                    <span>Your first standard chart question is free. Premium uses credits.</span>
                 </div>
             )}
             {!creditsLoading && showPremiumControls && freeQuestionRequiresNotifications && credits < effectiveCost && (
                 <div
-                    className="credit-warning"
+                    className="credit-warning credit-warning--info"
                     style={{
                         background: 'rgba(59, 130, 246, 0.1)',
                         borderColor: 'rgba(59, 130, 246, 0.35)',
@@ -382,7 +382,7 @@ const ChatInput = ({
                         justifyContent: 'space-between',
                     }}
                 >
-                    <span style={{ color: '#1e3a8a' }}>
+                    <span>
                         Allow browser notifications to unlock your free first standard question (one-time).
                     </span>
                     <button
@@ -419,7 +419,7 @@ const ChatInput = ({
                 </div>
             )}
             {!creditsLoading && credits < effectiveCost && !freeQuestionRequiresNotifications && (
-                <div className="credit-warning">
+                <div className="credit-warning credit-warning--danger">
                     <span>
                         Insufficient credits ({credits}/{effectiveCost} required for{' '}
                         {isPremiumAnalysis
@@ -541,7 +541,7 @@ const ChatInput = ({
                                     style={{ transform: 'scale(1.2)' }}
                                     disabled={isLocked || useFreeQuestionEligible}
                                 />
-                                <span className="chat-premium-label">⚡ Instant answer</span>
+                                <span className="chat-premium-label">Instant answer</span>
                             </label>
                         )}
                         <label
@@ -572,7 +572,7 @@ const ChatInput = ({
                                 style={{ transform: 'scale(1.2)' }}
                                 disabled={isLocked || useFreeQuestionEligible}
                             />
-                            <span className="chat-premium-label">🚀 Premium Deep Analysis</span>
+                            <span className="chat-premium-label">Premium deep analysis</span>
                         </label>
                         <span style={{
                             background: isPremiumAnalysis
@@ -603,7 +603,7 @@ const ChatInput = ({
                                 onClick={() => onShowEnhancedPopup && onShowEnhancedPopup()}
                                 style={{ cursor: 'pointer' }}
                             >
-                                ✨ Enhanced Analysis
+                                Enhanced analysis
                             </span>
                         )}
                     </div>
@@ -782,11 +782,11 @@ const ChatInput = ({
                             : credits < effectiveCost
                                 ? 'No Credits'
                                 : isPremiumAnalysis
-                                    ? '🚀 Send Premium'
+                                    ? 'Send Premium'
                                     : isInstantSendMode
-                                        ? '⚡ Send Instant'
+                                        ? 'Send Instant'
                                         : isPartnershipMode
-                                            ? '💕 Send Partnership'
+                                            ? 'Send'
                                             : 'Send'}
                     </span>
                     <span className="send-button__label-mobile" aria-hidden="true">

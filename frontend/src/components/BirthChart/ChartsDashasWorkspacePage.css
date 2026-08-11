@@ -1,12 +1,12 @@
 /* Parashari Desk — single-viewport working surface for charts + dashas */
 
 .parashari-desk {
-  --pd-bg: #f3eee8;
-  --pd-panel: #fffcf8;
-  --pd-ink: #1f1714;
-  --pd-muted: #6b5c54;
-  --pd-line: rgba(70, 45, 35, 0.14);
-  --pd-accent: #9f1239;
+  --pd-bg: var(--color-canvas);
+  --pd-panel: var(--color-surface);
+  --pd-ink: var(--color-text);
+  --pd-muted: var(--color-text-muted);
+  --pd-line: color-mix(in srgb, var(--color-text) 14%, transparent);
+  --pd-accent: var(--color-brand);
   height: 100vh;
   height: 100dvh;
   max-height: 100vh;
@@ -14,9 +14,11 @@
   overflow: hidden;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  background: linear-gradient(180deg, #f7f1e8 0%, #f1ebe4 100%);
+  background:
+    radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--color-accent) 12%, transparent), transparent 24rem),
+    var(--color-canvas);
   color: var(--pd-ink);
-  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-body);
   box-sizing: border-box;
 }
 
@@ -27,7 +29,7 @@
   min-height: 100dvh;
   max-height: none;
   overflow: visible;
-  background: #f3ebe3;
+  background: var(--color-canvas);
 }
 
 .parashari-desk *,
@@ -41,10 +43,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.65rem;
-  min-height: 40px;
-  padding: 0.3rem 0.65rem;
-  border-bottom: 1px solid var(--pd-line);
-  background: rgba(255, 252, 248, 0.97);
+  min-height: 48px;
+  padding: 0.4rem 0.75rem;
+  color: var(--color-text-inverse);
+  border-bottom: 1px solid var(--color-border-inverse);
+  background: var(--color-surface-inverse);
+  box-shadow: var(--shadow-sm);
 }
 
 .parashari-desk-bar__left,
@@ -63,13 +67,15 @@
 }
 
 .parashari-desk-bar__brand {
-  font-size: 0.86rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  color: var(--color-accent-soft);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
 }
 
 .parashari-desk-bar__native {
-  color: var(--pd-muted);
+  color: var(--color-text-inverse-muted);
   font-size: 0.74rem;
   white-space: nowrap;
   overflow: hidden;
@@ -80,16 +86,29 @@
 .parashari-desk-bar__back,
 .parashari-desk-bar__right button,
 .parashari-desk-chip {
-  border: 1px solid var(--pd-line);
-  background: #fff;
-  color: var(--pd-ink);
-  border-radius: 7px;
+  border: 1px solid var(--color-border-inverse);
+  background: color-mix(in srgb, var(--color-surface-inverse-raised) 78%, transparent);
+  color: var(--color-text-inverse);
+  border-radius: var(--radius-sm);
   min-height: 28px;
   padding: 0 0.5rem;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
+}
+
+.parashari-desk-bar__back:hover,
+.parashari-desk-bar__right button:hover,
+.parashari-desk-chip:hover,
+.parashari-desk-bar__back:focus-visible,
+.parashari-desk-bar__right button:focus-visible,
+.parashari-desk-chip:focus-visible {
+  color: var(--color-on-accent);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-soft);
+  outline: 0;
 }
 
 .parashari-desk-chip {
@@ -103,33 +122,33 @@
   font-size: 0.62rem;
   padding: 0.05rem 0.3rem;
   border-radius: 999px;
-  background: #fff1f2;
-  color: var(--pd-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-on-accent);
   font-weight: 800;
 }
 
 .parashari-desk-chip.is-active {
-  border-color: rgba(159, 18, 57, 0.35);
-  color: var(--pd-accent);
-  background: #fff1f2;
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
 }
 
 .parashari-desk-chip--activations {
-  border-color: rgba(159, 18, 57, 0.4);
-  color: var(--pd-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-soft);
   font-weight: 800;
-  box-shadow: 0 1px 0 rgba(159, 18, 57, 0.12);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--color-brand) 12%, transparent);
 }
 
 .parashari-desk-chip--activations.is-active {
-  background: var(--pd-accent);
-  border-color: var(--pd-accent);
-  color: #fff;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
 .parashari-desk-chip--activations.is-active em {
   background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  color: var(--color-on-brand);
 }
 
 .parashari-desk-bar__tools {
@@ -138,13 +157,13 @@
   gap: 0.25rem;
   margin-left: 0.35rem;
   padding-left: 0.45rem;
-  border-left: 1px solid var(--pd-line);
+  border-left: 1px solid var(--color-border-inverse);
 }
 
 .parashari-desk-bar__primary {
   background: var(--pd-accent) !important;
   border-color: var(--pd-accent) !important;
-  color: #fff !important;
+  color: var(--color-on-brand) !important;
 }
 
 .parashari-desk-empty {
@@ -172,8 +191,8 @@
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 0.3rem;
-  padding: 0.3rem 0.35rem 0.35rem;
+  gap: 0.45rem;
+  padding: 0.45rem 0.5rem 0.5rem;
   overflow: hidden;
 }
 
@@ -186,8 +205,10 @@
   min-height: 34px;
   padding: 0.2rem 0.45rem;
   border: 1px solid var(--pd-line);
-  border-radius: 8px;
-  background: rgba(255, 252, 248, 0.95);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(12px);
   overflow: hidden;
 }
 
@@ -241,7 +262,7 @@
   border: 1px solid transparent;
   background: transparent;
   color: var(--pd-muted);
-  border-radius: 5px;
+  border-radius: var(--radius-pill);
   min-height: 22px;
   padding: 0 0.32rem;
   font: inherit;
@@ -249,13 +270,21 @@
   font-weight: 750;
   cursor: pointer;
   flex-shrink: 0;
+  transition: color var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard);
+}
+
+.parashari-desk-pills button:hover,
+.parashari-desk-pills button:focus-visible {
+  color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 8%, transparent);
+  outline: 0;
 }
 
 .parashari-desk-pills button.is-active {
-  background: #fff;
-  border-color: rgba(159, 18, 57, 0.28);
-  color: var(--pd-accent);
-  box-shadow: 0 1px 3px rgba(40, 20, 10, 0.08);
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  color: var(--color-on-brand);
+  box-shadow: var(--shadow-sm);
 }
 
 .parashari-desk-pills__sep {
@@ -267,7 +296,7 @@
 }
 
 .parashari-desk-pills__jaimini {
-  color: #7c2d12 !important;
+  color: var(--color-warning) !important;
   font-weight: 800 !important;
 }
 
@@ -297,9 +326,9 @@
 }
 
 .parashari-desk-pills__jaimini.is-active {
-  background: #fff7ed !important;
-  border-color: rgba(194, 65, 12, 0.35) !important;
-  color: #c2410c !important;
+  background: var(--color-warning) !important;
+  border-color: var(--color-warning) !important;
+  color: var(--color-on-brand) !important;
 }
 
 .parashari-desk-grid {
@@ -308,7 +337,7 @@
   /* Equal chart cells on top; dasha + analysis dock below */
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-rows: minmax(0, 1.05fr) minmax(0, 1fr);
-  gap: 0.3rem;
+  gap: 0.45rem;
   overflow: hidden;
 }
 
@@ -318,8 +347,9 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   border: 1px solid var(--pd-line);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--pd-panel);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 
@@ -382,11 +412,11 @@
   min-width: 0;
   flex-shrink: 0;
   border-bottom: 1px solid var(--pd-line);
-  background: #f8f2eb;
+  background: var(--color-surface-muted);
 }
 
 .parashari-desk-analysis__chrome .desk-str {
-  border-bottom: 1px solid rgba(70, 45, 35, 0.1);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
 }
 
 .parashari-desk-analysis__head {
@@ -414,7 +444,7 @@
   border: 1px solid transparent;
   background: transparent;
   color: var(--pd-muted);
-  border-radius: 5px;
+  border-radius: var(--radius-pill);
   min-height: 22px;
   padding: 0 0.38rem;
   font: inherit;
@@ -425,10 +455,10 @@
 }
 
 .parashari-desk-analysis__tabs button.is-active {
-  background: #fff;
-  border-color: rgba(159, 18, 57, 0.28);
-  color: var(--pd-accent);
-  box-shadow: 0 1px 3px rgba(40, 20, 10, 0.08);
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  color: var(--color-on-brand);
+  box-shadow: var(--shadow-sm);
 }
 
 .parashari-desk-analysis__tab-count {
@@ -439,7 +469,7 @@
   margin-left: 0.2rem;
   padding: 0 0.22rem;
   border-radius: 999px;
-  background: rgba(159, 18, 57, 0.12);
+  background: color-mix(in srgb, var(--color-brand) 12%, transparent);
   color: var(--pd-accent);
   font-size: 0.52rem;
   font-style: normal;
@@ -467,7 +497,7 @@
   gap: 0.35rem;
   padding: 0.2rem 0.4rem;
   border-bottom: 1px solid var(--pd-line);
-  background: #f8f2eb;
+  background: var(--color-surface-muted);
   min-height: 24px;
 }
 
@@ -483,6 +513,7 @@
   font-size: 0.68rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+  color: var(--color-brand);
 }
 
 .parashari-desk-panel__titles span {
@@ -516,7 +547,7 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .parashari-desk-chart > * {
@@ -546,8 +577,12 @@
 }
 
 .parashari-desk-chart svg > rect:first-of-type {
-  fill: #fff !important;
+  fill: var(--color-surface) !important;
 }
+
+.parashari-desk-chart svg [stroke="#111111"] { stroke: var(--color-text) !important; }
+.parashari-desk-chart svg :is([fill="#333"], [fill="#666"]) { fill: var(--color-text-muted) !important; }
+.parashari-desk-chart svg [fill="#9f1239"] { fill: var(--color-brand) !important; }
 
 @media (max-width: 1280px) {
   .parashari-desk-grid {

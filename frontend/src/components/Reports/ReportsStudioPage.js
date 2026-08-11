@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import CreditsModal from '../Credits/CreditsModal';
 import BirthFormModal from '../BirthForm/BirthFormModal';
@@ -713,24 +713,20 @@ const ReportsStudioPage = ({
         keywords="vedic reports studio, partnership compatibility PDF, wealth astrology report, health astrology report, kundli PDF report, dasha timing report, marriage matching report, vedic wealth report, vedic health report, premium kundli report"
         canonical="https://astroroshni.com/reports/"
         structuredData={structuredData}
+        themeColor="#210b17"
       />
-      <NavigationHeader
-        compact
-        showZodiacSelector={false}
+      <ModernNavigationHeader
+        sticky
         user={user}
         onAdminClick={onAdminClick}
         onLogout={onLogout}
-        birthData={birthData}
-        onChangeNative={() => navigate('/')}
-        onCreditsClick={() => setShowCreditsModal(true)}
         onLogin={onLogin}
-        showLoginButton={showLoginButton}
       />
 
       <main className="reports-studio-main">
         <header className="reports-studio-hero">
-          <button type="button" className="reports-studio-back" onClick={() => navigate(-1)}>
-            ← Back
+          <button type="button" className="reports-studio-back" onClick={() => navigate('/')}>
+            ← Home
           </button>
           <p className="reports-studio-eyebrow">Most complete reading</p>
           <h1>Reports Studio</h1>
@@ -746,6 +742,11 @@ const ReportsStudioPage = ({
         </header>
 
         <section className="reports-studio-card" id="reports-studio-tool" aria-label="Reports Studio">
+          <div className="reports-studio-card__heading">
+            <span>Build your report</span>
+            <h2>From the right question to a finished reading.</h2>
+            <p>Your selections are kept visible as you move through the studio.</p>
+          </div>
           <div className="reports-studio-steps" aria-label="Progress">
             {['Type', 'Charts', 'Language'].map((label, index) => {
               const step = index + 1;
@@ -767,7 +768,7 @@ const ReportsStudioPage = ({
 
           {activeStep === 1 ? (
             <div className="reports-type-grid">
-              {REPORT_TYPES.map((item) => (
+              {REPORT_TYPES.map((item, index) => (
                 <button
                   key={item.key}
                   type="button"
@@ -780,6 +781,7 @@ const ReportsStudioPage = ({
                     setActiveStep(2);
                   }}
                 >
+                  <span className="reports-type-index">{String(index + 1).padStart(2, '0')}</span>
                   <h3>{item.title}</h3>
                   <p className="reports-type-subtitle">{item.subtitle}</p>
                   <p>{item.description}</p>
@@ -851,7 +853,11 @@ const ReportsStudioPage = ({
 
           {activeStep === 3 ? (
             <div className="reports-review-panel">
-              <h2>Language & generate</h2>
+              <p className="reports-step-kicker">Final step</p>
+              <h2>Review & generate</h2>
+              <p className="reports-review-intro">
+                Confirm the reading, choose its language, and open or create the finished PDF.
+              </p>
               <div className="reports-review-grid">
                 <div>
                   <span>Type</span>
@@ -917,15 +923,41 @@ const ReportsStudioPage = ({
                 </div>
               ) : null}
 
-              <div className="reports-actions">
+              {existingReady ? (
+                <div className="reports-ready-card">
+                  <div className="reports-ready-copy">
+                    <span className="reports-ready-mark" aria-hidden="true">✓</span>
+                    <div>
+                      <p className="reports-ready-label">Ready to read</p>
+                      <h3>Your {selectedTypeMeta.title.toLowerCase()} is available.</h3>
+                      <p>
+                        {isSingleChart
+                          ? singleChartReadyMessage(selectedReportType)
+                          : 'Your partnership report is ready. Open it anytime, or regenerate for a fresh reading.'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="reports-ready-actions">
+                    <button type="button" className="reports-primary-btn reports-open-btn" onClick={openPdf} disabled={loading}>
+                      Open report <span aria-hidden="true">↗</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="reports-regenerate-btn"
+                      disabled={loading}
+                      onClick={() => setConfirmMode('regenerate')}
+                    >
+                      Regenerate · {reportCost} credits
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="reports-actions reports-review-actions">
                 <button type="button" className="reports-secondary-btn" onClick={() => setActiveStep(2)} disabled={loading}>
                   Back
                 </button>
-                {existingReady ? (
-                  <button type="button" className="reports-primary-btn reports-open-btn" onClick={openPdf} disabled={loading}>
-                    Open report
-                  </button>
-                ) : (
+                {!existingReady ? (
                   <button
                     type="button"
                     className="reports-primary-btn"
@@ -936,25 +968,14 @@ const ReportsStudioPage = ({
                       ? 'Generating…'
                       : checkingExisting
                         ? 'Checking for existing report…'
-                        : `Generate · ${reportCost} credits`}
+                      : `Generate · ${reportCost} credits`}
                   </button>
-                )}
+                ) : null}
               </div>
-
-              {existingReady ? (
-                <button
-                  type="button"
-                  className="reports-regenerate-btn"
-                  disabled={loading}
-                  onClick={() => setConfirmMode('regenerate')}
-                >
-                  Regenerate · {reportCost} credits
-                </button>
-              ) : null}
 
               {statusMessage ? <p className="reports-status">{statusMessage}</p> : null}
               {error ? <p className="reports-error">{error}</p> : null}
-              {pdfUrl ? (
+              {pdfUrl && !existingReady ? (
                 <button type="button" className="reports-link-btn" onClick={openPdf}>
                   Open PDF in a new tab
                 </button>
@@ -964,6 +985,7 @@ const ReportsStudioPage = ({
         </section>
 
         <section className="reports-seo-section" aria-labelledby="reports-method-heading">
+          <p className="reports-section-eyebrow">Report philosophy</p>
           <h2 id="reports-method-heading">Why Reports Studio?</h2>
           <p>
             Free tools answer one score or one chat question. Reports Studio builds a full, shareable Vedic PDF —
@@ -1044,13 +1066,14 @@ const ReportsStudioPage = ({
         </section>
 
         <section className="reports-faq" aria-label="Reports FAQs">
+          <p className="reports-section-eyebrow">Before you begin</p>
           <h2>Frequently asked questions</h2>
           <div className="reports-faq-grid">
             {faqItems.map((item) => (
-              <article key={item.question}>
-                <h3>{item.question}</h3>
+              <details key={item.question}>
+                <summary>{item.question}</summary>
                 <p>{item.answer}</p>
-              </article>
+              </details>
             ))}
           </div>
         </section>

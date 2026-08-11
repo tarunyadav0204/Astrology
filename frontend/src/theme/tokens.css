@@ -1,0 +1,318 @@
+/*
+ * AstroRoshni semantic design tokens.
+ *
+ * Product code should consume semantic names (surface, text, action, border),
+ * never palette names. New themes can therefore change character without
+ * requiring page-level CSS rewrites.
+ */
+
+:root,
+[data-theme] {
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-body: 'Segoe UI', Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+
+  --text-xs: 0.6875rem;
+  --text-sm: 0.8125rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: clamp(2.5rem, 6vw, 5.5rem);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4.5rem;
+  --space-section: clamp(4.5rem, 8vw, 7.5rem);
+  --page-gutter: clamp(1.25rem, 5vw, 7rem);
+  --content-wide: 90rem;
+  --content-reading: 46rem;
+
+  --radius-sm: 0.625rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.5rem;
+  --radius-xl: 2rem;
+  --radius-pill: 999px;
+
+  --control-height-sm: 2.5rem;
+  --control-height-md: 3.125rem;
+  --control-height-lg: 3.5rem;
+  --touch-target: 2.75rem;
+
+  --motion-fast: 140ms;
+  --motion-standard: 200ms;
+  --motion-slow: 360ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  --z-header: 100;
+  --z-dropdown: 500;
+  --z-modal: 100000;
+  --z-toast: 110000;
+  --theme-brand-image-filter: none;
+}
+
+:root,
+[data-theme='heritage'] {
+  color-scheme: light;
+  --color-canvas: #f7f1e8;
+  --color-canvas-subtle: #fbf6ef;
+  --color-surface: #fffaf2;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #efe6da;
+  --color-surface-inverse: #210b17;
+  --color-surface-inverse-raised: #2a0d1d;
+  --color-header-surface: #210b17;
+  --color-header-surface-raised: #2a0d1d;
+  --color-header-text: #fff8ee;
+  --color-header-text-muted: rgba(255, 248, 238, 0.64);
+  --color-header-border: rgba(255, 248, 238, 0.16);
+
+  --color-text: #210b17;
+  --color-text-muted: rgba(33, 11, 23, 0.62);
+  --color-text-subtle: rgba(33, 11, 23, 0.44);
+  --color-text-inverse: #fff8ee;
+  --color-text-inverse-muted: rgba(255, 248, 238, 0.64);
+
+  --color-brand: #701d3f;
+  --color-brand-hover: #8b2850;
+  --color-brand-active: #58142f;
+  --color-on-brand: #fffaf2;
+  --color-accent: #d7b878;
+  --color-accent-soft: #ead8ad;
+  --color-on-accent: #210b17;
+
+  --color-border: rgba(69, 35, 46, 0.16);
+  --color-border-strong: rgba(69, 35, 46, 0.3);
+  --color-border-inverse: rgba(255, 248, 238, 0.16);
+  --color-focus: #8b2850;
+  --color-overlay: rgba(24, 6, 16, 0.82);
+
+  --color-success: #287354;
+  --color-warning: #9b661a;
+  --color-danger: #a12a47;
+  --color-info: #315f82;
+
+  --shadow-sm: 0 8px 24px rgba(54, 19, 35, 0.08);
+  --shadow-card: 0 24px 65px rgba(54, 19, 35, 0.12);
+  --shadow-modal: 0 38px 110px rgba(9, 0, 6, 0.46);
+
+  --planet-sun: #c47b22;
+  --planet-moon: #718096;
+  --planet-mars: #b33a3a;
+  --planet-mercury: #338061;
+  --planet-jupiter: #a97920;
+  --planet-venus: #a44870;
+  --planet-saturn: #4d5362;
+  --planet-rahu: #65508a;
+  --planet-ketu: #8a5b3e;
+
+  --color-cosmic-surface: #14070f;
+  --color-cosmic-surface-raised: rgba(42, 13, 29, 0.92);
+  --color-cosmic-text: #fff8ee;
+  --color-cosmic-text-muted: rgba(255, 248, 238, 0.58);
+  --color-cosmic-line: rgba(234, 216, 173, 0.24);
+  --color-cosmic-line-strong: rgba(234, 216, 173, 0.46);
+  --color-cosmic-glow: rgba(215, 184, 120, 0.18);
+}
+
+[data-theme='midnight'] {
+  color-scheme: dark;
+  --color-canvas: #100b17;
+  --color-canvas-subtle: #171020;
+  --color-surface: #1d1427;
+  --color-surface-raised: #281b35;
+  --color-surface-muted: #31223d;
+  --color-surface-inverse: #09060e;
+  --color-surface-inverse-raised: #171020;
+  --color-header-surface: #09060e;
+  --color-header-surface-raised: #1d1427;
+  --color-header-text: #f8f0e4;
+  --color-header-text-muted: rgba(248, 240, 228, 0.68);
+  --color-header-border: rgba(248, 240, 228, 0.16);
+
+  --color-text: #f8f0e4;
+  --color-text-muted: rgba(248, 240, 228, 0.68);
+  --color-text-subtle: rgba(248, 240, 228, 0.46);
+  --color-text-inverse: #f8f0e4;
+  --color-text-inverse-muted: rgba(248, 240, 228, 0.68);
+
+  --color-brand: #d1789b;
+  --color-brand-hover: #e18aad;
+  --color-brand-active: #b86083;
+  --color-on-brand: #190d18;
+  --color-accent: #d9bd7e;
+  --color-accent-soft: #f0dcae;
+  --color-on-accent: #17101d;
+
+  --color-border: rgba(248, 240, 228, 0.14);
+  --color-border-strong: rgba(248, 240, 228, 0.28);
+  --color-border-inverse: rgba(248, 240, 228, 0.16);
+  --color-focus: #f0dcae;
+  --color-overlay: rgba(4, 2, 7, 0.86);
+
+  --color-success: #65b68c;
+  --color-warning: #ddb56a;
+  --color-danger: #df7790;
+  --color-info: #75a9d0;
+
+  --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.22);
+  --shadow-card: 0 26px 70px rgba(0, 0, 0, 0.32);
+  --shadow-modal: 0 42px 120px rgba(0, 0, 0, 0.62);
+
+  --planet-sun: #e3a047;
+  --planet-moon: #b7c1d0;
+  --planet-mars: #e16c6c;
+  --planet-mercury: #70bc98;
+  --planet-jupiter: #e0bd5a;
+  --planet-venus: #dc82a7;
+  --planet-saturn: #8d97aa;
+  --planet-rahu: #a592d0;
+  --planet-ketu: #c18d69;
+
+  --color-cosmic-surface: #09060e;
+  --color-cosmic-surface-raised: rgba(29, 20, 39, 0.94);
+  --color-cosmic-text: #f8f0e4;
+  --color-cosmic-text-muted: rgba(248, 240, 228, 0.58);
+  --color-cosmic-line: rgba(240, 220, 174, 0.22);
+  --color-cosmic-line-strong: rgba(240, 220, 174, 0.44);
+  --color-cosmic-glow: rgba(209, 120, 155, 0.2);
+}
+
+[data-theme='clarity'] {
+  color-scheme: light;
+  --color-canvas: #f3f5f4;
+  --color-canvas-subtle: #f8faf9;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #e8eeeb;
+  --color-surface-inverse: #152c29;
+  --color-surface-inverse-raised: #1d3935;
+  --color-header-surface: #153b35;
+  --color-header-surface-raised: #1d4b43;
+  --color-header-text: #f8fbf9;
+  --color-header-text-muted: rgba(248, 251, 249, 0.68);
+  --color-header-border: rgba(248, 251, 249, 0.18);
+
+  --color-text: #142521;
+  --color-text-muted: rgba(20, 37, 33, 0.64);
+  --color-text-subtle: rgba(20, 37, 33, 0.44);
+  --color-text-inverse: #f8fbf9;
+  --color-text-inverse-muted: rgba(248, 251, 249, 0.66);
+
+  --color-brand: #265f56;
+  --color-brand-hover: #327468;
+  --color-brand-active: #19483f;
+  --color-on-brand: #ffffff;
+  --color-accent: #bd9145;
+  --color-accent-soft: #e8d5ac;
+  --color-on-accent: #142521;
+
+  --color-border: rgba(24, 57, 51, 0.16);
+  --color-border-strong: rgba(24, 57, 51, 0.3);
+  --color-border-inverse: rgba(255, 255, 255, 0.16);
+  --color-focus: #327468;
+  --color-overlay: rgba(8, 25, 22, 0.8);
+
+  --color-success: #26704f;
+  --color-warning: #956617;
+  --color-danger: #a13d4e;
+  --color-info: #356b8c;
+
+  --shadow-sm: 0 8px 24px rgba(20, 52, 46, 0.07);
+  --shadow-card: 0 24px 65px rgba(20, 52, 46, 0.11);
+  --shadow-modal: 0 38px 110px rgba(4, 20, 17, 0.42);
+
+  --planet-sun: #bf7620;
+  --planet-moon: #687a88;
+  --planet-mars: #ae3c3c;
+  --planet-mercury: #28755a;
+  --planet-jupiter: #9c751e;
+  --planet-venus: #9d4f70;
+  --planet-saturn: #48545e;
+  --planet-rahu: #5d5684;
+  --planet-ketu: #835d43;
+
+  --color-cosmic-surface: #0b211e;
+  --color-cosmic-surface-raised: rgba(21, 44, 41, 0.94);
+  --color-cosmic-text: #f8fbf9;
+  --color-cosmic-text-muted: rgba(248, 251, 249, 0.6);
+  --color-cosmic-line: rgba(232, 213, 172, 0.22);
+  --color-cosmic-line-strong: rgba(232, 213, 172, 0.44);
+  --color-cosmic-glow: rgba(38, 95, 86, 0.28);
+}
+
+[data-theme='monochrome'] {
+  color-scheme: light;
+  --theme-brand-image-filter: grayscale(1) contrast(1.08);
+  --color-canvas: #f4f4f2;
+  --color-canvas-subtle: #fafafa;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #e7e7e5;
+  --color-surface-inverse: #0a0a0a;
+  --color-surface-inverse-raised: #181818;
+  --color-header-surface: #050505;
+  --color-header-surface-raised: #181818;
+  --color-header-text: #ffffff;
+  --color-header-text-muted: rgba(255, 255, 255, 0.68);
+  --color-header-border: rgba(255, 255, 255, 0.2);
+
+  --color-text: #0a0a0a;
+  --color-text-muted: rgba(10, 10, 10, 0.64);
+  --color-text-subtle: rgba(10, 10, 10, 0.44);
+  --color-text-inverse: #ffffff;
+  --color-text-inverse-muted: rgba(255, 255, 255, 0.66);
+
+  --color-brand: #111111;
+  --color-brand-hover: #303030;
+  --color-brand-active: #000000;
+  --color-on-brand: #ffffff;
+  --color-accent: #8a8a8a;
+  --color-accent-soft: #e1e1df;
+  --color-on-accent: #080808;
+
+  --color-border: rgba(10, 10, 10, 0.17);
+  --color-border-strong: rgba(10, 10, 10, 0.34);
+  --color-border-inverse: rgba(255, 255, 255, 0.2);
+  --color-focus: #000000;
+  --color-overlay: rgba(0, 0, 0, 0.84);
+
+  --color-success: #242424;
+  --color-warning: #555555;
+  --color-danger: #111111;
+  --color-info: #6b6b6b;
+
+  --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 24px 65px rgba(0, 0, 0, 0.14);
+  --shadow-modal: 0 38px 110px rgba(0, 0, 0, 0.5);
+
+  --planet-sun: #111111;
+  --planet-moon: #a0a0a0;
+  --planet-mars: #2c2c2c;
+  --planet-mercury: #707070;
+  --planet-jupiter: #4a4a4a;
+  --planet-venus: #888888;
+  --planet-saturn: #393939;
+  --planet-rahu: #5d5d5d;
+  --planet-ketu: #777777;
+
+  --color-cosmic-surface: #050505;
+  --color-cosmic-surface-raised: rgba(20, 20, 20, 0.96);
+  --color-cosmic-text: #ffffff;
+  --color-cosmic-text-muted: rgba(255, 255, 255, 0.6);
+  --color-cosmic-line: rgba(255, 255, 255, 0.22);
+  --color-cosmic-line-strong: rgba(255, 255, 255, 0.46);
+  --color-cosmic-glow: rgba(255, 255, 255, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  [data-theme] {
+    --motion-fast: 0.001ms;
+    --motion-standard: 0.001ms;
+    --motion-slow: 0.001ms;
+  }
+}

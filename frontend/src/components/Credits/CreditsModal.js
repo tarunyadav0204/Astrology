@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useCredits } from '../../context/CreditContext';
+import { ThemeButton, ThemeInput, ThemeModal } from '../Theme';
 import './CreditsModal.css';
 
 const RAZORPAY_SCRIPT = 'https://checkout.razorpay.com/v1/checkout.js';
@@ -281,6 +282,9 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
 
             const Razorpay = await loadRazorpayScript();
 
+            const checkoutThemeColor = typeof window !== 'undefined'
+                ? getComputedStyle(document.documentElement).getPropertyValue('--color-brand').trim()
+                : '';
             const options = {
                 key: orderData.key_id,
                 amount: orderData.amount,
@@ -288,7 +292,7 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
                 order_id: orderData.order_id,
                 name: 'AstroRoshni',
                 description: `${orderData.credits} credits`,
-                theme: { color: '#e91e63' },
+                theme: { color: checkoutThemeColor || '#701d3f' },
                 modal: {
                     ondismiss: () => setPurchasingCredits(null),
                 },
@@ -361,49 +365,45 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
         }
     };
 
-    if (!isOpen) return null;
-
     return (
-        <div className="credits-modal-overlay" onClick={onClose} role="presentation">
-            <div
-                className="credits-modal-panel"
-                onClick={(e) => e.stopPropagation()}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="credits-modal-title"
-            >
-                <button type="button" className="credits-modal-close" onClick={onClose} aria-label="Close">
-                    ×
-                </button>
-
-                <div className="credits-modal-head">
-                    <h2 id="credits-modal-title" className="credits-modal-title">
-                        Credits
-                    </h2>
-                    <div className="credits-modal-balance" aria-live="polite">
-                        <span className="credits-modal-balance-label">Balance</span>
-                        <span className="credits-modal-balance-value">{credits}</span>
-                    </div>
+        <ThemeModal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Add AstroRoshni credits"
+            description="Choose a pack once, then use your balance across Tara, reports and analysis workspaces."
+            size="lg"
+            className="credits-modal-panel"
+            closeLabel="Close credits"
+        >
+            <div className="credits-modal-balance" aria-live="polite">
+                <div>
+                    <span className="credits-modal-balance-label">Available balance</span>
+                    <small>Ready across every workspace</small>
                 </div>
+                <span className="credits-modal-balance-value">{credits}<small>credits</small></span>
+            </div>
 
-                <div className="credits-modal-buy-section">
-                    <h3 className="credits-modal-section-title">Buy credits</h3>
-                    <p className="credits-modal-buy-lead">
-                        Secure checkout (UPI, cards, netbanking) — same packs as the Android app.{' '}
-                        <a href="/subscription" className="credits-modal-vip-link">VIP members save up to 30% on credits →</a>
-                    </p>
+            <section className="credits-modal-buy-section" aria-labelledby="credits-pack-heading">
+                    <div className="credits-modal-section-head">
+                        <div>
+                            <span>Secure checkout</span>
+                            <h3 id="credits-pack-heading" className="credits-modal-section-title">Choose your credit pack</h3>
+                        </div>
+                        <a href="/subscription" className="credits-modal-vip-link">VIP members save up to 30% <span aria-hidden>↗</span></a>
+                    </div>
+                    <p className="credits-modal-buy-lead">Pay securely with UPI, cards or netbanking. Packs match the Android app.</p>
                     {isLoggedIn && (
                         <a href="/order-management" className="credits-modal-order-link">
-                            View order history and billing support
+                            Order history and billing support <span aria-hidden>↗</span>
                         </a>
                     )}
                     {!isLoggedIn && (
                         <div className="credits-modal-buy-guest">
                             <p className="credits-modal-buy-guest-text">Sign in to purchase credits.</p>
                             {typeof onLogin === 'function' && (
-                                <button type="button" className="credits-modal-btn-signin" onClick={onLogin}>
+                                <ThemeButton type="button" className="credits-modal-btn-signin" onClick={onLogin}>
                                     Sign in
-                                </button>
+                                </ThemeButton>
                             )}
                         </div>
                     )}
@@ -415,7 +415,7 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
                     )}
                     {isLoggedIn && razorpayCatalog && razorpayCatalog.packs && (
                         <div className="credits-modal-pack-grid">
-                            {razorpayCatalog.packs.map((pack) => (
+                            {razorpayCatalog.packs.map((pack, index) => (
                                 <button
                                     key={pack.credits}
                                     type="button"
@@ -423,6 +423,7 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
                                     onClick={() => handleBuyPack(pack.credits)}
                                     disabled={purchasingCredits !== null}
                                 >
+                                    <span className="credits-modal-pack-index">{String(index + 1).padStart(2, '0')}</span>
                                     <span className="credits-modal-pack-name">
                                         {pack.name || `${pack.credits} Credits`}
                                         {pack.badge ? (
@@ -471,12 +472,14 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
                             {purchaseMessage}
                         </div>
                     )}
-                </div>
+            </section>
 
-                <div style={{ marginBottom: '20px' }}>
-                    <h3 className="credits-modal-section-title">Redeem promo code</h3>
+            <div className="credits-modal-lower-grid">
+                <section className="credits-modal-promo" aria-labelledby="credits-promo-heading">
+                    <span className="credits-modal-kicker">Have a code?</span>
+                    <h3 id="credits-promo-heading" className="credits-modal-section-title">Redeem a promo</h3>
                     <form onSubmit={handleRedeemPromo} className="credits-modal-form-row credits-modal-form-row--inline">
-                        <input
+                        <ThemeInput
                             type="text"
                             value={promoCode}
                             onChange={(e) => setPromoCode(e.target.value)}
@@ -485,13 +488,14 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
                             disabled={promoLoading}
                             autoComplete="off"
                         />
-                        <button
+                        <ThemeButton
                             type="submit"
                             disabled={promoLoading || !promoCode.trim()}
+                            size="md"
                             className="credits-modal-btn-primary"
                         >
                             {promoLoading ? 'Redeeming…' : 'Redeem'}
-                        </button>
+                        </ThemeButton>
                     </form>
                     {message && (
                         <div
@@ -502,10 +506,10 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
                             {message}
                         </div>
                     )}
-                </div>
+                </section>
 
-                <div className="credits-modal-costs">
-                    <h4 className="credits-modal-costs-title">Typical credit use</h4>
+                <section className="credits-modal-costs" aria-labelledby="credits-use-heading">
+                    <h4 id="credits-use-heading" className="credits-modal-costs-title">Typical credit use</h4>
                     <p className="credits-modal-costs-hint">
                         {loading
                             ? 'Loading your rates…'
@@ -521,9 +525,9 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
                             </div>
                         ))
                     )}
-                </div>
+                </section>
             </div>
-        </div>
+        </ThemeModal>
     );
 };
 

@@ -165,6 +165,43 @@ const ANALYSIS_CONFIG = {
   }
 };
 
+const EDITORIAL_ANALYSIS_TYPES = new Set(['career', 'marriage', 'health', 'education', 'wealth', 'progeny']);
+
+const EDITORIAL_COPY = {
+  career: {
+    quickTitle: 'Career direction',
+    loadingTitle: 'Reading your professional pattern',
+    loadingDetail: 'Connecting D10, the 10th house, Amatyakaraka and timing into one personalised report.'
+  },
+  marriage: {
+    quickTitle: 'Relationship pattern',
+    loadingTitle: 'Reading your relationship promise',
+    loadingDetail: 'Connecting D9, the 7th house, Darakaraka, Upapada and timing into one personalised report.'
+  },
+  health: {
+    quickTitle: 'Wellness pattern',
+    loadingTitle: 'Reading your vitality pattern',
+    loadingDetail: 'Connecting the Lagna, health houses, D30, constitution and timing into one personalised report.'
+  },
+  education: {
+    quickTitle: 'Learning direction',
+    loadingTitle: 'Reading your learning pattern',
+    loadingDetail: 'Connecting D24, the education houses, Mercury, Jupiter and timing into one personalised report.'
+  },
+  wealth: {
+    quickTitle: 'Wealth direction',
+    loadingTitle: 'Reading your financial pattern',
+    loadingDetail: 'Connecting D2, wealth houses, Dhana yogas, income sources and timing into one personalised report.'
+  },
+  progeny: {
+    quickTitle: 'Family pattern',
+    loadingTitle: 'Reading your progeny pattern',
+    loadingDetail: 'Connecting D7, the 5th house, Jupiter, family promise and timing into one personalised report.'
+  }
+};
+
+const cleanEditorialText = (value) => String(value || '').replace(/^[^A-Za-z0-9]+/, '');
+
 // Format text with proper line breaks, bold formatting, and clickable terms
 const formatText = (text, terms = null, glossary = null, onTermClick = null) => {
   if (!text) return '';
@@ -183,19 +220,19 @@ const formatText = (text, terms = null, glossary = null, onTermClick = null) => 
   }
   
   // Handle markdown headers (### -> h3)
-  formatted = formatted.replace(/^### (.*$)/gm, '<h3 style="color: #ff9800; margin: 1rem 0 0.5rem 0;">$1</h3>');
+  formatted = formatted.replace(/^### (.*$)/gm, '<h3 class="formatted-heading">$1</h3>');
   
   // Handle bold text (**text**)
-  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong style="color: #ff9800; font-weight: bold;">$1</strong>');
+  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="formatted-strong">$1</strong>');
   
   // Handle italic text (*text*)
-  formatted = formatted.replace(/\*(.*?)\*/g, '<em style="color: #ff9800; font-style: italic;">$1</em>');
+  formatted = formatted.replace(/\*(.*?)\*/g, '<em class="formatted-emphasis">$1</em>');
   
   // Handle bullet points (• text)
-  formatted = formatted.replace(/^• (.*$)/gm, '<li style="margin: 0.25rem 0;">$1</li>');
+  formatted = formatted.replace(/^• (.*$)/gm, '<li class="formatted-list-item">$1</li>');
   
   // Wrap consecutive list items in ul tags
-  formatted = formatted.replace(/(<li.*?<\/li>\s*)+/gs, '<ul style="margin: 0.5rem 0; padding-left: 1.5rem;">$&</ul>');
+  formatted = formatted.replace(/(<li.*?<\/li>\s*)+/gs, '<ul class="formatted-list">$&</ul>');
   
   // Handle line breaks - convert double line breaks to paragraphs
   formatted = formatted.replace(/\n\n+/g, '</p><p>');
@@ -212,7 +249,7 @@ const formatText = (text, terms = null, glossary = null, onTermClick = null) => 
 };
 
 // Accordion Panel Component
-const AccordionPanel = ({ qa, index, terms, glossary, onTermClick }) => {
+const AccordionPanel = ({ qa, index, terms, glossary, onTermClick, editorial = false }) => {
   const [isOpen, setIsOpen] = useState(index === 0); // First panel open by default
   
   const handleContentClick = (e) => {
@@ -227,21 +264,31 @@ const AccordionPanel = ({ qa, index, terms, glossary, onTermClick }) => {
   
   return (
     <div className="accordion-panel">
-      <div 
+      <button
+        type="button"
         className={`accordion-header ${isOpen ? 'open' : ''}`}
         onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+        aria-controls={`analysis-panel-${index}`}
+        id={`analysis-trigger-${index}`}
       >
         <div className="question-info">
           <span className="question-number">{index + 1}</span>
           <h4 className="question-text">{qa.question}</h4>
         </div>
         <span className="accordion-icon">{isOpen ? '−' : '+'}</span>
-      </div>
+      </button>
       
       {isOpen && (
-        <div className="accordion-content" onClick={handleContentClick}>
+        <div
+          className="accordion-content"
+          id={`analysis-panel-${index}`}
+          role="region"
+          aria-labelledby={`analysis-trigger-${index}`}
+          onClick={handleContentClick}
+        >
           <div className="answer-section">
-            <h5 className="universal-section-title">📝 Answer</h5>
+            <h5 className="universal-section-title">{editorial ? 'Interpretation' : '📝 Answer'}</h5>
             <div 
               className="answer-text"
               dangerouslySetInnerHTML={{ __html: formatText(qa.answer, terms, glossary, onTermClick) }}
@@ -250,7 +297,7 @@ const AccordionPanel = ({ qa, index, terms, glossary, onTermClick }) => {
           
           {qa.key_points && qa.key_points.length > 0 && (
             <div className="key-points-section">
-              <h5 className="universal-section-title">🔑 Key Points</h5>
+              <h5 className="universal-section-title">{editorial ? 'Key signals' : '🔑 Key Points'}</h5>
               <ul className="key-points-list">
                 {qa.key_points.map((point, idx) => (
                   <li key={idx} dangerouslySetInnerHTML={{ __html: formatText(point, terms, glossary, onTermClick) }} />
@@ -261,7 +308,7 @@ const AccordionPanel = ({ qa, index, terms, glossary, onTermClick }) => {
           
           {qa.astrological_basis && (
             <div className="astrological-section">
-              <h5 className="universal-section-title">🪐 Astrological Basis</h5>
+              <h5 className="universal-section-title">{editorial ? 'Astrological basis' : '🪐 Astrological Basis'}</h5>
               <div 
                 className="astrological-text"
                 dangerouslySetInnerHTML={{ __html: formatText(qa.astrological_basis, terms, glossary, onTermClick) }}
@@ -290,6 +337,12 @@ const UniversalAIInsights = ({
 }) => {
   const navigate = useNavigate();
   const config = ANALYSIS_CONFIG[analysisType];
+  const editorial = EDITORIAL_ANALYSIS_TYPES.has(analysisType);
+  const analysisName = cleanEditorialText(config?.title)
+    .replace(/^AI\s+/i, '')
+    .replace(/\s+Analysis$/i, '');
+  const editorialCopy = EDITORIAL_COPY[analysisType] || EDITORIAL_COPY.career;
+  const rootClassName = `universal-ai-insights ${editorial ? 'universal-ai-insights--editorial' : ''}`;
   const { credits, loading: creditsLoading, fetchBalance, wealthCost, careerCost, healthCost, marriageCost, educationCost, progenyCost } = useCredits();
   const [aiInsights, setAiInsights] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -664,11 +717,11 @@ const UniversalAIInsights = ({
   // Show regenerate confirmation screen
   if (showRegenerateConfirm) {
     return (
-      <div className="universal-ai-insights">
+      <div className={rootClassName}>
         <div className="analysis-confirmation">
           <div className="confirmation-header">
             <h3>
-              {hideConfirmationIntro ? '🔄 Regenerate report' : `🔄 Regenerate ${config.title}`}
+              {editorial ? `Refresh this ${analysisName.toLowerCase()} report` : hideConfirmationIntro ? '🔄 Regenerate report' : `🔄 Regenerate ${config.title}`}
             </h3>
             <p>Generate a fresh analysis with updated insights</p>
           </div>
@@ -692,7 +745,7 @@ const UniversalAIInsights = ({
                 setShowRegenerateConfirm(false);
                 loadAIInsights(true);
               }}>
-                🔄 Regenerate Analysis ({analysisCost} credits)
+                {editorial ? `Regenerate report · ${analysisCost} credits` : `🔄 Regenerate Analysis (${analysisCost} credits)`}
               </button>
               <button className="cancel-btn" onClick={() => setShowRegenerateConfirm(false)}>
                 Cancel
@@ -705,7 +758,7 @@ const UniversalAIInsights = ({
               </p>
               <div className="action-section">
                 <button className="add-credits-btn" onClick={() => setShowCreditsModal(true)}>
-                  💳 Add Credits
+                  {editorial ? 'Add credits' : '💳 Add Credits'}
                 </button>
                 <button className="cancel-btn" onClick={() => setShowRegenerateConfirm(false)}>
                   Cancel
@@ -726,7 +779,7 @@ const UniversalAIInsights = ({
   // Show initial confirmation screen if analysis hasn't started
   if (!hasStarted && !aiInsights) {
     return (
-      <div className="universal-ai-insights">
+      <div className={rootClassName}>
         <div className="analysis-confirmation">
           {!hideConfirmationIntro && (
             <div className="confirmation-header">
@@ -736,10 +789,10 @@ const UniversalAIInsights = ({
           )}
           
           <div className="analysis-preview">
-            <h4>📊 What You'll Get:</h4>
+            <h4>{editorial ? `Your ${analysisName.toLowerCase()} report includes` : "📊 What You'll Get:"}</h4>
             <ul className="preview-list">
               {config.preview.map((item, index) => (
-                <li key={index}>{item}</li>
+                <li key={index}>{editorial ? cleanEditorialText(item) : item}</li>
               ))}
             </ul>
           </div>
@@ -760,10 +813,10 @@ const UniversalAIInsights = ({
           {credits >= analysisCost ? (
             <div className="action-section">
               <button className="start-analysis-btn" onClick={startAnalysis}>
-                🚀 Start Analysis ({analysisCost} credits)
+                {editorial ? `Generate ${analysisName.toLowerCase()} report · ${analysisCost} credits` : `🚀 Start Analysis (${analysisCost} credits)`}
               </button>
               <p className="analysis-note">
-                ⏱️ Analysis takes up to 30 seconds • 🎯 Personalized to your birth chart
+                {editorial ? 'Usually ready in under 30 seconds · Personalised to this birth chart' : '⏱️ Analysis takes up to 30 seconds • 🎯 Personalized to your birth chart'}
               </p>
             </div>
           ) : (
@@ -772,7 +825,7 @@ const UniversalAIInsights = ({
                 You need <strong>{analysisCost} credits</strong> but have <strong>{credits} credits</strong>
               </p>
               <button className="add-credits-btn" onClick={() => setShowCreditsModal(true)}>
-                💳 Add Credits
+                {editorial ? 'Add credits' : '💳 Add Credits'}
               </button>
             </div>
           )}
@@ -793,9 +846,9 @@ const UniversalAIInsights = ({
     const currentCredits = creditMatch ? creditMatch[2] : credits;
     
     return (
-      <div className="universal-ai-insights">
+      <div className={rootClassName}>
         <div className="credit-warning">
-          <h3>💳 Insufficient Credits</h3>
+          <h3>{editorial ? 'More credits are needed' : '💳 Insufficient Credits'}</h3>
           <p>You need <strong>{neededCredits} credits</strong> for {analysisType} analysis but have <strong>{currentCredits} credits</strong>.</p>
           <p>Please purchase more credits or redeem a promo code to continue.</p>
           <div className="credit-actions">
@@ -822,20 +875,21 @@ const UniversalAIInsights = ({
 
   if (loading || creditsLoading) {
     return (
-      <div className="universal-ai-insights">
+      <div className={rootClassName}>
         <div className="loading-state">
           <div className="ai-spinner"></div>
-          <h3>💎 Generating Your Personalized {config.title.split(' ')[1]} Insights</h3>
+          <h3>{editorial ? editorialCopy.loadingTitle : `💎 Generating Your Personalized ${config.title.split(' ')[1]} Insights`}</h3>
           <div className="loading-steps">
             {config.steps.map((step, index) => (
               <div key={index} className={`step ${index <= currentStep ? 'active' : ''}`}>
-                {index === currentStep ? `${step}${dots}` : index < currentStep ? `${step}...` : step}
+                {editorial
+                  ? `${cleanEditorialText(step)}${index === currentStep ? dots : index < currentStep ? '…' : ''}`
+                  : index === currentStep ? `${step}${dots}` : index < currentStep ? `${step}...` : step}
               </div>
             ))}
           </div>
           <p className="loading-message">
-            ✨ This analysis typically finishes in up to 30 seconds.<br/>
-            🎯 We're creating insights tailored specifically to your birth chart.
+            {editorial ? editorialCopy.loadingDetail : <><span>✨ This analysis typically finishes in up to 30 seconds.</span><br/><span>🎯 We&apos;re creating insights tailored specifically to your birth chart.</span></>}
           </p>
         </div>
       </div>
@@ -844,9 +898,9 @@ const UniversalAIInsights = ({
 
   if (error && !showCreditWarning) {
     return (
-      <div className="universal-ai-insights">
+      <div className={rootClassName}>
         <div className="error-state">
-          <h3>⚠️ Analysis Error</h3>
+          <h3>{editorial ? 'The report could not be completed' : '⚠️ Analysis Error'}</h3>
           <p>{error}</p>
           <button onClick={() => loadAIInsights(true)}>Retry Analysis</button>
         </div>
@@ -856,11 +910,11 @@ const UniversalAIInsights = ({
 
   if (!aiInsights) {
     return (
-      <div className="universal-ai-insights">
+      <div className={rootClassName}>
         <div className="error-state">
-          <h3>{config.icon} Analysis Failed</h3>
+          <h3>{editorial ? 'The report could not be generated' : `${config.icon} Analysis Failed`}</h3>
           <p>Could not generate {analysisType} insights. Please try again.</p>
-          <button onClick={() => loadAIInsights(true)}>🔄 Regenerate Analysis</button>
+          <button onClick={() => loadAIInsights(true)}>{editorial ? 'Try again' : '🔄 Regenerate Analysis'}</button>
         </div>
       </div>
     );
@@ -877,11 +931,35 @@ const UniversalAIInsights = ({
   // Always render if we have analysis data
   if (analysis || (aiInsights && Object.keys(aiInsights).length > 0)) {
     const jsonResponse = analysis.json_response || analysis;
+    const reportContext = editorial
+      ? {
+          source: `${analysisType}_analysis_report`,
+          report_type: analysisType,
+          quick_answer: followUpPlainText(jsonResponse?.quick_answer).slice(0, 2400),
+          final_thoughts: followUpPlainText(jsonResponse?.final_thoughts).slice(0, 1600),
+          report_topics: Array.isArray(jsonResponse?.detailed_analysis)
+            ? jsonResponse.detailed_analysis
+                .map((item) => followUpPlainText(item?.question || item?.title))
+                .filter(Boolean)
+                .slice(0, 12)
+            : [],
+        }
+      : null;
+
+    const openReportChat = () => {
+      navigate('/chat', {
+        state: {
+          openSingleChartChat: true,
+          followUpQuestion: `Help me understand the most important findings and practical next steps from my ${analysisName} Analysis report.`,
+          queryContext: reportContext,
+        },
+      });
+    };
     
     console.log('Rendering analysis:', { analysis, jsonResponse });
     
     return (
-      <div className="universal-ai-insights">
+      <div className={rootClassName}>
         <div className="ai-header-actions">
           <button 
             className="regenerate-btn corner-btn" 
@@ -903,7 +981,7 @@ const UniversalAIInsights = ({
                   disabled={loading}
                   title="Download PDF Report"
                 >
-                  {loading ? '📄 Preparing...' : '📄 Download PDF'}
+                  {editorial ? (loading ? 'Preparing PDF…' : 'Download PDF') : (loading ? '📄 Preparing...' : '📄 Download PDF')}
                 </button>
               )}
             </PDFDownloadLink>
@@ -912,7 +990,7 @@ const UniversalAIInsights = ({
         
         {aiInsights.cached && (
           <div className="cache-indicator">
-            <span className="cache-badge">💾 Previously Generated</span>
+            <span className="cache-badge">{editorial ? 'Saved report' : '💾 Previously Generated'}</span>
           </div>
         )}
 
@@ -920,7 +998,7 @@ const UniversalAIInsights = ({
           {/* Quick Answer Section */}
           {jsonResponse.quick_answer && (
             <div className="quick-answer-section">
-              <h3>✨ Quick Answer</h3>
+              <h3>{editorial ? editorialCopy.quickTitle : '✨ Quick Answer'}</h3>
               <div className="quick-answer-card" onClick={handleContentClick}>
                 <div dangerouslySetInnerHTML={{__html: formatText(jsonResponse.quick_answer, jsonResponse.terms, jsonResponse.glossary, handleTermClick)}} />
               </div>
@@ -930,7 +1008,7 @@ const UniversalAIInsights = ({
           {/* Detailed Analysis Accordion */}
           {jsonResponse.detailed_analysis && jsonResponse.detailed_analysis.length > 0 && (
             <div className="detailed-analysis-section">
-              <h3>📊 Detailed Analysis</h3>
+              <h3>{editorial ? 'The complete reading' : '📊 Detailed Analysis'}</h3>
               <div className="questions-accordion">
                 {jsonResponse.detailed_analysis.map((qa, index) => {
                   const question = qa.question || qa.title || `Analysis ${index + 1}`;
@@ -943,6 +1021,7 @@ const UniversalAIInsights = ({
                       terms={jsonResponse.terms}
                       glossary={jsonResponse.glossary}
                       onTermClick={handleTermClick}
+                      editorial={editorial}
                     />
                   );
                 })}
@@ -953,7 +1032,7 @@ const UniversalAIInsights = ({
           {/* Final Thoughts Section */}
           {jsonResponse.final_thoughts && (
             <div className="final-thoughts-section">
-              <h3>💭 Final Thoughts</h3>
+              <h3>{editorial ? 'What to carry forward' : '💭 Final Thoughts'}</h3>
               <div className="final-thoughts-card" onClick={handleContentClick}>
                 <div dangerouslySetInnerHTML={{__html: formatText(jsonResponse.final_thoughts, jsonResponse.terms, jsonResponse.glossary, handleTermClick)}} />
               </div>
@@ -963,7 +1042,7 @@ const UniversalAIInsights = ({
           {/* Follow-up Questions */}
           {jsonResponse.follow_up_questions && jsonResponse.follow_up_questions.length > 0 && (
             <div className="follow-up-section">
-              <h3>🤔 Follow-up Questions</h3>
+              <h3>{editorial ? 'Continue with Tara' : '🤔 Follow-up Questions'}</h3>
               <div className="follow-up-chips">
                 {jsonResponse.follow_up_questions.map((question, index) => {
                   const raw = typeof question === 'string' ? question : String(question ?? '');
@@ -996,6 +1075,19 @@ const UniversalAIInsights = ({
             <strong>Disclaimer:</strong> {config.disclaimer}
           </p>
         </div>
+
+        {editorial && !tooltipModal.show && (
+          <button
+            type="button"
+            className="career-report-chat-cta"
+            onClick={openReportChat}
+            aria-label={`Ask Tara about this ${analysisName} Analysis report`}
+          >
+            <span>{analysisName} report</span>
+            <strong>Ask Tara about this report</strong>
+            <i aria-hidden>↗</i>
+          </button>
+        )}
         
         {/* Tooltip Modal */}
         {tooltipModal.show && (
@@ -1020,11 +1112,11 @@ const UniversalAIInsights = ({
 
   // Fallback for unsupported format
   return (
-    <div className="universal-ai-insights">
+      <div className={rootClassName}>
       <div className="error-state">
-        <h3>{config.icon} Analysis Format Not Supported</h3>
+        <h3>{editorial ? 'This report format needs attention' : `${config.icon} Analysis Format Not Supported`}</h3>
         <p>This analysis format is not yet supported by the universal component.</p>
-        <button onClick={() => loadAIInsights(true)}>🔄 Regenerate Analysis</button>
+        <button onClick={() => loadAIInsights(true)}>{editorial ? 'Try again' : '🔄 Regenerate Analysis'}</button>
       </div>
     </div>
   );

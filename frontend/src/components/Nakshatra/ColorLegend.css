@@ -1,55 +1,50 @@
-.color-legend {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 20px;
-  border: 1px solid #e9ecef;
-}
-
-.color-legend h4 {
-  margin: 0 0 15px 0;
-  color: #2c3e50;
-  text-align: center;
-}
-
-.legend-items {
+.nakshatra-page .color-legend {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
 }
 
-.legend-item {
+.nakshatra-page .color-legend h4 {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.nakshatra-page .legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+}
+
+.nakshatra-page .legend-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 14px;
+  gap: 0.5rem;
+  font-size: 0.72rem;
 }
 
-.legend-color {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  border: 2px solid transparent;
+.nakshatra-page .legend-color {
+  width: 0.5rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0.22rem color-mix(in srgb, currentColor 12%, transparent);
 }
 
-.legend-color.auspicious {
-  background: #10B981;
-  border-color: #10B981;
-}
+.nakshatra-page .legend-color.auspicious { color: var(--color-success); background: var(--color-success); }
+.nakshatra-page .legend-color.inauspicious { color: var(--color-danger); background: var(--color-danger); }
+.nakshatra-page .legend-color.neutral { color: var(--color-text-subtle); background: var(--color-text-subtle); }
 
-.legend-color.inauspicious {
-  background: #EF4444;
-  border-color: #EF4444;
-}
-
-.legend-color.neutral {
-  background: #6B7280;
-  border-color: #6B7280;
-}
-
-@media (min-width: 768px) {
-  .legend-items {
-    flex-direction: row;
-    justify-content: space-around;
-  }
+@media (max-width: 720px) {
+  .nakshatra-page .color-legend { align-items: flex-start; flex-direction: column; }
+  .nakshatra-page .legend-items { display: grid; gap: 0.65rem; }
 }

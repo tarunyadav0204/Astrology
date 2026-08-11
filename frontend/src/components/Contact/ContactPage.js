@@ -62,7 +62,7 @@ const ContactPage = () => {
               <a href="https://instagram.com/astroroshniai" target="_blank" rel="noopener noreferrer">
                 📷 Instagram
               </a>
-              <a href="https://facebook.com/astroroshniai" target="_blank" rel="noopener noreferrer">
+              <a href="https://www.facebook.com/AstroRoshni/" target="_blank" rel="noopener noreferrer">
                 📘 Facebook
               </a>
               <a href="https://www.linkedin.com/company/astroroshni" target="_blank" rel="noopener noreferrer">

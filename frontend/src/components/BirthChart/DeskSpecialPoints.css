@@ -4,7 +4,7 @@
   gap: 0.4rem;
   min-width: 0;
   flex: 1 1 auto;
-  border-left: 1px solid rgba(70, 45, 35, 0.14);
+  border-left: 1px solid color-mix(in srgb, var(--color-text) 14%, transparent);
   padding-left: 0.55rem;
 }
 
@@ -14,7 +14,7 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #6b5c54;
+  color: var(--color-text-muted);
 }
 
 .desk-sp__chips {
@@ -37,8 +37,8 @@
   flex-shrink: 0;
   padding: 0.12rem 0.4rem;
   border-radius: 5px;
-  border: 1px solid rgba(70, 45, 35, 0.12);
-  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+  background: var(--color-surface-raised);
   font-size: 0.66rem;
   line-height: 1.2;
   white-space: nowrap;
@@ -47,7 +47,7 @@
 .desk-sp__chip em {
   font-style: normal;
   font-weight: 700;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   font-size: 0.58rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -56,34 +56,34 @@
 .desk-sp__chip strong {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  color: #1f1714;
+  color: var(--color-text);
 }
 
-.desk-sp__chip--yogi { border-color: rgba(233, 30, 99, 0.35); }
-.desk-sp__chip--yogi strong { color: #c2185b; }
+.desk-sp__chip--yogi { border-color: color-mix(in srgb, var(--color-brand) 35%, transparent); }
+.desk-sp__chip--yogi strong { color: var(--color-brand); }
 .desk-sp__chip--ava { border-color: rgba(255, 152, 0, 0.4); }
-.desk-sp__chip--ava strong { color: #ef6c00; }
+.desk-sp__chip--ava strong { color: var(--color-warning); }
 .desk-sp__chip--dagdha { border-color: rgba(244, 67, 54, 0.35); }
-.desk-sp__chip--dagdha strong { color: #c62828; }
-.desk-sp__chip--shunya { border-color: rgba(156, 39, 176, 0.35); }
-.desk-sp__chip--shunya strong { color: #7b1fa2; }
+.desk-sp__chip--dagdha strong { color: var(--color-danger); }
+.desk-sp__chip--shunya { border-color: color-mix(in srgb, var(--color-info) 35%, transparent); }
+.desk-sp__chip--shunya strong { color: var(--color-info); }
 .desk-sp__chip--badhaka { border-color: rgba(255, 152, 0, 0.35); }
 .desk-sp__chip--maraka { border-color: rgba(244, 67, 54, 0.3); }
-.desk-sp__chip--maraka strong { color: #b71c1c; }
+.desk-sp__chip--maraka strong { color: var(--color-danger); }
 .desk-sp__chip--rasi { border-color: rgba(25, 118, 210, 0.3); }
-.desk-sp__chip--rasi strong { color: #1565c0; }
+.desk-sp__chip--rasi strong { color: var(--color-info); }
 .desk-sp__chip--bb { border-color: rgba(2, 132, 199, 0.35); }
-.desk-sp__chip--bb strong { color: #0369a1; }
+.desk-sp__chip--bb strong { color: var(--color-info); }
 .desk-sp__chip--mb { border-color: rgba(127, 29, 29, 0.35); }
-.desk-sp__chip--mb strong { color: #7f1d1d; }
+.desk-sp__chip--mb strong { color: var(--color-danger); }
 .desk-sp__chip--push { border-color: rgba(21, 128, 61, 0.35); }
-.desk-sp__chip--push strong { color: #15803d; }
+.desk-sp__chip--push strong { color: var(--color-success); }
 .desk-sp__chip--mudakku { border-color: rgba(194, 65, 12, 0.38); background: rgba(251, 146, 60, 0.07); }
-.desk-sp__chip--mudakku strong { color: #c2410c; }
-.desk-sp__chip--mudakku em { color: #9a3412; }
+.desk-sp__chip--mudakku strong { color: var(--color-warning); }
+.desk-sp__chip--mudakku em { color: var(--color-warning); }
 .desk-sp__chip--gandanta { border-color: rgba(127, 29, 29, 0.4); background: rgba(127, 29, 29, 0.06); }
-.desk-sp__chip--gandanta strong { color: #7f1d1d; }
-.desk-sp__chip--gandanta em { color: #991b1b; }
+.desk-sp__chip--gandanta strong { color: var(--color-danger); }
+.desk-sp__chip--gandanta em { color: var(--color-danger); }
 
 .desk-sp--panel {
   min-width: 0;
@@ -91,8 +91,8 @@
   height: 100%;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  background: #fffcf8;
-  border: 1px solid rgba(70, 45, 35, 0.12);
+  background: var(--color-surface);
+  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -103,8 +103,8 @@
   justify-content: space-between;
   gap: 0.25rem;
   padding: 0.28rem 0.45rem;
-  border-bottom: 1px solid rgba(70, 45, 35, 0.12);
-  background: #f7f1ea;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+  background: var(--color-canvas-subtle);
 }
 
 .desk-sp__head span {
@@ -117,7 +117,7 @@
   font-style: normal;
   font-size: 0.58rem;
   font-weight: 650;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   text-transform: uppercase;
 }
 
@@ -136,14 +136,14 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.35rem 0.5rem;
-  border-bottom: 1px solid rgba(70, 45, 35, 0.06);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 6%, transparent);
 }
 
 .desk-sp__item em {
   font-style: normal;
   font-size: 0.66rem;
   font-weight: 700;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -152,24 +152,24 @@
   font-size: 0.78rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  color: #1f1714;
+  color: var(--color-text);
   text-align: right;
 }
 
-.desk-sp__item--yogi strong { color: #c2185b; }
-.desk-sp__item--ava strong { color: #ef6c00; }
-.desk-sp__item--dagdha strong { color: #c62828; }
-.desk-sp__item--shunya strong { color: #7b1fa2; }
-.desk-sp__item--badhaka strong { color: #b45309; }
-.desk-sp__item--maraka strong { color: #b71c1c; }
-.desk-sp__item--rasi strong { color: #1565c0; }
-.desk-sp__item--bb strong { color: #0369a1; }
-.desk-sp__item--mb strong { color: #7f1d1d; }
-.desk-sp__item--push strong { color: #15803d; }
+.desk-sp__item--yogi strong { color: var(--color-brand); }
+.desk-sp__item--ava strong { color: var(--color-warning); }
+.desk-sp__item--dagdha strong { color: var(--color-danger); }
+.desk-sp__item--shunya strong { color: var(--color-info); }
+.desk-sp__item--badhaka strong { color: var(--color-warning); }
+.desk-sp__item--maraka strong { color: var(--color-danger); }
+.desk-sp__item--rasi strong { color: var(--color-info); }
+.desk-sp__item--bb strong { color: var(--color-info); }
+.desk-sp__item--mb strong { color: var(--color-danger); }
+.desk-sp__item--push strong { color: var(--color-success); }
 .desk-sp__item--mudakku { border-color: rgba(194, 65, 12, 0.25); background: rgba(251, 146, 60, 0.06); }
-.desk-sp__item--mudakku strong { color: #c2410c; }
+.desk-sp__item--mudakku strong { color: var(--color-warning); }
 .desk-sp__item--gandanta { border-color: rgba(127, 29, 29, 0.28); background: rgba(127, 29, 29, 0.05); }
-.desk-sp__item--gandanta strong { color: #7f1d1d; }
+.desk-sp__item--gandanta strong { color: var(--color-danger); }
 
 .desk-sp__row {
   display: flex;
@@ -177,13 +177,13 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.35rem 0.5rem;
-  border-bottom: 1px solid rgba(70, 45, 35, 0.06);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 6%, transparent);
 }
 
 .desk-sp__label {
   font-size: 0.66rem;
   font-weight: 700;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -192,32 +192,32 @@
   font-size: 0.78rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  color: #1f1714;
+  color: var(--color-text);
   text-align: right;
 }
 
-.desk-sp__row--yogi .desk-sp__value { color: #c2185b; }
-.desk-sp__row--ava .desk-sp__value { color: #ef6c00; }
-.desk-sp__row--dagdha .desk-sp__value { color: #c62828; }
-.desk-sp__row--shunya .desk-sp__value { color: #7b1fa2; }
-.desk-sp__row--maraka .desk-sp__value { color: #b71c1c; }
-.desk-sp__row--rasi .desk-sp__value { color: #1565c0; }
+.desk-sp__row--yogi .desk-sp__value { color: var(--color-brand); }
+.desk-sp__row--ava .desk-sp__value { color: var(--color-warning); }
+.desk-sp__row--dagdha .desk-sp__value { color: var(--color-danger); }
+.desk-sp__row--shunya .desk-sp__value { color: var(--color-info); }
+.desk-sp__row--maraka .desk-sp__value { color: var(--color-danger); }
+.desk-sp__row--rasi .desk-sp__value { color: var(--color-info); }
 
 .desk-sp--empty,
 .desk-sp--error {
   font-size: 0.7rem;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   padding: 0.35rem 0.5rem;
 }
 
 .desk-sp--error {
-  color: #9f1239;
+  color: var(--color-brand);
 }
 
 @media (max-width: 1100px) {
   .desk-sp--strip {
     border-left: 0;
-    border-top: 1px solid rgba(70, 45, 35, 0.14);
+    border-top: 1px solid color-mix(in srgb, var(--color-text) 14%, transparent);
     padding-left: 0;
     padding-top: 0.3rem;
     width: 100%;

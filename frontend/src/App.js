@@ -13,7 +13,6 @@ import AstroVishnuLanding from './components/AstroVishnu/AstroVishnuLanding';
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
 import AuthModalShell from './components/Auth/AuthModalShell';
-import FloatingChatButton from './components/FloatingChatButton/FloatingChatButton';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { CreditProvider } from './context/CreditContext';
 import { APP_CONFIG } from './config/app.config';
@@ -111,7 +110,7 @@ function AnalysisGuestAuthModal({ isOpen, onClose, authView, setAuthView, descri
   );
 }
 
-const AstroRoshniHomepage = lazy(() => import('./components/AstroRoshniHomepage/AstroRoshniHomepage'));
+const AstroRoshniHomepage = lazy(() => import('./components/AstroRoshniHomepage/HomepageExperience'));
 const AdminPanel = lazy(() => import('./components/Admin/AdminPanel'));
 const ChartSelector = lazy(() => import('./components/ChartSelector/ChartSelector'));
 const BirthFormModal = lazy(() => import('./components/BirthForm/BirthFormModal'));
@@ -157,26 +156,6 @@ const AshtakavargaToolPage = lazy(() => import('./components/Ashtakavarga/Ashtak
 const BlogList = lazy(() => import('./components/Blog/BlogList'));
 const BlogPost = lazy(() => import('./components/Blog/BlogPost'));
 const BlogDashboard = lazy(() => import('./components/Blog/BlogDashboard'));
-
-/** Hide “Ask Tara” FAB on full-page chat and dedicated tool pages (e.g. Ashtakavarga) where it overlaps the UI. */
-function FloatingChatButtonUnlessOnChatPage({ user, onRequireLogin }) {
-  const { pathname } = useLocation();
-  const navigate = useNavigate();
-  if (
-    pathname === '/chat'
-    || pathname === '/speech-chat'
-    || pathname.startsWith('/tools/')
-    || pathname.startsWith('/charts-dashas')
-  ) return null;
-  const handleOpenChat = () => {
-    if (user) {
-      navigate('/chat?app=1');
-    } else if (onRequireLogin) {
-      onRequireLogin();
-    }
-  };
-  return <FloatingChatButton onOpenChat={handleOpenChat} />;
-}
 
 function ChatRouteGate({ children }) {
   const location = useLocation();
@@ -491,11 +470,15 @@ function App() {
                     showLoginButton={true} 
                   />
                   <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
-                        <div style={{ marginBottom: '20px' }}>
-                          <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '20px' }}>Welcome to AstroRoshni</h2>
-                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                        <div className="auth-experience" style={{ marginBottom: '20px' }}>
+                          <p className="auth-experience__eyebrow">Your chart, remembered</p>
+                          <h2 className="auth-experience__title" style={{ textAlign: 'center', color: '#e91e63', marginBottom: '20px' }}>Welcome to AstroRoshni</h2>
+                          <p className="auth-experience__lead">Sign in to continue with your saved Kundlis, personal timing and Tara conversations.</p>
+                          <div className="auth-experience__tabs" style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
                             <button 
                               onClick={() => setAuthView('login')}
+                              className={authView === 'login' ? 'is-active' : ''}
+                              type="button"
                               style={{
                                 padding: '10px 20px',
                                 border: 'none',
@@ -510,6 +493,8 @@ function App() {
                             </button>
                             <button 
                               onClick={() => setAuthView('register')}
+                              className={authView === 'register' ? 'is-active' : ''}
+                              type="button"
                               style={{
                                 padding: '10px 20px',
                                 border: 'none',
@@ -800,7 +785,14 @@ function App() {
                 />
               </>
             } />
-            <Route path="/muhurat-finder" element={<MuhuratFinderPage user={user} onLogout={user ? handleLogout : undefined} onAdminClick={user ? handleAdminClick : undefined} />} />
+            <Route path="/muhurat-finder" element={
+              <MuhuratFinderPage
+                user={user}
+                onLogout={user ? handleLogout : undefined}
+                onAdminClick={user ? handleAdminClick : undefined}
+                onLogin={!user ? () => setShowLoginModal(true) : undefined}
+              />
+            } />
             <Route path="/health-analysis" element={
               <>
                 <AnalysisDetailPage
@@ -860,8 +852,22 @@ function App() {
                 onAdminClick={user ? handleAdminClick : undefined}
               />
             } />
-          <Route path="/nakshatras" element={<NakshatraListPage />} />
-          <Route path="/nakshatra/:nakshatraName/:year" element={<NakshatraPage />} />
+          <Route path="/nakshatras" element={
+            <NakshatraListPage
+              user={user}
+              onLogin={!user ? () => setShowLoginModal(true) : undefined}
+              onLogout={user ? handleLogout : undefined}
+              onAdminClick={user ? handleAdminClick : undefined}
+            />
+          } />
+          <Route path="/nakshatra/:nakshatraName/:year" element={
+            <NakshatraPage
+              user={user}
+              onLogin={!user ? () => setShowLoginModal(true) : undefined}
+              onLogout={user ? handleLogout : undefined}
+              onAdminClick={user ? handleAdminClick : undefined}
+            />
+          } />
           <Route path="/monthly-panchang" element={
             <MonthlyPanchangPage 
               user={user}
@@ -872,7 +878,14 @@ function App() {
             />
           } />
           <Route path="/festivals" element={<FestivalsPage />} />
-          <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
+          <Route path="/festivals/monthly" element={
+            <MonthlyFestivalsPage
+              user={user}
+              onLogout={user ? handleLogout : undefined}
+              onAdminClick={user ? handleAdminClick : undefined}
+              onLogin={!user ? () => setShowLoginModal(true) : undefined}
+            />
+          } />
           {/* CRA route: in-app navigation + fallback when static HTML is not served. SEO HTML: build/karma-analysis.html */}
           <Route
             path="/karma-analysis"
@@ -1297,8 +1310,22 @@ function App() {
               onLogin={!user ? () => setShowLoginModal(true) : undefined}
             />
           } />
-            <Route path="/blog" element={<BlogList />} />
-            <Route path="/blog/:slug" element={<BlogPost />} />
+            <Route path="/blog" element={
+              <BlogList
+                user={user}
+                onLogin={!user ? () => setShowLoginModal(true) : undefined}
+                onLogout={user ? handleLogout : undefined}
+                onAdminClick={user ? handleAdminClick : undefined}
+              />
+            } />
+            <Route path="/blog/:slug" element={
+              <BlogPost
+                user={user}
+                onLogin={!user ? () => setShowLoginModal(true) : undefined}
+                onLogout={user ? handleLogout : undefined}
+                onAdminClick={user ? handleAdminClick : undefined}
+              />
+            } />
             <Route
               path="/progeny-analysis"
               element={
@@ -1420,7 +1447,7 @@ function App() {
               }
             />
             <Route path="/speech-chat" element={user ? <SpeechChatPage /> : <Navigate to="/" replace />} />
-            <Route path="/profile" element={user ? <ProfilePage user={user} onLogout={handleLogout} /> : <Navigate to="/" replace />} />
+            <Route path="/profile" element={user ? <ProfilePage user={user} onLogout={handleLogout} onAdminClick={handleAdminClick} /> : <Navigate to="/" replace />} />
             <Route path="/admin/blog" element={
               user && user.role === 'admin' ? (
                 <BlogDashboard />
@@ -1432,9 +1459,6 @@ function App() {
               </Routes>
             </Suspense>
             <ToastContainer style={{ zIndex: 20000 }} />
-          {(!user || currentView !== 'dashboard') && (
-            <FloatingChatButtonUnlessOnChatPage user={user} onRequireLogin={() => setShowLoginModal(true)} />
-          )}
           </CreditProvider>
         </AstrologyProvider>
       </Router>

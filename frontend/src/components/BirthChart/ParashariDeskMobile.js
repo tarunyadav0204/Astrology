@@ -15,6 +15,7 @@ import DeskBirthPanchang from './DeskBirthPanchang';
 import DeskSpecialPoints from './DeskSpecialPoints';
 import DeskConditionStrip from './DeskConditionStrip';
 import DeskSpecialLagnas from './DeskSpecialLagnas';
+import ChartActivationKey from './ChartActivationKey';
 import './ParashariDeskMobile.css';
 
 const HUB_TABS = [
@@ -84,6 +85,9 @@ export default function ParashariDeskMobile({
   activationLoading,
   activationError,
   activationNowCount,
+  activationHouseStates,
+  showChartActivations,
+  onShowChartActivationsChange,
   analysisTab,
   onAnalysisTabChange,
   houseSelection,
@@ -254,6 +258,14 @@ export default function ParashariDeskMobile({
       <div className="pdm__body">
         {hubTab === 'chart' ? (
           <section className="pdm__pane pdm__pane--chart">
+            {(chartPill === 'lagna' || chartPill === 'transit') ? (
+              <ChartActivationKey
+                enabled={showChartActivations}
+                onToggle={onShowChartActivationsChange}
+                loading={activationLoading}
+                compact
+              />
+            ) : null}
             <div className="pdm__chart">
               <ChartWidget
                 title={activeChart.title}
@@ -268,6 +280,11 @@ export default function ParashariDeskMobile({
                 deskMode
                 onHouseSelect={handleHouseSelect}
                 selectedHouseNumber={houseSelection?.houseNumber}
+                activationHouseStates={
+                  showChartActivations && (chartPill === 'lagna' || chartPill === 'transit')
+                    ? activationHouseStates
+                    : null
+                }
               />
             </div>
 

@@ -3,13 +3,13 @@
   height: 100%;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  background: #fffcf8;
+  background: var(--color-surface);
 }
 
 .desk-asp--status {
   display: grid;
   place-items: center;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   font-size: 0.72rem;
   padding: 0.75rem;
 }
@@ -18,9 +18,9 @@
   margin: 0;
   padding: 0.3rem 0.4rem;
   font-size: 0.55rem;
-  color: #6b5c54;
-  border-bottom: 1px solid rgba(70, 45, 35, 0.1);
-  background: #f8f2eb;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  background: var(--color-canvas-subtle);
 }
 
 .desk-asp__scroll {
@@ -48,8 +48,8 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #f3ebe3;
-  color: #6b5c54;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
   font-weight: 800;
   font-size: 0.55rem;
   text-transform: uppercase;
@@ -58,28 +58,28 @@
 .desk-asp__table tbody th {
   position: sticky;
   left: 0;
-  background: #fff;
+  background: var(--color-surface-raised);
   font-weight: 800;
   font-size: 0.55rem;
-  color: #1f1714;
+  color: var(--color-text);
   text-transform: uppercase;
 }
 
 .desk-asp__self,
 .desk-asp__empty {
-  color: #c4b8b0;
+  color: var(--color-text-subtle);
   background: rgba(70, 45, 35, 0.03);
 }
 
 .desk-asp__hit {
   font-weight: 750;
-  color: #0369a1;
+  color: var(--color-info);
   background: rgba(2, 132, 199, 0.08);
 }
 
 .desk-asp__hit.is-special {
-  color: #9f1239;
-  background: rgba(159, 18, 57, 0.1);
+  color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 10%, transparent);
   font-weight: 800;
 }
 
@@ -88,14 +88,14 @@
   flex-wrap: wrap;
   gap: 0.35rem;
   padding: 0.3rem 0.4rem;
-  border-top: 1px solid rgba(70, 45, 35, 0.1);
-  background: #f8f2eb;
+  border-top: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  background: var(--color-canvas-subtle);
   font-size: 0.52rem;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   font-weight: 650;
 }
 
 .desk-asp__legend .is-special {
-  color: #9f1239;
+  color: var(--color-brand);
   font-weight: 750;
 }

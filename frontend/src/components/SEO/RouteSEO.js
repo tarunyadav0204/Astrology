@@ -11,6 +11,12 @@ const RouteSEO = () => {
 
   const seo = useMemo(() => resolveSeoForPathname(pathname), [pathname]);
 
+  // Career Analysis owns a richer page-level graph (Service, WebApplication,
+  // FAQ and breadcrumbs). Avoid emitting the generic fallback graph as well.
+  if (pathname === '/career-guidance' || pathname === '/career-guidance/') {
+    return null;
+  }
+
   if (!seo) {
     return null;
   }

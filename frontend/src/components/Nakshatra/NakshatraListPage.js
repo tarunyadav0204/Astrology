@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import { generatePageSEO } from '../../config/seo.config';
 import './NakshatraListPage.css';
@@ -97,12 +97,12 @@ function normalizeNakshatra(item, index) {
   };
 }
 
-const NakshatraListPage = () => {
+const NakshatraListPage = ({ user: propUser, onLogin, onLogout, onAdminClick }) => {
   const navigate = useNavigate();
   const [nakshatras, setNakshatras] = useState(FALLBACK_NAKSHATRAS);
   const [loading, setLoading] = useState(true);
   const [apiNotice, setApiNotice] = useState('');
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(propUser || null);
   const [activeLord, setActiveLord] = useState('All');
   const currentYear = new Date().getFullYear();
   const seoData = useMemo(() => generatePageSEO('nakshatrasList', { path: '/nakshatras' }), []);
@@ -118,6 +118,10 @@ const NakshatraListPage = () => {
   );
 
   useEffect(() => {
+    if (propUser) {
+      setUser(propUser);
+      return;
+    }
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
     if (token && savedUser) {
@@ -127,7 +131,7 @@ const NakshatraListPage = () => {
         setUser(null);
       }
     }
-  }, []);
+  }, [propUser]);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,8 +167,7 @@ const NakshatraListPage = () => {
 
   return (
     <div
-      className="nakshatra-list-page"
-      style={{ '--nakshatra-hero-image': `url(${process.env.PUBLIC_URL || ''}/images/software/birth-chart.png)` }}
+      className="nakshatra-list-page nakshatra-list-page--themed"
     >
       <SEOHead
         title={seoData.title}
@@ -210,44 +213,42 @@ const NakshatraListPage = () => {
           ]
         }}
       />
-      <NavigationHeader
-        compact
+      <ModernNavigationHeader
+        sticky
         user={user}
-        onLogin={() => navigate('/')}
-        onLogout={() => {
+        onLogin={onLogin || (() => navigate('/'))}
+        onAdminClick={onAdminClick}
+        onLogout={onLogout || (() => {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           setUser(null);
           navigate('/');
-        }}
+        })}
       />
 
       <main className="nakshatra-list-main">
         <section className="nakshatra-hero">
           <div className="nakshatra-hero__copy">
-            <p className="nakshatra-eyebrow">Vedic lunar mansions</p>
-            <h1>27 Nakshatras in Vedic Astrology</h1>
+            <p className="nakshatra-eyebrow"><span /> Vedic lunar mansions</p>
+            <h1>The Moon&rsquo;s<br /><em>27 rooms.</em></h1>
             <p>
-              Explore each nakshatra by lord, deity, zodiac span, nature, and yearly calendar. Use the list as a clean
-              reference for Janma Nakshatra, muhurat selection, compatibility, dasha interpretation, and Moon-based timing.
+              Explore the complete nakshatra cycle by planetary lord, deity, nature and zodiac span—then open any
+              mansion to see every transit window in {currentYear}.
             </p>
             <div className="nakshatra-hero__actions">
               <a href="#nakshatra-grid" className="nakshatra-primary-link">Browse all 27</a>
               <a href="#nakshatra-guide" className="nakshatra-secondary-link">Read the guide</a>
             </div>
           </div>
-          <div className="nakshatra-hero__panel" aria-label="Nakshatra quick facts">
-            <div>
-              <strong>27</strong>
-              <span>Lunar mansions</span>
+          <div className="nakshatra-hero__panel" aria-label="Nakshatra cycle">
+            <div className="nakshatra-hero__orbit" aria-hidden="true">
+              <span className="nakshatra-hero__orbit-number">27</span>
+              <i /><i /><i />
             </div>
-            <div>
-              <strong>13°20'</strong>
-              <span>Each nakshatra span</span>
-            </div>
-            <div>
-              <strong>4</strong>
-              <span>Padas per nakshatra</span>
+            <div className="nakshatra-hero__facts">
+              <span><strong>13°20′</strong>Each mansion</span>
+              <span><strong>4</strong>Padas each</span>
+              <span><strong>9</strong>Planetary lords</span>
             </div>
           </div>
         </section>
@@ -305,8 +306,8 @@ const NakshatraListPage = () => {
 
         <section id="nakshatra-guide" className="nakshatra-guide" aria-label="Nakshatra SEO guide">
           <div className="nakshatra-guide__intro">
-            <p className="nakshatra-eyebrow">Complete nakshatra guide</p>
-            <h2>Nakshatra names, lords, deities, padas, and calendars</h2>
+            <p className="nakshatra-eyebrow"><span /> Complete nakshatra guide</p>
+            <h2>The finer language<br /><em>of the zodiac.</em></h2>
             <p>
               Nakshatras divide the zodiac into 27 Moon-based segments. They add precision to Vedic astrology by showing
               the texture of the mind, the quality of time, the dasha starting point, and the deeper pattern behind
@@ -339,13 +340,14 @@ const NakshatraListPage = () => {
         </section>
 
         <section className="nakshatra-faq" aria-label="Nakshatra FAQ">
+          <p className="nakshatra-eyebrow"><span /> Questions</p>
           <h2>Nakshatra FAQ</h2>
           <div className="nakshatra-faq__grid">
-            {SEO_FAQS.map((item) => (
-              <article key={item.question}>
-                <h3>{item.question}</h3>
+            {SEO_FAQS.map((item, index) => (
+              <details key={item.question} open={index === 0}>
+                <summary>{item.question}<span aria-hidden>+</span></summary>
                 <p>{item.answer}</p>
-              </article>
+              </details>
             ))}
           </div>
         </section>

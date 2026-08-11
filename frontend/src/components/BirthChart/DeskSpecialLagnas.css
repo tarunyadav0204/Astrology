@@ -12,7 +12,7 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #6b5c54;
+  color: var(--color-text-muted);
 }
 
 .desk-lag__chips {
@@ -35,8 +35,8 @@
   flex-shrink: 0;
   padding: 0.12rem 0.4rem;
   border-radius: 5px;
-  border: 1px solid rgba(70, 45, 35, 0.12);
-  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+  background: var(--color-surface-raised);
   white-space: nowrap;
 }
 
@@ -46,35 +46,35 @@
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #6b5c54;
+  color: var(--color-text-muted);
 }
 
 .desk-lag__chip strong {
   font-size: 0.68rem;
   font-weight: 750;
-  color: #1f1714;
+  color: var(--color-text);
 }
 
-.desk-lag__chip--al strong { color: #9f1239; }
-.desk-lag__chip--al { border-color: rgba(159, 18, 57, 0.25); }
-.desk-lag__chip--ul strong { color: #7c3aed; }
-.desk-lag__chip--ul { border-color: rgba(124, 58, 237, 0.25); }
-.desk-lag__chip--a7 strong { color: #c2410c; }
+.desk-lag__chip--al strong { color: var(--color-brand); }
+.desk-lag__chip--al { border-color: color-mix(in srgb, var(--color-brand) 25%, transparent); }
+.desk-lag__chip--ul strong { color: var(--color-info); }
+.desk-lag__chip--ul { border-color: color-mix(in srgb, var(--color-info) 25%, transparent); }
+.desk-lag__chip--a7 strong { color: var(--color-warning); }
 .desk-lag__chip--a7 { border-color: rgba(194, 65, 12, 0.28); }
-.desk-lag__chip--indu strong { color: #0369a1; }
+.desk-lag__chip--indu strong { color: var(--color-info); }
 .desk-lag__chip--indu { border-color: rgba(2, 132, 199, 0.28); }
 
 .desk-lag--empty { opacity: 0.5; }
 .desk-lag--error {
   font-size: 0.62rem;
-  color: #9f1239;
+  color: var(--color-brand);
   padding: 0 0.35rem;
 }
 
 @media (max-width: 1100px) {
   .parashari-desk-tools__meta .desk-lag--strip {
     border-left: 0;
-    border-top: 1px solid rgba(70, 45, 35, 0.14);
+    border-top: 1px solid color-mix(in srgb, var(--color-text) 14%, transparent);
     padding-left: 0;
     padding-top: 0.3rem;
     width: 100%;

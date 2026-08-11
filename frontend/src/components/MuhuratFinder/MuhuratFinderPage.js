@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { muhuratService } from '../../services/muhuratService';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
+import LocationFinder from '../Panchang/components/LocationFinder';
 import SEOHead from '../SEO/SEOHead';
 import { generatePageSEO } from '../../config/seo.config';
 import './MuhuratFinderPage.css';
@@ -56,19 +57,24 @@ const MUHURAT_FAQS = [
   },
 ];
 
-const MuhuratFinderPage = () => {
+const MuhuratFinderPage = ({ user: propUser, onLogout, onAdminClick, onLogin }) => {
   const navigate = useNavigate();
   const { birthData } = useAstrology();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [location] = useState({ latitude: 28.6139, longitude: 77.2090, name: 'New Delhi' });
+  const [location, setLocation] = useState({ latitude: 28.6139, longitude: 77.2090, name: 'New Delhi, India' });
+  const [showLocationFinder, setShowLocationFinder] = useState(false);
   const [selectedMuhurat, setSelectedMuhurat] = useState('vivah');
   const [muhuratData, setMuhuratData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(propUser || null);
   const locationKey = `${location.latitude},${location.longitude}`;
 
   useEffect(() => {
+    if (propUser) {
+      setUser(propUser);
+      return;
+    }
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
     if (token && savedUser) {
@@ -78,7 +84,7 @@ const MuhuratFinderPage = () => {
         setUser(null);
       }
     }
-  }, []);
+  }, [propUser]);
 
   useEffect(() => {
     fetchMuhuratData();
@@ -193,34 +199,39 @@ const MuhuratFinderPage = () => {
   };
 
   return (
-    <div className="muhurat-finder-page">
+    <div className="muhurat-finder-page muhurat-finder-page--themed">
       <SEOHead
         title={seoData.title}
         description={seoData.description}
         keywords={seoData.keywords}
         canonical={seoData.canonical}
         structuredData={structuredData}
+        themeColor="#210b17"
       />
-      <NavigationHeader
-        compact={true}
+      <ModernNavigationHeader
+        sticky
         user={user}
-        onLogin={() => navigate('/')}
-        onLogout={() => {
+        onAdminClick={onAdminClick}
+        onLogin={onLogin || (() => navigate('/'))}
+        onLogout={onLogout || (() => {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           setUser(null);
           navigate('/');
-        }}
+        })}
       />
 
       <div className="muhurat-container">
         <section className="muhurat-hero">
           <div className="muhurat-hero-copy">
-            <span className="muhurat-eyebrow">Vedic Muhurat Calculator</span>
-            <h1>Muhurat Finder for Marriage, Property, Vehicle and Griha Pravesh</h1>
+            <button type="button" className="muhurat-back-link" onClick={() => navigate('/panchang')}>
+              <span aria-hidden>←</span> Panchang
+            </button>
+            <span className="muhurat-eyebrow">Purpose-led Vedic timing</span>
+            <h1>Find the moment<br /><em>that supports it.</em></h1>
             <p>
-              Shortlist auspicious time windows using date, location and purpose-specific Vedic
-              Panchang calculations before planning important ceremonies or purchases.
+              Shortlist auspicious windows for the decision you are making—calculated from the
+              local day, its Panchang and the rules that matter for that specific purpose.
             </p>
             <div className="muhurat-hero-tags" aria-label="Muhurat finder highlights">
               <span>Marriage</span>
@@ -230,10 +241,20 @@ const MuhuratFinderPage = () => {
             </div>
           </div>
           <div className="muhurat-hero-panel" aria-label="Selected muhurat search">
-            <span>Selected</span>
-            <strong>{selectedType.name}</strong>
-            <p>{formatDate(selectedDate)}</p>
-            <p>{location.name}</p>
+            <div className="muhurat-time-orbit" aria-hidden="true">
+              <span>{selectedType.name}</span>
+              <strong>{new Date(`${selectedDate}T12:00:00`).getDate()}</strong>
+              <small>{new Date(`${selectedDate}T12:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</small>
+            </div>
+            <div className="muhurat-hero-meta">
+              <span>{location.name}</span>
+              <strong>{displayMuhurtas.length || '—'} windows</strong>
+            </div>
+          </div>
+          <div className="muhurat-hero-proof">
+            <span><strong>Purpose</strong> specific</span>
+            <span><strong>Local</strong> sunrise</span>
+            <span><strong>Strict</strong> filters</span>
           </div>
         </section>
 
@@ -253,7 +274,7 @@ const MuhuratFinderPage = () => {
               <label>Location</label>
               <div className="location-display">
                 <span>{location.name}</span>
-                <button className="change-location-btn" type="button">Change</button>
+                <button className="change-location-btn" type="button" onClick={() => setShowLocationFinder(true)}>Change</button>
               </div>
             </div>
           </div>
@@ -469,8 +490,9 @@ const MuhuratFinderPage = () => {
           </div>
 
           <div className="muhurat-guide-grid">
-            {MUHURAT_GUIDE_CARDS.map((card) => (
+            {MUHURAT_GUIDE_CARDS.map((card, index) => (
               <article className="muhurat-guide-card" key={card.title}>
+                <span className="muhurat-guide-number">{String(index + 1).padStart(2, '0')}</span>
                 <h3>{card.title}</h3>
                 <p>{card.body}</p>
               </article>
@@ -501,15 +523,25 @@ const MuhuratFinderPage = () => {
             <h2 id="muhurat-faq-title">Muhurat Finder FAQs</h2>
           </div>
           <div className="muhurat-faq-grid">
-            {MUHURAT_FAQS.map((item) => (
-              <article className="muhurat-faq-card" key={item.question}>
-                <h3>{item.question}</h3>
+            {MUHURAT_FAQS.map((item, index) => (
+              <details className="muhurat-faq-card" key={item.question} open={index === 0}>
+                <summary>{item.question}<span aria-hidden>+</span></summary>
                 <p>{item.answer}</p>
-              </article>
+              </details>
             ))}
           </div>
         </section>
       </div>
+
+      <LocationFinder
+        isOpen={showLocationFinder}
+        onClose={() => setShowLocationFinder(false)}
+        onLocationSelect={(nextLocation) => {
+          setLocation(nextLocation);
+          setShowLocationFinder(false);
+        }}
+        currentLocation={location}
+      />
     </div>
   );
 };

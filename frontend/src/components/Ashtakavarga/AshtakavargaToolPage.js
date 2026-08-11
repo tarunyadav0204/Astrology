@@ -1,9 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAstrology } from '../../context/AstrologyContext';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
-import CreditsModal from '../Credits/CreditsModal';
 import AshtakavargaModal from './AshtakavargaModal';
 import './AshtakavargaModal.css';
 
@@ -15,37 +14,32 @@ function AshtakavargaToolPage({ user, onLogout, onAdminClick, onLogin }) {
   const navigate = useNavigate();
   const { birthData } = useAstrology();
   const [showBirthModal, setShowBirthModal] = useState(false);
-  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const transitDate = useMemo(() => new Date().toISOString().split('T')[0], []);
   const initialActiveTab = location.state?.initialActiveTab || 'matrix';
 
   const handleBack = () => {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate('/charts-dashas?tab=more');
-    }
+    navigate('/ashtakavarga');
   };
 
   return (
     <div className="ashtakavarga-tool-page-root">
-      <NavigationHeader
-        compact
-        showZodiacSelector={false}
+      <ModernNavigationHeader
+        sticky
         user={user}
         onLogout={onLogout}
         onAdminClick={onAdminClick}
         onLogin={onLogin}
-        showLoginButton={!user}
-        onCreditsClick={() => setShowCreditsModal(true)}
-        birthData={birthData}
-        onChangeNative={() => setShowBirthModal(true)}
-        onHomeClick={() => navigate('/')}
       />
-      <div className="ashtakavarga-tool-mobile-bar">
-        <button type="button" onClick={handleBack} aria-label="Back to previous screen">← Back</button>
-        <strong>Ashtakavarga</strong>
-      </div>
+      <header className="ashtakavarga-tool-masthead">
+        <button type="button" className="ashtakavarga-tool-back" onClick={handleBack}>
+          <span aria-hidden>←</span> Back to Ashtakavarga
+        </button>
+        <div className="ashtakavarga-tool-masthead__copy">
+          <span>Chart strength workspace</span>
+          <h1>Ashtakavarga</h1>
+          <p>{birthData?.name ? `Reading the bindu field for ${birthData.name}.` : 'Begin with an accurate sidereal birth chart.'}</p>
+        </div>
+      </header>
       {birthData ? (
         <AshtakavargaModal
           variant="page"
@@ -75,7 +69,6 @@ function AshtakavargaToolPage({ user, onLogout, onAdminClick, onLogin }) {
         title="Birth details for Ashtakavarga"
         description="Accurate sidereal chart data is required for bindus and transit comparisons."
       />
-      <CreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} onLogin={onLogin} />
     </div>
   );
 }

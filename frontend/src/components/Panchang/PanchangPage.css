@@ -2444,3 +2444,539 @@
     font-size: 0.9rem;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Theme-system redesign
+   Scoped to the modern page so legacy Panchang consumers remain unaffected.
+   -------------------------------------------------------------------------- */
+
+.panchang-page--themed {
+  --panchang-ink: var(--color-text);
+  --panchang-muted: var(--color-text-muted);
+  --panchang-soft: var(--color-canvas-subtle);
+  --panchang-panel: var(--color-surface-raised);
+  --panchang-line: var(--color-border);
+  --panchang-rust: var(--color-brand);
+  --panchang-rose: var(--color-brand-hover);
+  --panchang-gold: var(--color-accent);
+  --panchang-green: var(--color-success);
+  --panchang-shadow: var(--shadow-card);
+  min-height: 100vh;
+  padding-top: 0;
+  overflow-x: clip;
+  background:
+    radial-gradient(circle at 88% 7%, color-mix(in srgb, var(--color-accent) 14%, transparent), transparent 24rem),
+    var(--color-canvas);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+.panchang-page--themed *,
+.panchang-page--themed *::before,
+.panchang-page--themed *::after {
+  box-sizing: border-box;
+}
+
+.panchang-page--themed .panchang-content {
+  padding: clamp(1rem, 2.5vw, 2.5rem) 0 var(--space-section);
+}
+
+.panchang-page--themed .panchang-container {
+  width: min(calc(100% - (2 * var(--page-gutter))), var(--content-wide));
+  margin-inline: auto;
+}
+
+.panchang-editorial-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(21rem, .75fr);
+  min-height: clamp(35rem, 72vh, 49rem);
+  overflow: hidden;
+  border: 1px solid var(--color-border-inverse);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(circle at 72% 50%, var(--color-cosmic-glow), transparent 27%),
+    linear-gradient(145deg, var(--color-surface-inverse), var(--color-cosmic-surface));
+  color: var(--color-text-inverse);
+  box-shadow: var(--shadow-card);
+}
+
+.panchang-editorial-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .28;
+  background-image: radial-gradient(var(--color-accent-soft) .7px, transparent .7px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(90deg, transparent 30%, #000);
+}
+
+.panchang-editorial-copy {
+  z-index: 1;
+  align-self: center;
+  padding: clamp(3rem, 7vw, 7.5rem);
+}
+
+.panchang-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .65rem;
+  margin: 0 0 clamp(3rem, 7vh, 5rem);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-inverse-muted);
+  font: 700 var(--text-xs)/1 var(--font-body);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.panchang-back-link:hover { color: var(--color-accent-soft); }
+
+.panchang-editorial-eyebrow,
+.panchang-page--themed .panchang-eyebrow {
+  display: block;
+  color: var(--color-accent-soft);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+}
+
+.panchang-editorial-copy h1 {
+  max-width: 12ch;
+  margin: 1rem 0 1.5rem;
+  color: var(--color-text-inverse);
+  font: 400 clamp(3.7rem, 7.2vw, 7.6rem)/.88 var(--font-display);
+  letter-spacing: -.055em;
+}
+
+.panchang-editorial-copy h1 em {
+  color: var(--color-accent-soft);
+  font-weight: 400;
+}
+
+.panchang-editorial-copy p {
+  max-width: 38rem;
+  margin: 0;
+  color: var(--color-text-inverse-muted);
+  font-size: clamp(1rem, 1.45vw, 1.25rem);
+  line-height: 1.75;
+}
+
+.panchang-day-orbit {
+  position: relative;
+  z-index: 1;
+  align-self: center;
+  justify-self: center;
+  width: min(35vw, 29rem);
+  aspect-ratio: 1;
+}
+
+.panchang-orbit-ring {
+  position: absolute;
+  border: 1px solid var(--color-cosmic-line-strong);
+  border-radius: 50%;
+}
+
+.panchang-orbit-ring--outer { inset: 0; }
+.panchang-orbit-ring--inner { inset: 15%; border-color: var(--color-cosmic-line); }
+
+.panchang-orbit-ring--outer::before,
+.panchang-orbit-ring--outer::after {
+  content: '';
+  position: absolute;
+  inset: 49.8% -2%;
+  height: 1px;
+  background: var(--color-cosmic-line);
+}
+
+.panchang-orbit-ring--outer::after { transform: rotate(90deg); }
+
+.panchang-orbit-center {
+  position: absolute;
+  inset: 27%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-cosmic-line-strong);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-surface-inverse-raised) 88%, transparent);
+  box-shadow: 0 0 70px var(--color-cosmic-glow);
+  text-align: center;
+}
+
+.panchang-orbit-center small,
+.panchang-orbit-center span {
+  color: var(--color-cosmic-text-muted);
+  font-size: clamp(.57rem, .9vw, .75rem);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.panchang-orbit-center strong {
+  margin: .15rem 0;
+  color: var(--color-accent-soft);
+  font: 400 clamp(3.4rem, 6vw, 6.2rem)/1 var(--font-display);
+}
+
+.panchang-orbit-label {
+  position: absolute;
+  padding: .45rem .7rem;
+  border: 1px solid var(--color-cosmic-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-cosmic-surface-raised);
+  color: var(--color-cosmic-text-muted);
+  font-size: .64rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.panchang-orbit-label--tithi { top: 5%; left: 22%; }
+.panchang-orbit-label--star { top: 27%; right: -2%; }
+.panchang-orbit-label--yoga { bottom: 13%; right: 13%; }
+.panchang-orbit-label--karana { bottom: 19%; left: 0; }
+
+.panchang-orbit-dot {
+  position: absolute;
+  width: .75rem;
+  height: .75rem;
+  border-radius: 50%;
+  background: var(--color-accent-soft);
+  box-shadow: 0 0 22px var(--color-accent);
+}
+
+.panchang-orbit-dot--one { top: 15%; right: 15%; }
+.panchang-orbit-dot--two { bottom: 12%; left: 20%; width: .45rem; height: .45rem; }
+
+.panchang-hero-proof {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--color-border-inverse);
+  background: color-mix(in srgb, var(--color-cosmic-surface) 72%, transparent);
+}
+
+.panchang-hero-proof span {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: 1.3rem clamp(1rem, 3vw, 2.5rem);
+  color: var(--color-text-inverse-muted);
+  font-size: .78rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.panchang-hero-proof span + span { border-left: 1px solid var(--color-border-inverse); }
+.panchang-hero-proof strong { color: var(--color-accent-soft); }
+
+.panchang-control-deck {
+  display: grid;
+  grid-template-columns: minmax(13rem, .35fr) minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+  align-items: start;
+  margin: clamp(1.5rem, 4vw, 4rem) 0;
+}
+
+.panchang-control-intro { padding: 1.5rem 0; }
+.panchang-control-intro p {
+  max-width: 25rem;
+  color: var(--color-text-muted);
+  font-size: .95rem;
+  line-height: 1.7;
+}
+
+.panchang-page--themed .panchang-header {
+  margin: 0;
+  padding: clamp(1.5rem, 3vw, 2.75rem);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-sm);
+}
+
+.panchang-page--themed .panchang-hero-copy { margin-bottom: 1.75rem; }
+.panchang-page--themed .panchang-hero-copy h1 {
+  max-width: 18ch;
+  margin: .55rem 0 .75rem;
+  color: var(--color-text);
+  font: 400 clamp(2rem, 3.6vw, 3.8rem)/1.03 var(--font-display);
+  letter-spacing: -.035em;
+}
+.panchang-page--themed .panchang-hero-copy p { max-width: 50rem; color: var(--color-text-muted); line-height: 1.65; }
+.panchang-page--themed .panchang-hero-tags { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.1rem; }
+.panchang-page--themed .panchang-hero-tags span,
+.panchang-page--themed .quality-badge,
+.panchang-page--themed .recommendation,
+.panchang-page--themed .activity-tag,
+.panchang-page--themed .planet-tag {
+  padding: .38rem .7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.panchang-page--themed .header-row {
+  display: grid;
+  grid-template-columns: minmax(15rem, 1fr) auto auto minmax(12rem, auto);
+  gap: .65rem;
+  margin: 0;
+}
+
+.panchang-page--themed .date-navigation-container,
+.panchang-page--themed .location-info {
+  min-height: var(--control-height-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-subtle);
+  box-shadow: none;
+}
+
+.panchang-page--themed .date-navigation-container:hover { border-color: var(--color-border-strong); box-shadow: none; }
+.panchang-page--themed .nav-btn,
+.panchang-page--themed .today-btn,
+.panchang-page--themed .calendar-select,
+.panchang-page--themed .change-location-btn,
+.panchang-page--themed .monthly-panchang-link,
+.panchang-page--themed .retry-btn {
+  min-height: var(--control-height-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-brand);
+  font: 700 .78rem/1 var(--font-body);
+  transition: border-color var(--motion-standard), background var(--motion-standard), color var(--motion-standard);
+}
+
+.panchang-page--themed .nav-btn { min-width: var(--touch-target); border: 0; border-radius: 0; }
+.panchang-page--themed .date-input,
+.panchang-page--themed .calendar-select {
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+.panchang-page--themed .calendar-select { border: 1px solid var(--color-border); padding-inline: 1rem; }
+.panchang-page--themed .today-btn:hover,
+.panchang-page--themed .change-location-btn:hover,
+.panchang-page--themed .monthly-panchang-link:hover,
+.panchang-page--themed .retry-btn:hover {
+  transform: none;
+  border-color: var(--color-brand);
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  box-shadow: none;
+}
+.panchang-page--themed .location-info { padding: .25rem .4rem .25rem 1rem; border-color: var(--color-border); background: var(--color-surface-raised); color: var(--color-text); }
+.panchang-page--themed .location-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panchang-page--themed .change-location-btn { min-height: 2.35rem; padding-inline: .85rem; }
+.panchang-page--themed .monthly-panchang-link { grid-column: 1 / -1; justify-self: start; padding-inline: 1.15rem; }
+.panchang-page--themed .festival-banner { margin-top: 1rem; border: 1px solid color-mix(in srgb, var(--color-accent) 42%, transparent); border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-accent-soft) 30%, transparent); color: var(--color-text); }
+
+.panchang-page--themed .panchang-inline-loading,
+.panchang-page--themed .panchang-inline-error {
+  margin: 1rem 0 2rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+.panchang-page--themed .loading-spinner { border-color: var(--color-border); border-left-color: var(--color-brand); }
+
+.panchang-page--themed .panchang-section,
+.panchang-page--themed > .panchang-content .timing-grid > .timing-card {
+  margin: clamp(1.5rem, 3vw, 3rem) 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+.panchang-page--themed .section-header {
+  display: grid;
+  grid-template-columns: minmax(10rem, .28fr) 1fr;
+  align-items: end;
+  padding: clamp(1.5rem, 3vw, 3rem);
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+}
+.panchang-page--themed .section-header span { color: var(--color-brand); font-size: .7rem; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; }
+.panchang-page--themed .section-header h2 { margin: 0; color: var(--color-text); font: 400 clamp(2rem, 4vw, 4.3rem)/.98 var(--font-display); letter-spacing: -.04em; }
+.panchang-page--themed .section-content { padding: clamp(1rem, 2.5vw, 2.5rem); }
+
+.panchang-page--themed .panchang-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-border); }
+.panchang-page--themed .panchang-element {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--color-surface-raised);
+  box-shadow: none;
+}
+.panchang-page--themed .element-header { border-bottom: 1px solid var(--color-border); background: transparent; }
+.panchang-page--themed .element-header h3 { color: var(--color-text); }
+.panchang-page--themed .element-number { color: var(--color-brand); }
+.panchang-page--themed .main-value { color: var(--color-text); font-family: var(--font-display); font-size: clamp(1.45rem, 2vw, 2rem); }
+.panchang-page--themed .element-content,
+.panchang-page--themed .element-content * { color: var(--color-text-muted); }
+.panchang-page--themed .element-content strong { color: var(--color-text); }
+.panchang-page--themed .progress-bar,
+.panchang-page--themed .pada-progress { background: var(--color-surface-muted); }
+.panchang-page--themed .progress-fill,
+.panchang-page--themed .pada-fill { background: var(--color-brand); }
+
+.panchang-page--themed > .panchang-content .panchang-container > .timing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: clamp(1.5rem, 3vw, 3rem) 0;
+}
+.panchang-page--themed > .panchang-content .timing-grid > .timing-card { margin: 0; padding: clamp(1rem, 2vw, 1.75rem); min-width: 0; }
+.panchang-page--themed > .panchang-content .timing-grid > .timing-card > h3 { margin: 0 0 1.5rem; color: var(--color-text); font: 400 clamp(1.5rem, 2.3vw, 2.3rem)/1.05 var(--font-display); }
+
+.panchang-page--themed .timing-section,
+.panchang-page--themed .timing-item,
+.panchang-page--themed .duration-card,
+.panchang-page--themed .day-progress,
+.panchang-page--themed .timings-grid .timing-card,
+.panchang-page--themed .choghadiya-item,
+.panchang-page--themed .hora-item,
+.panchang-page--themed .summary-item,
+.panchang-page--themed .general-advice,
+.panchang-page--themed .weekly-pattern,
+.panchang-page--themed .active-warning,
+.panchang-page--themed .active-auspicious {
+  border-color: var(--color-border);
+  background: var(--color-canvas-subtle);
+  color: var(--color-text);
+  box-shadow: none;
+}
+.panchang-page--themed .timing-section h4,
+.panchang-page--themed .timing-section h5,
+.panchang-page--themed .timing-name,
+.panchang-page--themed .timing-title,
+.panchang-page--themed .duration-card h4,
+.panchang-page--themed .day-progress h4 { color: var(--color-text); }
+.panchang-page--themed .timing-duration,
+.panchang-page--themed .timing-description,
+.panchang-page--themed .additional-info,
+.panchang-page--themed .muhurat-details,
+.panchang-page--themed .choghadiya-time,
+.panchang-page--themed .hora-time { color: var(--color-text-muted); }
+.panchang-page--themed .main-time,
+.panchang-page--themed .duration-value { color: var(--color-brand); font-family: var(--font-display); }
+.panchang-page--themed .active-warning { border-left-color: var(--color-danger); }
+.panchang-page--themed .active-auspicious { border-left-color: var(--color-success); }
+.panchang-page--themed .timing-card.active,
+.panchang-page--themed .timing-item.active,
+.panchang-page--themed .hora-item.active,
+.panchang-page--themed .choghadiya-item.active { outline-color: var(--color-accent); background: color-mix(in srgb, var(--color-accent-soft) 28%, var(--color-surface)); }
+
+.panchang-page--themed .planets-grid { gap: .75rem; }
+.panchang-page--themed .planet-card-compact {
+  height: auto !important;
+  min-height: 7rem !important;
+  max-height: none !important;
+  padding: 1rem !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-md) !important;
+  background: var(--color-canvas-subtle) !important;
+  color: var(--color-text) !important;
+}
+.panchang-page--themed .planet-name,
+.panchang-page--themed .sign { color: var(--color-text); }
+.panchang-page--themed .degree,
+.panchang-page--themed .ayanamsa-info { color: var(--color-text-muted); }
+
+.panchang-page--themed .panchang-seo-section,
+.panchang-page--themed .panchang-faq-section {
+  margin-top: clamp(4rem, 8vw, 8rem);
+  padding: clamp(2rem, 5vw, 5rem);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-inverse);
+  color: var(--color-text-inverse);
+}
+.panchang-page--themed .panchang-faq-section { background: transparent; color: var(--color-text); }
+.panchang-page--themed .panchang-seo-intro { max-width: 58rem; margin-bottom: clamp(2rem, 5vw, 4rem); }
+.panchang-page--themed .panchang-seo-intro h2 { margin: .8rem 0 1rem; color: inherit; font: 400 clamp(2.4rem, 5vw, 5rem)/.95 var(--font-display); letter-spacing: -.045em; }
+.panchang-page--themed .panchang-seo-intro p { color: var(--color-text-inverse-muted); font-size: 1.05rem; line-height: 1.75; }
+.panchang-page--themed .panchang-faq-section .panchang-seo-intro p { color: var(--color-text-muted); }
+.panchang-page--themed .panchang-guide-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--color-border-inverse); border-radius: var(--radius-lg); background: var(--color-border-inverse); }
+.panchang-page--themed .panchang-guide-card { min-height: 17rem; padding: 1.6rem; border: 0; border-radius: 0; background: var(--color-surface-inverse-raised); }
+.panchang-page--themed .panchang-guide-number { display: block; margin-bottom: 4rem; color: var(--color-accent-soft); font: 700 .7rem/1 var(--font-mono); letter-spacing: .14em; }
+.panchang-page--themed .panchang-guide-card h3 { color: var(--color-text-inverse); font-family: var(--font-display); font-size: 1.45rem; }
+.panchang-page--themed .panchang-guide-card p { color: var(--color-text-inverse-muted); line-height: 1.65; }
+.panchang-page--themed .panchang-copy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(2rem, 5vw, 5rem); margin-top: clamp(3rem, 6vw, 6rem); }
+.panchang-page--themed .panchang-copy-grid article { border: 0; background: transparent; }
+.panchang-page--themed .panchang-copy-grid h3 { color: var(--color-accent-soft); font: 400 1.8rem/1.1 var(--font-display); }
+.panchang-page--themed .panchang-copy-grid p { color: var(--color-text-inverse-muted); line-height: 1.75; }
+
+.panchang-page--themed .panchang-faq-grid { display: grid; grid-template-columns: 1fr; gap: 0; }
+.panchang-page--themed .panchang-faq-card { margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--color-border); border-radius: 0; background: transparent; box-shadow: none; }
+.panchang-page--themed .panchang-faq-card summary { display: flex; justify-content: space-between; gap: 2rem; align-items: center; padding: 1.5rem 0; color: var(--color-text); font: 400 clamp(1.25rem, 2vw, 1.7rem)/1.2 var(--font-display); cursor: pointer; list-style: none; }
+.panchang-page--themed .panchang-faq-card summary::-webkit-details-marker { display: none; }
+.panchang-page--themed .panchang-faq-card summary span { color: var(--color-brand); font-family: var(--font-body); transition: transform var(--motion-standard); }
+.panchang-page--themed .panchang-faq-card[open] summary span { transform: rotate(45deg); }
+.panchang-page--themed .panchang-faq-card p { max-width: 54rem; margin: -.25rem 0 1.5rem; color: var(--color-text-muted); line-height: 1.75; }
+
+@media (max-width: 1100px) {
+  .panchang-editorial-hero { grid-template-columns: 1fr .8fr; }
+  .panchang-page--themed .panchang-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .panchang-page--themed .panchang-element:last-child { grid-column: 1 / -1; }
+  .panchang-page--themed > .panchang-content .panchang-container > .timing-grid { grid-template-columns: 1fr; }
+  .panchang-page--themed .panchang-guide-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .panchang-page--themed .header-row { grid-template-columns: 1fr auto auto; }
+  .panchang-page--themed .location-info { grid-column: 1 / -1; }
+}
+
+@media (max-width: 760px) {
+  .panchang-page--themed .panchang-container { width: min(calc(100% - 1.25rem), var(--content-wide)); }
+  .panchang-editorial-hero { display: block; min-height: 55rem; border-radius: var(--radius-lg); }
+  .panchang-editorial-copy { padding: 2rem 1.35rem 1rem; }
+  .panchang-back-link { margin-bottom: 2.5rem; }
+  .panchang-editorial-copy h1 { font-size: clamp(3.4rem, 17vw, 5.5rem); }
+  .panchang-editorial-copy p { font-size: .98rem; }
+  .panchang-day-orbit { width: min(76vw, 18rem); margin: 1.5rem auto 0; }
+  .panchang-hero-proof { grid-template-columns: 1fr; }
+  .panchang-hero-proof span { padding: .65rem 1.2rem; }
+  .panchang-hero-proof span + span { border-top: 1px solid var(--color-border-inverse); border-left: 0; }
+  .panchang-control-deck { grid-template-columns: 1fr; gap: .5rem; }
+  .panchang-control-intro { padding-bottom: .25rem; }
+  .panchang-page--themed .panchang-header { padding: 1.25rem; border-radius: var(--radius-lg); }
+  .panchang-page--themed .header-row { grid-template-columns: 1fr; }
+  .panchang-page--themed .location-info,
+  .panchang-page--themed .monthly-panchang-link { grid-column: auto; width: 100%; }
+  .panchang-page--themed .today-btn,
+  .panchang-page--themed .calendar-select { width: 100%; }
+  .panchang-page--themed .section-header { grid-template-columns: 1fr; gap: .75rem; padding: 1.35rem; }
+  .panchang-page--themed .section-content { padding: .75rem; }
+  .panchang-page--themed .panchang-grid,
+  .panchang-page--themed .panchang-guide-grid,
+  .panchang-page--themed .panchang-copy-grid { grid-template-columns: 1fr !important; }
+  .panchang-page--themed .panchang-element:last-child { grid-column: auto; }
+  .panchang-page--themed .panchang-seo-section,
+  .panchang-page--themed .panchang-faq-section { padding: 1.5rem 1.25rem; border-radius: var(--radius-lg); }
+  .panchang-page--themed .panchang-guide-number { margin-bottom: 2.5rem; }
+  .panchang-page--themed .panchang-guide-card { min-height: 14rem; }
+  .panchang-page--themed .planets-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panchang-page--themed *,
+  .panchang-page--themed *::before,
+  .panchang-page--themed *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}

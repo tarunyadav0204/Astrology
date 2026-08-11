@@ -26,6 +26,7 @@ const ChartWidget = ({
   selectedHouseNumber = null,
   highlightedPlanets = null,
   highlightedHouseNumbers = null,
+  activationHouseStates = null,
   chartStyle: controlledChartStyle,
   onChartStyleChange = null,
 }) => {
@@ -450,6 +451,7 @@ const ChartWidget = ({
             selectedHouseNumber={selectedHouseNumber}
             highlightedPlanets={highlightedPlanets}
             highlightedHouseNumbers={highlightedHouseNumbers}
+            activationHouseStates={activationHouseStates}
           />
         ) : (
           <SouthIndianChart 
@@ -464,6 +466,7 @@ const ChartWidget = ({
             selectedHouseNumber={selectedHouseNumber}
             highlightedPlanets={highlightedPlanets}
             highlightedHouseNumbers={highlightedHouseNumbers}
+            activationHouseStates={activationHouseStates}
           />
         )}
       </ChartContainer>

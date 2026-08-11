@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import { generatePageSEO } from '../../config/seo.config';
 import './MonthlyFestivalsPage.css';
@@ -111,7 +111,7 @@ const buildCalendarDays = (currentDate) => {
   });
 };
 
-const MonthlyFestivalsPage = () => {
+const MonthlyFestivalsPage = ({ user, onLogout, onAdminClick, onLogin }) => {
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [monthlyData, setMonthlyData] = useState({ festivals: [], vrats: [] });
@@ -222,6 +222,8 @@ const MonthlyFestivalsPage = () => {
     setCurrentDate(nextDate);
   };
 
+  const goToCurrentMonth = () => setCurrentDate(new Date());
+
   const getEventsForDate = (date) => {
     const dateStr = formatDateKey(date);
     return allEvents.filter((event) => event.date === dateStr);
@@ -234,18 +236,27 @@ const MonthlyFestivalsPage = () => {
       : [];
 
   return (
-    <div className="monthly-festivals-page">
-      <SEOHead {...seoData} structuredData={structuredData} />
-      <NavigationHeader compact />
+    <div className="monthly-festivals-page monthly-festivals-page--themed">
+      <SEOHead {...seoData} structuredData={structuredData} themeColor="#210b17" />
+      <ModernNavigationHeader
+        sticky
+        user={user}
+        onLogout={onLogout}
+        onAdminClick={onAdminClick}
+        onLogin={onLogin}
+      />
 
       <main className="monthly-festivals-shell">
         <section className={`monthly-festivals-hero ${monthlyData.is_adhika_month ? 'is-adhika' : ''}`}>
           <div className="monthly-festivals-hero__copy">
-            <span className="monthly-festivals-eyebrow">Monthly Hindu Calendar</span>
-            <h1>Monthly Festivals and Vrat Calendar</h1>
+            <button type="button" className="monthly-festivals-back" onClick={() => navigate('/festivals')}>
+              <span aria-hidden>←</span> Daily Festivals
+            </button>
+            <span className="monthly-festivals-eyebrow">Sacred month · {location.name}</span>
+            <h1>See the month<br /><em>in observance.</em></h1>
             <p>
-              Browse Hindu festivals, Ekadashi, Pradosh, Purnima, Amavasya and sacred observances by month,
-              with location-aware dates and festival details.
+              Scan festivals, Ekadashi, Pradosh, Purnima, Amavasya and vrats together,
+              then open an observance without losing the rhythm of the month.
             </p>
             <div className="monthly-festivals-hero__actions">
               <button type="button" className="monthly-festival-btn monthly-festival-btn--primary" onClick={() => navigate('/festivals')}>
@@ -257,13 +268,21 @@ const MonthlyFestivalsPage = () => {
             </div>
           </div>
           <div className="monthly-festivals-hero__panel">
-            <span>Showing</span>
-            <strong>{monthTitle}</strong>
+            <div className="monthly-festivals-orbit" aria-hidden="true">
+              <span>{MONTH_NAMES[currentDate.getMonth()]}</span>
+              <strong>{currentDate.getFullYear()}</strong>
+              <div><i></i><i></i><i></i><i></i><i></i></div>
+            </div>
             <div className="monthly-festival-stats">
               <div><strong>{monthlyData.festivals?.length || 0}</strong><span>Festivals</span></div>
               <div><strong>{monthlyData.vrats?.length || 0}</strong><span>Vrats</span></div>
             </div>
             {monthlyData.is_adhika_month && <p className="monthly-adhika-note">Adhika Maas - sacred leap month</p>}
+          </div>
+          <div className="monthly-festivals-hero__proof">
+            <span><strong>{allEvents.length || '—'}</strong> observances</span>
+            <span><strong>Local</strong> dates</span>
+            <span><strong>Full</strong> ritual context</span>
           </div>
         </section>
 
@@ -276,6 +295,9 @@ const MonthlyFestivalsPage = () => {
           <button type="button" className="monthly-nav-btn" onClick={() => navigateMonth(1)} aria-label="Next month">›</button>
           <button type="button" className="monthly-festival-btn monthly-festival-btn--ghost" onClick={() => setShowTransits((value) => !value)}>
             {showTransits ? 'Hide Transits' : 'Show Transits'}
+          </button>
+          <button type="button" className="monthly-festival-btn monthly-festival-btn--ghost" onClick={goToCurrentMonth}>
+            This month
           </button>
         </section>
 
@@ -401,6 +423,11 @@ const MonthlyFestivalsPage = () => {
                       <p>{selectedEvent.benefits}</p>
                     </section>
                   )}
+                  {selectedEvent.date && (
+                    <button type="button" className="monthly-detail-action" onClick={() => navigate(`/festivals?date=${selectedEvent.date}`)}>
+                      Open daily observances <span aria-hidden>↗</span>
+                    </button>
+                  )}
                 </article>
               ) : (
                 <div className="monthly-empty">
@@ -448,8 +475,9 @@ const MonthlyFestivalsPage = () => {
             </p>
           </div>
           <div className="monthly-guide-grid">
-            {GUIDE_CARDS.map(([title, body]) => (
+            {GUIDE_CARDS.map(([title, body], index) => (
               <article className="monthly-guide-card" key={title}>
+                <span className="monthly-guide-number">{String(index + 1).padStart(2, '0')}</span>
                 <h3>{title}</h3>
                 <p>{body}</p>
               </article>
@@ -463,11 +491,11 @@ const MonthlyFestivalsPage = () => {
             <h2>Monthly Festival Calendar FAQs</h2>
           </div>
           <div className="monthly-faq-grid">
-            {MONTHLY_FAQS.map((item) => (
-              <article className="monthly-faq-card" key={item.question}>
-                <h3>{item.question}</h3>
+            {MONTHLY_FAQS.map((item, index) => (
+              <details className="monthly-faq-card" key={item.question} open={index === 0}>
+                <summary>{item.question}<span aria-hidden>+</span></summary>
                 <p>{item.answer}</p>
-              </article>
+              </details>
             ))}
           </div>
         </section>

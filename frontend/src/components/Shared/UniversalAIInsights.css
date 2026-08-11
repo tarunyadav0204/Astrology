@@ -260,6 +260,7 @@
 }
 
 .accordion-header {
+  width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -269,6 +270,8 @@
   cursor: pointer;
   transition: all 0.3s ease;
   border: 1px solid #E2E8F0;
+  font: inherit;
+  text-align: left;
 }
 
 .accordion-header:hover {
@@ -719,6 +722,574 @@
   text-shadow: 0 0 5px rgba(255, 105, 180, 0.5);
 }
 
+/* Class-based rich text formatting keeps visual decisions in the theme layer. */
+.formatted-heading {
+  margin: 1rem 0 0.5rem;
+  color: #ff9800;
+}
+
+.formatted-strong {
+  color: #ff9800;
+  font-weight: 700;
+}
+
+.formatted-emphasis {
+  color: #ff9800;
+  font-style: italic;
+}
+
+.formatted-list {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.formatted-list-item { margin: 0.25rem 0; }
+
+/* Career dossier presentation — semantic tokens, no legacy report palette. */
+.universal-ai-insights--editorial {
+  min-height: 0;
+  padding: clamp(1.25rem, 4vw, 3.5rem);
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+.universal-ai-insights--editorial .ai-header-actions {
+  position: static;
+  justify-content: flex-end;
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.universal-ai-insights--editorial .corner-btn,
+.universal-ai-insights--editorial .regenerate-btn,
+.universal-ai-insights--editorial .pdf-download-btn {
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-brand);
+  font-family: var(--font-body);
+  font-weight: 700;
+}
+
+.universal-ai-insights--editorial .corner-btn:hover,
+.universal-ai-insights--editorial .regenerate-btn:hover,
+.universal-ai-insights--editorial .pdf-download-btn:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-brand-hover);
+}
+
+.universal-ai-insights--editorial .cache-indicator {
+  margin: 0 0 var(--space-5);
+  text-align: left;
+}
+
+.universal-ai-insights--editorial .cache-badge {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-success) 34%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-success) 9%, transparent);
+  color: var(--color-success);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.universal-ai-insights--editorial .enhanced-content {
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.universal-ai-insights--editorial .quick-answer-section,
+.universal-ai-insights--editorial .detailed-analysis-section,
+.universal-ai-insights--editorial .final-thoughts-section,
+.universal-ai-insights--editorial .follow-up-section {
+  margin: 0 0 clamp(3rem, 6vw, 5.5rem);
+}
+
+.universal-ai-insights--editorial .quick-answer-section > h3,
+.universal-ai-insights--editorial .detailed-analysis-section > h3,
+.universal-ai-insights--editorial .final-thoughts-section > h3,
+.universal-ai-insights--editorial .follow-up-section > h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-5);
+  color: var(--color-brand);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.universal-ai-insights--editorial .quick-answer-section > h3::before,
+.universal-ai-insights--editorial .detailed-analysis-section > h3::before,
+.universal-ai-insights--editorial .final-thoughts-section > h3::before,
+.universal-ai-insights--editorial .follow-up-section > h3::before {
+  content: '';
+  width: 2.5rem;
+  height: 1px;
+  background: currentColor;
+}
+
+.universal-ai-insights--editorial .quick-answer-card {
+  padding: clamp(2rem, 5vw, 4.5rem);
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-inverse);
+  color: var(--color-text-inverse);
+  box-shadow: none;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2.5vw, 2.15rem);
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+}
+
+.universal-ai-insights--editorial .quick-answer-card p { margin: 0 0 1em; }
+.universal-ai-insights--editorial .quick-answer-card p:last-child { margin-bottom: 0; }
+.universal-ai-insights--editorial .quick-answer-card .formatted-heading { color: var(--color-accent-soft); font: inherit; }
+.universal-ai-insights--editorial .quick-answer-card .formatted-strong,
+.universal-ai-insights--editorial .quick-answer-card .formatted-emphasis { color: var(--color-accent-soft); }
+
+.universal-ai-insights--editorial .questions-accordion {
+  border-top: 1px solid var(--color-border-strong);
+}
+
+.universal-ai-insights--editorial .accordion-panel {
+  margin: 0;
+  border-bottom: 1px solid var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.universal-ai-insights--editorial .accordion-panel:hover { box-shadow: none; }
+
+.universal-ai-insights--editorial .accordion-header {
+  width: 100%;
+  min-height: 5.25rem;
+  padding: var(--space-5) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+}
+
+.universal-ai-insights--editorial .accordion-header:hover,
+.universal-ai-insights--editorial .accordion-header.open {
+  background: transparent;
+  color: var(--color-brand);
+}
+
+.universal-ai-insights--editorial .question-info { gap: var(--space-5); }
+
+.universal-ai-insights--editorial .question-number {
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-brand);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+}
+
+.universal-ai-insights--editorial .question-number::before { content: '0'; }
+
+.universal-ai-insights--editorial .question-text {
+  color: inherit;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2vw, 1.75rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.universal-ai-insights--editorial .accordion-icon {
+  color: var(--color-brand);
+  font-size: 1.4rem;
+  font-weight: 300;
+}
+
+.universal-ai-insights--editorial .accordion-header.open .accordion-icon { transform: none; }
+
+.universal-ai-insights--editorial .accordion-content {
+  padding: 0 0 var(--space-7) clamp(2.25rem, 5vw, 4.25rem);
+  background: transparent;
+}
+
+.universal-ai-insights--editorial .answer-section,
+.universal-ai-insights--editorial .key-points-section,
+.universal-ai-insights--editorial .astrological-section { margin-bottom: var(--space-6); }
+
+.universal-ai-insights--editorial .universal-section-title {
+  margin: 0 0 var(--space-3) !important;
+  color: var(--color-text-subtle) !important;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs) !important;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.universal-ai-insights--editorial .answer-text,
+.universal-ai-insights--editorial .key-points-list,
+.universal-ai-insights--editorial .astrological-text {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-md);
+  line-height: 1.75;
+}
+
+.universal-ai-insights--editorial .answer-text p,
+.universal-ai-insights--editorial .astrological-text p { margin: 0 0 1em; }
+
+.universal-ai-insights--editorial .key-points-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  list-style: none;
+}
+
+.universal-ai-insights--editorial .key-points-list li {
+  position: relative;
+  margin: 0;
+  padding: var(--space-4) var(--space-4) var(--space-4) 2.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas-subtle);
+  color: var(--color-text);
+}
+
+.universal-ai-insights--editorial .key-points-list li::before {
+  content: '✦';
+  position: absolute;
+  left: var(--space-4);
+  color: var(--color-brand);
+}
+
+.universal-ai-insights--editorial .astrological-section {
+  padding: var(--space-5);
+  border-left: 2px solid var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.universal-ai-insights--editorial :is(.answer-text, .key-points-list, .astrological-text) .formatted-heading {
+  margin: var(--space-5) 0 var(--space-2);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 400;
+}
+
+.universal-ai-insights--editorial :is(.answer-text, .key-points-list, .astrological-text) .formatted-strong,
+.universal-ai-insights--editorial :is(.answer-text, .key-points-list, .astrological-text) strong {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.universal-ai-insights--editorial :is(.answer-text, .key-points-list, .astrological-text) .formatted-emphasis,
+.universal-ai-insights--editorial :is(.answer-text, .key-points-list, .astrological-text) em {
+  color: var(--color-brand);
+}
+
+.universal-ai-insights--editorial .final-thoughts-card {
+  padding: clamp(2rem, 5vw, 4rem);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+  border-radius: var(--radius-xl);
+  background: var(--color-accent-soft);
+  color: var(--color-on-accent);
+  box-shadow: none;
+  font-family: var(--font-display);
+  font-size: clamp(1.2rem, 2vw, 1.65rem);
+  line-height: 1.55;
+}
+
+.universal-ai-insights--editorial .final-thoughts-card .formatted-strong,
+.universal-ai-insights--editorial .final-thoughts-card .formatted-emphasis { color: var(--color-on-accent); }
+
+.universal-ai-insights--editorial .follow-up-chips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.universal-ai-insights--editorial .follow-up-chip {
+  min-height: var(--control-height-lg);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  box-shadow: none;
+  text-align: left;
+  font-weight: 600;
+}
+
+.universal-ai-insights--editorial .follow-up-chip::after {
+  content: '↗';
+  float: right;
+  margin-left: var(--space-3);
+  color: var(--color-brand);
+}
+
+.universal-ai-insights--editorial .follow-up-chip:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-brand);
+  background: var(--color-surface-muted);
+  box-shadow: none;
+}
+
+.universal-ai-insights--editorial .ai-footer {
+  padding: var(--space-5) 0 0;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.universal-ai-insights--editorial .ai-disclaimer {
+  color: var(--color-text-subtle);
+  font-size: var(--text-sm);
+}
+
+.universal-ai-insights--editorial .career-report-chat-cta {
+  position: fixed;
+  right: clamp(1rem, 2.5vw, 2rem);
+  bottom: calc(clamp(1rem, 2.5vw, 2rem) + env(safe-area-inset-bottom, 0px));
+  z-index: calc(var(--z-header, 100) - 10);
+  min-width: 18rem;
+  max-width: min(24rem, calc(100vw - 2rem));
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.15rem var(--space-4);
+  align-items: center;
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-5);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 44%, transparent);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-inverse);
+  color: var(--color-text-inverse);
+  box-shadow: var(--shadow-card);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard);
+}
+
+.universal-ai-insights--editorial .career-report-chat-cta span {
+  grid-column: 1;
+  color: var(--color-accent-soft);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.universal-ai-insights--editorial .career-report-chat-cta strong {
+  grid-column: 1;
+  color: inherit;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.universal-ai-insights--editorial .career-report-chat-cta i {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--color-border-inverse);
+  border-radius: 50%;
+  color: var(--color-accent-soft);
+  font-style: normal;
+}
+
+.universal-ai-insights--editorial .career-report-chat-cta:hover,
+.universal-ai-insights--editorial .career-report-chat-cta:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--color-accent);
+  background: var(--color-surface-inverse-raised);
+}
+
+.universal-ai-insights--editorial .clickable-term {
+  color: var(--color-brand) !important;
+  text-decoration-color: color-mix(in srgb, var(--color-brand) 42%, transparent);
+  text-underline-offset: 0.18em;
+  text-shadow: none;
+}
+
+.universal-ai-insights--editorial .analysis-confirmation {
+  max-width: 52rem;
+  padding: clamp(1.5rem, 4vw, 3.5rem);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+.universal-ai-insights--editorial .confirmation-header h3,
+.universal-ai-insights--editorial .loading-state h3,
+.universal-ai-insights--editorial .error-state h3,
+.universal-ai-insights--editorial .credit-warning h3 {
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+}
+
+.universal-ai-insights--editorial .analysis-preview,
+.universal-ai-insights--editorial .cost-section {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas-subtle);
+}
+
+.universal-ai-insights--editorial .analysis-preview h4 {
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 400;
+}
+
+.universal-ai-insights--editorial .preview-list li { color: var(--color-text-muted); }
+.universal-ai-insights--editorial .preview-list li::before { color: var(--color-brand); }
+
+.universal-ai-insights--editorial .cost-amount,
+.universal-ai-insights--editorial .balance-amount.sufficient {
+  background: var(--color-surface-inverse);
+  color: var(--color-text-inverse);
+}
+
+.universal-ai-insights--editorial .balance-amount.insufficient {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.universal-ai-insights--editorial .start-analysis-btn,
+.universal-ai-insights--editorial .add-credits-btn,
+.universal-ai-insights--editorial .credit-actions button,
+.universal-ai-insights--editorial .error-state button,
+.universal-ai-insights--editorial .tooltip-modal-close {
+  min-height: var(--control-height-md);
+  padding: 0 var(--space-5);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  box-shadow: none;
+  font-weight: 700;
+}
+
+.universal-ai-insights--editorial .cancel-btn,
+.universal-ai-insights--editorial .credit-actions .secondary-btn {
+  min-height: var(--control-height-md) !important;
+  margin: 0 !important;
+  padding: 0 var(--space-5) !important;
+  border: 1px solid var(--color-border-strong) !important;
+  border-radius: var(--radius-pill) !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  box-shadow: none !important;
+}
+
+.universal-ai-insights--editorial .analysis-note,
+.universal-ai-insights--editorial .confirmation-header p,
+.universal-ai-insights--editorial .loading-message,
+.universal-ai-insights--editorial .error-state p { color: var(--color-text-muted); }
+
+.universal-ai-insights--editorial .credit-warning,
+.universal-ai-insights--editorial .insufficient-credits {
+  padding: var(--space-6);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-warning) 9%, var(--color-surface));
+}
+
+.universal-ai-insights--editorial .credit-warning p,
+.universal-ai-insights--editorial .credit-warning-text { color: var(--color-text-muted); }
+
+.universal-ai-insights--editorial .loading-state,
+.universal-ai-insights--editorial .error-state { min-height: 30rem; }
+
+.universal-ai-insights--editorial .ai-spinner {
+  width: 4.5rem;
+  height: 4.5rem;
+  border: 1px solid var(--color-border-strong);
+  border-top-color: var(--color-brand);
+}
+
+.universal-ai-insights--editorial .loading-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.universal-ai-insights--editorial .step {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-subtle);
+}
+
+.universal-ai-insights--editorial .step.active {
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+}
+
+.universal-ai-insights--editorial .tooltip-modal-overlay { background: var(--color-overlay); }
+.universal-ai-insights--editorial .tooltip-modal-container { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-raised); box-shadow: var(--shadow-modal); }
+.universal-ai-insights--editorial .tooltip-modal-title { color: var(--color-text); font-family: var(--font-display); text-decoration: none; }
+.universal-ai-insights--editorial .tooltip-modal-text { color: var(--color-text-muted); }
+
+.universal-ai-insights--editorial :where(button, .clickable-term):focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+@media (max-width: 720px) {
+  .universal-ai-insights--editorial { padding: var(--space-4); }
+  .universal-ai-insights--editorial .ai-header-actions { justify-content: flex-start; flex-wrap: wrap; }
+  .universal-ai-insights--editorial .accordion-content { padding-left: 0; }
+  .universal-ai-insights--editorial .key-points-list,
+  .universal-ai-insights--editorial .follow-up-chips { grid-template-columns: 1fr; }
+  .universal-ai-insights--editorial .quick-answer-card { padding: var(--space-6) var(--space-5); }
+  .universal-ai-insights--editorial .ai-footer { margin-bottom: 5.5rem; }
+  .universal-ai-insights--editorial .career-report-chat-cta {
+    right: 0.75rem;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    left: 0.75rem;
+    width: auto;
+    max-width: none;
+    min-height: 3.75rem;
+  }
+}
+
+@media (max-width: 720px) and (max-height: 520px) {
+  .universal-ai-insights--editorial .career-report-chat-cta { display: none; }
+}
+
 /* Tooltip Modal Styles */
 .tooltip-modal-overlay {
   position: fixed;
@@ -917,4 +1488,15 @@
   .tooltip-modal-text {
     font-size: 0.95em;
   }
+}
+
+@media (max-width: 720px) {
+  .universal-ai-insights--editorial .quick-answer-card,
+  .universal-ai-insights--editorial .final-thoughts-card {
+    padding: var(--space-6) var(--space-5);
+    font-size: clamp(1.15rem, 5vw, 1.45rem);
+  }
+
+  .universal-ai-insights--editorial .follow-up-chips { justify-content: stretch; }
+  .universal-ai-insights--editorial .follow-up-chip { padding: var(--space-4); }
 }

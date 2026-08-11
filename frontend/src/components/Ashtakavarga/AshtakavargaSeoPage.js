@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import CreditsModal from '../Credits/CreditsModal';
 import SEOHead from '../SEO/SEOHead';
@@ -194,7 +194,7 @@ const AshtakavargaSeoPage = ({
 
   return (
     <div
-      className="analysis-detail-page analysis-detail-page--career ashtakavarga-seo-page"
+      className="analysis-detail-page analysis-detail-page--career analysis-detail-page--themed ashtakavarga-seo-page"
     >
       <SEOHead
         title={seoData.title}
@@ -202,20 +202,15 @@ const AshtakavargaSeoPage = ({
         keywords={seoData.keywords}
         canonical={seoData.canonical}
         structuredData={structuredData}
+        themeColor="#210b17"
       />
 
-      <NavigationHeader
-        compact
-        showZodiacSelector={false}
+      <ModernNavigationHeader
+        sticky
         user={user}
         onAdminClick={onAdminClick}
         onLogout={onLogout}
-        onLogin={!user ? onLogin : undefined}
-        showLoginButton={!user}
-        onCreditsClick={() => setShowCreditsModal(true)}
-        birthData={birthData}
-        onCreateBirthChart={() => navigate('/ai-kundli-generator')}
-        onSelectBirthChart={user ? () => setShowBirthModal(true) : () => onLogin?.()}
+        onLogin={onLogin}
       />
 
       <main className="analysis-detail-main">
@@ -227,7 +222,7 @@ const AshtakavargaSeoPage = ({
               </button>
               <p className="analysis-detail-kicker">Vedic chart strength analysis</p>
               <h1 className="analysis-detail-title">
-                <span className="analysis-detail-title__icon" aria-hidden>⊞</span>
+                <span className="analysis-detail-title__icon" aria-hidden>AV</span>
                 Ashtakavarga Calculator
               </h1>
               <p className="analysis-detail-blurb">
@@ -257,10 +252,10 @@ const AshtakavargaSeoPage = ({
               <div className="ashtakavarga-preview">
                 <div className="ashtakavarga-preview__topbar" />
                 <div className="ashtakavarga-preview__body">
-                  <div className="ashtakavarga-preview__badge">Sample preview, not your chart</div>
+                  <div className="ashtakavarga-preview__badge">Sample bindu field</div>
                   <div className="ashtakavarga-preview__header">
-                    <h3>Birth Sarvashtakavarga</h3>
-                    <p>337 total bindus</p>
+                    <div><span>Birth Sarvashtakavarga</span><h3>337</h3></div>
+                    <p>Total bindus</p>
                   </div>
 
                   <div className="ashtakavarga-preview__grid">
@@ -298,8 +293,9 @@ const AshtakavargaSeoPage = ({
               <h2>What this Ashtakavarga page helps you study</h2>
             </div>
             <div className="career-detail-method-grid">
-              {FEATURE_CARDS.map(([title, body]) => (
+              {FEATURE_CARDS.map(([title, body], index) => (
                 <article key={title}>
+                  <span className="career-detail-method-number">{String(index + 1).padStart(2, '0')}</span>
                   <h3>{title}</h3>
                   <p>{body}</p>
                 </article>
@@ -310,7 +306,7 @@ const AshtakavargaSeoPage = ({
           {!user ? (
             <div className="analysis-detail-empty">
               <div className="analysis-detail-empty__card">
-                <span className="analysis-detail-empty__icon" aria-hidden>🪐</span>
+                <span className="analysis-detail-empty__icon" aria-hidden>AV</span>
                 <h2>Sign in to open your chart-linked calculator</h2>
                 <p>
                   This public page explains Ashtakavarga for search and discovery. The live calculator works inside
@@ -419,10 +415,10 @@ const AshtakavargaSeoPage = ({
             </div>
             <div className="career-detail-faq-grid">
               {FAQ_ITEMS.map((item) => (
-                <article key={item.question}>
-                  <h3>{item.question}</h3>
+                <details key={item.question}>
+                  <summary>{item.question}</summary>
                   <p>{item.answer}</p>
-                </article>
+                </details>
               ))}
             </div>
           </section>

@@ -29,7 +29,7 @@
   flex: 1 1 auto;
   min-width: 6.8rem;
   text-align: center;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   font-size: 0.7rem;
   font-weight: 800;
 }
@@ -38,9 +38,9 @@
 .desk-date-nav__today,
 .desk-date-nav__value,
 .desk-date-nav__pickers button {
-  border: 1px solid rgba(70, 45, 35, 0.14);
-  background: #fff;
-  color: #1f1714;
+  border: 1px solid color-mix(in srgb, var(--color-text) 14%, transparent);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
   font: inherit;
   cursor: pointer;
   border-radius: 7px;
@@ -51,7 +51,7 @@
   padding: 0.28rem 0.4rem;
   font-size: 0.68rem;
   font-weight: 800;
-  color: #6b5c54;
+  color: var(--color-text-muted);
 }
 
 .desk-date-nav__value {
@@ -63,16 +63,16 @@
 
 .desk-date-nav__value--static {
   cursor: default;
-  background: #faf6f1;
+  background: var(--color-canvas-subtle);
 }
 
 .desk-date-nav__today {
   padding: 0.28rem 0.5rem;
   font-size: 0.62rem;
   font-weight: 800;
-  color: #9f1239;
-  border-color: rgba(159, 18, 57, 0.28);
-  background: #fff1f2;
+  color: var(--color-brand);
+  border-color: color-mix(in srgb, var(--color-brand) 28%, transparent);
+  background: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface));
 }
 
 .desk-date-nav__pickers {
@@ -82,8 +82,8 @@
   gap: 0.4rem;
   padding: 0.35rem;
   border-radius: 8px;
-  background: #faf6f1;
-  border: 1px solid rgba(70, 45, 35, 0.1);
+  background: var(--color-canvas-subtle);
+  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
 }
 
 .desk-date-nav__pickers label {
@@ -94,7 +94,7 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #6b5c54;
+  color: var(--color-text-muted);
 }
 
 .desk-date-nav__pickers input {
@@ -102,14 +102,14 @@
   font-weight: 650;
   padding: 0.25rem 0.35rem;
   border-radius: 6px;
-  border: 1px solid rgba(70, 45, 35, 0.16);
+  border: 1px solid color-mix(in srgb, var(--color-text) 16%, transparent);
 }
 
 .desk-date-nav__pickers button {
   padding: 0.35rem 0.65rem;
   font-size: 0.68rem;
   font-weight: 800;
-  color: #fff;
-  background: #9f1239;
-  border-color: #9f1239;
+  color: var(--color-on-brand);
+  background: var(--color-brand);
+  border-color: var(--color-brand);
 }

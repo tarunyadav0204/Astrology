@@ -7,6 +7,7 @@ import HouseAnalysisModal from './HouseAnalysisModal';
 import HouseInsightPopup from './HouseInsightPopup';
 import ChartOverlayActions from './ChartOverlayActions';
 import { resolveChartId } from '../../utils/chartIds';
+import { chartActivationFill } from './chartActivationTheme';
 
 const SouthIndianChart = ({
   chartData,
@@ -21,6 +22,7 @@ const SouthIndianChart = ({
   selectedHouseNumber = null,
   highlightedPlanets = null,
   highlightedHouseNumbers = null,
+  activationHouseStates = null,
 }) => {
   const { signs, planets } = CHART_CONFIG;
   const chartId = resolveChartId(chartType, division);
@@ -516,30 +518,30 @@ const SouthIndianChart = ({
       
       {/* Outer border */}
       <rect x="0" y="0" width="340" height="340" 
-            fill="url(#southChartGradient)" stroke="#e91e63" strokeWidth="3"/>
+            fill="url(#southChartGradient)" stroke="#111111" strokeWidth="1.5"/>
       
       {/* Outer house divisions - no center grid */}
       {/* Top row divisions */}
-      <line x1="85" y1="0" x2="85" y2="85" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="170" y1="0" x2="170" y2="85" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="255" y1="0" x2="255" y2="85" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="85" y1="0" x2="85" y2="85" stroke="#111111" strokeWidth="1"/>
+      <line x1="170" y1="0" x2="170" y2="85" stroke="#111111" strokeWidth="1"/>
+      <line x1="255" y1="0" x2="255" y2="85" stroke="#111111" strokeWidth="1"/>
       {/* Bottom row divisions */}
-      <line x1="85" y1="255" x2="85" y2="340" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="170" y1="255" x2="170" y2="340" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="255" y1="255" x2="255" y2="340" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="85" y1="255" x2="85" y2="340" stroke="#111111" strokeWidth="1"/>
+      <line x1="170" y1="255" x2="170" y2="340" stroke="#111111" strokeWidth="1"/>
+      <line x1="255" y1="255" x2="255" y2="340" stroke="#111111" strokeWidth="1"/>
       {/* Left column divisions */}
-      <line x1="0" y1="85" x2="85" y2="85" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="0" y1="170" x2="85" y2="170" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="0" y1="255" x2="85" y2="255" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="0" y1="85" x2="85" y2="85" stroke="#111111" strokeWidth="1"/>
+      <line x1="0" y1="170" x2="85" y2="170" stroke="#111111" strokeWidth="1"/>
+      <line x1="0" y1="255" x2="85" y2="255" stroke="#111111" strokeWidth="1"/>
       {/* Right column divisions */}
-      <line x1="255" y1="85" x2="340" y2="85" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="255" y1="170" x2="340" y2="170" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="255" y1="255" x2="340" y2="255" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="255" y1="85" x2="340" y2="85" stroke="#111111" strokeWidth="1"/>
+      <line x1="255" y1="170" x2="340" y2="170" stroke="#111111" strokeWidth="1"/>
+      <line x1="255" y1="255" x2="340" y2="255" stroke="#111111" strokeWidth="1"/>
       {/* Inner borders of outer houses */}
-      <line x1="0" y1="85" x2="340" y2="85" stroke="#ff6f00" strokeWidth="3"/>
-      <line x1="0" y1="255" x2="340" y2="255" stroke="#ff6f00" strokeWidth="3"/>
-      <line x1="85" y1="0" x2="85" y2="340" stroke="#ff6f00" strokeWidth="3"/>
-      <line x1="255" y1="0" x2="255" y2="340" stroke="#ff6f00" strokeWidth="3"/>
+      <line x1="0" y1="85" x2="340" y2="85" stroke="#111111" strokeWidth="1.5"/>
+      <line x1="0" y1="255" x2="340" y2="255" stroke="#111111" strokeWidth="1.5"/>
+      <line x1="85" y1="0" x2="85" y2="340" stroke="#111111" strokeWidth="1.5"/>
+      <line x1="255" y1="0" x2="255" y2="340" stroke="#111111" strokeWidth="1.5"/>
 
       {/* Instruction text */}
       {showFooterHint ? (
@@ -568,6 +570,18 @@ const SouthIndianChart = ({
                   onClick={(e) => handleRashiClick(e, pos.sign, houseNumber)}
                   onContextMenu={(e) => handleRashiClick(e, pos.sign, houseNumber)}
                 />
+
+                {chartActivationFill(activationHouseStates?.[houseNumber]) ? (
+                  <rect
+                    x={pos.x + 1}
+                    y={pos.y + 1}
+                    width={pos.width - 2}
+                    height={pos.height - 2}
+                    fill={chartActivationFill(activationHouseStates[houseNumber])}
+                    stroke="none"
+                    style={{ pointerEvents: 'none' }}
+                  />
+                ) : null}
 
                 {highlightedHouseSet?.has(houseNumber) ? (
                   <rect

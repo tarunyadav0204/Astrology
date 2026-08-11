@@ -29,17 +29,17 @@ function formatAsc(chartData) {
 
 function getPlanetColor(planetName) {
     const colors = {
-        Sun: '#ff6b35',
-        Moon: '#e0e0e0',
-        Mars: '#d32f2f',
-        Mercury: '#4caf50',
-        Jupiter: '#ffd700',
-        Venus: '#e91e63',
-        Saturn: '#2196f3',
-        Rahu: '#9e9e9e',
-        Ketu: '#795548',
+        Sun: 'var(--planet-sun)',
+        Moon: 'var(--planet-moon)',
+        Mars: 'var(--planet-mars)',
+        Mercury: 'var(--planet-mercury)',
+        Jupiter: 'var(--planet-jupiter)',
+        Venus: 'var(--planet-venus)',
+        Saturn: 'var(--planet-saturn)',
+        Rahu: 'var(--planet-rahu)',
+        Ketu: 'var(--planet-ketu)',
     };
-    return colors[planetName] || '#7c2d12';
+    return colors[planetName] || 'var(--color-brand)';
 }
 
 function parseDashaYmd(iso) {
@@ -137,17 +137,11 @@ const ChatChartEssence = ({ chartData, dashaData, personName, isLoading }) => {
                                         key={`${dasha.planet}-${index}-${String(dasha.start)}`}
                                         type="button"
                                         className="chat-chart-essence__chip"
-                                        style={{
-                                            borderColor: planetColor,
-                                            backgroundColor: `${planetColor}40`,
-                                        }}
+                                        style={{ '--chat-planet-color': planetColor }}
                                         onClick={handleChipClick}
                                         title="Open dashboard (Dasha browser)"
                                     >
-                                        <span
-                                            className="chat-chart-essence__chip-planet"
-                                            style={{ color: '#1a1a1a' }}
-                                        >
+                                        <span className="chat-chart-essence__chip-planet">
                                             {dasha.planet}
                                         </span>
                                         <span className="chat-chart-essence__chip-date">{startLabel}</span>

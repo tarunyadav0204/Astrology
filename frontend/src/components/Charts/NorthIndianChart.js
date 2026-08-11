@@ -7,6 +7,7 @@ import HouseAnalysisModal from './HouseAnalysisModal';
 import HouseInsightPopup from './HouseInsightPopup';
 import ChartOverlayActions from './ChartOverlayActions';
 import { resolveChartId } from '../../utils/chartIds';
+import { chartActivationFill } from './chartActivationTheme';
 
 /**
  * NORTH INDIAN CHART POSITIONING REFERENCE
@@ -71,6 +72,8 @@ const NorthIndianChart = ({
   highlightedPlanets = null,
   /** Soft house fills for yoga members' houses */
   highlightedHouseNumbers = null,
+  /** Current Parashari activation state keyed by natal house number. */
+  activationHouseStates = null,
 }) => {
   const { signs, planets } = CHART_CONFIG;
   const chartId = resolveChartId(chartType, division);
@@ -574,15 +577,15 @@ const NorthIndianChart = ({
       >
       {/* Outer square border */}
       <rect x="5" y="5" width="390" height="390" 
-            fill="url(#chartGradient)" stroke="#e91e63" strokeWidth="3"/>
+            fill="url(#chartGradient)" stroke="#111111" strokeWidth="1.5"/>
       
       {/* Inner diamond border */}
       <polygon points="200,5 395,200 200,395 5,200" 
-               fill="none" stroke="#ff6f00" strokeWidth="3"/>
+               fill="none" stroke="#111111" strokeWidth="1.5"/>
       
       {/* Diagonal lines creating 12 houses */}
-      <line x1="5" y1="5" x2="395" y2="395" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="395" y1="5" x2="5" y2="395" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="5" y1="5" x2="395" y2="395" stroke="#111111" strokeWidth="1"/>
+      <line x1="395" y1="5" x2="5" y2="395" stroke="#111111" strokeWidth="1"/>
       
 
       
@@ -640,6 +643,15 @@ const NorthIndianChart = ({
               onClick={(e) => handleRashiClick(e, rashiIndex, houseNumber)}
               onContextMenu={(e) => handleRashiClick(e, rashiIndex, houseNumber)}
             />
+
+            {chartActivationFill(activationHouseStates?.[houseNumber]) ? (
+              <path
+                d={houseData.path}
+                fill={chartActivationFill(activationHouseStates[houseNumber])}
+                stroke="none"
+                style={{ pointerEvents: 'none' }}
+              />
+            ) : null}
 
             
             {/* Desk / yoga house soft fill */}

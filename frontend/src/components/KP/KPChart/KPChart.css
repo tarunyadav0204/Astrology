@@ -16,13 +16,13 @@
   align-items: center;
   margin-bottom: 0.25rem;
   padding-bottom: 0.2rem;
-  border-bottom: 1px solid #e91e63;
+  border-bottom: 1px solid var(--color-brand);
   flex-shrink: 0;
 }
 
 .kp-chart-header h3 {
   margin: 0;
-  color: #e91e63;
+  color: var(--color-brand);
   font-size: 0.9rem;
 }
 
@@ -46,12 +46,12 @@
 
 .kp-house {
   flex: 1;
-  border: 1px solid #9c27b0;
+  border: 1px solid var(--color-brand-hover);
   padding: 0.2rem;
   display: flex;
   flex-direction: column;
   position: relative;
-  background: #fafafa;
+  background: var(--color-canvas-subtle);
   min-height: 0;
   overflow: hidden;
 }
@@ -62,8 +62,8 @@
   left: 1px;
   font-size: 0.6rem;
   font-weight: bold;
-  color: #9c27b0;
-  background: white;
+  color: var(--color-brand-hover);
+  background: var(--color-surface-raised);
   padding: 1px 2px;
   border-radius: 2px;
   line-height: 1;
@@ -71,7 +71,7 @@
 
 .house-cusp {
   font-size: 0.5rem;
-  color: #666;
+  color: var(--color-text-muted);
   margin-top: 0.5rem;
   line-height: 1;
 }
@@ -79,7 +79,7 @@
 .house-sign {
   font-size: 0.6rem;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text);
   margin: 0.1rem 0;
   line-height: 1;
 }
@@ -102,19 +102,19 @@
 
 .planet-symbol {
   font-weight: bold;
-  color: #e91e63;
+  color: var(--color-brand);
   font-size: 0.5rem;
 }
 
 .planet-name {
   font-size: 0.45rem;
-  color: #333;
+  color: var(--color-text);
   font-weight: 600;
   line-height: 1;
 }
 
 .planet-degree {
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 0.4rem;
   line-height: 1;
 }
@@ -125,8 +125,8 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--color-brand) 0%, var(--color-warning) 100%);
+  color: var(--color-on-brand);
   text-align: center;
   padding: 1rem;
 }
@@ -169,7 +169,7 @@
   justify-content: center;
   align-items: center;
   height: 200px;
-  color: #dc3545;
+  color: var(--color-danger);
   font-size: 1rem;
 }
 
@@ -178,9 +178,9 @@
   justify-content: center;
   align-items: center;
   height: 200px;
-  color: #dc3545;
+  color: var(--color-danger);
   font-size: 1rem;
-  background: white;
+  background: var(--color-surface-raised);
   border-radius: 12px;
 }
 
@@ -188,7 +188,7 @@
   height: 100%;
   border-radius: 0;
   background: transparent;
-  color: #6b5c54;
+  color: var(--color-text-muted);
   font-size: 0.78rem;
 }
 
@@ -208,10 +208,10 @@
   min-width: 24px;
   min-height: 22px;
   padding: 0 0.35rem;
-  border: 1px solid rgba(70, 45, 35, 0.18);
+  border: 1px solid color-mix(in srgb, var(--color-text) 18%, transparent);
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #6b5c54;
+  background: color-mix(in srgb, var(--color-surface-raised) 92%, transparent);
+  color: var(--color-text-muted);
   font: inherit;
   font-size: 0.62rem;
   font-weight: 800;
