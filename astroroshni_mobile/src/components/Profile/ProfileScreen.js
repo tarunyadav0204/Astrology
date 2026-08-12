@@ -95,6 +95,8 @@ export default function ProfileScreen({ navigation, route }) {
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
+  const profileScrollRef = useRef(null);
+  const preferencesYRef = useRef(0);
 
   useEffect(() => {
     loadUserData();
@@ -133,6 +135,18 @@ export default function ProfileScreen({ navigation, route }) {
     }
     setTimeout(() => setShowDashaBrowser(true), 100);
   }, [navigation, route.params?.reopenDashaBrowser]);
+
+  useEffect(() => {
+    if (!route.params?.focusThemePicker) return;
+    navigation.setParams({ focusThemePicker: undefined });
+    const timer = setTimeout(() => {
+      profileScrollRef.current?.scrollTo?.({
+        y: Math.max(0, preferencesYRef.current - 70),
+        animated: true,
+      });
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [navigation, route.params?.focusThemePicker]);
 
   const startAnimations = () => {
     const entranceAnimation = Animated.parallel([
@@ -478,6 +492,7 @@ export default function ProfileScreen({ navigation, route }) {
           </View>
 
           <GHScrollView
+            ref={profileScrollRef}
             style={[styles.scrollView, { backgroundColor: colors.background }]}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
@@ -804,7 +819,12 @@ export default function ProfileScreen({ navigation, route }) {
               </View>
             </Animated.View>
 
-            <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
+            <Animated.View
+              style={[styles.section, { opacity: fadeAnim }]}
+              onLayout={(event) => {
+                preferencesYRef.current = event.nativeEvent.layout.y;
+              }}
+            >
               <Text style={[styles.sectionEyebrow, { color: colors.primary }]}>{t('premiumUi.profile.preferences')}</Text>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 {t('profile.settings', 'Settings')}

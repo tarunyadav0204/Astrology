@@ -1,0 +1,123 @@
+{
+  "english": {
+    "eyebrow": "Appearance",
+    "title": "Choose your atmosphere",
+    "body": "Switch the look of AstroRoshni without leaving your conversation.",
+    "discoveryEyebrow": "Make it yours",
+    "discoveryTitle": "Make AstroRoshni yours",
+    "discoveryBody": "Choose a visual theme that feels right. You can change it anytime.",
+    "currentTheme": "Current theme",
+    "instantHint": "Changes apply instantly across the app.",
+    "viewAll": "View all themes"
+  },
+  "hindi": {
+    "eyebrow": "रूप-रंग",
+    "title": "अपना माहौल चुनें",
+    "body": "बातचीत छोड़े बिना AstroRoshni का रूप बदलें।",
+    "discoveryEyebrow": "इसे अपना बनाएं",
+    "discoveryTitle": "AstroRoshni को अपना बनाएं",
+    "discoveryBody": "वह विज़ुअल थीम चुनें जो आपको सही लगे। आप इसे कभी भी बदल सकते हैं।",
+    "currentTheme": "वर्तमान थीम",
+    "instantHint": "बदलाव पूरे ऐप में तुरंत लागू होते हैं।",
+    "viewAll": "सभी थीम देखें"
+  },
+  "es": {
+    "eyebrow": "Apariencia",
+    "title": "Elige tu atmósfera",
+    "body": "Cambia el aspecto de AstroRoshni sin salir de la conversación.",
+    "discoveryEyebrow": "Hazlo tuyo",
+    "discoveryTitle": "Haz tuyo AstroRoshni",
+    "discoveryBody": "Elige el tema visual que mejor te represente. Puedes cambiarlo cuando quieras.",
+    "currentTheme": "Tema actual",
+    "instantHint": "Los cambios se aplican al instante en toda la aplicación.",
+    "viewAll": "Ver todos los temas"
+  },
+  "fr": {
+    "eyebrow": "Apparence",
+    "title": "Choisissez votre atmosphère",
+    "body": "Changez l’apparence d’AstroRoshni sans quitter votre conversation.",
+    "discoveryEyebrow": "À votre image",
+    "discoveryTitle": "Personnalisez AstroRoshni",
+    "discoveryBody": "Choisissez le thème visuel qui vous correspond. Vous pourrez le modifier à tout moment.",
+    "currentTheme": "Thème actuel",
+    "instantHint": "Les changements s’appliquent instantanément dans toute l’application.",
+    "viewAll": "Voir tous les thèmes"
+  },
+  "german": {
+    "eyebrow": "Erscheinungsbild",
+    "title": "Wähle deine Atmosphäre",
+    "body": "Ändere das Aussehen von AstroRoshni, ohne das Gespräch zu verlassen.",
+    "discoveryEyebrow": "Mach es zu deinem",
+    "discoveryTitle": "Mach AstroRoshni zu deinem",
+    "discoveryBody": "Wähle ein visuelles Thema, das sich richtig anfühlt. Du kannst es jederzeit ändern.",
+    "currentTheme": "Aktuelles Thema",
+    "instantHint": "Änderungen gelten sofort in der gesamten App.",
+    "viewAll": "Alle Themen ansehen"
+  },
+  "russian": {
+    "eyebrow": "Оформление",
+    "title": "Выберите атмосферу",
+    "body": "Измените облик AstroRoshni, не покидая беседу.",
+    "discoveryEyebrow": "Сделайте по-своему",
+    "discoveryTitle": "Настройте AstroRoshni под себя",
+    "discoveryBody": "Выберите визуальную тему, которая вам подходит. Её можно изменить в любое время.",
+    "currentTheme": "Текущая тема",
+    "instantHint": "Изменения мгновенно применяются во всём приложении.",
+    "viewAll": "Посмотреть все темы"
+  },
+  "chinese": {
+    "eyebrow": "外观",
+    "title": "选择你的氛围",
+    "body": "无需离开对话，即可切换 AstroRoshni 的外观。",
+    "discoveryEyebrow": "打造专属体验",
+    "discoveryTitle": "让 AstroRoshni 更符合你的风格",
+    "discoveryBody": "选择让你感觉舒适的视觉主题，之后也可随时更换。",
+    "currentTheme": "当前主题",
+    "instantHint": "更改会立即应用到整个应用。",
+    "viewAll": "查看所有主题"
+  },
+  "tamil": {
+    "eyebrow": "தோற்றம்",
+    "title": "உங்கள் சூழலைத் தேர்ந்தெடுக்கவும்",
+    "body": "உரையாடலை விட்டு வெளியேறாமல் AstroRoshni-யின் தோற்றத்தை மாற்றுங்கள்.",
+    "discoveryEyebrow": "உங்களுக்கானதாக மாற்றுங்கள்",
+    "discoveryTitle": "AstroRoshni-யை உங்களுக்கானதாக மாற்றுங்கள்",
+    "discoveryBody": "உங்களுக்கு சரியாகத் தோன்றும் காட்சி தீமைத் தேர்ந்தெடுக்கவும். எப்போது வேண்டுமானாலும் மாற்றலாம்.",
+    "currentTheme": "தற்போதைய தீம்",
+    "instantHint": "மாற்றங்கள் செயலி முழுவதும் உடனடியாக அமலாகும்.",
+    "viewAll": "அனைத்து தீம்களையும் காண்க"
+  },
+  "telugu": {
+    "eyebrow": "రూపం",
+    "title": "మీ వాతావరణాన్ని ఎంచుకోండి",
+    "body": "సంభాషణ నుంచి బయటకు వెళ్లకుండా AstroRoshni రూపాన్ని మార్చండి.",
+    "discoveryEyebrow": "మీదిగా మార్చుకోండి",
+    "discoveryTitle": "AstroRoshniని మీదిగా మార్చుకోండి",
+    "discoveryBody": "మీకు నచ్చిన విజువల్ థీమ్‌ను ఎంచుకోండి. ఎప్పుడైనా మార్చుకోవచ్చు.",
+    "currentTheme": "ప్రస్తుత థీమ్",
+    "instantHint": "మార్పులు యాప్ అంతటా వెంటనే వర్తిస్తాయి.",
+    "viewAll": "అన్ని థీమ్‌లను చూడండి"
+  },
+  "gujarati": {
+    "eyebrow": "દેખાવ",
+    "title": "તમારું વાતાવરણ પસંદ કરો",
+    "body": "વાતચીત છોડ્યા વિના AstroRoshniનો દેખાવ બદલો.",
+    "discoveryEyebrow": "તમારું બનાવો",
+    "discoveryTitle": "AstroRoshniને તમારું બનાવો",
+    "discoveryBody": "તમને યોગ્ય લાગે તેવી વિઝ્યુઅલ થીમ પસંદ કરો. તમે તેને ગમે ત્યારે બદલી શકો છો.",
+    "currentTheme": "હાલની થીમ",
+    "instantHint": "ફેરફારો સમગ્ર એપમાં તરત લાગુ થાય છે.",
+    "viewAll": "બધી થીમ જુઓ"
+  },
+  "marathi": {
+    "eyebrow": "दिसणे",
+    "title": "तुमचे वातावरण निवडा",
+    "body": "संभाषण न सोडता AstroRoshniचे रूप बदला.",
+    "discoveryEyebrow": "तुमचे बनवा",
+    "discoveryTitle": "AstroRoshni तुमचे बनवा",
+    "discoveryBody": "तुम्हाला योग्य वाटणारी दृश्य थीम निवडा. ती कधीही बदलता येईल.",
+    "currentTheme": "सध्याची थीम",
+    "instantHint": "बदल संपूर्ण ॲपमध्ये तत्काळ लागू होतात.",
+    "viewAll": "सर्व थीम पहा"
+  }
+}

@@ -15,6 +15,7 @@ const accountNotificationsCopy = JSON.parse(fs.readFileSync(path.join(projectRoo
 const accountSecurityActionsCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/account-security-actions.json'), 'utf8'));
 const authDeepCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/auth-deep.json'), 'utf8'));
 const homeRecommendationsCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/home-recommendations.json'), 'utf8'));
+const themeDiscoveryCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/theme-discovery.json'), 'utf8'));
 const chatScreenSource = {
   english: 'marathi', hindi: 'hindi', es: 'es', fr: 'fr', german: 'english', russian: 'german',
   chinese: 'russian', tamil: 'chinese', telugu: 'tamil', gujarati: 'telugu', marathi: 'gujarati',
@@ -34,6 +35,7 @@ const protectedFiles = [
   'src/components/Common/DateNavigator.js',
   'src/components/Profile/ProfileScreen.js',
   'src/components/Common/ThemePicker.js',
+  'src/components/Common/QuickThemePickerModal.js',
   'src/components/Common/AppAlertModal.js',
   'src/components/Home/PremiumTodayOverview.js',
   'src/components/Chat/KpTodayCarousel.js',
@@ -171,6 +173,16 @@ Object.entries(accountSecurityActionsCopy).forEach(([language, copy]) => {
   const extra = Object.keys(localized).filter((key) => !accountSecurityActionsKeySet.has(key) && !isPluralVariant(key, accountSecurityActionsKeySet));
   if (missing.length) failures.push(`account-security-actions/${language}: missing ${missing.join(', ')}`);
   if (extra.length) failures.push(`account-security-actions/${language}: unexpected ${extra.join(', ')}`);
+});
+
+const themeDiscoveryEnglishKeys = Object.keys(flatten(themeDiscoveryCopy.english)).sort();
+const themeDiscoveryKeySet = new Set(themeDiscoveryEnglishKeys);
+Object.entries(themeDiscoveryCopy).forEach(([language, copy]) => {
+  const localized = flatten(copy);
+  const missing = themeDiscoveryEnglishKeys.filter((key) => !(key in localized));
+  const extra = Object.keys(localized).filter((key) => !themeDiscoveryKeySet.has(key));
+  if (missing.length) failures.push(`theme-discovery/${language}: missing ${missing.join(', ')}`);
+  if (extra.length) failures.push(`theme-discovery/${language}: unexpected ${extra.join(', ')}`);
 });
 
 const authDeepEnglishKeys = Object.keys(flatten(authDeepCopy.english)).sort();

@@ -26,6 +26,7 @@ import chatModes from './chat-modes.json';
 import creditConfirmation from './credit-confirmation.json';
 import copyAlert from './copy-alert.json';
 import partnershipExit from './partnership-exit.json';
+import themeDiscovery from './theme-discovery.json';
 
 // The original premium-ui import accumulated a shifted chatScreen block: the
 // English key contains German, German contains Russian, and the later Indic
@@ -116,40 +117,40 @@ i18n
   .init({
     resources: {
       english: {
-        translation: { ...en, premiumUi: { ...normalizedPremiumUi.english, homeRecommendations: homeRecommendations.english }, appUpdate: appUpdate.english, lifeAnalysisFlow: { ...lifeAnalysis.english, ...lifeAnalysisPdf.english }, historyUi: historyUi.english, historyDetail: historyDetail.english, knowledgeSupport: knowledgeSupport.english, notificationInbox: accountNotifications.english },
+        translation: { ...en, premiumUi: { ...normalizedPremiumUi.english, homeRecommendations: homeRecommendations.english }, themeDiscovery: themeDiscovery.english, appUpdate: appUpdate.english, lifeAnalysisFlow: { ...lifeAnalysis.english, ...lifeAnalysisPdf.english }, historyUi: historyUi.english, historyDetail: historyDetail.english, knowledgeSupport: knowledgeSupport.english, notificationInbox: accountNotifications.english },
       },
       es: {
-        translation: { ...es, premiumUi: { ...normalizedPremiumUi.es, homeRecommendations: homeRecommendations.es }, appUpdate: appUpdate.es, lifeAnalysisFlow: { ...lifeAnalysis.es, ...lifeAnalysisPdf.es }, historyUi: historyUi.es, historyDetail: historyDetail.es, knowledgeSupport: knowledgeSupport.es, notificationInbox: accountNotifications.es },
+        translation: { ...es, premiumUi: { ...normalizedPremiumUi.es, homeRecommendations: homeRecommendations.es }, themeDiscovery: themeDiscovery.es, appUpdate: appUpdate.es, lifeAnalysisFlow: { ...lifeAnalysis.es, ...lifeAnalysisPdf.es }, historyUi: historyUi.es, historyDetail: historyDetail.es, knowledgeSupport: knowledgeSupport.es, notificationInbox: accountNotifications.es },
       },
       hindi: {
-        translation: { ...hi, premiumUi: { ...normalizedPremiumUi.hindi, homeRecommendations: homeRecommendations.hindi }, appUpdate: appUpdate.hindi, lifeAnalysisFlow: { ...lifeAnalysis.hindi, ...lifeAnalysisPdf.hindi }, historyUi: historyUi.hindi, historyDetail: historyDetail.hindi, knowledgeSupport: knowledgeSupport.hindi, notificationInbox: accountNotifications.hindi },
+        translation: { ...hi, premiumUi: { ...normalizedPremiumUi.hindi, homeRecommendations: homeRecommendations.hindi }, themeDiscovery: themeDiscovery.hindi, appUpdate: appUpdate.hindi, lifeAnalysisFlow: { ...lifeAnalysis.hindi, ...lifeAnalysisPdf.hindi }, historyUi: historyUi.hindi, historyDetail: historyDetail.hindi, knowledgeSupport: knowledgeSupport.hindi, notificationInbox: accountNotifications.hindi },
       },
       tamil: {
-        translation: { ...tamil, premiumUi: { ...normalizedPremiumUi.tamil, homeRecommendations: homeRecommendations.tamil }, appUpdate: appUpdate.tamil, lifeAnalysisFlow: { ...lifeAnalysis.tamil, ...lifeAnalysisPdf.tamil }, historyUi: historyUi.tamil, historyDetail: historyDetail.tamil, knowledgeSupport: knowledgeSupport.tamil, notificationInbox: accountNotifications.tamil },
+        translation: { ...tamil, premiumUi: { ...normalizedPremiumUi.tamil, homeRecommendations: homeRecommendations.tamil }, themeDiscovery: themeDiscovery.tamil, appUpdate: appUpdate.tamil, lifeAnalysisFlow: { ...lifeAnalysis.tamil, ...lifeAnalysisPdf.tamil }, historyUi: historyUi.tamil, historyDetail: historyDetail.tamil, knowledgeSupport: knowledgeSupport.tamil, notificationInbox: accountNotifications.tamil },
       },
       telugu: {
-        translation: { ...te, premiumUi: { ...normalizedPremiumUi.telugu, homeRecommendations: homeRecommendations.telugu }, appUpdate: appUpdate.telugu, lifeAnalysisFlow: { ...lifeAnalysis.telugu, ...lifeAnalysisPdf.telugu }, historyUi: historyUi.telugu, historyDetail: historyDetail.telugu, knowledgeSupport: knowledgeSupport.telugu, notificationInbox: accountNotifications.telugu },
+        translation: { ...te, premiumUi: { ...normalizedPremiumUi.telugu, homeRecommendations: homeRecommendations.telugu }, themeDiscovery: themeDiscovery.telugu, appUpdate: appUpdate.telugu, lifeAnalysisFlow: { ...lifeAnalysis.telugu, ...lifeAnalysisPdf.telugu }, historyUi: historyUi.telugu, historyDetail: historyDetail.telugu, knowledgeSupport: knowledgeSupport.telugu, notificationInbox: accountNotifications.telugu },
       },
       gujarati: {
-        translation: { ...gu, premiumUi: { ...normalizedPremiumUi.gujarati, homeRecommendations: homeRecommendations.gujarati }, appUpdate: appUpdate.gujarati, lifeAnalysisFlow: { ...lifeAnalysis.gujarati, ...lifeAnalysisPdf.gujarati }, historyUi: historyUi.gujarati, historyDetail: historyDetail.gujarati, knowledgeSupport: knowledgeSupport.gujarati, notificationInbox: accountNotifications.gujarati },
+        translation: { ...gu, premiumUi: { ...normalizedPremiumUi.gujarati, homeRecommendations: homeRecommendations.gujarati }, themeDiscovery: themeDiscovery.gujarati, appUpdate: appUpdate.gujarati, lifeAnalysisFlow: { ...lifeAnalysis.gujarati, ...lifeAnalysisPdf.gujarati }, historyUi: historyUi.gujarati, historyDetail: historyDetail.gujarati, knowledgeSupport: knowledgeSupport.gujarati, notificationInbox: accountNotifications.gujarati },
       },
       marathi: {
-        translation: { ...mr, premiumUi: { ...normalizedPremiumUi.marathi, homeRecommendations: homeRecommendations.marathi }, appUpdate: appUpdate.marathi, lifeAnalysisFlow: { ...lifeAnalysis.marathi, ...lifeAnalysisPdf.marathi }, historyUi: historyUi.marathi, historyDetail: historyDetail.marathi, knowledgeSupport: knowledgeSupport.marathi, notificationInbox: accountNotifications.marathi },
+        translation: { ...mr, premiumUi: { ...normalizedPremiumUi.marathi, homeRecommendations: homeRecommendations.marathi }, themeDiscovery: themeDiscovery.marathi, appUpdate: appUpdate.marathi, lifeAnalysisFlow: { ...lifeAnalysis.marathi, ...lifeAnalysisPdf.marathi }, historyUi: historyUi.marathi, historyDetail: historyDetail.marathi, knowledgeSupport: knowledgeSupport.marathi, notificationInbox: accountNotifications.marathi },
       },
       german: {
-        translation: { ...de, premiumUi: { ...normalizedPremiumUi.german, homeRecommendations: homeRecommendations.german }, appUpdate: appUpdate.german, lifeAnalysisFlow: { ...lifeAnalysis.de, ...lifeAnalysisPdf.de }, historyUi: historyUi.de, historyDetail: historyDetail.de, knowledgeSupport: knowledgeSupport.de, notificationInbox: accountNotifications.de },
+        translation: { ...de, premiumUi: { ...normalizedPremiumUi.german, homeRecommendations: homeRecommendations.german }, themeDiscovery: themeDiscovery.german, appUpdate: appUpdate.german, lifeAnalysisFlow: { ...lifeAnalysis.de, ...lifeAnalysisPdf.de }, historyUi: historyUi.de, historyDetail: historyDetail.de, knowledgeSupport: knowledgeSupport.de, notificationInbox: accountNotifications.de },
       },
       french: {
-        translation: { ...fr, premiumUi: { ...normalizedPremiumUi.fr, homeRecommendations: homeRecommendations.fr }, appUpdate: appUpdate.french, lifeAnalysisFlow: { ...lifeAnalysis.fr, ...lifeAnalysisPdf.fr }, historyUi: historyUi.fr, historyDetail: historyDetail.fr, knowledgeSupport: knowledgeSupport.fr, notificationInbox: accountNotifications.fr },
+        translation: { ...fr, premiumUi: { ...normalizedPremiumUi.fr, homeRecommendations: homeRecommendations.fr }, themeDiscovery: themeDiscovery.fr, appUpdate: appUpdate.french, lifeAnalysisFlow: { ...lifeAnalysis.fr, ...lifeAnalysisPdf.fr }, historyUi: historyUi.fr, historyDetail: historyDetail.fr, knowledgeSupport: knowledgeSupport.fr, notificationInbox: accountNotifications.fr },
       },
       russian: {
-        translation: { ...ru, premiumUi: { ...normalizedPremiumUi.russian, homeRecommendations: homeRecommendations.russian }, appUpdate: appUpdate.russian, lifeAnalysisFlow: { ...lifeAnalysis.russian, ...lifeAnalysisPdf.russian }, historyUi: historyUi.russian, historyDetail: historyDetail.russian, knowledgeSupport: knowledgeSupport.russian, notificationInbox: accountNotifications.russian },
+        translation: { ...ru, premiumUi: { ...normalizedPremiumUi.russian, homeRecommendations: homeRecommendations.russian }, themeDiscovery: themeDiscovery.russian, appUpdate: appUpdate.russian, lifeAnalysisFlow: { ...lifeAnalysis.russian, ...lifeAnalysisPdf.russian }, historyUi: historyUi.russian, historyDetail: historyDetail.russian, knowledgeSupport: knowledgeSupport.russian, notificationInbox: accountNotifications.russian },
       },
       chinese: {
-        translation: { ...zh, premiumUi: { ...normalizedPremiumUi.chinese, homeRecommendations: homeRecommendations.chinese }, appUpdate: appUpdate.chinese, lifeAnalysisFlow: { ...lifeAnalysis.chinese, ...lifeAnalysisPdf.chinese }, historyUi: historyUi.chinese, historyDetail: historyDetail.chinese, knowledgeSupport: knowledgeSupport.chinese, notificationInbox: accountNotifications.chinese },
+        translation: { ...zh, premiumUi: { ...normalizedPremiumUi.chinese, homeRecommendations: homeRecommendations.chinese }, themeDiscovery: themeDiscovery.chinese, appUpdate: appUpdate.chinese, lifeAnalysisFlow: { ...lifeAnalysis.chinese, ...lifeAnalysisPdf.chinese }, historyUi: historyUi.chinese, historyDetail: historyDetail.chinese, knowledgeSupport: knowledgeSupport.chinese, notificationInbox: accountNotifications.chinese },
       },
       mandarin: {
-        translation: { ...zh, premiumUi: { ...normalizedPremiumUi.chinese, homeRecommendations: homeRecommendations.chinese }, appUpdate: appUpdate.chinese, lifeAnalysisFlow: { ...lifeAnalysis.chinese, ...lifeAnalysisPdf.chinese }, historyUi: historyUi.chinese, historyDetail: historyDetail.chinese, knowledgeSupport: knowledgeSupport.chinese, notificationInbox: accountNotifications.chinese },
+        translation: { ...zh, premiumUi: { ...normalizedPremiumUi.chinese, homeRecommendations: homeRecommendations.chinese }, themeDiscovery: themeDiscovery.chinese, appUpdate: appUpdate.chinese, lifeAnalysisFlow: { ...lifeAnalysis.chinese, ...lifeAnalysisPdf.chinese }, historyUi: historyUi.chinese, historyDetail: historyDetail.chinese, knowledgeSupport: knowledgeSupport.chinese, notificationInbox: accountNotifications.chinese },
       },
     },
     lng: 'english',

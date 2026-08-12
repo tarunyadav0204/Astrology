@@ -109,6 +109,19 @@ function MessageBubble({
 }) {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
+  const messageActionStyle = {
+    backgroundColor: colors.surfaceRaised,
+    borderColor: colors.cardBorder,
+  };
+  const highlightedActionStyle = {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.primary,
+  };
+  const destructiveActionStyle = {
+    backgroundColor: colors.surfaceRaised,
+    borderColor: colors.error,
+  };
+  const messageActionIcon = colors.textSecondary;
   const { podcastCost, credits, pricing, refreshCredits } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
   const navigation = useNavigation();
@@ -1965,37 +1978,37 @@ function MessageBubble({
 
         {/* Action buttons (podcast, share, copy, etc.) - show for assistant messages with content (incl. chat history) */}
         {!message.isTyping && message.role === 'assistant' && !message.isWelcome && !isNativeGate && (message.messageId || message.content) && (
-          <View style={styles.actionButtons}>
+          <View style={[styles.actionButtons, { borderTopColor: colors.cardBorder }]}>
             {/* Restart Button for timeout messages */}
             {message.showRestartButton && message.messageId && (
               <TouchableOpacity
-                style={[styles.actionButton, styles.restartButton]}
+                style={[styles.actionButton, messageActionStyle, styles.restartButton]}
                 onPress={() => onRestart && onRestart(message.messageId)}
               >
-                <Ionicons name="refresh" size={16} color="#ff6b35" />
+                <Ionicons name="refresh" size={16} color={colors.primary} />
               </TouchableOpacity>
             )}
             {/* Retry send button for initial network failures (no messageId yet) */}
             {message.showSendRetryButton && !message.messageId && (
               <TouchableOpacity
-                style={[styles.actionButton, styles.restartButton]}
+                style={[styles.actionButton, messageActionStyle, styles.restartButton]}
                 onPress={() => onSendRetry && onSendRetry(message)}
               >
-                <Ionicons name="refresh" size={16} color="#ff6b35" />
+                <Ionicons name="refresh" size={16} color={colors.primary} />
               </TouchableOpacity>
             )}
             {message.role === 'assistant' && (
               <>
                 {!isInstantChatMessage && !(isPlayingPodcast || isPausedPodcast) && (
                   <TouchableOpacity
-                    style={[styles.actionButton, styles.listenPodcastButton]}
+                    style={[styles.actionButton, styles.listenPodcastButton, highlightedActionStyle]}
                     onPress={onPodcastButtonPress}
                     disabled={isLoadingPodcast}
                   >
                     {isLoadingPodcast ? (
-                      <ActivityIndicator size="small" color="#ff6b35" />
+                      <ActivityIndicator size="small" color={colors.primary} />
                     ) : (
-                      <Ionicons name="radio-outline" size={17} color="#ff6b35" />
+                      <Ionicons name="radio-outline" size={17} color={colors.primary} />
                     )}
                   </TouchableOpacity>
                 )}
@@ -2003,70 +2016,70 @@ function MessageBubble({
                   <>
                     {isPlayingPodcast && (
                       <TouchableOpacity
-                        style={styles.actionButton}
+                        style={[styles.actionButton, messageActionStyle]}
                         onPress={handlePausePodcast}
                       >
-                        <Ionicons name="pause" size={16} color="#ff6b35" />
+                        <Ionicons name="pause" size={16} color={colors.primary} />
                       </TouchableOpacity>
                     )}
                     {isPausedPodcast && (
                       <TouchableOpacity
-                        style={styles.actionButton}
+                        style={[styles.actionButton, messageActionStyle]}
                         onPress={onPodcastButtonPress}
                       >
-                        <Ionicons name="play" size={16} color="#666" />
+                        <Ionicons name="play" size={16} color={messageActionIcon} />
                       </TouchableOpacity>
                     )}
                     <TouchableOpacity
-                      style={styles.actionButton}
+                      style={[styles.actionButton, messageActionStyle]}
                       onPress={handleStopPodcast}
                     >
-                      <Ionicons name="stop-circle" size={16} color="#666" />
+                      <Ionicons name="stop-circle" size={16} color={messageActionIcon} />
                     </TouchableOpacity>
                   </>
                 )}
                 {!isInstantChatMessage && (
                   <TouchableOpacity
-                    style={styles.actionButton}
+                    style={[styles.actionButton, messageActionStyle]}
                     onPress={sharePodcastAudio}
                     disabled={isSharingPodcast || isLoadingPodcast}
                   >
                     {isSharingPodcast ? (
-                      <ActivityIndicator size="small" color="#666" />
+                      <ActivityIndicator size="small" color={messageActionIcon} />
                     ) : (
-                      <Ionicons name="share-outline" size={16} color="#666" />
+                      <Ionicons name="share-outline" size={16} color={messageActionIcon} />
                     )}
                   </TouchableOpacity>
                 )}
               </>
             )}
             <TouchableOpacity
-              style={styles.actionButton}
+              style={[styles.actionButton, messageActionStyle]}
               onPress={copyToClipboard}
             >
-              <Ionicons name="copy-outline" size={16} color="#666" />
+              <Ionicons name="copy-outline" size={16} color={messageActionIcon} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.actionButton}
+              style={[styles.actionButton, messageActionStyle]}
               onPress={shareMessage}
             >
-              <Ionicons name="share-social-outline" size={16} color="#666" />
+              <Ionicons name="share-social-outline" size={16} color={messageActionIcon} />
             </TouchableOpacity>
             {message.role === 'assistant' && (
               <TouchableOpacity
-                style={[styles.actionButton, styles.pdfButton]}
+                style={[styles.actionButton, styles.pdfButton, messageActionStyle]}
                 onPress={sharePDF}
                 disabled={isGeneratingPDF}
               >
                 {isGeneratingPDF ? (
-                  <ActivityIndicator size="small" color={COLORS.primary} />
+                  <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
-                  <Ionicons name="document-text-outline" size={16} color="#666" />
+                  <Ionicons name="document-text-outline" size={16} color={messageActionIcon} />
                 )}
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={[styles.actionButton, styles.deleteButton]}
+              style={[styles.actionButton, styles.deleteButton, destructiveActionStyle]}
               onPress={() => {
                 Alert.alert(
                   'Delete Message',
@@ -2078,27 +2091,27 @@ function MessageBubble({
                 );
               }}
             >
-              <Ionicons name="trash-outline" size={16} color="#666" />
+              <Ionicons name="trash-outline" size={16} color={colors.error} />
             </TouchableOpacity>
           </View>
         )}
 
         {!message.isTyping && message.role === 'user' && !!(message.content && message.content.trim()) && (
-          <View style={styles.actionButtons}>
+          <View style={[styles.actionButtons, { borderTopColor: colors.cardBorder }]}>
             <TouchableOpacity
-              style={styles.actionButton}
+              style={[styles.actionButton, messageActionStyle]}
               onPress={copyToClipboard}
             >
-              <Ionicons name="copy-outline" size={16} color="#666" />
+              <Ionicons name="copy-outline" size={16} color={messageActionIcon} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.actionButton}
+              style={[styles.actionButton, messageActionStyle]}
               onPress={shareMessage}
             >
-              <Ionicons name="share-social-outline" size={16} color="#666" />
+              <Ionicons name="share-social-outline" size={16} color={messageActionIcon} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.actionButton, styles.deleteButton]}
+              style={[styles.actionButton, styles.deleteButton, destructiveActionStyle]}
               onPress={() => {
                 Alert.alert(
                   'Delete Message',
@@ -2110,13 +2123,13 @@ function MessageBubble({
                 );
               }}
             >
-              <Ionicons name="trash-outline" size={16} color="#666" />
+              <Ionicons name="trash-outline" size={16} color={colors.error} />
             </TouchableOpacity>
           </View>
         )}
 
         {message.role === 'assistant' && (
-          <Text style={styles.timestamp}>
+          <Text style={[styles.timestamp, { color: colors.textTertiary }]}>
             {new Date(message.timestamp).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit'

@@ -618,8 +618,8 @@ const ModernAstroRoshniHomepage = ({
             <div className="mh-app-device">
               <span className="mh-app-device__speaker" aria-hidden></span>
               <picture>
-                <source srcSet="/images/AppHomepage.webp" type="image/webp" />
-                <img src="/images/AppHomepage.png" alt="AstroRoshni Android app homepage showing personal timing, daily guidance and reports" width="646" height="1394" loading="lazy" />
+                <source srcSet="/images/AstroRoshni_Home.webp" type="image/webp" />
+                <img src="/images/AstroRoshni_Home.png" alt="AstroRoshni mobile app homepage in the new theme" width="1280" height="2856" loading="lazy" />
               </picture>
             </div>
           </div>

@@ -2451,14 +2451,14 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <picture>
                 <source
                   type="image/webp"
-                  srcSet={`${process.env.PUBLIC_URL || ''}/images/AppHomepage.webp`}
+                  srcSet={`${process.env.PUBLIC_URL || ''}/images/AstroRoshni_Home.webp`}
                 />
                 <img
                   className="app-homepage-screenshot"
-                  src={`${process.env.PUBLIC_URL || ''}/images/AppHomepage.png`}
-                  alt="AstroRoshni mobile app"
-                  width={458}
-                  height={1024}
+                  src={`${process.env.PUBLIC_URL || ''}/images/AstroRoshni_Home.png`}
+                  alt="AstroRoshni mobile app homepage in the new theme"
+                  width={1280}
+                  height={2856}
                   loading="lazy"
                   decoding="async"
                 />

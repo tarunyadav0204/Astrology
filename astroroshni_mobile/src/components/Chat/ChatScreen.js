@@ -54,6 +54,7 @@ import { Image } from 'react-native';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import AppAlertModal from '../Common/AppAlertModal';
+import QuickThemePickerModal from '../Common/QuickThemePickerModal';
 import { useCredits } from '../../credits/CreditContext';
 import { formatCreditsInr, LOWEST_CREDIT_PACK_CREDITS } from '../../credits/creditPackCatalog';
 import { useAuthGate } from '../../auth/AuthGateContext';
@@ -76,6 +77,7 @@ const DEFAULT_STANDARD_CHAT_COUNTDOWN_SECONDS = 110;
 const DEFAULT_PREMIUM_CHAT_COUNTDOWN_SECONDS = 210;
 const FIRST_PURCHASE_MODAL_DURATION_MS = 10 * 1000;
 const FIRST_PURCHASE_MODAL_SEEN_PREFIX = 'first_purchase_bonus_modal_seen_v1:';
+const THEME_DISCOVERY_SEEN_KEY = 'theme_discovery_seen_v1';
 const INSTANT_LOADER_LINES = [
   'chat.instantLoader.lineChart',
   'chat.instantLoader.lineDasha',
@@ -649,6 +651,8 @@ export default function ChatScreen({ navigation, route }) {
 
   const [language, setLanguage] = useState('english');
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [showQuickThemePicker, setShowQuickThemePicker] = useState(false);
+  const [themePickerDiscovery, setThemePickerDiscovery] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const drawerAnim = useRef(new Animated.Value(300)).current;
   const menuScrollViewRef = useRef(null);
@@ -665,6 +669,46 @@ export default function ChatScreen({ navigation, route }) {
   useEffect(() => {
     showMenuRef.current = showMenu;
   }, [showMenu]);
+
+  useEffect(() => {
+    let active = true;
+    let timer;
+    const loadThemeDiscovery = async () => {
+      try {
+        const seen = await AsyncStorage.getItem(THEME_DISCOVERY_SEEN_KEY);
+        if (!active || seen) return;
+        timer = setTimeout(() => {
+          if (!active) return;
+          setThemePickerDiscovery(true);
+          setShowQuickThemePicker(true);
+        }, 1400);
+      } catch (_) {
+        // Discovery is optional; never block the app if storage is unavailable.
+      }
+    };
+    loadThemeDiscovery();
+    return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
+
+  const closeQuickThemePicker = useCallback(async () => {
+    setShowQuickThemePicker(false);
+    if (themePickerDiscovery) {
+      setThemePickerDiscovery(false);
+      try {
+        await AsyncStorage.setItem(THEME_DISCOVERY_SEEN_KEY, '1');
+      } catch (_) {
+        // Discovery persistence should never block theme selection.
+      }
+    }
+  }, [themePickerDiscovery]);
+
+  const openQuickThemePicker = useCallback(() => {
+    setThemePickerDiscovery(false);
+    closeMenuDrawer(() => setShowQuickThemePicker(true));
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -6590,6 +6634,16 @@ export default function ChatScreen({ navigation, route }) {
           </View>
         </Modal>
 
+        <QuickThemePickerModal
+          visible={showQuickThemePicker}
+          discovery={themePickerDiscovery}
+          onClose={closeQuickThemePicker}
+          onViewAll={async () => {
+            await closeQuickThemePicker();
+            navigation.navigate('Profile', { focusThemePicker: true });
+          }}
+        />
+
         {/* Menu Drawer */}
         <Modal
           visible={showMenu}
@@ -6631,14 +6685,24 @@ export default function ChatScreen({ navigation, route }) {
                         <Text style={[styles.drawerTitle, { color: colors.text }]}>{t('premiumUi.chatScreen.explore')}</Text>
                       </View>
                     </View>
-                    <TouchableOpacity
-                      style={[styles.drawerCloseButton, { backgroundColor: colors.surfaceMuted }]}
-                      onPress={() => closeMenuDrawer()}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('premiumUi.chatScreen.closeMenu')}
-                    >
-                      <Ionicons name="close" size={22} color={colors.text} />
-                    </TouchableOpacity>
+                    <View style={styles.drawerHeaderActions}>
+                      <TouchableOpacity
+                        style={[styles.drawerCloseButton, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}
+                        onPress={openQuickThemePicker}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('themeDiscovery.title')}
+                      >
+                        <Ionicons name="color-palette-outline" size={21} color={colors.selectionText} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.drawerCloseButton, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}
+                        onPress={() => closeMenuDrawer()}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('premiumUi.chatScreen.closeMenu')}
+                      >
+                        <Ionicons name="close" size={22} color={colors.text} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   <Text style={[styles.drawerSubtitle, { color: colors.textSecondary }]}>{t('premiumUi.chatScreen.chooseNext')}</Text>
                   <TouchableOpacity
@@ -9034,8 +9098,15 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  drawerHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: 10,
   },
   logoContainer: {
     width: 50,
