@@ -69,8 +69,7 @@ export const THEMES = Object.freeze([
 ]);
 
 const THEME_IDS = new Set(THEMES.map((theme) => theme.id));
-const configuredDefault = process.env.REACT_APP_DEFAULT_THEME;
-export const DEFAULT_THEME = THEME_IDS.has(configuredDefault) ? configuredDefault : 'heritage';
+export const DEFAULT_THEME = 'heritage';
 
 const ThemeContext = createContext(null);
 

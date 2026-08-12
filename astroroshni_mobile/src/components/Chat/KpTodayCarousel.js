@@ -350,7 +350,7 @@ function KpTodayReaderSheet({
 /**
  * Home entry + full-prediction reader popup for KP Today.
  */
-export default function KpTodayCarousel({ birthDetails, onOpenKp, embedded = false }) {
+export default function KpTodayCarousel({ birthDetails, onOpenKp, onData, embedded = false }) {
   const { colors } = useTheme();
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage || i18n.language || 'en-IN';
@@ -402,6 +402,7 @@ export default function KpTodayCarousel({ birthDetails, onOpenKp, embedded = fal
         const cached = JSON.parse(cachedRaw);
         if (cached?.today) {
           setData(cached);
+          onData?.(cached);
           hasDataRef.current = true;
           setLoading(false);
           setError(null);
@@ -435,6 +436,7 @@ export default function KpTodayCarousel({ birthDetails, onOpenKp, embedded = fal
       if (response.data?.success && response.data?.data) {
         const payload = response.data.data;
         setData(payload);
+        onData?.(payload);
         hasDataRef.current = true;
         setError(null);
         try {
@@ -451,13 +453,14 @@ export default function KpTodayCarousel({ birthDetails, onOpenKp, embedded = fal
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [apiLanguage, t]);
+  }, [apiLanguage, onData, t]);
 
   useEffect(() => {
     if (!birthKey) return undefined;
     viewedRef.current = false;
     hasDataRef.current = false;
     setData(null);
+    onData?.(null);
     setError(null);
     load();
     return () => {

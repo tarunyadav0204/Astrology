@@ -5,6 +5,7 @@ import Svg, { Circle, Line } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 import { useTranslation } from 'react-i18next';
+import { buildKpHomeRecommendations } from '../../utils/kpHomeRecommendations';
 
 const LANGUAGE_LOCALES = { english: 'en-IN', hindi: 'hi-IN', es: 'es-ES', french: 'fr-FR', german: 'de-DE', russian: 'ru-RU', chinese: 'zh-CN', mandarin: 'zh-CN', tamil: 'ta-IN', telugu: 'te-IN', gujarati: 'gu-IN', marathi: 'mr-IN' };
 const formatToday = (language) => new Intl.DateTimeFormat(LANGUAGE_LOCALES[language] || 'en-IN', {
@@ -100,6 +101,9 @@ export default function PremiumTodayOverview({
   onOpenPanchang,
   onOpenCareer,
   onOpenKarma,
+  kpTodayData,
+  onOpenRecommendedAnalysis,
+  onAskRecommended,
   onOpenExplore,
   todayPredictions,
   onOpenAscendant,
@@ -109,6 +113,10 @@ export default function PremiumTodayOverview({
   const { colors, typography } = useTheme();
   const { t, i18n } = useTranslation();
   const displayName = name || t('premiumUi.home.explorer');
+  const dailyRecommendations = React.useMemo(
+    () => buildKpHomeRecommendations(kpTodayData, t),
+    [kpTodayData, t],
+  );
 
   return (
     <View style={styles.container}>
@@ -208,14 +216,40 @@ export default function PremiumTodayOverview({
 
       <View style={styles.sectionHeader}>
         <View>
-          <Text style={[styles.sectionEyebrow, typography.eyebrow, { color: colors.primary }]}>{t('premiumUi.home.goDeeper')}</Text>
-          <Text style={[styles.sectionTitle, typography.sectionTitle, { color: colors.text }]}>{t('premiumUi.home.chosenMoment')}</Text>
+          <Text style={[styles.sectionEyebrow, typography.eyebrow, { color: colors.primary }]}>{t('premiumUi.homeRecommendations.eyebrow')}</Text>
+          <Text style={[styles.sectionTitle, typography.sectionTitle, { color: colors.text }]}>{t('premiumUi.homeRecommendations.title')}</Text>
         </View>
       </View>
       <View style={styles.recommendations}>
-        <Recommendation number="01" title={t('premiumUi.home.yourDay')} body={t('premiumUi.home.yourDayBody')} onPress={onAsk} colors={colors} />
-        <Recommendation number="02" title={t('premiumUi.home.careerDirection')} body={t('premiumUi.home.careerBody')} onPress={onOpenCareer} colors={colors} />
-        <Recommendation number="03" title={t('premiumUi.home.karmaPatterns')} body={t('premiumUi.home.karmaBody')} onPress={onOpenKarma} colors={colors} />
+        {dailyRecommendations.length ? [...dailyRecommendations, ...(!dailyRecommendations[2] ? [{
+          id: 'daily-rhythm-fallback',
+          kind: 'panchang',
+          title: t('premiumUi.homeRecommendations.fallbackPanchangTitle'),
+          body: t('premiumUi.homeRecommendations.fallbackPanchangBody'),
+        }] : [])].slice(0, 3).map((item, index) => (
+          <Recommendation
+            key={item.id}
+            number={String(index + 1).padStart(2, '0')}
+            title={item.title}
+            body={item.body}
+            onPress={() => {
+              if (item.kind === 'ask') {
+                onAskRecommended?.(item.question, item.area, item.houses);
+              } else if (item.kind === 'panchang') {
+                onOpenPanchang?.();
+              } else {
+                onOpenRecommendedAnalysis?.(item.analysisType);
+              }
+            }}
+            colors={colors}
+          />
+        )) : (
+          <>
+            <Recommendation number="01" title={t('premiumUi.homeRecommendations.fallbackAskTitle')} body={t('premiumUi.homeRecommendations.fallbackAskBody')} onPress={onAsk} colors={colors} />
+            <Recommendation number="02" title={t('premiumUi.homeRecommendations.fallbackPanchangTitle')} body={t('premiumUi.homeRecommendations.fallbackPanchangBody')} onPress={onOpenPanchang} colors={colors} />
+            <Recommendation number="03" title={t('premiumUi.home.karmaPatterns')} body={t('premiumUi.home.karmaBody')} onPress={onOpenKarma} colors={colors} />
+          </>
+        )}
       </View>
 
       <TouchableOpacity onPress={onOpenExplore} activeOpacity={0.82} style={[styles.exploreButton, { borderColor: colors.borderStrong }]}>

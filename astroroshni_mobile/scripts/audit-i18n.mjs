@@ -14,6 +14,7 @@ const knowledgeSupportCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, '
 const accountNotificationsCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/account-notifications.json'), 'utf8'));
 const accountSecurityActionsCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/account-security-actions.json'), 'utf8'));
 const authDeepCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/auth-deep.json'), 'utf8'));
+const homeRecommendationsCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/home-recommendations.json'), 'utf8'));
 const protectedFiles = [
   'src/components/Yogas/YogaScreen.js',
   'src/components/Yogas/YogaAccordion.js',
@@ -71,11 +72,15 @@ const flatten = (value, prefix = '', result = {}) => {
 const isPluralVariant = (key, englishKeySet) => /_(few|many|zero|two)$/.test(key)
   && englishKeySet.has(key.replace(/_(few|many|zero|two)$/, '_other'));
 
-const englishKeys = Object.keys(flatten(premiumCopy.english)).sort();
+const mergedPremiumCopy = Object.fromEntries(Object.entries(premiumCopy).map(([language, copy]) => [
+  language,
+  { ...copy, homeRecommendations: homeRecommendationsCopy[language] || homeRecommendationsCopy.english },
+]));
+const englishKeys = Object.keys(flatten(mergedPremiumCopy.english)).sort();
 const englishKeySet = new Set(englishKeys);
 const failures = [];
 
-Object.entries(premiumCopy).forEach(([language, copy]) => {
+Object.entries(mergedPremiumCopy).forEach(([language, copy]) => {
   const localized = flatten(copy);
   const missing = englishKeys.filter((key) => !(key in localized));
   const extra = Object.keys(localized).filter((key) => !englishKeys.includes(key));

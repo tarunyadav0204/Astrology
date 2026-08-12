@@ -419,6 +419,7 @@ export default function HomeScreen({
 
   const [dashData, setDashData] = useState(null);
   const [chartData, setChartData] = useState(null);
+  const [kpTodayData, setKpTodayData] = useState(null);
   const [activeTab, setActiveTab] = useState('today');
   const [showExploreCatalog, setShowExploreCatalog] = useState(false);
   const premiumHomeScrollRef = useRef(null);
@@ -2269,6 +2270,22 @@ const loadHomeData = async (nativeData = null) => {
           onOpenPanchang={() => onOptionSelect?.({ action: 'panchang' })}
           onOpenCareer={() => onOptionSelect({ action: 'analysis', type: 'career', cost: pricing.career ?? 12 })}
           onOpenKarma={() => onOptionSelect({ action: 'analysis', type: 'karma', cost: pricing.karma ?? 25 })}
+          kpTodayData={kpTodayData}
+          onOpenRecommendedAnalysis={(type) => onOptionSelect({
+            action: 'analysis',
+            type,
+            cost: pricing[type] ?? ({ career: 12, wealth: 5, marriage: 3, education: 3, progeny: 15, health: 3, karma: 25 }[type] || 0),
+          })}
+          onAskRecommended={(initialMessage, area, houses) => onOptionSelect({
+            action: 'question',
+            initialMessage,
+            queryContext: {
+              source: 'homepage_kp_recommendation',
+              category: area,
+              kp_activated_houses: houses,
+              suppress_mode_intro: true,
+            },
+          })}
           onOpenExplore={showExploreSurface}
           onOpenAscendant={() => setActiveInsight(getSignInsight('ascendant', chartData?.houses?.[0]?.sign))}
           onOpenMoon={() => setActiveInsight(getSignInsight('moon', chartData?.planets?.Moon?.sign))}
@@ -2277,6 +2294,7 @@ const loadHomeData = async (nativeData = null) => {
             <KpTodayCarousel
               embedded
               birthDetails={currentNativeData || birthData}
+              onData={setKpTodayData}
               onOpenKp={(scope = 'today') => {
                 requireBirthChart((data) =>
                   navigation.navigate('KPSystem', {

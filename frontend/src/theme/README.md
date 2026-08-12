@@ -23,7 +23,7 @@ const { theme, themes, setTheme } = useTheme();
 
 The provider validates theme IDs, persists the choice under `astroroshni_theme`, synchronizes changes across tabs, updates `data-theme` on `<html>`, and updates the browser theme color.
 
-Available foundations are `heritage`, `midnight`, `clarity`, and `monochrome` (shown as Black & white). `heritage` is the default. A deployment can set `REACT_APP_DEFAULT_THEME` to another registered ID without changing page code.
+`heritage` is the default for new users. A user's saved selection continues to take precedence after they choose another theme.
 
 ## Page migration checklist
 
