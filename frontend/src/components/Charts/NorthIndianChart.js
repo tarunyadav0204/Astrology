@@ -422,7 +422,7 @@ const NorthIndianChart = ({
     if (status === 'combusted') return '#ff8c00';
     if (status === 'exalted') return '#22c55e';
     if (status === 'debilitated') return '#ef4444';
-    return '#2d3436';
+    return 'var(--color-chart-text, var(--color-text))';
   };
 
   const getPlanetSymbolWithStatus = (planet) => {
@@ -577,15 +577,15 @@ const NorthIndianChart = ({
       >
       {/* Outer square border */}
       <rect x="5" y="5" width="390" height="390" 
-            fill="url(#chartGradient)" stroke="#111111" strokeWidth="1.5"/>
+            fill="url(#chartGradient)" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1.5"/>
       
       {/* Inner diamond border */}
       <polygon points="200,5 395,200 200,395 5,200" 
-               fill="none" stroke="#111111" strokeWidth="1.5"/>
+               fill="none" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1.5"/>
       
       {/* Diagonal lines creating 12 houses */}
-      <line x1="5" y1="5" x2="395" y2="395" stroke="#111111" strokeWidth="1"/>
-      <line x1="395" y1="5" x2="5" y2="395" stroke="#111111" strokeWidth="1"/>
+      <line x1="5" y1="5" x2="395" y2="395" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
+      <line x1="395" y1="5" x2="5" y2="395" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
       
 
       
@@ -614,10 +614,10 @@ const NorthIndianChart = ({
       {/* Instruction text */}
       {showFooterHint ? (
         <>
-          <text x="200" y="405" fontSize="12" fill="#666" textAnchor="middle" fontStyle="italic">
+          <text x="200" y="405" fontSize="12" fill="var(--color-chart-text-muted, var(--color-text-muted))" textAnchor="middle" fontStyle="italic">
             {aspectsHighlight.show ? 'Pink: Selected House | Green Circles: Benefic Aspects | Red Circles: Malefic Aspects' : 'Hover or touch planets to see Nakshatra and degree'}
           </text>
-          <text x="200" y="420" fontSize="12" fill="#666" textAnchor="middle" fontStyle="italic">
+          <text x="200" y="420" fontSize="12" fill="var(--color-chart-text-muted, var(--color-text-muted))" textAnchor="middle" fontStyle="italic">
             {aspectsHighlight.show ? '' : 'Click any house for insights · Right-click for more options'}
           </text>
         </>
@@ -711,7 +711,7 @@ const NorthIndianChart = ({
                      houseNumber === 12 ? houseData.center.y + 20 : 
                      houseNumber === 5 ? houseData.center.y + 10 : houseData.center.y + 5} 
                   fontSize="15" 
-                  fill={customAscendant === rashiIndex ? "#e91e63" : "#333"} 
+                  fill={customAscendant === rashiIndex ? 'var(--color-brand)' : 'var(--color-chart-text-muted, var(--color-text-muted))'}
                   fontWeight={customAscendant === rashiIndex ? "900" : "bold"}
                   opacity="0.85"
                   style={{ pointerEvents: 'none' }}>
@@ -727,13 +727,13 @@ const NorthIndianChart = ({
                 </text>
                 {chartData.ascendant && (
                   <text x={houseData.center.x + 38} y={houseData.center.y + 35} 
-                        fontSize="7" fill="#666" fontWeight="500" textAnchor="middle">
+                        fontSize="7" fill="var(--color-chart-text-muted, var(--color-text-muted))" fontWeight="500" textAnchor="middle">
                     {formatDegreeCompact(chartData.ascendant % 30)}
                   </text>
                 )}
                 {chartData.ascendant && (
                   <text x={houseData.center.x + 38} y={houseData.center.y + 44} 
-                        fontSize="7" fill="#666" fontWeight="500" textAnchor="middle">
+                        fontSize="7" fill="var(--color-chart-text-muted, var(--color-text-muted))" fontWeight="500" textAnchor="middle">
                     {getShortNakshatra(chartData.ascendant)}
                   </text>
                 )}
@@ -933,7 +933,7 @@ const NorthIndianChart = ({
                       <text x={planetX} 
                             y={detailLine1Y} 
                             fontSize={detailFontSize} 
-                            fill="#666"
+                            fill="var(--color-chart-text-muted, var(--color-text-muted))"
                             fontWeight="500"
                             textAnchor="middle"
                             style={{ cursor: 'pointer' }}
@@ -944,7 +944,7 @@ const NorthIndianChart = ({
                       <text x={planetX} 
                             y={detailLine2Y} 
                             fontSize={detailFontSize} 
-                            fill="#666"
+                            fill="var(--color-chart-text-muted, var(--color-text-muted))"
                             fontWeight="500"
                             textAnchor="middle"
                             style={{ cursor: 'pointer' }}

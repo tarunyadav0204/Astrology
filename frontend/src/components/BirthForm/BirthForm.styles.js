@@ -54,7 +54,7 @@ export const FormContainer = styled.div`
   animation: ${fadeIn} 0.25s ease-out;
 
   h2 {
-    color: #2d1b22;
+    color: var(--color-text);
     font-size: 18px;
     font-weight: 800;
     margin: 0;
@@ -73,13 +73,13 @@ export const TabContainer = styled.div`
 export const TabNavigation = styled.div`
   display: flex;
   gap: 6px;
-  background: #f5eae5;
+  background: var(--color-surface-muted);
   border-radius: 14px;
   padding: 5px;
   margin: 16px 24px 18px;
   position: relative;
   z-index: 20;
-  border: 1px solid rgba(105, 55, 63, 0.08);
+  border: 1px solid var(--color-border);
 
   @media (max-width: 560px) {
     margin: 14px 16px;
@@ -103,15 +103,15 @@ export const TabButton = styled.button.withConfig({
   
   /* Active State */
   ${props => props.active ? css`
-    background: #ffffff;
-    color: #9f1239;
-    box-shadow: 0 4px 14px rgba(84, 38, 49, 0.1);
+    background: var(--color-surface-raised);
+    color: var(--color-brand);
+    box-shadow: var(--shadow-sm);
   ` : css`
     background: transparent;
-    color: #725f63;
+    color: var(--color-text-muted);
     &:hover {
-      color: #3f2930;
-      background: rgba(255,255,255,0.48);
+      color: var(--color-text);
+      background: color-mix(in srgb, var(--color-surface-raised) 52%, transparent);
     }
   `}
 `;
@@ -130,7 +130,7 @@ export const FormField = styled.div`
   position: relative;
   
   .error {
-    color: #b4233c;
+    color: var(--color-danger);
     font-size: 11px;
     margin-top: 5px;
     font-weight: 500;
@@ -148,7 +148,7 @@ export const FormField = styled.div`
 export const Label = styled.label`
   display: block;
   margin-bottom: 6px;
-  color: #49363c;
+  color: var(--color-text);
   font-weight: 750;
   font-size: 12px;
   letter-spacing: 0.01em;
@@ -158,36 +158,37 @@ const inputStyles = css`
   width: 100%;
   min-height: 46px;
   padding: 11px 13px;
-  border: 1px solid #daccc7;
+  border: 1px solid var(--color-border-strong);
   border-radius: 11px;
   font-size: 14px;
-  color: #2d1b22;
-  background: #fffdfb;
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  color-scheme: inherit;
   transition: all 0.2s ease;
   
   &::placeholder {
-    color: #9a898d;
+    color: var(--color-text-subtle);
   }
 
   &:hover {
-    border-color: #bfa8a1;
-    background: white;
+    border-color: var(--color-border-strong);
+    background: var(--color-surface);
   }
 
   &:focus {
     outline: none;
-    border-color: #b53a5d;
-    background: white;
-    box-shadow: 0 0 0 3px rgba(181, 58, 93, 0.11);
+    border-color: var(--color-focus);
+    background: var(--color-surface-raised);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus) 18%, transparent);
   }
 
   ${props => props.error && css`
-    border-color: #c73b52;
-    background: #fff7f7;
+    border-color: var(--color-danger);
+    background: color-mix(in srgb, var(--color-danger) 6%, var(--color-surface-raised));
     
     &:focus {
-      border-color: #c73b52;
-      box-shadow: 0 0 0 3px rgba(199, 59, 82, 0.1);
+      border-color: var(--color-danger);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger) 16%, transparent);
     }
   `}
 `;
@@ -210,11 +211,8 @@ export const Select = styled.select`
 
 export const SearchInput = styled(Input)`
   margin-bottom: 0;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'/%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: left 14px center;
-  background-size: 20px;
-  padding-left: 44px;
+  background-image: none;
+  padding-left: 42px;
 `;
 
 export const AutocompleteContainer = styled.div`
@@ -227,12 +225,12 @@ export const SuggestionList = styled.ul`
   top: auto;
   left: 0;
   right: 0;
-  background: white;
+  background: var(--color-surface-raised);
   border-radius: 12px;
   padding: 6px;
   list-style: none;
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08);
-  border: 1px solid #daccc7;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-border);
   z-index: 2000;
   max-height: min(240px, 40vh);
   overflow-y: auto;
@@ -243,12 +241,12 @@ export const SuggestionItem = styled.li`
   border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
-  color: #475569;
+  color: var(--color-text);
   transition: all 0.15s;
 
   &:hover {
-    background: #fff1ed;
-    color: #7f1838;
+    background: var(--color-surface-muted);
+    color: var(--color-brand);
   }
 `;
 
@@ -258,22 +256,22 @@ export const Button = styled.button`
   width: 100%;
   min-height: 48px;
   padding: 12px 20px;
-  background: linear-gradient(135deg, #a71945 0%, #c54a43 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-hover) 100%);
+  color: var(--color-on-brand);
   border: none;
   border-radius: 12px;
   font-size: 14px;
   font-weight: 800;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 8px 20px rgba(159, 18, 57, 0.2);
+  box-shadow: var(--shadow-sm);
   margin-top: 0;
   position: relative;
   overflow: hidden;
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 26px rgba(159, 18, 57, 0.28);
+    box-shadow: var(--shadow-card);
   }
 
   &:active {
@@ -281,8 +279,8 @@ export const Button = styled.button`
   }
 
   &:disabled {
-    background: #d9cbc7;
-    color: #8b7a7e;
+    background: var(--color-surface-muted);
+    color: var(--color-text-subtle);
     box-shadow: none;
     cursor: not-allowed;
     transform: none;
@@ -323,11 +321,11 @@ export const ChartsList = styled.div`
     background: transparent;
   }
   &::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: var(--color-border-strong);
     border-radius: 999px;
   }
   &::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: var(--color-text-subtle);
   }
 `;
 
@@ -337,15 +335,15 @@ export const LoadMoreButton = styled.button`
   padding: 12px 16px;
   border: none;
   border-radius: 10px;
-  background: #f3e7e2;
-  color: #5c3b43;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease, opacity 0.2s ease;
 
   &:hover:not(:disabled) {
-    background: rgba(0, 0, 0, 0.1);
+    background: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface-muted));
   }
 
   &:disabled {
@@ -355,8 +353,8 @@ export const LoadMoreButton = styled.button`
 `;
 
 export const ChartItem = styled.div`
-  background: #fffdfb;
-  border: 1px solid #e4d7d1;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 13px 14px;
   margin-bottom: 9px;
@@ -367,20 +365,20 @@ export const ChartItem = styled.div`
   cursor: pointer;
 
   &:hover {
-    border-color: #c66a78;
-    box-shadow: 0 8px 20px rgba(79, 38, 48, 0.08);
+    border-color: var(--color-brand);
+    box-shadow: var(--shadow-sm);
     transform: translateY(-1px);
   }
 
   strong {
     display: block;
-    color: #332127;
+    color: var(--color-text);
     font-size: 14px;
     margin-bottom: 4px;
   }
 
   small {
-    color: #79676b;
+    color: var(--color-text-muted);
     font-size: 11px;
   }
 

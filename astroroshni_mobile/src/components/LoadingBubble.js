@@ -5,6 +5,31 @@ import NorthIndianChart from './Chart/NorthIndianChart';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { stopAnimatedValue, stopAnimationLoop } from '../utils/safeAnimated';
+import { DISPLAY_FONT_FAMILY } from '../theme/tokens';
+
+const HOUSE_DOMAINS = {
+    1: 'SELF & IDENTITY',
+    2: 'WEALTH & FAMILY',
+    3: 'COURAGE & COMMUNICATION',
+    4: 'HOME & INNER LIFE',
+    5: 'CREATIVITY & CHILDREN',
+    6: 'WORK & WELLBEING',
+    7: 'PARTNERSHIPS',
+    8: 'CHANGE & SHARED RESOURCES',
+    9: 'WISDOM & PURPOSE',
+    10: 'CAREER & PUBLIC LIFE',
+    11: 'GAINS & COMMUNITY',
+    12: 'REST & RELEASE',
+};
+
+const PLANET_NAMES = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu'];
+
+function getInsightPlanets(chartData, houseNumber) {
+    const houseSign = Number(chartData?.houses?.[houseNumber - 1]?.sign);
+    const planets = chartData?.planets;
+    if (!Number.isFinite(houseSign) || !planets || typeof planets !== 'object') return [];
+    return PLANET_NAMES.filter((name) => Number(planets[name]?.sign) === houseSign);
+}
 
 const LoadingBubble = ({
     chartInsights,
@@ -196,17 +221,15 @@ const LoadingBubble = ({
             return (
                 <View style={styles.container}>
                     <LinearGradient
-                        colors={Platform.OS === 'android' 
-                            ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] 
-                            : ['rgba(255, 107, 53, 0.15)', 'rgba(255, 215, 0, 0.1)', 'rgba(255, 107, 53, 0.15)']}
+                        colors={[colors.cosmicSurface, colors.cosmicRaised]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
-                        style={styles.welcomeBubble}
+                        style={[styles.welcomeBubble, { borderColor: colors.cosmicLine, backgroundColor: colors.cosmicSurface }]}
                     >
                         <Text
                           style={[
                             styles.welcomeTitle,
-                            { color: isDarkMode ? '#ffd700' : '#ff6b35' },
+                            { color: colors.accent },
                             isDarkMode && {
                               textShadowColor: 'rgba(255, 107, 53, 0.3)',
                               textShadowOffset: { width: 0, height: 2 },
@@ -214,28 +237,32 @@ const LoadingBubble = ({
                             },
                           ]}
                         >
-                          ☀️ AstroRoshni
+                          {t('premiumUi.chat.readingChart')}
                         </Text>
-                        <Text style={[styles.welcomeSubtext, { color: isDarkMode ? '#fff' : '#1a1a1a' }]}>{t('chat.preparingInsights', 'Preparing your chart insights...')}</Text>
+                        <Text style={[styles.welcomeSubtext, { color: colors.textInverseMuted }]}>{t('chat.preparingInsights', 'Preparing your chart insights...')}</Text>
                     </LinearGradient>
                 </View>
             );
         }
         
+        const insightHouse = Math.max(1, Math.min(12, Number(currentInsight.house_number) || 1));
+        const insightPlanets = getInsightPlanets(chartData, insightHouse);
+        const focusDetail = insightPlanets.length > 0
+            ? `${insightPlanets.join(' · ')} ${insightPlanets.length === 1 ? 'is' : 'are'} active here`
+            : 'This area is highlighted in the chart';
+
         return (
             <View style={styles.container} ref={chartContainerRef}>
                 <LinearGradient
-                    colors={Platform.OS === 'android' 
-                        ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] 
-                        : ['rgba(255, 107, 53, 0.15)', 'rgba(255, 215, 0, 0.1)', 'rgba(255, 107, 53, 0.15)']}
+                    colors={[colors.cosmicSurface, colors.cosmicRaised]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={styles.chartBubble}
+                    style={[styles.chartBubble, { borderColor: colors.cosmicLine, backgroundColor: colors.cosmicSurface }]}
                 >
                     <Text
                       style={[
                         styles.chartTitle,
-                        { color: isDarkMode ? '#ffd700' : '#ff6b35' },
+                        { color: colors.accent },
                         isDarkMode && {
                           textShadowColor: 'rgba(255, 107, 53, 0.3)',
                           textShadowOffset: { width: 0, height: 2 },
@@ -243,22 +270,22 @@ const LoadingBubble = ({
                         },
                       ]}
                     >
-                      ☀️ AstroRoshni
+                      {t('premiumUi.chat.synthesizing')}
                     </Text>
-                    <View style={styles.timerCard}>
+                    <View style={[styles.timerCard, { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine }]}>
                         <View style={styles.timerTopRow}>
-                            <Text style={styles.timerTitle}>Estimated Time Remaining</Text>
+                            <Text style={[styles.timerTitle, { color: colors.textInverseMuted }]}>{t('premiumUi.chat.timeRemaining')}</Text>
                         </View>
                         <View style={styles.timerCountdownWrap}>
                             {showZodiacLoop ? (
-                                <Text style={styles.zodiacLoopText}>{zodiacSymbols[zodiacIndex]}</Text>
+                                <Text style={[styles.zodiacLoopText, { color: colors.textInverse }]}>{zodiacSymbols[zodiacIndex]}</Text>
                             ) : (
-                                <Text style={styles.timerText}>{timerText}</Text>
+                                <Text style={[styles.timerText, { color: colors.textInverse }]}>{timerText}</Text>
                             )}
                         </View>
                         <View style={styles.timerProgressTrack}>
                             <LinearGradient
-                                colors={['#f59e0b', '#f97316', '#ec4899']}
+                                colors={[colors.accent, colors.primary]}
                                 start={{ x: 0, y: 0.5 }}
                                 end={{ x: 1, y: 0.5 }}
                                 style={[styles.timerProgressFill, { width: `${Math.max(6, timerProgress * 100)}%` }]}
@@ -269,20 +296,38 @@ const LoadingBubble = ({
                         )}
                     </View>
                     
+                    <Animated.View style={[styles.insightFocusHeader, { opacity: fadeAnim }]}>
+                        <Text style={[styles.insightFocusEyebrow, { color: colors.accent }]}>{t('premiumUi.chat.currentInsight')}</Text>
+                        <Text style={[styles.insightFocusTitle, { color: colors.textInverse }]}>
+                            {t('premiumUi.chat.houseNumber', { number: insightHouse })} · {t(`premiumUi.chat.houseDomains.${insightHouse}`)}
+                        </Text>
+                        <Text style={[styles.insightFocusDetail, { color: colors.textInverseMuted }]}>{focusDetail}</Text>
+                    </Animated.View>
+
                     {hasChartData && (
-                        <Animated.View style={[styles.chartContainer, { opacity: fadeAnim }]}>
+                        <Animated.View style={[styles.chartContainer, { opacity: fadeAnim, borderColor: colors.cosmicLine, backgroundColor: colors.cosmicSurface }]}>
                             <NorthIndianChart 
                                 chartData={chartData}
                                 showDegreeNakshatra={false}
-                                highlightHouse={currentInsight.house_number}
-                                glowAnimation={glowAnim}
+                                highlightHouse={insightHouse}
+                                highlightColor={colors.accent}
+                                highlightFill={colors.cosmicGlow}
                                 hideInstructions={true}
+                                cosmicTheme
+                                onDarkSurface
                             />
                         </Animated.View>
                     )}
+
+                    {hasChartData && (
+                        <View style={styles.chartLegend}>
+                            <View style={[styles.chartLegendMark, { borderColor: colors.accent }]} />
+                            <Text style={[styles.chartLegendText, { color: colors.textInverseMuted }]}>{t('premiumUi.chat.highlightLegend')}</Text>
+                        </View>
+                    )}
                     
-                    <View style={styles.insightTextBlock}>
-                        <Animated.Text style={[styles.insightText, { color: isDarkMode ? '#fff' : '#1a1a1a', opacity: fadeAnim }]}>
+                    <View style={[styles.insightTextBlock, { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine }]}>
+                        <Animated.Text style={[styles.insightText, { color: colors.textInverse, opacity: fadeAnim }]}>
                             {currentInsight.message}
                         </Animated.Text>
                     </View>
@@ -294,12 +339,10 @@ const LoadingBubble = ({
     return (
         <View style={styles.container}>
             <LinearGradient
-                colors={Platform.OS === 'android' 
-                    ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] 
-                    : ['rgba(255, 107, 53, 0.15)', 'rgba(255, 215, 0, 0.1)', 'rgba(255, 107, 53, 0.15)']}
+                colors={[colors.cosmicSurface, colors.cosmicRaised]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.welcomeBubble}
+                style={[styles.welcomeBubble, { borderColor: colors.cosmicLine, backgroundColor: colors.cosmicSurface }]}
             >
                 <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
                     <View style={styles.logoContainer}>
@@ -314,7 +357,7 @@ const LoadingBubble = ({
                 <Text
                   style={[
                     styles.welcomeTitle,
-                    { color: theme === 'dark' ? '#ffd700' : '#ff6b35' },
+                    { color: colors.accent },
                     theme === 'dark' && {
                       textShadowColor: 'rgba(255, 107, 53, 0.3)',
                       textShadowOffset: { width: 0, height: 2 },
@@ -322,22 +365,22 @@ const LoadingBubble = ({
                     },
                   ]}
                 >
-                  AstroRoshni
+                  {t('premiumUi.chat.synthesizing')}
                 </Text>
-                <View style={styles.timerCard}>
+                <View style={[styles.timerCard, { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine }]}>
                     <View style={styles.timerTopRow}>
-                        <Text style={styles.timerTitle}>Estimated Time Remaining</Text>
+                        <Text style={[styles.timerTitle, { color: colors.textInverseMuted }]}>{t('premiumUi.chat.timeRemaining')}</Text>
                     </View>
                     <View style={styles.timerCountdownWrap}>
                         {showZodiacLoop ? (
-                            <Text style={styles.zodiacLoopText}>{zodiacSymbols[zodiacIndex]}</Text>
+                            <Text style={[styles.zodiacLoopText, { color: colors.textInverse }]}>{zodiacSymbols[zodiacIndex]}</Text>
                         ) : (
-                            <Text style={styles.timerText}>{timerText}</Text>
+                            <Text style={[styles.timerText, { color: colors.textInverse }]}>{timerText}</Text>
                         )}
                     </View>
                     <View style={styles.timerProgressTrack}>
                         <LinearGradient
-                            colors={['#f59e0b', '#f97316', '#ec4899']}
+                            colors={[colors.accent, colors.primary]}
                             start={{ x: 0, y: 0.5 }}
                             end={{ x: 1, y: 0.5 }}
                             style={[styles.timerProgressFill, { width: `${Math.max(6, timerProgress * 100)}%` }]}
@@ -354,12 +397,12 @@ const LoadingBubble = ({
                     <View style={styles.dividerLine} />
                 </View>
                 
-                <Text style={[styles.welcomeMessage, { color: theme === 'dark' ? '#fff' : '#1a1a1a' }]}>
-                    {t('chat.thankYou', 'Thank you for reaching out to AstroRoshni with your question.')}
+                <Text style={[styles.welcomeMessage, { color: colors.textInverse }]}>
+                    {t('chat.thankYou', 'Your question is now being read against the full chart.')}
                 </Text>
                 
-                <Text style={[styles.welcomeSubtext, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.85)' : '#4b5563' }]}>
-                    {t('chat.deeplyAnalyzing', 'I am reviewing your chart to provide the most relevant insights. This process takes a moment...')}
+                <Text style={[styles.welcomeSubtext, { color: colors.textInverseMuted }]}>
+                    {t('chat.deeplyAnalyzing', 'Parashari, Nadi, Jaimini and KP signals are being combined into one clear answer.')}
                 </Text>
                 
                 <View style={styles.cosmicDots}>
@@ -437,8 +480,9 @@ const styles = StyleSheet.create({
         borderRadius: 35,
     },
     welcomeTitle: {
+        fontFamily: DISPLAY_FONT_FAMILY,
         fontSize: 28,
-        fontWeight: '800',
+        fontWeight: '400',
         marginBottom: 16,
     },
     timerCard: {
@@ -555,11 +599,12 @@ const styles = StyleSheet.create({
     },
     chartBubble: {
         borderRadius: 24,
-        padding: 32,
+        padding: 20,
         alignItems: 'center',
         borderWidth: Platform.OS === 'android' ? StyleSheet.hairlineWidth : 2,
         borderColor: 'rgba(255, 215, 0, 0.15)',
-        maxWidth: '95%',
+        width: '100%',
+        maxWidth: 420,
         shadowColor: '#ff6b35',
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.2,
@@ -569,28 +614,73 @@ const styles = StyleSheet.create({
         backgroundColor: Platform.OS === 'android' ? 'rgba(0, 0, 0, 0.4)' : 'transparent',
     },
     chartTitle: {
+        fontFamily: DISPLAY_FONT_FAMILY,
         fontSize: 28,
-        fontWeight: '800',
-        marginBottom: 20,
-    },
-    chartContainer: {
-        width: 300,
-        height: 300,
+        fontWeight: '400',
         marginBottom: 16,
     },
+    insightFocusHeader: {
+        width: '100%',
+        marginBottom: 14,
+    },
+    insightFocusEyebrow: {
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 1.5,
+        marginBottom: 5,
+    },
+    insightFocusTitle: {
+        fontFamily: DISPLAY_FONT_FAMILY,
+        fontSize: 20,
+        lineHeight: 25,
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    insightFocusDetail: {
+        fontSize: 12,
+        lineHeight: 17,
+        fontWeight: '600',
+    },
+    chartContainer: {
+        width: 276,
+        height: 276,
+        borderRadius: 18,
+        borderWidth: 1,
+        padding: 8,
+        marginBottom: 10,
+        overflow: 'hidden',
+    },
+    chartLegend: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        marginBottom: 14,
+    },
+    chartLegendMark: {
+        width: 14,
+        height: 10,
+        borderRadius: 3,
+        borderWidth: 2,
+    },
+    chartLegendText: {
+        fontSize: 11,
+        fontWeight: '600',
+    },
     insightTextBlock: {
-        // Reserve space for multi-line insights so rotating text does not resize the bubble.
-        minHeight: 220,
         width: '100%',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderRadius: 18,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
     },
     insightText: {
-        fontSize: 15,
-        textAlign: 'center',
-        fontWeight: '400',
-        fontStyle: 'italic',
-        lineHeight: 22,
-        paddingHorizontal: 12,
+        fontSize: 14,
+        textAlign: 'left',
+        fontWeight: '600',
+        lineHeight: 21,
     },
 });
 

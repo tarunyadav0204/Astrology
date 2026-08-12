@@ -1874,7 +1874,7 @@
   text-align: left;
   padding: 16px 16px 22px;
   border-radius: 10px;
-  background: #fff;
+  background: var(--av-panel);
   border: 1px solid var(--av-line);
 }
 
@@ -1921,15 +1921,15 @@
   border-radius: 8px;
   font-size: 0.88rem;
   font-weight: 750;
-  color: #fff;
+  color: var(--color-on-brand);
   cursor: pointer;
   background: var(--av-accent);
   box-shadow: none;
 }
 
 .ashtakavarga-life-hero__cta:hover:not(:disabled) {
-  background: #861231;
-  border-color: #861231;
+  background: var(--color-brand-hover);
+  border-color: var(--color-brand-hover);
 }
 
 .ashtakavarga-life-hero__cta:disabled {
@@ -1942,7 +1942,7 @@
   margin-top: 16px;
   padding: 12px;
   border-radius: 8px;
-  background: var(--av-panel);
+  background: var(--color-surface-muted);
   border: 1px solid var(--av-line);
   box-shadow: none;
 }
@@ -2041,7 +2041,7 @@
   padding: 8px 14px;
   border-radius: 8px;
   border: 1px solid var(--av-line);
-  background: #fff;
+  background: var(--av-panel);
   color: var(--av-ink);
   font-weight: 700;
   font-size: 0.82rem;
@@ -2096,7 +2096,7 @@
   margin-bottom: 12px;
   padding: 12px 14px;
   border-radius: 10px;
-  background: #fff;
+  background: var(--av-panel);
   border: 1px solid var(--av-line);
 }
 
@@ -2111,7 +2111,7 @@
   margin-bottom: 10px;
   padding: 12px 14px;
   border-radius: 10px;
-  background: #fff;
+  background: var(--av-panel);
   border: 1px solid var(--av-line);
 }
 
@@ -2137,7 +2137,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 252, 248, 0.72);
+  background: color-mix(in srgb, var(--color-canvas) 76%, transparent);
   border-radius: 8px;
 }
 
@@ -2150,7 +2150,7 @@
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px)
     env(safe-area-inset-left, 0px);
   box-sizing: border-box;
-  background: rgba(40, 24, 18, 0.28);
+  background: var(--color-overlay);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
@@ -2184,7 +2184,7 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(40, 24, 18, 0.45);
+  background: var(--color-overlay);
   box-sizing: border-box;
 }
 
@@ -2235,7 +2235,7 @@
   padding: 9px 16px;
   border-radius: 8px;
   border: 1px solid var(--av-line);
-  background: #fff;
+  background: var(--av-panel);
   font-weight: 700;
   cursor: pointer;
   color: var(--av-muted);
@@ -2246,14 +2246,14 @@
   border-radius: 8px;
   border: 1px solid var(--av-accent);
   background: var(--av-accent);
-  color: #fff;
+  color: var(--color-on-brand);
   font-weight: 750;
   cursor: pointer;
 }
 
 .ashtakavarga-credit-confirm-ok:hover {
-  background: #861231;
-  border-color: #861231;
+  background: var(--color-brand-hover);
+  border-color: var(--color-brand-hover);
 }
 
 /* —— Desktop / tablet: full-page tool + popup modal —— */
@@ -2720,4 +2720,50 @@
   .ashtakavarga-tool-page-root .ashtakavarga-modal.ashtakavarga-modal--embedded .modal-content {
     padding: var(--space-4) var(--space-3) calc(5rem + env(safe-area-inset-bottom, 0px));
   }
+}
+
+/* This guard intentionally closes the cascade after all legacy modal rules. */
+.ashtakavarga-tool-page-root .ashtakavarga-modal .av-matrix__scroll,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .av-matrix__sticky,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .av-matrix__table tbody th.av-matrix__sticky,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .bindu-cell,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .planet-chart,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .mini-bindu,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .recommendations li,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .focus-area,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .comparison-cell,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .comparison-cell.stable,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .comparison-summary,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .timing-section,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .legend span,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .event-type-selector,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .prediction-card,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .monthly-breakdown,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .ashtakavarga-life-hero,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .ashtakavarga-life-regenerate-btn,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .ashtakavarga-life-domain-card,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .ashtakavarga-life-timing-card {
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+}
+
+.ashtakavarga-tool-page-root .ashtakavarga-modal .av-matrix__table thead th,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .av-matrix__table tfoot td,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .av-matrix__table tfoot th,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .av-matrix__table thead .av-matrix__sticky,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .av-matrix__table tfoot .av-matrix__sticky,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .ashtakavarga-life-hero__foot {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+}
+
+.ashtakavarga-tool-page-root .ashtakavarga-modal .ashtakavarga-life-hero__eyebrow,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .ashtakavarga-life-hero__hint-line,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .ashtakavarga-life-hero__sub-text {
+  color: var(--color-text-muted);
+}
+
+.ashtakavarga-tool-page-root .ashtakavarga-modal .ashtakavarga-life-hero__teaser,
+.ashtakavarga-tool-page-root .ashtakavarga-modal .ashtakavarga-life-hero__hint {
+  color: var(--color-text);
 }

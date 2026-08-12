@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
+import FocusedStatusBar from '../Common/FocusedStatusBar';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCredits } from '../../credits/CreditContext';
 import { useAuthGate } from '../../auth/AuthGateContext';
@@ -12,6 +14,8 @@ import { pricingAPI } from '../../services/api';
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function TradingCalendarScreen({ navigation }) {
+  const { colors } = useTheme();
+  const workspaceGradient = [colors.cosmicSurface, colors.headerSurface, colors.cosmicRaised];
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarData, setCalendarData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -280,7 +284,8 @@ export default function TradingCalendarScreen({ navigation }) {
 
   if (showCreditModal) return (
     <View style={styles.container}>
-      <LinearGradient colors={['#0f0c29', '#302b63']} style={styles.bg}>
+      <LinearGradient colors={workspaceGradient} style={styles.bg}>
+        <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -327,7 +332,8 @@ export default function TradingCalendarScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#0f0c29', '#302b63', '#24243e']} style={styles.bg}>
+      <LinearGradient colors={workspaceGradient} style={styles.bg}>
+        <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
         <SafeAreaView style={styles.safeArea}>
           
           <View style={styles.header}>
@@ -389,7 +395,7 @@ export default function TradingCalendarScreen({ navigation }) {
           )}
 
           {selectedDay && (
-            <View style={styles.detailCard}>
+            <View style={[styles.detailCard, { backgroundColor: colors.cosmicRaised, borderTopColor: colors.cosmicLine }]}>
               <View style={styles.detailHeader}>
                 <Text style={styles.detailDate}>{new Date(selectedDay.date).toDateString()}</Text>
                 <View style={[styles.detailBadge, { backgroundColor: getSignalColor(selectedDay.signal) }]}>

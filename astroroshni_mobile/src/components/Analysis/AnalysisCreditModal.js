@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 export default function AnalysisCreditModal({
   visible,
@@ -20,17 +20,12 @@ export default function AnalysisCreditModal({
   cost,
   credits,
   canAfford = credits >= cost,
-  confirmLabel = 'Start Analysis',
-  getCreditsLabel = 'Get Credits',
-  cancelLabel = 'Cancel',
-  confirmGradientColors,
+  confirmLabel,
+  getCreditsLabel,
+  cancelLabel,
 }) {
-  const { theme, colors } = useTheme();
-  const isDark = theme === 'dark';
-  const modalGradient = isDark
-    ? ['rgba(26, 0, 51, 0.98)', 'rgba(77, 44, 109, 0.98)']
-    : [colors.cardBackground, colors.backgroundSecondary];
-  const actionGradient = confirmGradientColors || [colors.primary, colors.secondary];
+  const { colors } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <Modal
@@ -39,20 +34,21 @@ export default function AnalysisCreditModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <Pressable style={styles.overlay} onPress={onClose}>
+      <Pressable style={[styles.overlay, { backgroundColor: colors.overlay }]} onPress={onClose}>
         <Pressable style={styles.modalContainer} onPress={(event) => event.stopPropagation()}>
-          <LinearGradient colors={modalGradient} style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.eyebrow, { color: colors.primary }]}>{t('lifeAnalysisFlow.personalisedReading')}</Text>
             <Text style={[styles.modalTitle, { color: colors.text }]}>{title}</Text>
             <Text style={[styles.modalText, { color: colors.textSecondary }]}>
               {description}
             </Text>
 
-            <View style={[styles.modalCreditInfo, { backgroundColor: colors.surface }]}>
+            <View style={[styles.modalCreditInfo, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
               <Text style={[styles.modalCreditText, { color: colors.text }]}>
-                💳 Credits required: {cost}
+                {t('lifeAnalysisFlow.creditsRequiredValue', { cost })}
               </Text>
               <Text style={[styles.modalBalanceText, { color: colors.textSecondary }]}>
-                Current balance: {credits}
+                {t('lifeAnalysisFlow.currentBalance', { credits })}
               </Text>
             </View>
 
@@ -60,26 +56,28 @@ export default function AnalysisCreditModal({
               <TouchableOpacity
                 style={[
                   styles.modalCancelButton,
-                  { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface },
+                  { backgroundColor: colors.surface, borderColor: colors.cardBorder },
                 ]}
                 onPress={onClose}
               >
                 <Text style={[styles.modalCancelText, { color: colors.text }]}>
-                  {cancelLabel}
+                  {cancelLabel || t('common.cancel')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalConfirmButton}
                 onPress={canAfford ? onConfirm : onGetCredits}
               >
-                <LinearGradient colors={actionGradient} style={styles.modalConfirmGradient}>
-                  <Text style={styles.modalConfirmText}>
-                    {canAfford ? confirmLabel : getCreditsLabel}
+                <View style={[styles.modalConfirmGradient, { backgroundColor: colors.primary }]}>
+                  <Text style={[styles.modalConfirmText, { color: colors.onPrimary }]}>
+                    {canAfford
+                      ? (confirmLabel || t('lifeAnalysisFlow.startAnalysis'))
+                      : (getCreditsLabel || t('lifeAnalysisFlow.getCredits'))}
                   </Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             </View>
-          </LinearGradient>
+          </View>
         </Pressable>
       </Pressable>
     </Modal>
@@ -97,22 +95,30 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: '100%',
     maxWidth: 420,
-    borderRadius: 16,
+    borderRadius: 26,
     overflow: 'hidden',
   },
   modalContent: {
-    padding: 24,
-    alignItems: 'center',
+    padding: 26,
+    alignItems: 'stretch',
+    borderWidth: 1,
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.8,
+    marginBottom: 10,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 30,
+    fontFamily: 'serif',
+    fontWeight: '500',
     marginBottom: 12,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   modalText: {
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: 'left',
     lineHeight: 22,
     marginBottom: 20,
   },
@@ -121,16 +127,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 24,
     width: '100%',
+    borderWidth: 1,
   },
   modalCreditText: {
     fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 4,
   },
   modalBalanceText: {
     fontSize: 14,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   modalButtons: {
     flexDirection: 'row',
@@ -142,6 +149,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
+    borderWidth: 1,
   },
   modalCancelText: {
     fontSize: 16,

@@ -1,763 +1,292 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  Share,
-  StatusBar,
-  Animated,
-  Dimensions,
-  Platform,
   ActivityIndicator,
+  Alert,
+  FlatList,
+  Platform,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import Icon from '@expo/vector-icons/Ionicons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import MessageBubble from './MessageBubble';
 import { storage } from '../../services/storage';
-import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
+import { goBackOrHome } from '../../navigation/navHelpers';
+import FocusedStatusBar from '../Common/FocusedStatusBar';
 
-const { width } = Dimensions.get('window');
 const DAY_SESSION_BATCH_SIZE = 2;
+const LANGUAGE_LOCALES = {
+  english: 'en-IN',
+  es: 'es-ES',
+  hindi: 'hi-IN',
+  tamil: 'ta-IN',
+  telugu: 'te-IN',
+  gujarati: 'gu-IN',
+  marathi: 'mr-IN',
+  german: 'de-DE',
+  french: 'fr-FR',
+  russian: 'ru-RU',
+  chinese: 'zh-CN',
+  mandarin: 'zh-CN',
+};
 
-function getDateKey(timestamp) {
+const getDateKey = (timestamp) => {
   if (!timestamp) return 'unknown';
-  const d = new Date(timestamp);
-  if (Number.isNaN(d.getTime())) return 'unknown';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return 'unknown';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
 
-function mapSessionMessages(sessionData, dayKey = null) {
-  const messages = (sessionData?.messages || []).map((msg, idx) => ({
-    messageId: msg.message_id ?? msg.messageId,
-    role:
-      msg.sender === 'ai' || msg.sender === 'assistant'
-        ? 'assistant'
-        : msg.sender === 'user'
-          ? 'user'
-          : msg.sender,
-    content: msg.content,
-    timestamp: msg.completed_at || msg.timestamp,
-    id: `${msg.message_id ?? msg.messageId ?? idx}_${msg.completed_at || msg.timestamp}`,
-    native_name: msg.native_name ?? sessionData.native_name ?? null,
-    terms: msg.terms,
-    glossary: msg.glossary,
-    images: msg.images,
-    message_type: msg.message_type,
-    intent_gate: msg.intent_gate,
-    gate_metadata: msg.gate_metadata,
+const mapSessionMessages = (sessionData, dayKey = null) => {
+  const messages = (sessionData?.messages || []).map((message, index) => ({
+    messageId: message.message_id ?? message.messageId,
+    role: message.sender === 'ai' || message.sender === 'assistant' ? 'assistant' : message.sender === 'user' ? 'user' : message.sender,
+    content: message.content,
+    timestamp: message.completed_at || message.timestamp,
+    id: `${message.message_id ?? message.messageId ?? index}_${message.completed_at || message.timestamp}`,
+    native_name: message.native_name ?? sessionData.native_name ?? null,
+    terms: message.terms,
+    glossary: message.glossary,
+    images: message.images,
+    message_type: message.message_type,
+    intent_gate: message.intent_gate,
+    gate_metadata: message.gate_metadata,
   }));
-
-  return dayKey ? messages.filter((msg) => getDateKey(msg.timestamp) === dayKey) : messages;
-}
-
-function MessageRow({ message, index, sessionId, onDelete }) {
-  return (
-    <View>
-      <MessageBubble
-        message={message}
-        language="english"
-        onDelete={onDelete}
-        sessionId={sessionId}
-      />
-    </View>
-  );
-}
+  return dayKey ? messages.filter((message) => getDateKey(message.timestamp) === dayKey) : messages;
+};
 
 export default function ChatViewScreen({ route, navigation }) {
-  const { theme, colors, getCardElevation } = useTheme();
+  const { t, i18n } = useTranslation();
+  const { colors } = useTheme();
   const { session } = route.params;
+  const locale = LANGUAGE_LOCALES[i18n.resolvedLanguage || i18n.language] || 'en-IN';
   const [messages, setMessages] = useState(session.messages || []);
-  const [isLoadingInitialMessages, setIsLoadingInitialMessages] = useState(false);
-  const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
-  const [loadMoreError, setLoadMoreError] = useState('');
-  const daySessionIds = Array.from(new Set((session?.session_ids || []).filter(Boolean)));
+  const [loadingInitial, setLoadingInitial] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const daySessionIds = useMemo(() => [...new Set((session?.session_ids || []).filter(Boolean))], [session?.session_ids]);
   const isDayTranscript = daySessionIds.length > 0;
-  const [loadedSessionCount, setLoadedSessionCount] = useState(
-    isDayTranscript && Array.isArray(session.messages) && session.messages.length > 0
-      ? daySessionIds.length
-      : 0
-  );
-  
-  const handleDeleteMessage = (messageId) => {
-    setMessages(prev => prev.filter(msg => msg.messageId !== messageId));
-  };
-  
-  // One conversation = one final assistant answer (clarification turns are excluded).
-  const isUserMessage = (msg) => (msg?.sender || msg?.role) === 'user';
-  const isAssistantMessage = (msg) => (msg?.sender || msg?.role) === 'assistant';
-  const answerCount = messages.filter(
-    (msg) => isAssistantMessage(msg) && msg?.message_type === 'answer'
-  ).length;
-  const conversationCount = answerCount > 0 ? answerCount : messages.filter(isUserMessage).length;
-  
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const starAnims = useRef([...Array(15)].map(() => new Animated.Value(0))).current;
-  const starPositions = useRef(
-    [...Array(15)].map(() => ({
-      top: `${Math.random() * 100}%`,
-      left: `${Math.random() * 100}%`,
-    }))
-  ).current;
+  const [loadedSessionCount, setLoadedSessionCount] = useState(isDayTranscript && session.messages?.length ? daySessionIds.length : 0);
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 50,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  const isUserMessage = (message) => (message?.sender || message?.role) === 'user';
+  const isAssistantMessage = (message) => (message?.sender || message?.role) === 'assistant';
+  const answerCount = messages.filter((message) => isAssistantMessage(message) && message?.message_type === 'answer').length;
+  const conversationCount = answerCount || messages.filter(isUserMessage).length;
+  const firstTimestamp = messages.find(isUserMessage)?.timestamp || session.created_at || session.date_key;
 
-    const pulseLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.1,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulseLoop.start();
-
-    const starLoops = starAnims.map((anim, index) => {
-      const loop = Animated.loop(
-        Animated.sequence([
-          Animated.delay(index * 150),
-          Animated.timing(anim, {
-            toValue: 1,
-            duration: 2000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(anim, {
-            toValue: 0,
-            duration: 2000,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      loop.start();
-      return loop;
-    });
-    return () => {
-      pulseLoop.stop();
-      starLoops.forEach((loop) => loop?.stop?.());
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isDayTranscript || messages.length > 0 || loadedSessionCount > 0) {
-      return;
+  const loadSessions = useCallback(async (sessionIds) => {
+    const token = await storage.getAuthToken();
+    if (!token) {
+      navigation.replace('Login');
+      return [];
     }
+    const responses = await Promise.all(sessionIds.map((id) => fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/session/${id}`)}`, { headers: { Authorization: `Bearer ${token}` } })));
+    if (responses.some((response) => response.status === 401)) {
+      await storage.removeAuthToken();
+      navigation.replace('Login');
+      return [];
+    }
+    const sessions = await Promise.all(responses.filter((response) => response.ok).map((response) => response.json()));
+    return sessions.flatMap((sessionData) => mapSessionMessages(sessionData, session?.date_key));
+  }, [navigation, session?.date_key]);
 
+  useEffect(() => {
+    if (!isDayTranscript || messages.length || loadedSessionCount) return undefined;
     let cancelled = false;
-
-    const loadInitialBatch = async () => {
-      setIsLoadingInitialMessages(true);
-      setLoadMoreError('');
+    const run = async () => {
+      setLoadingInitial(true);
+      setLoadError('');
       try {
-        const authToken = await storage.getAuthToken();
-        if (!authToken) {
-          navigation.replace('Login');
-          return;
+        const ids = daySessionIds.slice(0, DAY_SESSION_BATCH_SIZE);
+        const next = await loadSessions(ids);
+        if (!cancelled) {
+          setMessages(next.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
+          setLoadedSessionCount(ids.length);
         }
-
-        const batchSessionIds = daySessionIds.slice(0, DAY_SESSION_BATCH_SIZE);
-        const responses = await Promise.all(
-          batchSessionIds.map((sid) =>
-            fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/session/${sid}`)}`, {
-              method: 'GET',
-              headers: { Authorization: `Bearer ${authToken}` },
-            })
-          )
-        );
-
-        if (cancelled) return;
-
-        if (responses.some((response) => response.status === 401)) {
-          await storage.removeAuthToken();
-          navigation.replace('Login');
-          return;
-        }
-
-        const okResponses = responses.filter((response) => response.ok);
-        const sessions = await Promise.all(okResponses.map((response) => response.json()));
-        const nextMessages = sessions
-          .flatMap((sessionData) => mapSessionMessages(sessionData, session?.date_key))
-          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-        if (cancelled) return;
-
-        setMessages(nextMessages);
-        setLoadedSessionCount(batchSessionIds.length);
       } catch (error) {
-        if (!cancelled) {
-          setLoadMoreError('Failed to load messages for this day.');
-        }
+        if (!cancelled) setLoadError(t('historyDetail.loadError'));
       } finally {
-        if (!cancelled) {
-          setIsLoadingInitialMessages(false);
-        }
+        if (!cancelled) setLoadingInitial(false);
       }
     };
-
-    loadInitialBatch();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [daySessionIds, isDayTranscript, loadedSessionCount, messages.length, navigation, session?.date_key]);
-
-  const hasMoreMessages = isDayTranscript && loadedSessionCount < daySessionIds.length;
+    run();
+    return () => { cancelled = true; };
+  }, [daySessionIds, isDayTranscript, loadSessions, loadedSessionCount, messages.length, t]);
 
   const loadMoreMessages = async () => {
-    if (!hasMoreMessages || isLoadingMoreMessages) return;
-
-    setIsLoadingMoreMessages(true);
-    setLoadMoreError('');
+    if (loadingMore || loadedSessionCount >= daySessionIds.length) return;
+    setLoadingMore(true);
+    setLoadError('');
     try {
-      const authToken = await storage.getAuthToken();
-      if (!authToken) {
-        navigation.replace('Login');
-        return;
-      }
-
-      const nextSessionIds = daySessionIds.slice(
-        loadedSessionCount,
-        loadedSessionCount + DAY_SESSION_BATCH_SIZE
-      );
-      const responses = await Promise.all(
-        nextSessionIds.map((sid) =>
-          fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/session/${sid}`)}`, {
-            method: 'GET',
-            headers: { Authorization: `Bearer ${authToken}` },
-          })
-        )
-      );
-
-      if (responses.some((response) => response.status === 401)) {
-        await storage.removeAuthToken();
-        navigation.replace('Login');
-        return;
-      }
-
-      const okResponses = responses.filter((response) => response.ok);
-      const sessions = await Promise.all(okResponses.map((response) => response.json()));
-      const nextMessages = sessions.flatMap((sessionData) => mapSessionMessages(sessionData, session?.date_key));
-
-      setMessages((prev) => {
-        const seen = new Set(prev.map((msg) => msg.id || msg.messageId));
-        const merged = [...prev];
-        for (const message of nextMessages) {
-          const key = message.id || message.messageId;
-          if (!seen.has(key)) {
-            seen.add(key);
-            merged.push(message);
-          }
-        }
-        merged.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-        return merged;
+      const ids = daySessionIds.slice(loadedSessionCount, loadedSessionCount + DAY_SESSION_BATCH_SIZE);
+      const next = await loadSessions(ids);
+      setMessages((current) => {
+        const known = new Set(current.map((message) => message.id || message.messageId));
+        return [...current, ...next.filter((message) => !known.has(message.id || message.messageId))]
+          .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
       });
-      setLoadedSessionCount((prev) => prev + nextSessionIds.length);
+      setLoadedSessionCount((current) => current + ids.length);
     } catch (error) {
-      setLoadMoreError('Failed to load more messages.');
+      setLoadError(t('historyDetail.loadMoreError'));
     } finally {
-      setIsLoadingMoreMessages(false);
+      setLoadingMore(false);
     }
   };
 
-  const getRelativeTime = (date) => {
-    const now = new Date();
-    const then = new Date(date);
-    const diffMs = now - then;
-    const diffDays = Math.floor(diffMs / 86400000);
+  const displayDate = useMemo(() => {
+    if (session?.date_key) {
+      const date = new Date(`${session.date_key}T00:00:00`);
+      if (!Number.isNaN(date.getTime())) return new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+    }
+    const date = new Date(firstTimestamp);
+    return Number.isNaN(date.getTime()) ? session?.date_label || t('historyDetail.savedConversation') : new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(date);
+  }, [firstTimestamp, locale, session?.date_key, session?.date_label, t]);
 
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    return then.toLocaleDateString();
-  };
+  const displayTime = useMemo(() => {
+    const date = new Date(firstTimestamp);
+    return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(date);
+  }, [firstTimestamp, locale]);
 
   const shareChat = async () => {
-    try {
-      if (!Array.isArray(messages) || messages.length === 0) {
-        Alert.alert('No Messages', 'There are no messages to share.');
-        return;
-      }
-      
-      const chatText = messages
-        .map(msg => `${msg.role === 'user' ? 'You' : 'AstroRoshni'}: ${msg.content}`)
-        .join('\n\n');
-      
-      await Share.share({
-        message: `🔮 AstroRoshni Chat - ${new Date(session.created_at || Date.now()).toLocaleDateString()}\n\n${chatText}\n\nShared from AstroRoshni App`,
-      });
-    } catch (error) {
-
+    if (!messages.length) {
+      Alert.alert(t('historyDetail.noMessages'), t('historyDetail.nothingToShare'));
+      return;
     }
+    const transcript = messages.map((message) => `${isUserMessage(message) ? t('historyDetail.you') : 'AstroRoshni'}: ${message.content}`).join('\n\n');
+    await Share.share({ message: `${t('historyDetail.sharedTitle', { date: displayDate })}\n\n${transcript}\n\n${t('historyDetail.sharedFrom')}` });
   };
 
-  const continueConversation = () => {
-    navigation.navigate('Home', { startChat: true });
-  };
+  const renderMessage = ({ item }) => (
+    <MessageBubble
+      message={item}
+      language={i18n.resolvedLanguage || i18n.language}
+      onDelete={(messageId) => setMessages((current) => current.filter((message) => message.messageId !== messageId))}
+      sessionId={session?.session_id}
+    />
+  );
+
+  const footer = (
+    <View style={styles.footerArea}>
+      {loadError ? <Text style={[styles.errorText, { color: colors.error }]}>{loadError}</Text> : null}
+      {loadedSessionCount < daySessionIds.length ? (
+        <TouchableOpacity
+          onPress={loadMoreMessages}
+          disabled={loadingMore}
+          style={[styles.loadMoreButton, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}
+        >
+          {loadingMore ? <ActivityIndicator color={colors.primary} /> : <Text style={[styles.loadMoreText, { color: colors.primary }]}>{t('historyDetail.loadMore')}</Text>}
+        </TouchableOpacity>
+      ) : null}
+      {isDayTranscript && daySessionIds.length ? (
+        <Text style={[styles.loadedMeta, { color: colors.textTertiary }]}>{t('historyDetail.loadedSessions', { loaded: loadedSessionCount, total: daySessionIds.length })}</Text>
+      ) : null}
+    </View>
+  );
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
-      <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]} style={styles.gradient}>
-        
-        {/* Twinkling Stars */}
-        {starAnims.map((anim, index) => {
-          return (
-            <Animated.View
-              key={index}
-              style={[
-                styles.star,
-                {
-                  top: starPositions[index].top,
-                  left: starPositions[index].left,
-                  opacity: anim,
-                },
-              ]}
-            >
-              <Text style={styles.starText}>✨</Text>
-            </Animated.View>
-          );
-        })}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <FocusedStatusBar backgroundColor={colors.headerSurface} />
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.headerSurface }]} edges={['top']}>
+        <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cardBorder }]}>
+          <TouchableOpacity onPress={() => goBackOrHome(navigation)} style={[styles.headerButton, { borderColor: colors.cosmicLine || colors.cardBorder }]}>
+            <Ionicons name="arrow-back" size={21} color={colors.textInverse} />
+          </TouchableOpacity>
+          <View style={styles.headerCopy}>
+            <Text style={[styles.headerEyebrow, { color: colors.accent }]}>{t('historyDetail.privateArchive')}</Text>
+            <Text style={[styles.headerTitle, { color: colors.textInverse }]} numberOfLines={1}>{session.native_name || t('historyDetail.title')}</Text>
+          </View>
+          <TouchableOpacity onPress={shareChat} style={[styles.headerButton, { borderColor: colors.cosmicLine || colors.cardBorder }]} accessibilityLabel={t('historyDetail.share')}>
+            <Ionicons name="share-outline" size={20} color={colors.textInverse} />
+          </TouchableOpacity>
+        </View>
 
-        <SafeAreaView style={styles.safeArea}>
-          
-          {/* Header */}
-          <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <Icon name="arrow-back" size={24} color={colors.text} />
-            </TouchableOpacity>
-            
-            <View style={styles.headerInfo}>
-              <View style={styles.headerIconContainer}>
-                <LinearGradient
-                  colors={['#ff6b35', '#ff8c5a']}
-                  style={styles.headerIconGradient}
-                >
-                  <Text style={styles.headerIcon}>💬</Text>
-                </LinearGradient>
-              </View>
-              <View style={styles.headerTextContainer}>
-                {session.native_name && (
-                  <Text style={[styles.nativeName, { color: colors.text }]}>{session.native_name}</Text>
-                )}
-                <Text style={[styles.headerTitle, { color: colors.text }]}>
-                  {session?.date_label || getRelativeTime(session.created_at)}
-                </Text>
-                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-                  {conversationCount} {conversationCount === 1 ? 'conversation' : 'conversations'}
-                </Text>
-              </View>
+        <View style={[styles.contentShell, { backgroundColor: colors.background }]}>
+        <View style={[styles.contextCard, { backgroundColor: colors.surfaceInverse, borderColor: colors.cardBorder }]}>
+          <View pointerEvents="none" style={styles.linework}>
+            <View style={[styles.orbitLarge, { borderColor: colors.accent }]} />
+            <View style={[styles.orbitSmall, { borderColor: colors.accent }]} />
+          </View>
+          <Text style={[styles.contextEyebrow, { color: colors.accent }]}>{t('historyDetail.consultation')}</Text>
+          <Text style={[styles.contextTitle, { color: colors.onSurfaceInverse || colors.textInverse }]}>{displayDate}</Text>
+          <View style={styles.metaRow}>
+            {displayTime ? <Text style={[styles.metaText, { color: colors.onSurfaceInverseMuted || colors.textInverseMuted }]}>{displayTime}</Text> : null}
+            <View style={[styles.metaDot, { backgroundColor: colors.accent }]} />
+            <Text style={[styles.metaText, { color: colors.onSurfaceInverseMuted || colors.textInverseMuted }]}>{t('historyDetail.conversationCount', { count: conversationCount })}</Text>
+          </View>
+        </View>
+
+        <FlatList
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item, index) => String(item?.id || item?.messageId || `${item?.timestamp}_${index}`)}
+          style={styles.list}
+          contentContainerStyle={[styles.listContent, !messages.length && styles.emptyList]}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS === 'android'}
+          ListEmptyComponent={loadingInitial ? (
+            <View style={styles.emptyState}><ActivityIndicator color={colors.primary} /><Text style={[styles.emptyBody, { color: colors.textSecondary }]}>{t('historyDetail.loading')}</Text></View>
+          ) : (
+            <View style={styles.emptyState}>
+              <View style={[styles.emptyIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="chatbubbles-outline" size={28} color={colors.onAccent} /></View>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('historyDetail.noMessages')}</Text>
+              <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>{t('historyDetail.noMessagesBody')}</Text>
             </View>
-            
-            <TouchableOpacity style={styles.shareButton} onPress={shareChat}>
-              <Icon name="share-outline" size={24} color={colors.text} />
-            </TouchableOpacity>
-          </Animated.View>
+          )}
+          ListFooterComponent={footer}
+        />
 
-          {/* Info Card */}
-          <Animated.View style={[
-            styles.infoCard,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-              elevation: getCardElevation(5),
-            }
-          ]}>
-            <LinearGradient
-              colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)']}
-              style={styles.infoGradient}
-            >
-              <View style={styles.infoItem}>
-                <Icon name="calendar-outline" size={16} color={colors.textSecondary} />
-                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                  {(() => {
-                    const firstMsg = messages.find(isUserMessage);
-                    const timestamp = firstMsg?.timestamp || session.created_at;
-                    const utcTimestamp = (timestamp && typeof timestamp === 'string')
-                      ? (timestamp.includes('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z')
-                      : (timestamp != null ? new Date(timestamp).toISOString() : new Date().toISOString());
-                    return new Date(utcTimestamp).toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric', 
-                      year: 'numeric' 
-                    });
-                  })()}
-                </Text>
-              </View>
-              <View style={styles.infoDivider} />
-              <View style={styles.infoItem}>
-                <Icon name="time-outline" size={16} color={colors.textSecondary} />
-                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                  {(() => {
-                    const firstMsg = messages.find(isUserMessage);
-                    const timestamp = firstMsg?.timestamp || session.created_at;
-                    const utcTimestamp = (timestamp && typeof timestamp === 'string')
-                      ? (timestamp.includes('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z')
-                      : (timestamp != null ? new Date(timestamp).toISOString() : new Date().toISOString());
-                    const date = new Date(utcTimestamp);
-                    return date.toLocaleTimeString('en-US', { 
-                      hour: '2-digit', 
-                      minute: '2-digit',
-                      hour12: true
-                    });
-                  })()}
-                </Text>
-              </View>
-              <View style={styles.infoDivider} />
-              <View style={styles.infoItem}>
-                <Icon name="chatbubbles-outline" size={16} color={colors.textSecondary} />
-                <Text style={[styles.infoText, { color: colors.textSecondary }]}>{conversationCount}</Text>
-              </View>
-            </LinearGradient>
-          </Animated.View>
-
-          {/* Messages */}
-          <FlatList
-            data={messages}
-            renderItem={({ item, index }) => (
-              <MessageRow
-                message={item}
-                index={index}
-                onDelete={handleDeleteMessage}
-                sessionId={session?.session_id}
-              />
-            )}
-            keyExtractor={(item, index) => String(item?.id || item?.messageId || `${item?.timestamp}_${index}`)}
-            style={styles.messagesContainer}
-            contentContainerStyle={styles.messagesContent}
-            showsVerticalScrollIndicator={false}
-            initialNumToRender={8}
-            maxToRenderPerBatch={8}
-            windowSize={7}
-            removeClippedSubviews={Platform.OS === 'android'}
-            ListEmptyComponent={
-              isLoadingInitialMessages ? (
-                <View style={styles.loadingState}>
-                  <ActivityIndicator size="large" color="#ff6b35" />
-                  <Text style={styles.loadingText}>Loading messages...</Text>
-                </View>
-              ) : (
-              <Animated.View style={[styles.emptyState, { opacity: fadeAnim }]}>
-                <Text style={styles.emptyIcon}>💬</Text>
-                <Text style={styles.emptyText}>No messages to display</Text>
-              </Animated.View>
-              )
-            }
-            ListFooterComponent={
-              <>
-                {loadMoreError ? (
-                  <View style={styles.loadMoreContainer}>
-                    <Text style={styles.loadMoreError}>{loadMoreError}</Text>
-                  </View>
-                ) : null}
-                {hasMoreMessages ? (
-                  <View style={styles.loadMoreContainer}>
-                    <TouchableOpacity
-                      style={styles.loadMoreButton}
-                      onPress={loadMoreMessages}
-                      disabled={isLoadingMoreMessages}
-                    >
-                      {isLoadingMoreMessages ? (
-                        <ActivityIndicator color="#ffffff" />
-                      ) : (
-                        <Text style={styles.loadMoreText}>Load more messages</Text>
-                      )}
-                    </TouchableOpacity>
-                    <Text style={styles.loadMoreMeta}>
-                      Loaded {loadedSessionCount} of {daySessionIds.length} chat sessions for this day
-                    </Text>
-                  </View>
-                ) : null}
-              </>
-            }
-          />
-
-          {/* Floating Action Buttons */}
-          <Animated.View style={[styles.floatingButtons, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <TouchableOpacity style={[styles.floatingButtonSecondary, { elevation: getCardElevation(5) }]} onPress={shareChat}>
-              <LinearGradient
-                colors={['rgba(255, 107, 53, 0.6)', 'rgba(255, 140, 90, 0.5)']}
-                style={styles.floatingButtonGradient}
-              >
-                <Icon name="share-outline" size={20} color={colors.text} />
-                <Text style={styles.floatingButtonText}>Share</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <TouchableOpacity style={[styles.floatingButtonPrimary, { elevation: getCardElevation(8) }]} onPress={continueConversation}>
-                <LinearGradient
-                  colors={['#ff6b35', '#ff8c5a']}
-                  style={styles.floatingButtonGradient}
-                >
-                  <Icon name="chatbubbles" size={20} color={colors.text} />
-                  <Text style={styles.floatingButtonTextPrimary}>Continue Chat</Text>
-                  <Icon name="arrow-forward" size={20} color={colors.text} />
-                </LinearGradient>
-              </TouchableOpacity>
-            </Animated.View>
-          </Animated.View>
-
-        </SafeAreaView>
-      </LinearGradient>
+        <View style={[styles.actionBar, { backgroundColor: colors.background, borderTopColor: colors.cardBorder }]}>
+          <TouchableOpacity onPress={shareChat} style={[styles.secondaryAction, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+            <Ionicons name="share-outline" size={18} color={colors.primary} />
+            <Text style={[styles.secondaryActionText, { color: colors.text }]}>{t('historyDetail.share')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Home', { startChat: true })} style={[styles.primaryAction, { backgroundColor: colors.primary }]}>
+            <Ionicons name="sparkles-outline" size={18} color={colors.onPrimary} />
+            <Text style={[styles.primaryActionText, { color: colors.onPrimary }]}>{t('historyDetail.continueChat')}</Text>
+          </TouchableOpacity>
+        </View>
+        </View>
+      </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  gradient: { flex: 1 },
-  safeArea: { flex: 1 },
-  star: { position: 'absolute' },
-  starText: { fontSize: 10 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-  },
-  headerIconContainer: {
-    marginRight: 12,
-  },
-  headerIconGradient: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  headerIcon: { fontSize: 22 },
-  headerTextContainer: { flex: 1 },
-  nativeName: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: COLORS.white,
-    marginBottom: 2,
-  },
-  headerTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.85)',
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 2,
-  },
-  shareButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  infoCard: {
-    marginHorizontal: 20,
-    marginBottom: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        // elevation set dynamically
-      },
-    }),
-  },
-  infoGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 16,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  infoText: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '600',
-  },
-  infoDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  messagesContainer: {
-    flex: 1,
-    paddingHorizontal: 4,
-  },
-  messagesContent: {
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    paddingBottom: 100,
-    flexGrow: 1,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-  },
-  loadingState: {
-    paddingVertical: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '600',
-  },
-  loadMoreContainer: {
-    alignItems: 'center',
-    paddingTop: 8,
-    paddingBottom: 20,
-  },
-  loadMoreButton: {
-    minWidth: 190,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 999,
-    backgroundColor: '#ff6b35',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadMoreText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  loadMoreMeta: {
-    marginTop: 10,
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-  },
-  loadMoreError: {
-    marginBottom: 10,
-    fontSize: 13,
-    color: '#fecaca',
-    textAlign: 'center',
-  },
-  floatingButtons: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  floatingButtonSecondary: {
-    flex: 1,
-    borderRadius: 16,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        // elevation set dynamically
-      },
-    }),
-  },
-  floatingButtonPrimary: {
-    flex: 2,
-    borderRadius: 16,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#ff6b35',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.6,
-        shadowRadius: 12,
-      },
-      android: {
-        // elevation set dynamically
-      },
-    }),
-  },
-  floatingButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    gap: 8,
-  },
-  floatingButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  floatingButtonTextPrimary: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
+  container: { flex: 1 }, safeArea: { flex: 1 }, contentShell: { flex: 1 },
+  header: { minHeight: 78, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1 },
+  headerButton: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  headerCopy: { flex: 1, minWidth: 0, paddingHorizontal: 14 },
+  headerEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.8 },
+  headerTitle: { fontSize: 22, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '600', marginTop: 2 },
+  contextCard: { margin: 16, marginBottom: 4, borderWidth: 1, borderRadius: 26, paddingHorizontal: 22, paddingVertical: 22, overflow: 'hidden' },
+  linework: { ...StyleSheet.absoluteFillObject, opacity: 0.45 },
+  orbitLarge: { position: 'absolute', width: 150, height: 150, borderRadius: 75, borderWidth: 1, right: -48, top: -83 },
+  orbitSmall: { position: 'absolute', width: 96, height: 96, borderRadius: 48, borderWidth: 1, right: -20, top: -56 },
+  contextEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.8 },
+  contextTitle: { fontSize: 27, lineHeight: 33, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '500', marginTop: 9, maxWidth: '87%' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 13 },
+  metaText: { fontSize: 12, fontWeight: '700' }, metaDot: { width: 4, height: 4, borderRadius: 2 },
+  list: { flex: 1 }, listContent: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 24, flexGrow: 1 }, emptyList: { justifyContent: 'center' },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30, paddingVertical: 44, gap: 10 },
+  emptyIcon: { width: 60, height: 60, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 5 },
+  emptyTitle: { fontSize: 21, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '600', textAlign: 'center' },
+  emptyBody: { fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  footerArea: { alignItems: 'center', paddingTop: 8, paddingBottom: 18, gap: 9 },
+  errorText: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  loadMoreButton: { minWidth: 190, minHeight: 46, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
+  loadMoreText: { fontSize: 13, fontWeight: '900' }, loadedMeta: { fontSize: 11, textAlign: 'center' },
+  actionBar: { borderTopWidth: 1, flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 12 : 16, gap: 10 },
+  secondaryAction: { minHeight: 50, paddingHorizontal: 18, borderRadius: 18, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  secondaryActionText: { fontSize: 13, fontWeight: '800' },
+  primaryAction: { flex: 1, minHeight: 50, paddingHorizontal: 18, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  primaryActionText: { fontSize: 14, fontWeight: '900' },
 });

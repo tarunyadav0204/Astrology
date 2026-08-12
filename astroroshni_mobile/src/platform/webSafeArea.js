@@ -167,15 +167,29 @@ export function refreshWebShellHeight() {
   root.style.removeProperty('--ar-app-height');
   root.style.height = '';
   root.style.minHeight = '';
-  for (const el of [document.body, appRoot]) {
-    if (!el) continue;
-    el.style.top = '0';
-    el.style.left = '0';
-    el.style.right = '0';
-    el.style.bottom = '0';
-    el.style.height = '';
-    el.style.minHeight = '';
-    el.style.maxHeight = '';
+  if (document.body) {
+    document.body.style.top = '0';
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.bottom = '0';
+    document.body.style.height = '';
+    document.body.style.minHeight = '';
+    document.body.style.maxHeight = '';
+  }
+  if (appRoot) {
+    appRoot.style.top = '0';
+    appRoot.style.bottom = '0';
+    appRoot.style.height = '';
+    appRoot.style.minHeight = '';
+    appRoot.style.maxHeight = '';
+    // Do not defeat the centred desktop shell with inline left/right values.
+    if (window.innerWidth >= 768) {
+      appRoot.style.left = '50%';
+      appRoot.style.right = 'auto';
+    } else {
+      appRoot.style.left = '0';
+      appRoot.style.right = '0';
+    }
   }
 
   // Re-measure / refresh orange cover if Home has it active.
@@ -264,11 +278,11 @@ export function setWebBottomSafeColor(color) {
 
   styleEl.textContent = `
     html {
-      background-color: #1a0033 !important;
+      background-color: var(--ar-shell-bg, #1a0033) !important;
       background-image: linear-gradient(
         to bottom,
-        #1a0033 0%,
-        #1a0033 calc(100% - 34px),
+        var(--ar-shell-bg, #1a0033) 0%,
+        var(--ar-shell-bg, #1a0033) calc(100% - 34px),
         ${color} calc(100% - 34px),
         ${color} 100%
       ) !important;
@@ -278,9 +292,6 @@ export function setWebBottomSafeColor(color) {
       background-color: transparent !important;
       background-image: none !important;
       overflow: visible !important;
-    }
-    #root {
-      background-color: #1a0033 !important;
     }
     /* Strip below safe bottom:0 (= under the tab bar on iOS). */
     body::after {
@@ -298,6 +309,14 @@ export function setWebBottomSafeColor(color) {
       transform: translateY(100%);
       z-index: 9999;
       pointer-events: none;
+    }
+    @media (min-width: 768px) {
+      html {
+        background-image: none !important;
+      }
+      body::after {
+        display: none;
+      }
     }
   `;
 

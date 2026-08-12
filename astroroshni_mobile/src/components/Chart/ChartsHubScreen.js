@@ -18,6 +18,7 @@ import ChartScreen from './ChartScreen';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import AshtakvargaOracle from '../Ashtakvarga/AshtakvargaOracle';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
+import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 
 const TAB_KEYS = ['chart', 'dasha', 'ashtakvarga'];
 
@@ -105,7 +106,7 @@ export default function ChartsHubScreen({ navigation, route }) {
   const showChartHeader = activeTab === 'chart' && !!chartHeader?.chartName;
   const showDashaHeader = activeTab === 'dasha';
   const showAshtakHeader = activeTab === 'ashtakvarga';
-  const actionBtnBg = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(249,115,22,0.18)';
+  const actionBtnBg = colors.cosmicRaised;
   const dashaTitle = dashaHeader?.title || t('dasha.browserTitle', 'Dasha Browser');
   const dashaBirth = dashaHeader?.birthData || birthData;
   const ashtakTitle = ashtakHeader?.title || t('chartsHub.tabs.ashtakvarga', 'Ashtakvarga');
@@ -113,22 +114,22 @@ export default function ChartsHubScreen({ navigation, route }) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
-      <SafeAreaView style={styles.safeTop} edges={['top']}>
-        <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} translucent={false} />
+      <SafeAreaView style={[styles.safeTop, { backgroundColor: colors.headerSurface }]} edges={['top']}>
+        <View style={[styles.header, { borderBottomColor: colors.cosmicLine }]}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             style={[styles.backButton, { backgroundColor: actionBtnBg }]}
             accessibilityRole="button"
             accessibilityLabel={t('common.back', 'Back')}
           >
-            <Ionicons name="arrow-back" size={20} color={colors.text} />
+            <Ionicons name="arrow-back" size={20} color={colors.textInverse} />
           </TouchableOpacity>
 
           {showChartHeader ? (
             <>
               <View style={styles.headerCenter}>
-                <Text style={[styles.chartTitle, { color: colors.text }]} numberOfLines={1}>
+                <Text style={[styles.chartTitle, { color: colors.textInverse }]} numberOfLines={1}>
                   {chartHeader.chartName}
                 </Text>
                 {(chartHeader.birthData || birthData) ? (
@@ -136,8 +137,9 @@ export default function ChartsHubScreen({ navigation, route }) {
                     birthData={chartHeader.birthData || birthData}
                     onPress={() => navigation.navigate('SelectNative', { returnTo: 'ChartsHub' })}
                     maxLength={14}
-                    style={styles.nativeChip}
-                    textStyle={styles.nativeChipText}
+                    style={[styles.nativeChip, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}
+                    textStyle={[styles.nativeChipText, { color: colors.textInverseMuted }]}
+                    iconColor={colors.textInverseMuted}
                     showIcon={false}
                   />
                 ) : null}
@@ -149,18 +151,13 @@ export default function ChartsHubScreen({ navigation, route }) {
                 accessibilityRole="button"
                 accessibilityLabel={t('common.share', 'Share')}
               >
-                <Ionicons name="share-outline" size={18} color={colors.text} />
+                <Ionicons name="share-outline" size={18} color={colors.textInverse} />
               </TouchableOpacity>
-              <View style={[styles.positionBadge, { backgroundColor: actionBtnBg }]}>
-                <Text style={[styles.positionText, { color: colors.text }]}>
-                  {chartHeader.positionLabel}
-                </Text>
-              </View>
             </>
           ) : showDashaHeader ? (
             <>
               <View style={styles.headerCenter}>
-                <Text style={[styles.chartTitle, { color: colors.text }]} numberOfLines={1}>
+                <Text style={[styles.chartTitle, { color: colors.textInverse }]} numberOfLines={1}>
                   {dashaTitle}
                 </Text>
                 {dashaBirth?.name ? (
@@ -173,8 +170,9 @@ export default function ChartsHubScreen({ navigation, route }) {
                       })
                     }
                     maxLength={14}
-                    style={styles.nativeChip}
-                    textStyle={styles.nativeChipText}
+                    style={[styles.nativeChip, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}
+                    textStyle={[styles.nativeChipText, { color: colors.textInverseMuted }]}
+                    iconColor={colors.textInverseMuted}
                     showIcon={false}
                   />
                 ) : null}
@@ -184,7 +182,7 @@ export default function ChartsHubScreen({ navigation, route }) {
           ) : showAshtakHeader ? (
             <>
               <View style={styles.headerCenter}>
-                <Text style={[styles.chartTitle, { color: colors.text }]} numberOfLines={1}>
+                <Text style={[styles.chartTitle, { color: colors.textInverse }]} numberOfLines={1}>
                   {ashtakTitle}
                 </Text>
                 {ashtakBirth?.name ? (
@@ -197,8 +195,9 @@ export default function ChartsHubScreen({ navigation, route }) {
                       })
                     }
                     maxLength={14}
-                    style={styles.nativeChip}
-                    textStyle={styles.nativeChipText}
+                    style={[styles.nativeChip, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}
+                    textStyle={[styles.nativeChipText, { color: colors.textInverseMuted }]}
+                    iconColor={colors.textInverseMuted}
                     showIcon={false}
                   />
                 ) : null}
@@ -209,12 +208,12 @@ export default function ChartsHubScreen({ navigation, route }) {
                 accessibilityRole="button"
                 accessibilityLabel={t('common.info', 'Info')}
               >
-                <Ionicons name="information-circle-outline" size={20} color={colors.text} />
+                <Ionicons name="information-circle-outline" size={20} color={colors.textInverse} />
               </TouchableOpacity>
             </>
           ) : (
             <>
-              <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+              <Text style={[styles.headerTitle, { color: colors.textInverse }]} numberOfLines={1}>
                 {t('chartsHub.title', 'Charts')}
               </Text>
               <View style={styles.headerSpacer} />
@@ -222,7 +221,7 @@ export default function ChartsHubScreen({ navigation, route }) {
           )}
         </View>
 
-        <View style={[styles.tabRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(249,115,22,0.08)' }]}>
+        <View style={[styles.tabRow, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}>
           {tabs.map((tab) => {
             const selected = activeTab === tab.key;
             return (
@@ -231,8 +230,8 @@ export default function ChartsHubScreen({ navigation, route }) {
                 style={[
                   styles.tabChip,
                   selected && {
-                    backgroundColor: isDark ? 'rgba(249,115,22,0.9)' : '#fff',
-                    shadowColor: '#000',
+                    backgroundColor: colors.accentSoft,
+                    shadowColor: colors.cosmicSurface,
                     shadowOpacity: 0.08,
                     shadowRadius: 4,
                     shadowOffset: { width: 0, height: 1 },
@@ -246,11 +245,7 @@ export default function ChartsHubScreen({ navigation, route }) {
                   style={[
                     styles.tabLabel,
                     {
-                      color: selected
-                        ? isDark
-                          ? '#fff'
-                          : colors.primary
-                        : colors.textSecondary,
+                      color: selected ? colors.onAccent : colors.textInverseMuted,
                       fontWeight: selected ? '800' : '600',
                     },
                   ]}
@@ -311,15 +306,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingTop: 11,
+    paddingBottom: 11,
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 8,
   },
   backButton: {
     width: 36,
     height: 36,
-    borderRadius: 10,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -330,14 +325,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chartTitle: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 18,
+    fontWeight: '600',
     textAlign: 'center',
   },
   nativeChip: {
     marginTop: 2,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderWidth: 1,
   },
   nativeChipText: {
     fontSize: 10,
@@ -363,8 +360,9 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 17,
-    fontWeight: '800',
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 19,
+    fontWeight: '600',
   },
   headerSpacer: {
     width: 36,
@@ -372,16 +370,17 @@ const styles = StyleSheet.create({
   tabRow: {
     flexDirection: 'row',
     marginHorizontal: 10,
-    marginTop: 10,
-    marginBottom: 8,
+    marginTop: 8,
+    marginBottom: 10,
     padding: 4,
-    borderRadius: 12,
+    borderRadius: 16,
+    borderWidth: 1,
   },
   tabChip: {
     flex: 1,
     paddingVertical: 9,
     paddingHorizontal: 4,
-    borderRadius: 10,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },

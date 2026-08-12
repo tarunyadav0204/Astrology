@@ -16,13 +16,15 @@ import { apiErrorMessage } from '../../../utils/apiErrorMessage';
 import { trackAcquisitionFunnelEvent, updateAcquisitionLeadContact } from '../../../services/acquisitionTracking';
 import { registrationEmailRequiredForCountry } from '../countryCodes';
 import AuthKeyboardScreen from './AuthKeyboardScreen';
+import { useTheme } from '../../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
-function validateEmail(value) {
+function validateEmail(value, t) {
   const email = String(value || '').trim().toLowerCase();
   if (!email) return { valid: false, message: '' };
-  if (email.length > 254) return { valid: false, message: 'Email address is too long' };
+  if (email.length > 254) return { valid: false, message: t('authDeep.emailTooLong', 'Email address is too long') };
   if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,24}$/i.test(email)) {
-    return { valid: false, message: 'Enter a valid email address' };
+    return { valid: false, message: t('authDeep.emailInvalid', 'Enter a valid email address') };
   }
 
   const domain = email.split('@')[1] || '';
@@ -46,29 +48,31 @@ function validateEmail(value) {
   const typoTlds = new Set(['coma', 'con', 'cmo', 'comm', 'coom', 'om', 'cm']);
 
   if (typoTlds.has(tld)) {
-    return { valid: false, message: 'Check the email ending. Did you mean .com?' };
+    return { valid: false, message: t('authDeep.emailEnding', 'Check the email ending. Did you mean .com?') };
   }
   if (commonProviders.has(domainName) && !knownProviderTlds.has(fullTld)) {
-    return { valid: false, message: `Check the ${domainName} email ending` };
+    return { valid: false, message: t('authDeep.providerEnding', { provider: domainName, defaultValue: 'Check the {{provider}} email ending' }) };
   }
 
   return { valid: true, message: '' };
 }
 
-export default function EmailInputScreen({ 
-  formData, 
-  updateFormData, 
+export default function EmailInputScreen({
+  formData,
+  updateFormData,
   navigateToScreen,
   isLogin,
 }) {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
   const [loading, setLoading] = React.useState(false);
   const [sendError, setSendError] = React.useState('');
-  const emailValidation = validateEmail(formData.email);
+  const emailValidation = validateEmail(formData.email, t);
   const isValid = emailValidation.valid;
   const hasName = String(formData.name || '').trim().length >= 2;
   const emailRequiredForRegistration = registrationEmailRequiredForCountry(formData.countryCode || '+91');
   const backTarget = isLogin ? 'password' : (hasName ? 'name' : (formData.otpToken ? 'otp' : 'phone'));
-  
+
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
 
@@ -170,12 +174,12 @@ export default function EmailInputScreen({
 
   return (
     <AuthKeyboardScreen
-      emoji="📧"
-      title="What's your email?"
+      emoji="✦"
+      title={t('authDeep.emailTitle', 'Your email address')}
       subtitle={
         emailRequiredForRegistration
-          ? "We'll send your verification code to this email"
-          : "We'll use this to keep your account secure"
+          ? t('authDeep.emailOtpSubtitle', 'We’ll send your verification code to this email')
+          : t('authDeep.emailSecuritySubtitle', 'We’ll use this to keep your account secure')
       }
       onBack={() => navigateToScreen(backTarget, 'back')}
       action={(
@@ -193,11 +197,11 @@ export default function EmailInputScreen({
             disabled={!isValid || loading}
           >
             <LinearGradient
-              colors={isValid ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
+              colors={isValid ? [colors.accent, colors.accent] : [colors.surfaceMuted, colors.surfaceMuted]}
               style={styles.buttonGradient}
             >
-              <Text style={styles.buttonText}>{loading ? 'Sending OTP...' : 'Continue'}</Text>
-              <Ionicons name="arrow-forward" size={20} color="#ffffff" />
+              <Text style={[styles.buttonText, { color: isValid ? colors.onAccent : colors.textTertiary }]}>{loading ? t('authDeep.sendingCode', 'Sending code…') : t('authOnboarding.continue', 'Continue')}</Text>
+              <Ionicons name="arrow-forward" size={20} color={isValid ? colors.onAccent : colors.textTertiary} />
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
@@ -219,12 +223,12 @@ export default function EmailInputScreen({
             },
           ]}
         >
-          <View style={[styles.inputWrapper, isValid && styles.inputValid]}>
-            <Ionicons name="mail-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
+          <View style={[styles.inputWrapper, { backgroundColor: colors.cosmicRaised, borderColor: isValid ? colors.accent : colors.cosmicLine }]}>
+            <Ionicons name="mail-outline" size={20} color={colors.textInverseMuted} />
             <TextInput
               style={styles.input}
-              placeholder="Email Address"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              placeholder={t('authDeep.emailPlaceholder', 'Email address')}
+              placeholderTextColor={colors.textInverseMuted}
               value={formData.email}
               onChangeText={(value) => {
                 if (sendError) setSendError('');
@@ -241,11 +245,11 @@ export default function EmailInputScreen({
               autoFocus
             />
             {isValid && (
-              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+              <Ionicons name="checkmark-circle" size={24} color={colors.accent} />
             )}
           </View>
           {!!formData.email && !isValid && !!emailValidation.message && (
-            <Text style={styles.validationText}>{emailValidation.message}</Text>
+            <Text style={[styles.validationText, { color: colors.error }]}>{emailValidation.message}</Text>
           )}
           {!!sendError && (
             <View style={styles.inlineError}>

@@ -1,45 +1,45 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  RefreshControl,
-  StatusBar,
-  Platform,
   ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Platform,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { LinearGradient } from 'expo-linear-gradient';
-import Icon from '@expo/vector-icons/Ionicons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { storage } from '../../services/storage';
 import { chatAPI } from '../../services/api';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
-import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import PodcastPlayerModal from '../PodcastPlayerModal';
+import { goBackOrHome } from '../../navigation/navHelpers';
+import FocusedStatusBar from '../Common/FocusedStatusBar';
 
 export default function PodcastHistoryScreen({ navigation }) {
   useAnalytics('PodcastHistoryScreen');
-  const { t } = useTranslation();
-  const { theme, colors, getCardElevation } = useTheme();
+  const { t, i18n } = useTranslation();
+  const { colors } = useTheme();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [playingMessageId, setPlayingMessageId] = useState(null);
   const [sharingMessageId, setSharingMessageId] = useState(null);
-  const [showPodcastPlayerModal, setShowPodcastPlayerModal] = useState(false);
-  const [podcastPlayerMode, setPodcastPlayerMode] = useState('playing');
-  const [podcastPositionMillis, setPodcastPositionMillis] = useState(0);
-  const [podcastDurationMillis, setPodcastDurationMillis] = useState(0);
-  const [podcastPlaybackRate, setPodcastPlaybackRate] = useState(1);
-  const [selectedHistoryEntry, setSelectedHistoryEntry] = useState(null);
+  const [showPlayer, setShowPlayer] = useState(false);
+  const [playerMode, setPlayerMode] = useState('playing');
+  const [positionMillis, setPositionMillis] = useState(0);
+  const [durationMillis, setDurationMillis] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [selectedEntry, setSelectedEntry] = useState(null);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -48,10 +48,10 @@ export default function PodcastHistoryScreen({ navigation }) {
         setList([]);
         return;
       }
-      const res = await chatAPI.getPodcastHistory();
-      const podcasts = res?.data?.podcasts ?? [];
+      const response = await chatAPI.getPodcastHistory();
+      const podcasts = response?.data?.podcasts ?? [];
       setList(Array.isArray(podcasts) ? podcasts : []);
-    } catch (e) {
+    } catch (error) {
       setList([]);
     } finally {
       setLoading(false);
@@ -59,28 +59,13 @@ export default function PodcastHistoryScreen({ navigation }) {
     }
   }, []);
 
-  useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
+  useEffect(() => { loadHistory(); }, [loadHistory]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadHistory();
-  };
-
-  const getRelativeTime = (dateStr) => {
-    if (!dateStr) return '';
-    const now = new Date();
-    const then = new Date(dateStr);
-    const diffMs = now - then;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return then.toLocaleDateString();
+  const stopPlaying = () => {
+    getTextToSpeech().stopPodcast();
+    setPlayingMessageId(null);
+    setShowPlayer(false);
+    setSelectedEntry(null);
   };
 
   const playFromStream = async (entry) => {
@@ -90,83 +75,24 @@ export default function PodcastHistoryScreen({ navigation }) {
       return;
     }
     const streamUrl = chatAPI.getPodcastStreamUrl(entry.message_id, entry.lang);
-    setSelectedHistoryEntry(entry);
+    setSelectedEntry(entry);
     setPlayingMessageId(entry.message_id);
-    setShowPodcastPlayerModal(true);
-    setPodcastPlayerMode('playing');
-    setPodcastPositionMillis(0);
-    setPodcastDurationMillis(0);
+    setShowPlayer(true);
+    setPlayerMode('playing');
+    setPositionMillis(0);
+    setDurationMillis(0);
     getTextToSpeech().playPodcastFromStream(streamUrl, token, {
-      onStart: () => {
-        setPlayingMessageId(entry.message_id);
-        setPodcastPlayerMode('playing');
-        getTextToSpeech().setPodcastRate(podcastPlaybackRate);
-      },
-      onProgress: (positionMillis, durationMillis) => {
-        setPodcastPositionMillis(positionMillis);
-        setPodcastDurationMillis(durationMillis);
-      },
-      onPause: () => setPodcastPlayerMode('paused'),
-      onResume: () => setPodcastPlayerMode('playing'),
-      onDone: () => {
-        setPlayingMessageId(null);
-        setShowPodcastPlayerModal(false);
-        setSelectedHistoryEntry(null);
-      },
-      onError: () => {
-        setPlayingMessageId(null);
-        setShowPodcastPlayerModal(false);
-        setSelectedHistoryEntry(null);
-        Alert.alert('Error', 'Could not play podcast.');
-      },
-      onStop: () => {
-        setPlayingMessageId(null);
-        setShowPodcastPlayerModal(false);
-        setSelectedHistoryEntry(null);
-      },
+      onStart: () => { setPlayingMessageId(entry.message_id); setPlayerMode('playing'); getTextToSpeech().setPodcastRate(playbackRate); },
+      onProgress: (position, duration) => { setPositionMillis(position); setDurationMillis(duration); },
+      onPause: () => setPlayerMode('paused'),
+      onResume: () => setPlayerMode('playing'),
+      onDone: stopPlaying,
+      onStop: stopPlaying,
+      onError: () => { stopPlaying(); Alert.alert(t('historyUi.common.error'), t('historyUi.podcast.playError')); },
     });
   };
 
-  const stopPlaying = () => {
-    getTextToSpeech().stopPodcast();
-    setPlayingMessageId(null);
-    setShowPodcastPlayerModal(false);
-    setSelectedHistoryEntry(null);
-  };
-
-  const handlePodcastPlayerClose = () => {
-    getTextToSpeech().stopPodcast();
-    setPlayingMessageId(null);
-    setShowPodcastPlayerModal(false);
-    setSelectedHistoryEntry(null);
-  };
-
-  const handlePodcastSeek = (positionMillis) => {
-    getTextToSpeech().seekPodcast(positionMillis);
-    setPodcastPositionMillis(positionMillis);
-  };
-
-  const handlePausePodcast = () => {
-    getTextToSpeech().pausePodcast();
-  };
-
-  const handleResumePodcast = () => {
-    getTextToSpeech().resumePodcast();
-  };
-
-  const handleStopPodcast = () => {
-    getTextToSpeech().stopPodcast();
-    setPlayingMessageId(null);
-    setShowPodcastPlayerModal(false);
-    setSelectedHistoryEntry(null);
-  };
-
-  const handlePodcastShare = async () => {
-    if (selectedHistoryEntry) await sharePodcast(selectedHistoryEntry);
-  };
-
-  const sharePodcast = async (entry, e) => {
-    if (e) e.stopPropagation();
+  const sharePodcast = async (entry) => {
     const token = await storage.getAuthToken();
     if (!token) {
       navigation.replace('Login');
@@ -175,305 +101,195 @@ export default function PodcastHistoryScreen({ navigation }) {
     setSharingMessageId(entry.message_id);
     try {
       const streamUrl = chatAPI.getPodcastStreamUrl(entry.message_id, entry.lang);
-      const filename = `AstroRoshni-Podcast-${entry.message_id || Date.now()}.mp3`;
-      const localPath = `${FileSystem.cacheDirectory}${filename}`;
-      const { status } = await FileSystem.downloadAsync(streamUrl, localPath, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (status !== 200) {
-        Alert.alert('Error', 'Could not load podcast to share.');
+      const localPath = `${FileSystem.cacheDirectory}AstroRoshni-Podcast-${entry.message_id || Date.now()}.mp3`;
+      const { status } = await FileSystem.downloadAsync(streamUrl, localPath, { headers: { Authorization: `Bearer ${token}` } });
+      if (status !== 200) throw new Error('download_failed');
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert(t('historyUi.common.error'), t('historyUi.podcast.sharingUnavailable'));
         return;
       }
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (!isAvailable) {
-        Alert.alert('Error', 'Sharing is not available on this device.');
-        return;
-      }
-      await Sharing.shareAsync(localPath, {
-        mimeType: 'audio/mpeg',
-        dialogTitle: 'Share Podcast',
-      });
-    } catch (err) {
-      console.error('[PodcastHistory] share error', err);
-      Alert.alert('Error', 'Could not share podcast. Please try again.');
+      await Sharing.shareAsync(localPath, { mimeType: 'audio/mpeg', dialogTitle: t('historyUi.podcast.share') });
+    } catch (error) {
+      Alert.alert(t('historyUi.common.error'), t('historyUi.podcast.shareError'));
     } finally {
       setSharingMessageId(null);
     }
   };
 
   const openSession = async (entry) => {
-    const sessionId = entry.session_id;
-    if (!sessionId) {
-      Alert.alert('Cannot open', 'This podcast was from an older session. Find it in Chat History.');
+    if (!entry.session_id) {
+      Alert.alert(t('historyUi.podcast.cannotOpen'), t('historyUi.podcast.olderSession'));
       return;
     }
     try {
-      const authToken = await storage.getAuthToken();
-      if (!authToken) {
+      const token = await storage.getAuthToken();
+      if (!token) {
         navigation.replace('Login');
         return;
       }
       const base = (API_BASE_URL || '').replace(/\/$/, '');
-      const path = getEndpoint(`/chat-v2/session/${sessionId}`);
-      const response = await fetch(`${base}${path}`, {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      if (!response.ok) {
-        Alert.alert('Error', 'Failed to load conversation.');
-        return;
-      }
+      const response = await fetch(`${base}${getEndpoint(`/chat-v2/session/${entry.session_id}`)}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!response.ok) throw new Error('conversation_failed');
       const sessionData = await response.json();
-      const mappedMessages = (sessionData.messages || []).map((msg, idx) => ({
-        messageId: msg.message_id ?? msg.messageId,
-        role: (msg.sender === 'ai' || msg.sender === 'assistant') ? 'assistant' : (msg.sender === 'user' ? 'user' : msg.sender),
-        content: msg.content,
-        timestamp: msg.timestamp,
-        id: `${msg.message_id ?? msg.messageId ?? idx}_${msg.timestamp}`,
-        native_name: msg.native_name ?? sessionData.native_name ?? null,
-        terms: msg.terms,
-        glossary: msg.glossary,
-        images: msg.images,
+      const messages = (sessionData.messages || []).map((message, index) => ({
+        messageId: message.message_id ?? message.messageId,
+        role: message.sender === 'ai' || message.sender === 'assistant' ? 'assistant' : message.sender === 'user' ? 'user' : message.sender,
+        content: message.content,
+        timestamp: message.timestamp,
+        id: `${message.message_id ?? message.messageId ?? index}_${message.timestamp}`,
+        native_name: message.native_name ?? sessionData.native_name ?? null,
+        terms: message.terms,
+        glossary: message.glossary,
+        images: message.images,
       }));
-      const session = {
-        session_id: sessionId,
-        native_name: sessionData.native_name ?? null,
-        created_at: sessionData.created_at,
-        messages: mappedMessages,
-      };
-      navigation.navigate('ChatView', { session });
-    } catch (e) {
-      Alert.alert('Error', 'Failed to load conversation.');
+      navigation.navigate('ChatView', { session: { session_id: entry.session_id, native_name: sessionData.native_name ?? null, created_at: sessionData.created_at, messages } });
+    } catch (error) {
+      Alert.alert(t('historyUi.common.error'), t('historyUi.podcast.conversationError'));
     }
   };
 
-  const renderItem = ({ item }) => {
+  const formatDate = (value) => {
+    const parsed = new Date(value);
+    if (!value || Number.isNaN(parsed.getTime())) return '';
+    return new Intl.DateTimeFormat(i18n.resolvedLanguage || undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(parsed);
+  };
+
+  const renderItem = ({ item, index }) => {
     const isPlaying = playingMessageId === item.message_id;
     const isSharing = sharingMessageId === item.message_id;
     return (
-      <View style={[styles.card, { elevation: getCardElevation(5) }]}>
-        <TouchableOpacity
-          style={styles.cardGradientTouchable}
-          onPress={() => openSession(item)}
-          activeOpacity={0.9}
-        >
-          <LinearGradient
-            colors={Platform.OS === 'android'
-              ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-              : (theme === 'dark' ? ['rgba(255, 255, 255, 0.12)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.12)', 'rgba(249, 115, 22, 0.06)'])}
-            style={styles.cardGradient}
+      <View style={[styles.card, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+        <View style={styles.cardTop}>
+          <TouchableOpacity
+            onPress={() => isPlaying ? setShowPlayer(true) : playFromStream(item)}
+            style={[styles.playButton, { backgroundColor: colors.accentSoft }]}
+            accessibilityLabel={isPlaying ? t('historyUi.podcast.openPlayer') : t('historyUi.podcast.play')}
           >
-            <View style={styles.cardHeader}>
-              <TouchableOpacity
-                onPress={(e) => {
-                  e.stopPropagation();
-                  if (isPlaying) {
-                    setShowPodcastPlayerModal(true);
-                  } else {
-                    playFromStream(item);
-                  }
-                }}
-                style={styles.iconWrap}
-              >
-                <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.iconGrad}>
-                  {isPlaying ? (
-                    <Icon name="stop" size={20} color="#fff" />
-                  ) : (
-                    <Icon name="play" size={20} color="#fff" />
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
-              <View style={styles.cardMeta}>
-                <Text style={[styles.playedAt, { color: colors.textSecondary }]}>{getRelativeTime(item.created_at)}</Text>
-              </View>
-              <TouchableOpacity
-                onPress={(e) => sharePodcast(item, e)}
-                style={styles.shareIconWrap}
-                disabled={isSharing}
-              >
-                {isSharing ? (
-                  <ActivityIndicator size="small" color={colors.text} />
-                ) : (
-                  <Icon name="share-outline" size={22} color={colors.textSecondary} />
-                )}
-              </TouchableOpacity>
-              <Icon name="chevron-forward" size={20} color={colors.textSecondary} />
-            </View>
-            <Text style={[styles.preview, { color: colors.textSecondary }]} numberOfLines={2}>
-              {item.preview || 'Podcast'}
-            </Text>
-          </LinearGradient>
+            <Ionicons name={isPlaying ? 'radio' : 'play'} size={20} color={colors.onAccent} />
+          </TouchableOpacity>
+          <View style={styles.cardCopy}>
+            <Text style={[styles.cardEyebrow, { color: colors.primary }]}>{t('historyUi.podcast.episode', { number: list.length - index })}</Text>
+            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>{item.preview || t('historyUi.podcast.fallbackTitle')}</Text>
+            <Text style={[styles.cardDate, { color: colors.textSecondary }]}>{formatDate(item.created_at)}</Text>
+          </View>
+          <TouchableOpacity onPress={() => sharePodcast(item)} disabled={isSharing} style={[styles.iconButton, { borderColor: colors.cardBorder }]}>
+            {isSharing ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="share-outline" size={18} color={colors.primary} />}
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity onPress={() => openSession(item)} style={[styles.conversationButton, { borderTopColor: colors.cardBorder }]}>
+          <Text style={[styles.conversationText, { color: colors.textSecondary }]}>{t('historyUi.podcast.openConversation')}</Text>
+          <Ionicons name="arrow-forward" size={16} color={colors.primary} />
         </TouchableOpacity>
       </View>
     );
   };
 
-  const renderEmpty = () => (
-    <View style={styles.empty}>
-      <View style={styles.emptyIconWrap}>
-        <LinearGradient colors={['#ff6b35', '#ffd700']} style={styles.emptyIconGrad}>
-          <Icon name="radio-outline" size={48} color="#fff" />
-        </LinearGradient>
-      </View>
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>No podcast history</Text>
-      <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
-        Podcasts you listen to from chat or chat history will appear here.
-      </Text>
-      <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('Home')}>
-        <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.emptyBtnGrad}>
-          <Text style={styles.emptyBtnText}>Go to Chat</Text>
-        </LinearGradient>
+  const emptyState = (
+    <View style={styles.emptyState}>
+      <View style={[styles.emptyIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="headset-outline" size={31} color={colors.onAccent} /></View>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('historyUi.podcast.emptyTitle')}</Text>
+      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>{t('historyUi.podcast.emptyBody')}</Text>
+      <TouchableOpacity onPress={() => navigation.navigate('Home', { startChat: true })} style={[styles.emptyCta, { backgroundColor: colors.primary }]}>
+        <Text style={[styles.emptyCtaText, { color: colors.onPrimary }]}>{t('historyUi.podcast.goToChat')}</Text>
       </TouchableOpacity>
     </View>
   );
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
-      <LinearGradient
-        colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]}
-        style={styles.gradient}
-      >
-        <SafeAreaView style={styles.safe}>
-          <View style={styles.header}>
-            <TouchableOpacity
-              style={[styles.backBtn, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(249,115,22,0.25)' }]}
-              onPress={() => navigation.goBack()}
-            >
-              <Icon name="arrow-back" size={24} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-              {t('menu.podcastHistory', 'Podcast History')}
-            </Text>
-            <View style={styles.placeholder} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <FocusedStatusBar backgroundColor={colors.headerSurface} />
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.headerSurface }]} edges={['top']}>
+        <View
+          style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cardBorder }]}
+        >
+          <TouchableOpacity onPress={() => goBackOrHome(navigation)} style={[styles.backButton, { borderColor: colors.cosmicLine || colors.cardBorder }]}>
+            <Ionicons name="arrow-back" size={21} color={colors.textInverse} />
+          </TouchableOpacity>
+          <View style={styles.headerCopy}>
+            <Text style={[styles.headerEyebrow, { color: colors.accent }]}>{t('historyUi.library')}</Text>
+            <Text style={[styles.headerTitle, { color: colors.textInverse }]}>{t('historyUi.podcast.title')}</Text>
           </View>
-          {loading ? (
-            <View style={styles.loadingWrap}>
-              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading…</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={list}
-              renderItem={renderItem}
-              keyExtractor={(item, i) => (item.message_id ? `${item.message_id}_${item.lang}_${i}` : `ph_${i}`)}
-              contentContainerStyle={[styles.list, list.length === 0 && styles.listEmpty]}
-              ListEmptyComponent={renderEmpty}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.white} />
-              }
-            />
-          )}
-          {playingMessageId && !showPodcastPlayerModal ? (
-            <View style={[styles.nowPlayingBar, { backgroundColor: theme === 'dark' ? 'rgba(0,0,0,0.9)' : 'rgba(249,115,22,0.2)' }]}>
-              <Icon name="radio" size={20} color={colors.text} />
-              <TouchableOpacity style={styles.nowPlayingTextWrap} onPress={() => setShowPodcastPlayerModal(true)}>
-                <Text style={[styles.nowPlayingText, { color: colors.text }]} numberOfLines={1}>Playing podcast – tap to open player</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={stopPlaying} style={styles.nowPlayingStop}>
-                <Text style={styles.nowPlayingStopText}>Stop</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-          <PodcastPlayerModal
-            visible={showPodcastPlayerModal}
-            onClose={handlePodcastPlayerClose}
-            mode={podcastPlayerMode}
-            positionMillis={podcastPositionMillis}
-            durationMillis={podcastDurationMillis}
-            onSeek={handlePodcastSeek}
-            onPause={handlePausePodcast}
-            onResume={handleResumePodcast}
-            onStop={handleStopPodcast}
-            onShare={handlePodcastShare}
-            playbackRate={podcastPlaybackRate}
-            onSpeedChange={(rate) => {
-              setPodcastPlaybackRate(rate);
-              getTextToSpeech().setPodcastRate(rate);
-            }}
+          <View style={[styles.countPill, { backgroundColor: colors.accentSoft }]}><Text style={[styles.countText, { color: colors.onAccent }]}>{list.length}</Text></View>
+        </View>
+
+        <View style={[styles.contentShell, { backgroundColor: colors.background }]}>
+        <View style={styles.intro}>
+          <Text style={[styles.introTitle, { color: colors.text }]}>{t('historyUi.podcast.heroTitle')}</Text>
+          <Text style={[styles.introBody, { color: colors.textSecondary }]}>{t('historyUi.podcast.heroBody')}</Text>
+        </View>
+
+        {loading ? (
+          <View style={styles.loadingState}><ActivityIndicator color={colors.primary} /><Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('historyUi.podcast.loading')}</Text></View>
+        ) : (
+          <FlatList
+            data={list}
+            renderItem={renderItem}
+            keyExtractor={(item, index) => item.message_id ? `${item.message_id}_${item.lang}_${index}` : `podcast-${index}`}
+            contentContainerStyle={[styles.list, !list.length && styles.emptyList]}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadHistory(); }} tintColor={colors.primary} />}
+            ListEmptyComponent={emptyState}
           />
-        </SafeAreaView>
-      </LinearGradient>
+        )}
+
+        {playingMessageId && !showPlayer ? (
+          <View style={[styles.nowPlaying, { backgroundColor: colors.surfaceInverse, borderColor: colors.cardBorder }]}>
+            <Ionicons name="radio" size={18} color={colors.accent} />
+            <TouchableOpacity style={styles.nowPlayingCopy} onPress={() => setShowPlayer(true)}>
+              <Text style={[styles.nowPlayingText, { color: colors.onSurfaceInverse || colors.textInverse }]} numberOfLines={1}>{t('historyUi.podcast.nowPlaying')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={stopPlaying}><Text style={[styles.stopText, { color: colors.accent }]}>{t('historyUi.podcast.stop')}</Text></TouchableOpacity>
+          </View>
+        ) : null}
+
+        <PodcastPlayerModal
+          visible={showPlayer}
+          onClose={stopPlaying}
+          mode={playerMode}
+          positionMillis={positionMillis}
+          durationMillis={durationMillis}
+          onSeek={(position) => { getTextToSpeech().seekPodcast(position); setPositionMillis(position); }}
+          onPause={() => getTextToSpeech().pausePodcast()}
+          onResume={() => getTextToSpeech().resumePodcast()}
+          onStop={stopPlaying}
+          onShare={() => selectedEntry && sharePodcast(selectedEntry)}
+          playbackRate={playbackRate}
+          onSpeedChange={(rate) => { setPlaybackRate(rate); getTextToSpeech().setPodcastRate(rate); }}
+        />
+        </View>
+      </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  gradient: { flex: 1 },
-  safe: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: { fontSize: 20, fontWeight: '700' },
-  placeholder: { width: 40 },
-  list: { padding: 20, paddingTop: 8, paddingBottom: 100 },
-  listEmpty: { flexGrow: 1 },
-  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { fontSize: 16 },
-  card: {
-    marginBottom: 16,
-    borderRadius: 20,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  cardGradientTouchable: { flex: 1 },
-  cardGradient: { padding: 16, borderRadius: 20 },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  iconWrap: { marginRight: 12 },
-  iconGrad: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardMeta: { flex: 1 },
-  shareIconWrap: { padding: 8, marginRight: 4, justifyContent: 'center', alignItems: 'center' },
-  nativeName: { fontSize: 15, fontWeight: '600' },
-  playedAt: { fontSize: 12, marginTop: 2 },
-  preview: { fontSize: 14, lineHeight: 20 },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyIconWrap: { marginBottom: 20 },
-  emptyIconGrad: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyTitle: { fontSize: 20, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
-  emptySub: { fontSize: 15, textAlign: 'center', marginBottom: 24 },
-  emptyBtn: { borderRadius: 20, overflow: 'hidden' },
-  emptyBtnGrad: { paddingVertical: 14, paddingHorizontal: 28 },
-  emptyBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  nowPlayingBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-  },
-  nowPlayingTextWrap: { flex: 1, justifyContent: 'center' },
-  nowPlayingText: { fontSize: 14 },
-  nowPlayingStop: { paddingHorizontal: 12, paddingVertical: 6 },
-  nowPlayingStopText: { color: '#ff6b35', fontWeight: '600', fontSize: 14 },
+  container: { flex: 1 }, safeArea: { flex: 1 }, contentShell: { flex: 1 },
+  header: { minHeight: 78, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1 },
+  backButton: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  headerCopy: { flex: 1, paddingHorizontal: 14 },
+  headerEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+  headerTitle: { fontSize: 23, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '600', marginTop: 2 },
+  countPill: { minWidth: 38, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  countText: { fontSize: 13, fontWeight: '900' },
+  intro: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20 },
+  introTitle: { fontSize: 31, lineHeight: 36, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '500' },
+  introBody: { fontSize: 14, lineHeight: 21, marginTop: 8, maxWidth: 470 },
+  list: { paddingHorizontal: 20, paddingBottom: 100, gap: 12 }, emptyList: { flexGrow: 1 },
+  card: { borderWidth: 1, borderRadius: 22, overflow: 'hidden' },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 13, padding: 15 },
+  playButton: { width: 48, height: 48, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  cardCopy: { flex: 1, minWidth: 0 },
+  cardEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1.4, textTransform: 'uppercase' },
+  cardTitle: { fontSize: 16, lineHeight: 21, fontWeight: '700', marginTop: 4 },
+  cardDate: { fontSize: 11, fontWeight: '600', marginTop: 7 },
+  iconButton: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  conversationButton: { borderTopWidth: 1, paddingHorizontal: 16, minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  conversationText: { fontSize: 12, fontWeight: '700' },
+  loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }, loadingText: { fontSize: 13, fontWeight: '700' },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 40 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
+  emptyTitle: { fontSize: 22, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '600', textAlign: 'center' },
+  emptyBody: { fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8, maxWidth: 340 },
+  emptyCta: { marginTop: 20, paddingHorizontal: 22, paddingVertical: 13, borderRadius: 18 }, emptyCtaText: { fontSize: 14, fontWeight: '900' },
+  nowPlaying: { position: 'absolute', left: 14, right: 14, bottom: 14, minHeight: 58, borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  nowPlayingCopy: { flex: 1 }, nowPlayingText: { fontSize: 13, fontWeight: '700' }, stopText: { fontSize: 12, fontWeight: '900' },
 });

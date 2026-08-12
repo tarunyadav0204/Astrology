@@ -16,7 +16,7 @@ const AppScrollView = Platform.OS === 'web' ? RNScrollView : GHScrollView;
  * Main vertical page body. Web uses a real ScrollView in a height-locked shell;
  * native keeps gesture-handler ScrollView.
  */
-export function VerticalPageScroll({
+export const VerticalPageScroll = React.forwardRef(function VerticalPageScroll({
   style,
   contentContainerStyle,
   children,
@@ -25,10 +25,11 @@ export function VerticalPageScroll({
   showsVerticalScrollIndicator,
   nestedScrollEnabled,
   ...rest
-}) {
+}, ref) {
   if (Platform.OS === 'web') {
     return (
       <RNScrollView
+        ref={ref}
         style={[
           {
             flex: 1,
@@ -52,6 +53,7 @@ export function VerticalPageScroll({
   }
   return (
     <GHScrollView
+      ref={ref}
       style={style}
       contentContainerStyle={contentContainerStyle}
       onScroll={onScroll}
@@ -63,6 +65,6 @@ export function VerticalPageScroll({
       {children}
     </GHScrollView>
   );
-}
+});
 
 export default AppScrollView;

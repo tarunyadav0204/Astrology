@@ -17,9 +17,8 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
-import { BlurView } from 'expo-blur';
 import { Audio } from 'expo-av';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -28,21 +27,12 @@ import { shareCapturedChart, alertShareFailure } from '../../platform/shareChart
 import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
 import { chartAPI, creditAPI } from '../../services/api';
-import { getWebBottomInset, refreshWebShellHeight } from '../../platform/webSafeArea';
+import { refreshWebShellHeight } from '../../platform/webSafeArea';
 import { chartPreloader } from '../../services/chartPreloader';
 import ChartWidget from './ChartWidget';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 
-let createPortal = null;
-if (Platform.OS === 'web') {
-  try {
-    // eslint-disable-next-line global-require
-    createPortal = require('react-dom').createPortal;
-  } catch (_) {
-    createPortal = null;
-  }
-}
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { useAnalytics } from '../../hooks/useAnalytics';
@@ -60,8 +50,17 @@ import GuideVideoPlayer from '../../platform/GuideVideoPlayer';
 import AppAlertModal from '../Common/AppAlertModal';
 import { useAuthGate } from '../../auth/AuthGateContext';
 import { useCredits } from '../../credits/CreditContext';
+import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 
 const { width, height } = Dimensions.get('window');
+
+const CHART_CODES = {
+  lagna: 'D1', navamsa: 'D9', transit: 'NOW', karkamsa: 'AK', swamsa: 'AL',
+  hora: 'D2', drekkana: 'D3', chaturthamsa: 'D4', dashamsa: 'D10',
+  dwadashamsa: 'D12', shodamsa: 'D16', vimsamsa: 'D20', chaturvimsamsa: 'D24',
+  saptavimshamsa: 'D27', trimsamsa: 'D30', khavedamsa: 'D40',
+  akshavedamsa: 'D45', shashtyamsa: 'D60',
+};
 
 function localizeNakshatraName(t, nakshatraName) {
   if (!nakshatraName) return '-';
@@ -77,15 +76,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const isWhiteTheme = !isDark;
   const { requireAuthForPaid } = useAuthGate();
   const { isAstrologerLicensed } = useCredits();
-  const insets = useSafeAreaInsets();
-  // Web: cover home-indicator with nav background (env() often 0 on iOS PWA).
-  const bottomInset =
-    Platform.OS === 'web'
-      ? getWebBottomInset(insets.bottom)
-      : Math.max(0, insets.bottom || 0);
-  const navContentHeight = Platform.OS === 'web' ? 56 : 64;
   const embedded = !!route?.params?.embedded;
-  const [chartNavVisible, setChartNavVisible] = useState(true);
   const [birthData, setBirthData] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -101,7 +92,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   useEffect(() => {
     currentChartIndexRef.current = currentChartIndex;
   }, [currentChartIndex]);
-  
+
   // House Drawer State
   const [selectedHouse, setSelectedHouse] = useState(null);
   const [isSharing, setIsSharing] = useState(false);
@@ -121,7 +112,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   // Animation for smooth chart transitions
   const chartTranslateX = useRef(new Animated.Value(0)).current;
   const chartOpacity = useRef(new Animated.Value(1)).current;
-  
+
   const chartTypes = [
     { id: 'lagna', name: t('chartTypes.lagna.name'), icon: '🏠', description: t('chartTypes.lagna.description') },
     { id: 'navamsa', name: t('chartTypes.navamsa.name'), icon: '💎', description: t('chartTypes.navamsa.description') },
@@ -142,7 +133,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
     { id: 'akshavedamsa', name: t('chartTypes.akshavedamsa.name'), icon: '🎭', description: t('chartTypes.akshavedamsa.description') },
     { id: 'shashtyamsa', name: t('chartTypes.shashtyamsa.name'), icon: '⏰', description: t('chartTypes.shashtyamsa.description') },
   ];
-  
+
   const onGestureEvent = Animated.event(
     [{ nativeEvent: { translationX: chartTranslateX } }],
     { useNativeDriver: true }
@@ -155,7 +146,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   // Must be declared before handleSwipe/changeChart — those hooks read it in their dep arrays.
   const scrollToActiveTab = useCallback((index) => {
     if (!bottomNavScrollRef.current) return;
-    const pillWidth = 100;
+    const pillWidth = 126;
     const maxIndex = Math.max(0, chartTypes.length - 1);
     const safeIndex = Math.max(0, Math.min(index, maxIndex));
     const x = Math.max(0, safeIndex * pillWidth - (width / 2) + (pillWidth / 2));
@@ -328,7 +319,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
       }
     }
   }, [chartTypes.length, chartTranslateX, resetChartTranslation, scrollToActiveTab, embedded, navigation]);
-  
+
   const changeChart = useCallback((newIndex) => {
     if (newIndex === currentChartIndex) return;
     // Simplified for performance
@@ -367,13 +358,13 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
       },
     });
   }, [chartTranslateX, handleSwipe, resetChartTranslation]);
-  
+
   const getChartDataForType = useCallback((chartType) => {
     if (!birthData) return null;
     const cachedChart = chartPreloader.getChart(birthData, chartType);
     if (cachedChart) return cachedChart;
     if (chartType === 'lagna') return chartData;
-    return null; 
+    return null;
   }, [birthData, chartData]);
 
   // House Lord Logic
@@ -672,7 +663,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
       cancelled = true;
     };
   }, [chartData]);
-  
+
   const handleShare = useCallback(async () => {
     try {
       setIsSharing(true);
@@ -704,28 +695,26 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
     isSharing,
     birthData,
   ]);
-  
+
   useEffect(() => {
     loadBirthData();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      setChartNavVisible(true);
       if (Platform.OS === 'web') {
         refreshWebShellHeight();
         const t1 = setTimeout(refreshWebShellHeight, 50);
         const t2 = setTimeout(refreshWebShellHeight, 300);
         return () => {
-          setChartNavVisible(false);
           clearTimeout(t1);
           clearTimeout(t2);
         };
       }
-      return () => setChartNavVisible(false);
+      return undefined;
     }, [])
   );
-  
+
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       loadBirthData();
@@ -747,7 +736,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
     }
     setTimeout(() => setShowDashaBrowser(true), 100);
   }, [navigation, route.params?.reopenDashaBrowser]);
-  
+
 
 
   const loadBirthData = async () => {
@@ -769,7 +758,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
           longitude: parseFloat(data.longitude)
         };
         const response = await chartAPI.calculateChartOnly(formattedData);
-        
+
         // Only update if data is actually different to prevent unnecessary re-renders
         setChartData(prev => {
           if (JSON.stringify(prev) === JSON.stringify(response.data)) {
@@ -815,11 +804,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
         style={[
           styles.captureGradient,
           {
-            backgroundColor: isDark ? colors.gradientStart : colors.background,
-            // The activation CTA now follows the chart in normal flow, so the
-            // old overlay-safe-area reservation would create a large blank gap
-            // and place the CTA underneath the bottom navigation.
-            paddingBottom: activationEligible ? 12 : bottomInset + 80,
+            backgroundColor: 'transparent',
+            paddingBottom: 12,
           },
           webIntrinsic,
           chartFlowIntrinsic,
@@ -879,10 +865,6 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
             />
           </View>
         </View>
-
-        <View style={styles.captureFooter}>
-          <Text style={[styles.captureFooterText, { color: colors.textSecondary }]}>Generated by AstroRoshni</Text>
-        </View>
       </View>
     </View>
   );
@@ -890,7 +872,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   return (
     <GestureHandlerRootView style={[{ flex: 1 }, webFlexFix]}>
       <View style={[styles.container, webFlexFix]}>
-        <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
+        <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} translucent={false} />
         {isDark ? (
           <LinearGradient
             colors={[colors.gradientStart, colors.gradientMid, colors.gradientEnd]}
@@ -899,7 +881,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
         ) : (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
         )}
-        
+
         {/* Embedded in ChartsHub: plain View — SafeAreaView can still pad top on web
             even with edges={[]} and stacks a second gap under the hub tabs. */}
         {(() => {
@@ -917,7 +899,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
             <View style={styles.headerCenter}>
               <Text style={[styles.chartName, { color: colors.text }]}>{chartTypes[currentChartIndex]?.name}</Text>
               {birthData && (
-                <NativeSelectorChip 
+                <NativeSelectorChip
                   birthData={birthData}
                   onPress={() => navigation.navigate('SelectNative')}
                   maxLength={15}
@@ -927,8 +909,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                 />
               )}
             </View>
-            <TouchableOpacity 
-              onPress={handleShare} 
+            <TouchableOpacity
+              onPress={handleShare}
               style={[styles.shareButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(24, 24, 27, 0.08)' }]}
               disabled={isSharing}
             >
@@ -969,19 +951,54 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                         justifyContent: 'flex-start',
                         paddingTop: 0,
                         marginTop: 0,
-                        paddingBottom: activationEligible ? 128 : 12,
+                        paddingBottom: 112,
                       }
-                    : { flexGrow: 1, paddingBottom: activationEligible ? 128 : 0 }
+                    : { flexGrow: 1, paddingBottom: 112 }
                 }
                 showsVerticalScrollIndicator={false}
               >
-                <View 
+                <View
                   style={[
                     styles.mainContent,
-                    { backgroundColor: isDark ? '#1a0033' : colors.background },
+                    { backgroundColor: colors.background },
                     Platform.OS === 'web' ? webIntrinsic : null,
                   ]}
                 >
+                  <View style={styles.chartCollection}>
+                    <View style={styles.collectionHeadingRow}>
+                      <Text style={[styles.collectionLabel, { color: colors.textSecondary }]}>{t('premiumUi.common.chart')}</Text>
+                      <Text style={[styles.collectionContext, { color: colors.textTertiary }]} numberOfLines={1}>
+                        {chartTypes[currentChartIndex]?.description}
+                      </Text>
+                    </View>
+                    <AppScrollView
+                      ref={bottomNavScrollRef}
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.collectionRow}
+                    >
+                      {chartTypes.map((chart, index) => {
+                        const selected = currentChartIndex === index;
+                        return (
+                          <TouchableOpacity
+                            key={chart.id}
+                            onPress={() => changeChart(index)}
+                            activeOpacity={0.8}
+                            style={[
+                              styles.collectionCard,
+                              {
+                                borderBottomColor: selected ? colors.primary : 'transparent',
+                              },
+                            ]}
+                          >
+                            <Text style={[styles.collectionCode, { color: selected ? colors.primary : colors.textTertiary }]}>{CHART_CODES[chart.id] || `D${index + 1}`}</Text>
+                            <Text style={[styles.collectionName, { color: selected ? colors.text : colors.textSecondary }]} numberOfLines={1}>{chart.name.replace(/\s*\([^)]*\)\s*$/, '')}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </AppScrollView>
+                  </View>
+
                   <View style={[
                     styles.chartAndNavContainer,
                     webIntrinsic,
@@ -992,7 +1009,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                         {...(webSwipePanResponder?.panHandlers || {})}
                         style={{
                           transform: [{ translateX: chartTranslateX }],
-                          // Prefer vertical browser scroll; capture mostly-horizontal pans ourselves.
+                          // Preserve vertical document scrolling while claiming
+                          // deliberate horizontal drags to change charts.
                           touchAction: 'pan-y',
                           userSelect: 'none',
                         }}
@@ -1023,30 +1041,30 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
 
                   {activationEligible && (
                     <TouchableOpacity
-                      style={[styles.activationExplorerCta, { borderColor: colors.accent }]}
+                      style={[styles.activationExplorerCta, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
                       onPress={openActivationExplorer}
                       activeOpacity={0.88}
                       accessibilityRole="button"
-                      accessibilityLabel="What is activated now?"
+                      accessibilityLabel={t('premiumUi.common.activatedTitle')}
                     >
                       <View
                         style={[
                           styles.activationExplorerCtaGradient,
                           {
-                            backgroundColor: isWhiteTheme ? '#3F3F46' : '#c2410c',
+                            backgroundColor: colors.cosmicSurface,
                           },
                         ]}
                       >
                         <View style={styles.activationExplorerCtaIcon}>
-                          <Ionicons name="pulse" size={20} color="#ffffff" />
+                          <Ionicons name="pulse" size={20} color={colors.accent} />
                         </View>
                         <View style={styles.activationExplorerCtaCopy}>
-                          <Text style={styles.activationExplorerCtaTitle}>What is activated now?</Text>
-                          <Text style={styles.activationExplorerCtaSubtitle}>See active houses, reasons, results and timing</Text>
+                          <Text style={[styles.activationExplorerCtaTitle, { color: colors.textInverse }]}>{t('premiumUi.common.activatedTitle')}</Text>
+                          <Text style={[styles.activationExplorerCtaSubtitle, { color: colors.textInverseMuted }]}>{t('premiumUi.common.activatedBody')}</Text>
                         </View>
                         {checkingAstrologerLicense
-                          ? <ActivityIndicator size="small" color="#ffffff" />
-                          : <Ionicons name="chevron-forward" size={22} color="#ffffff" />}
+                          ? <ActivityIndicator size="small" color={colors.accent} />
+                          : <Ionicons name="chevron-forward" size={22} color={colors.accent} />}
                       </View>
                     </TouchableOpacity>
                   )}
@@ -1058,10 +1076,10 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                 visible={showAstrologerLicenseModal}
                 variant="info"
                 icon="school-outline"
-                title="Astrologer License required"
-                message={`Unlock professional activation analysis for ${astrologerLicensePrice}. The subscription renews monthly and can be cancelled through your billing provider.`}
-                primaryText="View Astrologer Plan"
-                secondaryText="Not now"
+                title={t('premiumUi.chart.licenseRequired')}
+                message={t('premiumUi.chart.licenseMessage', { price: astrologerLicensePrice })}
+                primaryText={t('premiumUi.chart.viewPlan')}
+                secondaryText={t('common.notNow')}
                 onPrimaryPress={() => {
                   setShowAstrologerLicenseModal(false);
                   navigation.navigate('Credits', {
@@ -1074,63 +1092,6 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                 onRequestClose={() => setShowAstrologerLicenseModal(false)}
               />
 
-              {(() => {
-                const bottomNav = (
-              <View
-                {...(Platform.OS === 'web' ? { dataSet: { arChartBottomNav: '1' }, nativeID: 'ar-chart-bottom-nav' } : null)}
-                style={[styles.bottomNavContainer, {
-                backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 1)' : 'rgba(255, 255, 255, 1)',
-                borderTopColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                height: navContentHeight + (Platform.OS === 'web' ? bottomInset : Math.max(bottomInset, 15)),
-                paddingBottom: Platform.OS === 'web' ? bottomInset : Math.max(bottomInset, 15),
-                ...(Platform.OS === 'web'
-                  ? {
-                      position: 'fixed',
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      boxSizing: 'border-box',
-                      paddingTop: 0,
-                      marginBottom: 0,
-                    }
-                  : null),
-              }]}>
-                {Platform.OS === 'ios' && (
-                  <BlurView intensity={theme === 'dark' ? 40 : 60} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />
-                )}
-                <AppScrollView
-                  ref={bottomNavScrollRef}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.navContent}
-                  decelerationRate="fast"
-                >
-                  {chartTypes.map((chart, index) => (
-                    <TouchableOpacity
-                      key={chart.id}
-                      style={[styles.navPill, currentChartIndex === index && styles.navPillActive]}
-                      onPress={() => changeChart(index)}
-                      activeOpacity={0.7}
-                    >
-                      {currentChartIndex === index && <View style={[styles.activeGlow, { backgroundColor: colors.primary + '40' }]} />}
-                      <Text style={[styles.navIcon, currentChartIndex === index && styles.navIconActive]}>{chart.icon}</Text>
-                      <Text style={[styles.navText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }, currentChartIndex === index && { color: theme === 'dark' ? '#ffffff' : colors.primary, fontWeight: '800' }]}>
-                        {chart.name.split(' ')[0]}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </AppScrollView>
-              </View>
-                );
-
-                if (Platform.OS === 'web') {
-                  if (!chartNavVisible || !createPortal || typeof document === 'undefined') {
-                    return null;
-                  }
-                  return createPortal(bottomNav, document.body);
-                }
-                return bottomNav;
-              })()}
             </View>
           ) : (
             <View style={styles.emptyContainer}>
@@ -1142,7 +1103,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
         </Root>
           );
         })()}
-        
+
         <CascadingDashaBrowser visible={showDashaBrowser} onClose={() => setShowDashaBrowser(false)} birthData={birthData} onRequireBirthData={() => navigation.replace('BirthProfileIntro', { returnTo: 'Chart' })} selectNativeReturnTo="Chart" />
 
         <Modal
@@ -1189,7 +1150,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
             )}
           </View>
         </Modal>
-        
+
         {/* House Insights Drawer */}
         <Modal
           visible={!!selectedHouse}
@@ -1208,12 +1169,13 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
               style={[
                 styles.drawerContent,
                 {
-                  backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 0.98)' : 'rgba(255, 255, 255, 0.98)',
+                  backgroundColor: colors.surfaceRaised || colors.surface,
+                  borderColor: colors.cardBorder,
                 },
               ]}
             >
-              <View style={styles.drawerHandle} />
-              
+              <View style={[styles.drawerHandle, { backgroundColor: colors.borderStrong }]} />
+
               {selectedHouse && (
                 <View style={styles.drawerInner}>
                   <AppScrollView
@@ -1226,14 +1188,15 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                   >
                     {/* House Header */}
                     <View style={styles.drawerHeader}>
-                      <View style={[styles.houseNumberBadge, { backgroundColor: colors.primary }]}>
-                        <Text style={styles.houseNumberText}>{selectedHouse.houseNum}</Text>
+                      <View style={[styles.houseNumberBadge, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
+                        <Text style={[styles.houseNumberText, { color: colors.onAccent }]}>{selectedHouse.houseNum}</Text>
                       </View>
                       <View style={styles.houseTitleContainer}>
+                        <Text style={[styles.houseEyebrow, { color: colors.primary }]}>{t('premiumUi.common.houseInsight')}</Text>
                         <Text style={[styles.houseTitle, { color: colors.text }]}>
                           {getHouseSignificance(selectedHouse.houseNum).title}
                         </Text>
-                        <Text style={[styles.houseSign, { color: colors.primary }]}>
+                        <Text style={[styles.houseSign, { color: colors.textSecondary }]}>
                           {t(`signs.${selectedHouse.signName}`, selectedHouse.signName)}
                         </Text>
                       </View>
@@ -1453,7 +1416,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                         </Text>
                         <View style={styles.ashtakavargaGrid}>
                           <View style={[styles.ashtakavargaCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)' }]}>
-                            <Text style={[styles.ashtakavargaLabel, { color: colors.textSecondary }]}>SAV</Text>
+                            <Text style={[styles.ashtakavargaLabel, { color: colors.textSecondary }]}>{t('premiumUi.chart.sav')}</Text>
                             <Text style={[styles.ashtakavargaValue, { color: colors.text }]}>
                               {houseInsight.raw.ashtakavarga.sav?.house_points ?? '-'}
                             </Text>
@@ -1472,7 +1435,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                                   `home.planet_names.${houseInsight.raw.ashtakavarga.lord_bav.planet}`,
                                   houseInsight.raw.ashtakavarga.lord_bav.planet,
                                 )}{' '}
-                                BAV
+                                {t('premiumUi.chart.bav')}
                               </Text>
                               <Text style={[styles.ashtakavargaValue, { color: colors.text }]}>
                                 {houseInsight.raw.ashtakavarga.lord_bav.house_points ?? '-'}
@@ -1653,21 +1616,21 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                         </Text>
                       </View>
                     )}
-                    
+
                     {/* Extra padding for scroll */}
                     <View style={{ height: 40 }} />
                   </AppScrollView>
 
                   {/* Sticky Quick Actions at Bottom */}
-                  <View style={[styles.drawerActions, { 
-                    backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 1)' : 'rgba(255, 255, 255, 1)',
+                  <View style={[styles.drawerActions, {
+                    backgroundColor: colors.surfaceRaised || colors.surface,
                     borderTopWidth: 1,
-                    borderTopColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                    borderTopColor: colors.cardBorder,
                     paddingTop: 16,
                     paddingHorizontal: 24,
                     paddingBottom: Platform.OS === 'ios' ? 30 : 20
                   }]}>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[styles.actionButton, { backgroundColor: colors.primary }]}
                       onPress={() => {
                         closeHouseDrawer();
@@ -1676,14 +1639,14 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                         }
                       }}
                     >
-                      <Ionicons name="refresh-outline" size={20} color="white" />
-                      <Text style={styles.actionButtonText}>
+                      <Ionicons name="refresh-outline" size={20} color={colors.onPrimary} />
+                      <Text style={[styles.actionButtonText, { color: colors.onPrimary }]}>
                         {t('chartScreen.houseDrawer.makeAscendant', 'Make Ascendant')}
                       </Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity 
-                      style={[styles.actionButton, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder, borderWidth: 1 }]}
                       onPress={() => {
                         const prompt = `Analyze the ${selectedHouse.houseNum} house in my ${chartTypes[currentChartIndex].name} chart. It has ${selectedHouse.signName} sign and ${selectedHouse.planets && selectedHouse.planets.length > 0 ? selectedHouse.planets.map(p => p.name).join(', ') : 'no planets'}.`;
                         closeHouseDrawer();
@@ -1787,6 +1750,51 @@ const styles = StyleSheet.create({
       ? { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', height: 'auto' }
       : null),
   },
+  chartCollection: {
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  collectionHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 4,
+  },
+  collectionLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginRight: 12,
+  },
+  collectionContext: {
+    flex: 1,
+    fontSize: 10,
+  },
+  collectionRow: {
+    paddingHorizontal: 10,
+    paddingRight: 24,
+    gap: 4,
+  },
+  collectionCard: {
+    width: 82,
+    minHeight: 49,
+    borderBottomWidth: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 7,
+    justifyContent: 'center',
+  },
+  collectionCode: {
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.9,
+    marginBottom: 3,
+    textAlign: 'center',
+  },
+  collectionName: {
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   chartAndNavContainer: {
     flex: 1,
     ...(Platform.OS === 'web'
@@ -1795,6 +1803,7 @@ const styles = StyleSheet.create({
   },
   captureArea: {
     flex: 1,
+    marginHorizontal: 0,
     ...(Platform.OS === 'web'
       ? { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', height: 'auto' }
       : null),
@@ -1802,6 +1811,7 @@ const styles = StyleSheet.create({
   captureGradient: {
     flex: 1,
     padding: 0,
+    overflow: 'visible',
     ...(Platform.OS === 'web'
       ? { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', height: 'auto' }
       : null),
@@ -1831,10 +1841,9 @@ const styles = StyleSheet.create({
   },
   chartArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'web' ? 0 : 20,
+    paddingTop: 0,
     paddingHorizontal: 0,
-    // Native: counteract legacy parent padding. Web/PWA: stay edge-to-edge for full-width charts.
-    marginHorizontal: Platform.OS === 'web' ? 0 : -20,
+    marginHorizontal: 0,
     ...(Platform.OS === 'web'
       ? {
           flexGrow: 0,
@@ -1863,13 +1872,13 @@ const styles = StyleSheet.create({
   },
   captureFooter: {
     alignItems: 'center',
-    marginTop: 16,
-    paddingBottom: 20,
+    marginTop: 14,
+    paddingBottom: 18,
   },
   captureFooterText: {
-    fontSize: 12,
-    fontWeight: '600',
-    fontStyle: 'italic',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
   },
   bottomNavContainer: {
     position: 'absolute',
@@ -1882,28 +1891,28 @@ const styles = StyleSheet.create({
   },
   activationExplorerCta: {
     marginHorizontal: 14,
-    marginTop: 12,
+    marginTop: 16,
     marginBottom: 24,
-    borderRadius: 14,
+    borderRadius: 22,
     borderWidth: 1,
     overflow: 'hidden',
     zIndex: 2,
-    elevation: 4,
+    elevation: 2,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
     shadowRadius: 10,
   },
   activationExplorerCtaGradient: {
-    minHeight: 52,
-    paddingHorizontal: 12,
+    minHeight: 72,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
   },
   activationExplorerCtaIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1913,14 +1922,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   activationExplorerCtaTitle: {
-    color: '#ffffff',
-    fontSize: 14,
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 17,
     fontWeight: '800',
   },
   activationExplorerCtaSubtitle: {
-    color: 'rgba(255,255,255,0.84)',
-    fontSize: 10,
-    marginTop: 2,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 3,
   },
   navContent: {
     paddingHorizontal: 16,
@@ -2024,6 +2033,8 @@ const styles = StyleSheet.create({
   drawerContent: {
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
+    borderWidth: 1,
+    borderBottomWidth: 0,
     maxHeight: height * 0.75,
     zIndex: 1,
     elevation: 24,
@@ -2051,12 +2062,13 @@ const styles = StyleSheet.create({
   drawerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 22,
   },
   houseNumberBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -2069,9 +2081,16 @@ const styles = StyleSheet.create({
   houseTitleContainer: {
     flex: 1,
   },
-  houseTitle: {
-    fontSize: 18,
+  houseEyebrow: {
+    fontSize: 10,
     fontWeight: '800',
+    letterSpacing: 1.8,
+    marginBottom: 3,
+  },
+  houseTitle: {
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 25,
+    fontWeight: '700',
   },
   houseSign: {
     fontSize: 14,
@@ -2080,7 +2099,9 @@ const styles = StyleSheet.create({
   },
   drawerSection: {
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(128,128,128,0.14)',
     marginBottom: 16,
   },
   sectionTitle: {

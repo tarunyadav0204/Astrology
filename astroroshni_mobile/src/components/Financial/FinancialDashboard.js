@@ -5,6 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
+import FocusedStatusBar from '../Common/FocusedStatusBar';
 
 const SECTOR_ICONS = {
   'Banking & Finance': 'cash',
@@ -76,6 +78,8 @@ const HotOpportunityCard = ({ opportunity, onPress }) => (
 );
 
 export default function FinancialDashboard({ navigation }) {
+  const { colors } = useTheme();
+  const workspaceGradient = [colors.cosmicSurface, colors.headerSurface, colors.cosmicRaised];
   const [loading, setLoading] = useState(true);
   const [currentTrends, setCurrentTrends] = useState({});
   const [hotOpportunities, setHotOpportunities] = useState([]);
@@ -132,7 +136,8 @@ export default function FinancialDashboard({ navigation }) {
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <LinearGradient colors={['#0f0c29', '#302b63']} style={styles.bg}>
+        <LinearGradient colors={workspaceGradient} style={styles.bg}>
+          <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
           <SafeAreaView style={styles.safeArea}>
             <ActivityIndicator size="large" color="#10b981" />
             <Text style={styles.loadingText}>Loading Market Insights...</Text>
@@ -144,7 +149,8 @@ export default function FinancialDashboard({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#0f0c29', '#302b63', '#24243e']} style={styles.bg}>
+      <LinearGradient colors={workspaceGradient} style={styles.bg}>
+        <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -161,13 +167,13 @@ export default function FinancialDashboard({ navigation }) {
             <View style={styles.heroSection}>
               <Text style={styles.heroTitle}>📈 Vedic Market Insights</Text>
               <TouchableOpacity 
-                style={styles.yearSelector}
+                style={[styles.yearSelector, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}
                 onPress={() => setShowYearPicker(true)}
               >
                 <Text style={styles.heroSubtitle}>
                   {metadata?.period || `${startYear}-${endYear}`}
                 </Text>
-                <Ionicons name="chevron-down" size={20} color="#10b981" />
+                <Ionicons name="chevron-down" size={20} color={colors.accent} />
               </TouchableOpacity>
               <Text style={styles.heroDate}>
                 Updated: {metadata?.generated_at ? new Date(metadata.generated_at).toLocaleDateString() : 'Today'}
@@ -224,7 +230,7 @@ export default function FinancialDashboard({ navigation }) {
 
             {/* View All Button */}
             <TouchableOpacity
-              style={styles.viewAllButton}
+              style={[styles.viewAllButton, { backgroundColor: colors.primary, borderColor: colors.cosmicLine }]}
               onPress={() => navigation.navigate('AllOpportunities')}
             >
               <Text style={styles.viewAllText}>View All Opportunities</Text>
@@ -236,7 +242,7 @@ export default function FinancialDashboard({ navigation }) {
           {/* Year Picker Modal */}
           {showYearPicker && (
             <View style={styles.modalOverlay}>
-              <View style={styles.yearPickerModal}>
+              <View style={[styles.yearPickerModal, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine, borderWidth: 1 }]}>
                 <Text style={styles.modalTitle}>Select Year Range</Text>
                 
                 <View style={styles.yearRangeContainer}>

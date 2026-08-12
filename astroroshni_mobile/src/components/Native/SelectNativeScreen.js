@@ -13,17 +13,16 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { COLORS } from '../../utils/constants';
 import { formatBirthDateForDisplay } from '../../utils/birthDateUtils';
 import { storage } from '../../services/storage';
 import { chartAPI } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { trackAstrologyEvent } from '../../utils/analytics';
+import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 
 const FAMILY_RELATION_ORDER = ['self', 'father', 'mother', 'spouse', 'child', 'sibling', 'friend', 'shared', 'other'];
 
@@ -82,75 +81,90 @@ const groupProfilesByRelation = (profiles) => {
   return Array.from(groups.values()).sort((a, b) => a.sort - b.sort);
 };
 
-const ProfileCard = ({ profile, selectedProfile, onSelect, onMore, getZodiacSign, theme, colors }) => {
+const ProfileCard = ({ profile, selectedProfile, onSelect, onMore, getZodiacSign, colors }) => {
+  const selected = selectedProfile === profile.name;
+  const cardBackground = selected ? colors.selectionSurface : colors.surface;
+  const primaryText = selected ? colors.selectionText : colors.text;
+  const secondaryText = selected ? colors.selectionTextMuted : colors.textSecondary;
+
   return (
     <View style={styles.profileWrapper}>
-      <View style={styles.profileCard}>
+      <View
+        style={[
+          styles.profileCard,
+          {
+            backgroundColor: cardBackground,
+            borderColor: selected ? colors.accent : colors.cardBorder,
+          },
+        ]}
+      >
         <TouchableOpacity
-          style={[
-            styles.cardTouchable,
-            selectedProfile === profile.name && styles.selectedCard
-          ]}
+          style={styles.cardTouchable}
           onPress={() => onSelect(profile)}
-          activeOpacity={0.8}
+          activeOpacity={0.86}
+          accessibilityRole="button"
+          accessibilityLabel={`Use ${profile.name}'s birth chart`}
         >
-          <LinearGradient
-            colors={
-              selectedProfile === profile.name
-                ? ['rgba(255, 107, 53, 0.3)', 'rgba(255, 107, 53, 0.1)']
-                : Platform.OS === 'android'
-                  ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                  : theme === 'dark'
-                    ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
-                    : ['rgba(249, 115, 22, 0.25)', 'rgba(249, 115, 22, 0.15)']
-            }
-            style={[styles.cardGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
-          >
-            <View style={styles.profileInfo}>
-              <View style={styles.profileLeft}>
-                <View style={styles.zodiacIcon}>
-                  <Text style={styles.zodiacText}>{getZodiacSign(profile)}</Text>
-                </View>
-                <View style={styles.profileDetails}>
-                  <View style={styles.nameRow}>
-                    <Text style={[styles.profileName, { color: colors.text }]}>{profile.name}</Text>
-                    {profile.isSelf && (
-                      <View style={styles.selfBadge}>
-                        <Text style={styles.selfBadgeText}>You</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={[styles.profileDate, { color: colors.textSecondary }]}>
-                    {formatBirthDateForDisplay(profile.date, {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })} • {profile.time}
-                  </Text>
-                  {profile.place && (
-                    <Text style={[styles.profilePlace, { color: colors.textSecondary }]}>📍 {profile.place}</Text>
-                  )}
-                  <View style={[styles.relationBadge, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.12)' }]}>
-                    <Text style={[styles.relationBadgeText, { color: colors.textSecondary }]}>{getRelationDisplay(profile)}</Text>
-                  </View>
-                </View>
-              </View>
-              <View style={styles.profileRight}>
-                <TouchableOpacity
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                  onPress={() => onMore(profile)}
-                  style={[styles.menuButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.06)' }]}
-                >
-                  <Ionicons name="ellipsis-horizontal" size={22} color={colors.textSecondary} />
-                </TouchableOpacity>
-                {selectedProfile === profile.name ? (
-                  <Ionicons name="checkmark-circle" size={24} color="#ff6b35" style={styles.cardCheck} />
-                ) : (
-                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} style={styles.cardChevron} />
-                )}
-              </View>
+          <View style={styles.profileInfo}>
+            <View
+              style={[
+                styles.zodiacIcon,
+                {
+                  backgroundColor: selected ? colors.selectionControl : colors.accentSoft,
+                  borderColor: selected ? colors.selectionBorder : colors.accent,
+                },
+              ]}
+            >
+              <Text style={[styles.zodiacText, { color: selected ? colors.accent : colors.onAccent }]}>{getZodiacSign(profile)}</Text>
             </View>
-          </LinearGradient>
+            <View style={styles.profileDetails}>
+              <Text style={[styles.relationKicker, { color: selected ? colors.selectionText : colors.primary }]}>
+                {getRelationDisplay(profile)}
+              </Text>
+              <View style={styles.nameRow}>
+                <Text style={[styles.profileName, { color: primaryText }]} numberOfLines={1}>{profile.name}</Text>
+                {profile.isSelf ? (
+                  <View style={[styles.selfBadge, { backgroundColor: selected ? colors.accentSoft : colors.surfaceMuted }]}>
+                    <Text style={[styles.selfBadgeText, { color: selected ? colors.onAccent : colors.textSecondary }]}>YOU</Text>
+                  </View>
+                ) : null}
+              </View>
+              <View style={styles.profileMetaRow}>
+                <Ionicons name="calendar-clear-outline" size={13} color={secondaryText} />
+                <Text style={[styles.profileDate, { color: secondaryText }]} numberOfLines={1}>
+                  {formatBirthDateForDisplay(profile.date, {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })} · {profile.time}
+                </Text>
+              </View>
+              {profile.place ? (
+                <View style={styles.profileMetaRow}>
+                  <Ionicons name="location-outline" size={13} color={secondaryText} />
+                  <Text style={[styles.profilePlace, { color: secondaryText }]} numberOfLines={1}>{profile.place}</Text>
+                </View>
+              ) : null}
+            </View>
+            <View style={styles.selectionMark}>
+              {selected ? (
+                <View style={[styles.activeCheck, { backgroundColor: colors.accentSoft }]}>
+                  <Ionicons name="checkmark" size={16} color={colors.onAccent} />
+                </View>
+              ) : (
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          onPress={() => onMore(profile)}
+          style={[styles.menuButton, { backgroundColor: selected ? colors.selectionControl : colors.surfaceMuted }]}
+          accessibilityRole="button"
+          accessibilityLabel={`More options for ${profile.name}`}
+        >
+          <Ionicons name="ellipsis-horizontal" size={18} color={secondaryText} />
         </TouchableOpacity>
       </View>
     </View>
@@ -176,7 +190,7 @@ const shouldShowForGenderFilter = (profile, genderFilter) => {
 
 export default function SelectNativeScreen({ navigation, route }) {
   const { t } = useTranslation();
-  const { theme, colors } = useTheme();
+  const { colors } = useTheme();
   const [profiles, setProfiles] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [listLoading, setListLoading] = useState(false);
@@ -578,24 +592,32 @@ export default function SelectNativeScreen({ navigation, route }) {
     return signIndex >= 0 ? icons[signIndex] : '✦';
   };
 
+  const selectionPrompt = returnTo === 'ChildbirthPlanner'
+    ? 'Select the mother’s chart'
+    : returnTo === 'KarmaAnalysis'
+      ? t('karmaAnalysis.selectNativePrompt')
+      : nativeGenderFilter === 'male'
+        ? 'Choose a boy chart for Kundli matching'
+        : nativeGenderFilter === 'female'
+          ? 'Choose a girl chart for Kundli matching'
+          : 'Choose the birth chart you want AstroRoshni to read.';
+
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.gradientStart} translucent={false} />
-      <LinearGradient
-        colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]}
-        style={styles.gradient}
-      >
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
+      <View style={[styles.gradient, { backgroundColor: colors.background }]}>
         <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={handleHeaderBack} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <View style={[styles.header, { borderBottomColor: colors.cardBorder }]}>
+            <TouchableOpacity onPress={handleHeaderBack} style={[styles.backButton, { backgroundColor: colors.surfaceMuted }]}>
+              <Ionicons name="arrow-back" size={20} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Select Native</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Birth charts</Text>
             <TouchableOpacity 
               onPress={() => navigation.navigate('BirthForm')} 
-              style={styles.addButton}
+              style={[styles.addButton, { backgroundColor: colors.accentSoft }]}
             >
-              <Ionicons name="add" size={24} color={colors.text} />
+              <Ionicons name="add" size={18} color={colors.onAccent} />
+              <Text style={[styles.addButtonText, { color: colors.onAccent }]}>New</Text>
             </TouchableOpacity>
           </View>
 
@@ -604,20 +626,25 @@ export default function SelectNativeScreen({ navigation, route }) {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              {returnTo === 'ChildbirthPlanner'
-                ? 'Select mother\'s chart'
-                : returnTo === 'KarmaAnalysis'
-                  ? t('karmaAnalysis.selectNativePrompt')
-                  : nativeGenderFilter === 'male'
-                    ? 'Choose a boy chart for Kundli matching'
-                    : nativeGenderFilter === 'female'
-                      ? 'Choose a girl chart for Kundli matching'
-                      : 'Choose a profile for astrological analysis'}
-            </Text>
+            <View style={[styles.heroCard, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
+              <View style={[styles.heroOrbitLarge, { borderColor: colors.cosmicLine }]} />
+              <View style={[styles.heroOrbitSmall, { borderColor: colors.cosmicLine }]} />
+              <Text style={[styles.heroEyebrow, { color: colors.accent }]}>CHART LIBRARY</Text>
+              <Text style={[styles.heroTitle, { color: colors.textInverse }]}>Whose sky are we reading?</Text>
+              <Text style={[styles.heroSubtitle, { color: colors.textInverseMuted }]}>{selectionPrompt}</Text>
+              <View style={styles.heroFooter}>
+                <View style={[styles.chartCountPill, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}>
+                  <Ionicons name="albums-outline" size={14} color={colors.accent} />
+                  <Text style={[styles.chartCountText, { color: colors.textInverseMuted }]}>
+                    {totalCharts ?? profiles.length} saved {Number(totalCharts ?? profiles.length) === 1 ? 'chart' : 'charts'}
+                  </Text>
+                </View>
+                <Text style={[styles.heroHint, { color: colors.textInverseMuted }]}>Tap a chart to continue</Text>
+              </View>
+            </View>
 
             {(totalCharts > PAGE_SIZE || localSearchQuery.length > 0 || profiles.length > 0) && (
-              <View style={[styles.localSearchContainer, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)' }]}>
+              <View style={[styles.localSearchContainer, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
                 <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.localSearchIcon} />
                 <TextInput
                   style={[styles.localSearchInput, { color: colors.text }]}
@@ -636,14 +663,17 @@ export default function SelectNativeScreen({ navigation, route }) {
             )}
 
             {listLoading && profiles.length === 0 ? (
-              <View style={styles.inlineLoader}>
-                <ActivityIndicator size="small" color="#ff6b35" />
-                <Text style={[styles.inlineLoaderText, { color: colors.textSecondary }]}>Loading charts...</Text>
+              <View style={[styles.inlineLoader, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={[styles.inlineLoaderText, { color: colors.textSecondary }]}>Preparing your chart library…</Text>
               </View>
             ) : (
               groupProfilesByRelation(profiles).map((group) => (
                 <View key={group.key} style={styles.profileGroup}>
-                  <Text style={[styles.profileGroupTitle, { color: colors.textSecondary }]}>{group.title}</Text>
+                  <View style={styles.profileGroupHeading}>
+                    <Text style={[styles.profileGroupTitle, { color: colors.primary }]}>{group.title}</Text>
+                    <View style={[styles.groupRule, { backgroundColor: colors.cardBorder }]} />
+                  </View>
                   {group.items.map((profile) => (
                     <ProfileCard
                       key={profile.id}
@@ -652,7 +682,6 @@ export default function SelectNativeScreen({ navigation, route }) {
                       onSelect={selectProfile}
                       onMore={handleMore}
                       getZodiacSign={getZodiacSign}
-                      theme={theme}
                       colors={colors}
                     />
                   ))}
@@ -662,12 +691,12 @@ export default function SelectNativeScreen({ navigation, route }) {
 
             {hasMore && !listLoading && (
               <TouchableOpacity
-                style={[styles.loadMoreButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)' }]}
+                style={[styles.loadMoreButton, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
                 onPress={() => loadProfiles({ reset: false })}
                 disabled={loadingMore}
               >
                 {loadingMore ? (
-                  <ActivityIndicator size="small" color="#ff6b35" />
+                  <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
                   <Text style={[styles.loadMoreText, { color: colors.text }]}>
                     {nativeGenderFilter ? 'Load more matching charts' : `Load more (${profiles.length}/${totalCharts || '?'})`}
@@ -678,7 +707,9 @@ export default function SelectNativeScreen({ navigation, route }) {
 
             {profiles.length === 0 && (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyIcon}>👤</Text>
+                <View style={[styles.emptyIcon, { backgroundColor: colors.accentSoft }]}>
+                  <Ionicons name="person-add-outline" size={28} color={colors.onAccent} />
+                </View>
                 <Text style={[styles.emptyTitle, { color: colors.text }]}>
                   {nativeGenderFilter ? 'No Matching Charts Found' : 'No Profiles Found'}
                 </Text>
@@ -687,22 +718,18 @@ export default function SelectNativeScreen({ navigation, route }) {
                     ? 'Charts without gender are also shown here. Add a new chart or load more if you have many saved charts.'
                     : 'Add your birth details to get started'}
                 </Text>
-                <TouchableOpacity 
-                  style={styles.addProfileButton}
+                <TouchableOpacity
+                  style={[styles.addProfileButton, { backgroundColor: colors.primary }]}
                   onPress={() => navigation.navigate('BirthForm')}
                 >
-                  <LinearGradient
-                    colors={['#ff6b35', '#ff8c5a']}
-                    style={styles.addProfileGradient}
-                  >
-                    <Text style={styles.addProfileText}>Add Profile</Text>
-                  </LinearGradient>
+                  <Text style={[styles.addProfileText, { color: colors.onPrimary }]}>Create birth chart</Text>
+                  <Ionicons name="arrow-forward" size={18} color={colors.onPrimary} />
                 </TouchableOpacity>
               </View>
             )}
           </ScrollView>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
 
       <Modal
         visible={showBottomSheet}
@@ -711,16 +738,19 @@ export default function SelectNativeScreen({ navigation, route }) {
         onRequestClose={closeBottomSheet}
       >
         <TouchableOpacity 
-          style={styles.modalOverlay} 
+          style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}
           activeOpacity={1} 
           onPress={closeBottomSheet}
         >
-          <View style={[styles.bottomSheet, { backgroundColor: theme === 'dark' ? '#2d1b4e' : COLORS.white }]}>
-            <View style={styles.bottomSheetHandle} />
-            <Text style={[styles.bottomSheetTitle, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>Options</Text>
+          <View style={[styles.bottomSheet, { backgroundColor: colors.surfaceRaised || colors.surface, borderColor: colors.cardBorder }]}>
+            <View style={[styles.bottomSheetHandle, { backgroundColor: colors.borderStrong }]} />
+            <Text style={[styles.sheetEyebrow, { color: colors.primary }]}>CHART OPTIONS</Text>
+            <Text style={[styles.bottomSheetTitle, { color: colors.text }]} numberOfLines={1}>
+              {selectedProfileForMenu?.name || 'Birth chart'}
+            </Text>
 
             <TouchableOpacity
-              style={[styles.bottomSheetItem, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f5f5f5' }]}
+              style={[styles.bottomSheetItem, { backgroundColor: colors.surfaceMuted }]}
               onPress={() => {
                 closeBottomSheet();
                 if (selectedProfileForMenu) {
@@ -728,12 +758,13 @@ export default function SelectNativeScreen({ navigation, route }) {
                 }
               }}
             >
-              <Ionicons name="pencil" size={22} color="#4CAF50" />
-              <Text style={[styles.bottomSheetItemText, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>Edit</Text>
+              <View style={[styles.sheetItemIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="pencil-outline" size={18} color={colors.onAccent} /></View>
+              <Text style={[styles.bottomSheetItemText, { color: colors.text }]}>Edit birth details</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.bottomSheetItem, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f5f5f5' }]}
+              style={[styles.bottomSheetItem, { backgroundColor: colors.surfaceMuted }]}
               onPress={() => {
                 closeBottomSheet();
                 if (selectedProfileForMenu) {
@@ -741,12 +772,13 @@ export default function SelectNativeScreen({ navigation, route }) {
                 }
               }}
             >
-              <Ionicons name="person" size={22} color="#2196F3" />
-              <Text style={[styles.bottomSheetItemText, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>Connect to My Profile</Text>
+              <View style={[styles.sheetItemIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="person-outline" size={18} color={colors.onAccent} /></View>
+              <Text style={[styles.bottomSheetItemText, { color: colors.text }]}>Set as my chart</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.bottomSheetItem, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f5f5f5' }]}
+              style={[styles.bottomSheetItem, { backgroundColor: colors.surfaceMuted }]}
               onPress={() => {
                 closeBottomSheet();
                 if (selectedProfileForMenu) {
@@ -754,12 +786,13 @@ export default function SelectNativeScreen({ navigation, route }) {
                 }
               }}
             >
-              <Ionicons name="share-social" size={22} color="#4CAF50" />
-              <Text style={[styles.bottomSheetItemText, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>Share</Text>
+              <View style={[styles.sheetItemIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="share-social-outline" size={18} color={colors.onAccent} /></View>
+              <Text style={[styles.bottomSheetItemText, { color: colors.text }]}>Share chart</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.bottomSheetItem, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f5f5f5' }]}
+              style={[styles.bottomSheetItem, { backgroundColor: colors.surfaceMuted }]}
               onPress={() => {
                 closeBottomSheet();
                 if (selectedProfileForMenu) {
@@ -767,8 +800,8 @@ export default function SelectNativeScreen({ navigation, route }) {
                 }
               }}
             >
-              <Ionicons name="trash" size={22} color="#f44336" />
-              <Text style={[styles.bottomSheetItemText, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>Delete</Text>
+              <View style={[styles.sheetItemIcon, { backgroundColor: `${colors.error}18` }]}><Ionicons name="trash-outline" size={18} color={colors.error} /></View>
+              <Text style={[styles.bottomSheetItemText, { color: colors.error }]}>Delete chart</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -797,14 +830,17 @@ export default function SelectNativeScreen({ navigation, route }) {
       >
         {/* Android: avoid KeyboardAvoidingView + behavior height — fights Modal/window resize and causes full-screen flicker when focusing TextInput */}
         <KeyboardAvoidingView
-          style={styles.shareModalOverlay}
+          style={[styles.shareModalOverlay, { backgroundColor: colors.overlay }]}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           enabled={Platform.OS === 'ios'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
         >
-          <View style={[styles.shareModalContent, { backgroundColor: theme === 'dark' ? '#2d1b4e' : COLORS.white }]}>
+          <View style={[styles.shareModalContent, { backgroundColor: colors.surfaceRaised || colors.surface, borderColor: colors.cardBorder }]}>
             <View style={styles.shareModalHeader}>
-              <Text style={[styles.shareModalTitle, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>Share Chart</Text>
+              <View>
+                <Text style={[styles.sheetEyebrow, { color: colors.primary }]}>PRIVATE SHARING</Text>
+                <Text style={[styles.shareModalTitle, { color: colors.text }]}>Share birth chart</Text>
+              </View>
               <TouchableOpacity onPress={() => {
                 if (shareSearchDebounceRef.current) {
                   clearTimeout(shareSearchDebounceRef.current);
@@ -821,8 +857,8 @@ export default function SelectNativeScreen({ navigation, route }) {
 
             <Text style={[styles.shareModalSubtitle, { color: colors.textSecondary }]}>Search user by name or phone (min 4 characters)</Text>
 
-            <View style={[styles.searchInputContainer, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f5f5f5' }]}>
-              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+            <View style={[styles.searchInputContainer, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+              <Ionicons name="search" size={20} color={colors.textTertiary} style={styles.searchIcon} />
               <TextInput
                 style={[styles.searchInput, { color: colors.text }]}
                 placeholder="Type name or phone number..."
@@ -832,7 +868,7 @@ export default function SelectNativeScreen({ navigation, route }) {
                 autoCorrect={false}
                 autoFocus
               />
-              {searching && <ActivityIndicator size="small" color="#ff6b35" />}
+              {searching && <ActivityIndicator size="small" color={colors.primary} />}
             </View>
 
             <View style={styles.searchResultsContainer}>
@@ -853,23 +889,23 @@ export default function SelectNativeScreen({ navigation, route }) {
                 {searchResults.length > 0 && searchResults.map((user) => (
                   <TouchableOpacity
                     key={user.userid}
-                    style={[styles.userResultItem, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f9f9f9' }]}
+                    style={[styles.userResultItem, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}
                     onPress={() => handleShareWithUser(user)}
                     disabled={sharing}
                   >
                     <View style={styles.userResultLeft}>
-                      <View style={styles.userAvatar}>
-                        <Text style={styles.userAvatarText}>{user.name.charAt(0).toUpperCase()}</Text>
+                      <View style={[styles.userAvatar, { backgroundColor: colors.accentSoft }]}>
+                        <Text style={[styles.userAvatarText, { color: colors.onAccent }]}>{user.name.charAt(0).toUpperCase()}</Text>
                       </View>
                       <View>
-                        <Text style={[styles.userResultName, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>{user.name}</Text>
+                        <Text style={[styles.userResultName, { color: colors.text }]}>{user.name}</Text>
                         <Text style={[styles.userResultPhone, { color: colors.textSecondary }]}>****{user.phone}</Text>
                       </View>
                     </View>
                     {sharing ? (
-                      <ActivityIndicator size="small" color="#ff6b35" />
+                      <ActivityIndicator size="small" color={colors.primary} />
                     ) : (
-                      <Ionicons name="arrow-forward" size={20} color="#999" />
+                      <Ionicons name="arrow-forward" size={20} color={colors.textTertiary} />
                     )}
                   </TouchableOpacity>
                 ))}
@@ -890,43 +926,124 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     alignItems: 'center', 
     justifyContent: 'space-between', 
-    paddingHorizontal: 20, 
-    paddingVertical: 16 
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backButton: { 
-    width: 40, 
-    height: 40, 
-    borderRadius: 20, 
-    backgroundColor: 'rgba(255, 255, 255, 0.1)', 
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center', 
     justifyContent: 'center' 
   },
   headerTitle: { 
-    fontSize: 20, 
-    fontWeight: '700'
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 20,
+    fontWeight: '700',
   },
   addButton: { 
-    width: 40, 
-    height: 40, 
-    borderRadius: 20, 
-    backgroundColor: 'rgba(255, 255, 255, 0.1)', 
+    minWidth: 66,
+    height: 38,
+    paddingHorizontal: 12,
+    borderRadius: 19,
+    flexDirection: 'row',
+    gap: 5,
     alignItems: 'center', 
-    justifyContent: 'center' 
+    justifyContent: 'center',
+  },
+  addButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
   scrollView: { flex: 1 },
-  scrollContent: { padding: 20 },
-  subtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 24,
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 44,
+  },
+  heroCard: {
+    minHeight: 220,
+    borderRadius: 28,
+    borderWidth: 1,
+    paddingHorizontal: 22,
+    paddingVertical: 24,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  heroOrbitLarge: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    borderWidth: 1,
+    right: -84,
+    top: -104,
+    opacity: 0.7,
+  },
+  heroOrbitSmall: {
+    position: 'absolute',
+    width: 142,
+    height: 142,
+    borderRadius: 71,
+    borderWidth: 1,
+    right: -30,
+    top: -76,
+    opacity: 0.8,
+  },
+  heroEyebrow: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+  heroTitle: {
+    maxWidth: 280,
+    marginTop: 12,
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: '700',
+  },
+  heroSubtitle: {
+    maxWidth: 300,
+    marginTop: 10,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  heroFooter: {
+    marginTop: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  chartCountPill: {
+    minHeight: 32,
+    paddingHorizontal: 11,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  chartCountText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  heroHint: {
+    flex: 1,
+    fontSize: 10,
+    textAlign: 'right',
   },
   localSearchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 14,
     marginBottom: 20,
-    height: 48,
+    height: 52,
   },
   localSearchIcon: {
     marginRight: 8,
@@ -940,6 +1057,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 84,
+    borderRadius: 20,
+    borderWidth: 1,
     marginBottom: 16,
     gap: 8,
   },
@@ -949,8 +1069,10 @@ const styles = StyleSheet.create({
   loadMoreButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingVertical: 14,
+    marginTop: 4,
     marginBottom: 8,
   },
   loadMoreText: {
@@ -958,38 +1080,47 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   profileGroup: {
-    marginBottom: 4,
+    marginBottom: 8,
+  },
+  profileGroupHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
   profileGroupTitle: {
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 10,
+    fontWeight: '900',
     textTransform: 'uppercase',
-    letterSpacing: 0,
-    marginBottom: 8,
-    marginLeft: 4,
+    letterSpacing: 1.5,
+  },
+  groupRule: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
   },
   profileWrapper: {
     position: 'relative',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   profileCard: {
-    borderRadius: 16,
+    borderRadius: 22,
+    borderWidth: 1,
     overflow: 'hidden',
-    backgroundColor: 'transparent',
   },
   cardTouchable: {
-    borderRadius: 16,
-    overflow: 'hidden',
+    padding: 16,
+    paddingRight: 54,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   bottomSheet: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     paddingHorizontal: 20,
     paddingBottom: 40,
     paddingTop: 12,
@@ -997,30 +1128,45 @@ const styles = StyleSheet.create({
   bottomSheetHandle: {
     width: 40,
     height: 4,
-    backgroundColor: '#ddd',
     borderRadius: 2,
     alignSelf: 'center',
-    marginBottom: 20,
+    marginBottom: 18,
+  },
+  sheetEyebrow: {
+    fontSize: 9,
+    lineHeight: 13,
+    fontWeight: '900',
+    letterSpacing: 1.7,
+    marginBottom: 5,
   },
   bottomSheetTitle: {
-    fontSize: 18,
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 26,
+    lineHeight: 31,
     fontWeight: '700',
-    marginBottom: 16,
-    textAlign: 'center',
+    marginBottom: 18,
   },
   bottomSheetItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: '#f5f5f5',
-    marginBottom: 12,
+    minHeight: 58,
+    paddingVertical: 10,
+    paddingHorizontal: 11,
+    borderRadius: 17,
+    marginBottom: 9,
+  },
+  sheetItemIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   bottomSheetItemText: {
-    fontSize: 16,
-    marginLeft: 16,
-    fontWeight: '600',
+    flex: 1,
+    fontSize: 14,
+    marginLeft: 12,
+    fontWeight: '700',
   },
   bottomSheetCancel: {
     paddingVertical: 16,
@@ -1033,13 +1179,13 @@ const styles = StyleSheet.create({
   },
   shareModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   shareModalContent: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     paddingHorizontal: 20,
     paddingBottom: 40,
     paddingTop: 20,
@@ -1053,7 +1199,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   shareModalTitle: {
-    fontSize: 20,
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 26,
     fontWeight: '700',
   },
   shareModalSubtitle: {
@@ -1063,8 +1210,8 @@ const styles = StyleSheet.create({
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
+    borderWidth: 1,
+    borderRadius: 17,
     paddingHorizontal: 12,
     marginBottom: 16,
   },
@@ -1099,8 +1246,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
+    borderWidth: 1,
+    borderRadius: 17,
     marginBottom: 8,
   },
   userResultLeft: {
@@ -1112,13 +1259,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#ff6b35',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   userAvatarText: {
-    color: COLORS.white,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -1130,41 +1275,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  selectedCard: {
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  cardGradient: {
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
   profileInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  profileLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   zodiacIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255, 107, 53, 0.2)',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: 14,
   },
   zodiacText: {
-    fontSize: 24,
+    fontSize: 25,
   },
   profileDetails: {
     flex: 1,
+  },
+  relationKicker: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 3,
   },
   nameRow: {
     flexDirection: 'row',
@@ -1172,68 +1308,79 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   profileName: {
-    fontSize: 18,
+    flexShrink: 1,
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 20,
+    lineHeight: 24,
     fontWeight: '700',
     marginRight: 8,
   },
   selfBadge: {
-    backgroundColor: 'rgba(255, 107, 53, 0.3)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: 10,
   },
   selfBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: COLORS.white,
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.7,
   },
-  profileDate: {
-    fontSize: 14,
-    marginBottom: 2,
-  },
-  profilePlace: {
-    fontSize: 12,
-  },
-  relationBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginTop: 6,
-  },
-  relationBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  profileRight: {
+  profileMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 12,
+    gap: 5,
+    marginTop: 4,
+  },
+  profileDate: {
+    flexShrink: 1,
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  profilePlace: {
+    flexShrink: 1,
+    fontSize: 11,
+    lineHeight: 15,
   },
   menuButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
   },
-  cardCheck: {
-    marginLeft: 0,
+  selectionMark: {
+    width: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+    marginTop: 34,
   },
-  cardChevron: {
-    marginLeft: 0,
+  activeCheck: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: 44,
+    paddingHorizontal: 24,
   },
   emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 24,
     fontWeight: '700',
     marginBottom: 8,
   },
@@ -1243,16 +1390,16 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   addProfileButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  addProfileGradient: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    minHeight: 48,
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   addProfileText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

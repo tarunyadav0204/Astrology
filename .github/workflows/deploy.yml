@@ -793,6 +793,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci
+          npm run i18n:check
           npm run web:export
           bash scripts/postexport-web.sh dist-web
           tar -czf "${RUNNER_TEMP}/mobile-web-build-${GITHUB_SHA}.tgz" -C dist-web .

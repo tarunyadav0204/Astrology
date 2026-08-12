@@ -44,6 +44,7 @@ import FomoHomeSheet from './FomoHomeSheet';
 import FomoHomeEntryCard from './FomoHomeEntryCard';
 import KpTodayCarousel from './KpTodayCarousel';
 import PanditHomePanel from '../Pandit/PanditHomePanel';
+import PremiumTodayOverview, { PremiumExploreIntro } from '../Home/PremiumTodayOverview';
 import { getWebBottomInset, refreshWebShellHeight, setWebBottomSafeColor } from '../../platform/webSafeArea';
 
 let createPortal = null;
@@ -355,6 +356,9 @@ export default function HomeScreen({
       : Platform.OS === 'web'
         ? Math.min(getWebBottomInset(insets.bottom), 12)
         : Math.max(0, insets.bottom || 0);
+  // The tab bar overlays the page. Reserve its full height plus a comfortable
+  // reveal gap so the final Today/Explore card can scroll completely above it.
+  const homeScrollBottomInset = tabContentHeight + tabSafeBottom + 32;
   /** Web: portaled tabs only while Home is focused (hidden on BirthForm etc.). */
   const [homeTabsVisible, setHomeTabsVisible] = useState(true);
   useAnalytics('HomeScreen');
@@ -372,25 +376,17 @@ export default function HomeScreen({
   const isHindiUi = isPanditMode || isHindiLocale(i18n.language);
   const tabActiveWeight = isHindiUi ? '600' : '800';
   const tabIdleWeight = isHindiUi ? '500' : '600';
-  const tabSafeColor = theme === 'dark' ? '#ea580c' : '#ffffff';
+  const tabSafeColor = colors.headerSurface;
   const isDark = theme === 'dark';
-  const homePageGradient = isDark
-    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary]
-    : isPanditMode
-      ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientEnd]
-      : [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientAccent || '#fde68a'];
+  const homePageGradient = [colors.background, colors.backgroundSecondary, colors.background];
   const homeHeaderGradient = isDark
     ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']
     : isPanditMode
       ? ['#FFFFFF', '#FFFFFF', '#FAFAFA']
       : ['rgba(255, 255, 255, 0.98)', 'rgba(255, 247, 237, 0.95)', 'rgba(255, 237, 213, 0.92)'];
-  const tabBarGradient = isDark
-    ? ['#f97316', '#ea580c']
-    : isPanditMode
-      ? ['#FFFFFF', '#FFFFFF']
-      : ['#ffffff', '#fff5f0'];
-  const tabActiveColor = isDark ? '#ffffff' : colors.primary;
-  const tabIdleColor = isDark ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary;
+  const tabBarGradient = [colors.headerSurface, colors.headerSurface];
+  const tabActiveColor = colors.accent;
+  const tabIdleColor = colors.textInverseMuted;
   const isIOS = Platform.OS === 'ios';
   const { freeQuestionAvailable, pricing, pricingOriginal, fetchPricing } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
@@ -423,7 +419,19 @@ export default function HomeScreen({
 
   const [dashData, setDashData] = useState(null);
   const [chartData, setChartData] = useState(null);
-  const [activeTab, setActiveTab] = useState('ask');
+  const [activeTab, setActiveTab] = useState('today');
+  const [showExploreCatalog, setShowExploreCatalog] = useState(false);
+  const premiumHomeScrollRef = useRef(null);
+  const showTodaySurface = useCallback(() => {
+    setShowExploreCatalog(false);
+    setActiveTab('today');
+    setTimeout(() => premiumHomeScrollRef.current?.scrollTo?.({ y: 0, animated: true }), 0);
+  }, []);
+  const showExploreSurface = useCallback(() => {
+    setShowExploreCatalog(true);
+    setActiveTab('explore');
+    setTimeout(() => premiumHomeScrollRef.current?.scrollTo?.({ y: 0, animated: true }), 0);
+  }, []);
   const [transitData, setTransitData] = useState(null);
   const [panchangData, setPanchangData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -513,7 +521,7 @@ export default function HomeScreen({
     };
     return insights[type];
   };
-  
+
   useFocusEffect(
     React.useCallback(() => {
       setHomeTabsVisible(true);
@@ -1269,7 +1277,7 @@ export default function HomeScreen({
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
     const msUntilMidnight = tomorrow.getTime() - now.getTime();
-    
+
     let dailyInterval;
     const refreshHomeAfterIdle = async () => {
       const nativeData = await loadCurrentNative();
@@ -1282,23 +1290,23 @@ export default function HomeScreen({
       refreshHomeAfterIdle();
       dailyInterval = setInterval(refreshHomeAfterIdle, 24 * 60 * 60 * 1000);
     }, msUntilMidnight);
-    
+
     // Update when app becomes active (user returns from background)
     const handleAppStateChange = (nextAppState) => {
       if (nextAppState === 'active') {
         refreshHomeAfterIdle();
       }
     };
-    
+
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-    
+
     return () => {
       clearTimeout(midnightTimer);
       if (dailyInterval) clearInterval(dailyInterval);
       subscription?.remove();
     };
   }, [fetchPricing, markHomeDataRefreshed]);
-  
+
 const loadCurrentNative = async () => {
     try {
       const { storage } = require('../../services/storage');
@@ -1382,10 +1390,10 @@ const loadHomeData = async (nativeData = null) => {
       let currentBirthData = nativeData;
       if (!currentBirthData) {
         const { storage } = require('../../services/storage');
-        
+
         // First try single birth details
         currentBirthData = await storage.getBirthDetails();
-        
+
         // If no single birth details, get from profiles
         if (!currentBirthData) {
           const profiles = await storage.getBirthProfiles();
@@ -1394,7 +1402,7 @@ const loadHomeData = async (nativeData = null) => {
           }
         }
       }
-      
+
       // Fallback to props if no native data
       if (!currentBirthData) {
         currentBirthData = birthData;
@@ -1471,7 +1479,7 @@ const loadHomeData = async (nativeData = null) => {
           setTickerData((prev) => ({ ...prev, loading: false }));
         }
       }
-      
+
       // Panchang is date+location bound — fetch at most once per calendar day per location.
       try {
         const { lat: panchangLat, lon: panchangLon } = getPanchangCoords(currentBirthData);
@@ -1528,10 +1536,10 @@ const loadHomeData = async (nativeData = null) => {
         }
       } catch (panchangError) {
       }
-      
-      
+
+
       if (currentBirthData) {
-        
+
         const formattedBirthData = {
           id: currentBirthData.id || currentBirthData.birth_chart_id,
           birth_chart_id: currentBirthData.birth_chart_id || currentBirthData.id,
@@ -1542,13 +1550,13 @@ const loadHomeData = async (nativeData = null) => {
           longitude: parseFloat(currentBirthData.longitude),
           location: currentBirthData.place || 'Unknown'
         };
-        
+
         // console.log('🏠 HomeScreen - Sending birth data to backend:', JSON.stringify(formattedBirthData, null, 2));
-        
+
         const [chartResponse] = await Promise.allSettled([
           chartAPI.calculateChartOnly(formattedBirthData)
         ]);
-        
+
         if (chartResponse && chartResponse.status === 'fulfilled' && chartResponse.value?.data) {
           // console.log('🏠 HomeScreen - Received chart data from backend:', JSON.stringify(chartResponse.value.data, null, 2));
           // console.log('🏠 HomeScreen - Ascendant sign from chart:', chartResponse.value.data?.houses?.[0]?.sign);
@@ -1569,7 +1577,7 @@ const loadHomeData = async (nativeData = null) => {
       setLoading(false);
     }
   };
-  
+
   const getPlanetColor = (planetName) => {
     const colors = {
       'Sun': '#ff6b35',
@@ -1595,7 +1603,7 @@ const loadHomeData = async (nativeData = null) => {
     const key = NAKSHATRA_KEY_BY_NAME[nakshatraName] || String(nakshatraName).replace(/\s+/g, '_');
     return t(`home.nakshatra_names.${key}`, nakshatraName);
   };
-  
+
   const getSignName = (signNumber) => {
     if (signNumber === undefined || signNumber === null) return t('common.unknown', 'Unknown');
     const signs = {
@@ -1606,7 +1614,7 @@ const loadHomeData = async (nativeData = null) => {
     const signName = signs[signNumber] || signNumber;
     return t(`signs.${signName}`, signName);
   };
-  
+
   const getSignIcon = (signNumber) => {
     if (signNumber === undefined || signNumber === null) return '⭐';
     const icons = {
@@ -1616,7 +1624,7 @@ const loadHomeData = async (nativeData = null) => {
     };
     return icons[signNumber] || '⭐';
   };
-  
+
   const getSignColor = (signNumber) => {
     if (signNumber === undefined || signNumber === null) return '#ffffff';
     const colors = {
@@ -1647,17 +1655,17 @@ const loadHomeData = async (nativeData = null) => {
     if (sign === undefined || sign === null) return [];
     const status = [];
     if (isRetrograde) status.push({ label: 'Rx', color: '#EF4444' });
-    
+
     // Simple Exaltation/Debilitation logic (Vedic)
     const exaltation = { 'Sun': 0, 'Moon': 1, 'Mars': 9, 'Mercury': 5, 'Jupiter': 3, 'Venus': 11, 'Saturn': 6 };
     const debilitation = { 'Sun': 6, 'Moon': 7, 'Mars': 3, 'Mercury': 11, 'Jupiter': 9, 'Venus': 5, 'Saturn': 0 };
-    
+
     if (exaltation[planet] === sign) status.push({ label: 'Exalted', color: '#10B981' });
     if (debilitation[planet] === sign) status.push({ label: 'Debilitated', color: '#F59E0B' });
-    
+
     return status;
   };
-  
+
   // Use current native data for display
   const displayData = currentNativeData || birthData;
   const moonNakshatra = useMemo(
@@ -1674,7 +1682,7 @@ const loadHomeData = async (nativeData = null) => {
   const time = displayData?.time || 'Unknown time';
 
   const handlePhysicalScan = async () => {
-    
+
     // Use current native data for scan
     const scanBirthData = currentNativeData || birthData;
     if (!scanBirthData) {
@@ -1692,9 +1700,9 @@ const loadHomeData = async (nativeData = null) => {
         longitude: scanBirthData.longitude,
         place: scanBirthData.place || ''
       };
-      
+
       const result = await chartAPI.scanPhysicalTraits(scanData, scanBirthData.id);
-      
+
       if (result.data?.success && result.data?.traits?.length > 0) {
         setPhysicalTraits(result.data.traits);
         setHasFeedback(result.data.has_feedback || false);
@@ -1728,15 +1736,15 @@ const loadHomeData = async (nativeData = null) => {
           feedback: feedbackType,
           birth_chart_id: scanBirthData.id
         };
-        
+
         await chartAPI.submitPhysicalFeedback(feedbackData);
         setHasFeedback(true); // Update state to hide buttons
       }
     } catch (error) {
     }
-    
+
     setShowTraitsModal(false);
-    
+
     if (feedbackType === 'accurate') {
       setTimeout(() => {
         Alert.alert('Amazing!', 'Vedic astrology reveals so much about us! ✨');
@@ -2091,17 +2099,21 @@ const loadHomeData = async (nativeData = null) => {
         colors={homePageGradient}
         style={styles.gradient}
       >
-        
-      <VerticalPageScroll 
-        style={[styles.scrollView, { zIndex: 1 }]} 
-        contentContainerStyle={styles.content} 
+
+      <VerticalPageScroll
+        ref={premiumHomeScrollRef}
+        style={[styles.scrollView, { zIndex: 1 }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: homeScrollBottomInset },
+        ]}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
         {/* Header with Native Selector & Big 3 Dashboard - Integrated into ScrollView */}
-        <View style={styles.header}>
+        <View style={[styles.header, !isPanditMode && { display: 'none' }]}>
           <LinearGradient
             colors={homeHeaderGradient}
             style={[
@@ -2135,7 +2147,7 @@ const loadHomeData = async (nativeData = null) => {
                     : (displayData?.name || t('home.greeting.guestName', 'Explorer'))}
                 </Text>
               </View>
-              <NativeSelectorChip 
+              <NativeSelectorChip
                 birthData={displayData}
                 onPress={() => {
                   if (!displayData) {
@@ -2151,7 +2163,7 @@ const loadHomeData = async (nativeData = null) => {
             </View>
 
             <View style={[styles.headerBigThree, (theme === 'light' || isPanditMode) && { backgroundColor: colors.surface }]}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.headerSignItem}
                 onPress={() => {
                   const insight = getSignInsight('ascendant', chartData?.houses?.[0]?.sign);
@@ -2173,7 +2185,7 @@ const loadHomeData = async (nativeData = null) => {
 
               <View style={[styles.headerDivider, (theme === 'light' || isPanditMode) && { backgroundColor: colors.cardBorder }]} />
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.headerSignItem}
                 onPress={() => {
                   const insight = getSignInsight('moon', chartData?.planets?.Moon?.sign);
@@ -2195,7 +2207,7 @@ const loadHomeData = async (nativeData = null) => {
 
               <View style={[styles.headerDivider, (theme === 'light' || isPanditMode) && { backgroundColor: colors.cardBorder }]} />
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.headerSignItem}
                 onPress={() => {
                   const insight = getSignInsight('sun', chartData?.planets?.Sun?.sign);
@@ -2234,7 +2246,91 @@ const loadHomeData = async (nativeData = null) => {
         ) : (
         <>
 
-        {!displayData ? (
+        {!showExploreCatalog ? <PremiumTodayOverview
+          name={displayData?.name}
+          hasChart={Boolean(displayData?.date)}
+          ascendant={chartData ? getSignName(chartData?.houses?.[0]?.sign) : null}
+          moon={chartData ? getSignName(chartData?.planets?.Moon?.sign) : null}
+          sun={chartData ? getSignName(chartData?.planets?.Sun?.sign) : null}
+          mahadasha={tickerData?.mahadasha ? getLocalizedPlanetName(tickerData.mahadasha) : null}
+          nakshatra={tickerData?.nakshatra ? getLocalizedNakshatraName(tickerData.nakshatra) : null}
+          panchangWindow={(() => {
+            const currentWindow = panchangData ? getActivePanchangWindow(panchangData) : null;
+            return currentWindow
+              ? t(currentWindow.labelKey, currentWindow.fallbackLabel).replace(/:$/, '')
+              : null;
+          })()}
+          onSelectNative={() => navigation.navigate('SelectNative', { returnTo: 'Home', returnParams: { stayOnGreeting: true } })}
+          onCreateChart={() => navigation.navigate('BirthForm', { returnTo: 'Home' })}
+          onAsk={() => onOptionSelect({ action: 'question' })}
+          onOpenCharts={() => requireBirthChart((data) => navigation.navigate('ChartsHub', { birthData: data }))}
+          onOpenDasha={() => requireBirthChart((data) => navigation.navigate('ChartsHub', { birthData: data, tab: 'dasha' }))}
+          onOpenNakshatra={() => requireBirthChart((data) => navigation.navigate('NakshatraCalendar', { birthData: data }))}
+          onOpenPanchang={() => onOptionSelect?.({ action: 'panchang' })}
+          onOpenCareer={() => onOptionSelect({ action: 'analysis', type: 'career', cost: pricing.career ?? 12 })}
+          onOpenKarma={() => onOptionSelect({ action: 'analysis', type: 'karma', cost: pricing.karma ?? 25 })}
+          onOpenExplore={showExploreSurface}
+          onOpenAscendant={() => setActiveInsight(getSignInsight('ascendant', chartData?.houses?.[0]?.sign))}
+          onOpenMoon={() => setActiveInsight(getSignInsight('moon', chartData?.planets?.Moon?.sign))}
+          onOpenSun={() => setActiveInsight(getSignInsight('sun', chartData?.planets?.Sun?.sign))}
+          todayPredictions={(currentNativeData || birthData)?.date ? (
+            <KpTodayCarousel
+              embedded
+              birthDetails={currentNativeData || birthData}
+              onOpenKp={(scope = 'today') => {
+                requireBirthChart((data) =>
+                  navigation.navigate('KPSystem', {
+                    birthDetails: data,
+                    initialTab: 'results',
+                    initialPredictionsScope: scope === 'hour' ? 'hour' : 'today',
+                  })
+                );
+              }}
+            />
+          ) : null}
+        /> : <PremiumExploreIntro
+          onOpenCharts={() => requireBirthChart((data) => navigation.navigate('ChartsHub', { birthData: data }))}
+          onOpenReports={async () => {
+            const ok = await requireAuthForPaid({
+              feature: t('authGate.featureReports'),
+              message: t('authGate.messageReports'),
+              resume: { resumeRoute: 'ReportsStudio', resumeParams: {} },
+            });
+            if (ok) navigation.navigate('ReportsStudio');
+          }}
+          onOpenPanchang={() => onOptionSelect?.({ action: 'panchang' })}
+          onOpenMuhurat={() => navigation.navigate('MuhuratHub')}
+          paths={options}
+          analyses={analysisOptions}
+          onSelectPath={(item) => onOptionSelect(item)}
+          onSelectAnalysis={(item) => {
+            if (item.navigateAction === 'events') {
+              onOptionSelect({ action: 'events' });
+              return;
+            }
+            if (item.id === 'muhurat') {
+              navigation.navigate('MuhuratHub');
+              return;
+            }
+            if (item.id === 'trading') {
+              onOptionSelect({ action: 'analysis', type: 'trading', cost: item.cost });
+              return;
+            }
+            if (item.id === 'financial') {
+              onOptionSelect({ action: 'analysis', type: 'financial', cost: item.cost });
+              return;
+            }
+            if (item.id === 'childbirth') {
+              onOptionSelect({ action: 'analysis', type: 'childbirth', cost: item.cost });
+              return;
+            }
+            onOptionSelect({ action: 'analysis', type: item.id, cost: item.cost });
+          }}
+        />}
+
+        {false && showExploreCatalog ? <>
+
+        {false && !displayData ? (
           <View
             style={[
               styles.emptyStateCard,
@@ -2305,8 +2401,8 @@ const loadHomeData = async (nativeData = null) => {
 
         {/* At-a-Glance Ticker */}
         <View style={[styles.tickerContainer, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-          <AppScrollView 
-            horizontal 
+          <AppScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.tickerContent}
           >
@@ -2324,9 +2420,9 @@ const loadHomeData = async (nativeData = null) => {
                     );
                   }}
                 >
-                  <TickerItem 
-                    icon="time-outline" 
-                    label={t('home.ticker.activeMahadasha', 'Active Mahadasha')} 
+                  <TickerItem
+                    icon="time-outline"
+                    label={t('home.ticker.activeMahadasha', 'Active Mahadasha')}
                     value={getLocalizedPlanetName(tickerData.mahadasha)}
                     color="#F59E0B"
                     showInfoIcon
@@ -2341,9 +2437,9 @@ const loadHomeData = async (nativeData = null) => {
                     )
                   }
                 >
-                  <TickerItem 
-                    icon="star-outline" 
-                    label={t('home.ticker.todaysNakshatra', "Today's Nakshatra")} 
+                  <TickerItem
+                    icon="star-outline"
+                    label={t('home.ticker.todaysNakshatra', "Today's Nakshatra")}
                     value={getLocalizedNakshatraName(tickerData.nakshatra)}
                     color="#8B5CF6"
                     showInfoIcon
@@ -2356,9 +2452,9 @@ const loadHomeData = async (nativeData = null) => {
                     requireBirthChart((data) => navigation.navigate('SadeSati', { birthData: data }))
                   }
                 >
-                  <TickerItem 
-                    icon="shield-checkmark-outline" 
-                    label={t('home.ticker.sadeSati', 'Sade Sati')} 
+                  <TickerItem
+                    icon="shield-checkmark-outline"
+                    label={t('home.ticker.sadeSati', 'Sade Sati')}
                     value={tickerData.sadeSati ? t('home.ticker.active', 'Active') : t('home.ticker.noSadeSati', 'No active Sade Sati')}
                     color={tickerData.sadeSati ? "#EF4444" : "#10B981"}
                     showInfoIcon
@@ -2405,7 +2501,7 @@ const loadHomeData = async (nativeData = null) => {
 
 
         {/* Biometric Teaser Card - COMMENTED OUT */}
-        {/* <BiometricTeaserCard 
+        {/* <BiometricTeaserCard
           onPressReveal={() => {
             console.log('🔄 BiometricTeaserCard pressed');
             handlePhysicalScan();
@@ -2681,7 +2777,7 @@ const loadHomeData = async (nativeData = null) => {
                         });
                       }}
                     >
-                      <Text style={styles.infoOnlyModalCloseText}>Open</Text>
+                      <Text style={styles.infoOnlyModalCloseText}>{t('premiumUi.common.open')}</Text>
                       <Icon name="arrow-forward" size={17} color="#fff" />
                     </TouchableOpacity>
                   ) : null}
@@ -2785,20 +2881,20 @@ const loadHomeData = async (nativeData = null) => {
                   const startDate = dasha.start ? new Date(dasha.start) : null;
                   const endDate = dasha.end ? new Date(dasha.end) : null;
                   const now = new Date();
-                  
+
                   let progress = 0;
                   if (startDate && endDate && !isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
                     const total = endDate.getTime() - startDate.getTime();
                     const elapsed = now.getTime() - startDate.getTime();
                     progress = (elapsed / total) * 100;
-                    
+
                     if (isNaN(progress) || !isFinite(progress)) {
                       progress = 0;
                     }
-                    
+
                     progress = Math.max(0, Math.min(100, progress));
                   }
-                  
+
                   return (
                     <View key={item.level} style={styles.timelineRow}>
                       <View style={styles.timelineLeft}>
@@ -2807,7 +2903,7 @@ const loadHomeData = async (nativeData = null) => {
                         </View>
                         {index < 2 && <View style={[styles.timelineConnector, { backgroundColor: (colors.textSecondary || '#ffffff') + '30' }]} />}
                       </View>
-                      
+
                       <View style={styles.timelineContent}>
                         <View style={styles.timelineHeader}>
                           <Text style={[styles.timelinePlanet, { color: planetColor }]}>
@@ -2817,7 +2913,7 @@ const loadHomeData = async (nativeData = null) => {
                             {t('common.ends', 'Ends')}: {endDate && !isNaN(endDate.getTime()) ? endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '...'}
                           </Text>
                         </View>
-                        
+
                         <View style={styles.progressContainer}>
                           <View style={[styles.progressBar, { backgroundColor: (colors.textSecondary || '#ffffff') + '10' }]}>
                             <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: planetColor }]} />
@@ -2862,26 +2958,26 @@ const loadHomeData = async (nativeData = null) => {
                       <Svg width="160" height="160" viewBox="0 0 160 160">
                         {/* Outer Sign Ring */}
                         <Circle cx="80" cy="80" r="75" fill="none" stroke={colors.strokeStrong} strokeWidth="2" />
-                        
+
                         {/* Sign Dividers & Symbols */}
                         {[...Array(12)].map((_, i) => {
                           const angle = (i * 30 - 90) * (Math.PI / 180);
                           const midAngle = angle + (15 * Math.PI / 180);
-                          
+
                           // Divider lines
                           const x1 = 80 + 55 * Math.cos(angle);
                           const y1 = 80 + 55 * Math.sin(angle);
                           const x2 = 80 + 75 * Math.cos(angle);
                           const y2 = 80 + 75 * Math.sin(angle);
-                          
+
                           if (isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) return null;
-                          
+
                           // Sign Symbol Position (just outside the ring)
                           const sx = 80 + 65 * Math.cos(midAngle);
                           const sy = 80 + 65 * Math.sin(midAngle);
-                          
+
                           if (isNaN(sx) || isNaN(sy)) return null;
-                          
+
                           return (
                             <React.Fragment key={i}>
                               <Line x1={x1} y1={y1} x2={x2} y2={y2} stroke={colors.strokeMuted} strokeWidth="1.5" />
@@ -2903,28 +2999,28 @@ const loadHomeData = async (nativeData = null) => {
                         {/* Inner Rings */}
                         <Circle cx="80" cy="80" r="55" fill="none" stroke={colors.strokeStrong} strokeWidth="2" />
                         <Circle cx="80" cy="80" r="40" fill="none" stroke={colors.strokeMuted} strokeWidth="1.5" />
-                        
+
                         {/* Planet Dots */}
                         {Object.entries(transitData.planets || {}).map(([planet, data], i) => {
                           if (!data || data.sign === undefined || data.degree === undefined) return null;
                           const sign = parseFloat(data.sign);
                           const degree = parseFloat(data.degree);
                           if (isNaN(sign) || isNaN(degree)) return null;
-                          
+
                           const angle = (sign * 30 + degree - 90) * (Math.PI / 180);
                           const r = 47;
                           const x = 80 + r * Math.cos(angle);
                           const y = 80 + r * Math.sin(angle);
-                          
+
                           if (isNaN(x) || isNaN(y)) return null;
-                          
+
                           return (
-                            <Circle 
-                              key={planet} 
-                              cx={x} 
-                              cy={y} 
-                              r="5" 
-                              fill={getPlanetColor(planet)} 
+                            <Circle
+                              key={planet}
+                              cx={x}
+                              cy={y}
+                              r="5"
+                              fill={getPlanetColor(planet)}
                               opacity={1}
                               stroke={theme === 'dark' ? '#FFFFFF' : colors.text}
                               strokeWidth="1.5"
@@ -2935,9 +3031,9 @@ const loadHomeData = async (nativeData = null) => {
                       {/* Center Glow */}
                       <View style={[styles.zodiacCenterGlow, theme === 'light' && { backgroundColor: 'rgba(249, 115, 22, 0.08)' }]} />
                     </View>
-                    
+
                     <View style={styles.zodiacSummary}>
-                      <Text style={[styles.zodiacSummaryTitle, { color: colors.textSecondary }]}>Planetary Alignment</Text>
+                      <Text style={[styles.zodiacSummaryTitle, { color: colors.textSecondary }]}>{t('premiumUi.common.planetaryAlignment')}</Text>
                       <Text style={[styles.zodiacSummaryText, { color: colors.text }]}>
                         {(() => {
                           const signCounts = {};
@@ -2950,13 +3046,13 @@ const loadHomeData = async (nativeData = null) => {
                           const sortedSigns = Object.entries(signCounts).sort((a, b) => b[1] - a[1]);
                           const maxSign = sortedSigns.length > 0 ? sortedSigns[0] : null;
                           if (!maxSign) return '';
-                          
+
                           const signIdx = parseInt(maxSign[0]);
                           if (isNaN(signIdx)) return '';
-                          
+
                           const signName = getSignName(signIdx);
                           if (!signName || signName === 'Unknown' || signName === t('common.unknown', 'Unknown')) return '';
-                          
+
                           return `${maxSign[1]} planets in ${signName}`;
                         })()}
                       </Text>
@@ -2967,8 +3063,8 @@ const loadHomeData = async (nativeData = null) => {
                   </View>
 
                 {/* Horizontal Transit Strip */}
-                <AppScrollView 
-                  horizontal 
+                <AppScrollView
+                  horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.transitScrollContent}
                 >
@@ -2979,7 +3075,7 @@ const loadHomeData = async (nativeData = null) => {
                           const signIdx = parseInt(data.sign);
                           if (isNaN(signIdx)) return null;
                           const signName = getSignName(signIdx);
-                          
+
                           return (
                             <View key={planet} style={[
                               styles.transitCard,
@@ -2993,7 +3089,7 @@ const loadHomeData = async (nativeData = null) => {
                                   <Text style={[styles.vibeTagText, { color: colors.textTertiary }]}>{vibe.tag}</Text>
                                 </View>
                               </View>
-                              
+
                               <View style={styles.transitMainInfo}>
                                 <Text style={[styles.transitPlanetName, { color: colors.text }]}>
                                   {t(`home.planet_names.${planet}`, planet)}
@@ -3006,7 +3102,7 @@ const loadHomeData = async (nativeData = null) => {
                                   ))}
                                 </View>
                               </View>
-                              
+
                               <View style={styles.transitSignRow}>
                                 <Text style={styles.transitSignIcon}>{getSignIcon(signIdx)}</Text>
                                 <Text style={[styles.transitSignName, { color: colors.textSecondary }]}>
@@ -3023,6 +3119,7 @@ const loadHomeData = async (nativeData = null) => {
 
 
         </View>
+        </> : null}
         </>
         )}
       </VerticalPageScroll>
@@ -3035,15 +3132,13 @@ const loadHomeData = async (nativeData = null) => {
         onRequestClose={() => setActiveInsight(null)}
       >
         <TouchableOpacity
-          style={[styles.modalOverlay, { backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.45)' }]}
+          style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}
           activeOpacity={1}
           onPress={() => setActiveInsight(null)}
         >
           <View style={styles.insightModalContent}>
             <LinearGradient
-              colors={theme === 'dark'
-                ? [colors.backgroundSecondary, colors.backgroundTertiary]
-                : [colors.background, colors.backgroundSecondary]}
+              colors={[colors.surfaceRaised || colors.surface, colors.surfaceMuted]}
               style={[styles.insightGradient, { borderColor: colors.cardBorder }]}
             >
               <View style={styles.insightHeader}>
@@ -3057,13 +3152,13 @@ const loadHomeData = async (nativeData = null) => {
                 style={[styles.insightCloseButton, { backgroundColor: colors.primary }]}
                 onPress={() => setActiveInsight(null)}
               >
-                <Text style={styles.insightCloseText}>{t('languageModal.close', 'Close')}</Text>
+                <Text style={[styles.insightCloseText, { color: colors.onPrimary }]}>{t('languageModal.close', 'Close')}</Text>
               </TouchableOpacity>
             </LinearGradient>
           </View>
         </TouchableOpacity>
       </Modal>
-      
+
       {/* Monthly Predictions Welcome Modal */}
       <Modal
         visible={showMonthlyWelcomeModal}
@@ -3251,7 +3346,7 @@ const loadHomeData = async (nativeData = null) => {
         onDismiss={dismissFomoHome}
         onAsk={askFomoQuestion}
       />
-      
+
       {/* Physical Traits Modal */}
       <PhysicalTraitsModal
         visible={showTraitsModal}
@@ -3260,7 +3355,7 @@ const loadHomeData = async (nativeData = null) => {
         onFeedback={handleTraitsFeedback}
         hasFeedback={hasFeedback}
       />
-      
+
       </LinearGradient>
 
       {showKnowYourselfPrompt ? (
@@ -3361,12 +3456,18 @@ const loadHomeData = async (nativeData = null) => {
                 position: 'fixed',
                 left: 0,
                 right: 0,
+                width: '100%',
+                maxWidth: 520,
+                marginLeft: 'auto',
+                marginRight: 'auto',
                 zIndex: 10000,
                 backgroundColor: tabSafeColor,
               }
             : null),
         },
-      ]}>
+      ]}
+      {...(Platform.OS === 'web' ? { dataSet: { arHomeBottomNav: '1' } } : null)}
+      >
         <LinearGradient
           colors={tabBarGradient}
           style={StyleSheet.absoluteFill}
@@ -3380,86 +3481,76 @@ const loadHomeData = async (nativeData = null) => {
             tint={theme === 'dark' ? 'dark' : 'light'}
           />
         )}
-        
-        <TouchableOpacity 
-          style={styles.tabItem} 
-          onPress={() => onOptionSelect({ action: 'question' })}
+
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={showTodaySurface}
           activeOpacity={0.7}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'today' }}
+          accessibilityLabel={t('premiumUi.home.tabs.today')}
         >
           <View style={styles.tabIconContainer}>
-            <Icon 
-              name="chatbubble-ellipses-outline" 
-              size={22} 
-              color={activeTab === 'ask' ? tabActiveColor : tabIdleColor} 
+            <Icon
+              name="today-outline"
+              size={22}
+              color={activeTab === 'today' ? tabActiveColor : tabIdleColor}
+            />
+          </View>
+          <Text style={[styles.tabLabel, { color: activeTab === 'today' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'today' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
+            {t('premiumUi.home.tabs.today')}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={() => onOptionSelect({ action: 'question' })}
+          activeOpacity={0.7}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'ask' }}
+          accessibilityLabel={t('premiumUi.home.tabs.askTara')}
+        >
+          <View style={styles.tabIconContainer}>
+            <Icon
+              name="sparkles-outline"
+              size={22}
+              color={activeTab === 'ask' ? tabActiveColor : tabIdleColor}
             />
           </View>
           <Text style={[styles.tabLabel, { color: activeTab === 'ask' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'ask' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
-            {t('home.tabs.ask', 'Ask')}
+            {t('premiumUi.home.tabs.askTara')}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.tabItem} 
-          onPress={() => {
-            if (isPanditMode) {
-              navigation.navigate('MuhuratHub');
-              return;
-            }
-            onOptionSelect({ action: 'events' });
-          }}
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={showExploreSurface}
           activeOpacity={0.7}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'explore' }}
+          accessibilityLabel={t('premiumUi.home.tabs.explore')}
         >
           <View style={styles.tabIconContainer}>
-            <Icon 
-              name="calendar-outline" 
-              size={22} 
-              color={activeTab === 'events' ? tabActiveColor : tabIdleColor} 
+            <Icon
+              name="compass-outline"
+              size={22}
+              color={activeTab === 'explore' ? tabActiveColor : tabIdleColor}
             />
           </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'events' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'events' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
-            {isPanditMode
-              ? t('home.tabs.muhurat', 'Muhurat')
-              : isIOS
-                ? t('home.tabs.events', 'Timing')
-                : t('home.tabs.eventsAndroid', 'Predictions')}
+          <Text style={[styles.tabLabel, { color: activeTab === 'explore' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'explore' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
+            {t('premiumUi.home.tabs.explore')}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.tabItem} 
-          onPress={async () => {
-            if (isPanditMode) {
-              navigation.navigate('ReportsStudio', { reportType: 'janam_kundli' });
-              return;
-            }
-            const ok = await requireAuthForPaid({
-              feature: t('authGate.featureReports'),
-              message: t('authGate.messageReports'),
-              resume: { resumeRoute: 'ReportsStudio', resumeParams: {} },
-            });
-            if (!ok) return;
-            navigation.navigate('ReportsStudio');
-          }}
-          activeOpacity={0.7}
-        >
-          <View style={styles.tabIconContainer}>
-            <Icon 
-              name="document-text-outline" 
-              size={22} 
-              color={activeTab === 'reports' ? tabActiveColor : tabIdleColor} 
-            />
-          </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'reports' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'reports' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
-            {t('home.tabs.reports', 'Reports')}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.tabItem} 
+        <TouchableOpacity
+          style={styles.tabItem}
           onPress={() =>
             requireBirthChart((data) => navigation.navigate('ChartsHub', { birthData: data }))
           }
           activeOpacity={0.7}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'charts' }}
+          accessibilityLabel={t('premiumUi.home.tabs.charts')}
         >
           <View style={styles.tabIconContainer}>
             <Svg width="22" height="22" viewBox="0 0 48 48">
@@ -3473,24 +3564,27 @@ const loadHomeData = async (nativeData = null) => {
             </Svg>
           </View>
           <Text style={[styles.tabLabel, { color: activeTab === 'charts' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'charts' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
-            {t('home.tabs.charts', 'Charts')}
+            {t('premiumUi.home.tabs.charts')}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.tabItem} 
+        <TouchableOpacity
+          style={styles.tabItem}
           onPress={() => navigation.navigate('Profile')}
           activeOpacity={0.7}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'you' }}
+          accessibilityLabel={t('premiumUi.home.tabs.you')}
         >
           <View style={styles.tabIconContainer}>
-            <Icon 
-              name="person-outline" 
-              size={22} 
-              color={activeTab === 'you' ? tabActiveColor : tabIdleColor} 
+            <Icon
+              name="person-outline"
+              size={22}
+              color={activeTab === 'you' ? tabActiveColor : tabIdleColor}
             />
           </View>
           <Text style={[styles.tabLabel, { color: activeTab === 'you' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'you' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
-            {t('home.tabs.you', 'You')}
+            {t('premiumUi.home.tabs.you')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -3512,7 +3606,7 @@ const loadHomeData = async (nativeData = null) => {
 function OptionCard({ option, index, onOptionSelect }) {
   const { theme, colors, androidLightCardFixStyle } = useTheme();
   const { t } = useTranslation();
-  
+
   if (!option) return null;
   const gradientColors = Platform.OS === 'ios'
     ? option.id === 'events'
@@ -3522,8 +3616,8 @@ function OptionCard({ option, index, onOptionSelect }) {
       : option.id === 'mundane'
       ? ['#0F766E', '#14B8A6']
       : ['#334155', '#64748B']
-    : option.id === 'events' 
-    ? ['#FFD700', '#FF8C00'] 
+    : option.id === 'events'
+    ? ['#FFD700', '#FF8C00']
     : option.id === 'ashtakvarga'
     ? ['#9C27B0', '#E91E63']
     : option.id === 'kundliMatch'
@@ -3539,9 +3633,9 @@ function OptionCard({ option, index, onOptionSelect }) {
       : theme === 'dark'
         ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
         : ['rgba(251, 146, 60, 0.2)', 'rgba(249, 115, 22, 0.1)'];
-  
+
   return (
-    <View 
+    <View
       style={[styles.optionCard, androidLightCardFixStyle]}
     >
       <TouchableOpacity
@@ -3680,11 +3774,11 @@ function LifeAnalysisCard({ option, index, onOptionSelect }) {
 // Premium Cosmic Ribbon Card for Timing Planners
 function CosmicRibbonCard({ option, index, onOptionSelect }) {
   const { theme, colors, androidLightCardFixStyle } = useTheme();
-  
+
   if (!option) return null;
-  
+
   const cardWidth = width * 0.72;
-  
+
   return (
     <View style={[styles.ribbonCardWrapper, androidLightCardFixStyle, { width: cardWidth }]}>
       <TouchableOpacity
@@ -3723,14 +3817,14 @@ function CosmicRibbonCard({ option, index, onOptionSelect }) {
             <View style={[styles.ribbonIconContainer, { backgroundColor: (option.gradient?.[0] || colors.primary) + '15' }]}>
               <Text style={styles.ribbonEmoji}>{option.icon}</Text>
             </View>
-            
+
             <View style={styles.ribbonTextContainer}>
               <Text style={[styles.ribbonTitle, { color: colors.text }]}>{option.title}</Text>
               <Text style={[styles.ribbonDescription, { color: colors.textSecondary }]} numberOfLines={2}>
                 {option.description}
               </Text>
             </View>
-            
+
             <View style={styles.ribbonActionContainer}>
               <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
             </View>
@@ -3819,7 +3913,7 @@ function ReportStudioCard({ navigation, isDark, colors, cost, originalCost, t, r
 // Full width Analysis Card for Timing Planners
 function AnalysisCard({ option, index, onOptionSelect }) {
   const { theme, colors, androidLightCardFixStyle } = useTheme();
-  
+
   if (!option) return null;
   return (
     <View
@@ -3868,7 +3962,7 @@ function SignCard({ type, signIndex, colors, label, icon, loading, onPress }) {
     };
     return icons[signNumber] || '⭐';
   };
-  
+
   const getSignName = (signNumber) => {
     if (signNumber === undefined || signNumber === null) return t('common.unknown', 'Unknown');
     const signs = {
@@ -3881,7 +3975,7 @@ function SignCard({ type, signIndex, colors, label, icon, loading, onPress }) {
   };
 
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.signCard}
       onPress={onPress}
       activeOpacity={0.85}
@@ -4080,7 +4174,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
   },
-  
+
   container: {
     flex: 1,
     ...(Platform.OS === 'web'
@@ -4560,7 +4654,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginBottom: 8,
   },
-  
+
   // Dasha Timeline Card
   dashaTimelineCard: {
     height: 140,
@@ -4626,7 +4720,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  
+
   // Big Three Signs Row
   bigThreeRow: {
     flexDirection: 'row',
@@ -5109,7 +5203,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  
+
   // Astrology Tools Section — compact square tiles
   toolsSection: {
     marginBottom: 24,
@@ -5379,7 +5473,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  
+
   // Panchang Card Styles
   panchangCard: {
     marginBottom: 40,
@@ -5791,7 +5885,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
   },
-  
+
   // Header Styles
   header_old: {
     position: 'absolute',
@@ -5801,7 +5895,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
     alignItems: 'flex-end',
   },
-  
+
   // Panchang Weather Card
   panchangWeatherCard: {
     height: 200,

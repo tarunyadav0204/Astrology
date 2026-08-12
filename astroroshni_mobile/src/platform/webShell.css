@@ -83,9 +83,22 @@ body {
     left: 50%;
     right: auto;
     width: 100%;
-    max-width: 480px;
+    max-width: 520px;
     transform: translateX(-50%);
-    box-shadow: 0 0 40px rgba(0, 0, 0, 0.35);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 80px rgba(0, 0, 0, 0.34);
+  }
+
+  /* Home tabs are rendered through a document.body portal. Constrain that
+     fixed layer to the same desktop phone shell instead of the whole browser. */
+  body [data-ar-home-bottom-nav='1'] {
+    left: 50% !important;
+    right: auto !important;
+    width: min(520px, 100vw) !important;
+    max-width: 520px !important;
+    margin: 0 !important;
+    transform: translateX(-50%) !important;
   }
 }
 
@@ -97,6 +110,13 @@ select {
   outline-width: 0 !important;
   outline-style: none !important;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Portal-based home tabs must yield to RN Web modal dialogs. Without this,
+   the fixed tab bar can paint above authentication and consultation sheets. */
+body:has([role='dialog']) [data-ar-home-bottom-nav='1'] {
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /*

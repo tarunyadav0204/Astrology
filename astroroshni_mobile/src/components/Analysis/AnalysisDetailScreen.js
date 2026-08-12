@@ -27,8 +27,10 @@ import { trackAstrologyEvent, trackEvent } from '../../utils/analytics';
 import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
 import { useAuthGate } from '../../auth/AuthGateContext';
 import AnalysisCreditModal from './AnalysisCreditModal';
+import { useTranslation } from 'react-i18next';
 
 export default function AnalysisDetailScreen({ route, navigation }) {
+  const { t, i18n } = useTranslation();
   const { analysisType, title, cost: costFromParams, originalCost: originalCostFromParams } = route.params;
   const analyticsScreenName = analysisType ? `AnalysisDetail:${analysisType}` : 'AnalysisDetailScreen';
   useAnalytics(analyticsScreenName);
@@ -57,48 +59,33 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   const lastTrackedResultRef = useRef(null);
   const loadingLoopsRef = useRef([]);
   const mountedRef = useRef(true);
-  const isIosStudyMode = Platform.OS === 'ios';
-  const iosAnalysisTitleMap = {
-    career: 'Chart Study',
-    wealth: 'Yearly Chart Study',
-    health: 'Wellness Review',
-    marriage: 'Shared Chart Study',
-    education: 'Chart Guidance',
-    progeny: 'Family Study',
-  };
-  const displayTitle = isIosStudyMode ? (iosAnalysisTitleMap[analysisType] || title) : title;
+  const localizedAnalysisTitle = t(`home.analysis.${analysisType}.title`, title);
+  const displayTitle = localizedAnalysisTitle;
   const uiText = {
-    startAnalysis: isIosStudyMode ? 'Start Study' : 'Start Analysis',
-    loadingTitle: isIosStudyMode ? 'Reviewing Chart Patterns' : 'Analyzing Your Cosmic Blueprint',
-    previewDescription: isIosStudyMode
-      ? `Get a clear study of your ${analysisType} chart patterns and themes`
-      : `Get comprehensive insights into your ${analysisType} prospects with detailed astrological analysis`,
-    quickInsights: isIosStudyMode ? '📚 Study Notes' : '✨ Quick Insights',
-    detailedAnalysis: isIosStudyMode ? '📋 Study Breakdown' : '📋 Detailed Analysis',
-    finalThoughts: isIosStudyMode ? '🌟 Closing Notes' : '🌟 Final Thoughts',
-    regenerateTitle: isIosStudyMode ? '🔄 Refresh Study' : '🔄 Regenerate Analysis',
-    regenerateBody: isIosStudyMode
-      ? `This will create a fresh ${displayTitle.toLowerCase()} study with new notes.`
-      : `This will create a fresh ${title.toLowerCase()} analysis with new insights.`,
-    regenerateButton: isIosStudyMode ? 'Refresh' : 'Regenerate',
-    downloadTitle: isIosStudyMode ? 'Download Study PDF' : 'Download PDF',
-    downloadBody: isIosStudyMode
-      ? `Generate ${displayTitle} study for ${birthData?.name || 'this chart'}?`
-      : `Generate ${title} report for ${birthData?.name || 'this chart'}?`,
-    generateButton: isIosStudyMode ? 'Generate Study' : 'Generate',
-    missingChildren: isIosStudyMode
-      ? 'Please choose how many children you currently have.'
-      : 'Please select how many children you currently have.',
-    insufficientCreditsTitle: isIosStudyMode ? 'Not Enough Credits' : 'Insufficient Credits',
-    insufficientCreditsBody: isIosStudyMode
-      ? `You need ${cost} credits for this study.`
-      : `You need ${cost} credits for this analysis.`,
-    creditsRequired: isIosStudyMode ? 'Study credits required' : 'Credits required',
-    creditsLeft: isIosStudyMode ? 'Study credits left' : 'Credits left',
-    followUp: isIosStudyMode ? 'Explore related chart questions' : '💭 Explore Further',
-    keyPoints: isIosStudyMode ? 'Key Notes:' : 'Key Points:',
-    astrologicalBasis: isIosStudyMode ? 'Chart Basis:' : 'Astrological Basis:',
-    cancel: 'Cancel',
+    startAnalysis: t('lifeAnalysisFlow.startAnalysis'),
+    loadingTitle: t('lifeAnalysisFlow.loadingTitle'),
+    previewDescription: t('lifeAnalysisFlow.previewDescription', { type: displayTitle }),
+    quickInsights: t('lifeAnalysisFlow.quickInsights'),
+    detailedAnalysis: t('lifeAnalysisFlow.detailedAnalysis'),
+    finalThoughts: t('lifeAnalysisFlow.finalThoughts'),
+    regenerateTitle: t('lifeAnalysisFlow.regenerateTitle'),
+    regenerateBody: t('lifeAnalysisFlow.regenerateBody', { type: displayTitle }),
+    regenerateButton: t('lifeAnalysisFlow.regenerate'),
+    downloadTitle: t('lifeAnalysisFlow.downloadPdf'),
+    downloadBody: t('lifeAnalysisFlow.downloadBody', { type: displayTitle, name: birthData?.name || t('lifeAnalysisFlow.thisChart') }),
+    generateButton: t('lifeAnalysisFlow.generate'),
+    missingChildren: t('lifeAnalysisFlow.missingChildren'),
+    insufficientCreditsTitle: t('lifeAnalysisFlow.insufficientCredits'),
+    insufficientCreditsBody: t('lifeAnalysisFlow.needCredits', { cost }),
+    creditsRequired: t('lifeAnalysisFlow.creditsRequired'),
+    creditsLeft: t('lifeAnalysisFlow.creditsLeft'),
+    followUp: t('lifeAnalysisFlow.exploreFurther'),
+    keyPoints: t('lifeAnalysisFlow.keyPoints'),
+    astrologicalBasis: t('lifeAnalysisFlow.astrologicalBasis'),
+    credits: t('lifeAnalysisFlow.credits', { count: cost }),
+    getCredits: t('lifeAnalysisFlow.getCredits'),
+    close: t('common.close'),
+    cancel: t('common.cancel'),
   };
 
   useEffect(() => {
@@ -265,8 +252,8 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
   const validateAnalysisStart = async () => {
     const authOk = await requireAuthForPaid({
-      feature: `${analysisType || 'life'} analysis`,
-      message: 'Sign in to run this analysis. Credits are charged only after you confirm.',
+      feature: t('lifeAnalysisFlow.lifeAnalysis'),
+      message: t('lifeAnalysisFlow.signInMessage'),
       resume: {
         resumeRoute: 'AnalysisDetail',
         resumeParams: {
@@ -283,9 +270,9 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     if (analysisType === 'progeny') {
       if ((analysisFocus === 'next_child' || analysisFocus === 'parenting') && childrenCount === 0) {
         Alert.alert(
-          'Missing Information', 
+          t('lifeAnalysisFlow.missingInformation'),
           uiText.missingChildren,
-          [{ text: 'OK' }]
+          [{ text: t('common.ok', 'OK') }]
         );
         return false;
       }
@@ -293,7 +280,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     // ----------------------------
     
     if (!birthData) {
-      Alert.alert('Error', 'Birth data not available');
+      Alert.alert(t('common.error', 'Error'), t('lifeAnalysisFlow.birthDataUnavailable'));
       return false;
     }
 
@@ -324,47 +311,13 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     setLoading(true);
     startLoadingAnimations();
     
-    const loadingMessages = isIosStudyMode
-      ? [
-          '📚 Reviewing chart patterns...',
-          '🪄 Checking timing markers...',
-          '📊 Mapping house strengths...',
-          '✨ Organizing study notes...',
-          '🌙 Reading lunar context...',
-          '☀️ Reviewing solar placements...',
-          '♃ Checking Jupiter themes...',
-          '♀ Reviewing Venus placements...',
-          '♂ Checking Mars influences...',
-          '☿ Reviewing Mercury signals...',
-          '♄ Studying Saturn lessons...',
-          '🐉 Mapping Rahu-Ketu patterns...',
-          '🏠 Comparing house strengths...',
-          '🔄 Reviewing dasha cycles...',
-          '🎯 Highlighting key yogas...',
-          '🌊 Sorting nakshatra themes...',
-        ]
-      : [
-          '🔮 Analyzing your birth chart...',
-          '⭐ Consulting the cosmic energies...',
-          '📊 Calculating planetary positions...',
-          '🌟 Interpreting astrological patterns...',
-          '✨ Preparing your personalized insights...',
-          '🌙 Reading lunar influences...',
-          '☀️ Examining solar aspects...',
-          '♃ Studying Jupiter blessings...',
-          '♀ Analyzing Venus placements...',
-          '♂ Checking Mars energy...',
-          '☿ Decoding Mercury messages...',
-          '♄ Understanding Saturn lessons...',
-          '🐉 Exploring Rahu-Ketu axis...',
-          '🏠 Examining house strengths...',
-          '🔄 Calculating dasha periods...',
-          '🎯 Identifying key yogas...',
-          '🌊 Flowing through nakshatras...',
-          '⚖️ Balancing planetary forces...',
-          '🎭 Unveiling karmic patterns...',
-          '🗝️ Unlocking hidden potentials...'
-        ];
+    const loadingMessages = [
+      `🔮 ${t('lifeAnalysisFlow.loadingMessages.chart')}`,
+      `📊 ${t('lifeAnalysisFlow.loadingMessages.planets')}`,
+      `🏠 ${t('lifeAnalysisFlow.loadingMessages.houses')}`,
+      `🔄 ${t('lifeAnalysisFlow.loadingMessages.dashas')}`,
+      `✨ ${t('lifeAnalysisFlow.loadingMessages.synthesis')}`,
+    ];
     
     let messageIndex = 0;
     setLoadingMessage(loadingMessages[0]);
@@ -395,7 +348,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       const requestBody = {
         ...fixedBirthData,
         chart_id: fixedBirthData?.chart_id || fixedBirthData?.id || null,
-        language: 'english',
+        language: i18n.resolvedLanguage || i18n.language || 'english',
         response_style: 'detailed',
         force_regenerate: shouldForceRegenerate,
         ...(analysisType === 'progeny' && {
@@ -925,9 +878,11 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       allMatches.sort((a, b) => a.start - b.start);
 
       // 6. Assembly (colors from theme)
-      const bodyColor = colors.text;
-      const termColor = colors.accent;
-      const finalBoldColor = isDark ? '#1a0033' : colors.text;
+      const bodyColor = isFinalThoughts
+        ? (colors.onSurfaceInverse || colors.textInverse)
+        : colors.text;
+      const termColor = isFinalThoughts ? colors.accentSoft : colors.accent;
+      const finalBoldColor = isFinalThoughts ? colors.onSurfaceInverse : colors.text;
       allMatches.forEach((m, i) => {
         if (m.start > currentIndex) {
           parts.push(<Text key={`text-${i}`} style={{ color: bodyColor }}>{cleanPara.substring(currentIndex, m.start)}</Text>);
@@ -1068,7 +1023,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       );
     } catch (error) {
 
-      Alert.alert('Error', 'Failed to download PDF. Please try again.');
+      Alert.alert(t('common.error', 'Error'), t('lifeAnalysisFlow.pdfDownloadFailed'));
     }
   };
 
@@ -1101,25 +1056,25 @@ export default function AnalysisDetailScreen({ route, navigation }) {
           </head>
           <body>
             <div class="header">
-              <div class="title">${displayTitle} Analysis</div>
-              <div class="subtitle">Personalized Report for ${birthData.name}</div>
-              <div class="subtitle">Generated on ${new Date().toLocaleDateString()}</div>
+              <div class="title">${displayTitle}</div>
+              <div class="subtitle">${t('lifeAnalysisFlow.personalizedReportFor', { name: birthData.name })}</div>
+              <div class="subtitle">${t('lifeAnalysisFlow.generatedOn', { date: new Date().toLocaleDateString(i18n.resolvedLanguage || undefined) })}</div>
             </div>
             
             <div class="section">
-              <div class="section-title">✨ Quick Insights</div>
-              <div class="quick-answer">${analysisResult.quick_answer?.replace(/<[^>]*>/g, '').replace(/\*\*(.*?)\*\*/g, '<span class="bold">$1</span>') || 'No quick answer available'}</div>
+              <div class="section-title">✨ ${uiText.quickInsights}</div>
+              <div class="quick-answer">${analysisResult.quick_answer?.replace(/<[^>]*>/g, '').replace(/\*\*(.*?)\*\*/g, '<span class="bold">$1</span>') || t('lifeAnalysisFlow.noQuickAnswer')}</div>
             </div>
             
             ${analysisResult.detailed_analysis && Array.isArray(analysisResult.detailed_analysis) ? `
               <div class="section">
-                <div class="section-title">📊 Detailed Analysis</div>
+                <div class="section-title">📊 ${uiText.detailedAnalysis}</div>
                 ${analysisResult.detailed_analysis.map(item => `
                   <div class="question">${item.question}</div>
                   <div class="answer">${item.answer?.replace(/\*\*(.*?)\*\*/g, '<span class="bold">$1</span>') || ''}</div>
                   ${item.key_points ? `
                     <div class="key-points">
-                      <strong>Key Points:</strong>
+                      <strong>${uiText.keyPoints}:</strong>
                       ${item.key_points.map(point => `<div class="key-point">${point}</div>`).join('')}
                     </div>
                   ` : ''}
@@ -1129,23 +1084,23 @@ export default function AnalysisDetailScreen({ route, navigation }) {
             
             ${analysisResult.final_thoughts ? `
               <div class="section">
-                <div class="section-title">🌟 Final Thoughts</div>
+                <div class="section-title">🌟 ${uiText.finalThoughts}</div>
                 <div class="final-thoughts">${analysisResult.final_thoughts.replace(/\*\*(.*?)\*\*/g, '<span class="bold">$1</span>')}</div>
               </div>
             ` : ''}
             
             <div class="footer">
-              This analysis is based on Vedic astrology principles and is for guidance purposes.
+              ${t('lifeAnalysisFlow.pdfDisclaimer')}
             </div>
           </body>
         </html>
       `;
 
       const pdfUri = await exportHtmlAsPdf(htmlContent);
-      await sharePDFOnWhatsApp(pdfUri, { dialogTitle: `${displayTitle} Analysis` });
+      await sharePDFOnWhatsApp(pdfUri, { dialogTitle: displayTitle });
     } catch (error) {
       console.error('Analysis PDF export error:', error);
-      Alert.alert('Export failed', userFacingPdfExportError(error));
+      Alert.alert(t('lifeAnalysisFlow.exportFailed'), userFacingPdfExportError(error));
     }
   };
 
@@ -1162,66 +1117,55 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   };
 
   const getAnalysisGradient = () => {
-    switch (analysisType) {
-      case 'career': return ['#6366F1', '#8B5CF6'];
-      case 'wealth': return ['#FFD700', '#FF8C00'];
-      case 'health': return ['#32CD32', '#228B22'];
-      case 'marriage': return ['#FF69B4', '#DC143C'];
-      case 'education': return ['#4169E1', '#1E90FF'];
-      case 'progeny': return ['#FF69B4', '#FFB6C1'];
-      default: return ['#ff6b35', '#ff8c5a'];
-    }
+    return [colors.primary, colors.primaryStrong || colors.secondary];
   };
 
-  const screenGradientColors = isDark
-    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary]
-    : [colors.background, colors.backgroundSecondary, colors.backgroundTertiary, colors.primary];
+  const screenGradientColors = [colors.background, colors.backgroundSecondary, colors.background];
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} />
       <LinearGradient colors={screenGradientColors} style={styles.gradientBg}>
         <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
+          <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cardBorder }]}>
             <TouchableOpacity 
-              style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface }]}
+              style={[styles.backButton, { backgroundColor: 'rgba(255,255,255,0.09)', borderColor: colors.cardBorder }]}
               onPress={() => navigation.navigate('Home', { resetToGreeting: true })}
             >
-              <Ionicons name="arrow-back" size={24} color={colors.text} />
+              <Ionicons name="arrow-back" size={22} color={colors.textInverse} />
             </TouchableOpacity>
             <View style={styles.headerTitleContainer}>
-              <Text style={[styles.headerTitle, { color: colors.text }]}>{displayTitle}</Text>
+              <Text style={[styles.headerTitle, { color: colors.textInverse }]}>{displayTitle}</Text>
               {birthData?.name && (
-                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>for {birthData.name.length > 15 ? birthData.name.substring(0, 15) + '...' : birthData.name}</Text>
+                <Text style={[styles.headerSubtitle, { color: colors.textInverseMuted }]}>
+                  {t('lifeAnalysisFlow.forName', { name: birthData.name.length > 15 ? `${birthData.name.substring(0, 15)}…` : birthData.name })}
+                </Text>
               )}
             </View>
             <View style={styles.headerRight}>
               {analysisResult && (
                 <TouchableOpacity 
-                  style={[styles.regenerateButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface }]}
+                  style={[styles.regenerateButton, { backgroundColor: 'rgba(255,255,255,0.09)', borderColor: colors.cardBorder }]}
                   onPress={regenerateAnalysis}
                 >
-                  <Ionicons name="refresh" size={20} color={colors.text} />
+                  <Ionicons name="refresh" size={19} color={colors.textInverse} />
                 </TouchableOpacity>
               )}
               {analysisResult && (
                 <TouchableOpacity 
-                  style={[styles.pdfButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface }]}
+                  style={[styles.pdfButton, { backgroundColor: 'rgba(255,255,255,0.09)', borderColor: colors.cardBorder }]}
                   onPress={downloadPDF}
                 >
-                  <Ionicons name="download" size={20} color={colors.text} />
+                  <Ionicons name="download" size={19} color={colors.textInverse} />
                 </TouchableOpacity>
               )}
               <TouchableOpacity 
                 style={styles.creditButton}
                 onPress={() => navigation.navigate('Credits')}
               >
-                <LinearGradient
-                  colors={[colors.primary, colors.secondary]}
-                  style={styles.creditGradient}
-                >
-                  <Text style={[styles.creditText, { color: '#fff' }]}>💳 {credits}</Text>
-                </LinearGradient>
+                <View style={[styles.creditGradient, { backgroundColor: colors.accentSoft }]}>
+                  <Text style={[styles.creditText, { color: colors.onAccent }]}>💳 {credits}</Text>
+                </View>
               </TouchableOpacity>
             </View>
           </View>
@@ -1229,17 +1173,14 @@ export default function AnalysisDetailScreen({ route, navigation }) {
           <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
             {!analysisResult ? (
               <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-                <View style={styles.previewSection}>
-                  <View style={styles.analysisIcon}>
-                    <LinearGradient
-                      colors={getAnalysisGradient()}
-                      style={styles.iconGradient}
-                    >
+                <View style={[styles.previewSection, { backgroundColor: colors.surfaceInverse, borderColor: colors.cardBorder }]}>
+                  <View style={[styles.analysisIcon, { borderColor: colors.cardBorder }]}>
+                    <View style={[styles.iconGradient, { backgroundColor: colors.accentSoft }]}>
                       <Text style={styles.iconText}>{getAnalysisIcon()}</Text>
-                    </LinearGradient>
+                    </View>
                   </View>
-                  <Text style={[styles.analysisTitle, { color: colors.text }]}>{displayTitle}</Text>
-                  <Text style={[styles.analysisDescription, { color: colors.textSecondary }]}>
+                  <Text style={[styles.analysisTitle, { color: colors.onSurfaceInverse || colors.textInverse }]}>{displayTitle}</Text>
+                  <Text style={[styles.analysisDescription, { color: colors.onSurfaceInverseMuted || colors.textInverseMuted }]}>
                     {uiText.previewDescription}
                   </Text>
                 </View>
@@ -1247,7 +1188,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                 {/* Progeny Focus Selector - only show when no existing analysis */}
                 {analysisType === 'progeny' && !analysisResult && (
                   <View style={styles.focusSection}>
-                    <Text style={[styles.focusTitle, { color: colors.text }]}>What is your primary focus today?</Text>
+                    <Text style={[styles.focusTitle, { color: colors.text }]}>{t('lifeAnalysisFlow.progeny.focusPrompt')}</Text>
                     
                     <TouchableOpacity
                       style={[styles.focusOption, analysisFocus === 'first_child' && styles.focusOptionSelected]}
@@ -1265,8 +1206,8 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                       >
                         <Text style={styles.focusIcon}>👶</Text>
                         <View style={styles.focusTextContainer}>
-                          <Text style={[styles.focusOptionTitle, { color: colors.text }]}>First Child Chart Study</Text>
-                          <Text style={[styles.focusOptionSubtitle, { color: colors.textSecondary }]}>Timing and chart markers for the first child topic</Text>
+                          <Text style={[styles.focusOptionTitle, { color: colors.text }]}>{t('lifeAnalysisFlow.progeny.firstChild')}</Text>
+                          <Text style={[styles.focusOptionSubtitle, { color: colors.textSecondary }]}>{t('lifeAnalysisFlow.progeny.firstChildBody')}</Text>
                         </View>
                       </LinearGradient>
                     </TouchableOpacity>
@@ -1287,8 +1228,8 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                       >
                         <Text style={styles.focusIcon}>👨‍👩‍👧</Text>
                         <View style={styles.focusTextContainer}>
-                          <Text style={[styles.focusOptionTitle, { color: colors.text }]}>Next Child Chart Study</Text>
-                          <Text style={[styles.focusOptionSubtitle, { color: colors.textSecondary }]}>Compare timing and chart factors for another child</Text>
+                          <Text style={[styles.focusOptionTitle, { color: colors.text }]}>{t('lifeAnalysisFlow.progeny.nextChild')}</Text>
+                          <Text style={[styles.focusOptionSubtitle, { color: colors.textSecondary }]}>{t('lifeAnalysisFlow.progeny.nextChildBody')}</Text>
                         </View>
                       </LinearGradient>
                     </TouchableOpacity>
@@ -1309,15 +1250,15 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                       >
                         <Text style={styles.focusIcon}>🧘</Text>
                         <View style={styles.focusTextContainer}>
-                          <Text style={[styles.focusOptionTitle, { color: colors.text }]}>Parenting Study</Text>
-                          <Text style={[styles.focusOptionSubtitle, { color: colors.textSecondary }]}>Review chart themes around parenting and care</Text>
+                          <Text style={[styles.focusOptionTitle, { color: colors.text }]}>{t('lifeAnalysisFlow.progeny.parenting')}</Text>
+                          <Text style={[styles.focusOptionSubtitle, { color: colors.textSecondary }]}>{t('lifeAnalysisFlow.progeny.parentingBody')}</Text>
                         </View>
                       </LinearGradient>
                     </TouchableOpacity>
 
                     {(analysisFocus === 'next_child' || analysisFocus === 'parenting') && (
                       <View style={[styles.childrenCountSection, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : colors.surface, borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}>
-                        <Text style={[styles.childrenCountTitle, { color: colors.text }]}>How many children are in the chart context?</Text>
+                        <Text style={[styles.childrenCountTitle, { color: colors.text }]}>{t('lifeAnalysisFlow.progeny.childrenCount')}</Text>
                         <View style={styles.childrenCountButtons}>
                           {[1, 2, 3, 4, 5].map(count => (
                             <TouchableOpacity
@@ -1338,20 +1279,20 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                 )}
 
                 {/* Pricing + credits card (same visual language as home / partnership analysis) */}
-                <View style={[styles.pricingCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface, borderColor: colors.cardBorder }]}>
+                <View style={[styles.pricingCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
                   <View style={styles.pricingLeft}>
-                    <Text style={[styles.pricingLabel, { color: colors.textSecondary }]}>Credits required</Text>
+                    <Text style={[styles.pricingLabel, { color: colors.textSecondary }]}>{uiText.creditsRequired}</Text>
                     {originalCost != null && originalCost > cost ? (
                       <View style={styles.costWithDiscount}>
                         <Text style={[styles.costText, styles.costOriginal, { color: colors.textSecondary }]}>{originalCost}</Text>
                         <Text style={[styles.costText, { color: colors.text }]}>{cost}</Text>
                       </View>
                     ) : (
-                      <Text style={[styles.costText, { color: colors.text }]}>{cost} credits</Text>
+                      <Text style={[styles.costText, { color: colors.text }]}>{uiText.credits}</Text>
                     )}
                   </View>
                   <View style={styles.pricingRight}>
-                    <Text style={[styles.pricingLabel, { color: colors.textSecondary }]}>Credits left</Text>
+                    <Text style={[styles.pricingLabel, { color: colors.textSecondary }]}>{uiText.creditsLeft}</Text>
                     <Text style={[styles.creditsLeftText, { color: credits >= cost ? colors.primary : '#b91c1c' }]}>
                       {credits}
                     </Text>
@@ -1367,8 +1308,8 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                       }) }]
                     }]}>
                       <LinearGradient
-                        colors={['#ff6b35', '#ffd700', '#ff6b35']}
-                        style={styles.loadingOrbGradient}
+                        colors={[colors.primary, colors.accent, colors.primaryStrong || colors.secondary]}
+                        style={[styles.loadingOrbGradient, { borderColor: colors.cardBorder }]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                       >
@@ -1377,7 +1318,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                         }]}>☸️</Animated.Text>
                       </LinearGradient>
                     </Animated.View>
-                    <Animated.View style={[styles.loadingGlow, {
+                    <Animated.View style={[styles.loadingGlow, { backgroundColor: colors.cosmicGlow,
                       opacity: glowAnim,
                       transform: [{ scale: glowAnim.interpolate({
                         inputRange: [0, 1],
@@ -1404,27 +1345,21 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                     onPress={requestStartAnalysis}
                     disabled={loading}
                   >
-                    <LinearGradient
-                      colors={getAnalysisGradient()}
-                      style={styles.startGradient}
-                    >
-                      <Text style={[styles.startButtonText, { color: '#fff' }]}>
-                        {uiText.startAnalysis} ({cost} credits)
+                    <View style={[styles.startGradient, { backgroundColor: colors.primary }]}>
+                      <Text style={[styles.startButtonText, { color: colors.onPrimary }]}>
+                        {uiText.startAnalysis} ({uiText.credits})
                       </Text>
-                    </LinearGradient>
+                    </View>
                   </TouchableOpacity>
                 )}
               </ScrollView>
             ) : (
               <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
                 <View style={styles.quickAnswerSection}>
-                  <LinearGradient
-                    colors={isDark ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
-                    style={[styles.quickAnswerCard, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
-                  >
+                  <View style={[styles.quickAnswerCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
                     <Text style={[styles.quickAnswerTitle, { color: colors.text }]}>{uiText.quickInsights}</Text>
                     <Text style={[styles.quickAnswerText, { color: colors.textSecondary }]}>{formatTextWithBold(analysisResult.quick_answer, false, analysisResult.terms, analysisResult.glossary)}</Text>
-                  </LinearGradient>
+                  </View>
                 </View>
 
                 {analysisResult.detailed_analysis && Array.isArray(analysisResult.detailed_analysis) && (
@@ -1436,21 +1371,18 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                           style={styles.analysisHeader}
                           onPress={() => toggleExpanded(index)}
                         >
-                          <LinearGradient
-                            colors={isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
-                            style={[styles.analysisHeaderGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
-                          >
+                          <View style={[styles.analysisHeaderGradient, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
                             <Text style={[styles.questionText, { color: colors.text }]}>{item.question}</Text>
                             <Ionicons 
                               name={expandedItems[index] ? "chevron-up" : "chevron-down"} 
                               size={20} 
                               color={colors.textSecondary} 
                             />
-                          </LinearGradient>
+                          </View>
                         </TouchableOpacity>
                         
                         {expandedItems[index] && (
-                          <View style={[styles.answerSection, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : colors.cardBackground }]}>
+                          <View style={[styles.answerSection, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
                             <Text style={[styles.answerText, { color: colors.textSecondary }]}>{formatTextWithBold(item.answer, false, analysisResult.terms, analysisResult.glossary)}</Text>
                             {item.key_points && item.key_points.length > 0 && (
                               <View style={styles.keyPointsSection}>
@@ -1475,15 +1407,12 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
                 {analysisResult.final_thoughts && (
                   <View style={styles.finalSection}>
-                    <LinearGradient
-                      colors={getAnalysisGradient()}
-                      style={[styles.finalCard, { borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : colors.cardBorder }]}
-                    >
-                      <Text style={[styles.finalTitle, { color: colors.text }]}>{uiText.finalThoughts}</Text>
+                    <View style={[styles.finalCard, { backgroundColor: colors.surfaceInverse, borderColor: colors.cardBorder }]}>
+                      <Text style={[styles.finalTitle, { color: colors.onSurfaceInverse || colors.textInverse }]}>{uiText.finalThoughts}</Text>
                       <View style={styles.finalTextContainer}>
                         {formatTextWithBold(analysisResult.final_thoughts, true, analysisResult.terms, analysisResult.glossary)}
                       </View>
-                    </LinearGradient>
+                    </View>
                   </View>
                 )}
 
@@ -1501,13 +1430,10 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                           })
                         }
                       >
-                        <LinearGradient
-                          colors={isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
-                          style={[styles.followUpGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
-                        >
+                        <View style={[styles.followUpGradient, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
                           <Text style={[styles.followUpText, { color: colors.text }]}>{question}</Text>
                           <Ionicons name="arrow-forward" size={16} color={colors.textSecondary} />
-                        </LinearGradient>
+                        </View>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -1523,7 +1449,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
             onGetCredits={confirmStart}
             title={uiText.startAnalysis}
             description={credits >= cost
-              ? `This will use ${cost} credits to generate your ${String(displayTitle || analysisType || 'analysis').toLowerCase()}.`
+              ? t('lifeAnalysisFlow.startBody', { cost, type: displayTitle })
               : uiText.insufficientCreditsBody}
             cost={cost}
             credits={credits}
@@ -1537,10 +1463,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
             <View style={styles.modalOverlay}>
               <ScrollView contentContainerStyle={styles.modalScrollContainer}>
                 <View style={styles.modalContainer}>
-                  <LinearGradient
-                    colors={isDark ? ['rgba(26, 0, 51, 0.95)', 'rgba(77, 44, 109, 0.95)'] : [colors.cardBackground, colors.backgroundSecondary]}
-                    style={styles.modalContent}
-                  >
+                  <View style={[styles.modalContent, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
                     <Text style={[styles.modalTitle, { color: colors.text }]}>{uiText.regenerateTitle}</Text>
                     <Text style={[styles.modalText, { color: colors.textSecondary }]}>
                       {credits >= cost ? uiText.regenerateBody : uiText.insufficientCreditsBody}
@@ -1549,7 +1472,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                     {/* Progeny Focus Selector in Modal */}
                     {analysisType === 'progeny' && (
                       <View style={styles.modalFocusSection}>
-                        <Text style={[styles.modalFocusTitle, { color: colors.text }]}>Update your focus:</Text>
+                        <Text style={[styles.modalFocusTitle, { color: colors.text }]}>{t('lifeAnalysisFlow.progeny.updateFocus')}</Text>
                         
                         <TouchableOpacity
                           style={[styles.modalFocusOption, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, analysisFocus === 'first_child' && styles.modalFocusOptionSelected]}
@@ -1560,10 +1483,10 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                         >
                         <Text style={styles.modalFocusIcon}>👶</Text>
                         <View style={styles.modalFocusTextContainer}>
-                            <Text style={[styles.modalFocusOptionTitle, { color: colors.text }]}>First Child Chart Study</Text>
-                            <Text style={[styles.modalFocusOptionSubtitle, { color: colors.textSecondary }]}>Timing and chart markers for the first child topic</Text>
+                            <Text style={[styles.modalFocusOptionTitle, { color: colors.text }]}>{t('lifeAnalysisFlow.progeny.firstChild')}</Text>
+                            <Text style={[styles.modalFocusOptionSubtitle, { color: colors.textSecondary }]}>{t('lifeAnalysisFlow.progeny.firstChildBody')}</Text>
                           </View>
-                          {analysisFocus === 'first_child' && <Ionicons name="checkmark-circle" size={20} color="#FF69B4" />}
+                          {analysisFocus === 'first_child' && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -1572,10 +1495,10 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                         >
                         <Text style={styles.modalFocusIcon}>👨‍👩‍👧</Text>
                         <View style={styles.modalFocusTextContainer}>
-                            <Text style={[styles.modalFocusOptionTitle, { color: colors.text }]}>Next Child Chart Study</Text>
-                            <Text style={[styles.modalFocusOptionSubtitle, { color: colors.textSecondary }]}>Compare timing and chart factors for another child</Text>
+                            <Text style={[styles.modalFocusOptionTitle, { color: colors.text }]}>{t('lifeAnalysisFlow.progeny.nextChild')}</Text>
+                            <Text style={[styles.modalFocusOptionSubtitle, { color: colors.textSecondary }]}>{t('lifeAnalysisFlow.progeny.nextChildBody')}</Text>
                           </View>
-                          {analysisFocus === 'next_child' && <Ionicons name="checkmark-circle" size={20} color="#FF69B4" />}
+                          {analysisFocus === 'next_child' && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -1584,15 +1507,15 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                         >
                         <Text style={styles.modalFocusIcon}>🧘</Text>
                         <View style={styles.modalFocusTextContainer}>
-                            <Text style={[styles.modalFocusOptionTitle, { color: colors.text }]}>Parenting Study</Text>
-                            <Text style={[styles.modalFocusOptionSubtitle, { color: colors.textSecondary }]}>Review chart themes around parenting and care</Text>
+                            <Text style={[styles.modalFocusOptionTitle, { color: colors.text }]}>{t('lifeAnalysisFlow.progeny.parenting')}</Text>
+                            <Text style={[styles.modalFocusOptionSubtitle, { color: colors.textSecondary }]}>{t('lifeAnalysisFlow.progeny.parentingBody')}</Text>
                           </View>
-                          {analysisFocus === 'parenting' && <Ionicons name="checkmark-circle" size={20} color="#FF69B4" />}
+                          {analysisFocus === 'parenting' && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
                         </TouchableOpacity>
 
                         {(analysisFocus === 'next_child' || analysisFocus === 'parenting') && (
                           <View style={[styles.modalChildrenCountSection, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : colors.surface }]}>
-                            <Text style={[styles.modalChildrenCountTitle, { color: colors.text }]}>How many children are in the chart context?</Text>
+                            <Text style={[styles.modalChildrenCountTitle, { color: colors.text }]}>{t('lifeAnalysisFlow.progeny.childrenCount')}</Text>
                             <View style={styles.modalChildrenCountButtons}>
                               {[1, 2, 3, 4, 5].map(count => (
                                 <TouchableOpacity
@@ -1612,8 +1535,8 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                     )}
                     
                     <View style={[styles.modalCreditInfo, { backgroundColor: colors.surface }]}>
-                      <Text style={[styles.modalCreditText, { color: colors.text }]}>💳 Credits to be charged: {cost}</Text>
-                      <Text style={[styles.modalBalanceText, { color: colors.textSecondary }]}>Current balance: {credits}</Text>
+                      <Text style={[styles.modalCreditText, { color: colors.text }]}>💳 {t('lifeAnalysisFlow.creditsToCharge', { cost })}</Text>
+                      <Text style={[styles.modalBalanceText, { color: colors.textSecondary }]}>{t('lifeAnalysisFlow.currentBalance', { credits })}</Text>
                     </View>
                     <View style={styles.modalButtons}>
                       <TouchableOpacity
@@ -1630,13 +1553,13 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                           colors={getAnalysisGradient()}
                           style={styles.modalConfirmGradient}
                         >
-                          <Text style={[styles.modalConfirmText, { color: '#fff' }]}>
-                            {credits >= cost ? uiText.regenerateButton : 'Get Credits'}
+                          <Text style={[styles.modalConfirmText, { color: colors.onPrimary }]}>
+                            {credits >= cost ? uiText.regenerateButton : uiText.getCredits}
                           </Text>
                         </LinearGradient>
                       </TouchableOpacity>
                     </View>
-                  </LinearGradient>
+                  </View>
                 </View>
               </ScrollView>
             </View>
@@ -1648,24 +1571,18 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       {tooltipModal.show && (
         <View style={styles.tooltipModalOverlay}>
           <View style={styles.tooltipModalContainer}>
-            <LinearGradient
-              colors={isDark ? ['rgba(26, 0, 51, 0.95)', 'rgba(77, 44, 109, 0.95)'] : [colors.cardBackground, colors.backgroundSecondary]}
-              style={styles.tooltipModalContent}
-            >
+            <View style={[styles.tooltipModalContent, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
               <Text style={[styles.tooltipModalTitle, { color: colors.accent }]}>{tooltipModal.term}</Text>
               <Text style={[styles.tooltipModalText, { color: colors.textSecondary }]}>{tooltipModal.definition}</Text>
               <TouchableOpacity
                 style={styles.tooltipModalButton}
                 onPress={() => setTooltipModal({ show: false, term: '', definition: '' })}
               >
-                <LinearGradient
-                  colors={[colors.primary, colors.secondary]}
-                  style={styles.tooltipModalButtonGradient}
-                >
-                  <Text style={styles.tooltipModalButtonText}>Close</Text>
-                </LinearGradient>
+                <View style={[styles.tooltipModalButtonGradient, { backgroundColor: colors.primary }]}>
+                  <Text style={[styles.tooltipModalButtonText, { color: colors.onPrimary }]}>{uiText.close}</Text>
+                </View>
               </TouchableOpacity>
-            </LinearGradient>
+            </View>
           </View>
         </View>
       )}
@@ -1682,6 +1599,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 12,
+    borderBottomWidth: 1,
   },
   backButton: {
     width: 36,
@@ -1691,6 +1609,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
+    borderWidth: 1,
   },
   headerTitleContainer: {
     flex: 1,
@@ -1698,8 +1617,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '500',
+    fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }),
     color: '#ffffff',
     textAlign: 'center',
   },
@@ -1715,44 +1635,49 @@ const styles = StyleSheet.create({
   creditText: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
   content: { flex: 1 },
   scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 30 },
+  scrollContent: { paddingBottom: 44 },
   previewSection: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
+    alignItems: 'flex-start',
+    margin: 16,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    borderRadius: 28,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   analysisIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 20,
-    shadowColor: '#ff6b35',
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    marginBottom: 24,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    elevation: 3,
+    borderWidth: 1,
   },
   iconGradient: {
     width: '100%',
     height: '100%',
-    borderRadius: 40,
+    borderRadius: 31,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderWidth: 0,
   },
-  iconText: { fontSize: 40 },
+  iconText: { fontSize: 30 },
   analysisTitle: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 40,
+    fontWeight: '500',
+    fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }),
     color: '#ffffff',
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 12,
   },
   analysisDescription: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
+    textAlign: 'left',
     lineHeight: 24,
   },
   startButton: {
@@ -1760,11 +1685,11 @@ const styles = StyleSheet.create({
     marginVertical: 20,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#ff6b35',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 3,
   },
   startGradient: {
     paddingVertical: 18,
@@ -1827,26 +1752,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 40,
     paddingHorizontal: 20,
+    marginHorizontal: 16,
+    marginTop: 12,
     position: 'relative',
   },
   cosmicLoadingOrb: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 92,
+    height: 92,
+    borderRadius: 46,
     marginBottom: 30,
-    shadowColor: '#ff6b35',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 3,
   },
   loadingOrbGradient: {
     width: '100%',
     height: '100%',
-    borderRadius: 60,
+    borderRadius: 46,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
+    borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   loadingOrbIcon: {
@@ -1855,10 +1782,9 @@ const styles = StyleSheet.create({
   loadingGlow: {
     position: 'absolute',
     top: 20,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(255, 107, 53, 0.3)',
+    width: 116,
+    height: 116,
+    borderRadius: 58,
     zIndex: -1,
   },
   loadingTitle: {
@@ -1887,14 +1813,15 @@ const styles = StyleSheet.create({
   },
   quickAnswerSection: { paddingHorizontal: 20, paddingVertical: 20 },
   quickAnswerCard: {
-    padding: 20,
-    borderRadius: 16,
+    padding: 22,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   quickAnswerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: '500',
+    fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }),
     color: '#ffffff',
     marginBottom: 12,
   },
@@ -1905,8 +1832,9 @@ const styles = StyleSheet.create({
   },
   detailedSection: { paddingHorizontal: 20 },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: '500',
+    fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }),
     color: '#ffffff',
     marginBottom: 16,
   },
@@ -1927,7 +1855,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginRight: 12,
   },
-  answerSection: { backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: 16 },
+  answerSection: { padding: 18, borderWidth: 1, borderTopWidth: 0 },
   answerText: {
     fontSize: 15,
     color: 'rgba(255, 255, 255, 0.9)',
@@ -1963,14 +1891,15 @@ const styles = StyleSheet.create({
   finalSection: { paddingHorizontal: 20, paddingVertical: 20 },
   finalCard: {
     padding: 20,
-    borderRadius: 16,
-    borderWidth: 2,
+    borderRadius: 22,
+    borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   finalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: '500',
+    fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }),
     color: '#333',
     marginBottom: 12,
   },
@@ -2014,6 +1943,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
   },
   pdfButton: {
     width: 36,
@@ -2022,6 +1952,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
   },
 
   modalOverlay: {
@@ -2038,24 +1969,26 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     marginHorizontal: 20,
-    borderRadius: 16,
+    borderRadius: 26,
     overflow: 'hidden',
   },
   modalContent: {
-    padding: 24,
-    alignItems: 'center',
+    padding: 26,
+    alignItems: 'stretch',
+    borderWidth: 1,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: '500',
+    fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }),
     color: '#ffffff',
     marginBottom: 12,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   modalText: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
+    textAlign: 'left',
     lineHeight: 22,
     marginBottom: 20,
   },
@@ -2065,6 +1998,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 24,
     width: '100%',
+    borderWidth: 1,
   },
   modalCreditText: {
     fontSize: 16,
@@ -2307,25 +2241,27 @@ const styles = StyleSheet.create({
   },
   tooltipModalContainer: {
     marginHorizontal: 20,
-    borderRadius: 16,
+    borderRadius: 24,
     overflow: 'hidden',
     maxWidth: 350,
   },
   tooltipModalContent: {
     padding: 24,
-    alignItems: 'center',
+    alignItems: 'stretch',
+    borderWidth: 1,
   },
   tooltipModalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '500',
+    fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }),
     color: '#FFD700',
     marginBottom: 12,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   tooltipModalText: {
     fontSize: 15,
     color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
+    textAlign: 'left',
     lineHeight: 22,
     marginBottom: 20,
   },

@@ -1,363 +1,133 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-  Alert,
-  Platform,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { COLORS } from '../../../utils/constants';
+import { useTranslation } from 'react-i18next';
+import { useTheme } from '../../../context/ThemeContext';
 import { authAPI } from '../../../services/api';
 import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
 import { registrationEmailRequiredForCountry } from '../countryCodes';
 import AuthKeyboardScreen from './AuthKeyboardScreen';
+import AppAlertModal from '../../Common/AppAlertModal';
 
-export default function OTPScreen({ 
-  formData, 
-  updateFormData, 
-  navigateToScreen, 
-  isLogin 
-}) {
+export default function OTPScreen({ formData, updateFormData, navigateToScreen, isLogin }) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
   const [loading, setLoading] = useState(false);
-  const [isValid, setIsValid] = useState(false);
+  const [resending, setResending] = useState(false);
   const [resendTimer, setResendTimer] = useState(30);
-  const [devOtpCode, setDevOtpCode] = useState(null);
-  const otpChannel = formData?.otpDelivery?.registration_otp_channel || '';
-  const otpSentToEmail = otpChannel === 'email';
-  const emailRequiredForRegistration = registrationEmailRequiredForCountry(formData.countryCode || '+91');
-  const otpDestination = otpSentToEmail && formData.email
-    ? formData.email
-    : `${formData.countryCode} ${formData.phone}`;
-  
+  const [devOtpCode, setDevOtpCode] = useState(formData.devOtpCode || null);
+  const [appAlert, setAppAlert] = useState(null);
   const inputAnim = useRef(new Animated.Value(0)).current;
-  const buttonAnim = useRef(new Animated.Value(50)).current;
   const lastAutoVerifyCodeRef = useRef('');
+  const code = String(formData.otpCode || '');
+  const isValid = code.length === 6;
+  const otpSentToEmail = formData?.otpDelivery?.registration_otp_channel === 'email';
+  const destination = otpSentToEmail && formData.email ? formData.email : `${formData.countryCode} ${formData.phone}`;
+  const emailRequired = registrationEmailRequiredForCountry(formData.countryCode || '+91');
 
   useEffect(() => {
-    trackAcquisitionFunnelEvent(
-      'registration_otp_screen_viewed',
-      { mode: isLogin ? 'login' : 'register' },
-      { screenName: 'OTPScreen' },
-    ).catch(() => {});
-    Animated.parallel([
-      Animated.timing(inputAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonAnim, {
-        toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // Start countdown timer
-    const timer = setInterval(() => {
-      setResendTimer(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
+    trackAcquisitionFunnelEvent('registration_otp_screen_viewed', { mode: isLogin ? 'login' : 'register' }, { screenName: 'OTPScreen' }).catch(() => {});
+    Animated.timing(inputAnim, { toValue: 1, duration: 420, useNativeDriver: true }).start();
+    const timer = setInterval(() => setResendTimer((value) => Math.max(0, value - 1)), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [inputAnim, isLogin]);
 
-  useEffect(() => {
-    setIsValid(formData.otpCode.length === 6);
-  }, [formData.otpCode]);
-
-  const handleVerifyOTP = async (codeOverride = null) => {
-    const codeForSubmit = String(codeOverride != null ? codeOverride : formData.otpCode || '').replace(/[^0-9]/g, '').slice(0, 6);
-    if (codeForSubmit.length !== 6 || loading) return;
-    
+  const verify = async (override) => {
+    const submitted = String(override ?? code).replace(/\D/g, '').slice(0, 6);
+    if (submitted.length !== 6 || loading) return;
     setLoading(true);
     try {
-      trackAcquisitionFunnelEvent(
-        'registration_otp_verify_submitted',
-        { source: 'otp_screen' },
-        { status: 'started', screenName: 'OTPScreen' },
-      ).catch(() => {});
-      const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
-      const response = await authAPI.verifyResetCode({
-        phone: fullPhone,
-        code: codeForSubmit,
-      });
+      trackAcquisitionFunnelEvent('registration_otp_verify_submitted', { source: 'otp_screen' }, { status: 'started', screenName: 'OTPScreen' }).catch(() => {});
+      const response = await authAPI.verifyResetCode({ phone: `${formData.countryCode || ''}${formData.phone}`, code: submitted });
       updateFormData('otpToken', response?.data?.reset_token || '');
-      trackAcquisitionFunnelEvent(
-        'registration_otp_verified',
-        { source: 'otp_screen' },
-        { status: 'success', screenName: 'OTPScreen' },
-      ).catch(() => {});
-      
-      // India verifies by SMS and skips email. International users collected email before this screen.
+      trackAcquisitionFunnelEvent('registration_otp_verified', { source: 'otp_screen' }, { status: 'success', screenName: 'OTPScreen' }).catch(() => {});
       navigateToScreen('name');
     } catch (error) {
-      trackAcquisitionFunnelEvent(
-        'registration_otp_verify_failed',
-        { source: 'otp_screen' },
-        { status: 'failed', screenName: 'OTPScreen' },
-      ).catch(() => {});
-      Alert.alert('Error', 'Invalid OTP. Please try again.');
+      lastAutoVerifyCodeRef.current = '';
+      trackAcquisitionFunnelEvent('registration_otp_verify_failed', { source: 'otp_screen' }, { status: 'failed', screenName: 'OTPScreen' }).catch(() => {});
+      setAppAlert({ variant: 'error', title: t('common.error', 'Error'), message: t('authDeep.otpInvalid', 'That code is not valid. Check it and try again.') });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOtpChange = (value) => {
-    const digits = value.replace(/[^0-9]/g, '').slice(0, 6);
+  const changeCode = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 6);
     updateFormData('otpCode', digits);
     if (digits.length === 6 && !loading && lastAutoVerifyCodeRef.current !== digits) {
       lastAutoVerifyCodeRef.current = digits;
-      setTimeout(() => {
-        handleVerifyOTP(digits);
-      }, 80);
+      setTimeout(() => verify(digits), 80);
     }
   };
 
-  const handleResendOTP = async () => {
-    if (resendTimer > 0) return;
-    
+  const resend = async () => {
+    if (resendTimer > 0 || resending) return;
+    setResending(true);
     try {
-      trackAcquisitionFunnelEvent(
-        'registration_otp_resent',
-        { source: 'otp_screen' },
-        { status: 'started', screenName: 'OTPScreen' },
-      ).catch(() => {});
-      const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
-      const payload = { phone: fullPhone };
-      if ((formData.email || '').trim()) {
-        payload.email = formData.email.trim();
-      }
+      const payload = { phone: `${formData.countryCode || ''}${formData.phone}` };
+      if ((formData.email || '').trim()) payload.email = formData.email.trim();
       const response = await authAPI.sendRegistrationOtp(payload);
       updateFormData('otpDelivery', response?.data?.delivery || formData.otpDelivery || null);
+      if (response?.data?.dev_code) setDevOtpCode(response.data.dev_code);
       setResendTimer(30);
-      
-      // Show dev OTP code if available
-      if (response.data.dev_code) {
-        setDevOtpCode(response.data.dev_code);
-      }
-      trackAcquisitionFunnelEvent(
-        'registration_otp_resent',
-        { source: 'otp_screen' },
-        { status: 'success', screenName: 'OTPScreen' },
-      ).catch(() => {});
-      
-      Alert.alert('Success', 'OTP sent successfully!');
+      setAppAlert({ variant: 'success', title: t('authDeep.codeSentTitle', 'Code sent'), message: t('authDeep.codeSentBody', 'A new verification code is on its way.') });
     } catch (error) {
-      trackAcquisitionFunnelEvent(
-        'registration_otp_resent',
-        { source: 'otp_screen', status_code: error?.response?.status || '' },
-        { status: 'failed', screenName: 'OTPScreen' },
-      ).catch(() => {});
-      Alert.alert('Error', 'Failed to resend OTP. Please try again.');
+      setAppAlert({ variant: 'error', title: t('common.error', 'Error'), message: t('authDeep.resendFailed', 'We could not resend the code. Please try again.') });
+    } finally {
+      setResending(false);
     }
   };
 
-  // Show dev OTP on initial load if available from previous API call
-  useEffect(() => {
-    // console.log('📱 OTP Screen loaded for phone:', formData.phone);
-    
-    if (formData.devOtpCode) {
-      // console.log('📱 Development OTP Code available:', formData.devOtpCode);
-      setDevOtpCode(formData.devOtpCode);
-    } else {
-      console.log('💡 Check backend logs for development OTP code');
-    }
-  }, [formData.devOtpCode]);
-
   return (
+    <>
     <AuthKeyboardScreen
-      emoji={otpSentToEmail ? '📧' : '📱'}
-      title="Enter OTP"
-      subtitle={`We've sent a 6-digit code to ${otpDestination}`}
-      onBack={() => navigateToScreen(emailRequiredForRegistration ? 'email' : 'phone', 'back')}
-      headerExtra={devOtpCode ? (
-            <View style={styles.devCodeContainer}>
-              <Text style={styles.devCodeLabel}>Development OTP:</Text>
-              <Text style={styles.devCodeText}>{devOtpCode}</Text>
-            </View>
-      ) : null}
-      action={(
-        <Animated.View
-          style={[
-            styles.buttonContainer,
-            {
-              transform: [{ translateY: buttonAnim }],
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={[styles.verifyButton, !isValid && styles.buttonDisabled]}
-            onPress={() => handleVerifyOTP()}
-            disabled={!isValid || loading}
-          >
-            <LinearGradient
-              colors={isValid ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
-              style={styles.buttonGradient}
-            >
-              <Text style={styles.buttonText}>
-                {loading ? 'Verifying...' : 'Verify OTP'}
-              </Text>
-              <Ionicons name="arrow-forward" size={20} color="#ffffff" />
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+      emoji="✦"
+      title={t('authDeep.otpTitle', 'Enter verification code')}
+      subtitle={t('authDeep.otpSubtitle', { destination, defaultValue: 'We sent a 6-digit code to {{destination}}' })}
+      onBack={() => navigateToScreen(emailRequired ? 'email' : 'phone', 'back')}
+      headerExtra={devOtpCode ? <View style={[styles.devCode, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}><Text style={[styles.devLabel, { color: colors.accent }]}>{t('authDeep.developmentCode', 'DEVELOPMENT CODE')}</Text><Text style={[styles.devValue, { color: colors.textInverse }]}>{devOtpCode}</Text></View> : null}
+      action={
+        <TouchableOpacity style={[styles.action, { backgroundColor: isValid ? colors.accent : colors.surfaceMuted }]} onPress={() => verify()} disabled={!isValid || loading}>
+          <Text style={[styles.actionText, { color: isValid ? colors.onAccent : colors.textTertiary }]}>{loading ? t('authDeep.verifying', 'Verifying…') : t('authDeep.verifyCode', 'Verify code')}</Text>
+          <Ionicons name="arrow-forward" size={19} color={isValid ? colors.onAccent : colors.textTertiary} />
+        </TouchableOpacity>
+      }
     >
-        <Animated.View
-          style={[
-            styles.inputContainer,
-            {
-              opacity: inputAnim,
-              transform: [
-                {
-                  translateY: inputAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [30, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View style={[styles.inputWrapper, isValid && styles.inputValid]}>
-            <TextInput
-              style={styles.input}
-              placeholder="6-digit code"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
-              value={formData.otpCode}
-              onChangeText={handleOtpChange}
-              keyboardType="number-pad"
-              inputMode="numeric"
-              textContentType="oneTimeCode"
-              autoComplete="sms-otp"
-              autoFocus
-              maxLength={6}
-            />
-            {isValid && (
-              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-            )}
-          </View>
-        </Animated.View>
-
-        <View style={styles.resendContainer}>
-          <TouchableOpacity
-            onPress={handleResendOTP}
-            disabled={resendTimer > 0}
-            style={styles.resendButton}
-          >
-            <Text style={[styles.resendText, resendTimer > 0 && styles.resendDisabled]}>
-              {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP'}
-            </Text>
+      <Animated.View style={{ opacity: inputAnim, transform: [{ translateY: inputAnim.interpolate({ inputRange: [0, 1], outputRange: [22, 0] }) }] }}>
+        <View style={[styles.inputWrap, { backgroundColor: colors.cosmicRaised, borderColor: isValid ? colors.accent : colors.cosmicLine }]}>
+          <TextInput style={[styles.input, { color: colors.textInverse }]} placeholder="••••••" placeholderTextColor={colors.textInverseMuted} value={code} onChangeText={changeCode} keyboardType="number-pad" inputMode="numeric" textContentType="oneTimeCode" autoComplete="sms-otp" autoFocus maxLength={6} />
+          {isValid && <Ionicons name="checkmark-circle" size={23} color={colors.accent} />}
+        </View>
+        <View style={styles.resendRow}>
+          <Text style={[styles.helper, { color: colors.textInverseMuted }]}>{t('authDeep.didNotReceive', 'Didn’t receive it?')}</Text>
+          <TouchableOpacity onPress={resend} disabled={resendTimer > 0 || resending}>
+            <Text style={[styles.resend, { color: resendTimer > 0 ? colors.textInverseMuted : colors.accent }]}>{resending ? t('authDeep.sending', 'Sending…') : resendTimer > 0 ? t('authDeep.resendIn', { seconds: resendTimer, defaultValue: 'Resend in {{seconds}}s' }) : t('authDeep.resend', 'Resend code')}</Text>
           </TouchableOpacity>
         </View>
+      </Animated.View>
     </AuthKeyboardScreen>
+    <AppAlertModal
+      visible={appAlert != null}
+      variant={appAlert?.variant || 'info'}
+      title={appAlert?.title || ''}
+      message={appAlert?.message || ''}
+      primaryText={t('common.ok', 'OK')}
+      onPrimaryPress={() => setAppAlert(null)}
+      onRequestClose={() => setAppAlert(null)}
+    />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  inputContainer: {
-    marginBottom: 20,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-  },
-  inputValid: {
-    borderColor: '#4CAF50',
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-  },
-  input: {
-    flex: 1,
-    fontSize: 24,
-    color: '#ffffff',
-    paddingVertical: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    letterSpacing: 3,
-    ...(Platform.OS === 'web'
-      ? { outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none' }
-      : null),
-  },
-  resendContainer: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  resendButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  resendText: {
-    color: '#ff6b35',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  resendDisabled: {
-    color: 'rgba(255, 255, 255, 0.5)',
-  },
-  buttonContainer: {
-    marginTop: 0,
-    marginBottom: 0,
-  },
-  verifyButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    gap: 8,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  devCodeContainer: {
-    marginTop: 20,
-    padding: 12,
-    backgroundColor: 'rgba(255, 107, 53, 0.2)',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ff6b35',
-  },
-  devCodeLabel: {
-    color: '#ff6b35',
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  devCodeText: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-    letterSpacing: 4,
-  },
+  inputWrap: { minHeight: 70, borderWidth: 1, borderRadius: 20, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center' },
+  input: { flex: 1, fontSize: 28, letterSpacing: 8, fontWeight: '700', textAlign: 'center', paddingVertical: 15, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : null) },
+  resendRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7, marginTop: 18 },
+  helper: { fontSize: 13 },
+  resend: { fontSize: 13, fontWeight: '800' },
+  action: { minHeight: 58, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  actionText: { fontSize: 16, fontWeight: '800' },
+  devCode: { marginTop: 16, borderRadius: 14, borderWidth: 1, paddingHorizontal: 18, paddingVertical: 10, alignItems: 'center' },
+  devLabel: { fontSize: 10, letterSpacing: 1.5, fontWeight: '800' },
+  devValue: { fontSize: 20, letterSpacing: 5, fontWeight: '800', marginTop: 3 },
 });

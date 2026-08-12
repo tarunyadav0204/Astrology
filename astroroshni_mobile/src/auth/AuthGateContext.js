@@ -28,6 +28,7 @@ import { trackGA4EventOnly } from '../utils/analytics';
 import { trackAcquisitionFunnelEvent, trackGuestActivity } from '../services/acquisitionTracking';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { DISPLAY_FONT_FAMILY } from '../theme/tokens';
 
 const AuthGateContext = createContext({
   isGuest: true,
@@ -125,12 +126,11 @@ export function AuthGateProvider({ children }) {
     [isGuest, refreshAuthState, requireAuthForPaid, openAuthGate, closeAuthGate],
   );
 
-  const sheetBg = isDark ? colors.backgroundSecondary : colors.cardBackground;
+  const sheetBg = colors.surfaceRaised || colors.surface;
   const sheetBorder = colors.cardBorder;
-  const iconBg = isDark ? 'rgba(249, 115, 22, 0.18)' : 'rgba(234, 88, 12, 0.12)';
-  const ctaColors = isDark
-    ? ['#f97316', '#ea580c', '#c2410c']
-    : ['#fb923c', '#ea580c', '#c2410c'];
+  const iconBg = colors.cosmicGlow;
+  const ctaColors = [colors.primaryStrong, colors.primary];
+  const isChatGate = /chat|tara|question/i.test(`${gateMeta.feature} ${gateMeta.message}`);
 
   return (
     <AuthGateContext.Provider value={value}>
@@ -141,7 +141,7 @@ export function AuthGateProvider({ children }) {
         animationType="slide"
         onRequestClose={dismissGate}
       >
-        <View style={styles.backdrop}>
+        <View style={[styles.backdrop, { backgroundColor: colors.overlay }]}>
           <TouchableOpacity
             style={styles.backdropTap}
             activeOpacity={1}
@@ -164,11 +164,12 @@ export function AuthGateProvider({ children }) {
                 { backgroundColor: isDark ? 'rgba(255,255,255,0.28)' : 'rgba(28,25,23,0.2)' },
               ]}
             />
-            <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
-              <Ionicons name="lock-closed" size={22} color={colors.primary} />
+            <View style={[styles.iconWrap, { backgroundColor: iconBg, borderColor: colors.cosmicLine }]}>
+              <Text style={[styles.gateGlyph, { color: colors.accent }]}>त</Text>
             </View>
+            <Text style={[styles.eyebrow, { color: colors.primary }]}>PRIVATE · CHART-AWARE · CONTINUOUS</Text>
             <Text style={[styles.title, { color: colors.text }]}>
-              {t('authGate.title')}
+              {isChatGate ? 'Begin your consultation' : t('authGate.title')}
             </Text>
             <Text style={[styles.body, { color: colors.textSecondary }]}>
               {gateMeta.message ||
@@ -181,7 +182,8 @@ export function AuthGateProvider({ children }) {
                 end={{ x: 1, y: 1 }}
                 style={styles.primaryBtn}
               >
-                <Text style={styles.primaryText}>{t('authGate.cta')}</Text>
+                <Text style={[styles.primaryText, { color: colors.onPrimary }]}>{t('authGate.cta')}</Text>
+                <Ionicons name="arrow-forward" size={17} color={colors.onPrimary} />
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity onPress={dismissGate} style={styles.secondaryBtn} activeOpacity={0.7}>
@@ -208,9 +210,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sheet: {
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    paddingHorizontal: 22,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 24,
     paddingTop: 10,
     borderWidth: 1,
     borderBottomWidth: 0,
@@ -235,16 +237,21 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
+  gateGlyph: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 30 },
+  eyebrow: { fontSize: 9, lineHeight: 13, fontWeight: '900', letterSpacing: 1.3, marginBottom: 7 },
   title: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 29,
+    lineHeight: 34,
+    fontWeight: '400',
     marginBottom: 8,
   },
   body: {
@@ -253,9 +260,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   primaryBtn: {
-    borderRadius: 14,
+    borderRadius: 999,
     paddingVertical: 15,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   primaryText: {
     color: '#fff',

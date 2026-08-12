@@ -1,18 +1,19 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
+import { typographyTokens } from '../../theme/tokens';
 
 const AshtakvargaChart = ({ chartData, ashtakvargaData, birthAshtakvargaData, onHousePress, cosmicTheme = true }) => {
-  const { theme, colors } = useTheme();
-  
-  const getBinduColor = (bindus) => {
-    if (bindus >= 30) return '#81C784'; // Strong - Darker Green
-    if (bindus <= 25) return '#E57373'; // Weak - Darker Red
-    return '#FFB74D'; // Moderate - Darker Orange
+  const { colors } = useTheme();
+
+  const getStrength = (bindus) => {
+    if (bindus >= 30) return { label: 'Strong', color: colors.success };
+    if (bindus <= 25) return { label: 'Sensitive', color: colors.error };
+    return { label: 'Steady', color: colors.warning };
   };
 
   const getSignName = (signIndex) => {
-    const signs = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
+    const signs = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
                   'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
     return signs[signIndex] || 'Unknown';
   };
@@ -25,28 +26,32 @@ const AshtakvargaChart = ({ chartData, ashtakvargaData, birthAshtakvargaData, on
           const bindus = ashtakvargaHouseData?.bindus || 0;
           const signIndex = ashtakvargaHouseData?.sign || 0;
           const signName = getSignName(signIndex);
-          const binduColor = getBinduColor(bindus);
-          
+          const strength = getStrength(bindus);
+
           // Calculate difference from birth chart if available
           const birthBindus = birthAshtakvargaData?.[houseNumber.toString()]?.bindus || 0;
           const difference = birthAshtakvargaData ? bindus - birthBindus : null;
-          
+
           return (
             <TouchableOpacity
               key={houseNumber}
-              style={[styles.houseBox, { backgroundColor: binduColor, borderWidth: 1, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(249,115,22,0.3)' }]}
+              style={[styles.houseBox, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}
               onPress={() => onHousePress?.(houseNumber, bindus, signName)}
             >
-              <Text style={[styles.houseNumber, { color: theme === 'dark' ? 'white' : '#1a1a1a' }]}>{houseNumber}</Text>
+              <View style={[styles.strengthRule, { backgroundColor: strength.color }]} />
+              <View style={styles.houseHeading}>
+                <Text style={[styles.houseNumber, { color: colors.textTertiary }]}>H{houseNumber}</Text>
+                <Text style={[styles.strengthLabel, { color: strength.color }]}>{strength.label}</Text>
+              </View>
               <View style={styles.bindusRow}>
-                <Text style={[styles.bindus, { color: theme === 'dark' ? 'white' : '#1a1a1a' }]}>{bindus}</Text>
+                <Text style={[styles.bindus, { color: colors.text }]}>{bindus}</Text>
                 {difference !== null && difference !== 0 && (
-                  <Text style={[styles.difference, { color: theme === 'dark' ? '#FFFFFF' : '#1a1a1a' }]}>
+                  <Text style={[styles.difference, { color: difference > 0 ? colors.success : colors.error }]}>
                     ({difference > 0 ? '+' : ''}{difference})
                   </Text>
                 )}
               </View>
-              <Text style={[styles.signName, { color: theme === 'dark' ? 'white' : '#1a1a1a' }]}>{signName}</Text>
+              <Text style={[styles.signName, { color: colors.textSecondary }]} numberOfLines={1}>{signName}</Text>
             </TouchableOpacity>
           );
         })}
@@ -57,7 +62,7 @@ const AshtakvargaChart = ({ chartData, ashtakvargaData, birthAshtakvargaData, on
 
 const styles = StyleSheet.create({
   container: {
-    padding: 10,
+    padding: 6,
   },
   grid: {
     flexDirection: 'row',
@@ -65,43 +70,56 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   houseBox: {
-    width: '28%',
-    aspectRatio: 1,
-    margin: '2%',
-    borderRadius: 8,
-    justifyContent: 'center',
+    width: '30.6%',
+    minHeight: 104,
+    margin: '1.35%',
+    borderRadius: 16,
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  strengthRule: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+  },
+  houseHeading: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
   },
   houseNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  strengthLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   bindusRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
+    alignItems: 'baseline',
   },
   bindus: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-    marginRight: 4,
+    ...typographyTokens.display,
+    fontSize: 30,
+    lineHeight: 32,
+    marginRight: 3,
   },
   difference: {
     fontSize: 10,
     fontWeight: '600',
   },
   signName: {
-    fontSize: 10,
-    color: 'white',
-    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
 

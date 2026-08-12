@@ -24,28 +24,34 @@ const HOUSE_DOT_POINTS_ALT = {
   10: { x: 250, y: 197 }, 11: { x: 375, y: 97 }, 12: { x: 300, y: 62 },
 };
 
-const NorthIndianChart = ({ 
-  chartData, 
+const NorthIndianChart = ({
+  chartData,
   chartType,
-  birthData, 
-  showDegreeNakshatra = false, 
-  cosmicTheme = false, 
-  rotatedAscendant = null, 
-  onRotate, 
-  showKarakas = false, 
-  karakas = null, 
-  highlightHouse = null, 
-  glowAnimation = null, 
+  birthData,
+  showDegreeNakshatra = false,
+  cosmicTheme = false,
+  rotatedAscendant = null,
+  onRotate,
+  showKarakas = false,
+  karakas = null,
+  highlightHouse = null,
+  highlightColor = null,
+  highlightFill = null,
+  glowAnimation = null,
   hideInstructions = false,
   onHousePress, // New prop for drawer
   houseActivation = null,
   size = null, // PWA/web: explicit pixel square (avoids % SVG collapse)
+  onDarkSurface = false,
 }) => {
   const { theme, colors } = useTheme();
   const { t } = useTranslation();
-  
+  const themedChartText = onDarkSurface ? colors.textInverse : colors.chartText;
+  const themedChartTextMuted = onDarkSurface ? colors.textInverseMuted : colors.chartTextMuted;
+  const themedChartLine = onDarkSurface ? colors.cosmicLine : colors.chartLine;
+
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
-  
+
   // Animation refs
   const drawAnim = useRef(new Animated.Value(0)).current;
   const lastDataRef = useRef(null);
@@ -77,7 +83,7 @@ const NorthIndianChart = ({
       return;
     }
     lastDataRef.current = dataString;
-    
+
     drawAnimHandleRef.current?.stop?.();
     drawAnim.setValue(0);
     if (!mountedRef.current) return;
@@ -104,12 +110,12 @@ const NorthIndianChart = ({
   };
 
   const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
-  
+
   const handleHousePressInternal = (houseNum) => {
     const houseIndex = houseNum - 1;
     const rashiIndex = getRashiForHouse(houseIndex);
     const planetsInHouse = getPlanetsInHouse(houseIndex);
-    
+
     if (onHousePress) {
       onHousePress({
         houseNum,
@@ -172,7 +178,9 @@ const NorthIndianChart = ({
     const status = getPlanetStatus(planet);
     if (status === 'exalted') return '#22c55e';
     if (status === 'debilitated') return '#ef4444';
-    return cosmicTheme ? (theme === 'dark' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0, 0, 0, 0.9)') : (theme === 'dark' ? '#fff' : '#2d3436');
+    return cosmicTheme
+      ? themedChartText
+      : (theme === 'dark' ? '#fff' : '#2d3436');
   };
 
   const getPlanetSymbolWithStatus = (planet) => {
@@ -290,8 +298,8 @@ const NorthIndianChart = ({
       >
         <Defs>
           <ClipPath id="chartClip">
-            <Rect 
-              x="2" y="2" width="396" height="396" 
+            <Rect
+              x="2" y="2" width="396" height="396"
               rx={cosmicTheme ? "16" : "0"}
               ry={cosmicTheme ? "16" : "0"}
             />
@@ -315,44 +323,47 @@ const NorthIndianChart = ({
           </LinearGradient>
         </Defs>
 
-        {/* Outer square border */}
-        <AnimatedRect 
-          x="2" y="2" width="396" height="396" 
-          fill="transparent" 
-          stroke={cosmicTheme ? "rgba(255, 107, 53, 0.9)" : "#e91e63"} 
-          strokeWidth={cosmicTheme ? "2" : "3"}
-          rx={cosmicTheme ? "16" : "0"}
-          ry={cosmicTheme ? "16" : "0"}
-          strokeDasharray="1600"
-          strokeDashoffset={gridStrokeDash}
-          pointerEvents="none"
-        />
-        
+        {/* In the premium chart stage, the surrounding card owns the perimeter.
+            Keeping an SVG perimeter as well creates a visibly doubled outline. */}
+        {!cosmicTheme ? (
+          <AnimatedRect
+            x="2" y="2" width="396" height="396"
+            fill="transparent"
+            stroke="#e91e63"
+            strokeWidth="3"
+            rx="0"
+            ry="0"
+            strokeDasharray="1600"
+            strokeDashoffset={gridStrokeDash}
+            pointerEvents="none"
+          />
+        ) : null}
+
         {/* Inner diamond border */}
-        <AnimatedPolygon 
-          points="200,2 398,200 200,398 2,200" 
-          fill="none" 
-          stroke={cosmicTheme ? "rgba(255, 215, 0, 0.8)" : "#ff6f00"} 
-          strokeWidth={cosmicTheme ? "2" : "3"}
+        <AnimatedPolygon
+          points="200,2 398,200 200,398 2,200"
+          fill="none"
+          stroke={cosmicTheme ? colors.chartLineStrong : "#ff6f00"}
+          strokeWidth={cosmicTheme ? "1.5" : "3"}
           strokeDasharray="1200"
           strokeDashoffset={gridStrokeDash}
           pointerEvents="none"
         />
-        
+
         {/* Diagonal lines */}
         <G clipPath="url(#chartClip)">
-          <AnimatedLine 
-            x1="2" y1="2" x2="398" y2="398" 
-            stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} 
-            strokeWidth="2"
+          <AnimatedLine
+            x1="2" y1="2" x2="398" y2="398"
+            stroke={cosmicTheme ? themedChartLine : "#ff8a65"}
+            strokeWidth={cosmicTheme ? "1" : "2"}
             strokeDasharray="600"
             strokeDashoffset={gridStrokeDash}
             pointerEvents="none"
           />
-          <AnimatedLine 
-            x1="398" y1="2" x2="2" y2="398" 
-            stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} 
-            strokeWidth="2"
+          <AnimatedLine
+            x1="398" y1="2" x2="2" y2="398"
+            stroke={cosmicTheme ? themedChartLine : "#ff8a65"}
+            strokeWidth={cosmicTheme ? "1" : "2"}
             strokeDasharray="600"
             strokeDashoffset={gridStrokeDash}
             pointerEvents="none"
@@ -365,14 +376,14 @@ const NorthIndianChart = ({
           const rashiIndex = getRashiForHouse(houseIndex);
           const planetsInHouse = getPlanetsInHouse(houseIndex);
           const houseData = getHouseData(houseNumber);
-          
+
           return (
             <G key={houseNumber}>
               {highlightHouse === houseNumber ? (
                 <Path
                   d={houseData.path}
-                  fill="rgba(255,215,0,0.18)"
-                  stroke="#ffd700"
+                  fill={highlightFill || "rgba(255,215,0,0.18)"}
+                  stroke={highlightColor || "#ffd700"}
                   strokeWidth="4"
                   pointerEvents="none"
                 />
@@ -399,8 +410,8 @@ const NorthIndianChart = ({
               {highlightHouse === houseNumber && glowAnimation && (
                 <Circle cx={houseData.center.x} cy={houseData.center.y} r="60" fill={getHouseGlowColor(houseNumber)} opacity={glowAnimation} />
               )}
-              
-              <SvgText 
+
+              <SvgText
                 x={houseNumber === 1 ? houseData.center.x - 5 :
                    houseNumber === 2 ? houseData.center.x - 10 :
                    houseNumber === 3 ? houseData.center.x + 10 :
@@ -412,37 +423,37 @@ const NorthIndianChart = ({
                    houseNumber === 9 ? houseData.center.x - 20 :
                    houseNumber === 10 ? houseData.center.x - 50 :
                    houseNumber === 11 ? houseData.center.x - 25 :
-                   houseData.center.x - 5} 
+                   houseData.center.x - 5}
                 y={houseNumber === 1 ? houseData.center.y + 55 :
                    houseNumber === 2 ? houseData.center.y + 25 :
                    houseNumber === 6 ? houseData.center.y - 10 :
                    houseNumber === 7 ? houseData.center.y - 40 :
                    houseNumber === 8 ? houseData.center.y - 10 :
                    houseNumber === 12 ? houseData.center.y + 20 :
-                   houseNumber === 5 ? houseData.center.y + 10 : houseData.center.y + 5} 
-                fontSize="18" 
-                fill={cosmicTheme ? 
-                  (rashiIndex === (chartData?.houses?.[0]?.sign ?? 0) ? "#ff6b35" : (theme === 'dark' ? "rgba(255, 255, 255, 0.9)" : "rgba(0, 0, 0, 0.8)")) :
-                  (rashiIndex === (chartData?.houses?.[0]?.sign ?? 0) ? "#e91e63" : (theme === 'dark' ? "#fff" : "#333"))} 
+                   houseNumber === 5 ? houseData.center.y + 10 : houseData.center.y + 5}
+                fontSize="18"
+                fill={cosmicTheme ?
+                  (rashiIndex === (chartData?.houses?.[0]?.sign ?? 0) ? colors.primary : themedChartTextMuted) :
+                  (rashiIndex === (chartData?.houses?.[0]?.sign ?? 0) ? "#e91e63" : (theme === 'dark' ? "#fff" : "#333"))}
                 fontWeight={rashiIndex === (chartData?.houses?.[0]?.sign ?? 0) ? "900" : "bold"}>
                 {rashiIndex + 1}
               </SvgText>
-              
+
               {houseNumber === 1 && (
                 <G>
-                  <SvgText x={houseData.center.x + 25} y={houseData.center.y + 35} fontSize="12" fill={cosmicTheme ? "#ff6b35" : "#e91e63"} fontWeight="900" textAnchor="middle">ASC</SvgText>
+                  <SvgText x={houseData.center.x + 25} y={houseData.center.y + 35} fontSize="12" fill={cosmicTheme ? colors.primary : "#e91e63"} fontWeight="900" textAnchor="middle">ASC</SvgText>
                   {(chartData?.ascendant ?? null) != null && (
-                    <SvgText x={houseData.center.x + 25} y={houseData.center.y + 50} fontSize="8" fill={cosmicTheme ? (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.6)") : (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "#666")} fontWeight="500" textAnchor="middle">
+                    <SvgText x={houseData.center.x + 25} y={houseData.center.y + 50} fontSize="8" fill={cosmicTheme ? themedChartTextMuted : (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "#666")} fontWeight="500" textAnchor="middle">
                       {formatDegree(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
                     </SvgText>
                   )}
                 </G>
               )}
-              
+
               {planetsInHouse.map((planet, pIndex) => {
                 const totalPlanets = planetsInHouse.length;
                 let planetX, planetY;
-                
+
                 if (totalPlanets === 1) {
                   if (houseNumber === 1) {
                     planetX = houseData.center.x;
@@ -502,7 +513,7 @@ const NorthIndianChart = ({
                     const col = pIndex % 2;
                     const spacing = 25;
                     const rowSpacing = 32;
-                    
+
                     if (houseNumber === 1) {
                       planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
                       planetY = houseData.center.y - 20 + (row * rowSpacing);
@@ -530,7 +541,7 @@ const NorthIndianChart = ({
                 } else {
                   // For 5+ planets - arrange in single column
                   const rowSpacing = 26;
-                  
+
                   if (houseNumber === 1) {
                     planetX = houseData.center.x;
                     planetY = houseData.center.y - 25 + (pIndex * rowSpacing);
@@ -562,13 +573,13 @@ const NorthIndianChart = ({
                     planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
                   }
                 }
-                
+
                 return (
                   <G key={pIndex}>
-                    <SvgText 
-                      x={planetX} 
-                      y={planetY - 8} 
-                      fontSize={showKarakas ? (totalPlanets > 4 ? "8" : totalPlanets > 2 ? "10" : "11") : (totalPlanets > 4 ? "10" : totalPlanets > 2 ? "12" : "14")} 
+                    <SvgText
+                      x={planetX}
+                      y={planetY - 8}
+                      fontSize={showKarakas ? (totalPlanets > 4 ? "8" : totalPlanets > 2 ? "10" : "11") : (totalPlanets > 4 ? "10" : totalPlanets > 2 ? "12" : "14")}
                       fill={getPlanetColor(planet)}
                       fontWeight="900"
                       textAnchor="middle"
@@ -576,11 +587,11 @@ const NorthIndianChart = ({
                       {getPlanetSymbolWithStatus(planet)}
                     </SvgText>
                     {showDegreeNakshatra && (
-                      <SvgText 
-                        x={planetX} 
-                        y={planetY + 8} 
-                        fontSize={totalPlanets > 4 ? "7" : totalPlanets > 2 ? "9" : "10"} 
-                        fill={cosmicTheme ? "rgba(255, 255, 255, 0.7)" : "#666"}
+                      <SvgText
+                        x={planetX}
+                        y={planetY + 8}
+                        fontSize={totalPlanets > 4 ? "7" : totalPlanets > 2 ? "9" : "10"}
+                        fill={cosmicTheme ? themedChartTextMuted : "#666"}
                         fontWeight="500"
                         textAnchor="middle"
                         onPress={() => handlePlanetPress(planet)}>
@@ -606,13 +617,13 @@ const NorthIndianChart = ({
           ))}
         </G>
       </Svg>
-      
+
       {tooltip.show && (
         <View style={[styles.tooltip, { backgroundColor: theme === 'dark' ? 'rgba(233, 30, 99, 0.9)' : 'rgba(249, 115, 22, 0.9)' }]}>
           <Text style={styles.tooltipText}>{tooltip.text}</Text>
         </View>
       )}
-      
+
       {!hideInstructions && (
         <Text style={[
           styles.instructionText,

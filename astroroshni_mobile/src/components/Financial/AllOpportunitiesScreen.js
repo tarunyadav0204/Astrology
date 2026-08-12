@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
+import FocusedStatusBar from '../Common/FocusedStatusBar';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../../utils/constants';
@@ -35,6 +37,8 @@ const OpportunityCard = ({ opportunity, onPress }) => (
 );
 
 export default function AllOpportunitiesScreen({ navigation }) {
+  const { colors } = useTheme();
+  const workspaceGradient = [colors.cosmicSurface, colors.headerSurface, colors.cosmicRaised];
   const [loading, setLoading] = useState(true);
   const [opportunities, setOpportunities] = useState([]);
   const [filter, setFilter] = useState('High');
@@ -62,7 +66,8 @@ export default function AllOpportunitiesScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#0f0c29', '#302b63', '#24243e']} style={styles.bg}>
+      <LinearGradient colors={workspaceGradient} style={styles.bg}>
+        <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -79,7 +84,11 @@ export default function AllOpportunitiesScreen({ navigation }) {
             {['High', 'Medium', 'Low'].map((intensity) => (
               <TouchableOpacity
                 key={intensity}
-                style={[styles.filterTab, filter === intensity && styles.filterTabActive]}
+                style={[
+                  styles.filterTab,
+                  { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine, borderWidth: 1 },
+                  filter === intensity && { backgroundColor: colors.primary, borderColor: colors.accent },
+                ]}
                 onPress={() => setFilter(intensity)}
               >
                 <Text style={[styles.filterText, filter === intensity && styles.filterTextActive]}>

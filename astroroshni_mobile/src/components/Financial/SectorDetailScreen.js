@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
+import FocusedStatusBar from '../Common/FocusedStatusBar';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../../utils/constants';
@@ -151,6 +153,8 @@ const TimelineChart = ({ timeline, period }) => {
 };
 
 export default function SectorDetailScreen({ route, navigation }) {
+  const { colors } = useTheme();
+  const workspaceGradient = [colors.cosmicSurface, colors.headerSurface, colors.cosmicRaised];
   const { sector } = route.params;
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
@@ -178,7 +182,8 @@ export default function SectorDetailScreen({ route, navigation }) {
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <LinearGradient colors={['#0f0c29', '#302b63']} style={styles.bg}>
+        <LinearGradient colors={workspaceGradient} style={styles.bg}>
+          <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
           <SafeAreaView style={styles.safeArea}>
             <ActivityIndicator size="large" color="#10b981" />
             <Text style={styles.loadingText}>Loading {sector}...</Text>
@@ -191,7 +196,8 @@ export default function SectorDetailScreen({ route, navigation }) {
   if (!data) {
     return (
       <View style={styles.centerContainer}>
-        <LinearGradient colors={['#0f0c29', '#302b63']} style={styles.bg}>
+        <LinearGradient colors={workspaceGradient} style={styles.bg}>
+          <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
           <SafeAreaView style={styles.safeArea}>
             <Text style={styles.errorText}>Failed to load sector data</Text>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -207,7 +213,8 @@ export default function SectorDetailScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#0f0c29', '#302b63', '#24243e']} style={styles.bg}>
+      <LinearGradient colors={workspaceGradient} style={styles.bg}>
+        <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -224,15 +231,15 @@ export default function SectorDetailScreen({ route, navigation }) {
               <Text style={styles.rulerText}>Ruled by ♃ {ruler}</Text>
               
               <View style={styles.statsRow}>
-                <View style={styles.statBox}>
+                <View style={[styles.statBox, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}>
                   <Text style={styles.statValue}>{summary.total_periods}</Text>
                   <Text style={styles.statLabel}>Total Periods</Text>
                 </View>
-                <View style={[styles.statBox, { borderColor: '#10b981' }]}>
+                <View style={[styles.statBox, { backgroundColor: colors.cosmicRaised, borderColor: colors.success }]}>
                   <Text style={[styles.statValue, { color: '#10b981' }]}>{summary.bullish_count}</Text>
                   <Text style={styles.statLabel}>Bullish</Text>
                 </View>
-                <View style={[styles.statBox, { borderColor: '#ef4444' }]}>
+                <View style={[styles.statBox, { backgroundColor: colors.cosmicRaised, borderColor: colors.error }]}>
                   <Text style={[styles.statValue, { color: '#ef4444' }]}>{summary.bearish_count}</Text>
                   <Text style={styles.statLabel}>Bearish</Text>
                 </View>

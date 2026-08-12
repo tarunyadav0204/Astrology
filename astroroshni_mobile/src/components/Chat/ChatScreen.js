@@ -29,6 +29,7 @@ import { getWebTabBottomPad, subscribeWebKeyboardOverlap } from '../../platform/
 import { useFocusEffect } from '@react-navigation/native';
 
 import MessageBubble from './MessageBubble';
+import PremiumConsultationContext from './PremiumConsultationContext';
 import LoadingBubble from '../LoadingBubble';
 import FeedbackComponent from './FeedbackComponent';
 import EventPeriods from './EventPeriods';
@@ -61,6 +62,7 @@ import { useTranslation } from 'react-i18next';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
 import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
 import { shouldPostChatErrorToAdminLogs } from '../../utils/chatAdminErrorGating';
+import { typographyTokens } from '../../theme/tokens';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -1673,20 +1675,12 @@ export default function ChatScreen({ navigation, route }) {
 
   const getMenuOptionStyle = () => [
     styles.menuOption,
-    { elevation: getCardElevation(3) }
+    { elevation: getCardElevation(0) }
   ];
 
-  const menuRowGradient = isPanditMode
-    ? ['rgba(24, 24, 27, 0.04)', 'rgba(24, 24, 27, 0.02)']
-    : Platform.OS === 'android'
-      ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-      : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']);
-  const menuRowBorder = isPanditMode
-    ? 'rgba(24, 24, 27, 0.1)'
-    : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)');
-  const menuAccentIconGradient = isPanditMode
-    ? ['#52525B', '#71717A']
-    : ['#ff6b35', '#ff8c5a'];
+  const menuRowGradient = [colors.surface, colors.surface];
+  const menuRowBorder = colors.cardBorder;
+  const menuAccentIconGradient = [colors.selectionSurface, colors.selectionSurface];
 
   const getSignName = (signNumber) => {
     if (signNumber === undefined || signNumber === null) return t('common.unknown', 'Unknown');
@@ -2564,7 +2558,7 @@ export default function ChatScreen({ navigation, route }) {
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <Text style={{ fontSize: 20 }}>🤝</Text>
-                <Text style={[styles.modalTitle, { color: colors.text, fontSize: 18 }]}>Partnership Setup</Text>
+                <Text style={[styles.modalTitle, { color: colors.text, fontSize: 18 }]}>{t('premiumUi.chatScreen.partnershipSetup')}</Text>
               </View>
               <TouchableOpacity
                 onPress={() => setShowPartnershipSetupModal(false)}
@@ -2600,7 +2594,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Text>{isNativeSet ? '👤' : '1️⃣'}</Text>
                   </View>
                   <View style={styles.setupSlotContent}>
-                    <Text style={styles.setupSlotLabel}>First Person</Text>
+                    <Text style={styles.setupSlotLabel}>{t('premiumUi.chatScreen.firstPerson')}</Text>
                     <Text style={isNativeSet ? styles.setupSlotValue : styles.setupSlotPlaceholder} numberOfLines={1}>
                       {isNativeSet ? nativeChart.name : 'Select from list below...'}
                     </Text>
@@ -2631,7 +2625,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Text>{isPartnerSet ? '👫' : '2️⃣'}</Text>
                   </View>
                   <View style={styles.setupSlotContent}>
-                    <Text style={styles.setupSlotLabel}>Partner / Family / Friend</Text>
+                    <Text style={styles.setupSlotLabel}>{t('premiumUi.chatScreen.partnerPerson')}</Text>
                     <Text style={isPartnerSet ? styles.setupSlotValue : styles.setupSlotPlaceholder} numberOfLines={1}>
                       {isPartnerSet ? partnerChart.name : (isNativeSet ? 'Select from list below...' : 'Complete Step 1 first')}
                     </Text>
@@ -2661,7 +2655,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Text>{isRelationSet ? '💍' : '3️⃣'}</Text>
                   </View>
                   <View style={styles.setupSlotContent}>
-                    <Text style={styles.setupSlotLabel}>Relationship Status</Text>
+                    <Text style={styles.setupSlotLabel}>{t('premiumUi.chatScreen.relationshipStatus')}</Text>
                     <Text style={isRelationSet ? styles.setupSlotValue : styles.setupSlotPlaceholder} numberOfLines={1}>
                       {isRelationSet ? partnershipRelation : (isPartnerSet ? 'Select or describe relationship...' : 'Complete Step 2 first')}
                     </Text>
@@ -2785,7 +2779,7 @@ export default function ChatScreen({ navigation, route }) {
                     <View style={styles.otherRelationContainer}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                         <Text style={[styles.setupHelperText, { color: '#ff6b35', fontWeight: '700', fontSize: 13, marginBottom: 0 }]}>
-                          Describe Relationship
+                          {t('premiumUi.chatScreen.describeRelationship')}
                         </Text>
                         <TouchableOpacity
                           onPress={() => {
@@ -2793,7 +2787,7 @@ export default function ChatScreen({ navigation, route }) {
                             setOtherRelationText('');
                           }}
                         >
-                          <Text style={{ color: '#ff6b35', fontSize: 11, fontWeight: '600', textDecorationLine: 'underline' }}>← Back</Text>
+                          <Text style={{ color: '#ff6b35', fontSize: 11, fontWeight: '600', textDecorationLine: 'underline' }}>← {t('premiumUi.common.goBack')}</Text>
                         </TouchableOpacity>
                       </View>
                       <View style={styles.otherInputWrapper}>
@@ -2801,7 +2795,7 @@ export default function ChatScreen({ navigation, route }) {
                           style={[styles.otherTextInput, { color: colors.text }]}
                           value={otherRelationText}
                           onChangeText={setOtherRelationText}
-                          placeholder="e.g. Mentor, Distant Cousin, etc."
+                          placeholder={t('premiumUi.chatScreen.relationshipExample')}
                           placeholderTextColor={theme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                           autoFocus
                         />
@@ -2842,7 +2836,7 @@ export default function ChatScreen({ navigation, route }) {
                                 setPartnershipSubStep(0);
                               }}
                             >
-                              <Text style={{ color: '#ff6b35', fontSize: 11, fontWeight: '600', textDecorationLine: 'underline' }}>← Back</Text>
+                              <Text style={{ color: '#ff6b35', fontSize: 11, fontWeight: '600', textDecorationLine: 'underline' }}>← {t('premiumUi.common.goBack')}</Text>
                             </TouchableOpacity>
                           </View>
                           <GHFlatList
@@ -2882,7 +2876,7 @@ export default function ChatScreen({ navigation, route }) {
                           )}
                         />
                         <Text style={[styles.setupHelperText, { color: colors.textSecondary, marginTop: 8 }]}>
-                          Pick a preset or type your own relationship in the chat box after closing this modal.
+                          {t('premiumUi.chatScreen.relationshipHint')}
                         </Text>
                       </View>
                     );
@@ -2912,7 +2906,7 @@ export default function ChatScreen({ navigation, route }) {
                   }}
                 >
                   <LinearGradient colors={['#ff6b35', '#f97316']} style={styles.setupConfirmGradient}>
-                    <Text style={styles.setupConfirmText}>Ready for Analysis ✨</Text>
+                    <Text style={styles.setupConfirmText}>{t('premiumUi.chatScreen.readyAnalysis')} ✨</Text>
                     <Ionicons name="arrow-forward" size={20} color="#fff" />
                   </LinearGradient>
                 </TouchableOpacity>
@@ -2929,7 +2923,7 @@ export default function ChatScreen({ navigation, route }) {
                     setPartnershipSubStep(0);
                   }}
                 >
-                  <Text style={styles.setupResetText}>Reset Setup</Text>
+                  <Text style={styles.setupResetText}>{t('premiumUi.chatScreen.resetSetup')}</Text>
                 </TouchableOpacity>
               )}
             </GHScrollView>
@@ -3637,10 +3631,10 @@ export default function ChatScreen({ navigation, route }) {
           { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : '#fff7ed' },
         ]}>
           <Text style={[styles.waitConversationTitle, { color: colors.text }]}>
-            Preparing your full study
+            {t('premiumUi.chatScreen.preparingStudy')}
           </Text>
           <Text style={[styles.waitConversationSubtitle, { color: colors.textSecondary }]}>
-            Keep chatting here until the detailed answer is ready.
+            {t('premiumUi.chatScreen.keepChatting')}
           </Text>
         </View>
         {waitConversation.messages.map((msg) => {
@@ -3670,7 +3664,7 @@ export default function ChatScreen({ navigation, route }) {
         })}
         {waitSideReplying && (
           <Text style={[styles.waitConversationTyping, { color: colors.textSecondary }]}>
-            Thinking about your reply...
+            {t('premiumUi.chatScreen.thinkingReply')}
           </Text>
         )}
       </View>
@@ -5308,22 +5302,24 @@ export default function ChatScreen({ navigation, route }) {
     inputScopeNativeTrimmed.length > 7
       ? `${inputScopeNativeTrimmed.slice(0, 7)}...`
       : inputScopeNativeTrimmed;
+  const activeMahadasha = dashaData?.maha_dashas?.find((period) => period?.current)?.planet || null;
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} translucent={false} />
       <LinearGradient
-        colors={
-          theme === 'dark'
-            ? // Home tabs are orange; ending this screen gradient in orange makes a second
-              // orange strip when anything peeks under the tab bar. Keep orange only in chat.
-              showGreeting
-                ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientEnd]
-                : [colors.gradientStart, colors.gradientMid, colors.gradientEnd, '#ea580c']
-            : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]
-        }
+        colors={[colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientEnd]}
         style={styles.gradientBg}
       >
+      {Platform.OS !== 'web' && insets.top > 0 ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.statusBarBackdrop,
+            { height: insets.top, backgroundColor: colors.headerSurface },
+          ]}
+        />
+      ) : null}
       <SafeAreaView
         style={styles.safeArea}
         edges={['top']}
@@ -5332,19 +5328,11 @@ export default function ChatScreen({ navigation, route }) {
         {/* Header - outside KeyboardAvoidingView so home/greeting layout is never affected by keyboard */}
         <View style={styles.headerContainer}>
           <LinearGradient
-            colors={theme === 'dark'
-              ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
-              : isPanditMode
-                ? ['rgba(24, 24, 27, 0.04)', 'rgba(24, 24, 27, 0.02)']
-                : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.05)']}
+            colors={[colors.headerSurface, colors.headerSurface]}
             style={[
               styles.header,
               {
-                borderColor: theme === 'dark'
-                  ? 'rgba(255, 255, 255, 0.2)'
-                  : isPanditMode
-                    ? 'rgba(24, 24, 27, 0.12)'
-                    : 'rgba(249, 115, 22, 0.2)',
+                borderColor: colors.cosmicLine,
                 elevation: getCardElevation(3),
               }
             ]}
@@ -5377,7 +5365,7 @@ export default function ChatScreen({ navigation, route }) {
                   setShowModeSelector(false);
                 }}
               >
-                <Ionicons name="arrow-back" size={20} color={colors.text} />
+                <Ionicons name="arrow-back" size={20} color={colors.textInverse} />
               </TouchableOpacity>
             )}
 
@@ -5392,7 +5380,7 @@ export default function ChatScreen({ navigation, route }) {
                     />
                   </View>
                   <View>
-                    <Text style={[styles.headerTitle, { color: colors.text, marginBottom: 4 }]}>AstroRoshni</Text>
+                    <Text style={[styles.headerTitle, { color: colors.textInverse, marginBottom: 4 }]}>{t('premiumUi.chatScreen.brand')}</Text>
                   </View>
                 </View>
               ) : isMundane ? (
@@ -5401,7 +5389,7 @@ export default function ChatScreen({ navigation, route }) {
                     onPress={() => setShowCountryPicker(true)}
                     style={[styles.nameChip, styles.compactChip]}
                   >
-                    <Text style={[styles.compactChipText, { color: colors.textSecondary }]}>
+                    <Text style={[styles.compactChipText, { color: colors.textInverseMuted }]}>
                       {selectedCountry.name}
                     </Text>
                   </TouchableOpacity>
@@ -5409,31 +5397,20 @@ export default function ChatScreen({ navigation, route }) {
                     onPress={() => setShowYearPicker(true)}
                     style={[styles.nameChip, styles.compactChip]}
                   >
-                    <Text style={[styles.compactChipText, { color: colors.textSecondary }]}>
+                    <Text style={[styles.compactChipText, { color: colors.textInverseMuted }]}>
                       {selectedYear}
                     </Text>
                   </TouchableOpacity>
                 </View>
               ) : !partnershipMode ? (
-                <View style={styles.headerNativeChipWrap}>
-                  {birthData ? (
-                    <NativeSelectorChip
-                      birthData={birthData}
-                      onPress={() => {
-                        keepChatOpenAfterNativeSelectRef.current = true;
-                        navigation.navigate('SelectNative', {
-                          returnTo: 'Home',
-                          returnParams: { returnToChat: true },
-                        });
-                      }}
-                      maxLength={8}
-                      showIcon={false}
-                      style={styles.headerNativeChip}
-                      textStyle={styles.headerNativeChipText}
-                    />
-                  ) : (
-                    <Text style={[styles.headerTitle, { color: colors.text }]}>Chat</Text>
-                  )}
+                <View style={styles.activeChatTitleWrap}>
+                  <View style={[styles.activeChatDot, { backgroundColor: colors.accent }]} />
+                  <View style={styles.activeChatTitleCopy}>
+                    <Text style={[styles.activeChatTitle, { color: colors.textInverse }]}>{t('premiumUi.home.askTara')}</Text>
+                    <Text style={[styles.activeChatSubtitle, { color: colors.textInverseMuted }]} numberOfLines={1}>
+                      {birthData?.name || 'Private consultation'}
+                    </Text>
+                  </View>
                 </View>
               ) : (
                 <View style={styles.partnershipChipsContainer}>
@@ -5472,13 +5449,17 @@ export default function ChatScreen({ navigation, route }) {
                 </View>
               ) : null}
               <TouchableOpacity
-                style={[styles.creditButton, isPremiumAnalysis && styles.creditButtonPremium]}
+                style={[
+                  styles.creditButton,
+                  { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine },
+                  isPremiumAnalysis && styles.creditButtonPremium,
+                ]}
                 onPress={() => navigation.navigate('Credits')}
               >
-                <Text style={[styles.creditText, { color: colors.text }]}>
+                <Text style={[styles.creditText, { color: colors.textInverse }]}>
                   {isPremiumAnalysis ? '👑' : (isInstantAnalysis ? '⚡' : '💳')} {credits}
                   {effectiveChatCost === 0 && (
-                    <Text style={[styles.creditText, { color: colors.primary, fontSize: 10, marginLeft: 4 }]}> · Free</Text>
+                    <Text style={[styles.creditText, { color: colors.primary, fontSize: 10, marginLeft: 4 }]}> · {t('premiumUi.home.free')}</Text>
                   )}
                 </Text>
               </TouchableOpacity>
@@ -5488,11 +5469,11 @@ export default function ChatScreen({ navigation, route }) {
                   style={styles.headerBellButton}
                   onPress={() => navigation.navigate('NudgeInbox')}
                   accessibilityRole="button"
-                  accessibilityLabel="Notification history"
+                  accessibilityLabel={t('premiumUi.chatScreen.notificationHistory')}
                 >
                   {/* Fixed 40×40 box: icon + badge both live inside so nothing draws outside bounds (no clipping surprises). */}
                   <View style={styles.headerBellHitBox} pointerEvents="none">
-                    <Ionicons name="notifications-outline" size={22} color={colors.text} />
+                    <Ionicons name="notifications-outline" size={22} color={colors.textInverse} />
                     {nudgeUnreadCount > 0 && (
                       <View style={styles.headerBellBadge}>
                         <Text
@@ -5513,7 +5494,7 @@ export default function ChatScreen({ navigation, route }) {
                 style={styles.menuButton}
                 onPress={openMenuDrawer}
               >
-                <Ionicons name="menu" size={20} color={colors.text} />
+                <Ionicons name="menu" size={20} color={colors.textInverse} />
               </TouchableOpacity>
             </View>
           </LinearGradient>
@@ -5662,7 +5643,7 @@ export default function ChatScreen({ navigation, route }) {
                 activeOpacity={0.8}
               >
                 <Ionicons name="create-outline" size={14} color="#ff6b35" />
-                <Text style={styles.changeBadgeText}>Change Partnership</Text>
+                <Text style={styles.changeBadgeText}>{t('premiumUi.chatScreen.changePartnership')}</Text>
               </TouchableOpacity>
 
               <View style={styles.floatingPartnershipBadge}>
@@ -5673,7 +5654,7 @@ export default function ChatScreen({ navigation, route }) {
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                   >
-                    <Text style={[styles.partnershipBadgeText, { color: COLORS.white }]}>👥 Partnership Mode</Text>
+                    <Text style={[styles.partnershipBadgeText, { color: COLORS.white }]}>👥 {t('premiumUi.chatScreen.partnershipMode')}</Text>
                   </LinearGradient>
                 </View>
                 <TouchableOpacity
@@ -5739,88 +5720,25 @@ export default function ChatScreen({ navigation, route }) {
                       activeOpacity={0.85}
                     >
                       <Text style={styles.historyWindowButtonText}>
-                        Load earlier messages ({hiddenMessageCount} hidden)
+                        {t('premiumUi.chatScreen.loadEarlier', { count: hiddenMessageCount })}
                       </Text>
                     </TouchableOpacity>
                   </View>
                 )}
-                {/* Signs Display – only for native-centric chat, not Global Markets (mundane) */}
                 {birthData && !isMundane && (
-                  <View style={styles.signsContainer}>
-                    <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.1)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.1)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)'])}
-                      style={styles.signsGradient}
-                    >
-                      <Text style={[styles.signsTitle, { color: colors.text }]}>✨ {t('chat.chartEssence', "{{name}}'s Chart Essence", { name: birthData.name })}</Text>
-                      <View style={styles.signsRow}>
-                        <View style={styles.signItem}>
-                          <Text style={[styles.signLabel, { color: colors.textSecondary }]}>☀️ {t('home.signs.sun', 'Sun')}</Text>
-                          <Text style={[styles.signValue, { color: colors.text }]}>
-                            {loadingChart ? '...' : (chartData?.planets?.Sun ? `${getSignIcon(chartData.planets.Sun.sign)} ${getSignName(chartData.planets.Sun.sign)}` : '...')}
-                          </Text>
-                        </View>
-                        <View style={styles.signItem}>
-                          <Text style={[styles.signLabel, { color: colors.textSecondary }]}>🌙 {t('home.signs.moon', 'Moon')}</Text>
-                          <Text style={[styles.signValue, { color: colors.text }]}>
-                            {loadingChart ? '...' : (chartData?.planets?.Moon ? `${getSignIcon(chartData.planets.Moon.sign)} ${getSignName(chartData.planets.Moon.sign)}` : '...')}
-                          </Text>
-                        </View>
-                        <View style={styles.signItem}>
-                          <Text style={[styles.signLabel, { color: colors.textSecondary }]}>⬆️ {t('home.signs.ascendant', 'Ascendant')}</Text>
-                          <Text style={[styles.signValue, { color: colors.text }]}>
-                            {loadingChart ? '...' : (chartData?.houses?.[0] ? `${getSignIcon(chartData.houses[0].sign)} ${getSignName(chartData.houses[0].sign)}` : '...')}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {dashaData && (
-                        <Animated.View style={[styles.dashaSection, { opacity: fadeAnim }]}>
-                          <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            nestedScrollEnabled
-                            contentContainerStyle={styles.dashaFlatListContent}
-                          >
-                            {[
-                              dashaData.maha_dashas?.find(d => d.current),
-                              dashaData.antar_dashas?.find(d => d.current),
-                              dashaData.pratyantar_dashas?.find(d => d.current),
-                              dashaData.sookshma_dashas?.find(d => d.current),
-                              dashaData.prana_dashas?.find(d => d.current)
-                            ].filter(Boolean).map((dasha, dashaIndex) => {
-                              if (!dasha || !dasha.planet || !dasha.start || !dasha.end) return null;
-                              const planetColor = getPlanetColor(dasha.planet);
-                              const startDateObj = new Date(dasha.start);
-                              const endDateObj = new Date(dasha.end);
-                              const startDate = !isNaN(startDateObj.getTime()) ? startDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '...';
-                              const endDate = !isNaN(endDateObj.getTime()) ? endDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '...';
-                              return (
-                                <TouchableOpacity
-                                  key={`dasha-chip-${dasha.planet}-${dashaIndex}`}
-                                  style={[
-                                    styles.dashaChip,
-                                    {
-                                      backgroundColor: theme === 'dark' ? planetColor + '40' : planetColor + '60',
-                                      borderColor: planetColor,
-                                      borderWidth: 2,
-                                    },
-                                  ]}
-                                  onPress={() => setShowDashaBrowser(true)}
-                                  activeOpacity={0.8}
-                                >
-                                  <Text style={[styles.dashaChipPlanet, { color: theme === 'dark' ? planetColor : '#1a1a1a' }]}>{t(`home.planet_names.${dasha.planet}`, dasha.planet)}</Text>
-                                  <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{startDate}</Text>
-                                  <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{endDate}</Text>
-                                </TouchableOpacity>
-                              );
-                            })}
-                          </ScrollView>
-                        </Animated.View>
-                      )}
-                    </LinearGradient>
-                  </View>
+                  <PremiumConsultationContext
+                    name={birthData.name}
+                    sun={loadingChart ? null : (chartData?.planets?.Sun ? getSignName(chartData.planets.Sun.sign) : null)}
+                    moon={loadingChart ? null : (chartData?.planets?.Moon ? getSignName(chartData.planets.Moon.sign) : null)}
+                    ascendant={loadingChart ? null : (chartData?.houses?.[0] ? getSignName(chartData.houses[0].sign) : null)}
+                    activePeriod={activeMahadasha ? t(`home.planet_names.${activeMahadasha}`, activeMahadasha) : null}
+                    onChangeChart={() => {
+                      keepChatOpenAfterNativeSelectRef.current = true;
+                      navigation.navigate('SelectNative', { returnTo: 'Home', returnParams: { returnToChat: true } });
+                    }}
+                    onOpenDasha={() => setShowDashaBrowser(true)}
+                    onOpenHistory={() => navigation.navigate('ChatHistory')}
+                  />
                 )}
               </>
             }
@@ -5843,20 +5761,13 @@ export default function ChatScreen({ navigation, route }) {
                       accessibilityLabel={item}
                     >
                       <LinearGradient
-                        colors={
-                          theme === 'dark'
-                            ? ['rgba(255, 107, 53, 0.20)', 'rgba(255, 107, 53, 0.06)']
-                            : ['rgba(255, 107, 53, 0.12)', 'rgba(255, 107, 53, 0.04)']
-                        }
+                        colors={[colors.surface, colors.surface]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={[
                           styles.welcomeSuggestionCardGradient,
                           {
-                            borderColor:
-                              theme === 'dark'
-                                ? 'rgba(255, 255, 255, 0.12)'
-                                : 'rgba(249, 115, 22, 0.18)',
+                            borderColor: colors.cardBorder,
                           },
                         ]}
                       >
@@ -5867,10 +5778,7 @@ export default function ChatScreen({ navigation, route }) {
                           style={[
                             styles.welcomeSuggestionCardArrow,
                             {
-                              backgroundColor:
-                                theme === 'dark'
-                                  ? 'rgba(255, 107, 53, 0.22)'
-                                  : 'rgba(249, 115, 22, 0.12)',
+                              backgroundColor: colors.accentSoft,
                             },
                           ]}
                         >
@@ -5926,15 +5834,15 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={{ fontSize: 18 }}>🤝</Text>
                         </View>
                         <View>
-                          <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>Partnership Analysis</Text>
-                          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Setup complete</Text>
+                          <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>{t('premiumUi.chatScreen.partnershipAnalysis')}</Text>
+                          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{t('premiumUi.chatScreen.setupComplete')}</Text>
                         </View>
                       </View>
                       <TouchableOpacity
                         style={{ backgroundColor: '#ff6b3520', paddingVertical: 10, borderRadius: 12, alignItems: 'center', marginTop: 8 }}
                         onPress={() => setShowPartnershipSetupModal(true)}
                       >
-                        <Text style={{ color: '#ff6b35', fontWeight: '700', fontSize: 13 }}>Edit Setup ✏️</Text>
+                        <Text style={{ color: '#ff6b35', fontWeight: '700', fontSize: 13 }}>{t('premiumUi.chatScreen.editSetup')} ✏️</Text>
                       </TouchableOpacity>
                     </LinearGradient>
                   </View>
@@ -6003,8 +5911,8 @@ export default function ChatScreen({ navigation, route }) {
                   onPress={() => handleSuggestionPress(item)}
                 >
                   <LinearGradient
-                    colors={['rgba(255, 107, 53, 0.1)', 'rgba(255, 107, 53, 0.03)']}
-                    style={styles.suggestionChipGradient}
+                    colors={[colors.surface, colors.surface]}
+                    style={[styles.suggestionChipGradient, { borderColor: colors.cardBorder }]}
                   >
                     <Text style={[styles.suggestionChipText, { color: colors.text }]}>{item}</Text>
                   </LinearGradient>
@@ -6053,8 +5961,8 @@ export default function ChatScreen({ navigation, route }) {
                   style={[
                     styles.chatInputScopeChangeChip,
                     {
-                      borderColor: theme === 'dark' ? 'rgba(251, 146, 60, 0.34)' : 'rgba(249, 115, 22, 0.22)',
-                      backgroundColor: theme === 'dark' ? 'rgba(251, 146, 60, 0.12)' : 'rgba(249, 115, 22, 0.08)',
+                      borderColor: colors.cardBorder,
+                      backgroundColor: colors.surface,
                     },
                   ]}
                   accessibilityRole="button"
@@ -6063,13 +5971,13 @@ export default function ChatScreen({ navigation, route }) {
                   <Ionicons
                     name="swap-horizontal-outline"
                     size={13}
-                    color={theme === 'dark' ? colors.text : colors.textSecondary}
+                    color={colors.textSecondary}
                     style={{ marginRight: 4 }}
                   />
                   <Text
                     style={[
                       styles.chatInputScopeChangeChipText,
-                      { color: theme === 'dark' ? colors.text : colors.textSecondary },
+                      { color: colors.textSecondary },
                     ]}
                   >
                     {t('chat.inputScopeSelectChart', 'Change chart')}
@@ -6081,8 +5989,8 @@ export default function ChatScreen({ navigation, route }) {
                     style={[
                       styles.topicIdeasToggle,
                       {
-                        borderColor: theme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(249, 115, 22, 0.25)',
-                        backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(249, 115, 22, 0.06)',
+                        borderColor: colors.cardBorder,
+                        backgroundColor: colors.surface,
                       },
                     ]}
                     accessibilityRole="button"
@@ -6116,13 +6024,11 @@ export default function ChatScreen({ navigation, route }) {
               />
             ) : null}
             <LinearGradient
-                      colors={Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.15)', 'rgba(0, 0, 0, 0.05)'] : ['rgba(249, 115, 22, 0.04)', 'rgba(249, 115, 22, 0.02)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0.03)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+              colors={[colors.surfaceRaised || colors.surface, colors.surfaceRaised || colors.surface]}
               style={[
                 styles.inputBarGradient,
                 {
-                  borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(249, 115, 22, 0.2)',
+                  borderColor: colors.cardBorder,
                 }
               ]}
             >
@@ -6145,7 +6051,7 @@ export default function ChatScreen({ navigation, route }) {
                           {formatCreditsInr(instantChatCost)}
                         </Text>
                         <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}>
-                          ~{instantChatCost} credit{instantChatCost !== 1 ? 's' : ''}
+                          {t('premiumUi.chatScreen.creditCount', { count: instantChatCost })}
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -6165,7 +6071,7 @@ export default function ChatScreen({ navigation, route }) {
                         {formatCreditsInr(chatCost)}
                       </Text>
                       <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}>
-                        ~{chatCost} credit{chatCost !== 1 ? 's' : ''}
+                        {t('premiumUi.chatScreen.creditCount', { count: chatCost })}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -6184,7 +6090,7 @@ export default function ChatScreen({ navigation, route }) {
                         {formatCreditsInr(premiumChatCost)}
                       </Text>
                       <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}>
-                        ~{premiumChatCost} credit{premiumChatCost !== 1 ? 's' : ''}
+                        {t('premiumUi.chatScreen.creditCount', { count: premiumChatCost })}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -6228,7 +6134,7 @@ export default function ChatScreen({ navigation, route }) {
                   isMundane ? "Ask about markets, politics, events..." :
                   t('chat.inputPlaceholderShort', 'Type your question...')
                 }
-                placeholderTextColor={theme === 'dark' ? "rgba(255, 255, 255, 0.5)" : "rgba(0, 0, 0, 0.4)"}
+                placeholderTextColor={colors.textTertiary}
                 maxLength={500}
                 editable={
                   !!activeWaitSideMessage ||
@@ -6304,7 +6210,7 @@ export default function ChatScreen({ navigation, route }) {
                   accessibilityHint={t('chat.speechChatCtaSubtext', 'Instant spoken answers')}
                 >
                   <LinearGradient
-                    colors={['#fb923c', '#f97316']}
+                    colors={[colors.primaryStrong, colors.primary]}
                     style={styles.speechMicGradient}
                   >
                     <Ionicons name="mic" size={20} color={COLORS.white} />
@@ -6327,7 +6233,7 @@ export default function ChatScreen({ navigation, route }) {
                 disabled={(!activeWaitSideMessage && loading) || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate)) || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
               >
                 <LinearGradient
-                  colors={isPremiumAnalysis ? ['#ffd700', '#ff6b35'] : (isInstantAnalysis ? ['#fb923c', '#f97316'] : ['#ff6b35', '#ff8c5a'])}
+                  colors={isPremiumAnalysis ? [colors.accent, colors.primary] : [colors.primaryStrong, colors.primary]}
                   style={styles.modernSendGradient}
                 >
                   {waitSideReplying ? (
@@ -6341,7 +6247,7 @@ export default function ChatScreen({ navigation, route }) {
                   ) : credits < effectiveChatCost ? (
                     <Text style={styles.modernSendText}>💳</Text>
                   ) : effectiveChatCost === 0 ? (
-                    <Text style={styles.modernSendText}>Free</Text>
+                    <Text style={styles.modernSendText}>{t('premiumUi.home.free')}</Text>
                   ) : (
                     <Ionicons name="send" size={20} color={COLORS.white} />
                   )}
@@ -6354,8 +6260,8 @@ export default function ChatScreen({ navigation, route }) {
               <View style={styles.firstQuestionFreeBanner}>
                 <Text style={styles.firstQuestionFreeIcon}>🎁</Text>
                 <View style={styles.firstQuestionFreeTextWrap}>
-                  <Text style={styles.firstQuestionFreeTitle}>First question free</Text>
-                  <Text style={styles.firstQuestionFreeSubtext}>Ask anything — no credits needed</Text>
+                  <Text style={styles.firstQuestionFreeTitle}>{t('premiumUi.chatScreen.firstFree')}</Text>
+                  <Text style={styles.firstQuestionFreeSubtext}>{t('premiumUi.chatScreen.askAnythingFree')}</Text>
                 </View>
               </View>
             )}
@@ -6367,7 +6273,7 @@ export default function ChatScreen({ navigation, route }) {
                 activeOpacity={0.85}
               >
                 <Text style={styles.notifGateText}>
-                  🔔 Turn on notifications to use your free first question — tap here
+                  🔔 {t('premiumUi.chatScreen.notificationFree')}
                 </Text>
               </TouchableOpacity>
             )}
@@ -6377,7 +6283,7 @@ export default function ChatScreen({ navigation, route }) {
                 style={styles.lowCreditBanner}
                 onPress={() => navigation.navigate('Credits')}
               >
-                <Text style={styles.lowCreditText}>💳 Get more credits to continue</Text>
+                <Text style={styles.lowCreditText}>💳 {t('premiumUi.chatScreen.getCredits')}</Text>
               </TouchableOpacity>
             )}
 
@@ -6399,7 +6305,7 @@ export default function ChatScreen({ navigation, route }) {
 
             <TouchableOpacity
               style={styles.quickActionButton}
-              onPress={() => navigation.navigate('Chart', { birthData })}
+              onPress={() => navigation.navigate('ChartsHub', { birthData })}
             >
               <Ionicons name="pie-chart-outline" size={18} color={colors.text} />
               <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.chart')}</Text>
@@ -6621,47 +6527,59 @@ export default function ChatScreen({ navigation, route }) {
               onStartShouldSetResponder={() => true}
             >
               <LinearGradient
-                colors={theme === 'dark' ? ['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35'] : ['#fefcfb', '#fefcfb', '#fefcfb', '#fefcfb']}
+                colors={[colors.background, colors.backgroundSecondary, colors.background]}
                 style={styles.drawerGradient}
               >
-                <View style={styles.drawerHeader}>
-                  <Animated.View style={[styles.logoContainer, {
-                    transform: [{
-                      scale: menuLogoGlow.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [1, 1.08],
-                      }),
-                    }],
-                  }]}>
-                    <Image
-                      source={require('../../../assets/logo.png')}
-                      style={styles.logoImage}
-                      resizeMode="contain"
-                    />
-                  </Animated.View>
-                  <Text
-                    style={[
-                      styles.drawerTitle,
-                      {
-                        color: theme === 'dark' ? '#ffffff' : '#1f2937',
-                        ...(theme === 'dark'
-                          ? {
-                              textShadowColor: 'rgba(0, 0, 0, 0.3)',
-                              textShadowOffset: { width: 0, height: 2 },
-                              textShadowRadius: 4,
-                            }
-                          : {
-                              fontWeight: isPanditMode || String(i18n.language || '').toLowerCase().startsWith('hi')
-                                ? '600'
-                                : '700',
-                              letterSpacing: 0,
-                            }),
-                      },
-                    ]}
+                <View style={[styles.drawerHeader, { borderBottomColor: colors.cardBorder }]}>
+                  <View style={styles.drawerHeaderTop}>
+                    <View style={styles.drawerBrandRow}>
+                      <Animated.View style={[styles.logoContainer, { borderColor: colors.accent }]}>
+                        <Image
+                          source={require('../../../assets/logo.png')}
+                          style={styles.logoImage}
+                          resizeMode="contain"
+                        />
+                      </Animated.View>
+                      <View style={styles.drawerBrandCopy}>
+                        <Text style={[styles.drawerBrandEyebrow, { color: colors.primary }]}>{t('premiumUi.chatScreen.brand').toUpperCase()}</Text>
+                        <Text style={[styles.drawerTitle, { color: colors.text }]}>{t('premiumUi.chatScreen.explore')}</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.drawerCloseButton, { backgroundColor: colors.surfaceMuted }]}
+                      onPress={() => closeMenuDrawer()}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('premiumUi.chatScreen.closeMenu')}
+                    >
+                      <Ionicons name="close" size={22} color={colors.text} />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={[styles.drawerSubtitle, { color: colors.textSecondary }]}>{t('premiumUi.chatScreen.chooseNext')}</Text>
+                  <TouchableOpacity
+                    style={[styles.drawerContextCard, { backgroundColor: colors.headerSurface, borderColor: colors.cosmicLine }]}
+                    activeOpacity={0.86}
+                    onPress={() => {
+                      closeMenuDrawer(() => {
+                        navigation.navigate('SelectNative', !showGreeting ? {
+                          returnTo: 'Home',
+                          returnParams: { returnToChat: true },
+                        } : undefined);
+                      });
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Change chart. Currently reading for ${birthData?.name || 'your chart'}`}
                   >
-                    {Platform.OS === 'ios' ? 'Study Menu' : t('menu.title')}
-                  </Text>
-                  <Text style={[styles.drawerSubtitle, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(31, 41, 55, 0.7)' }]}>{t('menu.subtitle')}</Text>
+                    <View style={styles.drawerContextCopy}>
+                      <Text style={[styles.drawerContextEyebrow, { color: colors.accentSoft }]}>{t('premiumUi.chatScreen.activeChart')}</Text>
+                      <Text style={[styles.drawerContextName, { color: colors.textInverse }]} numberOfLines={1}>
+                        {birthData?.name || 'Your chart'}
+                      </Text>
+                      <Text style={[styles.drawerContextAction, { color: colors.textInverseMuted }]}>{t('premiumUi.chatScreen.tapChangeChart')}</Text>
+                    </View>
+                    <View style={[styles.drawerContextArrow, { borderColor: colors.cosmicLine }]}>
+                      <Ionicons name="swap-horizontal" size={18} color={colors.accentSoft} />
+                    </View>
+                  </TouchableOpacity>
                 </View>
 
                 <GHScrollView
@@ -6671,6 +6589,7 @@ export default function ChatScreen({ navigation, route }) {
                   showsVerticalScrollIndicator={false}
                   nestedScrollEnabled={true}
                 >
+                  <Text style={[styles.drawerSectionLabel, { color: colors.primary }]}>{t('premiumUi.chatScreen.yourSpace')}</Text>
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
@@ -6751,7 +6670,7 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      closeMenuDrawer(() => navigation.navigate('Chart', { birthData }));
+                      closeMenuDrawer(() => navigation.navigate('ChartsHub', { birthData }));
                     }}
                   >
                     <LinearGradient
@@ -6771,6 +6690,7 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </TouchableOpacity>
 
+                  <Text style={[styles.drawerSectionLabel, styles.drawerSectionLabelSpaced, { color: colors.primary }]}>{t('premiumUi.chatScreen.vedicToolkit')}</Text>
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
@@ -6806,7 +6726,7 @@ export default function ChatScreen({ navigation, route }) {
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#9C27B0', '#E91E63']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>⊞</Text>
@@ -6852,7 +6772,7 @@ export default function ChatScreen({ navigation, route }) {
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#795548', '#8D6E63']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>🏰</Text>
@@ -6875,7 +6795,7 @@ export default function ChatScreen({ navigation, route }) {
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#8b5cf6', '#6366f1']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>🧘</Text>
@@ -6902,7 +6822,7 @@ export default function ChatScreen({ navigation, route }) {
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#10b981', '#34d399']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>🔢</Text>
@@ -6938,6 +6858,7 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </TouchableOpacity>
 
+                  <Text style={[styles.drawerSectionLabel, styles.drawerSectionLabelSpaced, { color: colors.primary }]}>{t('premiumUi.profile.library')}</Text>
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
@@ -6950,7 +6871,7 @@ export default function ChatScreen({ navigation, route }) {
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#667eea', '#764ba2']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>🕉️</Text>
@@ -6973,7 +6894,7 @@ export default function ChatScreen({ navigation, route }) {
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#667eea', '#764ba2']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>🔢</Text>
@@ -6996,7 +6917,7 @@ export default function ChatScreen({ navigation, route }) {
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#667eea', '#764ba2']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>💬</Text>
@@ -7095,15 +7016,15 @@ export default function ChatScreen({ navigation, route }) {
                     >
                       <LinearGradient
                         colors={partnershipMode
-                          ? (Platform.OS === 'android' ? ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.15)'] : ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.1)'])
+                          ? [colors.selectionSurface, colors.selectionSurface]
                           : menuRowGradient}
                         style={[styles.menuGradient, { borderColor: partnershipMode
-                          ? (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(147, 51, 234, 0.25)')
+                          ? colors.selectionBorder
                           : menuRowBorder }]}
                       >
                         <View style={styles.menuIconContainer}>
                           <LinearGradient
-                            colors={partnershipMode ? ['#9333ea', '#a855f7'] : menuAccentIconGradient}
+                            colors={partnershipMode ? [colors.selectionControl, colors.selectionControl] : menuAccentIconGradient}
                             style={styles.menuIconGradient}
                           >
                             <Text style={styles.menuEmoji}>👥</Text>
@@ -7115,6 +7036,7 @@ export default function ChatScreen({ navigation, route }) {
                     </TouchableOpacity>
                   )}
 
+                  <Text style={[styles.drawerSectionLabel, styles.drawerSectionLabelSpaced, { color: colors.primary }]}>{t('premiumUi.chatScreen.more')}</Text>
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
@@ -7127,7 +7049,7 @@ export default function ChatScreen({ navigation, route }) {
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#6366f1', '#8b5cf6']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>📚</Text>
@@ -7211,7 +7133,7 @@ export default function ChatScreen({ navigation, route }) {
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={['#0ea5e9', '#38bdf8']}
+                          colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>💬</Text>
@@ -7233,28 +7155,20 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={['rgba(255, 59, 48, 0.2)', 'rgba(255, 59, 48, 0.1)']}
+                      colors={[colors.surface, colors.surface]}
                       style={[styles.menuGradient, {
-                        borderColor: theme === 'dark'
-                          ? 'rgba(255, 255, 255, 0.2)'
-                          : isPanditMode
-                            ? 'rgba(220, 38, 38, 0.25)'
-                            : 'rgba(249, 115, 22, 0.3)',
+                        borderColor: colors.error,
                       }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
-                          colors={
-                            isGuest
-                              ? (isPanditMode ? ['#52525B', '#71717A'] : ['#ff7b45', '#FF6B35'])
-                              : ['#ff3b30', '#ff6b60']
-                          }
+                          colors={isGuest ? menuAccentIconGradient : [colors.surfaceMuted, colors.surfaceMuted]}
                           style={styles.menuIconGradient}
                         >
                           <Text style={styles.menuEmoji}>{isGuest ? '🔑' : '🚪'}</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#dc2626' }]}>
+                      <Text style={[styles.menuText, { color: isGuest ? colors.text : colors.error }]}>
                         {isGuest
                           ? t('menu.signIn', 'Sign in / Register')
                           : t('menu.logout')}
@@ -7263,7 +7177,7 @@ export default function ChatScreen({ navigation, route }) {
                         name="chevron-forward"
                         size={20}
                         color={
-                          theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(220, 38, 38, 0.65)'
+                          isGuest ? colors.textTertiary : colors.error
                         }
                       />
                     </LinearGradient>
@@ -7443,8 +7357,8 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </View>
                   <View style={styles.benefitText}>
-                    <Text style={styles.benefitTitle}>Remedial Recommendations</Text>
-                    <Text style={styles.benefitDesc}>Provides personalized gemstone, mantra, and ritual suggestions based on planetary strengths</Text>
+                    <Text style={styles.benefitTitle}>{t('premiumUi.chatScreen.remedialRecommendations')}</Text>
+                    <Text style={styles.benefitDesc}>{t('premiumUi.chatScreen.remedialBody')}</Text>
                   </View>
                 </View>
 
@@ -7456,7 +7370,7 @@ export default function ChatScreen({ navigation, route }) {
                     colors={['#ff6b35', '#ff8c5a']}
                     style={styles.popupButtonGradient}
                   >
-                    <Text style={styles.popupButtonText}>Got it!</Text>
+                    <Text style={styles.popupButtonText}>{t('premiumUi.chat.gotIt')}!</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               </GHScrollView>
@@ -7475,7 +7389,7 @@ export default function ChatScreen({ navigation, route }) {
             <View style={styles.chartPickerModal}>
               <View style={styles.chartPickerHeader}>
                 <Text style={styles.chartPickerTitle}>
-                  Select {selectingFor === 'native' ? 'Native' : 'Partner'} Chart
+                  {t('premiumUi.chatScreen.selectChart', { person: selectingFor === 'native' ? t('premiumUi.chatScreen.native') : t('premiumUi.chatScreen.partner') })}
                 </Text>
                 <TouchableOpacity onPress={() => setShowChartPicker(false)}>
                   <Ionicons name="close" size={24} color={COLORS.textPrimary} />
@@ -7509,8 +7423,8 @@ export default function ChatScreen({ navigation, route }) {
 
                 {savedCharts.length === 0 && (
                   <View style={styles.emptyChartList}>
-                    <Text style={styles.emptyChartText}>No saved charts found</Text>
-                    <Text style={styles.emptyChartSubtext}>Please save charts first</Text>
+                    <Text style={styles.emptyChartText}>{t('premiumUi.chatScreen.noSavedCharts')}</Text>
+                    <Text style={styles.emptyChartSubtext}>{t('premiumUi.chatScreen.saveChartsFirst')}</Text>
                   </View>
                 )}
               </GHScrollView>
@@ -7528,7 +7442,7 @@ export default function ChatScreen({ navigation, route }) {
           <View style={styles.modalOverlay}>
             <View style={styles.chartPickerModal}>
               <View style={styles.chartPickerHeader}>
-                <Text style={styles.chartPickerTitle}>Select Country</Text>
+                <Text style={styles.chartPickerTitle}>{t('premiumUi.chatScreen.selectCountry')}</Text>
                 <TouchableOpacity onPress={() => { setShowCountryPicker(false); setCountrySearchQuery(''); }}>
                   <Ionicons name="close" size={24} color={COLORS.textPrimary} />
                 </TouchableOpacity>
@@ -7537,7 +7451,7 @@ export default function ChatScreen({ navigation, route }) {
                 <Ionicons name="search" size={20} color={colors.textTertiary} style={styles.chartPickerSearchIcon} />
                 <TextInput
                   style={[styles.chartPickerSearchInput, { color: colors.text }]}
-                  placeholder="Search countries..."
+                  placeholder={t('premiumUi.chatScreen.searchCountries')}
                   placeholderTextColor={colors.textTertiary}
                   value={countrySearchQuery}
                   onChangeText={setCountrySearchQuery}
@@ -7587,7 +7501,7 @@ export default function ChatScreen({ navigation, route }) {
           <View style={styles.modalOverlay}>
             <View style={styles.chartPickerModal}>
               <View style={styles.chartPickerHeader}>
-                <Text style={styles.chartPickerTitle}>Select Year</Text>
+                <Text style={styles.chartPickerTitle}>{t('premiumUi.chatScreen.selectYear')}</Text>
                 <TouchableOpacity onPress={() => setShowYearPicker(false)}>
                   <Ionicons name="close" size={24} color={COLORS.textPrimary} />
                 </TouchableOpacity>
@@ -7731,7 +7645,7 @@ export default function ChatScreen({ navigation, route }) {
         visible={showPartnershipModal}
         onClose={() => setShowPartnershipModal(false)}
         onConfirm={confirmPartnershipMode}
-        title="Partnership Mode"
+        title={t('premiumUi.chatScreen.partnershipMode')}
         description={Platform.OS === 'ios'
           ? 'Partnership mode uses credits per question for detailed compatibility study between two charts.'
           : 'Partnership mode uses credits per question for compatibility study between two charts.'}
@@ -7743,7 +7657,7 @@ export default function ChatScreen({ navigation, route }) {
         visible={showMundaneModal}
         onClose={() => setShowMundaneModal(false)}
         onConfirm={confirmMundaneMode}
-        title="Global Markets & Events"
+        title={t('premiumUi.chatScreen.globalMarkets')}
         description={Platform.OS === 'ios'
           ? 'Global Markets & Events uses credits per question for detailed mundane study of nations, markets, and world events.'
           : 'Global Markets & Events analysis uses credits per question for deep mundane chart study of nations, markets, and world events.'}
@@ -7766,6 +7680,13 @@ const styles = StyleSheet.create({
     flex: 1,
     ...(Platform.OS === 'web' ? { minHeight: 0 } : null),
   },
+  statusBarBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1,
+  },
   safeArea: {
     flex: 1,
     ...(Platform.OS === 'web' ? { minHeight: 0 } : null),
@@ -7779,18 +7700,19 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' ? { minHeight: 0 } : null),
   },
   headerContainer: {
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
     overflow: 'visible',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    borderWidth: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 0,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     overflow: 'visible',
     ...Platform.select({
       ios: {
@@ -7817,30 +7739,57 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-  headerTitle: {
+  activeChatTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: 176,
+  },
+  activeChatDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginRight: 9,
+  },
+  activeChatTitleCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  activeChatTitle: {
+    fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif', default: 'serif' }),
     fontSize: 18,
+    lineHeight: 21,
+  },
+  activeChatSubtitle: {
+    fontSize: 9,
+    lineHeight: 12,
     fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  headerTitle: {
+    fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif', default: 'serif' }),
+    fontSize: 20,
+    fontWeight: '600',
     textAlign: 'center',
   },
   headerLogoContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(215, 184, 120, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
     overflow: 'hidden',
-    shadowColor: '#ff6b35',
+    shadowColor: '#d7b878',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 8,
     elevation: 8,
   },
   headerLogo: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
   },
   nameChip: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
@@ -7979,8 +7928,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   messagesContent: {
-    paddingVertical: 16,
-    paddingHorizontal: 12,
+    paddingTop: 18,
+    paddingBottom: 12,
+    paddingHorizontal: 14,
     flexGrow: 1,
   },
   historyWindowContainer: {
@@ -8231,8 +8181,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   welcomeSuggestionSection: {
-    paddingHorizontal: 4,
-    paddingBottom: 8,
+    paddingHorizontal: 0,
+    paddingBottom: 12,
   },
   welcomeSuggestionHeader: {
     flexDirection: 'row',
@@ -8241,21 +8191,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   welcomeSuggestionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif', default: 'serif' }),
+    fontSize: 19,
+    fontWeight: '400',
     marginLeft: 6,
   },
   welcomeSuggestionCard: {
-    marginBottom: 8,
-    borderRadius: 14,
+    marginBottom: 9,
+    borderRadius: 18,
     overflow: 'hidden',
   },
   welcomeSuggestionCardGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 13,
-    borderRadius: 14,
+    paddingVertical: 15,
+    borderRadius: 18,
     borderWidth: 1,
   },
   welcomeSuggestionCardText: {
@@ -8294,8 +8245,9 @@ const styles = StyleSheet.create({
   },
 
   unifiedInputContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 6,
   },
   chatInputScopeRow: {
     flexDirection: 'row',
@@ -8343,16 +8295,16 @@ const styles = StyleSheet.create({
   inputBarGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 28,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    borderRadius: 22,
+    paddingHorizontal: 7,
+    paddingVertical: 7,
     borderWidth: 1,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
       },
       android: {
         // elevation set dynamically
@@ -8782,9 +8734,11 @@ const styles = StyleSheet.create({
   quickActionsBar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingHorizontal: 16,
+    paddingTop: 10,
     paddingBottom: Platform.OS === 'ios' ? 8 : 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(80, 54, 64, 0.16)',
   },
   quickActionButton: {
     alignItems: 'center',
@@ -8951,46 +8905,69 @@ const styles = StyleSheet.create({
   },
   drawerOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(8, 3, 7, 0.72)',
     justifyContent: 'flex-end',
     flexDirection: 'row',
   },
   drawerContent: {
-    width: 300,
+    width: Math.min(screenWidth * 0.9, 380),
     height: '100%',
     shadowColor: '#000',
-    shadowOffset: { width: -2, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 15,
+    shadowOffset: { width: -8, height: 0 },
+    shadowOpacity: 0.22,
+    shadowRadius: 28,
+    elevation: 0,
   },
   drawerGradient: {
     flex: 1,
   },
   drawerHeader: {
-    alignItems: 'center',
-    paddingTop: 60,
+    alignItems: 'stretch',
+    paddingTop: 48,
     paddingBottom: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  drawerHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  drawerBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  drawerBrandCopy: {
+    marginLeft: 12,
+  },
+  drawerBrandEyebrow: {
+    ...typographyTokens.eyebrow,
+    fontSize: 9,
+    marginBottom: 2,
+  },
+  drawerCloseButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+  },
+  logoContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 15,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   logoImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 46,
+    height: 46,
+    borderRadius: 13,
   },
   cosmicOrbSmall: {
     width: 70,
@@ -9016,21 +8993,69 @@ const styles = StyleSheet.create({
     fontSize: 36,
   },
   drawerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 6,
-    // Shadow only applied inline when theme === 'dark' (smudges light/pandit UI).
+    ...typographyTokens.display,
+    fontSize: 26,
+    lineHeight: 29,
   },
   drawerSubtitle: {
-    fontSize: 14,
-    textAlign: 'center',
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 16,
+  },
+  drawerContextCard: {
+    minHeight: 70,
+    borderRadius: 19,
+    borderWidth: 1,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  drawerContextCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  drawerContextEyebrow: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    marginBottom: 4,
+  },
+  drawerContextName: {
+    ...typographyTokens.display,
+    fontSize: 19,
+    fontWeight: '600',
+  },
+  drawerContextAction: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 3,
+  },
+  drawerContextArrow: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
   },
   menuScrollView: {
-    height: 450,
+    flex: 1,
   },
   menuScrollContent: {
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 44,
+  },
+  drawerSectionLabel: {
+    ...typographyTokens.eyebrow,
+    fontSize: 9,
+    marginLeft: 8,
+    marginBottom: 10,
+  },
+  drawerSectionLabelSpaced: {
+    marginTop: 18,
   },
   modalTitle: {
     fontSize: 22,
@@ -9064,20 +9089,9 @@ const styles = StyleSheet.create({
     color: COLORS.black,
   },
   menuOption: {
-    marginBottom: 12,
-    borderRadius: 16,
+    marginBottom: 7,
+    borderRadius: 17,
     overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
   },
   menuOptionLast: {
     marginTop: 8,
@@ -9085,29 +9099,30 @@ const styles = StyleSheet.create({
   menuGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    minHeight: 58,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 17,
   },
   menuIconContainer: {
-    marginRight: 14,
+    marginRight: 12,
   },
   menuIconGradient: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderWidth: 0,
   },
   menuEmoji: {
-    fontSize: 22,
+    fontSize: 17,
   },
   menuText: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
   },
   modalCloseButton: {
     backgroundColor: COLORS.accent,

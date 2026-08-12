@@ -12,42 +12,35 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../context/ThemeContext';
 import { kpAPI } from '../../services/api';
 import { trackEvent } from '../../utils/analytics';
+import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
+import { useTranslation } from 'react-i18next';
 
 const CACHE_PREFIX = 'kp_today_home_v2:';
 const MAX_PAGES = 5;
 const BULLETS_PER_PAGE = 4;
 
-const TONE_LABELS = {
-  supportive: 'Favourable',
-  mixed: 'Mixed',
-  challenging: 'Under pressure',
-  neutral: 'Steady',
+const API_LANGUAGES = {
+  english: 'en', en: 'en', hindi: 'hi', hi: 'hi', es: 'es', fr: 'fr',
+  german: 'de', de: 'de', russian: 'ru', ru: 'ru', chinese: 'zh', zh: 'zh',
+  tamil: 'ta', ta: 'ta', telugu: 'te', te: 'te', gujarati: 'gu', gu: 'gu',
+  marathi: 'mr', mr: 'mr',
 };
 
-const TONE_UI = {
-  light: {
-    supportive: { accent: '#15803d', pillBg: '#15803d', pillText: '#ffffff' },
-    mixed: { accent: '#0369a1', pillBg: '#0369a1', pillText: '#ffffff' },
-    challenging: { accent: '#be123c', pillBg: '#be123c', pillText: '#ffffff' },
-    neutral: { accent: '#475569', pillBg: '#475569', pillText: '#ffffff' },
-  },
-  dark: {
-    supportive: { accent: '#22c55e', pillBg: '#15803d', pillText: '#ffffff' },
-    mixed: { accent: '#38bdf8', pillBg: '#0369a1', pillText: '#ffffff' },
-    challenging: { accent: '#fb7185', pillBg: '#be123c', pillText: '#ffffff' },
-    neutral: { accent: '#e2e8f0', pillBg: '#64748b', pillText: '#ffffff' },
-  },
-};
+const toneLabel = (t, tone) => t(`premiumUi.kpToday.tones.${tone || 'neutral'}`);
 
-function toneUi(tone, isDark) {
-  const palette = isDark ? TONE_UI.dark : TONE_UI.light;
-  return palette[tone] || palette.neutral;
+function toneUi(tone, colors) {
+  const accent = {
+    supportive: colors.success,
+    mixed: colors.warning,
+    challenging: colors.error,
+    neutral: colors.textSecondary,
+  }[tone] || colors.textSecondary;
+  return { accent, pillBg: colors.surfaceMuted, pillText: colors.text };
 }
 
 function formatLocalDate(d) {
@@ -63,9 +56,9 @@ function formatLocalTime(d) {
   return `${h}:${m}`;
 }
 
-function formatShortDate(d) {
+function formatShortDate(d, locale = 'en-IN') {
   try {
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
   } catch (_) {
     return formatLocalDate(d);
   }
@@ -85,8 +78,8 @@ function isTechnicalLabel(label) {
   return /combined activated|life themes|fructif|significat|house\s*\d+/i.test(s);
 }
 
-function humanHeadline(selfTheme, quiet) {
-  if (quiet) return 'A quieter day';
+function humanHeadline(selfTheme, quiet, t) {
+  if (quiet) return t('premiumUi.kpToday.quieterDay');
   const label = String(selfTheme?.label || '').trim();
   if (label && !isTechnicalLabel(label)) return label;
   const summary = String(selfTheme?.summary || '').trim();
@@ -96,10 +89,10 @@ function humanHeadline(selfTheme, quiet) {
     if (summary.length <= 72) return summary;
     return `${summary.slice(0, 69).trim()}…`;
   }
-  return 'Your day is ready';
+  return t('premiumUi.kpToday.dayReady');
 }
 
-function buildReaderPages(todayBlock) {
+function buildReaderPages(todayBlock, t) {
   const houses = todayBlock?.houses_giving_results || [];
   const selfTheme = (todayBlock?.manifestations || []).find(
     (item) => (item.subject || 'self') === 'self'
@@ -109,7 +102,7 @@ function buildReaderPages(todayBlock) {
   const possibilities = Array.isArray(selfTheme?.possibilities)
     ? selfTheme.possibilities.map((p) => String(p || '').trim()).filter(Boolean)
     : [];
-  const headline = humanHeadline(selfTheme, !houses.length);
+  const headline = humanHeadline(selfTheme, !houses.length, t);
   const quiet = !houses.length;
 
   if (quiet) {
@@ -117,16 +110,15 @@ function buildReaderPages(todayBlock) {
       quiet: true,
       tone: 'neutral',
       headline,
-      teaser: 'Not much is lined up to give clear results today. You can still check this hour in KP Predictions.',
+      teaser: t('premiumUi.kpToday.quietTeaser'),
       pages: [
         {
           id: 'quiet',
           showSummary: true,
-          summary:
-            'Today looks quieter for clear, fructifying results. That can change through the day as ruling planets and fine dashas shift.',
+          summary: t('premiumUi.kpToday.quietSummary'),
           bullets: [
-            'Check back later, or open KP Predictions for this hour’s sharper timing.',
-            'A quiet day does not mean nothing happens — only that fewer houses are strongly confirmed right now.',
+            t('premiumUi.kpToday.quietBulletOne'),
+            t('premiumUi.kpToday.quietBulletTwo'),
           ],
         },
       ],
@@ -136,9 +128,7 @@ function buildReaderPages(todayBlock) {
   let bullets = [...possibilities];
   if (!bullets.length && summary) bullets = [summary];
   if (!bullets.length) {
-    bullets = [
-      'Several life themes look able to move today. Open full KP Predictions for timing detail.',
-    ];
+    bullets = [t('premiumUi.kpToday.fallbackBullet')];
   }
 
   const capped = bullets.slice(0, MAX_PAGES * BULLETS_PER_PAGE);
@@ -156,7 +146,7 @@ function buildReaderPages(todayBlock) {
     quiet: false,
     tone,
     headline,
-    teaser: summary || bullets[0] || 'Your predictions for today are ready.',
+    teaser: summary || bullets[0] || t('premiumUi.kpToday.predictionsReady'),
     pages,
   };
 }
@@ -168,17 +158,18 @@ function KpTodayReaderSheet({
   onClose,
   onOpenKp,
 }) {
-  const { theme, colors } = useTheme();
+  const { colors } = useTheme();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage || i18n.language || 'en-IN';
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
-  const isDark = theme === 'dark';
   const [pageIndex, setPageIndex] = useState(0);
-  const surface = isDark ? '#1a1030' : '#FFFDFC';
-  const tile = isDark ? '#241540' : '#FFF7ED';
-  const border = isDark ? 'rgba(255,255,255,0.16)' : '#FED7AA';
-  const bodyText = isDark ? '#f8fafc' : '#0f172a';
-  const mutedText = isDark ? '#cbd5e1' : '#44403c';
-  const tone = toneUi(reader?.tone || 'neutral', isDark);
+  const surface = colors.surfaceRaised || colors.surface;
+  const tile = colors.surfaceMuted;
+  const border = colors.cardBorder;
+  const bodyText = colors.text;
+  const mutedText = colors.textSecondary;
+  const tone = toneUi(reader?.tone || 'neutral', colors);
   const pages = reader?.pages || [];
   // Sheet is width 100% with overlay pad 16 and maxWidth 440 — page must match that exactly for paging.
   const pageWidth = Math.min(windowWidth - 32, 440);
@@ -225,22 +216,22 @@ function KpTodayReaderSheet({
           <View style={styles.handle} />
           <View style={styles.sheetHeader}>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.sheetEyebrow, { color: isDark ? '#fdba74' : '#ea580c' }]}>
-                Today · {formatShortDate(new Date())}
+              <Text style={[styles.sheetEyebrow, { color: colors.primary }]}>
+                {t('premiumUi.kpToday.today')} · {formatShortDate(new Date(), locale)}
               </Text>
               <Text style={[styles.sheetTitle, { color: bodyText }]} numberOfLines={2}>
-                {reader?.headline || 'Your day is ready'}
+                {reader?.headline || t('premiumUi.kpToday.dayReady')}
               </Text>
             </View>
             <View style={[styles.tonePill, { backgroundColor: tone.pillBg }]}>
               <Text style={[styles.tonePillText, { color: tone.pillText }]}>
-                {TONE_LABELS[reader?.tone] || 'Steady'}
+                {toneLabel(t, reader?.tone)}
               </Text>
             </View>
             <TouchableOpacity
               onPress={onClose}
               style={[styles.closeBtn, { backgroundColor: tile }]}
-              accessibilityLabel="Close"
+              accessibilityLabel={t('premiumUi.common.close')}
             >
               <Ionicons name="close" size={20} color={bodyText} />
             </TouchableOpacity>
@@ -250,7 +241,7 @@ function KpTodayReaderSheet({
             <View style={styles.sheetLoading}>
               <ActivityIndicator color={colors.primary} />
               <Text style={[styles.sheetLoadingText, { color: mutedText }]}>
-                Writing today’s predictions…
+                {t('premiumUi.kpToday.writing')}
               </Text>
             </View>
           ) : (
@@ -302,13 +293,13 @@ function KpTodayReaderSheet({
                         contentContainerStyle={styles.longCardScroll}
                       >
                         <Text style={[styles.pageMeta, { color: mutedText }]}>
-                          {index + 1} of {pages.length}
+                          {t('premiumUi.kpToday.pageOf', { current: index + 1, total: pages.length })}
                         </Text>
                         {item.showSummary && item.summary ? (
                           <Text style={[styles.summaryText, { color: mutedText }]}>{item.summary}</Text>
                         ) : null}
                         <Text style={[styles.sectionLabel, { color: tone.accent }]}>
-                          What may unfold
+                          {t('premiumUi.kpToday.unfold')}
                         </Text>
                         {(item.bullets || []).map((line) => (
                           <View key={line} style={styles.bulletRow}>
@@ -330,7 +321,7 @@ function KpTodayReaderSheet({
                         styles.dotPage,
                         {
                           backgroundColor:
-                            i === pageIndex ? tone.accent : isDark ? 'rgba(255,255,255,0.25)' : '#cbd5e1',
+                            i === pageIndex ? tone.accent : colors.strokeMuted,
                         },
                       ]}
                     />
@@ -342,12 +333,12 @@ function KpTodayReaderSheet({
 
           <View style={[styles.footer, { borderTopColor: border }]}>
             <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: isDark ? '#ea580c' : colors.primary }]}
+              style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
               onPress={() => onOpenKp?.('today')}
               activeOpacity={0.9}
             >
-              <Text style={styles.primaryBtnText}>Open KP Predictions</Text>
-              <Ionicons name="arrow-forward" size={16} color="#fff" />
+              <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>{t('premiumUi.kpToday.open')}</Text>
+              <Ionicons name="arrow-forward" size={16} color={colors.onPrimary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -359,9 +350,11 @@ function KpTodayReaderSheet({
 /**
  * Home entry + full-prediction reader popup for KP Today.
  */
-export default function KpTodayCarousel({ birthDetails, onOpenKp }) {
-  const { theme, colors } = useTheme();
-  const isDark = theme === 'dark';
+export default function KpTodayCarousel({ birthDetails, onOpenKp, embedded = false }) {
+  const { colors } = useTheme();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage || i18n.language || 'en-IN';
+  const apiLanguage = API_LANGUAGES[i18n.resolvedLanguage] || API_LANGUAGES[i18n.language] || 'en';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -396,7 +389,7 @@ export default function KpTodayCarousel({ birthDetails, onOpenKp }) {
     const details = birthDetailsRef.current;
     if (!details?.date || !details?.time || details.latitude == null || details.longitude == null) {
       setLoading(false);
-      setError('Birth details incomplete.');
+      setError(t('premiumUi.kpToday.birthDetailsIncomplete'));
       return;
     }
 
@@ -434,7 +427,7 @@ export default function KpTodayCarousel({ birthDetails, onOpenKp }) {
         timezone: '',
         as_of_date: formatLocalDate(now),
         as_of_time: formatLocalTime(now),
-        language: 'en',
+        language: apiLanguage,
         synthesize: true,
       });
 
@@ -450,15 +443,15 @@ export default function KpTodayCarousel({ birthDetails, onOpenKp }) {
           /* ignore */
         }
       } else if (!hasDataRef.current) {
-        setError(response.data?.detail || 'Could not load today’s predictions.');
+        setError(response.data?.detail || t('premiumUi.kpToday.loadError'));
       }
     } catch (e) {
       if (requestId !== requestIdRef.current) return;
-      if (!hasDataRef.current) setError(e.message || 'Could not load today’s predictions.');
+      if (!hasDataRef.current) setError(e.message || t('premiumUi.kpToday.loadError'));
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, []);
+  }, [apiLanguage, t]);
 
   useEffect(() => {
     if (!birthKey) return undefined;
@@ -483,7 +476,7 @@ export default function KpTodayCarousel({ birthDetails, onOpenKp }) {
     }, [load])
   );
 
-  const reader = useMemo(() => buildReaderPages(data?.today), [data?.today]);
+  const reader = useMemo(() => buildReaderPages(data?.today, t), [data?.today, t]);
 
   useEffect(() => {
     if (!data || viewedRef.current) return;
@@ -514,11 +507,11 @@ export default function KpTodayCarousel({ birthDetails, onOpenKp }) {
 
   if (!birthDetails?.date) return null;
 
-  const tone = toneUi(reader.tone, isDark);
-  const entryTitle = reader.quiet ? 'A quieter day' : 'Your day is ready';
+  const tone = toneUi(reader.tone, colors);
+  const entryTitle = reader.headline || (reader.quiet ? 'A quieter day' : 'Your day is ready');
   const entryToneLine = reader.quiet
     ? 'Fewer clear results confirmed right now'
-    : `${TONE_LABELS[reader.tone] || 'Steady'} · ${formatShortDate(new Date())}`;
+    : `${toneLabel(t, reader.tone)} · ${formatShortDate(new Date(), locale)}`;
 
   return (
     <>
@@ -528,39 +521,41 @@ export default function KpTodayCarousel({ birthDetails, onOpenKp }) {
         disabled={loading && !data}
         style={[
           styles.entryShell,
+          embedded && styles.entryShellEmbedded,
           {
-            borderColor: isDark ? 'rgba(253,186,116,0.45)' : '#FDBA74',
+            borderColor: colors.cardBorder,
             backgroundColor: colors.surface,
           },
         ]}
         accessibilityRole="button"
-        accessibilityLabel="Read today’s predictions"
+        accessibilityLabel={t('premiumUi.kpToday.read')}
       >
-        <LinearGradient
-          colors={isDark ? ['#31145A', '#22113B'] : ['#FFF7ED', '#FFFBEB']}
-          style={styles.entryGradient}
-        >
+        <View style={[styles.entryGradient, { backgroundColor: colors.surface }]}>
           {loading && !data ? (
             <View style={styles.entryLoading}>
               <ActivityIndicator size="small" color={colors.primary} />
               <Text style={[styles.entrySubtitle, { color: colors.textSecondary }]}>
-                Preparing today’s predictions…
+                {t('premiumUi.kpToday.preparing')}
               </Text>
             </View>
           ) : error && !data ? (
             <View>
-              <Text style={[styles.entryTitle, { color: colors.text }]}>Today’s predictions</Text>
+              <Text style={[styles.entryTitle, { color: colors.text }]}>{t('premiumUi.kpToday.title')}</Text>
               <Text style={[styles.entrySubtitle, { color: colors.textSecondary }]}>{error}</Text>
               <TouchableOpacity onPress={load} style={styles.retry}>
-                <Text style={[styles.entryCtaText, { color: colors.primary }]}>Retry</Text>
+                <Text style={[styles.entryCtaText, { color: colors.primary }]}>{t('premiumUi.common.tryAgain')}</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <>
+              <View style={styles.liveRow}>
+                <View style={[styles.liveDot, { backgroundColor: tone.accent }]} />
+                <Text style={[styles.liveLabel, { color: colors.textTertiary }]}>{t('premiumUi.kpToday.live')} · {formatShortDate(new Date(), locale)}</Text>
+                <Text style={[styles.pageCount, { color: colors.textTertiary }]}>
+                  {reader.pages.length} {reader.pages.length === 1 ? 'card' : 'cards'}
+                </Text>
+              </View>
               <View style={styles.entryHeader}>
-                <View style={[styles.entryIcon, { backgroundColor: `${tone.accent}22` }]}>
-                  <Ionicons name="sunny-outline" size={20} color={tone.accent} />
-                </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[styles.entryTitle, { color: colors.text }]}>{entryTitle}</Text>
                   <Text style={[styles.entrySubtitle, { color: colors.textSecondary }]}>
@@ -569,7 +564,7 @@ export default function KpTodayCarousel({ birthDetails, onOpenKp }) {
                 </View>
                 <View style={[styles.tonePill, { backgroundColor: tone.pillBg }]}>
                   <Text style={[styles.tonePillText, { color: tone.pillText }]}>
-                    {TONE_LABELS[reader.tone] || 'Steady'}
+                    {toneLabel(t, reader.tone)}
                   </Text>
                 </View>
               </View>
@@ -577,14 +572,16 @@ export default function KpTodayCarousel({ birthDetails, onOpenKp }) {
                 {reader.teaser}
               </Text>
               <View style={styles.entryCta}>
-                <Text style={[styles.entryCtaText, { color: isDark ? '#fdba74' : '#ea580c' }]}>
-                  Read today’s predictions
+                <Text style={[styles.entryCtaText, { color: colors.primary }]}>
+                  {t('premiumUi.kpToday.swipe')}
                 </Text>
-                <Ionicons name="arrow-forward" size={17} color={isDark ? '#fdba74' : '#ea580c'} />
+                <View style={[styles.entryArrow, { borderColor: colors.cardBorder }]}>
+                  <Ionicons name="arrow-forward" size={16} color={colors.primary} />
+                </View>
               </View>
             </>
           )}
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
 
       <KpTodayReaderSheet
@@ -607,21 +604,20 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
   },
-  entryGradient: { padding: 17 },
+  entryShellEmbedded: { marginHorizontal: 0, marginTop: 0, marginBottom: 0 },
+  entryGradient: { padding: 18 },
   entryLoading: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 56 },
-  entryHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  entryIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  entryTitle: { fontSize: 18, lineHeight: 23, fontWeight: '700' },
+  liveRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  liveDot: { width: 7, height: 7, borderRadius: 4, marginRight: 7 },
+  liveLabel: { flex: 1, fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 1.1 },
+  pageCount: { fontSize: 10, lineHeight: 13, fontWeight: '700' },
+  entryHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  entryTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 23, lineHeight: 28, fontWeight: '400' },
   entrySubtitle: { fontSize: 13, lineHeight: 18, marginTop: 2, fontWeight: '500' },
-  entryTeaser: { fontSize: 14, lineHeight: 21, fontWeight: '600', marginTop: 12 },
-  entryCta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14 },
+  entryTeaser: { fontSize: 13, lineHeight: 20, fontWeight: '500', marginTop: 12 },
+  entryCta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 18 },
   entryCtaText: { fontSize: 14, lineHeight: 19, fontWeight: '700' },
+  entryArrow: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   retry: { marginTop: 10 },
   tonePill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
   tonePillText: { fontSize: 11, fontWeight: '800' },
@@ -665,7 +661,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
-  sheetTitle: { fontSize: 20, lineHeight: 26, fontWeight: '800', marginTop: 4 },
+  sheetTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 24, lineHeight: 29, fontWeight: '400', marginTop: 4 },
   closeBtn: {
     width: 36,
     height: 36,

@@ -67,7 +67,9 @@
 }
 
 .parashari-desk-bar__brand {
-  color: var(--color-accent-soft);
+  /* The desk bar is dark in some themes and pale in others. Its semantic
+     foreground always has the correct contrast for both variants. */
+  color: var(--color-text-inverse);
   font-family: var(--font-display);
   font-size: 1.05rem;
   font-weight: 400;
@@ -135,7 +137,7 @@
 
 .parashari-desk-chip--activations {
   border-color: var(--color-accent);
-  color: var(--color-accent-soft);
+  color: var(--color-text-inverse);
   font-weight: 800;
   box-shadow: 0 1px 0 color-mix(in srgb, var(--color-brand) 12%, transparent);
 }
@@ -581,6 +583,7 @@
 }
 
 .parashari-desk-chart svg [stroke="#111111"] { stroke: var(--color-text) !important; }
+.parashari-desk-chart svg [fill="#2d3436"] { fill: var(--color-text) !important; }
 .parashari-desk-chart svg :is([fill="#333"], [fill="#666"]) { fill: var(--color-text-muted) !important; }
 .parashari-desk-chart svg [fill="#9f1239"] { fill: var(--color-brand) !important; }
 

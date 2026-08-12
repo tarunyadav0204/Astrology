@@ -15,6 +15,7 @@ import WebDatePickerModal from './Common/WebDatePickerModal';
 import { useTheme } from '../context/ThemeContext';
 import { trackAstrologyEvent } from '../utils/analytics';
 import { useTranslation } from 'react-i18next';
+import FocusedStatusBar from './Common/FocusedStatusBar';
 
 const isWeb = Platform.OS === 'web';
 
@@ -24,14 +25,14 @@ export default function ChildbirthPlannerScreen({ navigation }) {
   const { credits, fetchBalance } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
   const { theme, colors } = useTheme();
-  const isDark = theme === 'dark';
+  const isDark = colors.statusBarStyle === 'light-content';
   const ui = {
     text: colors.text,
     muted: colors.textSecondary,
-    cardBg: isDark ? 'rgba(255,255,255,0.1)' : colors.cardBackground,
-    cardBorder: isDark ? 'rgba(255,255,255,0.2)' : colors.cardBorder,
-    insetBg: isDark ? 'rgba(0,0,0,0.3)' : colors.backgroundSecondary,
-    softBg: isDark ? 'rgba(255,255,255,0.08)' : colors.backgroundSecondary,
+    cardBg: colors.cardBackground,
+    cardBorder: colors.cardBorder,
+    insetBg: colors.surfaceMuted,
+    softBg: colors.surfaceRaised,
   };
   const [loading, setLoading] = useState(false);
   const [motherProfile, setMotherProfile] = useState(null);
@@ -245,9 +246,8 @@ export default function ChildbirthPlannerScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {isDark ? (
-        <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={StyleSheet.absoluteFill} />
-      ) : null}
+      <LinearGradient colors={[colors.gradientStart, colors.gradientMid, colors.gradientEnd]} style={StyleSheet.absoluteFill} />
+      <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
         <SafeAreaView style={styles.safeArea}>
           <ScrollView contentContainerStyle={styles.scroll}>
             
@@ -332,39 +332,20 @@ export default function ChildbirthPlannerScreen({ navigation }) {
               onPress={calculateDates} 
               disabled={loading || !creditInfo.can_afford}
             >
-              {isDark ? (
-                <LinearGradient 
-                  colors={creditInfo.can_afford ? ['#ff6b35', '#ff8c5a'] : ['#666', '#888']} 
-                  style={styles.calcGradient}
-                >
+              <LinearGradient
+                colors={creditInfo.can_afford ? [colors.primary, colors.primaryStrong] : [colors.surfaceMuted, colors.backgroundTertiary]}
+                style={styles.calcGradient}
+              >
                   {loading ? (
-                    <ActivityIndicator color={COLORS.white} />
+                    <ActivityIndicator color={colors.onPrimary} />
                   ) : (
-                    <Text style={styles.calcButtonText}>
+                    <Text style={[styles.calcButtonText, { color: creditInfo.can_afford ? colors.onPrimary : colors.textSecondary }]}>
                       {creditInfo.can_afford
                         ? t('muhurat.common.findAuspiciousDates', 'Find Auspicious Dates')
                         : t('muhurat.common.insufficientCredits', 'Insufficient Credits')}
                     </Text>
                   )}
-                </LinearGradient>
-              ) : (
-                <View
-                  style={[
-                    styles.calcGradient,
-                    { backgroundColor: creditInfo.can_afford ? colors.primary : colors.backgroundTertiary },
-                  ]}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.calcButtonText}>
-                      {creditInfo.can_afford
-                        ? t('muhurat.common.findAuspiciousDates', 'Find Auspicious Dates')
-                        : t('muhurat.common.insufficientCredits', 'Insufficient Credits')}
-                    </Text>
-                  )}
-                </View>
-              )}
+              </LinearGradient>
             </TouchableOpacity>
 
             {/* Results */}

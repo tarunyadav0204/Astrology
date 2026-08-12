@@ -11,6 +11,8 @@ import { API_BASE_URL } from '../../utils/constants';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { storage } from '../../services/storage';
 import { pricingAPI } from '../../services/api';
+import { useTheme } from '../../context/ThemeContext';
+import FocusedStatusBar from '../Common/FocusedStatusBar';
 
 const LuckGauge = ({ score, signal }) => {
   const getColor = () => {
@@ -94,6 +96,8 @@ const RiskBadge = ({ risks }) => {
 
 export default function TradingDashboardScreen({ navigation }) {
   useAnalytics('TradingDashboardScreen');
+  const { colors } = useTheme();
+  const workspaceGradient = [colors.cosmicSurface, colors.headerSurface, colors.cosmicRaised];
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -334,17 +338,18 @@ export default function TradingDashboardScreen({ navigation }) {
 
   if (showCreditModal && !data) return (
     <View style={styles.centerContainer}>
-      <LinearGradient colors={['#0f0c29', '#302b63']} style={styles.bg}>
+      <LinearGradient colors={workspaceGradient} style={styles.bg}>
+        <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()}>
-              <Ionicons name="arrow-back" size={24} color="#fff" />
+              <Ionicons name="arrow-back" size={24} color={colors.textInverse} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Trading Cockpit</Text>
             <View style={{width:24}}/>
           </View>
           <View style={styles.loadingContainer}>
-            <Ionicons name="card" size={48} color="#FFD700" />
+                <Ionicons name="card" size={48} color={colors.accent} />
             <Text style={styles.errorTitle}>Trading Analysis</Text>
             
             <View style={styles.premiumToggle}>
@@ -381,7 +386,8 @@ export default function TradingDashboardScreen({ navigation }) {
 
   if (loading) return (
     <View style={styles.centerContainer}>
-        <LinearGradient colors={['#0f0c29', '#302b63']} style={styles.bg}>
+        <LinearGradient colors={workspaceGradient} style={styles.bg}>
+          <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
           <SafeAreaView style={styles.safeArea}>
             <View style={styles.header}>
               <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -391,7 +397,7 @@ export default function TradingDashboardScreen({ navigation }) {
               <View style={{width:24}}/>
             </View>
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#00C853" />
+              <ActivityIndicator size="large" color={colors.accent} />
               <Text style={styles.loadingText}>Aligning Market Stars...</Text>
               <View style={styles.skeletonContainer}>
                 <View style={styles.skeletonGauge} />
@@ -406,7 +412,8 @@ export default function TradingDashboardScreen({ navigation }) {
 
   if (!data) return (
     <View style={styles.centerContainer}>
-        <LinearGradient colors={['#0f0c29', '#302b63']} style={styles.bg}>
+        <LinearGradient colors={workspaceGradient} style={styles.bg}>
+          <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
           <SafeAreaView style={styles.safeArea}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -439,17 +446,18 @@ export default function TradingDashboardScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#0f0c29', '#302b63', '#24243e']} style={styles.bg}>
+      <LinearGradient colors={workspaceGradient} style={styles.bg}>
+        <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
         <SafeAreaView style={styles.safeArea}>
           <GHScrollView>
             
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color="#fff" />
+                    <Ionicons name="arrow-back" size={24} color={colors.textInverse} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Trading Cockpit</Text>
                 <TouchableOpacity onPress={() => setShowRegenerateModal(true)}>
-                    <Ionicons name="refresh" size={24} color="#fff" />
+                    <Ionicons name="refresh" size={24} color={colors.textInverse} />
                 </TouchableOpacity>
             </View>
 
@@ -501,8 +509,8 @@ export default function TradingDashboardScreen({ navigation }) {
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.calendarButton} onPress={() => navigation.navigate('TradingCalendar')}>
-              <Text style={styles.calendarButtonText}>View Monthly Planner</Text>
+            <TouchableOpacity style={[styles.calendarButton, { backgroundColor: colors.primary, borderColor: colors.cosmicLine, borderWidth: 1 }]} onPress={() => navigation.navigate('TradingCalendar')}>
+              <Text style={[styles.calendarButtonText, { color: colors.onPrimary }]}>View Monthly Planner</Text>
               <Ionicons name="calendar" size={20} color="#fff" />
             </TouchableOpacity>
 

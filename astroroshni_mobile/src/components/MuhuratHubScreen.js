@@ -6,6 +6,7 @@ import Icon from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import { pricingAPI } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
+import FocusedStatusBar from './Common/FocusedStatusBar';
 
 const { width } = Dimensions.get('window');
 
@@ -54,7 +55,7 @@ const MUHURAT_TYPE_DEFS = [
 export default function MuhuratHubScreen({ navigation }) {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
-  const isDark = theme === 'dark';
+  const isDark = colors.statusBarStyle === 'light-content';
   const [pricing, setPricing] = useState({});
   const [pricingOriginal, setPricingOriginal] = useState({});
 
@@ -93,17 +94,16 @@ export default function MuhuratHubScreen({ navigation }) {
     }
   };
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.08)' : colors.cardBackground;
-  const cardBorder = isDark ? 'rgba(255,255,255,0.1)' : colors.cardBorder;
-  const bannerBg = isDark ? 'rgba(249,115,22,0.18)' : 'rgba(24, 24, 27, 0.04)';
-  const bannerBorder = isDark ? 'rgba(255,215,0,0.35)' : colors.cardBorder;
-  const iconCircleBg = isDark ? '#f97316' : colors.primary;
+  const cardBg = colors.cardBackground;
+  const cardBorder = colors.cardBorder;
+  const bannerBg = colors.surfaceRaised;
+  const bannerBorder = colors.selectionBorder;
+  const iconCircleBg = colors.primary;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {isDark ? (
-        <LinearGradient colors={['#120E24', '#261C45']} style={StyleSheet.absoluteFill} />
-      ) : null}
+      <LinearGradient colors={[colors.gradientStart, colors.gradientMid, colors.gradientEnd]} style={StyleSheet.absoluteFill} />
+      <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -135,7 +135,7 @@ export default function MuhuratHubScreen({ navigation }) {
               {t('muhurat.hub.todaysPanchangSub', 'Tithi, Choghadiya, Hora, Amrit & Rahu Kaal')}
             </Text>
           </View>
-          <Icon name="chevron-forward" size={18} color={isDark ? '#FFD700' : colors.textTertiary} />
+          <Icon name="chevron-forward" size={18} color={colors.accent} />
         </TouchableOpacity>
 
         <ScrollView contentContainerStyle={styles.grid}>
@@ -163,15 +163,9 @@ export default function MuhuratHubScreen({ navigation }) {
                     )}
                   </View>
                 )}
-                {isDark ? (
-                  <LinearGradient colors={item.gradient} style={styles.iconCircle}>
-                    <Icon name={item.icon} size={28} color="#fff" />
-                  </LinearGradient>
-                ) : (
-                  <View style={[styles.iconCircle, { backgroundColor: colors.backgroundSecondary }]}>
-                    <Icon name={item.icon} size={28} color={colors.primary} />
-                  </View>
-                )}
+                <LinearGradient colors={[colors.primary, colors.primaryStrong]} style={styles.iconCircle}>
+                  <Icon name={item.icon} size={28} color={colors.onPrimary} />
+                </LinearGradient>
                 <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
                 <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{item.subtitle}</Text>
               </TouchableOpacity>

@@ -333,6 +333,7 @@
     "close": "Cerrar"
   },
   "authOnboarding": {
+    "welcomeEyebrow": "TU GUÍA VÉDICA", "welcomeHero": "Conoce a Tara.\nLee tu vida.", "welcomeHeroBody": "Tu carta completa, sintetizada mediante Parashari, Nadi, Jaimini y KP, convertida en orientación clara.", "analysisLayers": "capas de análisis", "vedicSystems": "sistemas védicos", "createAccount": "Crear cuenta", "signIn": "Iniciar sesión", "languageEyebrow": "HAZLO TUYO", "legalPrefix": "Al continuar, aceptas nuestros", "terms": "Términos del servicio", "and": "y", "privacy": "Política de privacidad",
     "chooseLanguageTitle": "Elige tu idioma",
     "chooseLanguageSubtitle": "Lo usaremos en toda la app. Puedes cambiarlo cuando quieras en Perfil.",
     "continue": "Continuar",

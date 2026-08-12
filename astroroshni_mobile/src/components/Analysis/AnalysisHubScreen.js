@@ -6,8 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
-  Dimensions,
-  Image,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,17 +20,13 @@ import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
 
-const { width } = Dimensions.get('window');
-
 export default function AnalysisHubScreen({ navigation }) {
   useAnalytics('AnalysisHubScreen');
   const { t } = useTranslation();
-  const { theme, colors } = useTheme();
-  const isDark = theme === 'dark';
+  const { colors } = useTheme();
   const { credits } = useCredits();
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(50));
-  const [logoGlow] = useState(new Animated.Value(0));
   const [pricing, setPricing] = useState({});
   const [pricingOriginal, setPricingOriginal] = useState({});
   const [loadingPricing, setLoadingPricing] = useState(true);
@@ -52,27 +46,8 @@ export default function AnalysisHubScreen({ navigation }) {
       }),
     ]).start();
 
-    const logoGlowLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(logoGlow, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: false,
-        }),
-        Animated.timing(logoGlow, {
-          toValue: 0,
-          duration: 1500,
-          useNativeDriver: false,
-        }),
-      ])
-    );
-    logoGlowLoop.start();
-    
     fetchPricing();
     loadBirthData();
-    return () => {
-      logoGlowLoop.stop();
-    };
   }, []);
   
   const loadBirthData = async () => {
@@ -115,85 +90,69 @@ export default function AnalysisHubScreen({ navigation }) {
     const baseTypes = [
       {
         id: 'reports',
-        title: Platform.OS === 'ios' ? 'Premium Report Studio' : 'Premium Reports',
-        subtitle: Platform.OS === 'ios' ? 'Choose charts, language, and generate a polished PDF' : 'Build a premium PDF with two-chart selection',
+        title: t('lifeAnalysisFlow.premiumReports'),
+        subtitle: t('lifeAnalysisFlow.premiumReportsSubtitle'),
         icon: '📄',
         gradient: ['#fb7185', '#f97316'],
-        description: Platform.OS === 'ios'
-          ? 'A premium report flow that keeps the answer hidden until after generation, then gives you a polished PDF.'
-          : 'Start here when you want a premium PDF report instead of a generic summary.',
+        description: t('lifeAnalysisFlow.premiumReportsDescription'),
         isFree: false,
       },
       {
         id: 'career',
-        title: Platform.OS === 'ios' ? 'Chart Study' : 'Career Analysis',
-        subtitle: Platform.OS === 'ios' ? 'Review your chart for work themes and direction' : 'Professional success & opportunities',
+        title: t('home.analysis.career.title'),
+        subtitle: t('home.analysis.career.description'),
         icon: '💼',
         gradient: ['#6366F1', '#8B5CF6'],
-        description: Platform.OS === 'ios'
-          ? 'Read your chart, understand your patterns, or review the next step you want to study.'
-          : 'Discover your career potential, ideal industries, and professional timing with AI-powered insights'
+        description: t('lifeAnalysisFlow.cardDescriptions.career')
       },
       {
         id: 'wealth',
-        title: Platform.OS === 'ios' ? 'Yearly Chart Study' : 'Wealth Analysis',
-        subtitle: Platform.OS === 'ios' ? 'Review the year month by month with chart-based timing notes' : 'Financial prospects & opportunities',
+        title: t('home.analysis.wealth.title'),
+        subtitle: t('home.analysis.wealth.description'),
         icon: '💰',
         gradient: ['#FFD700', '#FF8C00'],
-        description: Platform.OS === 'ios'
-          ? 'Review the year month by month with chart-based timing notes for the areas you care about.'
-          : 'Discover your financial potential, investment timing, and wealth accumulation patterns'
+        description: t('lifeAnalysisFlow.cardDescriptions.wealth')
       },
       {
         id: 'health',
-        title: Platform.OS === 'ios' ? 'Wellness Review' : 'Health Analysis',
-        subtitle: Platform.OS === 'ios' ? 'Study health routines and care points' : 'Wellness review & care points',
+        title: t('home.analysis.health.title'),
+        subtitle: t('home.analysis.health.description'),
         icon: '🏥',
         gradient: ['#32CD32', '#228B22'],
-        description: Platform.OS === 'ios'
-          ? 'Review health themes, routines, and points to watch.'
-          : 'Understand health vulnerabilities, body constitution, and preventive measures'
+        description: t('lifeAnalysisFlow.cardDescriptions.health')
       },
       {
         id: 'relationshipMatch',
-        title: Platform.OS === 'ios' ? 'Chart Comparison' : 'Kundli Matching',
-        subtitle: Platform.OS === 'ios' ? 'Compare two charts and review relationship patterns' : 'Two-chart relationship compatibility',
+        title: t('lifeAnalysisFlow.kundliMatching'),
+        subtitle: t('lifeAnalysisFlow.kundliMatchingSubtitle'),
         icon: '💞',
         gradient: ['#fb7185', '#f97316'],
-        description: Platform.OS === 'ios'
-          ? 'Compare two birth charts and review shared strengths, caution areas, and timing context.'
-          : 'See a trust-first compatibility verdict, timing climate, strengths, and caution areas before going deeper',
+        description: t('lifeAnalysisFlow.kundliMatchingDescription'),
         isFree: true,
       },
       {
         id: 'marriage',
-        title: Platform.OS === 'ios' ? 'Shared Chart Study' : 'My Marriage Analysis',
-        subtitle: Platform.OS === 'ios' ? 'Review relationship patterns, strengths, and points to watch' : 'Your relationship patterns & timing',
+        title: t('home.analysis.marriage.title'),
+        subtitle: t('home.analysis.marriage.description'),
         icon: '💕',
         gradient: ['#FF69B4', '#DC143C'],
-        description: Platform.OS === 'ios'
-          ? 'Compare two charts and review relationship patterns, strengths, and points to watch.'
-          : 'Explore relationship patterns, marriage timing, and partner compatibility'
+        description: t('lifeAnalysisFlow.cardDescriptions.marriage')
       },
       {
         id: 'education',
-        title: Platform.OS === 'ios' ? 'Chart Guidance' : 'Education Analysis',
-        subtitle: Platform.OS === 'ios' ? 'Ask about your chart, your patterns, or the next step you want to understand' : 'Learning path & skill growth',
+        title: t('home.analysis.education.title'),
+        subtitle: t('home.analysis.education.description'),
         icon: '🎓',
         gradient: ['#4169E1', '#1E90FF'],
-        description: Platform.OS === 'ios'
-          ? 'Read your chart, understand your patterns, or review the next step you want to study.'
-          : 'Identify educational strengths, career paths, and learning opportunities'
+        description: t('lifeAnalysisFlow.cardDescriptions.education')
       },
       {
         id: 'progeny',
-        title: Platform.OS === 'ios' ? 'Family Study' : 'Progeny Analysis',
-        subtitle: Platform.OS === 'ios' ? 'Review child and family timing patterns' : 'Children & family planning',
+        title: t('home.analysis.progeny.title'),
+        subtitle: t('home.analysis.progeny.description'),
         icon: '👶',
         gradient: ['#FF69B4', '#FFB6C1'],
-        description: Platform.OS === 'ios'
-          ? 'Review child-related timing, family patterns, and the questions you want to study.'
-          : 'Explore fertility potential, timing for children, and family expansion insights'
+        description: t('lifeAnalysisFlow.cardDescriptions.progeny')
       }
     ];
     
@@ -226,41 +185,39 @@ export default function AnalysisHubScreen({ navigation }) {
     });
   };
 
-  const screenGradientColors = isDark
-    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary]
-    : [colors.background, colors.backgroundSecondary, colors.backgroundTertiary, colors.primary];
+  const screenGradientColors = [colors.background, colors.backgroundSecondary, colors.background];
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} />
       <LinearGradient colors={screenGradientColors} style={styles.gradientBg}>
         <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
+          <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cardBorder }]}>
             <TouchableOpacity 
-              style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface }]}
+              style={[styles.backButton, { backgroundColor: 'rgba(255,255,255,0.09)', borderColor: colors.cardBorder }]}
               onPress={() => navigation.navigate('Home', { resetToGreeting: true })}
             >
-              <Ionicons name="arrow-back" size={24} color={colors.text} />
+              <Ionicons name="arrow-back" size={22} color={colors.textInverse} />
             </TouchableOpacity>
             <View style={styles.headerCenter}>
-              <Text style={[styles.headerTitle, { color: colors.text }]}>
-                {Platform.OS === 'ios' ? 'Chart Study' : 'Life Analysis'}
+              <Text style={[styles.headerTitle, { color: colors.textInverse }]}>
+                {t('lifeAnalysisFlow.lifeAnalysis')}
               </Text>
               {birthData && (
                 <NativeSelectorChip 
                   birthData={birthData}
                   onPress={() => navigation.navigate('SelectNative')}
                   maxLength={15}
-                  style={[styles.nativeChip, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : colors.surface }]}
-                  textStyle={[styles.nativeChipText, { color: colors.textSecondary }]}
+                  style={[styles.nativeChip, { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: colors.cardBorder }]}
+                  textStyle={[styles.nativeChipText, { color: colors.textInverseMuted }]}
                   showIcon={false}
                 />
               )}
             </View>
             <TouchableOpacity style={styles.creditButton} onPress={() => navigation.navigate('Credits')}>
-              <LinearGradient colors={[colors.primary, colors.secondary]} style={styles.creditGradient}>
-                <Text style={[styles.creditText, { color: '#fff' }]}>💳 {credits}</Text>
-              </LinearGradient>
+              <View style={[styles.creditGradient, { backgroundColor: colors.accentSoft }]}>
+                <Text style={[styles.creditText, { color: colors.onAccent }]}>💳 {credits}</Text>
+              </View>
             </TouchableOpacity>
           </View>
 
@@ -280,46 +237,24 @@ export default function AnalysisHubScreen({ navigation }) {
               showsVerticalScrollIndicator={false}
             >
               {/* Hero Section */}
-              <View style={styles.heroSection}>
-                <Animated.View style={[styles.logoContainer, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : colors.surface }, {
-                  shadowOpacity: logoGlow.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.6, 1],
-                  }),
-                  shadowRadius: logoGlow.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [12, 20],
-                  }),
-                  transform: [{
-                    scale: logoGlow.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 1.05],
-                    })
-                  }]
-                }]}>
-                  <Image 
-                    source={require('../../../assets/logo.png')}
-                    style={styles.logoImage}
-                    resizeMode="contain"
-                  />
-                </Animated.View>
+              <View style={[styles.heroSection, { backgroundColor: colors.surfaceInverse, borderColor: colors.cardBorder }]}>
+                <View pointerEvents="none" style={styles.heroLinework}>
+                  <View style={[styles.heroOrbitOuter, { borderColor: colors.accent }]} />
+                  <View style={[styles.heroOrbitInner, { borderColor: colors.accent }]} />
+                  <View style={[styles.heroDiagonal, { backgroundColor: colors.accent }]} />
+                  <View style={[styles.heroAxis, { backgroundColor: colors.accent }]} />
+                  <View style={[styles.heroPoint, { backgroundColor: colors.accent }]} />
+                </View>
               <Text
                 style={[
                   styles.heroTitle,
-                  { color: colors.text },
-                  isDark && {
-                    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-                    textShadowOffset: { width: 0, height: 2 },
-                    textShadowRadius: 4,
-                  },
+                  { color: colors.onSurfaceInverse || colors.textInverse },
                 ]}
               >
-                {Platform.OS === 'ios' ? 'Study Your Life Patterns' : "Unlock Your Life's Mysteries"}
+                {t('lifeAnalysisFlow.heroTitle')}
               </Text>
-              <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-                  {Platform.OS === 'ios'
-                    ? 'Explore chart patterns across career, relationships, health, and growth'
-                    : 'Deep astrological insights into the four pillars of life'}
+              <Text style={[styles.heroSubtitle, { color: colors.onSurfaceInverseMuted || colors.textInverseMuted }]}>
+                  {t('lifeAnalysisFlow.heroBody')}
               </Text>
               </View>
 
@@ -345,26 +280,23 @@ export default function AnalysisHubScreen({ navigation }) {
                       onPress={() => handleAnalysisSelect(analysis)}
                       style={styles.cardTouchable}
                     >
-                      <LinearGradient
-                        colors={isDark ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
-                        style={[styles.cardGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
-                      >
+                      <View style={[styles.cardGradient, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
                         <View style={styles.cardHeader}>
                           <View style={styles.iconContainer}>
-                            <LinearGradient colors={analysis.gradient} style={[styles.iconGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : colors.cardBorder }]}>
+                            <View style={[styles.iconGradient, { backgroundColor: colors.accentSoft, borderColor: colors.cardBorder }]}>
                               <Text style={styles.cardIcon}>{analysis.icon}</Text>
-                            </LinearGradient>
+                            </View>
                           </View>
                           <View style={[styles.costBadge, { backgroundColor: colors.primary }]}>
                             {analysis.isFree ? (
-                              <Text style={[styles.costText, { color: '#fff' }]}>{t('relationshipMatch.freeCompare')}</Text>
+                              <Text style={[styles.costText, { color: colors.onPrimary }]}>{t('relationshipMatch.freeCompare')}</Text>
                             ) : analysis.originalCost != null && analysis.originalCost > analysis.cost ? (
                               <View style={styles.costWithDiscount}>
-                                <Text style={[styles.costText, styles.costOriginal, { color: '#fff' }]}>{analysis.originalCost}</Text>
-                                <Text style={[styles.costText, { color: '#fff' }]}>{analysis.cost} credits</Text>
+                                <Text style={[styles.costText, styles.costOriginal, { color: colors.onPrimary }]}>{analysis.originalCost}</Text>
+                                <Text style={[styles.costText, { color: colors.onPrimary }]}>{t('lifeAnalysisFlow.credits', { count: analysis.cost })}</Text>
                               </View>
                             ) : (
-                              <Text style={[styles.costText, { color: '#fff' }]}>{analysis.cost} credits</Text>
+                              <Text style={[styles.costText, { color: colors.onPrimary }]}>{t('lifeAnalysisFlow.credits', { count: analysis.cost })}</Text>
                             )}
                           </View>
                         </View>
@@ -372,27 +304,22 @@ export default function AnalysisHubScreen({ navigation }) {
                         <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{analysis.subtitle}</Text>
                         <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>{analysis.description}</Text>
                         <View style={styles.cardFooter}>
-                          <Text style={[styles.exploreText, { color: colors.primary }]}>Explore Now</Text>
+                          <Text style={[styles.exploreText, { color: colors.primary }]}>{t('lifeAnalysisFlow.exploreNow')}</Text>
                           <Ionicons name="arrow-forward" size={16} color={colors.textSecondary} />
                         </View>
-                      </LinearGradient>
+                      </View>
                     </TouchableOpacity>
                   </Animated.View>
                 ))}
               </View>
 
               <View style={styles.infoSection}>
-                <LinearGradient
-                  colors={isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
-                  style={[styles.infoCard, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
-                >
-                  <Text style={[styles.infoTitle, { color: colors.text }]}>{Platform.OS === 'ios' ? '✨ Premium Study Features' : '✨ Premium Analysis Features'}</Text>
+                <View style={[styles.infoCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+                  <Text style={[styles.infoTitle, { color: colors.text }]}>✨ {t('lifeAnalysisFlow.premiumFeatures')}</Text>
                   <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                    {Platform.OS === 'ios'
-                      ? '• Detailed chart calculations\n• Personalized suggestions\n• Timing context and useful periods\n• Interactive Q&A format\n• Follow-up questions for deeper study'
-                      : '• Detailed astrological calculations\n• Personalized remedies & suggestions\n• Timing predictions & favorable periods\n• Interactive Q&A format\n• Follow-up questions for deeper insights'}
+                    {t('lifeAnalysisFlow.premiumFeaturesBody')}
                   </Text>
-                </LinearGradient>
+                </View>
               </View>
             </ScrollView>
           </Animated.View>
@@ -416,16 +343,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
   },
   headerTitle: {
     fontSize: 18,
@@ -470,59 +399,99 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
   heroSection: {
-    alignItems: 'center',
-    paddingVertical: 30,
-    paddingHorizontal: 20,
+    alignItems: 'flex-start',
+    margin: 16,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    borderRadius: 28,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+  heroLinework: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.58,
   },
-  logoImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+  heroOrbitOuter: {
+    position: 'absolute',
+    width: 218,
+    height: 218,
+    borderRadius: 109,
+    borderWidth: 1,
+    top: -112,
+    right: -62,
+  },
+  heroOrbitInner: {
+    position: 'absolute',
+    width: 148,
+    height: 148,
+    borderRadius: 74,
+    borderWidth: 1,
+    top: -77,
+    right: -27,
+  },
+  heroDiagonal: {
+    position: 'absolute',
+    width: 1,
+    height: 210,
+    top: -24,
+    right: 72,
+    opacity: 0.34,
+    transform: [{ rotate: '38deg' }],
+  },
+  heroAxis: {
+    position: 'absolute',
+    width: 92,
+    height: 1,
+    top: 47,
+    right: 24,
+    opacity: 0.72,
+  },
+  heroPoint: {
+    position: 'absolute',
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    top: 44,
+    right: 68,
   },
   heroTitle: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 38,
+    fontWeight: '500',
+    fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }),
     color: '#ffffff',
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 12,
+    maxWidth: '84%',
+    zIndex: 1,
   },
   heroSubtitle: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
+    textAlign: 'left',
     lineHeight: 24,
+    maxWidth: '88%',
+    zIndex: 1,
   },
   analysisGrid: {
-    paddingHorizontal: 20,
-    gap: 16,
+    paddingHorizontal: 16,
+    gap: 12,
   },
   analysisCard: {
-    borderRadius: 20,
+    borderRadius: 18,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 2,
   },
   cardTouchable: {
     width: '100%',
   },
   cardGradient: {
-    padding: 20,
+    padding: 18,
     borderWidth: 1,
+    borderRadius: 18,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   cardHeader: {
@@ -532,9 +501,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   iconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     overflow: 'hidden',
   },
   iconGradient: {
@@ -569,8 +538,9 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   cardTitle: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: '500',
+    fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }),
     color: '#ffffff',
     marginBottom: 8,
   },

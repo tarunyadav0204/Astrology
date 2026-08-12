@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Animated, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Animated, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 import NativeSelectorChip from '../components/Common/NativeSelectorChip';
 import DateNavigator from '../components/Common/DateNavigator';
+import { typographyTokens } from '../theme/tokens';
 
 function formatLocalDate(d) {
     const y = d.getFullYear();
@@ -57,12 +58,12 @@ const PlanetaryTable = ({ data, theme, colors }) => {
         const pada = Math.floor(nakPosition / 3.333333) + 1;
         return { name: nakshatras[nakIndex], pada };
     };
-    
+
     const shortPlanet = (name) => {
-        const map = { 
-            'Sun': 'Su', 'Moon': 'Mo', 'Mars': 'Ma', 'Mercury': 'Me', 
-            'Jupiter': 'Ju', 'Venus': 'Ve', 'Saturn': 'Sa', 'Rahu': 'Ra', 
-            'Ketu': 'Ke', 'Ascendant': 'Asc' 
+        const map = {
+            'Sun': 'Su', 'Moon': 'Mo', 'Mars': 'Ma', 'Mercury': 'Me',
+            'Jupiter': 'Ju', 'Venus': 'Ve', 'Saturn': 'Sa', 'Rahu': 'Ra',
+            'Ketu': 'Ke', 'Ascendant': 'Asc'
         };
         return map[name] || name.substring(0, 2);
     };
@@ -70,7 +71,7 @@ const PlanetaryTable = ({ data, theme, colors }) => {
     return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.table}>
-                <View style={styles.tableRow}>
+                <View style={[styles.tableRow, styles.tableHeadingRow, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.borderStrong }]}>
                     <Text style={[styles.tableHeader, { color: colors.text, width: 60 }]}>Planet</Text>
                     <Text style={[styles.tableHeader, { color: colors.text, width: 60 }]}>Deg</Text>
                     <Text style={[styles.tableHeader, { color: colors.text, width: 90 }]}>Star</Text>
@@ -83,7 +84,7 @@ const PlanetaryTable = ({ data, theme, colors }) => {
                 {data.map((item, index) => {
                     const nakInfo = getNakshatraInfo(item.longitude);
                     return (
-                        <View key={index} style={[styles.tableRow, index % 2 === 0 && styles.tableRowAlt]}>
+                        <View key={index} style={[styles.tableRow, { borderBottomColor: colors.cardBorder }, index % 2 === 0 && { backgroundColor: colors.backgroundSecondary }]}>
                             <Text style={[styles.tableCell, { color: colors.primary, width: 60 }]}>{shortPlanet(item.planet)}</Text>
                             <Text style={[styles.tableCell, { color: colors.text, width: 60 }]}>{item.longitude.toFixed(1)}°</Text>
                             <Text style={[styles.tableCell, { color: colors.text, width: 90 }]}>{nakInfo.name}</Text>
@@ -110,12 +111,12 @@ const CuspalTable = ({ data, theme, colors }) => {
         const pada = Math.floor(nakPosition / 3.333333) + 1;
         return { name: nakshatras[nakIndex], pada };
     };
-    
+
     const shortPlanet = (name) => {
-        const map = { 
-            'Sun': 'Su', 'Moon': 'Mo', 'Mars': 'Ma', 'Mercury': 'Me', 
-            'Jupiter': 'Ju', 'Venus': 'Ve', 'Saturn': 'Sa', 'Rahu': 'Ra', 
-            'Ketu': 'Ke', 'Ascendant': 'Asc' 
+        const map = {
+            'Sun': 'Su', 'Moon': 'Mo', 'Mars': 'Ma', 'Mercury': 'Me',
+            'Jupiter': 'Ju', 'Venus': 'Ve', 'Saturn': 'Sa', 'Rahu': 'Ra',
+            'Ketu': 'Ke', 'Ascendant': 'Asc'
         };
         return map[name] || name.substring(0, 2);
     };
@@ -123,7 +124,7 @@ const CuspalTable = ({ data, theme, colors }) => {
     return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.table}>
-                <View style={styles.tableRow}>
+                <View style={[styles.tableRow, styles.tableHeadingRow, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.borderStrong }]}>
                     <Text style={[styles.tableHeader, { color: colors.text, width: 50 }]}>Cusp</Text>
                     <Text style={[styles.tableHeader, { color: colors.text, width: 60 }]}>Deg</Text>
                     <Text style={[styles.tableHeader, { color: colors.text, width: 90 }]}>Star</Text>
@@ -136,7 +137,7 @@ const CuspalTable = ({ data, theme, colors }) => {
                 {data.map((item, index) => {
                     const nakInfo = getNakshatraInfo(item.longitude);
                     return (
-                        <View key={index} style={[styles.tableRow, index % 2 === 0 && styles.tableRowAlt]}>
+                        <View key={index} style={[styles.tableRow, { borderBottomColor: colors.cardBorder }, index % 2 === 0 && { backgroundColor: colors.backgroundSecondary }]}>
                             <Text style={[styles.tableCell, { color: colors.primary, width: 50 }]}>{item.cusp}</Text>
                             <Text style={[styles.tableCell, { color: colors.text, width: 60 }]}>{item.longitude.toFixed(1)}°</Text>
                             <Text style={[styles.tableCell, { color: colors.text, width: 90 }]}>{nakInfo.name}</Text>
@@ -154,14 +155,13 @@ const CuspalTable = ({ data, theme, colors }) => {
 };
 
 const sigChipStyles = (theme, colors) => {
-    const isDark = theme === 'dark';
     return {
-        cardBg: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(249, 115, 22, 0.05)',
-        // Dark: solid chip + light label (tint+orange text is too low-contrast).
-        chipBg: isDark ? colors.primary : 'rgba(249, 115, 22, 0.14)',
-        chipBorder: isDark ? colors.primary : 'rgba(249, 115, 22, 0.55)',
-        chipText: isDark ? '#fff7ed' : colors.primary,
-        title: isDark ? '#fdba74' : colors.primary,
+        cardBg: colors.surfaceRaised,
+        cardBorder: colors.cardBorder,
+        chipBg: colors.selectionSurface,
+        chipBorder: colors.selectionBorder,
+        chipText: colors.selectionText,
+        title: colors.primary,
     };
 };
 
@@ -172,7 +172,7 @@ const SignificatorsView = ({ data, theme, colors }) => {
     return (
         <ScrollView showsVerticalScrollIndicator={false}>
             {Object.entries(data).map(([house, significators]) => (
-                <View key={house} style={[styles.significatorCard, { backgroundColor: chip.cardBg }]}>
+                <View key={house} style={[styles.significatorCard, { backgroundColor: chip.cardBg, borderColor: chip.cardBorder }]}>
                     <Text style={[styles.significatorHouse, { color: chip.title }]}>House {house}</Text>
                     <View style={styles.significatorChips}>
                         {significators.map((sig, idx) => (
@@ -194,7 +194,7 @@ const PlanetSignificatorsView = ({ data, theme, colors }) => {
     return (
         <ScrollView showsVerticalScrollIndicator={false}>
             {Object.entries(data).map(([planet, houses]) => (
-                <View key={planet} style={[styles.significatorCard, { backgroundColor: chip.cardBg }]}>
+                <View key={planet} style={[styles.significatorCard, { backgroundColor: chip.cardBg, borderColor: chip.cardBorder }]}>
                     <Text style={[styles.significatorHouse, { color: chip.title }]}>{planet}</Text>
                     <View style={styles.significatorChips}>
                         {houses.map((house, idx) => (
@@ -212,13 +212,12 @@ const PlanetSignificatorsView = ({ data, theme, colors }) => {
 const FourStepTheoryView = ({ data, theme, colors }) => {
     if (!data) return <Text style={[styles.errorText, { color: colors.textSecondary }]}>No data available</Text>;
     const chip = sigChipStyles(theme, colors);
-    const isDark = theme === 'dark';
 
     const renderStep = (num, label, lord, houses) => (
         <View style={styles.stepContainer}>
             <View style={styles.stepIndicator}>
                 <View style={[styles.stepDot, { backgroundColor: colors.primary }]} />
-                {num < 4 && <View style={[styles.stepLine, { backgroundColor: isDark ? 'rgba(253, 186, 116, 0.35)' : 'rgba(249, 115, 22, 0.25)' }]} />}
+                {num < 4 && <View style={[styles.stepLine, { backgroundColor: colors.cardBorder }]} />}
             </View>
             <View style={styles.stepContent}>
                 <Text style={[styles.stepNumber, { color: colors.textSecondary }]}>Step {num}: {label}</Text>
@@ -240,14 +239,12 @@ const FourStepTheoryView = ({ data, theme, colors }) => {
         <ScrollView showsVerticalScrollIndicator={false}>
             {Object.entries(data).map(([planet, steps]) => (
                 <View key={planet} style={[styles.fourStepCard, {
-                    backgroundColor: Platform.OS === 'android'
-                        ? (isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(249, 115, 22, 0.08)')
-                        : (isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(249, 115, 22, 0.03)'),
-                    borderColor: isDark ? 'rgba(253, 186, 116, 0.35)' : 'rgba(249, 115, 22, 0.2)',
+                    backgroundColor: colors.surfaceRaised,
+                    borderColor: colors.cardBorder,
                 }]}>
-                    <View style={styles.fourStepHeader}>
+                    <View style={[styles.fourStepHeader, { borderBottomColor: colors.cardBorder }]}>
                         <View style={[styles.planetIconCircle, { backgroundColor: colors.primary }]}>
-                            <Text style={styles.planetIconText}>{planet.substring(0, 2)}</Text>
+                            <Text style={[styles.planetIconText, { color: colors.onPrimary }]}>{planet.substring(0, 2)}</Text>
                         </View>
                         <Text style={[styles.fourStepPlanetTitle, { color: colors.text }]}>{planet} Analysis</Text>
                     </View>
@@ -268,7 +265,7 @@ const RulingPlanetsView = ({ data, theme, colors }) => {
     if (!data) return null;
 
     const renderRPChip = (label, value) => (
-        <View style={[styles.rpChip, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]}>
+        <View style={[styles.rpChip, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}>
             <Text style={[styles.rpChipLabel, { color: colors.textSecondary }]}>{label}:</Text>
             <Text style={[styles.rpChipValue, { color: colors.primary }]}>{value}</Text>
         </View>
@@ -276,17 +273,15 @@ const RulingPlanetsView = ({ data, theme, colors }) => {
 
     return (
         <View style={styles.rpContainer}>
-            <View style={[styles.rpCard, { 
-                backgroundColor: Platform.OS === 'android'
-                    ? (theme === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(249, 115, 22, 0.08)')
-                    : (theme === 'dark' ? 'rgba(255, 255, 255, 0.03)' : 'rgba(249, 115, 22, 0.03)'), 
-                borderColor: colors.primary + '30' 
+            <View style={[styles.rpCard, {
+                backgroundColor: colors.surfaceRaised,
+                borderColor: colors.cardBorder,
             }]}>
                 <View style={styles.rpHeader}>
                     <Ionicons name="flash" size={16} color={colors.primary} />
                     <Text style={[styles.rpTitle, { color: colors.text }]}>Ruling Planets (Birth Moment)</Text>
                 </View>
-                
+
                 <View style={styles.rpSection}>
                     <Text style={[styles.rpSectionTitle, { color: colors.textSecondary }]}>Ascendant</Text>
                     <View style={styles.rpChipGroup}>
@@ -305,10 +300,10 @@ const RulingPlanetsView = ({ data, theme, colors }) => {
                     </View>
                 </View>
 
-                <View style={styles.rpFooter}>
+                <View style={[styles.rpFooter, { borderTopColor: colors.cardBorder }]}>
                     <View style={[styles.dayLordBadge, { backgroundColor: colors.primary }]}>
-                        <Text style={styles.dayLordLabel}>Day Lord</Text>
-                        <Text style={styles.dayLordValue}>{data.day_lord}</Text>
+                        <Text style={[styles.dayLordLabel, { color: colors.onPrimary }]}>Day Lord</Text>
+                        <Text style={[styles.dayLordValue, { color: colors.onPrimary }]}>{data.day_lord}</Text>
                     </View>
                 </View>
             </View>
@@ -316,7 +311,6 @@ const RulingPlanetsView = ({ data, theme, colors }) => {
     );
 };
 
-// High-contrast tone UI for purple→orange KP gradient (avoid amber; solid pills).
 const TONE_LABELS = {
     supportive: 'Favourable',
     mixed: 'Mixed',
@@ -324,25 +318,20 @@ const TONE_LABELS = {
     neutral: 'Neutral',
 };
 
-const TONE_UI = {
-    light: {
-        supportive: { accent: '#15803d', pillBg: '#15803d', pillText: '#ffffff', softBg: '#dcfce7' },
-        mixed: { accent: '#0369a1', pillBg: '#0369a1', pillText: '#ffffff', softBg: '#e0f2fe' },
-        challenging: { accent: '#be123c', pillBg: '#be123c', pillText: '#ffffff', softBg: '#ffe4e6' },
-        neutral: { accent: '#475569', pillBg: '#475569', pillText: '#ffffff', softBg: '#e2e8f0' },
-    },
-    // Fully opaque fills — translucent greens/reds/ambers vanish on purple→orange gradient.
-    dark: {
-        supportive: { accent: '#22c55e', pillBg: '#15803d', pillText: '#ffffff', softBg: '#14532d' },
-        mixed: { accent: '#38bdf8', pillBg: '#0369a1', pillText: '#ffffff', softBg: '#0c4a6e' },
-        challenging: { accent: '#fb7185', pillBg: '#be123c', pillText: '#ffffff', softBg: '#881337' },
-        neutral: { accent: '#e2e8f0', pillBg: '#64748b', pillText: '#ffffff', softBg: '#334155' },
-    },
-};
-
-const toneUi = (tone, isDark) => {
-    const palette = isDark ? TONE_UI.dark : TONE_UI.light;
-    return palette[tone] || palette.neutral;
+const toneUi = (tone, colors) => {
+    const accents = {
+        supportive: colors.success,
+        mixed: colors.info,
+        challenging: colors.error,
+        neutral: colors.textSecondary,
+    };
+    const accent = accents[tone] || accents.neutral;
+    return {
+        accent,
+        pillBg: accent,
+        pillText: colors.textInverse,
+        softBg: colors.surfaceMuted,
+    };
 };
 
 const RP_ROLE_SHORT = {
@@ -370,16 +359,13 @@ const FructificationView = ({ data, theme, colors, initialScope = 'today' }) => 
 
     if (!data) return null;
 
-    const isDark = theme === 'dark';
-    // Fully opaque cards — glass fills let the purple→orange gradient kill contrast.
-    const surface = isDark ? '#1a1030' : '#ffffff';
-    const surfaceMuted = isDark ? '#241540' : '#f1f5f9';
-    const border = isDark ? 'rgba(255,255,255,0.22)' : 'rgba(100, 116, 139, 0.28)';
-    const bodyText = isDark ? '#f8fafc' : '#0f172a';
-    const mutedText = isDark ? '#cbd5e1' : '#334155';
-    const subtleText = isDark ? '#94a3b8' : '#64748b';
-    // Avoid orange link text over the orange end of the gradient.
-    const linkColor = isDark ? '#f8fafc' : colors.primary;
+    const surface = colors.surfaceRaised;
+    const surfaceMuted = colors.surfaceMuted;
+    const border = colors.cardBorder;
+    const bodyText = colors.text;
+    const mutedText = colors.textSecondary;
+    const subtleText = colors.textTertiary;
+    const linkColor = colors.primary;
 
     const block = scopeTab === 'hour' ? data.hour : data.today;
     const houses = block?.houses_giving_results || [];
@@ -412,8 +398,8 @@ const FructificationView = ({ data, theme, colors, initialScope = 'today' }) => 
 
     const renderHowSteps = (how, accent) => {
         if (!how?.steps?.length) return null;
-        const passTone = toneUi('supportive', isDark);
-        const failTone = toneUi('challenging', isDark);
+        const passTone = toneUi('supportive', colors);
+        const failTone = toneUi('challenging', colors);
         return (
             <View style={[styles.fructHowBox, { borderColor: border, backgroundColor: surfaceMuted }]}>
                 {how.summary ? (
@@ -460,7 +446,7 @@ const FructificationView = ({ data, theme, colors, initialScope = 'today' }) => 
     const renderHouseCard = (row, soft = false) => {
         const key = `${scopeTab}-${row.tier || 'p'}-${row.house}`;
         const expanded = expandedHouse === key;
-        const tone = soft ? toneUi('neutral', isDark) : toneUi(row.tone, isDark);
+        const tone = soft ? toneUi('neutral', colors) : toneUi(row.tone, colors);
         const toneLabel = soft ? 'Background' : (TONE_LABELS[row.tone] || 'Neutral');
         return (
             <View key={key} style={{ marginBottom: 10 }}>
@@ -527,7 +513,7 @@ const FructificationView = ({ data, theme, colors, initialScope = 'today' }) => 
                 </ScrollView>
             ) : null}
 
-            <View style={[styles.fructScopeBar, { backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : '#f1f5f9', borderColor: border }]}>
+            <View style={[styles.fructScopeBar, { backgroundColor: colors.surfaceMuted, borderColor: border }]}>
                 {[
                     { id: 'today', label: 'Today', count: (data.today?.houses_giving_results || []).length },
                     { id: 'hour', label: 'This hour', count: (data.hour?.houses_giving_results || []).length },
@@ -538,15 +524,15 @@ const FructificationView = ({ data, theme, colors, initialScope = 'today' }) => 
                             key={tab.id}
                             style={[
                                 styles.fructScopeChip,
-                                { backgroundColor: active ? colors.primary : 'transparent' },
+                                { backgroundColor: active ? colors.selectionControl : 'transparent' },
                             ]}
                             onPress={() => setScopeTab(tab.id)}
                             activeOpacity={0.9}
                         >
-                            <Text style={[styles.fructScopeChipText, { color: active ? '#fff' : bodyText }]}>
+                            <Text style={[styles.fructScopeChipText, { color: active ? colors.selectionText : bodyText }]}>
                                 {tab.label}
                             </Text>
-                            <Text style={[styles.fructScopeCount, { color: active ? 'rgba(255,255,255,0.85)' : subtleText }]}>
+                            <Text style={[styles.fructScopeCount, { color: active ? colors.selectionTextMuted : subtleText }]}>
                                 {tab.count} house{tab.count === 1 ? '' : 's'}
                             </Text>
                         </TouchableOpacity>
@@ -571,8 +557,8 @@ const FructificationView = ({ data, theme, colors, initialScope = 'today' }) => 
             ) : null}
 
             {gate.prana_fallback ? (
-                <View style={[styles.fructNotice, { backgroundColor: isDark ? 'rgba(56,189,248,0.18)' : '#e0f2fe', borderColor: isDark ? '#38bdf8' : '#7dd3fc' }]}>
-                    <Ionicons name="information-circle-outline" size={16} color={isDark ? '#38bdf8' : '#0369a1'} />
+                <View style={[styles.fructNotice, { backgroundColor: colors.surfaceMuted, borderColor: colors.info }]}>
+                    <Ionicons name="information-circle-outline" size={16} color={colors.info} />
                     <Text style={[styles.fructBody, { color: bodyText, flex: 1, marginBottom: 0 }]}>
                         Prana did not confirm this hour. Showing Sookshma ∩ ruling planets instead.
                     </Text>
@@ -584,7 +570,7 @@ const FructificationView = ({ data, theme, colors, initialScope = 'today' }) => 
                 style={[styles.fructCalcToggle, { borderColor: border, backgroundColor: surface }]}
                 activeOpacity={0.88}
             >
-                <View style={[styles.fructCalcIcon, { backgroundColor: isDark ? 'rgba(253,186,116,0.2)' : 'rgba(249,115,22,0.14)' }]}>
+                <View style={[styles.fructCalcIcon, { backgroundColor: colors.selectionSurface }]}>
                     <Ionicons name="git-branch-outline" size={16} color={linkColor} />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -667,7 +653,7 @@ const FructificationView = ({ data, theme, colors, initialScope = 'today' }) => 
                 return groups.map((group) => (
                     <View key={group.subject} style={{ marginBottom: 14 }}>
                         <View style={styles.fructSubjectHead}>
-                            <View style={[styles.fructSubjectIcon, { backgroundColor: isDark ? 'rgba(253,186,116,0.2)' : 'rgba(249,115,22,0.14)' }]}>
+                            <View style={[styles.fructSubjectIcon, { backgroundColor: colors.selectionSurface }]}>
                                 <Ionicons
                                     name={group.subject === 'self' ? 'person-outline' : 'people-outline'}
                                     size={16}
@@ -679,7 +665,7 @@ const FructificationView = ({ data, theme, colors, initialScope = 'today' }) => 
                             </Text>
                         </View>
                         {group.items.map((item) => {
-                            const tone = toneUi(item.outcome_tone, isDark);
+                            const tone = toneUi(item.outcome_tone, colors);
                             return (
                                 <View
                                     key={item.manifestation_id || item.signature_key || item.label}
@@ -793,8 +779,8 @@ const KPScreen = ({ route, navigation }) => {
         const unsubscribe = navigation.addListener('focus', () => {
             if (route.params?.birthDetails) {
                 const newDetails = route.params.birthDetails;
-                if (newDetails.name !== birthDetails?.name || 
-                    newDetails.date !== birthDetails?.date || 
+                if (newDetails.name !== birthDetails?.name ||
+                    newDetails.date !== birthDetails?.date ||
                     newDetails.time !== birthDetails?.time) {
                     setBirthDetails(newDetails);
                 }
@@ -967,7 +953,7 @@ const KPScreen = ({ route, navigation }) => {
                 birthDetails.date.split('T')[0],
                 birthDetails.time.split('T')[1] ? birthDetails.time.split('T')[1].slice(0, 5) : birthDetails.time,
             );
-            
+
             // Natal KP chart + ruling planets (birth moment). Significators use sigMoment separately.
             const [response, rpResponse] = await Promise.all([
                 kpAPI.getKPChart(apiPayload),
@@ -1009,12 +995,12 @@ const KPScreen = ({ route, navigation }) => {
         const birthMoment = birthMomentFromDetails(birthDetails);
         const activeMoment = resolveSigMoment();
         const isDark = theme === 'dark';
-        const segmentActiveBg = isDark ? 'rgba(255, 107, 53, 0.95)' : colors.primary;
-        const segmentIdleBg = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(249, 115, 22, 0.1)';
+        const segmentActiveBg = colors.selectionControl;
+        const segmentIdleBg = colors.surfaceMuted;
 
         return (
             <>
-                <View style={[styles.sigModeBar, { backgroundColor: isDark ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.65)' }]}>
+                <View style={[styles.sigModeBar, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
                     {['birth', 'today'].map((mode) => {
                         const active = sigMode === mode;
                         return (
@@ -1024,7 +1010,7 @@ const KPScreen = ({ route, navigation }) => {
                                 onPress={() => selectSigMode(mode)}
                                 activeOpacity={0.85}
                             >
-                                <Text style={[styles.sigModeChipText, { color: active ? '#fff' : colors.text }]}>
+                                <Text style={[styles.sigModeChipText, { color: active ? colors.selectionText : colors.text }]}>
                                     {mode === 'birth' ? 'Birth' : 'Today'}
                                 </Text>
                             </TouchableOpacity>
@@ -1107,15 +1093,15 @@ const KPScreen = ({ route, navigation }) => {
 
     const renderResultsTab = () => {
         const isDark = theme === 'dark';
-        const segmentIdleBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.12)';
+        const segmentIdleBg = colors.surfaceMuted;
         const activeMoment = sigMoment instanceof Date ? sigMoment : new Date();
-        const bodyText = isDark ? 'rgba(255,255,255,0.92)' : '#1c1917';
-        const mutedText = isDark ? 'rgba(255,255,255,0.72)' : '#44403c';
+        const bodyText = colors.text;
+        const mutedText = colors.textSecondary;
         return (
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
                 <View style={[styles.fructMomentBar, {
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.92)',
-                    borderColor: isDark ? 'rgba(255,255,255,0.14)' : 'rgba(194, 65, 12, 0.16)',
+                    backgroundColor: colors.surfaceRaised,
+                    borderColor: colors.cardBorder,
                 }]}>
                     <View style={{ flex: 1 }}>
                         <Text style={[styles.fructMomentTitle, { color: bodyText }]}>Selected moment</Text>
@@ -1226,88 +1212,122 @@ const KPScreen = ({ route, navigation }) => {
             case 'planets':
                 return (
                     <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+                        <View style={styles.sectionHeading}>
+                            <Text style={[styles.sectionEyebrow, { color: colors.primary }]}>NATAL KP MAP</Text>
+                            <Text style={[styles.sectionTitle, { color: colors.text }]}>Planetary lords</Text>
+                            <Text style={[styles.sectionCopy, { color: colors.textSecondary }]}>Sign, star, sub and sub-sub lords at the birth moment.</Text>
+                        </View>
                         <RulingPlanetsView data={rulingPlanets} theme={theme} colors={colors} />
                         <PlanetaryTable data={processedData.planets} theme={theme} colors={colors} />
                     </ScrollView>
                 );
             case 'cusps':
-                return <CuspalTable data={processedData.cusps} theme={theme} colors={colors} />;
+                return (
+                    <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+                        <View style={styles.sectionHeading}>
+                            <Text style={[styles.sectionEyebrow, { color: colors.primary }]}>HOUSE PROMISE</Text>
+                            <Text style={[styles.sectionTitle, { color: colors.text }]}>Cuspal lords</Text>
+                            <Text style={[styles.sectionCopy, { color: colors.textSecondary }]}>The fine-grained lordship chain for every house cusp.</Text>
+                        </View>
+                        <CuspalTable data={processedData.cusps} theme={theme} colors={colors} />
+                    </ScrollView>
+                );
             default:
                 return null;
         }
     };
 
+    const tabs = [
+        { id: 'results', label: 'Predictions' },
+        { id: 'planets', label: 'Planets' },
+        { id: 'cusps', label: 'Cusps' },
+        { id: 'significators', label: 'House significators' },
+        { id: 'planetSignificators', label: 'Planet significators' },
+        { id: 'fourStep', label: 'Four step' },
+    ];
+
     return (
-        <View style={{ flex: 1 }}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} translucent={false} />
             <LinearGradient
-                colors={theme === 'dark' 
-                    ? ['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']
-                    : ['#fefcfb', '#fef7f0', '#fed7d7', '#fefcfb']}
+                colors={[colors.background, colors.backgroundSecondary, colors.background]}
                 style={styles.container}
             >
-                <SafeAreaView style={styles.safeArea}>
-                    <View style={styles.header}>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                            <Ionicons name="arrow-back" size={24} color={colors.text} />
-                        </TouchableOpacity>
+                <SafeAreaView edges={['top']} style={{ backgroundColor: colors.headerSurface }}>
+                    <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cosmicLine }]}>
+                        <View style={styles.headerSide}>
+                            <TouchableOpacity
+                                onPress={() => navigation.goBack()}
+                                style={[styles.backButton, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}
+                            >
+                                <Ionicons name="arrow-back" size={22} color={colors.textInverse} />
+                            </TouchableOpacity>
+                        </View>
                         <View style={styles.headerCenter}>
-                            <Text style={[styles.headerTitle, { color: colors.text }]}>🎯 KP System</Text>
-                            {birthDetails && (
-                                <NativeSelectorChip 
+                            <Text style={[styles.headerEyebrow, { color: colors.accent }]}>KRISHNAMURTI PADDHATI</Text>
+                            <Text style={[styles.headerTitle, { color: colors.textInverse }]}>KP System</Text>
+                        </View>
+                        <View style={[styles.headerSide, styles.headerSideRight]}>
+                            {birthDetails ? (
+                                <NativeSelectorChip
                                     birthData={birthDetails}
                                     onPress={() => navigation.navigate('SelectNative', { returnTo: 'KP' })}
                                     maxLength={7}
+                                    showIcon={false}
+                                    style={{ backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }}
+                                    textStyle={{ color: colors.textInverse }}
+                                    iconColor={colors.textInverseMuted}
                                 />
-                            )}
+                            ) : null}
                         </View>
-                        <View style={{ width: 40 }} />
                     </View>
+                </SafeAreaView>
 
+                <SafeAreaView edges={['bottom']} style={styles.safeArea}>
                     <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-                        <View style={styles.tabContainer}>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                                {['results', 'planets', 'cusps', 'significators', 'planetSignificators', 'fourStep'].map((tab) => (
-                                    <TouchableOpacity
-                                        key={tab}
-                                        onPress={() => {
-                                            if (tab === 'results' && activeTab !== 'results') {
-                                                setSigMoment(new Date());
-                                            }
-                                            setActiveTab(tab);
-                                        }}
-                                        style={[styles.tab, activeTab === tab && styles.activeTab]}
-                                    >
-                                        <LinearGradient
-                                            colors={activeTab === tab 
-                                                ? ['#ff6b35', '#ff8c5a']
-                                                : Platform.OS === 'android'
-                                                    ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.1)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.1)'])
-                                                    : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
-                                            style={styles.tabGradient}
+                        <View style={[styles.heroCard, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
+                            <View style={[styles.heroOrbit, styles.heroOrbitLarge, { borderColor: colors.cosmicLine }]} />
+                            <View style={[styles.heroOrbit, styles.heroOrbitSmall, { borderColor: colors.cosmicLine }]} />
+                            <Text style={[styles.heroEyebrow, { color: colors.accent }]}>PRECISION DESK</Text>
+                            <Text style={[styles.heroTitle, { color: colors.textInverse }]}>Read the promise. Then time it.</Text>
+                            <Text style={[styles.heroCopy, { color: colors.textInverseMuted }]}>Natal significators, ruling planets and dasha gates brought into one coherent KP workspace.</Text>
+                        </View>
+
+                        <View style={[styles.tabContainer, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
+                                {tabs.map((tab) => {
+                                    const active = activeTab === tab.id;
+                                    return (
+                                        <TouchableOpacity
+                                            key={tab.id}
+                                            onPress={() => {
+                                                if (tab.id === 'results' && activeTab !== 'results') setSigMoment(new Date());
+                                                setActiveTab(tab.id);
+                                            }}
+                                            style={[
+                                                styles.tab,
+                                                {
+                                                    backgroundColor: active ? colors.selectionControl : 'transparent',
+                                                    borderColor: active ? colors.selectionBorder : 'transparent',
+                                                },
+                                            ]}
                                         >
-                                            <Text
-                                                numberOfLines={1}
-                                                style={[styles.tabText, { color: activeTab === tab ? '#fff' : colors.text }]}
-                                            >
-                                                {tab === 'planets' ? 'Planets' :
-                                                 tab === 'cusps' ? 'Cusps' :
-                                                 tab === 'significators' ? 'H-Sig' :
-                                                 tab === 'planetSignificators' ? 'P-Sig' :
-                                                 tab === 'fourStep' ? 'Steps' : 'Predictions'}
+                                            <Text numberOfLines={1} style={[styles.tabText, { color: active ? colors.selectionText : colors.textSecondary }]}>
+                                                {tab.label}
                                             </Text>
-                                        </LinearGradient>
-                                    </TouchableOpacity>
-                                ))}
+                                        </TouchableOpacity>
+                                    );
+                                })}
                             </ScrollView>
                         </View>
 
-                        <View style={[styles.contentCard, { backgroundColor: theme === 'dark' ? (activeTab === 'results' ? '#140c24' : 'rgba(255, 255, 255, 0.05)') : 'rgba(255, 255, 255, 0.9)' }]}>
+                        <View style={[styles.contentCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
                             {renderContent()}
-                            
+
                             {activeTab !== 'results' ? (
-                                <View style={[styles.legend, { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.1)' : 'rgba(249, 115, 22, 0.08)' }]}>
-                                    <Text style={[styles.legendTitle, { color: colors.text }]}>Legend:</Text>
-                                    <Text style={[styles.legendText, { color: colors.textSecondary }]}>SL = Sign Lord  •  NL = Nakshatra Lord  •  SB = Sub Lord  •  SS = Sub-Sub Lord  •  Pd = Pada</Text>
+                                <View style={[styles.legend, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+                                    <Text style={[styles.legendTitle, { color: colors.text }]}>Reading the table</Text>
+                                    <Text style={[styles.legendText, { color: colors.textSecondary }]}>SL Sign Lord  ·  NL Nakshatra Lord  ·  SB Sub Lord  ·  SS Sub-Sub Lord  ·  Pd Pada</Text>
                                 </View>
                             ) : null}
                         </View>
@@ -1330,61 +1350,120 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingVertical: 11,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        minHeight: 74,
     },
     backButton: {
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 1,
     },
     headerTitle: {
-        fontSize: 20,
-        fontWeight: '800',
+        ...typographyTokens.display,
+        fontSize: 25,
+        lineHeight: 28,
+    },
+    headerEyebrow: {
+        ...typographyTokens.eyebrow,
+        fontSize: 9,
+        letterSpacing: 1.5,
     },
     headerCenter: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 4,
+        gap: 2,
+        paddingHorizontal: 8,
+    },
+    headerSide: {
+        width: 84,
+        alignItems: 'flex-start',
+    },
+    headerSideRight: {
+        alignItems: 'flex-end',
     },
     content: {
         flex: 1,
-        padding: 16,
+        paddingHorizontal: 14,
+        paddingTop: 14,
+        paddingBottom: 10,
+    },
+    heroCard: {
+        borderWidth: 1,
+        borderRadius: 22,
+        paddingHorizontal: 18,
+        paddingVertical: 16,
+        marginBottom: 12,
+        minHeight: 130,
+        overflow: 'hidden',
+    },
+    heroEyebrow: {
+        ...typographyTokens.eyebrow,
+        marginBottom: 8,
+    },
+    heroTitle: {
+        ...typographyTokens.display,
+        fontSize: 25,
+        lineHeight: 29,
+        maxWidth: '82%',
+        marginBottom: 7,
+    },
+    heroCopy: {
+        fontSize: 13,
+        lineHeight: 19,
+        fontWeight: '500',
+        maxWidth: '88%',
+    },
+    heroOrbit: {
+        position: 'absolute',
+        borderWidth: 1,
+        borderRadius: 999,
+    },
+    heroOrbitLarge: {
+        width: 138,
+        height: 138,
+        right: -54,
+        top: -48,
+    },
+    heroOrbitSmall: {
+        width: 88,
+        height: 88,
+        right: -21,
+        top: -26,
     },
     tabContainer: {
-        flexDirection: 'row',
-        gap: 8,
-        marginBottom: 16,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderRadius: 16,
+        padding: 4,
+    },
+    tabScrollContent: {
+        gap: 4,
+        paddingRight: 4,
     },
     tab: {
         borderRadius: 12,
-        overflow: 'hidden',
         flexShrink: 0,
-    },
-    tabGradient: {
         paddingVertical: 10,
-        paddingHorizontal: 14,
+        paddingHorizontal: 13,
         alignItems: 'center',
-        borderRadius: 12,
+        justifyContent: 'center',
+        borderWidth: 1,
     },
     tabText: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '700',
     },
     contentCard: {
         flex: 1,
-        borderRadius: 16,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 4,
-        // Android Glassmorphism Fix - Use dark tint instead of white
-        backgroundColor: Platform.OS === 'android' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.05)',
+        borderRadius: 22,
+        padding: 14,
+        borderWidth: 1,
+        overflow: 'hidden',
     },
     sigModeBar: {
         flexDirection: 'row',
@@ -1392,6 +1471,7 @@ const styles = StyleSheet.create({
         padding: 4,
         borderRadius: 12,
         marginBottom: 10,
+        borderWidth: 1,
     },
     sigModeChip: {
         flex: 1,
@@ -1782,37 +1862,32 @@ const styles = StyleSheet.create({
     },
     table: {
         minWidth: '100%',
+        borderRadius: 14,
+        overflow: 'hidden',
     },
     tableRow: {
         flexDirection: 'row',
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0, 0, 0, 0.25)',
     },
-    tableRowAlt: {
-        backgroundColor: 'rgba(249, 115, 22, 0.03)',
+    tableHeadingRow: {
+        paddingVertical: 11,
     },
     tableHeader: {
         fontSize: 12,
-        fontWeight: '700',
+        fontWeight: '800',
         paddingHorizontal: 8,
-        borderRightWidth: 1,
-        borderRightColor: 'rgba(0, 0, 0, 0.25)',
     },
     tableCell: {
         fontSize: 12,
         paddingHorizontal: 8,
-        borderRightWidth: 1,
-        borderRightColor: 'rgba(0, 0, 0, 0.2)',
+        fontWeight: '600',
     },
     significatorCard: {
         padding: 16,
-        borderRadius: 12,
+        borderRadius: 16,
         marginBottom: 12,
         borderWidth: 1,
-        borderColor: 'rgba(249, 115, 22, 0.2)',
-        // Android Glassmorphism Fix - Use dark tint instead of white
-        backgroundColor: Platform.OS === 'android' ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.05)',
     },
     significatorHouse: {
         fontSize: 16,
@@ -1839,7 +1914,6 @@ const styles = StyleSheet.create({
         padding: 12,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(249, 115, 22, 0.2)',
     },
     legendTitle: {
         fontSize: 13,
@@ -1855,8 +1929,8 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     rpCard: {
-        padding: 12,
-        borderRadius: 12,
+        padding: 14,
+        borderRadius: 16,
         borderWidth: 1,
     },
     rpTitle: {
@@ -1882,8 +1956,13 @@ const styles = StyleSheet.create({
         gap: 12,
         marginBottom: 16,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0,0,0,0.05)',
         paddingBottom: 12,
+    },
+    fourStepCard: {
+        borderWidth: 1,
+        borderRadius: 18,
+        padding: 14,
+        marginBottom: 12,
     },
     planetIconCircle: {
         width: 36,
@@ -1893,7 +1972,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     planetIconText: {
-        color: '#fff',
         fontSize: 14,
         fontWeight: '800',
     },
@@ -2002,7 +2080,6 @@ const styles = StyleSheet.create({
         marginTop: 12,
         alignItems: 'center',
         borderTopWidth: 1,
-        borderTopColor: 'rgba(0,0,0,0.05)',
         paddingTop: 12,
     },
     dayLordBadge: {
@@ -2019,14 +2096,28 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
     },
     dayLordLabel: {
-        color: 'rgba(255,255,255,0.8)',
         fontSize: 11,
         fontWeight: '600',
     },
     dayLordValue: {
-        color: '#fff',
         fontSize: 14,
         fontWeight: '800',
+    },
+    sectionHeading: {
+        marginBottom: 14,
+    },
+    sectionEyebrow: {
+        ...typographyTokens.eyebrow,
+        marginBottom: 5,
+    },
+    sectionTitle: {
+        ...typographyTokens.sectionTitle,
+        marginBottom: 4,
+    },
+    sectionCopy: {
+        fontSize: 13,
+        lineHeight: 19,
+        fontWeight: '500',
     },
 });
 

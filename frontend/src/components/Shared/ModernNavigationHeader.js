@@ -6,6 +6,7 @@ import { useCredits } from '../../context/CreditContext';
 import { useTheme } from '../../theme';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import CreditsModal from '../Credits/CreditsModal';
+import ModernSiteSearch from '../Search/ModernSiteSearch';
 import './ModernNavigationHeader.css';
 
 const SECTION_LINKS = [
@@ -36,6 +37,7 @@ const ModernNavigationHeader = ({
   const mobileMenuRef = useRef(null);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showBirthFormModal, setShowBirthFormModal] = useState(false);
+  const [showSiteSearch, setShowSiteSearch] = useState(false);
   const [birthFormDefaultTab, setBirthFormDefaultTab] = useState('saved');
 
   const accountName = user?.name || user?.email || user?.phone || 'Your account';
@@ -132,6 +134,9 @@ const ModernNavigationHeader = ({
             {user?.role === 'admin' && (
               <button className="mh-text-button" type="button" onClick={onAdminClick}>Admin</button>
             )}
+            <button className="mh-search-button" type="button" onClick={() => { closeMenus(); setShowSiteSearch(true); }} aria-label="Search AstroRoshni" title="Search">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.7"></circle><path d="m16 16 4.2 4.2"></path></svg>
+            </button>
             <details className="mh-theme-menu" ref={themeMenuRef}>
               <summary aria-label={`Appearance: ${themes.find((item) => item.id === theme)?.label || 'Theme'}`} title="Change appearance">
                 <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -263,6 +268,7 @@ const ModernNavigationHeader = ({
         defaultActiveTab={birthFormDefaultTab}
       />
       <CreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} onLogin={onLogin} />
+      <ModernSiteSearch isOpen={showSiteSearch} onClose={() => setShowSiteSearch(false)} user={user} onLogin={onLogin} />
     </>
   );
 };

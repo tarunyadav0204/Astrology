@@ -23,6 +23,7 @@ import MonthlyAccordion from './MonthlyAccordion';
 import ConfirmCreditsModal from './ConfirmCreditsModal';
 import { generateEventTimelinePDF, sharePDFOnWhatsApp, getLogoDataUriForModule, userFacingPdfExportError } from '../utils/pdfGenerator';
 import { useTheme } from '../context/ThemeContext';
+import FocusedStatusBar from './Common/FocusedStatusBar';
 import { useTranslation } from 'react-i18next';
 import { trackEvent } from '../utils/analytics';
 import { userFacingTimelineError } from '../utils/timelineUserErrors';
@@ -42,9 +43,7 @@ export default function MonthlyDeepScreen() {
   const { requireAuthForPaid } = useAuthGate();
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
-  const bgGradient = theme === 'dark'
-    ? ['#1a0033', '#2d1b4e', '#4a2c6d', colors.primary]
-    : ['#fefcfb', '#fef7f0', '#fed7d7', '#fefcfb'];
+  const bgGradient = [colors.gradientStart, colors.gradientMid, colors.gradientEnd];
 
   const [birthData, setBirthData] = useState(null);
   const [monthlyData, setMonthlyData] = useState(null);
@@ -688,6 +687,7 @@ export default function MonthlyDeepScreen() {
   if (loading) {
     return (
       <LinearGradient colors={bgGradient} style={{ flex: 1 }}>
+        <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
         <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -700,6 +700,7 @@ export default function MonthlyDeepScreen() {
 
   return (
     <LinearGradient colors={bgGradient} style={{ flex: 1 }}>
+      <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
       <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <View style={[styles.header, { backgroundColor: 'transparent', borderBottomColor: colors.cardBorder }]}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: colors.surface }]}>
@@ -788,14 +789,14 @@ export default function MonthlyDeepScreen() {
                   <>
                     <ActivityIndicator
                       size="small"
-                      color={theme === 'dark' ? colors.background : '#1a1a1a'}
+                      color={colors.onPrimary}
                     />
-                    <Text style={[styles.generateButtonText, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>
+                    <Text style={[styles.generateButtonText, { color: colors.onPrimary }]}>
                       {t('eventScreen.checking', 'Checking…')}
                     </Text>
                   </>
                 ) : (
-                  <Text style={[styles.generateButtonText, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>
+                  <Text style={[styles.generateButtonText, { color: colors.onPrimary }]}>
                     {t('monthlyDeepScreen.generateDeepDive', 'Generate deep dive')}
                   </Text>
                 )}

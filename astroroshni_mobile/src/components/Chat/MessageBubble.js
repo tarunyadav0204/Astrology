@@ -30,6 +30,7 @@ import { getTextToSpeech } from '../../utils/textToSpeechLazy';
 import { chatAPI } from '../../services/api';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
+import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 import { useCredits } from '../../credits/CreditContext';
 import { useAuthGate } from '../../auth/AuthGateContext';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
@@ -40,6 +41,14 @@ import {
   freeDetailUnlockStorageKey,
   splitFreeAnswerContent,
 } from '../../utils/freeAnswerSplit';
+
+const formatGlossaryTitle = (value) => String(value || '')
+  .trim()
+  .split(/\s+/)
+  .map((word) => (/\d/.test(word) || word.length <= 2
+    ? word.toUpperCase()
+    : `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`))
+  .join(' ');
 
 /** Avoid replaying slide-in when a tall bubble remounts (Android clipping / recycle). */
 const messageBubbleEntryPlayedIds = new Set();
@@ -98,7 +107,7 @@ function MessageBubble({
   podcastAutoLaunchKey = 0,
 }) {
   const { t } = useTranslation();
-  const { theme } = useTheme();
+  const { theme, colors } = useTheme();
   const { podcastCost, credits, pricing, refreshCredits } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
   const navigation = useNavigation();
@@ -578,7 +587,7 @@ function MessageBubble({
         .trim();
 
       const shareText = `☀️ AstroRoshni Prediction\n\n${cleanText}\n\nShared from AstroRoshni App`;
-      
+
       await Share.share({
         message: shareText,
       });
@@ -591,10 +600,10 @@ function MessageBubble({
     if (!content || content.trim() === '') {
       return '';
     }
-    
+
     // First decode HTML entities AGGRESSIVELY
     let formatted = content;
-    
+
     // Multiple passes to handle nested encoding
     for (let i = 0; i < 3; i++) {
       formatted = formatted
@@ -605,7 +614,7 @@ function MessageBubble({
         .replace(/&#39;/g, "'")
         .replace(/&nbsp;/g, ' ');
     }
-    
+
     // Remove glossary JSON blocks that shouldn't be displayed
     formatted = formatted.replace(/GLOSSARY_START[\s\S]*?GLOSSARY_END/g, '');
     formatted = formatted.replace(/```json[\s\S]*?```/g, '');
@@ -614,13 +623,13 @@ function MessageBubble({
     formatted = formatted.replace(/#### Glossary[\s\S]*?(?=####|$)/gi, '');
     formatted = formatted.replace(/### Glossary[\s\S]*?(?=###|$)/gi, '');
     formatted = formatted.replace(/## Glossary[\s\S]*?(?=##|$)/gi, '');
-    
+
     // Remove standalone # at end of lines (trailing markdown artifacts)
     formatted = formatted
       .replace(/\n\s*#+\s*$/gm, '')
       .replace(/\n\s*#+\s*\n/g, '\n')
       .replace(/#+\s*$/, '');
-    
+
     // Process term tooltips FIRST, after HTML entity decoding (only first occurrence per term per message)
     if (message.terms && message.glossary && Object.keys(message.glossary).length > 0) {
       const wrappedTermIds = new Set();
@@ -636,7 +645,7 @@ function MessageBubble({
         }
         return termText;
       });
-      
+
       // If no tags found, auto-wrap terms from glossary keys (first occurrence only per term)
       if (termCount === 0) {
         Object.keys(message.glossary).forEach(termKey => {
@@ -650,16 +659,16 @@ function MessageBubble({
         });
       }
     }
-    
+
     // Normalize line breaks
     formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\\n/g, '\n');
-    
+
     // Handle markdown tables - convert to simple format
     formatted = formatted.replace(/\|(.+?)\|\s*\n\s*\|[:\s-|]+\|\s*\n([\s\S]*?)(?=\n\n|\n###|\n##|$)/g, (match, header, rows) => {
       // console.log('Table regex match:', { match, header, rows });
       return `<table>${header.trim()}|||${rows.trim()}</table>`;
     });
-    
+
     // Handle Final Thoughts section
     formatted = formatted.replace(/(### Final Thoughts[\s\S]*?)(?=###|$)/g, (match, finalThoughts) => {
       const cleanContent = finalThoughts.replace(/### Final Thoughts\n?/, '').trim();
@@ -684,15 +693,15 @@ function MessageBubble({
         return `<finalthoughts>${cleanContent}</finalthoughts>`;
       }
     );
-    
+
     // Handle Quick Answer sections
     formatted = formatted.replace(/<div class="quick-answer-card">(.*?)<\/div>/gs, '<quickanswer>$1</quickanswer>');
     formatted = formatted.replace(/<div class="final-thoughts-card">(.*?)<\/div>/gs, '<finalthoughts>$1</finalthoughts>');
-    
+
     // Normalize over-duplicated markdown header hashes while keeping a single header marker
     // Example: "#### #### Health" -> "#### Health" so our header parsing still works
     formatted = formatted.replace(/^(#{2,6})(?:\s+\1)+\s*(.*)$/gm, (_match, hashes, rest) => `${hashes} ${rest}`);
-    
+
     return formatted;
   };
 
@@ -701,14 +710,14 @@ function MessageBubble({
     let currentIndex = 0;
     let lastIndex = 0;
     const wrappedTermsInRender = new Set(); // first occurrence per term only (for line-level <term> fallback)
-    
+
     // Handle all special sections
     const sections = [
       { regex: /<quickanswer>(.*?)<\/quickanswer>/gs, type: 'quick' },
       { regex: /<finalthoughts>(.*?)<\/finalthoughts>/gs, type: 'final' },
       { regex: /<table>(.*?)<\/table>/gs, type: 'table' }
     ];
-    
+
     // Find all matches and sort by position
     const allMatches = [];
     sections.forEach(section => {
@@ -723,9 +732,9 @@ function MessageBubble({
         });
       }
     });
-    
+
     allMatches.sort((a, b) => a.index - b.index);
-    
+
     // Process matches in order
     for (const item of allMatches) {
       // Add text before this match
@@ -734,7 +743,7 @@ function MessageBubble({
         elements.push(...parseRegularText(beforeText, currentIndex));
         currentIndex += 100;
       }
-      
+
       // Add the special section
       if (item.type === 'quick') {
         let cardContent = item.match[1]
@@ -750,20 +759,18 @@ function MessageBubble({
           .replace(/^\n*:/, '')
           .replace(/^\s*:\s*/, '')
           .trim();
-        
+
         const quickKey = currentIndex;
         currentIndex += 1;
         elements.push(
-          <TouchableOpacity 
-            key={`quick-${quickKey}`} 
+          <TouchableOpacity
+            key={`quick-${quickKey}`}
             activeOpacity={0.95}
             style={styles.quickAnswerWrapper}
           >
             <LinearGradient
-              colors={Platform.OS === 'android' 
-                ? ['rgba(255, 255, 255, 0.98)', 'rgba(255, 248, 225, 0.95)'] 
-                : ['rgba(255, 255, 255, 0.25)', 'rgba(255, 255, 255, 0.1)']}
-              style={styles.quickAnswerCard}
+              colors={[colors.surfaceMuted, colors.surface]}
+              style={[styles.quickAnswerCard, { borderColor: colors.cardBorder }]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
@@ -788,14 +795,14 @@ function MessageBubble({
                   ]}>⚡</Animated.Text>
                 </View>
                 <View>
-                  <Text style={styles.cardTitle}>Quick Answer</Text>
-                  <View style={styles.titleUnderline} />
+                  <Text style={[styles.cardTitle, { color: colors.primary }]}>{t('premiumUi.chat.quickAnswer')}</Text>
+                  <View style={[styles.titleUnderline, { backgroundColor: colors.primary }]} />
                 </View>
               </View>
               <View style={styles.cardText}>
-                {renderTextWithBold(cardContent, quickKey * 1000, message.role, styles.cardText)}
+                {renderTextWithBold(cardContent, quickKey * 1000, message.role, [styles.cardText, { color: colors.text }])}
               </View>
-              
+
               {/* Decorative sparkle */}
               <Text style={styles.sparkleIcon}>✨</Text>
             </LinearGradient>
@@ -816,20 +823,18 @@ function MessageBubble({
           .replace(/^\n*:/, '')
           .replace(/^\s*:\s*/, '')
           .trim();
-        
+
         const finalKey = currentIndex;
         currentIndex += 100;
         elements.push(
-          <TouchableOpacity 
+          <TouchableOpacity
             key={`final-${finalKey}`}
             activeOpacity={0.95}
             style={styles.finalThoughtsWrapper}
           >
             <LinearGradient
-              colors={Platform.OS === 'android'
-                ? ['rgba(240, 249, 255, 0.98)', 'rgba(224, 242, 254, 0.95)']
-                : ['rgba(230, 243, 255, 0.25)', 'rgba(176, 224, 230, 0.1)']}
-              style={styles.finalThoughtsCard}
+              colors={[colors.surfaceMuted, colors.surface]}
+              style={[styles.finalThoughtsCard, { borderColor: colors.cardBorder }]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
@@ -844,12 +849,12 @@ function MessageBubble({
                   <Text style={styles.thoughtIcon}>💭</Text>
                 </View>
                 <View>
-                  <Text style={[styles.cardTitle, { color: '#4169E1' }]}>Final Thoughts</Text>
-                  <View style={[styles.titleUnderline, { backgroundColor: '#4169E1' }]} />
+                  <Text style={[styles.cardTitle, { color: colors.primary }]}>{t('premiumUi.chat.finalThoughts')}</Text>
+                  <View style={[styles.titleUnderline, { backgroundColor: colors.primary }]} />
                 </View>
               </View>
               <View style={styles.cardText}>
-                {renderTextWithBold(cardContent, finalKey * 1000, message.role, styles.cardText)}
+                {renderTextWithBold(cardContent, finalKey * 1000, message.role, [styles.cardText, { color: colors.text }])}
               </View>
               <Text style={[styles.sparkleIcon, { color: '#4169E1' }]}>📜</Text>
             </LinearGradient>
@@ -866,9 +871,9 @@ function MessageBubble({
             .map(row => row.trim())
             .filter(row => row && row.includes('|') && !row.match(/^\s*\|[\s:-]+\|/))
             .slice(0, 10); // Limit rows to prevent infinite scroll
-          
+
           // console.log('Table debug:', { headerRow, dataRows, rowsText, tableContent });
-          
+
           if (dataRows.length > 0) {
             const columnWidth = headerRow.length >= 6 ? 132 : 108;
             const tableWidth = Math.max(headerRow.length * columnWidth, Dimensions.get('window').width - 56);
@@ -881,12 +886,30 @@ function MessageBubble({
                 style={styles.tableScroll}
                 contentContainerStyle={styles.tableScrollContent}
               >
-                <View style={[styles.tableContainer, { width: tableWidth }]}>
+                <View
+                  style={[
+                    styles.tableContainer,
+                    {
+                      width: tableWidth,
+                      backgroundColor: colors.surfaceMuted,
+                      borderColor: colors.cardBorder,
+                      shadowColor: colors.primary,
+                    },
+                  ]}
+                >
                   {/* Header */}
-                  <View style={styles.tableHeaderRow}>
+                  <View
+                    style={[
+                      styles.tableHeaderRow,
+                      {
+                        backgroundColor: colors.cosmicSurface,
+                        borderBottomColor: colors.cosmicLine,
+                      },
+                    ]}
+                  >
                     {headerRow.map((header, idx) => (
                       <View key={`th-${idx}`} style={[styles.tableHeaderCellWrap, { width: columnWidth }]}>
-                        {renderTextWithBold(header, 2000 + idx, message.role, styles.tableHeaderCell)}
+                        {renderTextWithBold(header, 2000 + idx, message.role, [styles.tableHeaderCell, { color: colors.textInverse }])}
                       </View>
                     ))}
                   </View>
@@ -895,10 +918,19 @@ function MessageBubble({
                     const cells = row.split('|').map(c => c.trim()).filter(c => c);
                     if (cells.length === 0) return null;
                     return (
-                      <View key={`tr-${rowIdx}`} style={styles.tableRow}>
+                      <View
+                        key={`tr-${rowIdx}`}
+                        style={[
+                          styles.tableRow,
+                          {
+                            backgroundColor: rowIdx % 2 === 0 ? colors.surface : colors.surfaceMuted,
+                            borderBottomColor: colors.cardBorder,
+                          },
+                        ]}
+                      >
                         {cells.map((cell, cellIdx) => (
                           <View key={`td-${rowIdx}-${cellIdx}`} style={[styles.tableCellWrap, { width: columnWidth }]}>
-                            {renderTextWithBold(cell, 2000 + rowIdx * 100 + cellIdx, message.role, styles.tableCell)}
+                            {renderTextWithBold(cell, 2000 + rowIdx * 100 + cellIdx, message.role, [styles.tableCell, { color: colors.text }])}
                           </View>
                         ))}
                       </View>
@@ -910,19 +942,19 @@ function MessageBubble({
           }
         }
       }
-      
+
       lastIndex = item.lastIndex;
     }
-    
+
     // Add remaining text
     if (lastIndex < text.length) {
       const remainingText = text.slice(lastIndex);
       elements.push(...parseRegularText(remainingText, currentIndex));
     }
-    
+
     return elements;
   };
-  
+
   /** Bold + italic for one substring (no tooltips); used inside tooltip parts and sentiment wrappers. */
   const stripAnySentimentMarkers = (value) =>
     String(value || '')
@@ -943,6 +975,7 @@ function MessageBubble({
             key={`bold-${keyPrefix}-${boldIndex}`}
             style={[
               styles.boldText,
+              { color: colors.text },
               baseTextStyle,
               message.role === 'user' && styles.userText,
               message.role === 'user' && { fontWeight: '700' },
@@ -963,6 +996,7 @@ function MessageBubble({
                 key={`italic-${keyPrefix}-${boldIndex}-${italicIndex}`}
                 style={[
                   styles.regularText,
+                  { color: colors.text },
                   baseTextStyle,
                   { fontStyle: 'italic' },
                   message.role === 'user' && styles.userText,
@@ -1005,7 +1039,15 @@ function MessageBubble({
           <Text
             key={`tooltip-${keyPrefix}-${i}`}
             onPress={() => setTooltipModal({ show: true, term: part, definition: definition })}
-            style={[styles.tooltipText, baseTextStyle]}
+            style={[
+              baseTextStyle,
+              styles.tooltipText,
+              {
+                color: colors.primary,
+                backgroundColor: colors.surfaceMuted,
+                borderColor: colors.cardBorder,
+              },
+            ]}
           >
             {part} ⓘ
           </Text>
@@ -1065,8 +1107,8 @@ function MessageBubble({
 
   const renderTextWithBold = (text, startIndex, role, baseTextStyle) => {
     const textStyle = baseTextStyle
-      ? [styles.regularText, baseTextStyle, message.role === 'user' && styles.userText]
-      : [styles.regularText, message.role === 'user' && styles.userText];
+      ? [styles.regularText, { color: colors.text }, baseTextStyle, message.role === 'user' && styles.userText]
+      : [styles.regularText, { color: colors.text }, message.role === 'user' && styles.userText];
     const raw = (text || '');
     const lines = raw.split('\n');
     const allChildren = [];
@@ -1179,14 +1221,14 @@ function MessageBubble({
     let listCounter = 0;
 
     text = normalizeNativePlainChunk(text);
-    
+
     // Split by headers and paragraphs — full header line including colons (e.g. "### Key Insights:")
     const parts = text.split(/(<h3>.*?<\/h3>|##\s+[^\n]+|###\s+[^\n]+|####\s+[^\n]+|\n\n+)/).filter(part => {
       const trimmed = part.trim();
       // Filter out standalone # symbols
       return trimmed && trimmed !== '#';
     });
-    
+
     for (const part of parts) {
       if (part.match(/<h3>(.*?)<\/h3>/)) {
         listCounter = 0; // Reset counter for new section
@@ -1197,7 +1239,7 @@ function MessageBubble({
         elements.push(
           <View key={`header-${currentIndex++}`} style={styles.headerContainer}>
             <Text style={styles.headerIcon}>{symbol}</Text>
-            <Text style={styles.headerText}>{headerText}</Text>
+            <Text style={[styles.headerText, { color: colors.text }]}>{headerText}</Text>
           </View>
         );
       } else if (part.match(/^##\s+(.+)$/m) || part.match(/^###\s+(.+)$/m)) {
@@ -1208,7 +1250,7 @@ function MessageBubble({
         elements.push(
           <View key={`header-${currentIndex++}`} style={styles.headerContainer}>
             <Text style={styles.headerIcon}>{symbol}</Text>
-            <Text style={styles.headerText}>{headerText}</Text>
+            <Text style={[styles.headerText, { color: colors.text }]}>{headerText}</Text>
           </View>
         );
       } else if (part.match(/^####\s+(.+)$/m)) {
@@ -1218,7 +1260,7 @@ function MessageBubble({
         elements.push(
           <View key={`subheader-${currentIndex++}`} style={styles.subHeaderContainer}>
             <Text style={styles.subHeaderIcon}>{symbol}</Text>
-            <Text style={styles.subHeaderText}>{headerText}</Text>
+            <Text style={[styles.subHeaderText, { color: colors.text }]}>{headerText}</Text>
           </View>
         );
       } else if (part.trim()) {
@@ -1228,14 +1270,14 @@ function MessageBubble({
         if (!cleanPart.trim()) continue;
 
         const lines = cleanPart.split('\n');
-        
+
         for (const line of lines) {
           const trimmedLine = line.trim();
           if (!trimmedLine) {
             elements.push(<View key={`para-gap-${currentIndex++}`} style={{ height: 8 }} />);
             continue;
           }
-          
+
           const isMarkdownBullet =
             trimmedLine.startsWith('•') ||
             /^[-*]\s+/.test(trimmedLine) ||
@@ -1243,7 +1285,7 @@ function MessageBubble({
           if (isMarkdownBullet) {
             const isNumbered = trimmedLine.match(/^(\d+)\./);
             const number = isNumbered ? isNumbered[1] : null;
-            
+
             listCounter++;
             let cleanListText = stripLeadingListMarkersForNativeRow(trimmedLine)
               .replace(/&lt;/g, '<')
@@ -1253,9 +1295,9 @@ function MessageBubble({
               .replace(/&#39;/g, "'")
               .replace(/&nbsp;/g, ' ')
               .replace(/<[^>]*>/g, '');
-            
+
             const listTextElements = renderTextWithBold(cleanListText, currentIndex, message.role, styles.listText);
-            
+
             elements.push(
               <View key={`list-${currentIndex++}`} style={styles.listItem}>
                 {isNumbered ? (
@@ -1283,7 +1325,7 @@ function MessageBubble({
               .replace(/&amp;/g, '&')
               .replace(/&#39;/g, "'")
               .replace(/&nbsp;/g, ' ');
-            
+
             // Process tooltips after HTML entity decoding (first occurrence per term only)
             if (message.terms && message.glossary) {
               processedLine = processedLine.replace(/<term id="([^"]+)">([^<]+)<\/term>/g, (match, termId, termText) => {
@@ -1295,10 +1337,10 @@ function MessageBubble({
                 return message.glossary[termId] ? termText : match;
               });
             }
-            
+
             // Remove any remaining term tags that weren't processed
             processedLine = processedLine.replace(/<term id="[^"]+">([^<]+)<\/term>/g, '$1');
-            
+
             // Regular text with bold formatting
             const textElements = renderTextWithBold(processedLine, currentIndex, message.role);
             elements.push(...textElements);
@@ -1307,7 +1349,7 @@ function MessageBubble({
         }
       }
     }
-    
+
     return elements;
   };
 
@@ -1488,24 +1530,25 @@ function MessageBubble({
     if (role === 'user') {
       return (
         <LinearGradient
-          colors={['#fffef5', '#fffae6']}
+          colors={[colors.surfaceMuted, colors.surfaceMuted]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[
             styles.bubble,
             styles.userBubble,
-            isPartnership && styles.partnershipBubble
+            isPartnership && styles.partnershipBubble,
+            { borderColor: colors.cardBorder },
           ]}
         >
           <View style={styles.userHeader}>
             <LinearGradient
-              colors={['#3b82f6', '#60a5fa']}
+              colors={[colors.primary, colors.primaryStrong]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.userBadge}
             >
-            <Ionicons name="person" size={10} color="#fff" style={styles.userIcon} />
-            <Text style={styles.userLabel}>{t('chat.you', 'You')}</Text>
+            <Ionicons name="person" size={10} color={colors.onPrimary} style={styles.userIcon} />
+            <Text style={[styles.userLabel, { color: colors.onPrimary }]}>{t('chat.you', 'You')}</Text>
           </LinearGradient>
             {chartName ? (
               <View style={[styles.chartNameBadge, styles.chartNameBadgeUser]}>
@@ -1515,7 +1558,7 @@ function MessageBubble({
             ) : null}
           </View>
           {children}
-          <Text style={[styles.timestamp, { color: 'rgba(30, 58, 138, 0.5)' }]}>
+          <Text style={[styles.timestamp, { color: colors.textTertiary }]}>
             {new Date(timestamp).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit'
@@ -1529,7 +1572,8 @@ function MessageBubble({
         styles.bubble,
         styles.assistantBubble,
         isPartnership && styles.partnershipBubble,
-        isClarification && styles.clarificationBubble
+        isClarification && styles.clarificationBubble,
+        { backgroundColor: colors.surface, borderColor: colors.cardBorder, borderLeftColor: colors.primary },
       ]}>
         {children}
       </View>
@@ -1543,27 +1587,27 @@ function MessageBubble({
       message.role === 'user' ? styles.userContainer : styles.assistantContainer,
       { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
     ]}>
-      <BubbleWrapper 
-        role={message.role} 
-        isPartnership={isPartnership} 
+      <BubbleWrapper
+        role={message.role}
+        isPartnership={isPartnership}
         isClarification={isClarification}
         timestamp={message.timestamp}
       >
         {message.role === 'assistant' && (
           <View style={styles.assistantHeader}>
             <LinearGradient
-              colors={['#ff6b35', '#ff8c5a']}
+              colors={[colors.cosmicRaised, colors.cosmicRaised]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.verifiedBadge}
             >
-            <Ionicons name="checkmark-circle" size={12} color="#fff" style={styles.verifiedIcon} />
-            <Text style={styles.assistantLabel}>
+            <Ionicons name="sparkles-outline" size={12} color={colors.accent} style={styles.verifiedIcon} />
+            <Text style={[styles.assistantLabel, { color: colors.textInverse }]}>
               {isClarification
                 ? t('chat.inquiry', 'AstroRoshni Inquiry')
                 : isNativeGate
                   ? t('chat.nativeGateBadge', 'Saved profile needed')
-                  : t('chat.verified', 'AstroRoshni Verified')}
+                  : t('chat.verified', 'Tara · chart synthesis')}
             </Text>
           </LinearGradient>
             {chartName ? (
@@ -1579,24 +1623,12 @@ function MessageBubble({
             )}
           </View>
         )}
-        
-        {/* Beta Notice for timeline-based interpretations */}
-        {message.role === 'assistant' && !isClarification && !isNativeGate && (
-          <View style={styles.betaNotice}>
-            <Text style={styles.betaNoticeText}>{Platform.OS === 'ios' ? '⚠️ BETA: Timeline studies are experimental. Use judgment and discretion.' : t('chat.betaNotice', '⚠️ BETA: Timeline interpretations are experimental. Use judgment and discretion.')}</Text>
-          </View>
-        )}
-        
-        {/* Legal Disclaimer */}
-        {message.role === 'assistant' && !isClarification && !isNativeGate && (
-          <View style={styles.disclaimerNotice}>
-            <Text style={styles.disclaimerNoticeText}>
-              {t('chat.disclaimerNotice', '⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.')}
-            </Text>
-          </View>
-        )}
 
-        {/* Quick action buttons under disclaimer (for long messages) - show for assistant messages with content (incl. chat history) */}
+        <View style={styles.messageContent}>
+          {renderedElements}
+        </View>
+
+        {/* Reading actions follow the answer, like an editorial utility bar. */}
         {!message.isTyping && message.role === 'assistant' && !message.isWelcome && !isNativeGate && (message.messageId || message.content) && (
           <View style={styles.actionButtons}>
             {message.showRestartButton && (
@@ -1710,14 +1742,14 @@ function MessageBubble({
 
         {/* Summary Image */}
         {message.summary_image && (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.imageContainer}
             onPress={() => setShowImageModal(true)}
             activeOpacity={0.8}
           >
             {isImageLoading && (
               <View style={styles.skeletonWrapper}>
-                <Animated.View 
+                <Animated.View
                   style={[
                     styles.skeletonGradient,
                     {
@@ -1726,15 +1758,15 @@ function MessageBubble({
                         outputRange: [0.3, 0.7]
                       })
                     }
-                  ]} 
+                  ]}
                 />
                 <View style={styles.skeletonContent}>
                   <Ionicons name="image-outline" size={32} color="rgba(255, 107, 53, 0.2)" />
-                  <Text style={styles.skeletonText}>Preparing Chart...</Text>
+                  <Text style={styles.skeletonText}>{t('premiumUi.chat.preparingChart')}</Text>
                 </View>
               </View>
             )}
-            <Image 
+            <Image
               source={{ uri: message.summary_image }}
               style={[
                 styles.summaryImage,
@@ -1751,14 +1783,19 @@ function MessageBubble({
               }}
             />
             {!isImageLoading && (
-              <Text style={styles.tapToEnlarge}>Tap to enlarge</Text>
+              <Text style={styles.tapToEnlarge}>{t('premiumUi.chat.tapEnlarge')}</Text>
             )}
           </TouchableOpacity>
         )}
-        
-        <View style={styles.messageContent}>
-          {renderedElements}
-        </View>
+
+        {message.role === 'assistant' && !isClarification && !isNativeGate && (
+          <View style={[styles.disclaimerNotice, { borderTopColor: colors.cardBorder }]}>
+            <Ionicons name="information-circle-outline" size={13} color={colors.textTertiary} />
+            <Text style={[styles.disclaimerNoticeText, { color: colors.textTertiary }]}>
+              {t('chat.disclaimerNoticeCompact', 'Astrological guidance is probabilistic; use qualified advice for important medical, legal or financial decisions.')}
+            </Text>
+          </View>
+        )}
 
         {shouldBlurDetail && (
           <View style={styles.freeDetailPaywall}>
@@ -1926,6 +1963,7 @@ function MessageBubble({
         {/* NEW: Render Follow-up Questions from the dedicated prop */}
         {message.follow_up_questions && message.follow_up_questions.length > 0 && (
           <View style={styles.followUpContainer}>
+            <Text style={[styles.followUpEyebrow, { color: colors.primary }]}>{t('premiumUi.chat.continueReading')}</Text>
             {message.follow_up_questions.map((question, index) => {
               const cleanQuestion = question
                 .replace(/^[\s☀️🌟⭐💫✨📅💼🍎📚🧘*•-]+/, '')
@@ -1936,10 +1974,21 @@ function MessageBubble({
               return (
                 <TouchableOpacity
                   key={`followup-prop-${index}`}
-                  style={styles.followUpButton}
+                  style={[
+                    styles.followUpButton,
+                    {
+                      backgroundColor: colors.surfaceMuted,
+                      borderColor: colors.cardBorder,
+                    },
+                  ]}
                   onPress={() => onFollowUpClick && onFollowUpClick(cleanQuestion)}
+                  activeOpacity={0.78}
                 >
-                  <Text style={styles.followUpText}>{cleanQuestion}</Text>
+                  <Text style={[styles.followUpIndex, { color: colors.primary }]}>0{index + 1}</Text>
+                  <Text style={[styles.followUpText, { color: colors.text }]}>{cleanQuestion}</Text>
+                  <View style={[styles.followUpArrow, { backgroundColor: colors.accentSoft }]}>
+                    <Ionicons name="arrow-forward" size={15} color={colors.onAccent} />
+                  </View>
                 </TouchableOpacity>
               );
             }).filter(Boolean)}
@@ -1947,11 +1996,26 @@ function MessageBubble({
         )}
 
         {hasRemedyCard ? (
-          <View style={styles.remedyCard}>
-            <Text style={styles.remedyCardTitle}>{message.next_action.title}</Text>
-            <Text style={styles.remedyCardReason}>{message.next_action.reason}</Text>
+          <View
+            style={[
+              styles.remedyCard,
+              {
+                backgroundColor: colors.cosmicSurface,
+                borderColor: colors.cosmicLine,
+                shadowColor: colors.cosmicGlow,
+              },
+            ]}
+          >
+            <View style={styles.remedyCardHeader}>
+              <View style={[styles.remedySeal, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}>
+                <Ionicons name="sparkles-outline" size={17} color={colors.accent} />
+              </View>
+              <Text style={[styles.remedyEyebrow, { color: colors.accent }]}>{t('premiumUi.chat.personalizedRemedy')}</Text>
+            </View>
+            <Text style={[styles.remedyCardTitle, { color: colors.textInverse }]}>{message.next_action.title}</Text>
+            <Text style={[styles.remedyCardReason, { color: colors.textInverseMuted }]}>{message.next_action.reason}</Text>
             <TouchableOpacity
-              style={styles.remedyCardButton}
+              style={[styles.remedyCardButton, { backgroundColor: colors.accent }]}
               onPress={() => {
                 const remedyPrompt = String(message.next_action.follow_up_questions[0]).trim();
                 const sourceMessageId = message.messageId || message.id;
@@ -1970,10 +2034,10 @@ function MessageBubble({
               }}
               activeOpacity={0.88}
             >
-              <Text style={styles.remedyCardButtonText}>
+              <Text style={[styles.remedyCardButtonText, { color: colors.onAccent }]}>
                 {message.next_action.follow_up_questions[0]}
               </Text>
-              <Ionicons name="arrow-forward" size={16} color="#fff" />
+              <Ionicons name="arrow-forward" size={16} color={colors.onAccent} />
             </TouchableOpacity>
           </View>
         ) : null}
@@ -2160,7 +2224,7 @@ function MessageBubble({
           </Text>
         )}
       </BubbleWrapper>
-      
+
       {/* Tooltip Modal */}
       <Modal
         visible={tooltipModal.show}
@@ -2168,40 +2232,61 @@ function MessageBubble({
         animationType="fade"
         onRequestClose={() => setTooltipModal({ show: false, term: '', definition: '' })}
       >
-        <TouchableOpacity 
-          style={styles.tooltipModalOverlay} 
-          activeOpacity={1} 
+        <TouchableOpacity
+          style={[styles.tooltipModalOverlay, { backgroundColor: colors.overlay }]}
+          activeOpacity={1}
           onPress={() => setTooltipModal({ show: false, term: '', definition: '' })}
         >
-          <Animated.View style={styles.tooltipModalContent}>
+          <Animated.View
+            style={[
+              styles.tooltipModalContent,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.cardBorder,
+                shadowColor: colors.primary,
+              },
+            ]}
+          >
             <LinearGradient
-              colors={theme === 'dark'
-                ? ['rgba(0, 0, 0, 0.9)', 'rgba(20, 20, 20, 0.85)']
-                : ['rgba(255, 255, 255, 0.98)', 'rgba(255, 248, 240, 0.95)']}
-              style={[styles.tooltipGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 107, 53, 0.1)' }]}
+              colors={[colors.surfaceRaised, colors.surface]}
+              style={styles.tooltipGradient}
             >
               <View style={styles.tooltipHeader}>
-                <View style={styles.tooltipIconCircle}>
-                  <Ionicons name="book-outline" size={20} color="#ff6b35" />
+                <View style={[styles.tooltipIconCircle, { backgroundColor: colors.accentSoft, borderColor: colors.cardBorder }]}>
+                  <Ionicons name="book-outline" size={19} color={colors.onAccent} />
                 </View>
-                <Text style={styles.tooltipModalTitle}>{tooltipModal.term}</Text>
+                <View style={styles.tooltipHeadingCopy}>
+                  <Text style={[styles.tooltipEyebrow, { color: colors.primary }]}>{t('premiumUi.chat.vedicGlossary')}</Text>
+                  <Text style={[styles.tooltipModalTitle, { color: colors.text }]}>{formatGlossaryTitle(tooltipModal.term)}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.tooltipHeaderClose, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}
+                  onPress={() => setTooltipModal({ show: false, term: '', definition: '' })}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('premiumUi.chat.closeDefinition')}
+                >
+                  <Ionicons name="close" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
               </View>
-              
+
               <ScrollView style={styles.tooltipScrollView} showsVerticalScrollIndicator={false}>
-                <Text style={[styles.tooltipModalDefinition, { color: theme === 'dark' ? '#ecf0f1' : '#2c3e50' }]}>{tooltipModal.definition}</Text>
+                <Text style={[styles.tooltipModalDefinition, { color: colors.textSecondary }]}>{tooltipModal.definition}</Text>
               </ScrollView>
 
               <TouchableOpacity
-                style={styles.tooltipModalClose}
+                style={[styles.tooltipModalClose, { backgroundColor: colors.primary }]}
                 onPress={() => setTooltipModal({ show: false, term: '', definition: '' })}
+                activeOpacity={0.82}
               >
-                <Text style={styles.tooltipModalCloseText}>{t('languageModal.close', 'Close')}</Text>
+                <Text style={[styles.tooltipModalCloseText, { color: colors.onPrimary }]}>{t('premiumUi.chat.gotIt')}</Text>
+                <Ionicons name="checkmark" size={17} color={colors.onPrimary} />
               </TouchableOpacity>
             </LinearGradient>
           </Animated.View>
         </TouchableOpacity>
       </Modal>
-      
+
       {/* Image Modal */}
       <Modal
         visible={showImageModal}
@@ -2529,9 +2614,9 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    shadowColor: '#ff6b35',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.12,
     shadowRadius: 4,
     elevation: 3,
   },
@@ -2560,7 +2645,7 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     textTransform: 'uppercase',
   },
   messageContent: {
-    paddingBottom: 4,
+    paddingBottom: 8,
   },
   regularText: {
     fontSize: 15,
@@ -2570,7 +2655,6 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     flexShrink: 1,
   },
   userText: {
-    color: '#1e3a8a',
     fontWeight: '500',
   },
   boldText: {
@@ -2791,24 +2875,28 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   },
   actionButtons: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
-    gap: 8,
+    justifyContent: 'flex-start',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(80, 54, 64, 0.14)',
+    gap: 6,
+    flexWrap: 'wrap',
   },
   actionButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 10,
-    width: 36,
-    height: 36,
+    backgroundColor: 'rgba(120, 96, 104, 0.08)',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.05)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   // Podcast action button styling (no badge; just a subtle orange highlight).
   listenPodcastButton: {
@@ -2851,22 +2939,46 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     alignSelf: 'stretch',
     width: '100%',
     maxWidth: '100%',
-    marginVertical: 6,
-    gap: 6,
+    marginTop: 14,
+    marginBottom: 6,
+    gap: 8,
+  },
+  followUpEyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.7,
+    marginBottom: 2,
   },
   remedyCard: {
-    backgroundColor: Platform.OS === 'android' ? 'rgba(22, 163, 74, 0.12)' : 'rgba(22, 163, 74, 0.08)',
-    borderRadius: 20,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(22, 163, 74, 0.25)',
-    padding: 14,
-    marginTop: 8,
-    marginBottom: 4,
+    padding: 18,
+    marginTop: 14,
+    marginBottom: 6,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: Platform.OS === 'android' ? 0 : 0.24,
+    shadowRadius: 22,
+    elevation: Platform.OS === 'android' ? 3 : 0,
   },
   remedyCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    gap: 10,
+    marginBottom: 14,
+  },
+  remedySeal: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  remedyEyebrow: {
+    flex: 1,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
   },
   remedyBadge: {
     flexDirection: 'row',
@@ -2885,16 +2997,16 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     letterSpacing: 0.2,
   },
   remedyCardTitle: {
-    color: '#14532d',
-    fontSize: 16,
-    fontWeight: '800',
-    marginBottom: 6,
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 21,
+    lineHeight: 26,
+    fontWeight: '700',
+    marginBottom: 8,
   },
   remedyCardReason: {
-    color: '#166534',
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 12,
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 16,
     fontWeight: '500',
   },
   remedyCardButton: {
@@ -2902,10 +3014,9 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#16a34a',
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
   },
   remedyCardButtonText: {
     color: '#fff',
@@ -2916,26 +3027,34 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     alignSelf: 'stretch',
     width: '100%',
     maxWidth: '100%',
-    backgroundColor: Platform.OS === 'android' ? 'rgba(255, 107, 53, 0.18)' : 'rgba(255, 107, 53, 0.12)',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1.5,
-    borderColor: Platform.OS === 'android' ? 'rgba(255, 107, 53, 0.4)' : 'rgba(255, 107, 53, 0.3)',
-    shadowColor: Platform.OS === 'android' ? 'transparent' : '#ff6b35',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: Platform.OS === 'android' ? 0 : 0.2,
-    shadowRadius: Platform.OS === 'android' ? 0 : 4,
-    elevation: Platform.OS === 'android' ? 0 : 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 18,
+    paddingLeft: 13,
+    paddingRight: 10,
+    paddingVertical: 12,
+    borderWidth: 1,
+  },
+  followUpIndex: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   followUpText: {
-    color: '#ff6b35',
     fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 18,
+    fontWeight: '700',
+    lineHeight: 19,
+    flex: 1,
     flexShrink: 1,
     flexWrap: 'wrap',
-    width: '100%',
+  },
+  followUpArrow: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   typingContainer: {
     flexDirection: 'row',
@@ -3001,91 +3120,94 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     borderColor: 'rgba(233, 30, 99, 0.3)',
   },
   tooltipText: {
-    color: '#ff6b35',
     fontWeight: '700',
-    backgroundColor: 'rgba(255, 107, 53, 0.08)',
-    borderRadius: 6,
+    borderRadius: 7,
     paddingHorizontal: 6,
     paddingVertical: 1,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255, 107, 53, 0.3)',
-    textDecorationLine: 'underline',
-    textDecorationStyle: Platform.OS === 'ios' ? 'solid' : 'dashed',
+    borderWidth: 1,
     overflow: 'hidden',
   },
   tooltipModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
   },
   tooltipModalContent: {
-    width: '90%',
-    maxWidth: 400,
-    borderRadius: 24,
+    width: '92%',
+    maxWidth: 420,
+    borderRadius: 28,
+    borderWidth: 1,
     overflow: 'hidden',
-    shadowColor: '#ff6b35',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
+    shadowOpacity: 0.24,
+    shadowRadius: 28,
     elevation: 10,
   },
   tooltipGradient: {
-    padding: 24,
-    borderRadius: 24,
-    borderWidth: 1,
+    padding: 22,
+    borderRadius: 28,
   },
   tooltipHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 18,
     gap: 12,
   },
   tooltipIconCircle: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.2)',
+  },
+  tooltipHeadingCopy: {
+    flex: 1,
+  },
+  tooltipEyebrow: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginBottom: 2,
+  },
+  tooltipHeaderClose: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tooltipModalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#ff6b35',
-    flex: 1,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 22,
+    lineHeight: 27,
+    fontWeight: '600',
   },
   tooltipScrollView: {
     maxHeight: 300,
-    marginBottom: 20,
+    marginBottom: 22,
   },
   tooltipModalDefinition: {
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 23,
+    fontWeight: '500',
   },
   tooltipModalClose: {
-    backgroundColor: '#ff6b35',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 25,
-    alignSelf: 'center',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    minHeight: 46,
+    paddingHorizontal: 22,
+    borderRadius: 999,
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
   },
   tooltipModalCloseText: {
-    color: 'white',
     fontSize: 14,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    fontWeight: '800',
   },
   tableScroll: {
     marginVertical: 12,
@@ -3097,19 +3219,14 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.15)',
-    backgroundColor: '#fff',
-    shadowColor: '#ff6b35',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: Platform.OS === 'android' ? 0 : 0.1,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: Platform.OS === 'android' ? 1 : 0,
   },
   tableHeaderRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 107, 53, 0.08)',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 107, 53, 0.15)',
     paddingVertical: 12,
     paddingHorizontal: 8,
   },
@@ -3120,7 +3237,6 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   tableHeaderCell: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#ff6b35',
     textAlign: 'center',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -3162,18 +3278,18 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     lineHeight: 16,
   },
   disclaimerNotice: {
-    backgroundColor: 'rgba(156, 39, 176, 0.08)',
-    borderLeftWidth: 3,
-    borderLeftColor: '#9C27B0',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 10,
+    marginTop: 10,
   },
   disclaimerNoticeText: {
-    fontSize: 11,
-    color: '#6A1B9A',
-    fontWeight: '600',
-    lineHeight: 16,
+    flex: 1,
+    fontSize: 9,
+    fontWeight: '500',
+    lineHeight: 13,
   },
   timeoutHint: {
     backgroundColor: 'rgba(255, 107, 53, 0.1)',

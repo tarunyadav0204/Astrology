@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import './SearchBar.css';
 
 /** Site pages available in header search. `public: true` = reachable without login. */
-const SEARCH_DATA = [
+export const SEARCH_DATA = [
   // Core
   { title: 'Home', path: '/', keywords: ['home', 'homepage', 'main'], public: true },
   { title: 'AI Kundli Generator (Birth Chart)', path: '/ai-kundli-generator', keywords: ['birth chart', 'kundli', 'janam kundli', 'create chart', 'generator', 'horoscope chart'], public: true },
@@ -25,7 +25,6 @@ const SEARCH_DATA = [
 
   // Tools
   { title: 'Ashtakavarga', path: '/ashtakavarga', keywords: ['ashtakavarga', 'ashtak', 'bindu', 'transit strength'], public: true },
-  { title: 'AstroVastu', path: '/astrovastu', keywords: ['vastu', 'astrovastu', 'home vastu', 'office vastu', 'direction'], public: true },
   { title: 'Numerology', path: '/#numerology', keywords: ['numerology', 'numbers', 'name number', 'life path'], public: true },
   { title: 'Astrology Tools', path: '/#astrology', keywords: ['astrology', 'vedic', 'tools', 'planets'], public: true },
 
@@ -39,9 +38,10 @@ const SEARCH_DATA = [
   { title: 'Calendar 2026', path: '/calendar-2026', keywords: ['calendar', '2026', 'hindu calendar', 'yearly calendar'], public: true },
 
   // Horoscope
-  { title: 'Daily Horoscope', path: '/horoscope?period=daily', keywords: ['horoscope', 'daily', 'prediction', 'zodiac', 'rashi'], public: true },
-  { title: 'Weekly Horoscope', path: '/horoscope?period=weekly', keywords: ['weekly horoscope', 'week prediction'], public: true },
-  { title: 'Monthly Horoscope', path: '/horoscope?period=monthly', keywords: ['monthly horoscope', 'month prediction'], public: true },
+  { title: 'Daily Horoscope', path: '/horoscope/daily', keywords: ['horoscope', 'daily', 'prediction', 'zodiac', 'rashi'], public: true },
+  { title: 'Weekly Horoscope', path: '/horoscope/weekly', keywords: ['weekly horoscope', 'week prediction'], public: true },
+  { title: 'Monthly Horoscope', path: '/horoscope/monthly', keywords: ['monthly horoscope', 'month prediction'], public: true },
+  { title: 'Yearly Horoscope', path: '/horoscope/yearly', keywords: ['yearly horoscope', 'annual horoscope', 'year prediction'], public: true },
 
   // Chat & learning
   { title: 'AI Astrologer Chat (Ask Tara)', path: '/chat?app=1', keywords: ['chat', 'astrologer', 'ai', 'tara', 'ask tara', 'consultation', 'kundli chat'] },
@@ -60,7 +60,7 @@ const SEARCH_DATA = [
   { title: 'Terms of Service', path: '/terms', keywords: ['terms', 'conditions', 'tos', 'legal'], public: true },
 ];
 
-const matchesQuery = (item, searchQuery) => {
+export const matchesQuery = (item, searchQuery) => {
   if (item.title.toLowerCase().includes(searchQuery)) return true;
   return item.keywords.some((keyword) => keyword.toLowerCase().includes(searchQuery));
 };

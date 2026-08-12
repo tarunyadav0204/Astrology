@@ -1,8 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
+import { typographyTokens } from '../../theme/tokens';
 
 const FortressWheel = ({ kotaData, colors, onPlanetPress }) => {
+  const { width } = useWindowDimensions();
+  const wheelSize = Math.min(300, Math.max(250, width - 60));
+  const wheelScale = wheelSize / 300;
   const getPlanetSymbol = (planet) => {
     const symbols = {
       'Sun': '☉',
@@ -30,22 +34,20 @@ const FortressWheel = ({ kotaData, colors, onPlanetPress }) => {
 
   const getPlanetColor = (planetData, kotaData) => {
     const planetName = planetData.planet;
-    
-    // Kota Swami (fortress lord) - always gold/yellow (royal)
+
     if (planetName === kotaData.kota_swami) {
-      return '#FFD700'; // Gold
+      return colors.accent;
     }
-    
-    // Kota Paala (fortress guard) - always blue (guardian)
+
     if (planetName === kotaData.kota_paala) {
-      return '#4A90E2'; // Blue
+      return colors.info;
     }
-    
+
     // Regular benefics - green (protective)
     if (planetData.is_benefic) {
       return colors.success;
     }
-    
+
     // Regular malefics - red (threatening)
     return colors.error;
   };
@@ -53,14 +55,14 @@ const FortressWheel = ({ kotaData, colors, onPlanetPress }) => {
   const renderPlanetInSection = (planets, section, radius, centerX, centerY) => {
     return planets.map((planetData, index) => {
       // Position planets at angles to avoid vertical overlap with labels
-      const baseAngle = section === 'Stambha' ? 45 : 
+      const baseAngle = section === 'Stambha' ? 45 :
                        section === 'Madhya' ? 135 :
                        section === 'Prakaara' ? 225 : 315; // Different quadrants
       const angle = baseAngle + (index * 30); // 30° spacing between planets
       const radian = (angle * Math.PI) / 180;
       const x = centerX + radius * Math.cos(radian);
       const y = centerY + radius * Math.sin(radian);
-      
+
       return (
         <TouchableOpacity
           key={`${section}-${index}`}
@@ -72,16 +74,16 @@ const FortressWheel = ({ kotaData, colors, onPlanetPress }) => {
               top: y - 15,
               backgroundColor: getPlanetColor(planetData, kotaData),
               borderColor: getSectionColor(section),
-              borderWidth: 3,
+              borderWidth: 2,
             }
           ]}
           onPress={() => onPlanetPress && onPlanetPress(planetData.planet)}
         >
-          <Text style={styles.planetText}>
+          <Text style={[styles.planetText, { color: planetData.planet === kotaData.kota_swami ? colors.onAccent : colors.textInverse }]}>
             {getPlanetSymbol(planetData.planet)}
           </Text>
           {planetData.motion === 'entering' && (
-            <View style={styles.enteringIndicator} />
+            <View style={[styles.enteringIndicator, { backgroundColor: colors.primary, borderColor: colors.surfaceRaised }]} />
           )}
         </TouchableOpacity>
       );
@@ -89,13 +91,15 @@ const FortressWheel = ({ kotaData, colors, onPlanetPress }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={[styles.title, { color: colors.text }]}>
-        🏰 Fortress Layout
-      </Text>
-      
-      <View style={styles.wheelContainer}>
-        <Svg width={300} height={300} style={styles.svg}>
+    <View style={[styles.container, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+      <View style={styles.heading}>
+        <Text style={[styles.eyebrow, { color: colors.primary }]}>PLANETARY SIEGE MAP</Text>
+        <Text style={[styles.title, { color: colors.text }]}>The four defensive zones</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Tap a planet to understand its role and current effect.</Text>
+      </View>
+
+      <View style={[styles.wheelContainer, { width: wheelSize, height: wheelSize, borderRadius: wheelSize / 2, backgroundColor: colors.chartSurface, borderColor: colors.chartLine }]}>
+        <Svg width={wheelSize} height={wheelSize} viewBox="0 0 300 300" style={styles.svg}>
           {/* Bahya (Outer) */}
           <Circle
             cx={150}
@@ -106,7 +110,7 @@ const FortressWheel = ({ kotaData, colors, onPlanetPress }) => {
             strokeWidth={2}
             opacity={0.3}
           />
-          
+
           {/* Prakaara */}
           <Circle
             cx={150}
@@ -117,7 +121,7 @@ const FortressWheel = ({ kotaData, colors, onPlanetPress }) => {
             strokeWidth={2}
             opacity={0.4}
           />
-          
+
           {/* Madhya */}
           <Circle
             cx={150}
@@ -128,7 +132,7 @@ const FortressWheel = ({ kotaData, colors, onPlanetPress }) => {
             strokeWidth={3}
             opacity={0.5}
           />
-          
+
           {/* Stambha (Inner) */}
           <Circle
             cx={150}
@@ -139,7 +143,7 @@ const FortressWheel = ({ kotaData, colors, onPlanetPress }) => {
             stroke={getSectionColor('Stambha')}
             strokeWidth={3}
           />
-          
+
           {/* Section Labels */}
           <SvgText
             x={150}
@@ -151,7 +155,7 @@ const FortressWheel = ({ kotaData, colors, onPlanetPress }) => {
           >
             Bahya
           </SvgText>
-          
+
           <SvgText
             x={150}
             y={60}
@@ -162,7 +166,7 @@ const FortressWheel = ({ kotaData, colors, onPlanetPress }) => {
           >
             Prakaara
           </SvgText>
-          
+
           <SvgText
             x={150}
             y={90}
@@ -173,7 +177,7 @@ const FortressWheel = ({ kotaData, colors, onPlanetPress }) => {
           >
             Madhya
           </SvgText>
-          
+
           <SvgText
             x={150}
             y={150}
@@ -185,46 +189,46 @@ const FortressWheel = ({ kotaData, colors, onPlanetPress }) => {
             Stambha
           </SvgText>
         </Svg>
-        
+
         {/* Planet positions */}
-        {kotaData.malefic_siege?.Stambha && 
-          renderPlanetInSection(kotaData.malefic_siege.Stambha, 'Stambha', 50, 150, 150)}
-        
-        {kotaData.malefic_siege?.Madhya && 
-          renderPlanetInSection(kotaData.malefic_siege.Madhya, 'Madhya', 80, 150, 150)}
-        
-        {kotaData.malefic_siege?.Prakaara && 
-          renderPlanetInSection(kotaData.malefic_siege.Prakaara, 'Prakaara', 110, 150, 150)}
-        
-        {kotaData.malefic_siege?.Bahya && 
-          renderPlanetInSection(kotaData.malefic_siege.Bahya, 'Bahya', 140, 150, 150)}
+        {kotaData.malefic_siege?.Stambha &&
+          renderPlanetInSection(kotaData.malefic_siege.Stambha, 'Stambha', 50 * wheelScale, wheelSize / 2, wheelSize / 2)}
+
+        {kotaData.malefic_siege?.Madhya &&
+          renderPlanetInSection(kotaData.malefic_siege.Madhya, 'Madhya', 80 * wheelScale, wheelSize / 2, wheelSize / 2)}
+
+        {kotaData.malefic_siege?.Prakaara &&
+          renderPlanetInSection(kotaData.malefic_siege.Prakaara, 'Prakaara', 110 * wheelScale, wheelSize / 2, wheelSize / 2)}
+
+        {kotaData.malefic_siege?.Bahya &&
+          renderPlanetInSection(kotaData.malefic_siege.Bahya, 'Bahya', 130 * wheelScale, wheelSize / 2, wheelSize / 2)}
       </View>
-      
+
       {/* Legend */}
       <View style={styles.legend}>
-        <Text style={[styles.legendTitle, { color: colors.text }]}>Planet Colors:</Text>
-        
+        <Text style={[styles.legendTitle, { color: colors.text }]}>Planet roles</Text>
+
         <View style={styles.legendRow}>
-          <View style={[styles.legendColor, { backgroundColor: '#FFD700' }]} />
+          <View style={[styles.legendColor, { backgroundColor: colors.accent }]} />
           <Text style={[styles.legendText, { color: colors.textSecondary }]}>
             Kota Swami (Lord)
           </Text>
         </View>
-        
+
         <View style={styles.legendRow}>
-          <View style={[styles.legendColor, { backgroundColor: '#4A90E2' }]} />
+          <View style={[styles.legendColor, { backgroundColor: colors.info }]} />
           <Text style={[styles.legendText, { color: colors.textSecondary }]}>
             Kota Paala (Guard)
           </Text>
         </View>
-        
+
         <View style={styles.legendRow}>
           <View style={[styles.legendColor, { backgroundColor: colors.success }]} />
           <Text style={[styles.legendText, { color: colors.textSecondary }]}>
             Benefics (Protective)
           </Text>
         </View>
-        
+
         <View style={styles.legendRow}>
           <View style={[styles.legendColor, { backgroundColor: colors.error }]} />
           <Text style={[styles.legendText, { color: colors.textSecondary }]}>
@@ -239,17 +243,32 @@ const FortressWheel = ({ kotaData, colors, onPlanetPress }) => {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    marginVertical: 20,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderRadius: 22,
+    padding: 16,
+  },
+  heading: {
+    width: '100%',
+    marginBottom: 14,
+  },
+  eyebrow: {
+    ...typographyTokens.eyebrow,
+    marginBottom: 5,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
+    ...typographyTokens.sectionTitle,
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '500',
   },
   wheelContainer: {
     position: 'relative',
-    width: 300,
-    height: 300,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   svg: {
     position: 'absolute',
@@ -261,10 +280,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#ffffff',
   },
   planetText: {
-    color: '#ffffff',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -275,7 +292,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#ff0000',
+    borderWidth: 1,
   },
   legendTitle: {
     fontSize: 14,
@@ -288,8 +305,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    marginTop: 20,
-    gap: 16,
+    marginTop: 18,
+    gap: 12,
   },
   legendRow: {
     flexDirection: 'row',

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  StatusBar,
   TextInput,
   ActivityIndicator,
 } from 'react-native';
@@ -16,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { authAPI, chatAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import AppAlertModal from '../Common/AppAlertModal';
+import FocusedStatusBar from '../Common/FocusedStatusBar';
 
 function formatApiError(e, t) {
   const d = e.response?.data?.detail;
@@ -32,7 +32,7 @@ const GENDER_OPTIONS = [
 ];
 
 export default function AccountSecurityScreen({ navigation }) {
-  const { theme, colors } = useTheme();
+  const { colors } = useTheme();
   const { t } = useTranslation();
 
   const [loading, setLoading] = useState(true);
@@ -404,41 +404,68 @@ export default function AccountSecurityScreen({ navigation }) {
   };
 
   const bg = colors.background;
-  const cardBg = theme === 'dark' ? colors.backgroundSecondary : colors.surface;
+  const cardBg = colors.surfaceRaised;
   const borderCol = colors.cardBorder;
+  const inputBg = colors.surfaceMuted;
+
+  const SectionHeader = ({ icon, title, detail }) => (
+    <View style={styles.sectionHeader}>
+      <View style={[styles.sectionIcon, { backgroundColor: colors.accentSoft }]}>
+        <Ionicons name={icon} size={18} color={colors.onAccent} />
+      </View>
+      <View style={styles.sectionHeaderCopy}>
+        <Text style={[styles.sectionHeading, { color: colors.text }]}>{title}</Text>
+        {!!detail && <Text style={[styles.sectionDetail, { color: colors.textSecondary }]}>{detail}</Text>}
+      </View>
+    </View>
+  );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: bg }]}>
-      <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor="#ff6b35" />
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.headerSurface }]} edges={['top']}>
+      <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
+      <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cosmicLine }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <Ionicons name="arrow-back" size={23} color={colors.textInverse} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+        <Text style={[styles.headerTitle, { color: colors.textInverse }]} numberOfLines={1}>
           {t('accountSecurity.title', 'Account & security')}
         </Text>
         <View style={{ width: 40 }} />
       </View>
 
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <View style={[styles.contentShell, { backgroundColor: bg }]}>
+        {loading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={colors.accent} />
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <View style={[styles.hero, { backgroundColor: colors.surfaceInverse, borderColor: colors.cosmicLine }]}>
+            <View style={[styles.heroRing, styles.heroRingLarge, { borderColor: colors.cosmicLine }]} />
+            <View style={[styles.heroRing, styles.heroRingSmall, { borderColor: colors.cosmicLine }]} />
+            <View style={[styles.heroIcon, { backgroundColor: colors.accentSoft }]}>
+              <Ionicons name="shield-checkmark-outline" size={27} color={colors.onAccent} />
+            </View>
+            <Text style={[styles.heroEyebrow, { color: colors.accent }]}>{t('accountSecurity.title', 'Account & security')}</Text>
+            <Text style={[styles.heroTitle, { color: colors.textInverse }]}>{t('accountSecurity.sectionPassword', 'Password')} · {t('accountSecurity.sectionEmail', 'Email')}</Text>
+            <View style={styles.heroPills}>
+              <View style={[styles.heroPill, { borderColor: colors.cosmicLine }]}><Ionicons name="lock-closed-outline" size={14} color={colors.accent} /><Text style={[styles.heroPillText, { color: colors.textInverseMuted }]}>{t('accountSecurity.sectionPassword', 'Password')}</Text></View>
+              <View style={[styles.heroPill, { borderColor: colors.cosmicLine }]}><Ionicons name="person-outline" size={14} color={colors.accent} /><Text style={[styles.heroPillText, { color: colors.textInverseMuted }]}>{t('accountSecurity.sectionGender', 'Gender (account)')}</Text></View>
+            </View>
+          </View>
+
           {!!errorBanner && (
-            <View style={[styles.banner, { borderColor: colors.error }]}>
-              <Text style={{ color: colors.error }}>{errorBanner}</Text>
+            <View style={[styles.banner, { borderColor: colors.error, backgroundColor: colors.surfaceRaised }]}>
+              <Ionicons name="alert-circle-outline" size={20} color={colors.error} />
+              <Text style={[styles.bannerText, { color: colors.error }]}>{errorBanner}</Text>
             </View>
           )}
 
-          <Text style={[styles.sectionHeading, { color: colors.textSecondary }]}>
-            {t('accountSecurity.sectionPassword', 'Password')}
-          </Text>
           <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
+            <SectionHeader icon="key-outline" title={t('accountSecurity.sectionPassword', 'Password')} detail={t('accountSecurity.newPasswordHint', 'Min. 8 characters, one number')} />
             <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accountSecurity.currentPassword', 'Current password')}</Text>
             <TextInput
-              style={[styles.input, { color: colors.text, borderColor: borderCol, backgroundColor: theme === 'dark' ? colors.backgroundTertiary : '#fafafa' }]}
+              style={[styles.input, { color: colors.text, borderColor: borderCol, backgroundColor: inputBg }]}
               secureTextEntry
               value={curPw}
               onChangeText={setCurPw}
@@ -447,7 +474,7 @@ export default function AccountSecurityScreen({ navigation }) {
             />
             <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>{t('accountSecurity.newPassword', 'New password')}</Text>
             <TextInput
-              style={[styles.input, { color: colors.text, borderColor: borderCol, backgroundColor: theme === 'dark' ? colors.backgroundTertiary : '#fafafa' }]}
+              style={[styles.input, { color: colors.text, borderColor: borderCol, backgroundColor: inputBg }]}
               secureTextEntry
               value={newPw}
               onChangeText={setNewPw}
@@ -456,7 +483,7 @@ export default function AccountSecurityScreen({ navigation }) {
             />
             <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>{t('accountSecurity.confirmPassword', 'Confirm new password')}</Text>
             <TextInput
-              style={[styles.input, { color: colors.text, borderColor: borderCol, backgroundColor: theme === 'dark' ? colors.backgroundTertiary : '#fafafa' }]}
+              style={[styles.input, { color: colors.text, borderColor: borderCol, backgroundColor: inputBg }]}
               secureTextEntry
               value={confirmPw}
               onChangeText={setConfirmPw}
@@ -469,17 +496,15 @@ export default function AccountSecurityScreen({ navigation }) {
               disabled={savingPw}
             >
               {savingPw ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={colors.onPrimary} />
               ) : (
-                <Text style={styles.primaryBtnText}>{t('accountSecurity.updatePassword', 'Update password')}</Text>
+                <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>{t('accountSecurity.updatePassword', 'Update password')}</Text>
               )}
             </TouchableOpacity>
           </View>
 
-          <Text style={[styles.sectionHeading, { color: colors.textSecondary }]}>
-            {t('accountSecurity.sectionEmail', 'Email')}
-          </Text>
           <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
+            <SectionHeader icon="mail-outline" title={t('accountSecurity.sectionEmail', 'Email')} />
             {!serverEmail ? (
               <Text style={[styles.help, { color: colors.textSecondary }]}>
                 {isIndia
@@ -504,13 +529,13 @@ export default function AccountSecurityScreen({ navigation }) {
             )}
             <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accountSecurity.emailField', 'Email address')}</Text>
             <TextInput
-              style={[styles.input, { color: colors.text, borderColor: borderCol, backgroundColor: theme === 'dark' ? colors.backgroundTertiary : '#fafafa' }]}
+              style={[styles.input, { color: colors.text, borderColor: borderCol, backgroundColor: inputBg }]}
               value={emailDraft}
               onChangeText={setEmailDraft}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
-              placeholder="name@example.com"
+              placeholder={t('accountSecurity.emailField', 'Email address')}
               placeholderTextColor={colors.textSecondary}
             />
             <TouchableOpacity
@@ -519,9 +544,9 @@ export default function AccountSecurityScreen({ navigation }) {
               disabled={savingEmail}
             >
               {savingEmail ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={colors.onPrimary} />
               ) : (
-                <Text style={styles.primaryBtnText}>
+                <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>
                   {serverEmail ? t('accountSecurity.saveEmail', 'Save email') : t('accountSecurity.addEmail', 'Add email')}
                 </Text>
               )}
@@ -533,10 +558,8 @@ export default function AccountSecurityScreen({ navigation }) {
             )}
           </View>
 
-          <Text style={[styles.sectionHeading, { color: colors.textSecondary }]}>
-            {t('accountSecurity.sectionGender', 'Gender (account)')}
-          </Text>
           <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
+            <SectionHeader icon="person-outline" title={t('accountSecurity.sectionGender', 'Gender (account)')} />
             <Text style={[styles.help, { color: colors.textSecondary }]}>
               {t(
                 'accountSecurity.genderHelp',
@@ -552,14 +575,14 @@ export default function AccountSecurityScreen({ navigation }) {
                     style={[
                       styles.chip,
                       {
-                        borderColor: active ? colors.primary : borderCol,
-                        backgroundColor: active ? 'rgba(249,115,22,0.12)' : 'transparent',
+                        borderColor: active ? colors.selectionBorder : borderCol,
+                        backgroundColor: active ? colors.selectionSurface : colors.surfaceMuted,
                       },
                     ]}
                     onPress={() => onPressGenderChip(opt.value)}
                     disabled={savingGender}
                   >
-                    <Text style={[styles.chipText, { color: colors.text }]}>{t(opt.labelKey, opt.fb)}</Text>
+                    <Text style={[styles.chipText, { color: active ? colors.selectionText : colors.text }]}>{t(opt.labelKey, opt.fb)}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -571,26 +594,25 @@ export default function AccountSecurityScreen({ navigation }) {
             )}
           </View>
 
-          <Text style={[styles.sectionHeading, { color: colors.textSecondary }]}>
-            {t('accountSecurity.sectionDanger', 'Danger zone')}
-          </Text>
-          <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
+          <View style={[styles.dangerCard, { backgroundColor: cardBg, borderColor: colors.error }]}>
+            <SectionHeader icon="trash-outline" title={t('accountSecurity.sectionDanger', 'Danger zone')} detail={t('accountSecurity.deleteAllChatHistory', 'Delete All Chat History')} />
             <TouchableOpacity
-              style={[styles.dangerBtn, { opacity: deletingChatHistory ? 0.6 : 1 }]}
+              style={[styles.dangerBtn, { borderColor: colors.error, opacity: deletingChatHistory ? 0.6 : 1 }]}
               onPress={onDeleteAccount}
               disabled={deletingChatHistory}
             >
               {deletingChatHistory ? (
                 <ActivityIndicator color={colors.error} />
               ) : (
-              <Text style={[styles.dangerBtnText, { color: theme === 'dark' ? '#fff' : colors.error }]}>
+              <Text style={[styles.dangerBtnText, { color: colors.error }]}>
                 {t('profile.deleteAccountAndData', 'Delete Account & Data')}
               </Text>
               )}
             </TouchableOpacity>
           </View>
-        </ScrollView>
-      )}
+          </ScrollView>
+        )}
+      </View>
 
       <AppAlertModal
         visible={appAlert != null}
@@ -611,24 +633,41 @@ export default function AccountSecurityScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8 },
+  contentShell: { flex: 1, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   backButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700' },
-  content: { padding: 20, paddingBottom: 40 },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 20, fontFamily: 'serif', fontWeight: '600' },
+  content: { padding: 18, paddingBottom: 48 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  banner: { padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 16 },
-  sectionHeading: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 8, marginBottom: 8 },
-  card: { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 8 },
+  hero: { minHeight: 218, borderRadius: 28, borderWidth: 1, padding: 24, marginBottom: 18, overflow: 'hidden', justifyContent: 'flex-end' },
+  heroRing: { position: 'absolute', borderWidth: 1, borderRadius: 999 },
+  heroRingLarge: { width: 220, height: 220, right: -72, top: -96 },
+  heroRingSmall: { width: 152, height: 152, right: -31, top: -66 },
+  heroIcon: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
+  heroEyebrow: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2.2, marginBottom: 7 },
+  heroTitle: { fontSize: 30, lineHeight: 35, fontFamily: 'serif', fontWeight: '600', marginBottom: 16 },
+  heroPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  heroPill: { flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 7 },
+  heroPillText: { fontSize: 12, fontWeight: '700' },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 13, borderRadius: 14, borderWidth: 1, marginBottom: 16 },
+  bannerText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
+  sectionIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  sectionHeaderCopy: { flex: 1, marginLeft: 12 },
+  sectionHeading: { fontSize: 20, fontFamily: 'serif', fontWeight: '600' },
+  sectionDetail: { fontSize: 12, marginTop: 2 },
+  card: { borderRadius: 22, borderWidth: 1, padding: 18, marginBottom: 14 },
+  dangerCard: { borderRadius: 22, borderWidth: 1, padding: 18, marginTop: 2 },
   label: { fontSize: 13, marginBottom: 6 },
   help: { fontSize: 14, lineHeight: 20, marginBottom: 12 },
-  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16 },
-  primaryBtn: { marginTop: 16, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  input: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, fontSize: 16 },
+  primaryBtn: { marginTop: 16, borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
+  primaryBtnText: { fontSize: 15, fontWeight: '800' },
   linkRow: { marginTop: 12, alignItems: 'center' },
   linkText: { fontSize: 15, fontWeight: '600' },
   genderRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   chip: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1 },
   chipText: { fontSize: 14, fontWeight: '600' },
-  dangerBtn: { paddingVertical: 14, alignItems: 'center' },
+  dangerBtn: { paddingVertical: 13, alignItems: 'center', borderWidth: 1, borderRadius: 999 },
   dangerBtnText: { fontSize: 16, fontWeight: '700' },
 });

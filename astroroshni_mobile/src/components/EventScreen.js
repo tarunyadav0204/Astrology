@@ -26,6 +26,7 @@ import MonthlyAccordion from './MonthlyAccordion';
 import NativeSelectorChip from './Common/NativeSelectorChip';
 import { API_BASE_URL } from '../utils/constants';
 import { useTheme } from '../context/ThemeContext';
+import FocusedStatusBar from './Common/FocusedStatusBar';
 import ConfirmCreditsModal from './ConfirmCreditsModal';
 import { useTranslation } from 'react-i18next';
 import {
@@ -94,11 +95,6 @@ const mergeCachedYearList = (...lists) => {
   return [...merged].sort((a, b) => a - b);
 };
 
-const CHIP_CACHED = {
-  dark: { bg: '#166534', border: '#22c55e', text: '#ecfdf5' },
-  light: { bg: '#dcfce7', border: '#16a34a', text: '#14532d' },
-};
-
 export default function EventScreen({ route }) {
   useAnalytics('EventScreen');
   const navigation = useNavigation();
@@ -107,12 +103,10 @@ export default function EventScreen({ route }) {
   const { requireAuthForPaid } = useAuthGate();
   const { theme, colors } = useTheme();
   const isIOS = Platform.OS === 'ios';
-  const onPrimaryText = '#ffffff';
-  const cachedChip = CHIP_CACHED[theme] || CHIP_CACHED.dark;
-  const bgGradient = theme === 'dark'
-    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd]
-    : [colors.gradientStart, colors.gradientMid, colors.gradientEnd];
-  const continueGradient = [colors.primary, theme === 'dark' ? '#ea580c' : '#c2410c'];
+  const onPrimaryText = colors.onPrimary;
+  const cachedChip = { bg: colors.selectionSurface, border: colors.success, text: colors.success };
+  const bgGradient = [colors.gradientStart, colors.gradientMid, colors.gradientEnd];
+  const continueGradient = [colors.primary, colors.primaryStrong];
   const quickSelectButtonStyle = {
     backgroundColor: colors.surface,
     borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.24)' : colors.cardBorder,
@@ -1383,6 +1377,7 @@ export default function EventScreen({ route }) {
 
   return (
     <LinearGradient colors={bgGradient} style={{ flex: 1 }}>
+      <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
       <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
       {/* Regenerate Confirmation Modal */}
       <Modal
@@ -1697,7 +1692,7 @@ export default function EventScreen({ route }) {
             style={[
               styles.macroCard,
               {
-                backgroundColor: theme === 'dark' ? 'rgba(44, 30, 78, 0.85)' : colors.cardBackground,
+                backgroundColor: colors.cardBackground,
                 borderColor: colors.cardBorder,
               },
             ]}

@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTheme } from '../../../context/ThemeContext';
 
 export default function AuthKeyboardScreen({
   emoji,
@@ -24,6 +25,7 @@ export default function AuthKeyboardScreen({
   headerExtra,
   keyboardVerticalOffset = 0,
 }) {
+  const { colors } = useTheme();
   const { height: windowHeight } = useWindowDimensions();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardMetrics, setKeyboardMetrics] = useState({ height: 0, screenY: 0 });
@@ -85,15 +87,17 @@ export default function AuthKeyboardScreen({
       keyboardVerticalOffset={keyboardVerticalOffset}
     >
       <View style={styles.frame}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+        <View style={[styles.orbit, styles.orbitLarge, { borderColor: colors.cosmicLine }]} />
+        <View style={[styles.orbit, styles.orbitSmall, { borderColor: colors.cosmicLine }]} />
+        <TouchableOpacity style={[styles.backButton, { borderColor: colors.cosmicLine }]} onPress={onBack}>
+          <Ionicons name="arrow-back" size={23} color={colors.textInverse} />
         </TouchableOpacity>
 
         <View style={[styles.header, keyboardVisible && styles.headerCompact]}>
           <Text style={[styles.emoji, keyboardVisible && styles.emojiCompact]}>{emoji}</Text>
-          <Text style={[styles.title, keyboardVisible && styles.titleCompact]}>{title}</Text>
+          <Text style={[styles.title, { color: colors.textInverse }, keyboardVisible && styles.titleCompact]}>{title}</Text>
           <Text
-            style={[styles.subtitle, keyboardVisible && styles.subtitleCompact]}
+            style={[styles.subtitle, { color: colors.textInverseMuted }, keyboardVisible && styles.subtitleCompact]}
             numberOfLines={keyboardVisible ? 1 : 3}
           >
             {subtitle}
@@ -145,11 +149,14 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
+  orbit: { position: 'absolute', borderWidth: 1, borderRadius: 999 },
+  orbitLarge: { width: 250, height: 250, right: -130, top: -95 },
+  orbitSmall: { width: 170, height: 170, right: -78, top: -56 },
   backButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 20,
@@ -172,8 +179,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
-    color: '#ffffff',
+    fontFamily: 'serif',
+    fontWeight: '600',
     marginBottom: 12,
     textAlign: 'center',
   },

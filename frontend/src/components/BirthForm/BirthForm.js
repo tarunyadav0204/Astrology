@@ -638,13 +638,16 @@ const BirthForm = ({
       ) : (
         <div className="saved-charts-panel">
           <div className="saved-charts-panel__toolbar">
-            <SearchInput
-              type="search"
-              aria-label="Search saved charts"
-              placeholder="Search saved charts by name"
-              value={searchQuery}
-              onChange={handleSearchChange}
-            />
+            <div className="saved-charts-panel__search">
+              <span aria-hidden>⌕</span>
+              <SearchInput
+                type="search"
+                aria-label="Search saved charts"
+                placeholder="Search saved charts by name"
+                value={searchQuery}
+                onChange={handleSearchChange}
+              />
+            </div>
             <span className="saved-charts-panel__count">
               {chartsTotal || existingCharts.length} {(chartsTotal || existingCharts.length) === 1 ? 'chart' : 'charts'}
             </span>

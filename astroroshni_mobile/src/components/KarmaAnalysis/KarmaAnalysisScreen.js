@@ -7,15 +7,14 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  Dimensions,
   TouchableOpacity,
   Animated,
   Alert,
   Platform,
+  StatusBar,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { userFacingPdfExportError } from '../../utils/pdfExportMessages';
 import { API_BASE_URL, getEndpoint } from '../../utils/constants';
@@ -28,6 +27,8 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 import { trackAstrologyEvent, trackEvent } from '../../utils/analytics';
 import { useAuthGate } from '../../auth/AuthGateContext';
 import AnalysisCreditModal from '../Analysis/AnalysisCreditModal';
+import NativeSelectorChip from '../Common/NativeSelectorChip';
+import { typographyTokens } from '../../theme/tokens';
 
 /** Map AI/backend section heading to karmaAnalysis.sectionTitles.<slug> */
 function karmaSectionTitleSlug(title) {
@@ -43,24 +44,15 @@ function karmaSectionTitleSlug(title) {
   return slug || 'unknown';
 }
 
-const { width, height } = Dimensions.get('window');
-
 const KarmaAnalysisScreen = ({ route, navigation }) => {
   useAnalytics('KarmaAnalysisScreen');
   const { t } = useTranslation();
-  const { theme, colors } = useTheme();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const isDark = theme === 'dark';
   const { chartId } = route.params || {};
   const { credits, fetchBalance } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
 
-  const screenGradient = isDark
-    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd]
-    : [colors.background, colors.backgroundSecondary, colors.backgroundTertiary];
-  const screenGradientWithAccent = isDark
-    ? [...screenGradient, colors.primary]
-    : [...screenGradient, colors.primary];
   const isIosKarmaStudy = Platform.OS === 'ios';
   const [karmaCost, setKarmaCost] = useState(25);
   const [loading, setLoading] = useState(false);
@@ -601,99 +593,66 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
     }
   };
 
-  const headerBorder = isDark ? 'rgba(255,215,0,0.14)' : colors.cardBorder;
-  const headerIconBg = isDark ? 'rgba(255,255,255,0.08)' : colors.surface;
-  const headerIconBorder = isDark ? 'rgba(255,215,0,0.3)' : colors.cardBorder;
-
-  const renderKarmaTopBar = ({ nativeInteractive = false, rightSlot }) => (
-    <View
-      style={[
-        styles.karmaTopBar,
-        {
-          paddingTop: Math.max(insets.top, 12) + 6,
-          borderBottomColor: headerBorder,
-        },
-      ]}
-    >
-      <View style={styles.karmaTopBarSide}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={[styles.headerIconBtn, { backgroundColor: headerIconBg, borderColor: headerIconBorder }]}
-          activeOpacity={0.75}
-          accessibilityRole="button"
-          accessibilityLabel={t('karmaAnalysis.a11yGoBack')}
-        >
-          <Ionicons name="arrow-back" size={22} color={colors.accent} />
-        </TouchableOpacity>
+  const renderKarmaTopBar = ({ showActions = false } = {}) => (
+    <View style={[styles.karmaTopBar, { paddingTop: Math.max(insets.top, 10) + 5, backgroundColor: colors.headerSurface, borderBottomColor: colors.cosmicLine }]}>
+      <TouchableOpacity
+        onPress={() => navigation.goBack()}
+        style={[styles.headerIconBtn, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityLabel={t('karmaAnalysis.a11yGoBack')}
+      >
+        <Ionicons name="arrow-back" size={21} color={colors.textInverse} />
+      </TouchableOpacity>
+      <View style={styles.karmaTopBarCopy}>
+        <Text style={[styles.karmaTopBarEyebrow, { color: colors.accent }]}>{t('premiumUi.karma.soulPatterns')}</Text>
+        <Text style={[styles.karmaTopBarTitle, { color: colors.textInverse }]}>{t('premiumUi.karma.title')}</Text>
       </View>
-      <View style={styles.karmaTopBarCenter} pointerEvents="box-none">
-        {nativeInteractive ? (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('SelectNative', { returnTo: 'KarmaAnalysis' })}
-            style={[
-              styles.nameChip,
-              {
-                backgroundColor: isDark ? 'rgba(255,215,0,0.14)' : colors.surface,
-                borderColor: isDark ? 'rgba(255,215,0,0.38)' : colors.cardBorder,
-              },
-            ]}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel={t('karmaAnalysis.a11yChangeNative')}
-          >
-            <Text style={[styles.nameChipText, { color: colors.accent }]} numberOfLines={1}>
-              {nativeName}
-            </Text>
-            <Ionicons name="chevron-down" size={17} color={colors.accent} style={styles.nameChipChevron} />
+      {showActions ? (
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={generateKarmaPDF} style={[styles.headerIconBtn, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]} disabled={generatingPDF} accessibilityLabel={t('karmaAnalysis.a11ySharePdf')}>
+            {generatingPDF ? <ActivityIndicator size="small" color={colors.accent} /> : <Ionicons name="share-outline" size={20} color={colors.textInverse} />}
           </TouchableOpacity>
-        ) : (
-          <View
-            style={[
-              styles.nameChip,
-              styles.nameChipStatic,
-              {
-                backgroundColor: isDark ? 'rgba(255,215,0,0.14)' : colors.surface,
-                borderColor: isDark ? 'rgba(255,215,0,0.38)' : colors.cardBorder,
-              },
-            ]}
-          >
-            <Text style={[styles.nameChipText, { color: colors.accent }]} numberOfLines={1}>
-              {nativeName}
-            </Text>
-          </View>
-        )}
-      </View>
-      <View style={[styles.karmaTopBarSide, styles.karmaTopBarSideRight]}>{rightSlot}</View>
+          <TouchableOpacity onPress={handleRegenerate} style={[styles.headerIconBtn, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]} accessibilityLabel={t('karmaAnalysis.a11yRegenerate')}>
+            <Ionicons name="refresh" size={20} color={colors.textInverse} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <NativeSelectorChip
+          birthData={{ name: nativeName }}
+          onPress={() => navigation.navigate('SelectNative', { returnTo: 'KarmaAnalysis' })}
+          maxLength={8}
+          showIcon={false}
+          style={{ backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }}
+          textStyle={{ color: colors.textInverseMuted }}
+          iconColor={colors.accent}
+        />
+      )}
     </View>
   );
 
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <LinearGradient colors={screenGradient} style={StyleSheet.absoluteFill} />
-        {renderKarmaTopBar({ rightSlot: <View style={styles.headerRightSpacer} /> })}
+        <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} />
+        {renderKarmaTopBar()}
         <Animated.View style={[styles.loadingContainer, { opacity: Platform.OS === 'web' ? 1 : fadeAnim }]}>
-          <View style={[styles.cosmicLoader, { backgroundColor: isDark ? 'rgba(255,215,0,0.1)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.3)' : colors.cardBorder }]}>
-            <Text style={styles.omSymbol}>🕉️</Text>
+          <View style={[styles.cosmicLoader, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
+            <Ionicons name="infinite-outline" size={34} color={colors.accent} />
           </View>
-          <ActivityIndicator size="large" color={colors.primary} style={styles.spinner} />
-          <Text style={[styles.loadingTitle, { color: colors.accent }]}>{uiText.loadingTitle}</Text>
+          <ActivityIndicator size="small" color={colors.primary} style={styles.spinner} />
+          <Text style={[styles.loadingTitle, { color: colors.text }]}>{uiText.loadingTitle}</Text>
           <Text style={[styles.loadingSubtitle, { color: colors.textSecondary }]}>
             {showProgress ? uiText.loadingSubtitleProgress : uiText.loadingSubtitleSlow}
           </Text>
           {showProgress && (
             <View style={styles.progressBarContainer}>
-              <View style={[styles.progressBarBackground, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : colors.surface }]}>
+              <View style={[styles.progressBarBackground, { backgroundColor: colors.surfaceMuted }]}>
                 <View style={[styles.progressBarFill, { width: `${progress}%`, backgroundColor: colors.primary }]} />
               </View>
-              <Text style={[styles.progressText, { color: colors.accent }]}>{Math.round(progress)}%</Text>
+              <Text style={[styles.progressText, { color: colors.primaryStrong }]}>{Math.round(progress)}%</Text>
             </View>
           )}
-          <View style={styles.dotsContainer}>
-            <View style={[styles.dot, styles.dot1, { backgroundColor: colors.accent }]} />
-            <View style={[styles.dot, styles.dot2, { backgroundColor: colors.accent }]} />
-            <View style={[styles.dot, styles.dot3, { backgroundColor: colors.accent }]} />
-          </View>
         </Animated.View>
       </View>
     );
@@ -702,25 +661,23 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   if (error) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <LinearGradient colors={screenGradient} style={StyleSheet.absoluteFill} />
-        {renderKarmaTopBar({ rightSlot: <View style={styles.headerRightSpacer} /> })}
+        <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} />
+        {renderKarmaTopBar()}
         <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>⚠️</Text>
-          <Text style={[styles.errorTitle, { color: colors.accent }]}>{uiText.errorTitle}</Text>
+          <View style={[styles.errorIcon, { backgroundColor: colors.errorSoft || colors.surfaceMuted }]}><Ionicons name="alert-circle-outline" size={28} color={colors.error} /></View>
+          <Text style={[styles.errorTitle, { color: colors.text }]}>{uiText.errorTitle}</Text>
           <Text style={[styles.errorText, { color: colors.textSecondary }]}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => initiateAnalysis(false)}>
-            <LinearGradient colors={[colors.primary, colors.secondary]} style={styles.retryGradient}>
-              <Text style={[styles.retryText, { color: '#fff' }]}>{t('karmaAnalysis.tryAgain')}</Text>
-            </LinearGradient>
+          <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={() => initiateAnalysis(false)}>
+            <Text style={[styles.retryText, { color: colors.onPrimary }]}>{t('karmaAnalysis.tryAgain')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.errorBackRow, { borderColor: headerIconBorder, backgroundColor: headerIconBg }]}
+            style={[styles.errorBackRow, { borderColor: colors.cardBorder, backgroundColor: colors.cardBackground }]}
             onPress={() => navigation.goBack()}
             activeOpacity={0.75}
             accessibilityRole="button"
             accessibilityLabel={t('karmaAnalysis.a11yGoBack')}
           >
-            <Ionicons name="arrow-back" size={20} color={colors.accent} />
+            <Ionicons name="arrow-back" size={20} color={colors.primaryStrong} />
             <Text style={[styles.errorBackRowText, { color: colors.textSecondary }]}>{t('karmaAnalysis.goBack')}</Text>
           </TouchableOpacity>
         </View>
@@ -731,21 +688,41 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   if (!analysis && !loading && !error) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <LinearGradient colors={screenGradient} style={StyleSheet.absoluteFill} />
-        {renderKarmaTopBar({
-          nativeInteractive: true,
-          rightSlot: <View style={styles.headerRightSpacer} />,
-        })}
-        <View style={styles.startContainer}>
-          <Text style={styles.omSymbol}>🕉️</Text>
-          <Text style={[styles.startTitle, { color: colors.accent }]}>{uiText.startTitle}</Text>
-          <Text style={[styles.startSubtitle, { color: colors.textSecondary }]}>{uiText.startSubtitle}</Text>
-          <TouchableOpacity style={styles.startButton} onPress={handleStartAnalysis}>
-            <LinearGradient colors={[colors.primary, colors.secondary]} style={styles.startGradient}>
-              <Text style={[styles.startButtonText, { color: '#fff' }]}>{isIosKarmaStudy ? 'Start Study' : t('karmaAnalysis.startButton')}</Text>
-            </LinearGradient>
+        <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} />
+        {renderKarmaTopBar()}
+        <ScrollView contentContainerStyle={styles.startScrollContent} showsVerticalScrollIndicator={false}>
+          <View style={[styles.startHero, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
+            <View style={[styles.orbitLarge, { borderColor: colors.cosmicLine }]} />
+            <View style={[styles.orbitSmall, { borderColor: colors.cosmicLine }]} />
+            <Text style={[styles.heroEyebrow, { color: colors.accent }]}>{t('premiumUi.karma.pastPresent')}</Text>
+            <Text style={[styles.startTitle, { color: colors.textInverse }]}>{uiText.startTitle}</Text>
+            <Text style={[styles.startSubtitle, { color: colors.textInverseMuted }]}>{uiText.startSubtitle}</Text>
+            <View style={[styles.readingForRow, { borderTopColor: colors.cosmicLine }]}>
+              <View style={[styles.readingAvatar, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}><Text style={[styles.readingAvatarText, { color: colors.accent }]}>{nativeName?.charAt(0)?.toUpperCase()}</Text></View>
+              <View style={styles.readingForCopy}><Text style={[styles.readingForLabel, { color: colors.textInverseMuted }]}>{t('premiumUi.karma.readingFor')}</Text><Text style={[styles.readingForName, { color: colors.textInverse }]}>{nativeName}</Text></View>
+              <TouchableOpacity onPress={() => navigation.navigate('SelectNative', { returnTo: 'KarmaAnalysis' })}><Text style={[styles.changeChartText, { color: colors.accent }]}>{t('premiumUi.common.change')}</Text></TouchableOpacity>
+            </View>
+          </View>
+          <View style={styles.includedSection}>
+            <Text style={[styles.sectionEyebrow, { color: colors.primaryStrong }]}>{t('premiumUi.karma.whatTaraExplores')}</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('premiumUi.karma.deeperSynthesis')}</Text>
+            {[
+              ['repeat-outline', t('premiumUi.karma.repeatingThemes'), t('premiumUi.karma.repeatingBody')],
+              ['git-branch-outline', t('premiumUi.karma.karmicSignatures'), t('premiumUi.karma.signaturesBody')],
+              ['compass-outline', t('premiumUi.karma.pathForward'), t('premiumUi.karma.pathBody')],
+            ].map(([icon, title, body], index) => (
+              <View key={title} style={[styles.includedRow, index < 2 && { borderBottomColor: colors.cardBorder, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+                <View style={[styles.includedIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name={icon} size={20} color={colors.primaryStrong} /></View>
+                <View style={styles.includedCopy}><Text style={[styles.includedTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.includedBody, { color: colors.textSecondary }]}>{body}</Text></View>
+              </View>
+            ))}
+          </View>
+          <TouchableOpacity style={[styles.startButton, { backgroundColor: colors.primary }]} onPress={handleStartAnalysis}>
+            <Ionicons name="sparkles-outline" size={18} color={colors.onPrimary} />
+            <Text style={[styles.startButtonText, { color: colors.onPrimary }]}>{isIosKarmaStudy ? 'Start Study' : t('karmaAnalysis.startButton')}</Text>
+            <View style={[styles.creditPill, { backgroundColor: colors.primaryStrong }]}><Text style={[styles.creditPillText, { color: colors.onPrimary }]}>{t('premiumUi.karma.credits', { count: karmaCost })}</Text></View>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
         <AnalysisCreditModal
           visible={showStartModal}
           onClose={() => setShowStartModal(false)}
@@ -775,41 +752,8 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <LinearGradient colors={screenGradientWithAccent} style={styles.backgroundGradient}>
-        {renderKarmaTopBar({
-          nativeInteractive: true,
-          rightSlot: (
-            <>
-              <TouchableOpacity
-                onPress={generateKarmaPDF}
-                style={[
-                  styles.headerIconBtn,
-                  { backgroundColor: headerIconBg, borderColor: headerIconBorder },
-                  generatingPDF && styles.headerIconBtnDisabled,
-                ]}
-                disabled={generatingPDF}
-                activeOpacity={0.75}
-                accessibilityRole="button"
-                accessibilityLabel={t('karmaAnalysis.a11ySharePdf')}
-              >
-                {generatingPDF ? (
-                  <ActivityIndicator size="small" color={colors.accent} />
-                ) : (
-                  <Ionicons name="share-outline" size={21} color={colors.accent} />
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleRegenerate}
-                style={[styles.headerIconBtn, { backgroundColor: headerIconBg, borderColor: headerIconBorder }]}
-                activeOpacity={0.75}
-                accessibilityRole="button"
-                accessibilityLabel={t('karmaAnalysis.a11yRegenerate')}
-              >
-                <Ionicons name="refresh" size={22} color={colors.accent} />
-              </TouchableOpacity>
-            </>
-          ),
-        })}
+      <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} />
+        {renderKarmaTopBar({ showActions: true })}
         <AnalysisCreditModal
           visible={showRegenerateModal}
           onClose={() => setShowRegenerateModal(false)}
@@ -836,14 +780,18 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           bounces={true}
         >
           <Animated.View style={{ opacity: Platform.OS === 'web' ? 1 : fadeAnim }}>
-            <View style={[styles.headerContainer, { backgroundColor: isDark ? 'rgba(255,215,0,0.08)' : colors.surface }]}>
-              <View style={[styles.headerGlow, { backgroundColor: isDark ? 'rgba(255,215,0,0.15)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.3)' : colors.cardBorder }]}>
-                <Text style={styles.omHeader}>🕉️</Text>
-                <Text style={[styles.title, { color: colors.accent }]}>{uiText.resultTitle}</Text>
-                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{uiText.resultSubtitle}</Text>
-                <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,215,0,0.3)' : colors.cardBorder }]} />
+            <View style={[styles.resultHero, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
+              <View style={[styles.orbitLarge, { borderColor: colors.cosmicLine }]} />
+              <Text style={[styles.heroEyebrow, { color: colors.accent }]}>{t('premiumUi.karma.karmicMap')}</Text>
+              <Text style={[styles.resultTitle, { color: colors.textInverse }]}>{uiText.resultTitle}</Text>
+              <Text style={[styles.resultSubtitle, { color: colors.textInverseMuted }]}>{uiText.resultSubtitle}</Text>
+              <View style={[styles.resultMeta, { borderTopColor: colors.cosmicLine }]}>
+                <TouchableOpacity onPress={() => navigation.navigate('SelectNative', { returnTo: 'KarmaAnalysis' })}><Text style={[styles.resultMetaLabel, { color: colors.textInverseMuted }]}>{t('premiumUi.karma.readingForChange')}</Text><Text style={[styles.resultMetaValue, { color: colors.textInverse }]}>{nativeName}</Text></TouchableOpacity>
+                <View style={styles.resultMetaRight}><Text style={[styles.resultMetaLabel, { color: colors.textInverseMuted }]}>{t('premiumUi.karma.chapters')}</Text><Text style={[styles.resultMetaValue, { color: colors.accent }]}>{sectionKeys.length}</Text></View>
               </View>
             </View>
+
+            <View style={styles.readingHeading}><Text style={[styles.sectionEyebrow, { color: colors.primaryStrong }]}>{t('premiumUi.karma.interpretation')}</Text><Text style={[styles.sectionTitle, { color: colors.text }]}>{t('premiumUi.karma.karmicChapters')}</Text></View>
 
             {sectionKeys.map((key, index) => (
               <KarmaCard
@@ -852,38 +800,31 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
                 content={sections[key]}
                 index={index}
                 colors={colors}
-                isDark={isDark}
                 resolveSectionTitle={resolveSectionTitle}
               />
             ))}
 
             <View style={styles.footerContainer}>
-              <View style={[styles.footerGradient, { backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.15)' : colors.cardBorder }]}>
-                <Text style={styles.footerIcon}>✨</Text>
-                <Text style={[styles.footerText, { color: colors.textSecondary }]}>{uiText.footerAnalyzedBy}</Text>
+              <View style={[styles.footerGradient, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
+                <View style={[styles.footerIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="sparkles-outline" size={20} color={colors.primaryStrong} /></View>
+                <Text style={[styles.footerText, { color: colors.text }]}>{uiText.footerAnalyzedBy}</Text>
                 <Text style={[styles.footerSubtext, { color: colors.textSecondary }]}>{uiText.footerAI}</Text>
               </View>
             </View>
           </Animated.View>
         </ScrollView>
-      </LinearGradient>
     </View>
   );
 };
 
-const KarmaCard = ({ title, content, index, colors = {}, isDark = true, resolveSectionTitle }) => {
-  const [expanded, setExpanded] = useState(true);
-  const icons = ['🕉️', '🌟', '🎯', '⚖️', '💎', '🔱', '👪', '🦋', '🙏', '⏳', '🕉️'];
-  
+const KarmaCard = ({ title, content, index, colors, resolveSectionTitle }) => {
+  const [expanded, setExpanded] = useState(index === 0);
+  const icons = ['book-outline', 'repeat-outline', 'git-branch-outline', 'scale-outline', 'diamond-outline', 'flame-outline', 'people-outline', 'leaf-outline', 'hand-left-outline', 'hourglass-outline'];
   const displayTitle = resolveSectionTitle ? resolveSectionTitle(title) : title;
-  const isIntroduction = title === 'Introduction';
-  const cardStyle = isIntroduction 
-    ? { backgroundColor: isDark ? 'rgba(218, 165, 32, 0.9)' : (colors.cardBackground || colors.surface), borderColor: isDark ? 'rgba(218, 165, 32, 1)' : (colors.cardBorder || colors.primary) }
-    : { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : (colors.cardBackground || colors.surface), borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : (colors.cardBorder || colors.primary) };
 
   const formatContent = (text) => {
     // Clean up text first
-    const cleanText = text.trim();
+    const cleanText = String(text || '').trim();
     
     // Split by markdown patterns while preserving them
     const parts = [];
@@ -926,10 +867,6 @@ const KarmaCard = ({ title, content, index, colors = {}, isDark = true, resolveS
     });
   };
 
-  const contentColor = colors.text || 'rgba(255,255,255,0.95)';
-  const accentColor = colors.accent || '#FFD700';
-  const introHighlightColor = isDark ? '#4a0080' : (colors.primary || colors.text);
-
   const renderFormattedText = (text) => {
     // Split by single or double newlines to get paragraphs
     const paragraphs = text.split(/\n+/).filter(p => p.trim().length > 0);
@@ -939,15 +876,15 @@ const KarmaCard = ({ title, content, index, colors = {}, isDark = true, resolveS
         {paragraphs.map((para, paraIndex) => {
           const parts = formatContent(para);
           return (
-            <Text key={paraIndex} style={[styles.cardContent, { color: contentColor }, paraIndex > 0 && styles.paragraphSpacing]}>
+            <Text key={paraIndex} style={[styles.cardContent, { color: colors.textSecondary }, paraIndex > 0 && styles.paragraphSpacing]}>
               {parts.map((part, index) => (
                 <Text
                   key={index}
                   style={[
                     styles.cardContent,
-                    { color: contentColor },
-                    part.style === 'bold' && (isIntroduction ? { fontWeight: '700', color: introHighlightColor } : { fontWeight: '700', color: accentColor }),
-                    part.style === 'italic' && (isIntroduction ? { fontStyle: 'italic', color: introHighlightColor } : { fontStyle: 'italic', color: accentColor }),
+                    { color: colors.textSecondary },
+                    part.style === 'bold' && { fontWeight: '800', color: colors.text },
+                    part.style === 'italic' && { fontStyle: 'italic', color: colors.primaryStrong },
                   ]}
                 >
                   {index === 0 ? part.text.trimStart() : part.text}
@@ -960,27 +897,23 @@ const KarmaCard = ({ title, content, index, colors = {}, isDark = true, resolveS
     );
   };
 
-  const iconCircleStyle = isIntroduction
-    ? (isDark ? { backgroundColor: 'rgba(139, 69, 19, 0.3)', borderColor: 'rgba(139, 69, 19, 0.6)' } : { backgroundColor: colors.surface, borderColor: colors.cardBorder })
-    : (isDark ? { backgroundColor: 'rgba(255, 215, 0, 0.2)', borderColor: 'rgba(255, 215, 0, 0.4)' } : { backgroundColor: colors.surface, borderColor: colors.cardBorder });
-
   return (
     <View style={styles.cardWrapper}>
-      <View style={[styles.glassCard, cardStyle]}>
+      <View style={[styles.glassCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
         <TouchableOpacity 
           style={styles.cardHeader}
           onPress={() => setExpanded(!expanded)}
           activeOpacity={0.8}
         >
-          <View style={[styles.iconCircle, isIntroduction && styles.introIconCircle, iconCircleStyle]}>
-            <Text style={styles.cardIcon}>{icons[index % icons.length]}</Text>
+          <View style={[styles.iconCircle, { backgroundColor: expanded ? colors.selectionSurface : colors.accentSoft, borderColor: expanded ? colors.selectionBorder : colors.cardBorder }]}>
+            <Ionicons name={icons[index % icons.length]} size={20} color={expanded ? colors.selectionText : colors.primaryStrong} />
           </View>
-          <Text style={[styles.cardTitle, { color: colors.text || '#fff' }]}>{displayTitle}</Text>
-          <Text style={[styles.expandIcon, { color: colors.textSecondary || 'rgba(255,255,255,0.8)' }]}>{expanded ? '▼' : '▶'}</Text>
+          <View style={styles.cardTitleWrap}><Text style={[styles.cardNumber, { color: colors.primaryStrong }]}>{String(index + 1).padStart(2, '0')}</Text><Text style={[styles.cardTitle, { color: colors.text }]}>{displayTitle}</Text></View>
+          <View style={[styles.expandIcon, { backgroundColor: expanded ? colors.primary : colors.surfaceMuted }]}><Ionicons name={expanded ? 'remove' : 'add'} size={18} color={expanded ? colors.onPrimary : colors.textSecondary} /></View>
         </TouchableOpacity>
         {expanded && (
           <View style={styles.cardContentContainer}>
-            <View style={[styles.contentDivider, { backgroundColor: colors.cardBorder || 'rgba(255,255,255,0.2)' }]} />
+            <View style={[styles.contentDivider, { backgroundColor: colors.cardBorder }]} />
             {renderFormattedText(content)}
           </View>
         )}
@@ -989,7 +922,7 @@ const KarmaCard = ({ title, content, index, colors = {}, isDark = true, resolveS
   );
 };
 
-const styles = StyleSheet.create({
+const legacyStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1a0033',
@@ -1115,7 +1048,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   progressBarContainer: {
-    width: width * 0.7,
+    width: '70%',
     marginTop: 20,
     alignItems: 'center',
   },
@@ -1380,6 +1313,85 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1a0033',
   },
+});
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  karmaTopBar: { minHeight: 77, paddingHorizontal: 18, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  karmaTopBarCopy: { flex: 1 },
+  karmaTopBarEyebrow: { ...typographyTokens.eyebrow, fontSize: 8, marginBottom: 3 },
+  karmaTopBarTitle: { ...typographyTokens.sectionTitle, fontSize: 22 },
+  headerActions: { flexDirection: 'row', gap: 8 },
+  headerIconBtn: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 34 },
+  cosmicLoader: { width: 66, height: 66, borderRadius: 33, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  spinner: { marginBottom: 15 },
+  loadingTitle: { ...typographyTokens.sectionTitle, fontSize: 23, textAlign: 'center' },
+  loadingSubtitle: { fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 },
+  progressBarContainer: { width: '78%', marginTop: 22, alignItems: 'center' },
+  progressBarBackground: { width: '100%', height: 6, borderRadius: 3, overflow: 'hidden' },
+  progressBarFill: { height: '100%', borderRadius: 3 },
+  progressText: { fontSize: 11, fontWeight: '800', marginTop: 8 },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 34 },
+  errorIcon: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: 17 },
+  errorTitle: { ...typographyTokens.sectionTitle, fontSize: 23, textAlign: 'center', marginBottom: 8 },
+  errorText: { fontSize: 14, lineHeight: 21, textAlign: 'center', marginBottom: 22 },
+  retryButton: { minHeight: 46, borderRadius: 23, paddingHorizontal: 26, alignItems: 'center', justifyContent: 'center' },
+  retryText: { fontSize: 13, fontWeight: '800' },
+  errorBackRow: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 11, paddingHorizontal: 18, borderRadius: 22, borderWidth: 1 },
+  errorBackRowText: { fontSize: 13, fontWeight: '700' },
+  startScrollContent: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 44 },
+  startHero: { borderRadius: 28, borderWidth: 1, padding: 24, overflow: 'hidden' },
+  orbitLarge: { position: 'absolute', width: 184, height: 184, borderRadius: 92, borderWidth: 1, right: -78, top: -88 },
+  orbitSmall: { position: 'absolute', width: 120, height: 120, borderRadius: 60, borderWidth: 1, right: -12, top: -62 },
+  heroEyebrow: { ...typographyTokens.eyebrow, fontSize: 9, marginBottom: 14 },
+  startTitle: { ...typographyTokens.display, fontSize: 38, lineHeight: 42, maxWidth: 290 },
+  startSubtitle: { fontSize: 15, lineHeight: 23, marginTop: 12, maxWidth: 300 },
+  readingForRow: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 24, paddingTop: 17, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  readingAvatar: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  readingAvatarText: { ...typographyTokens.sectionTitle, fontSize: 18 },
+  readingForCopy: { flex: 1 },
+  readingForLabel: { ...typographyTokens.eyebrow, fontSize: 8, marginBottom: 2 },
+  readingForName: { ...typographyTokens.sectionTitle, fontSize: 17 },
+  changeChartText: { fontSize: 12, fontWeight: '800' },
+  includedSection: { paddingVertical: 27 },
+  sectionEyebrow: { ...typographyTokens.eyebrow, fontSize: 9, marginBottom: 5 },
+  sectionTitle: { ...typographyTokens.sectionTitle, fontSize: 25 },
+  includedRow: { minHeight: 80, flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13 },
+  includedIcon: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  includedCopy: { flex: 1 },
+  includedTitle: { ...typographyTokens.sectionTitle, fontSize: 17, marginBottom: 3 },
+  includedBody: { fontSize: 12, lineHeight: 18 },
+  startButton: { minHeight: 56, borderRadius: 28, paddingHorizontal: 17, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  startButtonText: { flex: 1, fontSize: 14, fontWeight: '800' },
+  creditPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  creditPillText: { fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4 },
+  scrollContent: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 46 },
+  resultHero: { borderRadius: 28, borderWidth: 1, padding: 24, overflow: 'hidden', marginBottom: 28 },
+  resultTitle: { ...typographyTokens.display, fontSize: 38, lineHeight: 42, maxWidth: 290 },
+  resultSubtitle: { fontSize: 15, lineHeight: 22, marginTop: 10 },
+  resultMeta: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 22, paddingTop: 17, flexDirection: 'row', justifyContent: 'space-between' },
+  resultMetaRight: { alignItems: 'flex-end' },
+  resultMetaLabel: { ...typographyTokens.eyebrow, fontSize: 8, marginBottom: 4 },
+  resultMetaValue: { ...typographyTokens.sectionTitle, fontSize: 17 },
+  readingHeading: { marginBottom: 14 },
+  cardWrapper: { marginBottom: 11 },
+  glassCard: { borderRadius: 21, borderWidth: 1, overflow: 'hidden' },
+  cardHeader: { minHeight: 76, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 12 },
+  iconCircle: { width: 44, height: 44, borderRadius: 15, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  cardTitleWrap: { flex: 1 },
+  cardNumber: { ...typographyTokens.eyebrow, fontSize: 8, marginBottom: 3 },
+  cardTitle: { ...typographyTokens.sectionTitle, fontSize: 17, lineHeight: 21 },
+  expandIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  cardContentContainer: { paddingHorizontal: 17, paddingBottom: 20 },
+  contentDivider: { height: StyleSheet.hairlineWidth, marginBottom: 16 },
+  cardContent: { fontSize: 14, lineHeight: 23 },
+  paragraphSpacing: { marginTop: 13 },
+  footerContainer: { marginTop: 22, marginBottom: 10 },
+  footerGradient: { borderRadius: 20, padding: 22, alignItems: 'center', borderWidth: 1 },
+  footerIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 11 },
+  footerText: { ...typographyTokens.sectionTitle, fontSize: 16, marginBottom: 4, textAlign: 'center' },
+  footerSubtext: { fontSize: 11, textAlign: 'center' },
 });
 
 export default KarmaAnalysisScreen;

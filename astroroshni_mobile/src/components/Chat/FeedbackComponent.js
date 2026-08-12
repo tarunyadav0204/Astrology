@@ -12,13 +12,15 @@ import {
 } from 'react-native';
 import { chatAPI } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 
 /** Same listing as web chat + AstroRoshni homepage CTA. */
 const ANDROID_PACKAGE_NAME = 'com.astroroshni.mobile';
 const GOOGLE_PLAY_LISTING_URL =
   `https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE_NAME}&showAllReviews=true&pcampaignid=web_share`;
 
-function FeedbackPlayStoreRow({ colors, theme }) {
+function FeedbackPlayStoreRow({ colors, t }) {
   const openPlay = async () => {
     if (Platform.OS === 'android') {
       try {
@@ -31,7 +33,7 @@ function FeedbackPlayStoreRow({ colors, theme }) {
     try {
       await Linking.openURL(GOOGLE_PLAY_LISTING_URL);
     } catch (_) {
-      Alert.alert('Could not open Play Store', 'Please search for AstroRoshni in the Play Store.');
+      Alert.alert(t('premiumUi.chat.playStoreError'), t('premiumUi.chat.playStoreSearch'));
     }
   };
   return (
@@ -41,31 +43,32 @@ function FeedbackPlayStoreRow({ colors, theme }) {
         style={[
           styles.playLinkButton,
           {
-            borderColor: theme === 'dark' ? 'rgba(96, 165, 250, 0.45)' : 'rgba(15, 71, 160, 0.25)',
-            backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(255, 255, 255, 0.85)',
+            borderColor: colors.cardBorder,
+            backgroundColor: colors.surfaceMuted,
           },
         ]}
         onPress={openPlay}
         activeOpacity={0.85}
         accessibilityRole="link"
-        accessibilityLabel="Leave a rating on Google Play"
+        accessibilityLabel={t('premiumUi.chat.rateOnPlay')}
       >
         <View style={styles.playIconBadge}>
           <Text style={styles.playIconText}>▶</Text>
         </View>
-        <Text style={[styles.playLinkLabel, { color: theme === 'dark' ? '#93c5fd' : '#0f47a0' }]}>
-          Leave a rating on Google Play
+        <Text style={[styles.playLinkLabel, { color: colors.text }]}>
+          {t('premiumUi.chat.rateOnPlay')}
         </Text>
       </TouchableOpacity>
       <Text style={[styles.playHint, { color: colors.textSecondary || '#6b7280' }]}>
-        Helps others discover the app
+        {t('premiumUi.chat.ratingHelps')}
       </Text>
     </>
   );
 }
 
 export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
-  const { theme, colors } = useTheme();
+  const { colors } = useTheme();
+  const { t } = useTranslation();
   const [feedback, setFeedback] = useState({ rating: 0, comment: '', submitted: false });
   const [visible, setVisible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -144,57 +147,75 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
         styles.container,
         {
           opacity: visible ? fadeAnim : 0,
-          minHeight: 72,
-          backgroundColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.05)' : 'rgba(249, 115, 22, 0.1)',
-          borderColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.2)' : 'rgba(249, 115, 22, 0.3)',
+          minHeight: 58,
+          backgroundColor: colors.surface,
+          borderColor: colors.cardBorder,
         },
       ]}
       pointerEvents={visible ? 'auto' : 'none'}
     >
       {feedback.submitted ? (
         <>
-          <Text style={[styles.thanksText, { color: colors.primary }]}>Thanks for your feedback! 🙏</Text>
+          <Text style={[styles.thanksText, { color: colors.primary }]}>{t('premiumUi.chat.feedbackThanks')} 🙏</Text>
           {feedback.rating >= 4 && (
-            <FeedbackPlayStoreRow colors={colors} theme={theme} />
+            <FeedbackPlayStoreRow colors={colors} t={t} />
           )}
         </>
       ) : (
         <>
-          <Text style={[styles.title, { color: colors.text }]}>How was this answer?</Text>
-          <View style={styles.starsContainer}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity
-                key={star}
-                onPress={() => handleStarPress(star)}
-                style={styles.starButton}
-              >
-                <Text style={[
-                  styles.starIcon,
-                  { color: star <= feedback.rating ? '#FFD700' : '#999' }
-                ]}>★</Text>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.ratingRow}>
+            <View style={styles.ratingPrompt}>
+              <Text style={[styles.eyebrow, { color: colors.primary }]}>{t('premiumUi.chat.answerFeedback')}</Text>
+              <Text style={[styles.title, { color: colors.text }]}>{t('premiumUi.chat.wasUseful')}</Text>
+            </View>
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity
+                  key={star}
+                  onPress={() => handleStarPress(star)}
+                  style={styles.starButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('premiumUi.chat.rateAnswer', { rating: star })}
+                  accessibilityState={{ selected: star <= feedback.rating }}
+                >
+                  <Ionicons
+                    name={star <= feedback.rating ? 'star' : 'star-outline'}
+                    size={22}
+                    color={star <= feedback.rating ? colors.accent : colors.textTertiary}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              onPress={handleSkip}
+              style={styles.dismissButton}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('premiumUi.chat.dismissFeedback')}
+            >
+              <Ionicons name="close" size={17} color={colors.textTertiary} />
+            </TouchableOpacity>
           </View>
           {feedback.rating > 0 && (
             <>
               <TextInput
-                style={[styles.commentInput, { 
+                style={[styles.commentInput, {
                   color: colors.text,
-                  borderColor: theme === 'dark' ? '#E0E0E0' : 'rgba(249, 115, 22, 0.3)',
-                  backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(249, 115, 22, 0.05)'
+                  borderColor: colors.cardBorder,
+                  backgroundColor: colors.surfaceMuted,
                 }]}
-                placeholder="Tell us more (optional)"
-                placeholderTextColor={theme === 'dark' ? '#999' : 'rgba(0, 0, 0, 0.4)'}
+                placeholder={t('premiumUi.chat.tellMore')}
+                placeholderTextColor={colors.textTertiary}
                 multiline
                 value={feedback.comment}
                 onChangeText={(text) => setFeedback(prev => ({ ...prev, comment: text }))}
               />
               <View style={styles.buttonsContainer}>
-                <TouchableOpacity style={styles.submitButton} onPress={submitFeedback}>
-                  <Text style={styles.submitButtonText}>Submit</Text>
+                <TouchableOpacity style={[styles.submitButton, { backgroundColor: colors.primary }]} onPress={submitFeedback}>
+                  <Text style={[styles.submitButtonText, { color: colors.onPrimary }]}>{t('premiumUi.chat.sendFeedback')}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-                  <Text style={[styles.skipButtonText, { color: colors.text }]}>Skip</Text>
+                <TouchableOpacity style={[styles.skipButton, { borderColor: colors.cardBorder }]} onPress={handleSkip}>
+                  <Text style={[styles.skipButtonText, { color: colors.textSecondary }]}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -207,62 +228,77 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 8,
-    padding: 12,
-    borderRadius: 8,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 18,
     borderWidth: 1,
-    marginHorizontal: 16,
+    marginHorizontal: 12,
+  },
+  ratingRow: {
+    minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ratingPrompt: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  eyebrow: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 1,
   },
   title: {
-    fontSize: 13,
-    marginBottom: 8,
-    textAlign: 'center',
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '700',
   },
   starsContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 8,
+    alignItems: 'center',
   },
   starButton: {
-    padding: 4,
+    paddingHorizontal: 3,
+    paddingVertical: 5,
   },
-  starIcon: {
-    fontSize: 20,
+  dismissButton: {
+    paddingLeft: 7,
+    paddingVertical: 7,
   },
   commentInput: {
     borderWidth: 1,
-    borderRadius: 6,
-    padding: 8,
-    marginTop: 8,
-    minHeight: 60,
+    borderRadius: 14,
+    padding: 11,
+    marginTop: 10,
+    minHeight: 68,
     textAlignVertical: 'top',
     fontSize: 14,
   },
   buttonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginTop: 10,
   },
   submitButton: {
-    backgroundColor: '#ff6b35',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingVertical: 10,
+    borderRadius: 999,
     flex: 1,
     marginRight: 8,
   },
   submitButtonText: {
-    color: 'white',
-    fontWeight: '600',
+    fontWeight: '800',
     textAlign: 'center',
   },
   skipButton: {
     backgroundColor: 'transparent',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingVertical: 10,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(249, 115, 22, 0.3)',
   },
   skipButtonText: {
     textAlign: 'center',

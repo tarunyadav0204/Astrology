@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  StatusBar,
   FlatList,
   RefreshControl,
   Alert,
@@ -20,20 +19,21 @@ import { reportAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import { downloadPdfToLocalUri, sharePDFOnWhatsApp } from '../../utils/pdfGenerator';
 import { goBackOrHome } from '../../navigation/navHelpers';
+import FocusedStatusBar from '../Common/FocusedStatusBar';
 
 const STATUS_META = {
-  completed: { icon: 'checkmark-circle', tint: '#22c55e' },
-  processing: { icon: 'hourglass-outline', tint: '#f59e0b' },
-  pending: { icon: 'time-outline', tint: '#f59e0b' },
-  failed: { icon: 'close-circle', tint: '#f43f5e' },
+  completed: { icon: 'checkmark-circle', tone: 'success' },
+  processing: { icon: 'hourglass-outline', tone: 'warning' },
+  pending: { icon: 'time-outline', tone: 'warning' },
+  failed: { icon: 'close-circle', tone: 'error' },
 };
 
 const REPORT_TYPE_META = {
-  partnership: { icon: '💞', gradient: ['#fb7185', '#f97316'] },
-  career: { icon: '💼', gradient: ['#6366F1', '#8B5CF6'] },
-  wealth: { icon: '💰', gradient: ['#0EA5E9', '#38BDF8'] },
-  health: { icon: '🏥', gradient: ['#22c55e', '#15803d'] },
-  progeny: { icon: '👶', gradient: ['#ec4899', '#a855f7'] },
+  partnership: { icon: 'people-outline' },
+  career: { icon: 'briefcase-outline' },
+  wealth: { icon: 'wallet-outline' },
+  health: { icon: 'fitness-outline' },
+  progeny: { icon: 'happy-outline' },
 };
 
 const normalize = (value) => String(value || '').trim().toLowerCase();
@@ -50,8 +50,7 @@ const formatDate = (value, locale = 'en-IN') => {
 export default function ReportHistoryScreen({ navigation }) {
   useAnalytics('ReportHistoryScreen');
   const { t, i18n } = useTranslation();
-  const { theme, colors } = useTheme();
-  const isDark = theme === 'dark';
+  const { colors } = useTheme();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -171,13 +170,14 @@ export default function ReportHistoryScreen({ navigation }) {
   const renderItem = ({ item }) => {
     const reportMeta = REPORT_TYPE_META[item.report_type] || REPORT_TYPE_META.partnership;
     const statusMeta = STATUS_META[normalize(item.status)] || STATUS_META.pending;
+    const statusColor = colors[statusMeta.tone] || colors.primary;
     const isOpening = openingId === item.report_id;
     const dateLabel = formatDate(item.completed_at || item.created_at, i18n.language === 'en' ? 'en-IN' : undefined);
     return (
-      <View style={[styles.card, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface, borderColor: colors.cardBorder }]}>
+      <View style={[styles.card, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
         <View style={styles.cardTopRow}>
-          <View style={[styles.iconWrap, { backgroundColor: `${reportMeta.gradient[0]}18` }]}>
-            <Text style={styles.iconText}>{reportMeta.icon}</Text>
+          <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
+            <Ionicons name={reportMeta.icon} size={22} color={colors.onAccent} />
           </View>
           <View style={styles.cardBody}>
             <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
@@ -189,9 +189,9 @@ export default function ReportHistoryScreen({ navigation }) {
                 : item.subtitle || t('reports.historySubtitleFallback', 'Generated report')}
             </Text>
             <View style={styles.metaRow}>
-              <View style={[styles.statusPill, { backgroundColor: `${statusMeta.tint}18` }]}>
-                <Ionicons name={statusMeta.icon} size={12} color={statusMeta.tint} />
-                <Text style={[styles.statusText, { color: statusMeta.tint }]}>
+              <View style={[styles.statusPill, { backgroundColor: colors.surfaceMuted }]}>
+                <Ionicons name={statusMeta.icon} size={12} color={statusColor} />
+                <Text style={[styles.statusText, { color: statusColor }]}>
                   {t(`reports.status.${normalize(item.status)}`, item.status || 'pending')}
                 </Text>
               </View>
@@ -211,18 +211,18 @@ export default function ReportHistoryScreen({ navigation }) {
           <TouchableOpacity
             onPress={() => openReport(item)}
             disabled={isOpening || normalize(item.status) !== 'completed'}
-            style={[styles.primaryButton, { backgroundColor: isDark ? colors.primary : colors.primary }, (isOpening || normalize(item.status) !== 'completed') && styles.disabledButton]}
+            style={[styles.primaryButton, { backgroundColor: colors.primary }, (isOpening || normalize(item.status) !== 'completed') && styles.disabledButton]}
           >
             {isOpening ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.onPrimary} />
             ) : (
-              <Text style={styles.primaryButtonText}>{t('reports.openPdf', 'Open PDF')}</Text>
+              <Text style={[styles.primaryButtonText, { color: colors.onPrimary }]}>{t('reports.openPdf', 'Open PDF')}</Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => shareReport(item)}
             disabled={isOpening || normalize(item.status) !== 'completed'}
-            style={[styles.secondaryButton, { borderColor: colors.cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : colors.surface }, (isOpening || normalize(item.status) !== 'completed') && styles.disabledButton]}
+            style={[styles.secondaryButton, { borderColor: colors.cardBorder, backgroundColor: colors.surface }, (isOpening || normalize(item.status) !== 'completed') && styles.disabledButton]}
           >
             <Text style={[styles.secondaryButtonText, { color: colors.text }]}>{t('reports.sharePdf', 'Share PDF')}</Text>
           </TouchableOpacity>
@@ -233,35 +233,33 @@ export default function ReportHistoryScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
-      <LinearGradient
-        colors={isDark ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd] : [colors.background, colors.backgroundSecondary, colors.backgroundTertiary]}
-        style={styles.gradient}
-      >
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
-            <View style={styles.headerTopRow}>
-              <TouchableOpacity
-                onPress={() => goBackOrHome(navigation)}
-                style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]}
-              >
-                <Ionicons name="arrow-back" size={22} color={colors.text} />
-              </TouchableOpacity>
-              <View style={[styles.headerBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : colors.surface }]}>
-                <Ionicons name="time-outline" size={14} color={colors.primary} />
-                <Text style={[styles.headerBadgeText, { color: colors.text }]}>
-                  {t('reports.historyTitle', 'Report History')}
-                </Text>
-              </View>
-            </View>
+      <FocusedStatusBar backgroundColor={colors.headerSurface} />
+      <LinearGradient colors={[colors.background, colors.backgroundSecondary, colors.background]} style={styles.gradient}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.headerSurface }]} edges={['top']}>
+          <View
+            style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cardBorder }]}
+          >
+            <TouchableOpacity
+              onPress={() => goBackOrHome(navigation)}
+              style={[styles.backButton, { borderColor: colors.cosmicLine || colors.cardBorder }]}
+            >
+              <Ionicons name="arrow-back" size={22} color={colors.textInverse} />
+            </TouchableOpacity>
             <View style={styles.headerTextWrap}>
-              <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1} ellipsizeMode="tail">
+              <Text style={[styles.headerEyebrow, { color: colors.accent }]}>{t('historyUi.library')}</Text>
+              <Text style={[styles.headerTitle, { color: colors.textInverse }]} numberOfLines={1} ellipsizeMode="tail">
                 {t('reports.historyTitle', 'Report History')}
               </Text>
-              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]} numberOfLines={2} ellipsizeMode="tail">
-                {t('reports.historySubtitle', 'Open past reports, share them again, or review what you already generated.')}
-              </Text>
             </View>
+            <View style={[styles.headerBadge, { backgroundColor: colors.accentSoft }]}>
+              <Text style={[styles.headerBadgeText, { color: colors.onAccent }]}>{history.length}</Text>
+            </View>
+          </View>
+
+          <View style={[styles.contentShell, { backgroundColor: colors.background }]}>
+          <View style={styles.intro}>
+            <Text style={[styles.introTitle, { color: colors.text }]}>{t('historyUi.report.heroTitle')}</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{t('reports.historySubtitle', 'Open past reports, share them again, or review what you already generated.')}</Text>
           </View>
 
           {loading ? (
@@ -301,6 +299,7 @@ export default function ReportHistoryScreen({ navigation }) {
               )}
             />
           )}
+          </View>
         </SafeAreaView>
       </LinearGradient>
     </View>
@@ -310,40 +309,42 @@ export default function ReportHistoryScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   gradient: { flex: 1 },
-  safeArea: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
+  safeArea: { flex: 1 },
+  contentShell: { flex: 1 },
   header: {
-    gap: 10,
-    marginBottom: 14,
-  },
-  headerTopRow: {
+    minHeight: 78,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+    borderBottomWidth: 1,
   },
   backButton: {
     width: 42,
     height: 42,
     borderRadius: 21,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerBadge: {
-    flexDirection: 'row',
+    minWidth: 38,
+    height: 34,
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
     paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 18,
+    borderRadius: 17,
   },
-  headerBadgeText: { fontSize: 11, fontWeight: '900' },
+  headerBadgeText: { fontSize: 13, fontWeight: '900' },
   headerTextWrap: {
     flex: 1,
     minWidth: 0,
-    paddingRight: 4,
+    paddingHorizontal: 14,
   },
-  headerTitle: { fontSize: 20, fontWeight: '900' },
-  headerSubtitle: { fontSize: 12, marginTop: 3, lineHeight: 17 },
+  headerEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+  headerTitle: { fontSize: 23, fontFamily: 'serif', fontWeight: '600', marginTop: 2 },
+  intro: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20 },
+  introTitle: { fontSize: 31, lineHeight: 36, fontFamily: 'serif', fontWeight: '500' },
+  headerSubtitle: { fontSize: 14, marginTop: 8, lineHeight: 21, maxWidth: 470 },
   loadingState: {
     flex: 1,
     alignItems: 'center',
@@ -352,12 +353,14 @@ const styles = StyleSheet.create({
   },
   loadingText: { fontSize: 13, fontWeight: '700' },
   listContent: {
-    paddingBottom: 28,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
     gap: 12,
   },
   emptyListContent: {
     flexGrow: 1,
     justifyContent: 'center',
+    paddingHorizontal: 20,
   },
   card: {
     borderWidth: 1,
@@ -377,7 +380,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconText: { fontSize: 22 },
   cardBody: { flex: 1 },
   cardTitle: { fontSize: 15, fontWeight: '900' },
   cardSubtitle: { fontSize: 12, marginTop: 4, lineHeight: 17 },

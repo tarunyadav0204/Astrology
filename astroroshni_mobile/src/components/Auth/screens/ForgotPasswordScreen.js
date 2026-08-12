@@ -1,602 +1,159 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-  Alert,
-  ScrollView,
-  Keyboard,
-  Modal,
-  FlatList,
-  Platform,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, FlatList, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
+import { useTheme } from '../../../context/ThemeContext';
 import { authAPI } from '../../../services/api';
-import {
-  COUNTRY_CODES,
-  getNationalPhoneMaxLength,
-  isNationalPhoneValid,
-} from '../countryCodes';
 import { apiErrorMessage } from '../../../utils/apiErrorMessage';
+import { COUNTRY_CODES, getNationalPhoneMaxLength, isNationalPhoneValid } from '../countryCodes';
+import AuthKeyboardScreen from './AuthKeyboardScreen';
+import AppAlertModal from '../../Common/AppAlertModal';
 
-export default function ForgotPasswordScreen({ 
-  formData, 
-  updateFormData, 
-  navigateToScreen 
-}) {
+export default function ForgotPasswordScreen({ formData, updateFormData, navigateToScreen }) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1); // 1: phone, 2: code, 3: new password
   const [resetToken, setResetToken] = useState('');
-  const [localNewPassword, setLocalNewPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
-  const [selectedCountry, setSelectedCountry] = useState(
-    () => COUNTRY_CODES.find((c) => c.code === (formData.countryCode || '+91')) || COUNTRY_CODES[2]
-  );
-
-  const nationalDigits = (formData.phone || '').replace(/[^0-9]/g, '');
-  const fullPhone = `${selectedCountry.code}${nationalDigits}`;
-  const isPhoneValid = isNationalPhoneValid(selectedCountry.code, nationalDigits);
-  /** India (+91): reset OTP is SMS-only; backend does not require email (see `send_reset_code`). */
-  const isIndiaSmsReset = selectedCountry.code === '+91';
-
-  useEffect(() => {
-    const match = COUNTRY_CODES.find((c) => c.code === formData.countryCode);
-    if (match) setSelectedCountry(match);
-  }, [formData.countryCode]);
-  
-  const inputAnim = useRef(new Animated.Value(0)).current;
-  const buttonAnim = useRef(new Animated.Value(50)).current;
-  const scrollViewRef = useRef(null);
+  const [appAlert, setAppAlert] = useState(null);
+  const [country, setCountry] = useState(() => COUNTRY_CODES.find((item) => item.code === (formData.countryCode || '+91')) || COUNTRY_CODES[2]);
+  const entrance = useRef(new Animated.Value(0)).current;
+  const digits = String(formData.phone || '').replace(/\D/g, '');
+  const fullPhone = `${country.code}${digits}`;
+  const phoneValid = isNationalPhoneValid(country.code, digits);
+  const indiaSms = country.code === '+91';
+  const emailPresent = Boolean(String(formData.email || '').trim());
+  const stepValid = step === 1 ? phoneValid && (indiaSms || emailPresent) : step === 2 ? String(formData.resetCode || '').length === 6 : newPassword.length >= 8 && /\d/.test(newPassword);
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(inputAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonAnim, {
-        toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+    Animated.timing(entrance, { toValue: 1, duration: 380, useNativeDriver: true }).start();
+  }, [entrance, step]);
 
-  useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
-      if (scrollViewRef.current) {
-        scrollViewRef.current.scrollToEnd({ animated: true });
-      }
-    });
-
-    return () => {
-      keyboardDidShowListener?.remove();
-    };
-  }, []);
-
-  const handleSendCode = async () => {
-    if (!nationalDigits) {
-      Alert.alert('Error', 'Please enter phone number');
-      return;
-    }
-    if (!isPhoneValid) {
-      Alert.alert(
-        'Error',
-        selectedCountry.code === '+91' || selectedCountry.code === '+1'
-          ? 'Enter a valid 10-digit phone number'
-          : 'Please enter a valid phone number for the selected country'
-      );
-      return;
-    }
-    if (!isIndiaSmsReset && !(formData.email || '').trim()) {
-      Alert.alert('Error', 'Please enter your email address');
-      return;
-    }
-
+  const sendCode = async () => {
+    if (!stepValid) return;
     setLoading(true);
+    const buildPayload = (phone) => ({ phone, ...(!indiaSms ? { email: String(formData.email || '').trim() } : {}) });
     try {
-      const buildPayload = (phoneVal) => {
-        const base = { phone: phoneVal };
-        if (!isIndiaSmsReset) {
-          base.email = (formData.email || '').trim();
-        }
-        return base;
-      };
-      let response;
       try {
-        response = await authAPI.sendResetCode(buildPayload(fullPhone));
+        await authAPI.sendResetCode(buildPayload(fullPhone));
       } catch (error) {
-        // Match PasswordScreen login: DB may store 10-digit local while UI sends +91…
-        if (
-          error.response?.status === 404 &&
-          nationalDigits &&
-          fullPhone !== nationalDigits
-        ) {
-          response = await authAPI.sendResetCode(buildPayload(nationalDigits));
-        } else {
-          throw error;
-        }
+        if (error?.response?.status === 404 && fullPhone !== digits) await authAPI.sendResetCode(buildPayload(digits));
+        else throw error;
       }
-      const okMsg = response?.data?.message;
-      const defaultOk = isIndiaSmsReset
-        ? 'Check your phone for the reset code (SMS).'
-        : 'Check your email for the reset code.';
-      Alert.alert(
-        'Success',
-        typeof okMsg === 'string' && okMsg.trim() ? okMsg.trim() : defaultOk,
-      );
+      setAppAlert({ variant: 'success', title: t('authDeep.codeSentTitle', 'Code sent'), message: indiaSms ? t('authDeep.resetSmsSent', 'Check your phone for the reset code.') : t('authDeep.resetEmailSent', 'Check your email for the reset code.') });
+      entrance.setValue(0);
       setStep(2);
     } catch (error) {
-      Alert.alert('Error', apiErrorMessage(error, 'Phone number not found'));
-    } finally {
-      setLoading(false);
-    }
+      setAppAlert({ variant: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, t('authDeep.accountNotFound', 'We could not find that account.')) });
+    } finally { setLoading(false); }
   };
 
-  const handleVerifyCode = async () => {
-    if (!formData.resetCode) {
-      Alert.alert('Error', 'Please enter verification code');
-      return;
-    }
-
+  const verifyCode = async () => {
+    if (!stepValid) return;
     setLoading(true);
     try {
-      const response = await authAPI.verifyResetCode({
-        phone: fullPhone,
-        code: formData.resetCode
-      });
+      const response = await authAPI.verifyResetCode({ phone: fullPhone, code: formData.resetCode });
       setResetToken(response.data.reset_token);
-      setLocalNewPassword(''); // Reset password field
-      Alert.alert('Success', 'Code verified! Enter new password.');
+      setNewPassword('');
+      entrance.setValue(0);
       setStep(3);
     } catch (error) {
-      Alert.alert('Error', apiErrorMessage(error, 'Invalid or expired code'));
-    } finally {
-      setLoading(false);
-    }
+      setAppAlert({ variant: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, t('authDeep.resetCodeInvalid', 'That code is invalid or has expired.')) });
+    } finally { setLoading(false); }
   };
 
-  const handleResetPassword = async () => {
-    if (!localNewPassword) {
-      Alert.alert('Error', 'Please enter new password');
-      return;
-    }
-
+  const resetPassword = async () => {
+    if (!stepValid) return;
     setLoading(true);
     try {
-      await authAPI.resetPasswordWithToken({
-        token: resetToken,
-        new_password: localNewPassword
-      });
-      Alert.alert('Success', 'Password reset successfully!', [
-        { text: 'OK', onPress: () => navigateToScreen('welcome') }
-      ]);
+      await authAPI.resetPasswordWithToken({ token: resetToken, new_password: newPassword });
+      setAppAlert({ variant: 'success', title: t('authDeep.passwordChangedTitle', 'Password changed'), message: t('authDeep.passwordChangedBody', 'Your new password is ready. You can sign in now.'), primaryText: t('authDeep.returnToSignIn', 'Return to sign in'), onPrimaryPress: () => navigateToScreen('phone', 'back') });
     } catch (error) {
-      Alert.alert('Error', apiErrorMessage(error, 'Password reset failed'));
-    } finally {
-      setLoading(false);
-    }
+      setAppAlert({ variant: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, t('authDeep.resetFailed', 'We could not reset your password.')) });
+    } finally { setLoading(false); }
   };
 
-  const renderStep = () => {
-    switch (step) {
-      case 1:
-        return (
-          <>
-            <View style={styles.header}>
-              <Text style={styles.emoji}>📱</Text>
-              <Text style={styles.title}>Reset Password</Text>
-              <Text style={styles.subtitle}>
-                {isIndiaSmsReset
-                  ? 'Enter your phone number. We will send a reset code by SMS.'
-                  : 'Enter your phone number and email. We will send a reset code to your email.'}
-              </Text>
-            </View>
+  const meta = step === 1
+    ? { title: t('authDeep.resetTitle', 'Recover your account'), subtitle: indiaSms ? t('authDeep.resetPhoneSubtitle', 'We’ll send a secure reset code to your phone') : t('authDeep.resetEmailPhoneSubtitle', 'Confirm your phone and email to receive a secure reset code'), action: t('authDeep.sendCode', 'Send reset code') }
+    : step === 2
+      ? { title: t('authDeep.resetCodeTitle', 'Enter reset code'), subtitle: t('authDeep.resetCodeSubtitle', { destination: indiaSms ? fullPhone : formData.email, defaultValue: 'Enter the 6-digit code sent to {{destination}}' }), action: t('authDeep.verifyCode', 'Verify code') }
+      : { title: t('authDeep.newPasswordTitle', 'Create a new password'), subtitle: t('authDeep.newPasswordSubtitle', 'Use at least 8 characters and include one number'), action: t('authDeep.savePassword', 'Save new password') };
 
-            <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
-              <View style={[styles.inputWrapper, isPhoneValid && styles.inputValid]}>
-                <TouchableOpacity
-                  style={styles.countryCode}
-                  onPress={() => setShowCountryPicker(true)}
-                >
-                  <Text style={styles.countryText}>
-                    {selectedCountry.flag} {selectedCountry.code}
-                  </Text>
-                  <Ionicons
-                    name="chevron-down"
-                    size={16}
-                    color="rgba(255, 255, 255, 0.7)"
-                    style={{ marginLeft: 4 }}
-                  />
-                </TouchableOpacity>
-                <TextInput
-                  style={styles.input}
-                  placeholder={
-                    selectedCountry.code === '+91' || selectedCountry.code === '+1'
-                      ? '10-digit number'
-                      : 'Phone Number'
-                  }
-                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                  value={formData.phone}
-                  onChangeText={(value) => {
-                    const digits = value.replace(/[^0-9]/g, '');
-                    const maxLen = getNationalPhoneMaxLength(selectedCountry.code);
-                    updateFormData('phone', digits.slice(0, maxLen));
-                  }}
-                  keyboardType="phone-pad"
-                  autoFocus
-                  maxLength={getNationalPhoneMaxLength(selectedCountry.code)}
-                />
-                {isPhoneValid ? (
-                  <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-                ) : null}
-              </View>
-            </Animated.View>
-
-            {!isIndiaSmsReset ? (
-              <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="mail-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Email Address"
-                    placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                    value={formData.email}
-                    onChangeText={(value) => updateFormData('email', value)}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                </View>
-              </Animated.View>
-            ) : null}
-
-            <Animated.View style={[styles.buttonContainer, { transform: [{ translateY: buttonAnim }] }]}>
-              <TouchableOpacity
-                style={[styles.continueButton, (!isPhoneValid || loading) && styles.buttonDisabled]}
-                onPress={handleSendCode}
-                disabled={loading || !isPhoneValid}
-              >
-                <LinearGradient
-                  colors={isPhoneValid && !loading ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
-                  style={styles.buttonGradient}
-                >
-                  <Text style={styles.buttonText}>
-                    {loading ? 'Sending...' : 'Send Code'}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </Animated.View>
-          </>
-        );
-
-      case 2:
-        return (
-          <>
-            <View style={styles.header}>
-              <Text style={styles.emoji}>🔐</Text>
-              <Text style={styles.title}>Enter Code</Text>
-              <Text style={styles.subtitle}>
-                {isIndiaSmsReset
-                  ? `We've sent a 6-digit code by SMS to\n${fullPhone}`
-                  : `We've sent a 6-digit code to\n${(formData.email || '').trim() ? formData.email.trim() : fullPhone}`}
-              </Text>
-            </View>
-
-            <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="keypad-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter 6-digit Code"
-                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                  value={formData.resetCode}
-                  onChangeText={(value) => updateFormData('resetCode', value)}
-                  keyboardType="numeric"
-                  maxLength={6}
-                  autoFocus
-                />
-              </View>
-            </Animated.View>
-
-            <Animated.View style={[styles.buttonContainer, { transform: [{ translateY: buttonAnim }] }]}>
-              <TouchableOpacity
-                style={styles.continueButton}
-                onPress={handleVerifyCode}
-                disabled={loading}
-              >
-                <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.buttonGradient}>
-                  <Text style={styles.buttonText}>
-                    {loading ? 'Verifying...' : 'Verify Code'}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </Animated.View>
-          </>
-        );
-
-      case 3:
-        return (
-          <>
-            <View style={styles.header}>
-              <Text style={styles.emoji}>🔄</Text>
-              <Text style={styles.title}>New Password</Text>
-              <Text style={styles.subtitle}>Enter your new password</Text>
-            </View>
-
-            <Animated.View style={[styles.inputContainer, { opacity: inputAnim }]}>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="lock-closed-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
-                <TextInput
-                  key="newPassword"
-                  style={styles.input}
-                  placeholder="New Password"
-                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                  value={localNewPassword}
-                  onChangeText={setLocalNewPassword}
-                  secureTextEntry={!showPassword}
-                  autoFocus
-                  editable={true}
-                  selectTextOnFocus={true}
-                  textContentType="newPassword"
-                />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <Ionicons 
-                    name={showPassword ? "eye-off-outline" : "eye-outline"} 
-                    size={20} 
-                    color="rgba(255, 255, 255, 0.5)" 
-                  />
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-
-            <Animated.View style={[styles.buttonContainer, { transform: [{ translateY: buttonAnim }] }]}>
-              <TouchableOpacity
-                style={styles.continueButton}
-                onPress={handleResetPassword}
-                disabled={loading}
-              >
-                <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.buttonGradient}>
-                  <Text style={styles.buttonText}>
-                    {loading ? 'Resetting...' : 'Reset Password'}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </Animated.View>
-          </>
-        );
-    }
+  const back = () => {
+    if (step === 1) navigateToScreen('password', 'back');
+    else { entrance.setValue(0); setStep(step - 1); }
   };
 
   return (
     <>
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+      <AuthKeyboardScreen
+        emoji="✦"
+        title={meta.title}
+        subtitle={meta.subtitle}
+        onBack={back}
+        action={<TouchableOpacity style={[styles.action, { backgroundColor: stepValid ? colors.accent : colors.surfaceMuted }]} onPress={step === 1 ? sendCode : step === 2 ? verifyCode : resetPassword} disabled={!stepValid || loading}><Text style={[styles.actionText, { color: stepValid ? colors.onAccent : colors.textTertiary }]}>{loading ? t('authDeep.pleaseWait', 'Please wait…') : meta.action}</Text><Ionicons name="arrow-forward" size={19} color={stepValid ? colors.onAccent : colors.textTertiary} /></TouchableOpacity>}
       >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigateToScreen('password', 'back')}
-        >
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-
-        <View style={styles.content}>{renderStep()}</View>
-      </ScrollView>
-
-      <Modal
-        visible={showCountryPicker}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowCountryPicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Country</Text>
-              <TouchableOpacity onPress={() => setShowCountryPicker(false)}>
-                <Ionicons name="close" size={24} color="#ffffff" />
-              </TouchableOpacity>
+        <Animated.View style={{ opacity: entrance, transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
+          {step === 1 && <>
+            <View style={[styles.inputWrap, { backgroundColor: colors.cosmicRaised, borderColor: phoneValid ? colors.accent : colors.cosmicLine }]}>
+              <TouchableOpacity style={[styles.countryButton, { borderRightColor: colors.cosmicLine }]} onPress={() => setShowCountryPicker(true)}><Text style={[styles.countryLabel, { color: colors.textInverse }]}>{country.flag} {country.code}</Text><Ionicons name="chevron-down" size={15} color={colors.textInverseMuted} /></TouchableOpacity>
+              <TextInput style={[styles.input, { color: colors.textInverse }]} value={formData.phone} onChangeText={(value) => updateFormData('phone', value.replace(/\D/g, '').slice(0, getNationalPhoneMaxLength(country.code)))} placeholder={t('authDeep.phonePlaceholder', 'Phone number')} placeholderTextColor={colors.textInverseMuted} keyboardType="phone-pad" autoFocus />
+              {phoneValid && <Ionicons name="checkmark-circle" size={22} color={colors.accent} />}
             </View>
-            <FlatList
-              data={COUNTRY_CODES}
-              keyExtractor={(item) => item.code}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.countryItem}
-                  onPress={() => {
-                    setSelectedCountry(item);
-                    updateFormData('countryCode', item.code);
-                    const maxLen = getNationalPhoneMaxLength(item.code);
-                    const current = (formData.phone || '').replace(/[^0-9]/g, '');
-                    updateFormData('phone', current.slice(0, maxLen));
-                    setShowCountryPicker(false);
-                  }}
-                >
-                  <Text style={styles.countryFlag}>{item.flag}</Text>
-                  <View style={styles.countryInfo}>
-                    <Text style={styles.countryName}>{item.name}</Text>
-                    <Text style={styles.countryCodeText}>{item.code}</Text>
-                  </View>
-                  {selectedCountry.code === item.code ? (
-                    <Ionicons name="checkmark" size={24} color="#4CAF50" />
-                  ) : null}
-                </TouchableOpacity>
-              )}
-            />
+            {!indiaSms && <View style={[styles.inputWrap, styles.secondInput, { backgroundColor: colors.cosmicRaised, borderColor: emailPresent ? colors.accent : colors.cosmicLine }]}><Ionicons name="mail-outline" size={20} color={colors.textInverseMuted} /><TextInput style={[styles.input, { color: colors.textInverse }]} value={formData.email} onChangeText={(value) => updateFormData('email', value)} placeholder={t('authDeep.emailPlaceholder', 'Email address')} placeholderTextColor={colors.textInverseMuted} keyboardType="email-address" autoCapitalize="none" /></View>}
+          </>}
+          {step === 2 && <View style={[styles.inputWrap, { backgroundColor: colors.cosmicRaised, borderColor: stepValid ? colors.accent : colors.cosmicLine }]}><Ionicons name="keypad-outline" size={20} color={colors.textInverseMuted} /><TextInput style={[styles.input, styles.codeInput, { color: colors.textInverse }]} value={formData.resetCode} onChangeText={(value) => updateFormData('resetCode', value.replace(/\D/g, '').slice(0, 6))} placeholder="••••••" placeholderTextColor={colors.textInverseMuted} keyboardType="number-pad" autoFocus maxLength={6} /></View>}
+          {step === 3 && <View style={[styles.inputWrap, { backgroundColor: colors.cosmicRaised, borderColor: stepValid ? colors.accent : colors.cosmicLine }]}><Ionicons name="lock-closed-outline" size={20} color={colors.textInverseMuted} /><TextInput style={[styles.input, { color: colors.textInverse }]} value={newPassword} onChangeText={setNewPassword} placeholder={t('authDeep.newPasswordPlaceholder', 'New password')} placeholderTextColor={colors.textInverseMuted} secureTextEntry={!showPassword} autoFocus /><TouchableOpacity onPress={() => setShowPassword((value) => !value)}><Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textInverseMuted} /></TouchableOpacity></View>}
+          <View style={styles.stepRow}>{[1, 2, 3].map((value) => <View key={value} style={[styles.stepDot, { backgroundColor: value <= step ? colors.accent : colors.cosmicLine }]} />)}</View>
+        </Animated.View>
+      </AuthKeyboardScreen>
+
+      <Modal visible={showCountryPicker} transparent animationType="slide" onRequestClose={() => setShowCountryPicker(false)}>
+        <View style={[styles.overlay, { backgroundColor: colors.overlay }]}>
+          <View style={[styles.sheet, { backgroundColor: colors.surfaceInverse, borderColor: colors.cosmicLine }]}>
+            <View style={[styles.sheetHeader, { borderBottomColor: colors.cosmicLine }]}><Text style={[styles.sheetTitle, { color: colors.textInverse }]}>{t('authDeep.selectCountry', 'Select country')}</Text><TouchableOpacity onPress={() => setShowCountryPicker(false)}><Ionicons name="close" size={23} color={colors.textInverse} /></TouchableOpacity></View>
+            <FlatList data={COUNTRY_CODES} keyExtractor={(item) => item.code} renderItem={({ item }) => <TouchableOpacity style={[styles.countryRow, { borderBottomColor: colors.cosmicLine }]} onPress={() => { setCountry(item); updateFormData('countryCode', item.code); updateFormData('phone', digits.slice(0, getNationalPhoneMaxLength(item.code))); setShowCountryPicker(false); }}><Text style={styles.flag}>{item.flag}</Text><View style={styles.countryCopy}><Text style={[styles.countryName, { color: colors.textInverse }]}>{item.name}</Text><Text style={[styles.countryDial, { color: colors.textInverseMuted }]}>{item.code}</Text></View>{country.code === item.code && <Ionicons name="checkmark-circle" size={22} color={colors.accent} />}</TouchableOpacity>} />
           </View>
         </View>
       </Modal>
+      <AppAlertModal
+        visible={appAlert != null}
+        variant={appAlert?.variant || 'info'}
+        title={appAlert?.title || ''}
+        message={appAlert?.message || ''}
+        primaryText={appAlert?.primaryText || t('common.ok', 'OK')}
+        onPrimaryPress={() => {
+          const next = appAlert?.onPrimaryPress;
+          setAppAlert(null);
+          next?.();
+        }}
+        onRequestClose={() => setAppAlert(null)}
+      />
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 150,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 600,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 60,
-  },
-  emoji: {
-    fontSize: 60,
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  inputContainer: {
-    marginBottom: 40,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-  },
-  inputValid: {
-    borderColor: '#4CAF50',
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-  },
-  countryCode: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingRight: 12,
-    borderRightWidth: 1,
-    borderRightColor: 'rgba(255, 255, 255, 0.2)',
-    marginRight: 12,
-  },
-  countryText: {
-    fontSize: 16,
-    color: '#ffffff',
-    fontWeight: '600',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#1a1a2e',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '70%',
-    paddingBottom: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  countryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  countryFlag: {
-    fontSize: 28,
-    marginRight: 12,
-  },
-  countryInfo: {
-    flex: 1,
-  },
-  countryName: {
-    fontSize: 16,
-    color: '#ffffff',
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  countryCodeText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  input: {
-    flex: 1,
-    fontSize: 18,
-    color: '#ffffff',
-    paddingVertical: 16,
-    fontWeight: '500',
-    ...(Platform.OS === 'web'
-      ? { outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none' }
-      : null),
-  },
-  buttonContainer: {
-    marginBottom: 100,
-  },
-  continueButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.85,
-  },
-  buttonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    gap: 8,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
+  inputWrap: { minHeight: 66, borderRadius: 19, borderWidth: 1, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  secondInput: { marginTop: 11 },
+  input: { flex: 1, fontSize: 17, paddingVertical: 14, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : null) },
+  codeInput: { textAlign: 'center', letterSpacing: 7, fontSize: 24, fontWeight: '700' },
+  countryButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingRight: 11, borderRightWidth: 1 },
+  countryLabel: { fontSize: 15, fontWeight: '700' },
+  action: { minHeight: 58, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  actionText: { fontSize: 16, fontWeight: '800' },
+  stepRow: { flexDirection: 'row', justifyContent: 'center', gap: 7, marginTop: 22 },
+  stepDot: { width: 26, height: 3, borderRadius: 2 },
+  overlay: { flex: 1, justifyContent: 'flex-end' },
+  sheet: { maxHeight: '74%', borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, paddingBottom: 18 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1 },
+  sheetTitle: { fontSize: 23, fontFamily: 'serif', fontWeight: '600' },
+  countryRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  flag: { fontSize: 25, marginRight: 13 },
+  countryCopy: { flex: 1 },
+  countryName: { fontSize: 16, fontWeight: '700' },
+  countryDial: { fontSize: 13, marginTop: 2 },
 });

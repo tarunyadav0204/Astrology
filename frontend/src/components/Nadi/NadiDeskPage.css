@@ -87,7 +87,7 @@
 }
 
 .nadi-desk__brand {
-  color: var(--color-accent-soft);
+  color: var(--color-text-inverse);
   font-family: var(--font-display);
   font-size: 1.05rem;
   font-weight: 400;
@@ -453,6 +453,7 @@
 }
 
 .nadi-desk__chart svg [stroke="#111111"] { stroke: var(--color-text) !important; }
+.nadi-desk__chart svg [fill="#2d3436"] { fill: var(--color-text) !important; }
 .nadi-desk__chart svg :is([fill="#333"], [fill="#666"]) { fill: var(--color-text-muted) !important; }
 .nadi-desk__chart svg [fill="#9f1239"] { fill: var(--color-brand) !important; }
 

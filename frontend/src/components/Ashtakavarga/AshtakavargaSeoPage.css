@@ -37,6 +37,24 @@
   justify-content: flex-start;
 }
 
+/* The hero uses the inverse surface. Accent-soft can be nearly identical to
+   that surface in light inverse palettes such as Oxford Tan, so hero copy must
+   use the inverse foreground contract instead of an accent foreground. */
+.ashtakavarga-seo-page .analysis-detail-hero .analysis-detail-kicker {
+  color: var(--color-text-inverse-muted);
+}
+
+.ashtakavarga-seo-page .analysis-detail-hero .analysis-detail-title__icon {
+  color: var(--color-text-inverse);
+  border-color: var(--color-border-inverse);
+}
+
+.ashtakavarga-seo-page .analysis-detail-hero .career-detail-primary {
+  color: var(--color-on-accent);
+  background: color-mix(in srgb, var(--color-text-inverse) 18%, var(--color-accent-soft));
+  border: 1px solid var(--color-border-inverse);
+}
+
 .ashtakavarga-seo-hero__visual {
   position: relative;
   z-index: 1;

@@ -14,15 +14,19 @@ import { COLORS } from '../../../utils/constants';
 import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
 import { registrationEmailRequiredForCountry } from '../countryCodes';
 import AuthKeyboardScreen from './AuthKeyboardScreen';
+import { useTheme } from '../../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
-export default function NameInputScreen({ 
-  formData, 
-  updateFormData, 
-  navigateToScreen 
+export default function NameInputScreen({
+  formData,
+  updateFormData,
+  navigateToScreen
 }) {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
   const isValid = formData.name.trim().length >= 2;
   const emailRequiredForRegistration = registrationEmailRequiredForCountry(formData.countryCode || '+91');
-  
+
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
 
@@ -60,9 +64,9 @@ export default function NameInputScreen({
 
   return (
     <AuthKeyboardScreen
-      emoji="👋"
-      title="What's your name?"
-      subtitle="Help us personalize your chart experience"
+      emoji="✦"
+      title={t('authOnboarding.nameTitle', 'What should Tara call you?')}
+      subtitle={t('authOnboarding.nameSubtitle', 'This personalizes your chart experience')}
       onBack={() => navigateToScreen('otp', 'back')}
       action={(
         <Animated.View
@@ -79,11 +83,11 @@ export default function NameInputScreen({
             disabled={!isValid}
           >
             <LinearGradient
-              colors={isValid ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
+              colors={isValid ? [colors.accent, colors.accent] : [colors.surfaceMuted, colors.surfaceMuted]}
               style={styles.buttonGradient}
             >
               <Text style={styles.buttonText}>Continue</Text>
-              <Ionicons name="arrow-forward" size={20} color="#ffffff" />
+              <Ionicons name="arrow-forward" size={20} color={isValid ? colors.onAccent : colors.textTertiary} />
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
@@ -105,19 +109,19 @@ export default function NameInputScreen({
           },
         ]}
       >
-        <View style={[styles.inputWrapper, isValid && styles.inputValid]}>
-          <Ionicons name="person-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
+        <View style={[styles.inputWrapper, { borderColor: isValid ? colors.accent : colors.cosmicLine, backgroundColor: colors.cosmicRaised }]}>
+          <Ionicons name="person-outline" size={20} color={colors.textInverseMuted} />
           <TextInput
             style={styles.input}
             placeholder="Full Name"
-            placeholderTextColor="rgba(255, 255, 255, 0.5)"
+            placeholderTextColor={colors.textInverseMuted}
             value={formData.name}
             onChangeText={(value) => updateFormData('name', value)}
             autoFocus
             autoCapitalize="words"
           />
           {isValid && (
-            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+            <Ionicons name="checkmark-circle" size={24} color={colors.accent} />
           )}
         </View>
       </Animated.View>

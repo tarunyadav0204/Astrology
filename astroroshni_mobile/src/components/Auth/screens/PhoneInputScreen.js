@@ -24,16 +24,20 @@ import {
 } from '../countryCodes';
 import { trackAcquisitionFunnelEvent, updateAcquisitionLeadContact } from '../../../services/acquisitionTracking';
 import AuthKeyboardScreen from './AuthKeyboardScreen';
+import { useTheme } from '../../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import AuthLegalNotice from '../AuthLegalNotice';
 
-export default function PhoneInputScreen({ 
-  formData, 
-  updateFormData, 
-  navigateToScreen, 
+export default function PhoneInputScreen({
+  formData,
+  updateFormData,
+  navigateToScreen,
   isLogin,
   setIsLogin,
   navigation,
 }) {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [isValid, setIsValid] = useState(false);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
@@ -43,7 +47,7 @@ export default function PhoneInputScreen({
   );
   const modeKnown = isLogin === true || isLogin === false;
   const registrationUsesEmailOtp = isLogin === false && registrationEmailRequiredForCountry(selectedCountry.code);
-  
+
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
   const lastAutoSubmitPhoneRef = useRef('');
@@ -84,16 +88,16 @@ export default function PhoneInputScreen({
     const phoneIsValid = isNationalPhoneValid(selectedCountry.code, phoneForSubmit);
     if (!phoneIsValid || loading) return;
     setPhoneError('');
-    
+
     // Construct full phone number with country code
     const fullPhone = `${selectedCountry.code}${phoneForSubmit}`;
-    
+
     console.log('📱 Phone Input - handleContinue');
     console.log('  Local phone:', phoneForSubmit);
     console.log('  Country code:', selectedCountry.code);
     console.log('  Full phone:', fullPhone);
     console.log('  Is login:', isLogin);
-    
+
     if (isLogin === true) {
       updateFormData('countryCode', selectedCountry.code);
       updateAcquisitionLeadContact({ phone: fullPhone }).catch(() => {});
@@ -221,8 +225,8 @@ export default function PhoneInputScreen({
   return (
     <>
       <AuthKeyboardScreen
-        emoji="📱"
-        title={isLogin === true ? 'Welcome back!' : "What's your number?"}
+        emoji="✦"
+        title={isLogin === true ? t('authOnboarding.welcomeBack', 'Welcome back') : t('authOnboarding.phoneTitle', 'Your phone number')}
         subtitle={
           isLogin === true
             ? 'Enter your phone number to sign in'
@@ -286,13 +290,13 @@ export default function PhoneInputScreen({
               disabled={!isValid || loading}
             >
               <LinearGradient
-                colors={isValid ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
+              colors={isValid ? [colors.accent, colors.accent] : [colors.surfaceMuted, colors.surfaceMuted]}
                 style={styles.buttonGradient}
               >
                 <Text style={styles.buttonText}>
                   {loading ? 'Checking...' : 'Continue'}
                 </Text>
-                <Ionicons name="arrow-forward" size={20} color="#ffffff" />
+                <Ionicons name="arrow-forward" size={20} color={isValid ? colors.onAccent : colors.textTertiary} />
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
@@ -314,18 +318,18 @@ export default function PhoneInputScreen({
               },
             ]}
           >
-            <View style={[styles.inputWrapper, isValid && styles.inputValid]}>
+            <View style={[styles.inputWrapper, { borderColor: isValid ? colors.accent : colors.cosmicLine, backgroundColor: colors.cosmicRaised }]}>
               <TouchableOpacity
                 style={styles.countryCode}
                 onPress={() => setShowCountryPicker(true)}
               >
                 <Text style={styles.countryText}>{selectedCountry.flag} {selectedCountry.code}</Text>
-                <Ionicons name="chevron-down" size={16} color="rgba(255, 255, 255, 0.7)" style={{ marginLeft: 4 }} />
+                <Ionicons name="chevron-down" size={16} color={colors.textInverseMuted} style={{ marginLeft: 4 }} />
               </TouchableOpacity>
               <TextInput
                 style={styles.input}
                 placeholder="Phone Number"
-                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                placeholderTextColor={colors.textInverseMuted}
                 value={formData.phone}
                 onChangeText={handlePhoneChange}
                 keyboardType="number-pad"
@@ -335,7 +339,7 @@ export default function PhoneInputScreen({
                 maxLength={getNationalPhoneMaxLength(selectedCountry.code)}
               />
               {isValid && (
-                <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                <Ionicons name="checkmark-circle" size={24} color={colors.accent} />
               )}
             </View>
             {!!phoneError && isLogin === false && (

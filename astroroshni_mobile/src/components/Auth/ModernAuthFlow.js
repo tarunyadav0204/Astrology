@@ -22,7 +22,8 @@ import SuccessScreen from './screens/SuccessScreen';
 import WelcomeAfterRegistrationScreen from './screens/WelcomeAfterRegistrationScreen';
 import ChooseLanguageScreen from './screens/ChooseLanguageScreen';
 
-import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
+import FocusedStatusBar from '../Common/FocusedStatusBar';
 
 const { width } = Dimensions.get('window');
 
@@ -84,6 +85,7 @@ const INITIAL_FORM_DATA = {
 };
 
 export default function ModernAuthFlow({ navigation, route }) {
+  const { colors } = useTheme();
   const [currentScreen, setCurrentScreen] = useState('phone');
   const [isLogin, setIsLogin] = useState(null);
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
@@ -250,11 +252,12 @@ export default function ModernAuthFlow({ navigation, route }) {
 
   return (
     <View style={styles.container}>
+      <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
       <LinearGradient
-        colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']}
+        colors={[colors.headerSurface, colors.surfaceInverse, colors.cosmicRaised || colors.surfaceInverse]}
         style={styles.gradient}
       >
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]}>
           <Animated.View
             style={[
               styles.screenContainer,

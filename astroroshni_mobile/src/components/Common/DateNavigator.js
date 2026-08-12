@@ -1,8 +1,25 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Modal, ActivityIndicator } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { COLORS } from '../../utils/constants';
 import WebDatePickerModal from './WebDatePickerModal';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTheme } from '../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
+
+const INTL_LOCALES = {
+  english: 'en-IN',
+  hindi: 'hi-IN',
+  es: 'es-ES',
+  french: 'fr-FR',
+  german: 'de-DE',
+  russian: 'ru-RU',
+  chinese: 'zh-CN',
+  mandarin: 'zh-CN',
+  tamil: 'ta-IN',
+  telugu: 'te-IN',
+  gujarati: 'gu-IN',
+  marathi: 'mr-IN',
+};
 
 /**
  * Compact date stepper used by ChartScreen transit and KP significators.
@@ -15,7 +32,10 @@ const DateNavigator = ({
   cosmicTheme = false,
   resetDate = null,
   includeTime = false,
+  loading = false,
 }) => {
+  const { colors } = useTheme();
+  const { t, i18n } = useTranslation();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [tempDate, setTempDate] = useState(date);
@@ -57,39 +77,22 @@ const DateNavigator = ({
   };
 
   const safeDate = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date();
-  const dateOnlyLabel = safeDate.toLocaleDateString('en-US', {
+  const intlLocale = INTL_LOCALES[i18n.resolvedLanguage] || INTL_LOCALES[i18n.language] || 'en-IN';
+  const dateOnlyLabel = safeDate.toLocaleDateString(intlLocale, {
     month: 'short',
     day: 'numeric',
     year: '2-digit',
   });
-  const timeLabel = safeDate.toLocaleTimeString('en-US', {
+  const timeLabel = safeDate.toLocaleTimeString(intlLocale, {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
   });
 
-  const shellStyle = cosmicTheme
-    ? {
-        backgroundColor: 'rgba(0, 0, 0, 0.4)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-      }
-    : {
-        backgroundColor: COLORS.surface,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-      };
-
-  const ghostBtn = cosmicTheme
-    ? { backgroundColor: 'rgba(255, 255, 255, 0.15)' }
-    : { backgroundColor: COLORS.lightGray };
-  const accentBtn = cosmicTheme
-    ? { backgroundColor: 'rgba(255, 107, 53, 0.8)' }
-    : { backgroundColor: COLORS.accent };
-  const ghostText = { color: cosmicTheme ? 'rgba(255, 255, 255, 0.9)' : COLORS.accent };
+  const shellStyle = { backgroundColor: colors.surface, borderColor: colors.cardBorder };
+  const ghostBtn = { backgroundColor: colors.surfaceMuted };
+  const accentBtn = { backgroundColor: colors.primary };
+  const ghostText = { color: colors.textSecondary };
 
   const renderPicker = (visible, setVisible, mode) => {
     if (Platform.OS === 'web') {
@@ -98,7 +101,7 @@ const DateNavigator = ({
         <WebDatePickerModal
           visible={visible}
           value={tempDate}
-          title="Select date"
+          title={t('premiumUi.common.selectDate')}
           onClose={() => setVisible(false)}
           onChange={(next) => {
             if (includeTime && next instanceof Date) {
@@ -122,7 +125,7 @@ const DateNavigator = ({
           onRequestClose={() => setVisible(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.datePickerContainer}>
+            <View style={[styles.datePickerContainer, { backgroundColor: colors.surfaceRaised || colors.surface, borderColor: colors.cardBorder }]}>
               <DateTimePicker
                 value={tempDate}
                 mode={mode}
@@ -132,7 +135,7 @@ const DateNavigator = ({
                 }}
               />
               <TouchableOpacity
-                style={styles.doneButton}
+                style={[styles.doneButton, { backgroundColor: colors.primary }]}
                 onPress={() => {
                   if (mode === 'time' && includeTime) {
                     const merged = new Date(safeDate);
@@ -148,7 +151,7 @@ const DateNavigator = ({
                   setVisible(false);
                 }}
               >
-                <Text style={styles.doneButtonText}>Done</Text>
+                <Text style={[styles.doneButtonText, { color: colors.onPrimary }]}>{t('premiumUi.common.done')}</Text>
               </TouchableOpacity>
             </View>
             <TouchableOpacity
@@ -191,58 +194,47 @@ const DateNavigator = ({
     <View style={styles.dateNav}>
       <View style={[styles.navShell, shellStyle]}>
         <View style={styles.compactNavRow}>
-          <View style={styles.navButtonGroup}>
-            <TouchableOpacity style={[styles.compactNavButton, ghostBtn]} onPress={() => adjustDate(-30)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-              <Text style={[styles.compactNavText, ghostText]}>-M</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.compactNavButton, ghostBtn]} onPress={() => adjustDate(-7)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-              <Text style={[styles.compactNavText, ghostText]}>-W</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.compactNavButton, ghostBtn]} onPress={() => adjustDate(-1)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-              <Text style={[styles.compactNavText, ghostText]}>-D</Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.compactDateButton, accentBtn]}
-            onPress={Platform.OS === 'web' ? openDatePicker : handleReset}
-            onLongPress={handleReset}
-            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-          >
-            <Text style={[styles.compactDateText, { color: COLORS.white }]}>{dateOnlyLabel}</Text>
+          <TouchableOpacity style={[styles.dayStepButton, ghostBtn]} onPress={() => adjustDate(-1)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }} accessibilityLabel={t('premiumUi.common.previousDay')}>
+            <Ionicons name="chevron-back" size={18} color={colors.text} />
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.compactCalendarButton, accentBtn]}
+            style={[styles.compactDateButton, { backgroundColor: colors.surfaceRaised || colors.surface, borderColor: colors.cardBorder }]}
             onPress={openDatePicker}
             hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            accessibilityState={{ busy: loading }}
           >
-            <Text style={styles.calendarIcon}>📅</Text>
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Ionicons name="calendar-clear-outline" size={15} color={colors.primary} />
+            )}
+            <Text style={[styles.compactDateText, { color: colors.text }]}>{dateOnlyLabel}</Text>
           </TouchableOpacity>
 
-          <View style={styles.navButtonGroup}>
-            <TouchableOpacity style={[styles.compactNavButton, ghostBtn]} onPress={() => adjustDate(1)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-              <Text style={[styles.compactNavText, ghostText]}>+D</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.compactNavButton, ghostBtn]} onPress={() => adjustDate(7)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-              <Text style={[styles.compactNavText, ghostText]}>+W</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.compactNavButton, ghostBtn]} onPress={() => adjustDate(30)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-              <Text style={[styles.compactNavText, ghostText]}>+M</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={[styles.dayStepButton, ghostBtn]} onPress={() => adjustDate(1)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }} accessibilityLabel={t('premiumUi.common.nextDay')}>
+            <Ionicons name="chevron-forward" size={18} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.rangeRow, { borderTopColor: colors.cardBorder }]}>
+          <TouchableOpacity style={styles.rangeButton} onPress={() => adjustDate(-30)}><Text style={[styles.rangeButtonText, ghostText]}>{t('premiumUi.common.minusMonth')}</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.rangeButton} onPress={() => adjustDate(-7)}><Text style={[styles.rangeButtonText, ghostText]}>{t('premiumUi.common.minusWeek')}</Text></TouchableOpacity>
+          <TouchableOpacity style={[styles.todayButton, { backgroundColor: colors.accentSoft }]} onPress={handleReset}><Text style={[styles.todayButtonText, { color: colors.onAccent }]}>{t('premiumUi.common.today')}</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.rangeButton} onPress={() => adjustDate(7)}><Text style={[styles.rangeButtonText, ghostText]}>{t('premiumUi.common.plusWeek')}</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.rangeButton} onPress={() => adjustDate(30)}><Text style={[styles.rangeButtonText, ghostText]}>{t('premiumUi.common.plusMonth')}</Text></TouchableOpacity>
         </View>
 
         {includeTime ? (
           <View style={[
             styles.timeRow,
-            { borderTopColor: cosmicTheme ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)' },
+            { borderTopColor: colors.cardBorder },
           ]}>
             <TouchableOpacity style={[styles.compactNavButton, ghostBtn]} onPress={() => adjustDate(-1, 'hour')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
               <Text style={[styles.compactNavText, ghostText]}>-H</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.timeChip, accentBtn]} onPress={Platform.OS === 'web' ? undefined : openTimePicker} onLongPress={handleReset}>
-              <Text style={[styles.compactDateText, { color: COLORS.white }]}>{timeLabel}</Text>
+              <Text style={[styles.compactDateText, { color: colors.onPrimary }]}>{timeLabel}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.compactNavButton, ghostBtn]} onPress={() => adjustDate(1, 'hour')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
               <Text style={[styles.compactNavText, ghostText]}>+H</Text>
@@ -259,13 +251,15 @@ const DateNavigator = ({
 
 const styles = StyleSheet.create({
   dateNav: {
+    marginTop: 14,
     marginBottom: 12,
     alignSelf: 'stretch',
   },
   navShell: {
-    borderRadius: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
   },
   modalOverlay: {
     flex: 1,
@@ -282,8 +276,8 @@ const styles = StyleSheet.create({
     zIndex: -1,
   },
   datePickerContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderWidth: 1,
+    borderRadius: 20,
     padding: 16,
     paddingBottom: 20,
     minHeight: 250,
@@ -293,7 +287,39 @@ const styles = StyleSheet.create({
   compactNavRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-evenly',
+    justifyContent: 'space-between',
+  },
+  dayStepButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rangeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 9,
+    paddingTop: 9,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  rangeButton: {
+    paddingVertical: 5,
+    paddingHorizontal: 3,
+  },
+  rangeButtonText: {
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  todayButton: {
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  todayButtonText: {
+    fontSize: 9,
+    fontWeight: '800',
   },
   timeRow: {
     flexDirection: 'row',
@@ -304,10 +330,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  navButtonGroup: {
-    flexDirection: 'row',
-    gap: 6,
   },
   compactNavButton: {
     paddingHorizontal: 6,
@@ -321,12 +343,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   compactDateButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 8,
-    minWidth: 75,
-    height: 32,
+    flex: 1,
+    height: 38,
+    marginHorizontal: 10,
+    paddingHorizontal: 10,
+    borderRadius: 19,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
+    gap: 7,
   },
   timeChip: {
     paddingHorizontal: 14,
@@ -341,19 +367,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
-  compactCalendarButton: {
-    padding: 6,
-    borderRadius: 8,
-    height: 32,
-    width: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  calendarIcon: {
-    fontSize: 16,
-  },
   doneButton: {
-    backgroundColor: COLORS.accent,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
@@ -361,7 +375,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   doneButtonText: {
-    color: COLORS.white,
     fontSize: 16,
     fontWeight: '600',
   },

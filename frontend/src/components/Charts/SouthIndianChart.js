@@ -196,7 +196,7 @@ const SouthIndianChart = ({
     if (status === 'combusted') return '#ff8c00';
     if (status === 'exalted') return '#22c55e';
     if (status === 'debilitated') return '#ef4444';
-    return '#2d3436';
+    return 'var(--color-chart-text, var(--color-text))';
   };
 
   const getPlanetSymbolWithStatus = (planet) => {
@@ -518,34 +518,34 @@ const SouthIndianChart = ({
       
       {/* Outer border */}
       <rect x="0" y="0" width="340" height="340" 
-            fill="url(#southChartGradient)" stroke="#111111" strokeWidth="1.5"/>
+            fill="url(#southChartGradient)" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1.5"/>
       
       {/* Outer house divisions - no center grid */}
       {/* Top row divisions */}
-      <line x1="85" y1="0" x2="85" y2="85" stroke="#111111" strokeWidth="1"/>
-      <line x1="170" y1="0" x2="170" y2="85" stroke="#111111" strokeWidth="1"/>
-      <line x1="255" y1="0" x2="255" y2="85" stroke="#111111" strokeWidth="1"/>
+      <line x1="85" y1="0" x2="85" y2="85" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
+      <line x1="170" y1="0" x2="170" y2="85" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
+      <line x1="255" y1="0" x2="255" y2="85" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
       {/* Bottom row divisions */}
-      <line x1="85" y1="255" x2="85" y2="340" stroke="#111111" strokeWidth="1"/>
-      <line x1="170" y1="255" x2="170" y2="340" stroke="#111111" strokeWidth="1"/>
-      <line x1="255" y1="255" x2="255" y2="340" stroke="#111111" strokeWidth="1"/>
+      <line x1="85" y1="255" x2="85" y2="340" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
+      <line x1="170" y1="255" x2="170" y2="340" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
+      <line x1="255" y1="255" x2="255" y2="340" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
       {/* Left column divisions */}
-      <line x1="0" y1="85" x2="85" y2="85" stroke="#111111" strokeWidth="1"/>
-      <line x1="0" y1="170" x2="85" y2="170" stroke="#111111" strokeWidth="1"/>
-      <line x1="0" y1="255" x2="85" y2="255" stroke="#111111" strokeWidth="1"/>
+      <line x1="0" y1="85" x2="85" y2="85" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
+      <line x1="0" y1="170" x2="85" y2="170" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
+      <line x1="0" y1="255" x2="85" y2="255" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
       {/* Right column divisions */}
-      <line x1="255" y1="85" x2="340" y2="85" stroke="#111111" strokeWidth="1"/>
-      <line x1="255" y1="170" x2="340" y2="170" stroke="#111111" strokeWidth="1"/>
-      <line x1="255" y1="255" x2="340" y2="255" stroke="#111111" strokeWidth="1"/>
+      <line x1="255" y1="85" x2="340" y2="85" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
+      <line x1="255" y1="170" x2="340" y2="170" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
+      <line x1="255" y1="255" x2="340" y2="255" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
       {/* Inner borders of outer houses */}
-      <line x1="0" y1="85" x2="340" y2="85" stroke="#111111" strokeWidth="1.5"/>
-      <line x1="0" y1="255" x2="340" y2="255" stroke="#111111" strokeWidth="1.5"/>
-      <line x1="85" y1="0" x2="85" y2="340" stroke="#111111" strokeWidth="1.5"/>
-      <line x1="255" y1="0" x2="255" y2="340" stroke="#111111" strokeWidth="1.5"/>
+      <line x1="0" y1="85" x2="340" y2="85" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1.5"/>
+      <line x1="0" y1="255" x2="340" y2="255" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1.5"/>
+      <line x1="85" y1="0" x2="85" y2="340" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1.5"/>
+      <line x1="255" y1="0" x2="255" y2="340" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1.5"/>
 
       {/* Instruction text */}
       {showFooterHint ? (
-        <text x="170" y="350" fontSize="9" fill="#666" textAnchor="middle" fontStyle="italic">
+        <text x="170" y="350" fontSize="9" fill="var(--color-chart-text-muted, var(--color-text-muted))" textAnchor="middle" fontStyle="italic">
           Click any house for insights · Hover planets for degree
         </text>
       ) : null}
@@ -614,7 +614,7 @@ const SouthIndianChart = ({
                 {/* House number */}
                 <text x={pos.x + 8} y={pos.y + 18} 
                       fontSize="12" 
-                      fill={customAscendant === pos.sign ? "#e91e63" : "#333"} 
+                      fill={customAscendant === pos.sign ? 'var(--color-brand)' : 'var(--color-chart-text-muted, var(--color-text-muted))'}
                       fontWeight={customAscendant === pos.sign ? "900" : "bold"}
                       style={{ pointerEvents: 'none' }}>
                   {houseNumber}
@@ -629,7 +629,7 @@ const SouthIndianChart = ({
                     </text>
                     {chartData.ascendant && (
                       <text x={pos.x + pos.width - 8} y={pos.y + pos.height - 8} 
-                            fontSize="7" fill="#666" fontWeight="500" textAnchor="end">
+                            fontSize="7" fill="var(--color-chart-text-muted, var(--color-text-muted))" fontWeight="500" textAnchor="end">
                         {formatDegreeDMS(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
                       </text>
                     )}
@@ -638,7 +638,7 @@ const SouthIndianChart = ({
                 
                 {/* Sign name */}
                 <text x={pos.x + pos.width - 8} y={pos.y + 18} 
-                      fontSize="10" fill="#666"
+                      fontSize="10" fill="var(--color-chart-text-muted, var(--color-text-muted))"
                       textAnchor="end"
                       style={{ pointerEvents: 'none' }}>
                   {signs[pos.sign]}
@@ -738,7 +738,7 @@ const SouthIndianChart = ({
                         <text x={planetX} 
                               y={planetY + 8} 
                               fontSize={totalPlanets > 4 ? "6" : totalPlanets > 2 ? "7" : totalPlanets > 1 ? "8" : "9"} 
-                              fill="#666"
+                              fill="var(--color-chart-text-muted, var(--color-text-muted))"
                               fontWeight="500"
                               textAnchor="middle"
                               style={{ cursor: 'pointer' }}

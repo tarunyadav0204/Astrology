@@ -430,7 +430,9 @@ export default function App() {
       const panditFlag = await AsyncStorage.getItem('panditMode');
       const panditOn = panditFlag === '1' || panditFlag === 'true';
       setInitialPanditMode(panditOn);
-      setInitialTheme(savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : 'dark');
+      // ThemeProvider normalizes legacy light/dark values as well as the new
+      // semantic theme ids. Heritage is the premium consumer default.
+      setInitialTheme(savedTheme || 'heritage');
 
       loadSavedLanguage();
 
@@ -627,7 +629,7 @@ export default function App() {
   if (isLoading) {
     return (
       <SafeAreaProvider>
-        <SplashScreen />
+        <SplashScreen themeId={initialTheme || 'heritage'} panditMode={initialPanditMode} />
       </SafeAreaProvider>
     );
   }

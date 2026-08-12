@@ -11,46 +11,79 @@ import de from './de.json';
 import fr from './fr.json';
 import ru from './ru.json';
 import zh from './zh.json';
+import premiumUi from './premium-ui.json';
+import lifeAnalysis from './life-analysis.json';
+import lifeAnalysisPdf from './life-analysis-pdf.json';
+import historyUi from './history-ui.json';
+import historyDetail from './history-detail.json';
+import knowledgeSupport from './knowledge-support.json';
+import accountNotifications from './account-notifications.json';
+import accountSecurityActions from './account-security-actions.json';
+import authDeep from './auth-deep.json';
+
+[
+  [en, accountSecurityActions.english],
+  [es, accountSecurityActions.es],
+  [hi, accountSecurityActions.hindi],
+  [tamil, accountSecurityActions.tamil],
+  [te, accountSecurityActions.telugu],
+  [gu, accountSecurityActions.gujarati],
+  [mr, accountSecurityActions.marathi],
+  [de, accountSecurityActions.de],
+  [fr, accountSecurityActions.fr],
+  [ru, accountSecurityActions.russian],
+  [zh, accountSecurityActions.chinese],
+].forEach(([baseCopy, actionCopy]) => {
+  baseCopy.accountSecurity = { ...baseCopy.accountSecurity, ...actionCopy };
+});
+
+[
+  [en, authDeep.english], [es, authDeep.es], [hi, authDeep.hindi], [tamil, authDeep.tamil],
+  [te, authDeep.telugu], [gu, authDeep.gujarati], [mr, authDeep.marathi], [de, authDeep.de],
+  [fr, authDeep.fr], [ru, authDeep.russian], [zh, authDeep.chinese],
+].forEach(([baseCopy, deepCopy]) => {
+  baseCopy.authDeep = deepCopy;
+});
 
 i18n
   .use(initReactI18next)
   .init({
     resources: {
       english: {
-        translation: en,
+        translation: { ...en, premiumUi: premiumUi.english, lifeAnalysisFlow: { ...lifeAnalysis.english, ...lifeAnalysisPdf.english }, historyUi: historyUi.english, historyDetail: historyDetail.english, knowledgeSupport: knowledgeSupport.english, notificationInbox: accountNotifications.english },
       },
       es: {
-        translation: es,
+        translation: { ...es, premiumUi: premiumUi.es, lifeAnalysisFlow: { ...lifeAnalysis.es, ...lifeAnalysisPdf.es }, historyUi: historyUi.es, historyDetail: historyDetail.es, knowledgeSupport: knowledgeSupport.es, notificationInbox: accountNotifications.es },
       },
       hindi: {
-        translation: hi,
+        translation: { ...hi, premiumUi: premiumUi.hindi, lifeAnalysisFlow: { ...lifeAnalysis.hindi, ...lifeAnalysisPdf.hindi }, historyUi: historyUi.hindi, historyDetail: historyDetail.hindi, knowledgeSupport: knowledgeSupport.hindi, notificationInbox: accountNotifications.hindi },
       },
       tamil: {
-        translation: tamil,
+        translation: { ...tamil, premiumUi: premiumUi.tamil, lifeAnalysisFlow: { ...lifeAnalysis.tamil, ...lifeAnalysisPdf.tamil }, historyUi: historyUi.tamil, historyDetail: historyDetail.tamil, knowledgeSupport: knowledgeSupport.tamil, notificationInbox: accountNotifications.tamil },
       },
       telugu: {
-        translation: te,
+        translation: { ...te, premiumUi: premiumUi.telugu, lifeAnalysisFlow: { ...lifeAnalysis.telugu, ...lifeAnalysisPdf.telugu }, historyUi: historyUi.telugu, historyDetail: historyDetail.telugu, knowledgeSupport: knowledgeSupport.telugu, notificationInbox: accountNotifications.telugu },
       },
       gujarati: {
-        translation: gu,
+        translation: { ...gu, premiumUi: premiumUi.gujarati, lifeAnalysisFlow: { ...lifeAnalysis.gujarati, ...lifeAnalysisPdf.gujarati }, historyUi: historyUi.gujarati, historyDetail: historyDetail.gujarati, knowledgeSupport: knowledgeSupport.gujarati, notificationInbox: accountNotifications.gujarati },
       },
       marathi: {
-        translation: mr,
+        translation: { ...mr, premiumUi: premiumUi.marathi, lifeAnalysisFlow: { ...lifeAnalysis.marathi, ...lifeAnalysisPdf.marathi }, historyUi: historyUi.marathi, historyDetail: historyDetail.marathi, knowledgeSupport: knowledgeSupport.marathi, notificationInbox: accountNotifications.marathi },
       },
       german: {
-        translation: de,
+        translation: { ...de, premiumUi: premiumUi.german, lifeAnalysisFlow: { ...lifeAnalysis.de, ...lifeAnalysisPdf.de }, historyUi: historyUi.de, historyDetail: historyDetail.de, knowledgeSupport: knowledgeSupport.de, notificationInbox: accountNotifications.de },
       },
       french: {
-        translation: fr,
+        translation: { ...fr, premiumUi: premiumUi.fr, lifeAnalysisFlow: { ...lifeAnalysis.fr, ...lifeAnalysisPdf.fr }, historyUi: historyUi.fr, historyDetail: historyDetail.fr, knowledgeSupport: knowledgeSupport.fr, notificationInbox: accountNotifications.fr },
       },
       russian: {
-        translation: ru,
+        translation: { ...ru, premiumUi: premiumUi.russian, lifeAnalysisFlow: { ...lifeAnalysis.russian, ...lifeAnalysisPdf.russian }, historyUi: historyUi.russian, historyDetail: historyDetail.russian, knowledgeSupport: knowledgeSupport.russian, notificationInbox: accountNotifications.russian },
       },
       chinese: {
-        translation: zh,
+        translation: { ...zh, premiumUi: premiumUi.chinese, lifeAnalysisFlow: { ...lifeAnalysis.chinese, ...lifeAnalysisPdf.chinese }, historyUi: historyUi.chinese, historyDetail: historyDetail.chinese, knowledgeSupport: knowledgeSupport.chinese, notificationInbox: accountNotifications.chinese },
       },
       mandarin: {
-        translation: zh,
+        translation: { ...zh, premiumUi: premiumUi.chinese, lifeAnalysisFlow: { ...lifeAnalysis.chinese, ...lifeAnalysisPdf.chinese }, historyUi: historyUi.chinese, historyDetail: historyDetail.chinese, knowledgeSupport: knowledgeSupport.chinese, notificationInbox: accountNotifications.chinese },
       },
     },
     lng: 'english',

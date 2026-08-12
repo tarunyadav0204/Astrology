@@ -18,6 +18,8 @@ import { trackAstrologyEvent } from '../../../utils/analytics';
 import { apiErrorMessage } from '../../../utils/apiErrorMessage';
 import { useCredits } from '../../../credits/CreditContext';
 import { trackAcquisitionFunnelEvent } from '../../../services/acquisitionTracking';
+import { useTheme } from '../../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import AuthKeyboardScreen from './AuthKeyboardScreen';
 import AuthLegalNotice from '../AuthLegalNotice';
 import {
@@ -29,14 +31,16 @@ import { useAuthGate } from '../../../auth/AuthGateContext';
 import { trackGA4EventOnly } from '../../../utils/analytics';
 import { resetToRoute } from '../../../navigation/navHelpers';
 
-export default function PasswordScreen({ 
-  formData, 
-  updateFormData, 
-  navigateToScreen, 
+export default function PasswordScreen({
+  formData,
+  updateFormData,
+  navigateToScreen,
   isLogin,
   setIsLogin,
-  navigation 
+  navigation
 }) {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
   const signupClient = Platform.OS === 'web' && typeof window !== 'undefined' && String(window.location?.pathname || '').startsWith('/mobile')
     ? 'mobile_pwa'
     : 'mobile';
@@ -46,7 +50,7 @@ export default function PasswordScreen({
   const [showPassword, setShowPassword] = useState(false);
   const [isValid, setIsValid] = useState(false);
   const [passwordError, setPasswordError] = useState('');
-  
+
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
   const passwordInputRef = useRef(null);
@@ -139,45 +143,45 @@ export default function PasswordScreen({
       ).catch(() => {});
       return;
     }
-    
+
     // Combine country code with phone for API calls
     const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
-    
+
     console.log('🔐 Password Screen - handleContinue');
     console.log('  formData.phone:', formData.phone);
     console.log('  formData.countryCode:', formData.countryCode);
     console.log('  fullPhone:', fullPhone);
     console.log('  isLogin:', isLogin);
-    
+
     setPasswordError('');
     setLoading(true);
     try {
       if (isLogin) {
         trackAcquisitionFunnelEvent('login_submitted', {}, { status: 'started', screenName: 'PasswordScreen' }).catch(() => {});
         console.log('  📤 Calling login API with phone:', fullPhone);
-        
+
         let response;
         try {
           // Try with country code first
-          response = await authAPI.login({ 
-            phone: fullPhone, 
-            password: formData.password 
+          response = await authAPI.login({
+            phone: fullPhone,
+            password: formData.password
           });
         } catch (error) {
           // If 401, try without country code for legacy users
           if (error.response?.status === 401) {
             console.log('  🔄 Retrying without country code:', formData.phone);
-            response = await authAPI.login({ 
-              phone: formData.phone, 
-              password: formData.password 
+            response = await authAPI.login({
+              phone: formData.phone,
+              password: formData.password
             });
           } else {
             throw error;
           }
         }
-        
+
         console.log('  ✅ Login successful');
-        
+
         await storage.setAuthToken(response.data.access_token);
         await storage.setUserData(response.data.user);
         try {
@@ -276,7 +280,7 @@ export default function PasswordScreen({
             signup_client: signupClient,
             ...(formData?.birthDetails?.gender ? { gender: formData.birthDetails.gender } : {}),
           });
-          
+
           await storage.setAuthToken(response.data.access_token);
           await storage.setUserData(response.data.user);
           try {
@@ -299,7 +303,7 @@ export default function PasswordScreen({
             /* non-fatal */
           }
           trackGA4EventOnly('auth_gate_completed', { feature: 'registration' }).catch(() => {});
-          
+
           // Language selection, then welcome (same preference as Profile → language)
           navigateToScreen('chooseLanguage');
         } catch (error) {
@@ -355,8 +359,8 @@ export default function PasswordScreen({
 
   return (
     <AuthKeyboardScreen
-      emoji="🔐"
-      title={isLogin ? 'Enter your password' : 'Create a password'}
+      emoji="✦"
+      title={isLogin ? t('authOnboarding.passwordTitle', 'Enter your password') : t('authOnboarding.createPasswordTitle', 'Create a password')}
       subtitle={isLogin ? 'Welcome back to your chart journey' : 'Choose a strong password to secure your account'}
       onBack={() => navigateToScreen(isLogin ? 'phone' : 'name', 'back')}
       action={(
@@ -374,13 +378,13 @@ export default function PasswordScreen({
             disabled={!isValid || loading}
           >
             <LinearGradient
-              colors={isValid ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
+              colors={isValid ? [colors.accent, colors.accent] : [colors.surfaceMuted, colors.surfaceMuted]}
               style={styles.buttonGradient}
             >
               <Text style={styles.buttonText}>
                 {loading ? (isLogin ? 'Signing In...' : 'Continue') : (isLogin ? 'Sign In' : 'Continue')}
               </Text>
-              <Ionicons name="arrow-forward" size={20} color="#ffffff" />
+              <Ionicons name="arrow-forward" size={20} color={isValid ? colors.onAccent : colors.textTertiary} />
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
@@ -403,13 +407,13 @@ export default function PasswordScreen({
           },
         ]}
       >
-        <View style={[styles.inputWrapper, isValid && styles.inputValid]}>
-          <Ionicons name="lock-closed-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
+        <View style={[styles.inputWrapper, { borderColor: isValid ? colors.accent : colors.cosmicLine, backgroundColor: colors.cosmicRaised }]}>
+          <Ionicons name="lock-closed-outline" size={20} color={colors.textInverseMuted} />
           <TextInput
             ref={passwordInputRef}
             style={styles.input}
             placeholder="Password"
-            placeholderTextColor="rgba(255, 255, 255, 0.5)"
+            placeholderTextColor={colors.textInverseMuted}
             value={formData.password}
             onChangeText={(value) => {
               if (passwordError) setPasswordError('');
@@ -424,11 +428,11 @@ export default function PasswordScreen({
             <Ionicons
               name={showPassword ? 'eye-off-outline' : 'eye-outline'}
               size={20}
-              color="rgba(255, 255, 255, 0.5)"
+              color={colors.textInverseMuted}
             />
           </TouchableOpacity>
           {isValid && (
-            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+            <Ionicons name="checkmark-circle" size={24} color={colors.accent} />
           )}
         </View>
 
@@ -476,7 +480,7 @@ export default function PasswordScreen({
         )}
 
         {isLogin && (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.forgotButton}
             onPress={() => navigateToScreen('forgotPassword')}
           >

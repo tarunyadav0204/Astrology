@@ -333,6 +333,7 @@
     "close": "बंद करा"
   },
   "authOnboarding": {
+    "welcomeEyebrow": "तुमची वैदिक मार्गदर्शिका", "welcomeHero": "ताराला भेटा.\nतुमचे जीवन वाचा.", "welcomeHeroBody": "पाराशरी, नाडी, जैमिनी आणि केपीच्या संयुक्त अभ्यासातून तुमची संपूर्ण कुंडली स्पष्ट मार्गदर्शनात.", "analysisLayers": "विश्लेषण स्तर", "vedicSystems": "वैदिक पद्धती", "createAccount": "खाते तयार करा", "signIn": "साइन इन", "languageEyebrow": "तुमचे बनवा", "legalPrefix": "पुढे जाऊन तुम्ही आमच्या", "terms": "सेवा अटी", "and": "आणि", "privacy": "गोपनीयता धोरणाशी सहमत आहात",
     "chooseLanguageTitle": "आपली भाषा निवडा",
     "chooseLanguageSubtitle": "आम्ही संपूर्ण अॅपमध्ये याचा वापर करू. प्रोफाइलमधून कधीही बदला.",
     "continue": "पुढे जा",

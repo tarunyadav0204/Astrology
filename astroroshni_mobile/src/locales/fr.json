@@ -333,6 +333,7 @@
     "close": "Fermer"
   },
   "authOnboarding": {
+    "welcomeEyebrow": "VOTRE GUIDE VÉDIQUE", "welcomeHero": "Rencontrez Tara.\nLisez votre vie.", "welcomeHeroBody": "Votre thème complet, synthétisé par Parashari, Nadi, Jaimini et KP, puis traduit en conseils clairs.", "analysisLayers": "couches d’analyse", "vedicSystems": "systèmes védiques", "createAccount": "Créer un compte", "signIn": "Se connecter", "languageEyebrow": "FAITES-LE VÔTRE", "legalPrefix": "En continuant, vous acceptez nos", "terms": "Conditions d’utilisation", "and": "et notre", "privacy": "Politique de confidentialité",
     "chooseLanguageTitle": "Choisissez votre langue",
     "chooseLanguageSubtitle": "Nous l'utiliserons dans toute l'application. Vous pouvez la modifier à tout moment dans le profil.",
     "continue": "Continuer",

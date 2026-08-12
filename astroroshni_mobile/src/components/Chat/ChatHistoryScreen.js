@@ -1,759 +1,283 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
+  ActivityIndicator,
   Alert,
+  FlatList,
   RefreshControl,
-  StatusBar,
+  StyleSheet,
+  Text,
   TextInput,
-  Animated,
-  Dimensions,
+  TouchableOpacity,
+  View,
   Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import Icon from '@expo/vector-icons/Ionicons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { storage } from '../../services/storage';
-import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
+import { goBackOrHome } from '../../navigation/navHelpers';
+import FocusedStatusBar from '../Common/FocusedStatusBar';
 
-const { width } = Dimensions.get('window');
-
-const SkeletonCard = () => {
-  const { theme } = useTheme();
-  const shimmerAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const shimmerLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmerAnim, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shimmerAnim, {
-          toValue: 0,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    shimmerLoop.start();
-    return () => {
-      shimmerLoop.stop();
-    };
-  }, []);
-
-  const shimmerOpacity = shimmerAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 0.7],
-  });
-
-  return (
-    <View style={styles.sessionCard}>
-      <Animated.View style={[styles.skeleton, styles.skeletonTitle, { opacity: shimmerOpacity }]} />
-      <Animated.View style={[styles.skeleton, styles.skeletonText, { opacity: shimmerOpacity }]} />
-      <Animated.View style={[styles.skeleton, styles.skeletonFooter, { opacity: shimmerOpacity }]} />
-    </View>
-  );
+const getDateKey = (timestamp) => {
+  if (!timestamp) return 'unknown';
+  const value = new Date(timestamp);
+  if (Number.isNaN(value.getTime())) return 'unknown';
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
 };
 
 export default function ChatHistoryScreen({ navigation }) {
   useAnalytics('ChatHistoryScreen');
-  const { theme, colors, getCardElevation } = useTheme();
+  const { t, i18n } = useTranslation();
+  const { colors } = useTheme();
   const [historyRows, setHistoryRows] = useState([]);
-  const [filteredRows, setFilteredRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    loadChatHistory();
-
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
-  useEffect(() => {
-    filterHistoryRows();
-  }, [searchQuery, historyRows]);
-
-  const getDateKey = (timestamp) => {
-    if (!timestamp) return 'unknown';
-    const d = new Date(timestamp);
-    if (isNaN(d.getTime())) return 'unknown';
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  };
-
-  const loadChatHistory = async (pageNum = 1, append = false) => {
+  const loadChatHistory = useCallback(async (pageNum = 1, append = false) => {
     try {
       const authToken = await storage.getAuthToken();
       if (!authToken) {
         navigation.replace('Login');
         return;
       }
-      const response = await fetch(
-        `${API_BASE_URL}${getEndpoint('/chat-v2/history')}?page=${pageNum}&limit=5&list_mode=dates`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-          },
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/history')}?page=${pageNum}&limit=5&list_mode=dates`, {
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+      });
       if (response.status === 401) {
         await storage.removeAuthToken();
         navigation.replace('Login');
         return;
       }
-      if (!response.ok) return;
+      if (!response.ok) throw new Error('history_request_failed');
       const data = await response.json();
       let rows = Array.isArray(data.dates) ? data.dates : [];
-      // Backward compatibility: old backend returns sessions, not date buckets.
-      if (rows.length === 0 && Array.isArray(data.sessions) && data.sessions.length > 0) {
-        rows = data.sessions.map((s) => {
-          const ts = s.last_activity_at || s.created_at;
-          const dk = getDateKey(ts);
+      if (!rows.length && Array.isArray(data.sessions)) {
+        rows = data.sessions.map((session) => {
+          const timestamp = session.last_activity_at || session.created_at;
+          const dateKey = getDateKey(timestamp);
           return {
-            date_key: dk,
-            date_label: dk,
-            last_activity_at: ts,
-            message_count: Number(s.main_question_count || 1),
-            session_ids: s.session_id ? [s.session_id] : [],
+            date_key: dateKey,
+            date_label: dateKey,
+            last_activity_at: timestamp,
+            message_count: Number(session.main_question_count || 1),
+            session_ids: session.session_id ? [session.session_id] : [],
           };
         });
       }
-      if (append) {
-        setHistoryRows((prev) => {
-          const seen = new Set(prev.map((r) => r.date_key));
-          const next = rows.filter((r) => !seen.has(r.date_key));
-          return [...prev, ...next];
-        });
-      } else {
-        setHistoryRows(rows);
-        setPage(1);
-      }
+      setHistoryRows((current) => {
+        if (!append) return rows;
+        const known = new Set(current.map((row) => row.date_key));
+        return [...current, ...rows.filter((row) => !known.has(row.date_key))];
+      });
       setHasMore(Boolean(data.pagination?.has_more));
+      setPage(pageNum);
     } catch (error) {
-
+      if (!append) setHistoryRows([]);
     } finally {
-      if (!append) {
-        setLoading(false);
-        setRefreshing(false);
-      } else {
-        setLoadingMore(false);
-      }
+      setLoading(false);
+      setRefreshing(false);
+      setLoadingMore(false);
     }
-  };
+  }, [navigation]);
 
-  const filterHistoryRows = () => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) {
-      setFilteredRows(historyRows);
+  useEffect(() => { loadChatHistory(); }, [loadChatHistory]);
+
+  const filteredRows = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return historyRows;
+    return historyRows.filter((row) => String(row.date_label || row.date_key || '').toLowerCase().includes(query));
+  }, [historyRows, searchQuery]);
+
+  const openDay = (item) => {
+    const sessionIds = [...new Set((item.session_ids || []).filter(Boolean))];
+    if (!sessionIds.length) {
+      Alert.alert(t('historyUi.chat.noMessages'), t('historyUi.chat.noMessagesBody'));
       return;
     }
-    const matchedRows = historyRows.filter((row) =>
-      (row.date_label || row.date_key || '').toLowerCase().includes(q)
-    );
-    setFilteredRows(matchedRows);
+    navigation.navigate('ChatView', {
+      session: {
+        session_id: `day_${item.date_key}`,
+        created_at: item.date_key,
+        date_key: item.date_key,
+        date_label: item.date_label || item.date_key,
+        message_count: Number(item.message_count || 0),
+        session_ids: sessionIds,
+        native_name: null,
+        messages: [],
+      },
+    });
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    setPage(1);
-    setHasMore(true);
-    loadChatHistory(1, false);
+  const formatDay = (item) => {
+    const parsed = item.date_key ? new Date(`${item.date_key}T00:00:00`) : null;
+    if (!parsed || Number.isNaN(parsed.getTime())) return item.date_label || item.date_key;
+    return new Intl.DateTimeFormat(i18n.resolvedLanguage || undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(parsed);
   };
 
-  const loadMore = () => {
-    if (!loadingMore && hasMore) {
-      setLoadingMore(true);
-      const nextPage = page + 1;
-      setPage(nextPage);
-      loadChatHistory(nextPage, true);
-    }
-  };
-
-  const viewChatSession = async (dayItem) => {
-    try {
-      const sessionIds = Array.from(new Set((dayItem?.session_ids || []).filter(Boolean)));
-      if (!sessionIds.length) {
-        Alert.alert('No messages', 'No chats found for this day.');
-        return;
-      }
-
-      navigation.navigate('ChatView', {
-        session: {
-          session_id: `day_${dayItem.date_key}`,
-          created_at: dayItem.date_key,
-          date_key: dayItem.date_key,
-          date_label: dayItem.date_label || dayItem.date_key,
-          message_count: Number(dayItem.message_count || 0),
-          session_ids: sessionIds,
-          native_name: null,
-          messages: [],
-        },
-      });
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load chat messages');
-    }
-  };
-
-  const getRelativeTime = (date) => {
-    const now = new Date();
-    const then = new Date(date);
-    const diffMs = now - then;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return then.toLocaleDateString();
-  };
-
-  const HistoryMessageCard = React.memo(({ item, index }) => {
-    const cardAnim = useRef(new Animated.Value(0)).current;
-    const calendarDate = item?.date_key ? new Date(`${item.date_key}T00:00:00`) : null;
-    const calendarMonth =
-      calendarDate && !isNaN(calendarDate.getTime())
-        ? calendarDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
-        : '--';
-    const calendarDay =
-      calendarDate && !isNaN(calendarDate.getTime())
-        ? String(calendarDate.getDate())
-        : '--';
-
-    useEffect(() => {
-      Animated.spring(cardAnim, {
-        toValue: 1,
-        delay: Math.min(index, 8) * 40,
-        tension: 50,
-        friction: 7,
-        useNativeDriver: true,
-      }).start();
-    }, []);
-
+  const renderItem = ({ item }) => {
+    const parsed = item.date_key ? new Date(`${item.date_key}T00:00:00`) : null;
+    const validDate = parsed && !Number.isNaN(parsed.getTime());
+    const month = validDate ? new Intl.DateTimeFormat(i18n.resolvedLanguage || undefined, { month: 'short' }).format(parsed).toUpperCase() : '—';
+    const day = validDate ? parsed.getDate() : '—';
     return (
-      <Animated.View
-        style={[
-          styles.sessionCardWrapper,
-          {
-            opacity: cardAnim,
-            transform: [
-              {
-                translateY: cardAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [24, 0],
-                }),
-              },
-            ],
-          },
-        ]}
+      <TouchableOpacity
+        onPress={() => openDay(item)}
+        activeOpacity={0.88}
+        style={[styles.card, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}
       >
-        <TouchableOpacity
-          style={[styles.sessionCard, { elevation: getCardElevation(8) }]}
-          onPress={() => viewChatSession(item)}
-          activeOpacity={0.9}
+        <View
+          style={[styles.dateTile, { backgroundColor: colors.surfaceInverse, borderColor: colors.accent }]}
         >
-          <LinearGradient
-            colors={Platform.OS === 'android'
-              ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-              : (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)'])}
-            style={styles.sessionGradient}
-          >
-            <View style={styles.sessionHeader}>
-              <View style={styles.sessionIconContainer}>
-                <LinearGradient
-                  colors={['#ff6b35', '#ff8c5a']}
-                  style={[styles.sessionIconGradient, styles.messageSenderIcon]}
-                >
-                  <Text style={styles.calendarMonth}>{calendarMonth}</Text>
-                  <Text style={styles.calendarDay}>{calendarDay}</Text>
-                </LinearGradient>
-              </View>
-              <View style={styles.sessionInfo}>
-                <View style={styles.sessionTitleRow}>
-                  <View style={styles.messageTitleLeft}>
-                    <Text style={[styles.senderPill, { color: colors.text, borderColor: colors.textSecondary }]}>
-                      Day
-                    </Text>
-                    <Text style={[styles.nativeName, { color: colors.text }]} numberOfLines={1}>
-                      {item.date_label}
-                    </Text>
-                  </View>
-                  <Text style={[styles.sessionDate, { color: colors.textSecondary }]}>
-                    {(item.message_count || 0)} message{(item.message_count || 0) === 1 ? '' : 's'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            <Text style={[styles.sessionPreview, { color: colors.textSecondary }]} numberOfLines={3}>
-              Open to view all chats for this day
-            </Text>
-
-            <View style={styles.sessionFooter}>
-              <Text style={[styles.sessionTime, { color: colors.textSecondary }]}>
-                Tap to view day timeline
-              </Text>
-              <View style={styles.sessionActions} />
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
-      </Animated.View>
+          <Text style={[styles.month, { color: colors.onSurfaceInverseMuted || colors.textInverseMuted }]}>{month}</Text>
+          <Text style={[styles.day, { color: colors.onSurfaceInverse || colors.textInverse }]}>{day}</Text>
+        </View>
+        <View style={styles.cardBody}>
+          <Text style={[styles.cardEyebrow, { color: colors.primary }]}>{t('historyUi.chat.dayLabel')}</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>{formatDay(item)}</Text>
+          <Text style={[styles.cardMeta, { color: colors.textSecondary }]}>
+            {t('historyUi.chat.messageCount', { count: Number(item.message_count || 0) })}
+          </Text>
+          <Text style={[styles.cardHint, { color: colors.textTertiary }]}>{t('historyUi.chat.openDay')}</Text>
+        </View>
+        <View style={[styles.arrow, { borderColor: colors.cardBorder }]}>
+          <Ionicons name="arrow-forward" size={17} color={colors.primary} />
+        </View>
+      </TouchableOpacity>
     );
-  });
+  };
 
-  const renderHistoryRow = React.useCallback(({ item, index }) => (
-    <HistoryMessageCard item={item} index={index} />
-  ), []);
-
-  const renderEmptyState = () => (
-    <Animated.View style={[styles.emptyState, { opacity: fadeAnim }]}>
-      <View style={styles.emptyIconContainer}>
-        <LinearGradient
-          colors={['#ff6b35', '#ffd700', '#ff6b35']}
-          style={styles.emptyIconGradient}
-        >
-          <Text style={styles.emptyIcon}>💬</Text>
-        </LinearGradient>
+  const emptyState = (
+    <View style={styles.emptyState}>
+      <View style={[styles.emptyIcon, { backgroundColor: colors.accentSoft }]}>
+        <Ionicons name="chatbubbles-outline" size={30} color={colors.onAccent} />
       </View>
-      <Text style={styles.emptyTitle}>No Chat History</Text>
-      <Text style={styles.emptyText}>
-        {searchQuery ? 'No days match your search' : 'Start a conversation to see your day-wise history here'}
-      </Text>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>{searchQuery ? t('historyUi.chat.noMatches') : t('historyUi.chat.emptyTitle')}</Text>
+      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>{searchQuery ? t('historyUi.chat.noMatchesBody') : t('historyUi.chat.emptyBody')}</Text>
       {!searchQuery && (
-        <TouchableOpacity
-          style={styles.startChatButton}
-          onPress={() => navigation.navigate('Home')}
-        >
-          <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.startChatGradient}>
-            <Text style={styles.startChatText}>Start Chatting</Text>
-          </LinearGradient>
+        <TouchableOpacity onPress={() => navigation.navigate('Home', { startChat: true })} style={[styles.emptyCta, { backgroundColor: colors.primary }]}>
+          <Text style={[styles.emptyCtaText, { color: colors.onPrimary }]}>{t('historyUi.chat.startChat')}</Text>
         </TouchableOpacity>
       )}
-    </Animated.View>
+    </View>
   );
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
-      <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]} style={styles.gradient}>
-        <SafeAreaView style={styles.safeArea}>
-          
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity style={[styles.backButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]} onPress={() => navigation.goBack()}>
-              <Icon name="arrow-back" size={24} color={colors.text} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <FocusedStatusBar backgroundColor={colors.headerSurface} />
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.headerSurface }]} edges={['top']}>
+        <View
+          style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cardBorder }]}
+        >
+          <TouchableOpacity onPress={() => goBackOrHome(navigation)} style={[styles.backButton, { borderColor: colors.cosmicLine || colors.cardBorder }]}>
+            <Ionicons name="arrow-back" size={21} color={colors.textInverse} />
+          </TouchableOpacity>
+          <View style={styles.headerCopy}>
+            <Text style={[styles.headerEyebrow, { color: colors.accent }]}>{t('historyUi.library')}</Text>
+            <Text style={[styles.headerTitle, { color: colors.textInverse }]}>{t('historyUi.chat.title')}</Text>
+          </View>
+          <View style={[styles.countPill, { backgroundColor: colors.accentSoft }]}>
+            <Text style={[styles.countText, { color: colors.onAccent }]}>{historyRows.length}</Text>
+          </View>
+        </View>
+
+        <View style={[styles.contentShell, { backgroundColor: colors.background }]}>
+        <View style={styles.intro}>
+          <Text style={[styles.introTitle, { color: colors.text }]}>{t('historyUi.chat.heroTitle')}</Text>
+          <Text style={[styles.introBody, { color: colors.textSecondary }]}>{t('historyUi.chat.heroBody')}</Text>
+        </View>
+
+        <View
+          style={[styles.search, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}
+        >
+          <Ionicons name="search-outline" size={19} color={colors.textSecondary} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={t('historyUi.chat.search')}
+            placeholderTextColor={colors.textTertiary}
+            style={[styles.searchInput, { color: colors.text }]}
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityLabel={t('historyUi.clearSearch')}>
+              <Ionicons name="close-circle" size={19} color={colors.textSecondary} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Chat History</Text>
-            <View style={styles.placeholder} />
+          ) : null}
+        </View>
+
+        {loading ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('historyUi.chat.loading')}</Text>
           </View>
-
-          {/* Search Bar */}
-          <View style={styles.searchContainer}>
-            <LinearGradient
-              colors={Platform.OS === 'android'
-                ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                : (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)'])}
-              style={styles.searchGradient}
-            >
-              <Icon name="search" size={20} color={colors.textSecondary} />
-              <TextInput
-                style={[styles.searchInput, { color: colors.text }]}
-                placeholder="Search chats..."
-                placeholderTextColor={colors.textSecondary}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchQuery('')}>
-                  <Icon name="close-circle" size={20} color="rgba(255, 255, 255, 0.6)" />
-                </TouchableOpacity>
-              )}
-            </LinearGradient>
-          </View>
-
-          {/* Content */}
-          {loading ? (
-            <View style={styles.listContainer}>
-              {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
-            </View>
-          ) : (
-            <FlatList
-              data={filteredRows}
-              renderItem={renderHistoryRow}
-              keyExtractor={(item, index) => item.date_key || `day-${index}`}
-              contentContainerStyle={[styles.listContainer, { paddingBottom: loadingMore ? 200 : 100 }]}
-              showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={onRefresh}
-                  tintColor={COLORS.white}
-                />
-              }
-              ListEmptyComponent={renderEmptyState}
-              // onEndReached={loadMore}
-              // onEndReachedThreshold={0.5}
-              removeClippedSubviews={false}
-              maxToRenderPerBatch={5}
-              windowSize={5}
-              initialNumToRender={15}
-              ListFooterComponent={() => 
-                hasMore ? (
-                  <View style={styles.loadMoreContainer}>
-                    {loadingMore ? (
-                      <View style={styles.loadingMore}>
-                        <SkeletonCard />
-                        <SkeletonCard />
-                        <Text style={styles.loadingMoreText}>Loading more days...</Text>
-                      </View>
-                    ) : (
-                      <TouchableOpacity 
-                        style={styles.loadMoreButton} 
-                        onPress={loadMore}
-                      >
-                        <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.loadMoreGradient}>
-                          <Text style={styles.loadMoreText}>Load more</Text>
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ) : null
-              }
-            />
-          )}
-        </SafeAreaView>
-        
-
-      </LinearGradient>
+        ) : (
+          <FlatList
+            data={filteredRows}
+            renderItem={renderItem}
+            keyExtractor={(item, index) => item.date_key || `day-${index}`}
+            contentContainerStyle={[styles.list, !filteredRows.length && styles.emptyList]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadChatHistory(1); }} tintColor={colors.primary} />}
+            ListEmptyComponent={emptyState}
+            ListFooterComponent={hasMore && filteredRows.length ? (
+              <TouchableOpacity
+                disabled={loadingMore}
+                onPress={() => { setLoadingMore(true); loadChatHistory(page + 1, true); }}
+                style={[styles.loadMore, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceRaised }]}
+              >
+                {loadingMore ? <ActivityIndicator color={colors.primary} /> : <Text style={[styles.loadMoreText, { color: colors.primary }]}>{t('historyUi.loadMore')}</Text>}
+              </TouchableOpacity>
+            ) : null}
+          />
+        )}
+        </View>
+      </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  gradient: { flex: 1 },
   safeArea: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  placeholder: { width: 40 },
-  searchContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  searchGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
-    color: COLORS.white,
-  },
-  listContainer: {
-    padding: 20,
-    paddingTop: 0,
-    flexGrow: 1,
-  },
-  sessionCardWrapper: {
-    marginBottom: 16,
-  },
-  sessionCard: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-      },
-      android: {
-        // elevation set dynamically
-      },
-    }),
-  },
-  sessionGradient: {
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
-  },
-  sessionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sessionIconContainer: {
-    marginRight: 12,
-  },
-  sessionIconGradient: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  messageSenderIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
-  messageTitleLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginRight: 8,
-    minWidth: 0,
-  },
-  senderPill: {
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  sessionIcon: {
-    fontSize: 24,
-  },
-  calendarMonth: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: 0.3,
-    lineHeight: 11,
-    marginTop: 2,
-  },
-  calendarDay: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#fff',
-    lineHeight: 16,
-  },
-  sessionInfo: {
-    flex: 1,
-  },
-  sessionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  nativeName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.white,
-    marginRight: 8,
-  },
-  sessionDate: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  unreadBadge: {
-    backgroundColor: '#ff6b35',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  unreadText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  sessionPreview: {
-    fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.8)',
-    lineHeight: 22,
-    marginBottom: 12,
-  },
-  sessionFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sessionTime: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  sessionActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionButton: {
-    padding: 8,
-  },
-  skeleton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-  },
-  skeletonTitle: {
-    width: '60%',
-    height: 20,
-    marginBottom: 12,
-  },
-  skeletonText: {
-    width: '100%',
-    height: 16,
-    marginBottom: 8,
-  },
-  skeletonFooter: {
-    width: '40%',
-    height: 14,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 24,
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  emptyIconGradient: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  emptyIcon: {
-    fontSize: 48,
-  },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: COLORS.white,
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 32,
-  },
-  startChatButton: {
-    borderRadius: 25,
-    overflow: 'hidden',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  startChatGradient: {
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-  },
-  startChatText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  loadingMore: {
-    paddingVertical: 10,
-  },
-  loadingMoreText: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 14,
-    textAlign: 'center',
-    padding: 20,
-  },
-  endSpacer: {
-    height: 80,
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(26, 0, 51, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  loadingContent: {
-    alignItems: 'center',
-    padding: 20,
-  },
-  loadMoreButton: {
-    margin: 20,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  loadMoreGradient: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  loadMoreText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loadMoreContainer: {
-    minHeight: 80,
-  },
+  contentShell: { flex: 1 },
+  header: { minHeight: 78, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1 },
+  backButton: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  headerCopy: { flex: 1, paddingHorizontal: 14 },
+  headerEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+  headerTitle: { fontSize: 23, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '600', marginTop: 2 },
+  countPill: { minWidth: 38, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  countText: { fontSize: 13, fontWeight: '900' },
+  intro: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 18 },
+  introTitle: { fontSize: 31, lineHeight: 36, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '500' },
+  introBody: { fontSize: 14, lineHeight: 21, marginTop: 8, maxWidth: 470 },
+  search: { marginHorizontal: 20, marginBottom: 16, minHeight: 52, borderWidth: 1, borderRadius: 18, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  searchInput: { flex: 1, fontSize: 15, paddingVertical: 12 },
+  list: { paddingHorizontal: 20, paddingBottom: 40, gap: 12 },
+  emptyList: { flexGrow: 1 },
+  card: { borderWidth: 1, borderRadius: 22, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  dateTile: { width: 58, height: 68, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  month: { fontSize: 9, letterSpacing: 1.3, fontWeight: '900' },
+  day: { fontSize: 25, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), marginTop: 1 },
+  cardBody: { flex: 1, minWidth: 0 },
+  cardEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' },
+  cardTitle: { fontSize: 17, lineHeight: 22, fontWeight: '700', marginTop: 3 },
+  cardMeta: { fontSize: 12, marginTop: 5, fontWeight: '600' },
+  cardHint: { fontSize: 11, marginTop: 5 },
+  arrow: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  loadingText: { fontSize: 13, fontWeight: '700' },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 40 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
+  emptyTitle: { fontSize: 22, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '600', textAlign: 'center' },
+  emptyBody: { fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8, maxWidth: 340 },
+  emptyCta: { marginTop: 20, paddingHorizontal: 22, paddingVertical: 13, borderRadius: 18 },
+  emptyCtaText: { fontSize: 14, fontWeight: '900' },
+  loadMore: { minHeight: 48, marginTop: 4, borderWidth: 1, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  loadMoreText: { fontSize: 13, fontWeight: '900' },
 });

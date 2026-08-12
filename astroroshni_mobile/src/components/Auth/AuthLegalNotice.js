@@ -1,5 +1,7 @@
 import React from 'react';
 import { Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { useTheme } from '../../context/ThemeContext';
 
 const TERMS_URL = 'https://astroroshni.com/terms';
 const PRIVACY_URL = 'https://astroroshni.com/policy';
@@ -13,16 +15,18 @@ function openUrl(url) {
 }
 
 export default function AuthLegalNotice({ compact = false }) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
   return (
     <View style={[styles.container, compact && styles.containerCompact]}>
-      <Text style={[styles.text, compact && styles.textCompact]}>
-        By continuing, you agree to our{' '}
-        <Text style={styles.link} onPress={() => openUrl(TERMS_URL)}>
-          Terms of Service
+      <Text style={[styles.text, { color: colors.textInverseMuted }, compact && styles.textCompact]}>
+        {t('authOnboarding.legalPrefix', 'By continuing, you agree to our')}{' '}
+        <Text style={[styles.link, { color: colors.accent }]} onPress={() => openUrl(TERMS_URL)}>
+          {t('authOnboarding.terms', 'Terms of Service')}
         </Text>{' '}
-        and{' '}
-        <Text style={styles.link} onPress={() => openUrl(PRIVACY_URL)}>
-          Privacy Policy
+        {t('authOnboarding.and', 'and')}{' '}
+        <Text style={[styles.link, { color: colors.accent }]} onPress={() => openUrl(PRIVACY_URL)}>
+          {t('authOnboarding.privacy', 'Privacy Policy')}
         </Text>
         .
       </Text>

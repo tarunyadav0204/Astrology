@@ -8,7 +8,6 @@ import {
   TextInput,
   ActivityIndicator,
   Platform,
-  StatusBar,
   RefreshControl,
   Alert,
 } from 'react-native';
@@ -24,6 +23,8 @@ import { supportAPI } from '../../services/api';
 import { sanitizeSupportBody, sanitizeSupportSubject } from '../../utils/supportText';
 import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { trackAstrologyEvent } from '../../utils/analytics';
+import { goBackOrHome } from '../../navigation/navHelpers';
+import FocusedStatusBar from '../Common/FocusedStatusBar';
 
 function formatApiError(e, t) {
   const d = e.response?.data?.detail;
@@ -34,7 +35,7 @@ function formatApiError(e, t) {
 
 export default function SupportScreen({ navigation }) {
   const route = useRoute();
-  const { theme, colors } = useTheme();
+  const { colors } = useTheme();
   const { t } = useTranslation();
   const source = Platform.OS === 'ios' ? 'ios' : 'android';
 
@@ -185,7 +186,7 @@ export default function SupportScreen({ navigation }) {
     try {
       const token = (await AsyncStorage.getItem('authToken')) || '';
       if (!token) {
-        throw new Error('Please log in again to download this file.');
+        throw new Error(t('knowledgeSupport.loginToDownload'));
       }
       const filename = attachment.filename || `support_attachment_${attachment.id}.pdf`;
       const targetPath = `${FileSystem.cacheDirectory}${Date.now()}_${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
@@ -198,11 +199,11 @@ export default function SupportScreen({ navigation }) {
         },
       });
       if (status < 200 || status >= 300) {
-        throw new Error('Download failed');
+        throw new Error(t('knowledgeSupport.downloadFailed'));
       }
       const isAvailable = await Sharing.isAvailableAsync();
       if (!isAvailable) {
-        Alert.alert('Downloaded', 'PDF downloaded successfully.');
+        Alert.alert(t('knowledgeSupport.downloaded'), t('knowledgeSupport.downloadedBody'));
         return;
       }
       await Sharing.shareAsync(uri, {
@@ -211,14 +212,14 @@ export default function SupportScreen({ navigation }) {
         UTI: 'com.adobe.pdf',
       });
     } catch (e) {
-      Alert.alert('Download failed', e?.message || 'Could not download the attachment.');
+      Alert.alert(t('knowledgeSupport.downloadFailed'), e?.message || t('knowledgeSupport.downloadFailedBody'));
     } finally {
       setDownloadingAttachmentId(null);
     }
   };
 
   const bg = colors.background;
-  const cardBg = theme === 'dark' ? colors.backgroundSecondary : colors.surface;
+  const cardBg = colors.surfaceRaised;
   const borderCol = colors.cardBorder;
 
   const renderList = () => (
@@ -234,18 +235,25 @@ export default function SupportScreen({ navigation }) {
         />
       }
     >
+      <View style={[styles.hero, { backgroundColor: colors.surfaceInverse, borderColor: colors.cosmicLine || borderCol }]}>
+        <View pointerEvents="none" style={styles.heroLinework}><View style={[styles.heroOrbit, styles.heroOrbitLarge, { borderColor: colors.accent }]} /><View style={[styles.heroOrbit, styles.heroOrbitSmall, { borderColor: colors.accent }]} /></View>
+        <Text style={[styles.heroEyebrow, { color: colors.accent }]}>{t('knowledgeSupport.supportEyebrow')}</Text>
+        <Text style={[styles.heroTitle, { color: colors.onSurfaceInverse }]}>{t('knowledgeSupport.supportTitle')}</Text>
+        <Text style={[styles.heroBody, { color: colors.onSurfaceInverseMuted }]}>{t('knowledgeSupport.supportBody')}</Text>
+      </View>
+      <View style={styles.listHeading}><View><Text style={[styles.sectionEyebrow, { color: colors.primary }]}>{t('knowledgeSupport.yourRequests')}</Text><Text style={[styles.sectionTitle, { color: colors.text }]}>{t('knowledgeSupport.conversationTitle')}</Text></View><View style={[styles.countBadge, { backgroundColor: colors.accentSoft }]}><Text style={[styles.countText, { color: colors.onAccent }]}>{tickets.length}</Text></View></View>
       <TouchableOpacity
-        style={[styles.primaryBtn, { backgroundColor: '#f97316' }]}
+        style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
         onPress={() => {
           setView('compose');
           setError('');
         }}
       >
-        <Text style={styles.primaryBtnText}>{t('support.newTicket')}</Text>
+        <Ionicons name="add" size={20} color={colors.onPrimary} /><Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>{t('support.newTicket')}</Text>
       </TouchableOpacity>
 
       {listLoading ? (
-        <ActivityIndicator size="large" color="#f97316" style={{ marginTop: 24 }} />
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
       ) : tickets.length === 0 ? (
         <Text style={[styles.empty, { color: colors.textSecondary }]}>{t('support.noTickets')}</Text>
       ) : (
@@ -255,17 +263,10 @@ export default function SupportScreen({ navigation }) {
             style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}
             onPress={() => openThread(tk.id)}
           >
-            <Text style={[styles.ticketTitle, { color: colors.text }]} numberOfLines={2}>
-              {tk.subject}
-            </Text>
-            <Text style={[styles.ticketMeta, { color: colors.textSecondary }]}>
-              #{tk.id} · {ticketStatusLabel(tk.status)} · {ticketSourceLabel(tk.source)}
-            </Text>
-            {tk.last_message_preview ? (
-              <Text style={[styles.preview, { color: colors.textSecondary }]} numberOfLines={2}>
-                {tk.last_message_preview}
-              </Text>
-            ) : null}
+            <View style={styles.ticketTop}><Text style={[styles.ticketNumber, { color: colors.primary }]}>#{tk.id}</Text><View style={[styles.statusPill, { backgroundColor: colors.surfaceMuted }]}><Text style={[styles.statusText, { color: colors.textSecondary }]}>{ticketStatusLabel(tk.status)}</Text></View></View>
+            <Text style={[styles.ticketTitle, { color: colors.text }]} numberOfLines={2}>{tk.subject}</Text>
+            {tk.last_message_preview ? <Text style={[styles.preview, { color: colors.textSecondary }]} numberOfLines={2}>{tk.last_message_preview}</Text> : null}
+            <View style={styles.ticketFooter}><Text style={[styles.ticketMeta, { color: colors.textTertiary }]}>{ticketSourceLabel(tk.source)}</Text><Ionicons name="arrow-forward" size={18} color={colors.primary} /></View>
           </TouchableOpacity>
         ))
       )}
@@ -274,6 +275,7 @@ export default function SupportScreen({ navigation }) {
 
   const renderCompose = () => (
     <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <View style={[styles.composeIntro, { backgroundColor: colors.surfaceInverse, borderColor: colors.cosmicLine || borderCol }]}><Text style={[styles.heroEyebrow, { color: colors.accent }]}>{t('knowledgeSupport.newRequest')}</Text><Text style={[styles.composeTitle, { color: colors.onSurfaceInverse }]}>{t('knowledgeSupport.tellUs')}</Text><Text style={[styles.composeBody, { color: colors.onSurfaceInverseMuted }]}>{t('knowledgeSupport.tellUsBody')}</Text></View>
       <Text style={[styles.label, { color: colors.text }]}>{t('support.subject')}</Text>
       <TextInput
         style={[styles.input, { color: colors.text, borderColor: borderCol, backgroundColor: cardBg }]}
@@ -294,14 +296,14 @@ export default function SupportScreen({ navigation }) {
         placeholderTextColor={colors.textSecondary}
       />
       <TouchableOpacity
-        style={[styles.primaryBtn, { backgroundColor: submitting ? '#999' : '#f97316' }]}
+        style={[styles.primaryBtn, { backgroundColor: submitting ? colors.textTertiary : colors.primary }]}
         onPress={submitNew}
         disabled={submitting}
       >
         {submitting ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={colors.onPrimary} />
         ) : (
-          <Text style={styles.primaryBtnText}>{t('support.send')}</Text>
+          <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>{t('support.send')}</Text>
         )}
       </TouchableOpacity>
       <TouchableOpacity style={styles.secondaryBtn} onPress={() => setView('list')}>
@@ -313,19 +315,16 @@ export default function SupportScreen({ navigation }) {
   const renderThread = () => (
     <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
       {threadLoading ? (
-        <ActivityIndicator size="large" color="#f97316" style={{ marginTop: 24 }} />
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
       ) : ticketMeta ? (
         <>
-          <Text style={[styles.threadTitle, { color: colors.text }]}>{ticketMeta.subject}</Text>
-          <Text style={[styles.ticketMeta, { color: colors.textSecondary, marginBottom: 12 }]}>
-            {t('support.status')}: {ticketStatusLabel(ticketMeta.status)}
-          </Text>
+          <View style={[styles.threadHero, { backgroundColor: colors.surfaceInverse, borderColor: colors.cosmicLine || borderCol }]}><Text style={[styles.heroEyebrow, { color: colors.accent }]}>#{ticketMeta.id || activeId} · {ticketStatusLabel(ticketMeta.status)}</Text><Text style={[styles.threadTitle, { color: colors.onSurfaceInverse }]}>{ticketMeta.subject}</Text></View>
           {messages.map((m) => (
             <View
               key={m.id}
               style={[
                 styles.bubble,
-                { backgroundColor: m.author_role === 'admin' ? 'rgba(34,197,94,0.15)' : 'rgba(0,0,0,0.06)' },
+                { backgroundColor: m.author_role === 'admin' ? colors.surfaceRaised : colors.surfaceMuted, borderColor: borderCol, alignSelf: m.author_role === 'admin' ? 'flex-start' : 'flex-end' },
               ]}
             >
               <Text style={[styles.bubbleMeta, { color: colors.textSecondary }]}>
@@ -348,11 +347,11 @@ export default function SupportScreen({ navigation }) {
                             {att.filename}
                           </Text>
                           <Text style={[styles.attachmentMeta, { color: colors.textSecondary }]}>
-                            PDF · {Math.max(1, Math.round((Number(att.size_bytes || 0) / 1024) || 0))} KB
+                            {`PDF · ${Math.max(1, Math.round((Number(att.size_bytes || 0) / 1024) || 0))} KB`}
                           </Text>
                         </View>
                         {isDownloading ? (
-                          <ActivityIndicator size="small" color="#f97316" />
+                          <ActivityIndicator size="small" color={colors.primary} />
                         ) : (
                           <Ionicons name="download-outline" size={20} color={colors.text} />
                         )}
@@ -376,14 +375,14 @@ export default function SupportScreen({ navigation }) {
                 placeholderTextColor={colors.textSecondary}
               />
               <TouchableOpacity
-                style={[styles.primaryBtn, { backgroundColor: submitting ? '#999' : '#f97316' }]}
+                style={[styles.primaryBtn, { backgroundColor: submitting ? colors.textTertiary : colors.primary }]}
                 onPress={sendReply}
                 disabled={submitting}
               >
                 {submitting ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={colors.onPrimary} />
                 ) : (
-                  <Text style={styles.primaryBtnText}>{t('support.sendReply')}</Text>
+                  <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>{t('support.sendReply')}</Text>
                 )}
               </TouchableOpacity>
             </>
@@ -408,16 +407,17 @@ export default function SupportScreen({ navigation }) {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: bg }]} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor="#ff6b35" />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.headerSurface }]} edges={['top', 'left', 'right']}>
+      <FocusedStatusBar backgroundColor={colors.headerSurface} />
+      <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cosmicLine || borderCol }]}>
+        <TouchableOpacity onPress={() => view === 'list' ? goBackOrHome(navigation) : setView('list')} style={[styles.backButton, { borderColor: colors.cosmicLine || borderCol }]}>
+          <Ionicons name="arrow-back" size={21} color={colors.textInverse} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('support.title')}</Text>
-        <View style={{ width: 40 }} />
+        <View style={styles.headerCopy}><Text style={[styles.headerEyebrow, { color: colors.accent }]}>{t('knowledgeSupport.helpDesk')}</Text><Text style={[styles.headerTitle, { color: colors.textInverse }]}>{t('support.title')}</Text></View>
+        <View style={[styles.headerSeal, { borderColor: colors.cosmicLine || borderCol }]}><Ionicons name="chatbubbles-outline" size={19} color={colors.accent} /></View>
       </View>
 
+      <View style={[styles.contentShell, { backgroundColor: bg }]}>
       {error ? (
         <View style={styles.errBar}>
           <Text style={styles.errText}>{error}</Text>
@@ -427,64 +427,74 @@ export default function SupportScreen({ navigation }) {
       {view === 'list' && renderList()}
       {view === 'compose' && renderCompose()}
       {view === 'thread' && renderThread()}
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  contentShell: { flex: 1 },
   header: {
+    minHeight: 78,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0,0,0,0.08)',
+    paddingHorizontal: 18,
+    borderBottomWidth: 1,
   },
-  backButton: { padding: 8 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
+  backButton: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  headerCopy: { flex: 1, paddingHorizontal: 14 }, headerEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1.7 }, headerTitle: { fontSize: 21, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '600', marginTop: 2 },
+  headerSeal: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   errBar: { backgroundColor: 'rgba(220,38,38,0.12)', paddingHorizontal: 12, paddingVertical: 8 },
   errText: { color: '#b91c1c', fontSize: 13 },
-  scrollContent: { padding: 16, paddingBottom: 40 },
+  scrollContent: { padding: 16, paddingBottom: 60 },
+  hero: { minHeight: 250, borderRadius: 30, borderWidth: 1, padding: 26, justifyContent: 'flex-end', overflow: 'hidden', marginBottom: 28 },
+  heroLinework: { ...StyleSheet.absoluteFillObject, opacity: 0.48 }, heroOrbit: { position: 'absolute', borderWidth: 1 }, heroOrbitLarge: { width: 180, height: 180, borderRadius: 90, right: -50, top: -72 }, heroOrbitSmall: { width: 112, height: 112, borderRadius: 56, right: -13, top: -35 },
+  heroEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.8, textTransform: 'uppercase' }, heroTitle: { fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontSize: 36, lineHeight: 40, marginTop: 10 }, heroBody: { fontSize: 15, lineHeight: 22, fontWeight: '600', marginTop: 12, maxWidth: '90%' },
+  listHeading: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 18 }, sectionEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.6 }, sectionTitle: { fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontSize: 27, marginTop: 4 }, countBadge: { minWidth: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }, countText: { fontSize: 13, fontWeight: '900' },
   primaryBtn: {
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
     marginBottom: 16,
   },
-  primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  primaryBtnText: { fontWeight: '800', fontSize: 15 },
   secondaryBtn: { paddingVertical: 12, alignItems: 'center' },
   secondaryBtnText: { fontSize: 16 },
   card: {
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 1,
-    padding: 14,
+    padding: 17,
     marginBottom: 12,
   },
-  ticketTitle: { fontSize: 16, fontWeight: '600' },
+  ticketTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }, ticketNumber: { fontSize: 10, fontWeight: '900', letterSpacing: 1.2 }, statusPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 }, statusText: { fontSize: 10, fontWeight: '800' }, ticketFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 },
+  ticketTitle: { fontSize: 18, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '600' },
   ticketMeta: { fontSize: 12, marginTop: 6 },
   preview: { fontSize: 13, marginTop: 8 },
   empty: { textAlign: 'center', marginTop: 32, fontSize: 15 },
-  label: { fontWeight: '600', marginBottom: 6, marginTop: 8 },
+  composeIntro: { borderRadius: 26, borderWidth: 1, padding: 22, marginBottom: 20 }, composeTitle: { fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontSize: 28, marginTop: 8 }, composeBody: { fontSize: 14, lineHeight: 21, marginTop: 9 }, label: { fontWeight: '800', marginBottom: 8, marginTop: 10 },
   input: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 17,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
   },
   textarea: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 17,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
     minHeight: 120,
     textAlignVertical: 'top',
   },
-  threadTitle: { fontSize: 20, fontWeight: '700', marginBottom: 4 },
-  bubble: { borderRadius: 10, padding: 12, marginBottom: 10 },
+  threadHero: { borderRadius: 26, borderWidth: 1, padding: 22, marginBottom: 20 }, threadTitle: { fontSize: 28, lineHeight: 34, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), marginTop: 8 },
+  bubble: { maxWidth: '91%', borderRadius: 20, borderWidth: 1, padding: 14, marginBottom: 11 },
   bubbleMeta: { fontSize: 11, marginBottom: 6 },
   bubbleBody: { fontSize: 15, lineHeight: 22 },
   attachmentList: { marginTop: 10, gap: 8 },

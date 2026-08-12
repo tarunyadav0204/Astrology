@@ -22,15 +22,14 @@ import SouthIndianChart from './SouthIndianChart';
 import DateNavigator from '../Common/DateNavigator';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
+import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
+import AppScrollView from '../../platform/AppScrollView';
 
 const isWeb = Platform.OS === 'web';
 
 const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, onOpenChartGuide, division, navigation, onHousePress }, ref) => {
   const { t } = useTranslation();
-  const { theme } = useTheme();
-  // light + pandit share white chrome; only dark keeps translucent white buttons
-  const isLight = theme !== 'dark';
-  const isPanditMode = theme === 'pandit';
+  const { theme, colors } = useTheme();
   const [chartStyle, setChartStyle] = useState(defaultStyle);
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(false);
   const [currentChartType, setCurrentChartType] = useState(chartType || 'lagna');
@@ -64,7 +63,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     const subscription = Dimensions.addEventListener('change', syncSize);
     return () => subscription?.remove?.();
   }, []);
-  
+
   useEffect(() => {
     if (chartType && chartType !== currentChartType) {
       setCurrentChartType(chartType);
@@ -77,10 +76,10 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const [showSwipeHint, setShowSwipeHint] = useState(true);
   const [chartDataCache, setChartDataCache] = useState({ lagna: chartData });
   const [transitDate, setTransitDate] = useState(new Date());
-  
+
   const activeChartTypeRef = useRef(currentChartType);
   const chartDataCacheRef = useRef(chartDataCache);
-  
+
   useEffect(() => {
     activeChartTypeRef.current = currentChartType;
   }, [currentChartType]);
@@ -88,13 +87,13 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   useEffect(() => {
     chartDataCacheRef.current = chartDataCache;
   }, [chartDataCache]);
-  
+
   const chartTypes = [
-    'lagna', 'navamsa', 'transit', 'karkamsa', 'swamsa', 'saptamsa', 'dasamsa', 'dwadasamsa', 'shodasamsa', 
-    'vimshamsa', 'chaturvimshamsa', 'saptavimshamsa', 'trimshamsa', 
+    'lagna', 'navamsa', 'transit', 'karkamsa', 'swamsa', 'saptamsa', 'dasamsa', 'dwadasamsa', 'shodasamsa',
+    'vimshamsa', 'chaturvimshamsa', 'saptavimshamsa', 'trimshamsa',
     'khavedamsa', 'akshavedamsa', 'shashtyamsa'
   ];
-  
+
   const chartTitles = {
     lagna: 'Birth Chart (Lagna)',
     navamsa: 'Navamsa (D9)',
@@ -113,7 +112,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     akshavedamsa: 'Akshavedamsa (D45)',
     shashtyamsa: 'Shashtyamsa (D60)'
   };
-  
+
   // Keys must match ChartScreen chart type ids (and swipe list aliases).
   const chartDivisions = {
     hora: 2,
@@ -142,15 +141,15 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const toggleStyle = useCallback(() => {
     setChartStyle(prev => prev === 'north' ? 'south' : 'north');
   }, []);
-  
+
   const handleRotate = useCallback((rashiIndex) => {
     setRotatedAscendant(rashiIndex);
   }, []);
-  
+
   const handleResetRotation = useCallback(() => {
     setRotatedAscendant(null);
   }, []);
-  
+
   const loadKarakas = useCallback(async () => {
     if (!birthData) return null;
     try {
@@ -182,7 +181,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       return null;
     }
   }, [chartData, birthData, chartDataCache.lagna, currentChartType]);
-  
+
   const toggleKarakas = useCallback(async () => {
     if (!karakas && !showKarakas) {
       await loadKarakas();
@@ -437,31 +436,31 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       }
     },
   });
-  
+
   const navigateToTransit = useCallback(() => {
     setShowSwipeHint(false);
     setCurrentChartType('transit');
     Animated.timing(slideAnim, { toValue: -1, duration: 350, useNativeDriver: true }).start(() => slideAnim.setValue(0));
   }, [slideAnim]);
-  
+
   useEffect(() => {
     if (currentChartType === 'transit') loadChartData('transit', true, transitDate);
   }, [transitDate]);
-  
+
   const handleTransitDateChange = (newDate) => setTransitDate(newDate);
-  
+
   useImperativeHandle(ref, () => ({ navigateToTransit, handleRotate }), [navigateToTransit, handleRotate]);
-  
+
   useEffect(() => {
     const timer = setTimeout(() => setShowSwipeHint(false), 3000);
     return () => clearTimeout(timer);
   }, []);
-  
+
   const renderChart = useCallback((type, data) => {
-    if (!type || !data) return <View style={styles.loadingContainer}><Text style={styles.loadingText}>Loading...</Text></View>;
+    if (!type || !data) return <View style={styles.loadingContainer}><Text style={styles.loadingText}>{t('premiumUi.common.loading')}</Text></View>;
     const sizeProp = isWeb && webChartSize ? { size: webChartSize } : {};
     return chartStyle === 'north' ? (
-      <NorthIndianChart 
+      <NorthIndianChart
         chartData={data}
         chartType={type}
         birthData={birthData}
@@ -472,10 +471,11 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         showKarakas={showKarakas}
         karakas={karakas}
         onHousePress={onHousePress}
+        hideInstructions={cosmicTheme}
         {...sizeProp}
       />
     ) : (
-      <SouthIndianChart 
+      <SouthIndianChart
         chartData={data}
         chartType={type}
         birthData={birthData}
@@ -491,24 +491,22 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize]);
 
   const QuickActionButton = ({ icon, label, onPress, active, primary }) => {
-    const iconColor = primary ? '#fff' : (isLight ? '#18181B' : '#fff');
-    const textColor = primary ? '#fff' : (isLight ? '#18181B' : '#fff');
+    const iconColor = primary ? colors.onPrimary : (active ? colors.onAccent : colors.text);
+    const textColor = colors.text;
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[
-          styles.quickActionButton, 
-          isLight && styles.quickActionButtonLight,
-          active && (isLight ? styles.quickActionButtonActiveLight : styles.quickActionButtonActive),
-          primary && (isPanditMode ? styles.quickActionButtonPrimaryPandit : styles.quickActionButtonPrimary),
-        ]} 
+          styles.quickActionButton,
+        ]}
         onPress={onPress}
+        activeOpacity={0.8}
       >
-        <Ionicons name={icon} size={18} color={iconColor} />
+        <View style={[styles.quickActionIcon, { backgroundColor: primary ? colors.primary : active ? colors.accentSoft : colors.surfaceMuted }]}>
+          <Ionicons name={icon} size={18} color={iconColor} />
+        </View>
         <Text style={[
-          styles.quickActionText, 
+          styles.quickActionText,
           { color: textColor },
-          active && styles.quickActionTextActive,
-          primary && styles.quickActionTextPrimary
         ]}>
           {label}
         </Text>
@@ -528,66 +526,58 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           </View>
         </View>
       )}
-      
+
       {currentChartType === 'transit' && (
-        <DateNavigator 
-          date={transitDate} 
-          onDateChange={handleTransitDateChange} 
-          cosmicTheme={cosmicTheme} 
+        <DateNavigator
+          date={transitDate}
+          onDateChange={handleTransitDateChange}
+          cosmicTheme={cosmicTheme}
         />
       )}
-      
+
       {rotatedAscendant !== null && (
         <View style={[styles.rotationBadge, cosmicTheme && styles.rotationBadgeCosmic]}>
-          <Text style={[styles.rotationBadgeText, cosmicTheme && styles.rotationBadgeTextCosmic]}>🔄 Rotated View</Text>
-          <TouchableOpacity onPress={handleResetRotation} style={styles.resetButton}><Text style={styles.resetButtonText}>Reset</Text></TouchableOpacity>
+          <Text style={[styles.rotationBadgeText, cosmicTheme && styles.rotationBadgeTextCosmic]}>🔄 {t('premiumUi.chart.rotatedView')}</Text>
+          <TouchableOpacity onPress={handleResetRotation} style={styles.resetButton}><Text style={styles.resetButtonText}>{t('premiumUi.common.reset')}</Text></TouchableOpacity>
         </View>
       )}
 
-      {/* Web: toolbar row above the diamond (not overlaid on it). */}
-      {cosmicTheme && isWeb ? (
-        <View style={styles.webToolbar}>
+      <View
+        style={cosmicTheme
+          ? [styles.chartStage, { backgroundColor: colors.chartSurface, borderColor: colors.chartLine }]
+          : null}
+      >
+      {cosmicTheme ? (
+        <View style={[styles.webToolbar, { backgroundColor: colors.chartRaised, borderBottomColor: colors.chartLine }]}>
+          <Text style={[styles.viewToolbarLabel, { color: colors.chartTextMuted }]}>{t('premiumUi.common.view')}</Text>
           <View style={styles.webToolbarLeft}>
             <TouchableOpacity
               onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
-              style={[styles.floatingButton, showDegreeNakshatra && styles.floatingButtonActive]}
+              style={[
+                styles.viewControl,
+                {
+                  backgroundColor: 'transparent',
+                },
+              ]}
             >
-              <Ionicons name={showDegreeNakshatra ? "eye" : "eye-off"} size={18} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={toggleStyle} style={styles.floatingButton}>
-              <Text style={styles.floatingButtonText}>{chartStyle === 'north' ? 'S' : 'N'}</Text>
+              <Ionicons name={showDegreeNakshatra ? "eye" : "eye-off"} size={15} color={showDegreeNakshatra ? colors.primary : colors.chartTextMuted} />
+              <Text style={[styles.viewControlText, { color: showDegreeNakshatra ? colors.primary : colors.chartTextMuted }]}>{t('premiumUi.common.degrees')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => navigation?.navigate('AshtakvargaOracle')}
-              style={styles.floatingButton}
+              onPress={toggleStyle}
+              style={[styles.viewControl, { backgroundColor: 'transparent' }]}
             >
-              <Ionicons name="grid-outline" size={18} color="#fff" />
+              <Ionicons name="grid-outline" size={15} color={colors.chartTextMuted} />
+              <Text style={[styles.viewControlText, { color: colors.chartTextMuted }]}>{chartStyle === 'north' ? 'South' : 'North'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => navigation?.navigate('KPSystem', { birthDetails: birthData })}
-              style={styles.floatingButton}
-            >
-              <Ionicons name="compass-outline" size={18} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => navigation?.navigate('KotaChakra', { birthChartId: birthData?.id })}
-              style={styles.floatingButton}
-            >
-              <Ionicons name="shield-outline" size={18} color="#fff" />
-            </TouchableOpacity>
-            {onOpenChartGuide ? (
-              <TouchableOpacity
-                onPress={onOpenChartGuide}
-                style={styles.floatingButton}
-                accessibilityRole="button"
-                accessibilityLabel={t('chartScreen.watchGuide', 'Watch guide')}
-              >
-                <Ionicons name="play-circle-outline" size={18} color="#fff" />
-              </TouchableOpacity>
-            ) : null}
           </View>
-          <TouchableOpacity onPress={() => setShowInfoModal(true)} style={styles.infoButton}>
-            <Ionicons name="information-circle-outline" size={20} color="#fff" />
+          <TouchableOpacity
+            onPress={() => setShowInfoModal(true)}
+            style={styles.viewInfoButton}
+            accessibilityRole="button"
+            accessibilityLabel={t('premiumUi.common.aboutChart')}
+          >
+            <Ionicons name="information-circle-outline" size={18} color={colors.chartTextMuted} />
           </TouchableOpacity>
         </View>
       ) : null}
@@ -609,55 +599,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             : null,
         ]}
       >
-        {cosmicTheme && !isWeb && (
-          <>
-            <View style={[styles.floatingControls, currentChartType === 'transit' && styles.floatingControlsTransit]}>
-              <TouchableOpacity
-                onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
-                style={[styles.floatingButton, showDegreeNakshatra && styles.floatingButtonActive]}
-              >
-                <Ionicons name={showDegreeNakshatra ? "eye" : "eye-off"} size={18} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={toggleStyle} style={styles.floatingButton}>
-                <Text style={styles.floatingButtonText}>{chartStyle === 'north' ? 'S' : 'N'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => navigation?.navigate('AshtakvargaOracle')}
-                style={styles.floatingButton}
-              >
-                <Ionicons name="grid-outline" size={18} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => navigation?.navigate('KPSystem', { birthDetails: birthData })}
-                style={styles.floatingButton}
-              >
-                <Ionicons name="compass-outline" size={18} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => navigation?.navigate('KotaChakra', { birthChartId: birthData?.id })}
-                style={styles.floatingButton}
-              >
-                <Ionicons name="shield-outline" size={18} color="#fff" />
-              </TouchableOpacity>
-              {onOpenChartGuide ? (
-                <TouchableOpacity
-                  onPress={onOpenChartGuide}
-                  style={styles.floatingButton}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('chartScreen.watchGuide', 'Watch guide')}
-                >
-                  <Ionicons name="play-circle-outline" size={18} color="#fff" />
-                </TouchableOpacity>
-              ) : null}
-            </View>
-            <View style={styles.infoButtonContainer}>
-              <TouchableOpacity onPress={() => setShowInfoModal(true)} style={styles.infoButton}>
-                <Ionicons name="information-circle-outline" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
-
         <Animated.View
           {...(disableSwipe ? {} : panResponder.panHandlers)}
           style={[
@@ -672,34 +613,72 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           {renderChart(currentChartType, getChartData())}
         </Animated.View>
       </View>
-      
+      </View>
+
+      {cosmicTheme && (
+        <View style={styles.advancedToolsSection}>
+          <Text style={[styles.advancedToolsLabel, { color: colors.textSecondary }]}>{t('premiumUi.common.professionalTools')}</Text>
+          <AppScrollView
+            horizontal
+            nestedScrollEnabled
+            directionalLockEnabled
+            showsHorizontalScrollIndicator={false}
+            style={styles.horizontalRail}
+            contentContainerStyle={styles.advancedToolsRow}
+          >
+            {[
+              ['grid-outline', 'Ashtakvarga', () => navigation?.navigate('AshtakvargaOracle')],
+              ['compass-outline', 'KP system', () => navigation?.navigate('KPSystem', { birthDetails: birthData })],
+              ['shield-outline', 'Kota Chakra', () => navigation?.navigate('KotaChakra', { birthChartId: birthData?.id })],
+              ...(onOpenChartGuide ? [['play-circle-outline', 'Chart guide', onOpenChartGuide]] : []),
+            ].map(([icon, label, action]) => (
+              <TouchableOpacity
+                key={label}
+                onPress={action}
+                style={styles.advancedTool}
+                activeOpacity={0.8}
+              >
+                <Ionicons name={icon} size={16} color={colors.primary} />
+                <Text style={[styles.advancedToolText, { color: colors.text }]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </AppScrollView>
+        </View>
+      )}
+
       {cosmicTheme && (
         <View style={styles.quickActionsGrid}>
-          <View style={styles.quickActionsRow}>
+          <Text style={[styles.advancedToolsLabel, { color: colors.textSecondary }]}>{t('premiumUi.common.readChart')}</Text>
+          <AppScrollView
+            horizontal
+            nestedScrollEnabled
+            directionalLockEnabled
+            showsHorizontalScrollIndicator={false}
+            style={styles.horizontalRail}
+            contentContainerStyle={styles.quickActionsRow}
+          >
             {currentChartType !== 'transit' && (
-              <QuickActionButton 
-                icon="planet-outline" 
-                label={t('chartScreen.transit', 'Transit')} 
+              <QuickActionButton
+                icon="planet-outline"
+                label={t('chartScreen.transit', 'Transit')}
                 onPress={() => { setCurrentChartType('transit'); if (onNavigateToTransit) onNavigateToTransit(); }}
                 active={false}
               />
             )}
-            <QuickActionButton 
-              icon="time-outline" 
-              label={t('chartScreen.dasha', 'Dasha')} 
+            <QuickActionButton
+              icon="time-outline"
+              label={t('chartScreen.dasha', 'Dasha')}
               onPress={onOpenDasha}
             />
-            <QuickActionButton 
-              icon="star-outline" 
-              label={t('chartScreen.karakas', 'Karakas')} 
+            <QuickActionButton
+              icon="star-outline"
+              label={t('chartScreen.karakas', 'Karakas')}
               onPress={toggleKarakas}
               active={showKarakas}
             />
-          </View>
-          <View style={styles.quickActionsRow}>
-            <QuickActionButton 
-              icon="list-outline" 
-              label={t('chartScreen.positions', 'Positions')} 
+            <QuickActionButton
+              icon="list-outline"
+              label={t('chartScreen.positions', 'Positions')}
               onPress={() => {
                 const cd = getChartData();
                 if (cd?.planets && birthData) {
@@ -707,18 +686,16 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 }
               }}
             />
-            {currentChartType === 'lagna' ? (
-              <QuickActionButton 
-                icon="body-outline" 
-                label={t('chartScreen.yogas', 'Yogas')} 
+            {currentChartType === 'lagna' && (
+              <QuickActionButton
+                icon="body-outline"
+                label={t('chartScreen.yogas', 'Yogas')}
                 onPress={() => navigation?.navigate('Yogas')}
               />
-            ) : (
-              <View style={{ flex: 1 }} />
             )}
-            <QuickActionButton 
-              icon="sparkles-outline" 
-              label={t('chartScreen.analyze', 'Analyze')} 
+            <QuickActionButton
+              icon="sparkles-outline"
+              label={t('chartScreen.askTara', 'Ask Tara')}
               primary
               onPress={() => {
                 const chartName = chartTitles[currentChartType] || currentChartType;
@@ -726,10 +703,10 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 navigation?.navigate('Home', { startChat: true, initialMessage: prompt });
               }}
             />
-          </View>
+          </AppScrollView>
         </View>
       )}
-      
+
       {showInfoModal && (
         <Modal
           visible={showInfoModal}
@@ -737,9 +714,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           animationType="fade"
           onRequestClose={() => setShowInfoModal(false)}
         >
-          <View style={styles.infoOverlay}>
-            <View style={styles.infoContent}>
-              <Text style={styles.infoTitle}>
+          <View style={[styles.infoOverlay, { backgroundColor: colors.overlay }]}>
+            <View style={[styles.infoContent, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.infoTitle, { color: colors.text }]}>
                 {t('chartScreen.infoTitle', 'About this chart')}
               </Text>
               <ScrollView style={styles.infoScroll} showsVerticalScrollIndicator={false}>
@@ -750,36 +727,36 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                       setShowInfoModal(false);
                       onOpenChartGuide();
                     }}
-                    style={styles.infoGuideCard}
+                    style={[styles.infoGuideCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}
                     accessibilityRole="button"
                     accessibilityLabel={t('chartScreen.watchGuideTitle', 'How to read this chart')}
                   >
-                    <View style={styles.infoGuideIcon}>
-                      <Ionicons name="play" size={14} color="#fff" />
+                    <View style={[styles.infoGuideIcon, { backgroundColor: colors.primary }]}>
+                      <Ionicons name="play" size={14} color={colors.onPrimary} />
                     </View>
                     <View style={styles.infoGuideTextWrap}>
-                      <Text style={styles.infoGuideLabel}>
+                      <Text style={[styles.infoGuideLabel, { color: colors.primary }]}>
                         {t('chartScreen.watchGuide', 'Watch guide')}
                       </Text>
-                      <Text style={styles.infoGuideTitle}>
+                      <Text style={[styles.infoGuideTitle, { color: colors.text }]}>
                         {t('chartScreen.watchGuideTitle', 'How to read this chart')}
                       </Text>
                     </View>
-                    <Text style={styles.infoGuideMeta}>
+                    <Text style={[styles.infoGuideMeta, { color: colors.primary }]}>
                       {t('chartScreen.watchGuideDuration', '4 min')}
                     </Text>
                   </TouchableOpacity>
                 ) : null}
-                <Text style={styles.infoText}>
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                   {getChartInfoIntro()}
                 </Text>
-                <Text style={styles.infoText}>
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                   {getChartInfoUsage()}
                 </Text>
-                <Text style={styles.infoSubTitle}>
+                <Text style={[styles.infoSubTitle, { color: colors.text }]}>
                   {t('chartScreen.legendTitle', 'Legend')}
                 </Text>
-                <Text style={styles.infoText}>
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                   • {t('chartScreen.legendHouses', 'The house with ASC written is your 1st house. From there, go counter‑clockwise around the chart for houses 1–12.')}{'\n'}
                   • {t('chartScreen.legendSigns', 'The small number inside each diamond is the zodiac sign number (1–12), not the house number.')}{'\n'}
                   • {t('chartScreen.legendPlanets', 'Planet symbols show where each planet sits in the chart.')}{'\n'}
@@ -788,8 +765,8 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                   • {t('chartScreen.legendNakshatra', 'Turn on the eye icon to see exact degrees and nakshatra names under each planet.')}
                 </Text>
               </ScrollView>
-              <TouchableOpacity onPress={() => setShowInfoModal(false)} style={styles.infoCloseButton}>
-                <Text style={styles.infoCloseButtonText}>
+              <TouchableOpacity onPress={() => setShowInfoModal(false)} style={[styles.infoCloseButton, { backgroundColor: colors.primary }]}>
+                <Text style={[styles.infoCloseButtonText, { color: colors.onPrimary }]}>
                   {t('common.close', 'Close')}
                 </Text>
               </TouchableOpacity>
@@ -805,6 +782,12 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
 const styles = StyleSheet.create({
   container: { backgroundColor: COLORS.surface, borderRadius: 16, paddingVertical: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5 },
   cosmicContainer: { backgroundColor: 'transparent', borderRadius: 0, paddingVertical: 0, shadowColor: 'transparent', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
+  chartStage: {
+    marginHorizontal: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
   header: { alignItems: 'center', marginBottom: 20 },
   title: { fontSize: 20, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 12 },
   chartIndicators: { flexDirection: 'row', gap: 6 },
@@ -828,7 +811,7 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       justifyContent: 'center',
       padding: 0,
-      paddingTop: 60,
+      paddingTop: 0,
     },
   }),
   cosmicChartContainer: Platform.select({
@@ -837,87 +820,108 @@ const styles = StyleSheet.create({
       aspectRatio: 1,
       padding: 0,
       marginTop: 0,
-      marginBottom: 12,
+      marginBottom: 0,
       overflow: 'visible',
     },
     default: {
       width: '100%',
       aspectRatio: 1,
       padding: 0,
-      paddingTop: 60,
-      marginBottom: 20,
+      paddingTop: 0,
+      marginBottom: 0,
     },
   }),
   swipeArea: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
   swipeAreaWeb: { flex: 0, width: '100%', alignSelf: 'center', overflow: 'visible' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: 16, color: COLORS.textSecondary },
-  floatingControls: { position: 'absolute', top: 10, left: 30, flexDirection: 'row', gap: 8, zIndex: 10 },
-  floatingControlsTransit: { top: 10 },
   chartContainerTransit: { marginTop: 12 },
-  floatingButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
-  floatingButtonActive: { backgroundColor: 'rgba(255, 107, 53, 0.8)', borderColor: 'rgba(255, 107, 53, 1)' },
-  floatingButtonText: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  infoButtonContainer: { position: 'absolute', top: 10, right: 30, zIndex: 10 },
-  infoButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
   webToolbar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     width: '100%',
-    paddingHorizontal: 10,
-    paddingTop: 10,
-    paddingBottom: 10,
-    marginTop: 4,
+    minHeight: 46,
+    paddingHorizontal: 15,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
     zIndex: 2,
+  },
+  viewToolbarLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    marginRight: 12,
   },
   webToolbarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
+    gap: 7,
     flex: 1,
-    paddingRight: 8,
   },
-  quickActionsGrid: { marginTop: 24, paddingHorizontal: 36, gap: 12 },
-  quickActionsRow: { flexDirection: 'row', gap: 12 },
-  quickActionButton: { 
-    flex: 1,
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    paddingHorizontal: 12, 
-    paddingVertical: 12, 
-    backgroundColor: 'rgba(255, 255, 255, 0.1)', 
-    borderRadius: 16, 
-    borderWidth: 1, 
-    borderColor: 'rgba(255, 255, 255, 0.2)', 
+  viewControl: {
+    minHeight: 30,
+    paddingHorizontal: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  viewControlText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  viewInfoButton: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickActionsGrid: { marginTop: 22 },
+  quickActionsRow: { paddingHorizontal: 16, paddingRight: 28, gap: 18 },
+  quickActionButton: {
+    width: 58,
+    minHeight: 62,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  quickActionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 7,
+  },
+  quickActionText: { fontSize: 10, lineHeight: 13, fontWeight: '700', textAlign: 'center' },
+  advancedToolsSection: {
+    marginTop: 20,
+  },
+  horizontalRail: Platform.select({
+    web: { width: '100%', overflow: 'auto', touchAction: 'pan-x' },
+    default: { width: '100%' },
+  }),
+  advancedToolsLabel: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+  },
+  advancedToolsRow: {
+    paddingHorizontal: 16,
+    paddingRight: 28,
     gap: 8,
-    justifyContent: 'center'
   },
-  quickActionButtonLight: {
-    backgroundColor: '#FFFFFF',
-    borderColor: 'rgba(24, 24, 27, 0.18)',
-    borderWidth: 1.5,
+  advancedTool: {
+    minHeight: 32,
+    paddingHorizontal: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  quickActionButtonActive: { 
-    backgroundColor: 'rgba(255, 255, 255, 0.25)', 
-    borderColor: 'rgba(255, 255, 255, 0.4)',
+  advancedToolText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
-  quickActionButtonActiveLight: {
-    backgroundColor: 'rgba(24, 24, 27, 0.08)',
-    borderColor: 'rgba(24, 24, 27, 0.35)',
-  },
-  quickActionButtonPrimary: {
-    backgroundColor: '#ff6b35',
-    borderColor: '#ff8a65',
-  },
-  quickActionButtonPrimaryPandit: {
-    backgroundColor: '#3F3F46',
-    borderColor: '#27272A',
-  },
-  quickActionText: { fontSize: 12, fontWeight: '600' },
-  quickActionTextActive: { fontWeight: '800' },
-  quickActionTextPrimary: { color: '#fff', fontWeight: '800' },
   rotationBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.accent, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginVertical: 12, alignSelf: 'center', gap: 12 },
   rotationBadgeCosmic: { backgroundColor: 'rgba(255, 107, 53, 0.8)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
   rotationBadgeText: { fontSize: 14, fontWeight: '600', color: COLORS.white },
@@ -925,34 +929,30 @@ const styles = StyleSheet.create({
   resetButton: { backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
   resetButtonText: { fontSize: 12, fontWeight: '700', color: COLORS.white },
   infoOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  infoContent: { 
-    width: '100%', 
-    maxWidth: 420, 
+  infoContent: {
+    width: '100%',
+    maxWidth: 420,
     maxHeight: 480,
-    backgroundColor: '#020617', 
-    borderRadius: 24, 
-    paddingHorizontal: 22, 
-    paddingVertical: 20, 
-    borderWidth: 1, 
-    borderColor: 'rgba(248, 250, 252, 0.1)',
+    borderRadius: 28,
+    paddingHorizontal: 22,
+    paddingVertical: 20,
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.45,
     shadowRadius: 26,
     elevation: 16,
   },
-  infoTitle: { 
-    fontSize: 19, 
-    fontWeight: '800', 
-    color: '#f9fafb', 
-    marginBottom: 6, 
-    textAlign: 'center', 
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
+  infoTitle: {
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 24,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
   },
-  infoSubTitle: { fontSize: 14, fontWeight: '700', color: '#cbd5f5', marginTop: 12, marginBottom: 4 },
+  infoSubTitle: { fontSize: 12, fontWeight: '800', marginTop: 12, marginBottom: 5, letterSpacing: 1.1 },
   infoScroll: { maxHeight: 360, marginBottom: 16 },
-  infoText: { fontSize: 13, color: '#e5e7eb', lineHeight: 20, marginBottom: 8 },
+  infoText: { fontSize: 13, lineHeight: 20, marginBottom: 8 },
   infoGuideCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -961,15 +961,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 14,
-    backgroundColor: 'rgba(249, 115, 22, 0.16)',
     borderWidth: 1,
-    borderColor: 'rgba(249, 115, 22, 0.35)',
   },
   infoGuideIcon: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#f97316',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -977,20 +974,18 @@ const styles = StyleSheet.create({
   infoGuideLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#fdba74',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     marginBottom: 1,
   },
-  infoGuideTitle: { fontSize: 13, fontWeight: '700', color: '#f9fafb' },
+  infoGuideTitle: { fontSize: 13, fontWeight: '700' },
   infoGuideMeta: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#fdba74',
     flexShrink: 0,
   },
-  infoCloseButton: { alignSelf: 'center', paddingHorizontal: 24, paddingVertical: 10, borderRadius: 999, backgroundColor: '#f97316' },
-  infoCloseButtonText: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 0.3, textTransform: 'uppercase' },
+  infoCloseButton: { alignSelf: 'stretch', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999 },
+  infoCloseButtonText: { fontSize: 14, fontWeight: '800', letterSpacing: 0.2 },
 });
 
 export default ChartWidget;

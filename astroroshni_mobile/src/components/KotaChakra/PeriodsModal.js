@@ -6,13 +6,16 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  ScrollView,
+  StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { typographyTokens } from '../../theme/tokens';
 
 const PeriodsModal = ({ visible, onClose, type, data, colors }) => {
   const periods = type === 'good' ? data.good_periods : data.vulnerable_periods;
-  
+
   const getStatusColor = (vulnerabilityScore) => {
     if (vulnerabilityScore >= 6) return colors.error;
     if (vulnerabilityScore >= 3) return colors.warning;
@@ -20,23 +23,27 @@ const PeriodsModal = ({ visible, onClose, type, data, colors }) => {
     return colors.success;
   };
 
+  const getStatusTextColor = (vulnerabilityScore) => (
+    vulnerabilityScore >= 2 && vulnerabilityScore < 6 ? colors.onAccent : colors.textInverse
+  );
+
   const renderPeriodItem = ({ item }) => (
-    <View style={[styles.periodCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
+    <View style={[styles.periodCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
       <View style={styles.periodHeader}>
         <Text style={[styles.monthName, { color: colors.text }]}>
           {item.month_name}
         </Text>
         <View style={[styles.scoreBadge, { backgroundColor: getStatusColor(item.vulnerability_score) }]}>
-          <Text style={styles.scoreText}>
+          <Text style={[styles.scoreText, { color: getStatusTextColor(item.vulnerability_score) }]}>
             {item.vulnerability_score}
           </Text>
         </View>
       </View>
-      
+
       <Text style={[styles.interpretation, { color: colors.textSecondary }]}>
         {item.interpretation}
       </Text>
-      
+
       {item.malefic_siege && (
         <View style={styles.siegeInfo}>
           {Object.entries(item.malefic_siege).map(([section, planets]) => {
@@ -61,22 +68,20 @@ const PeriodsModal = ({ visible, onClose, type, data, colors }) => {
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} style={styles.container}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>
-            {type === 'good' ? '🟢 Protected Periods' : '🔴 Vulnerable Periods'}
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Year {data.year}
-          </Text>
-          
-          <TouchableOpacity
-            style={[styles.closeButton, { backgroundColor: colors.primary }]}
-            onPress={onClose}
-          >
-            <Text style={styles.closeButtonText}>✕</Text>
-          </TouchableOpacity>
-        </View>
+      <LinearGradient colors={[colors.background, colors.backgroundSecondary]} style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} translucent={false} />
+        <SafeAreaView edges={['top']} style={{ backgroundColor: colors.headerSurface }}>
+          <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cosmicLine }]}>
+            <View>
+              <Text style={[styles.eyebrow, { color: colors.accent }]}>{type === 'good' ? 'PROTECTION WINDOWS' : 'CAUTION WINDOWS'}</Text>
+              <Text style={[styles.title, { color: colors.textInverse }]}>{type === 'good' ? 'Protected periods' : 'Vulnerable periods'}</Text>
+              <Text style={[styles.subtitle, { color: colors.textInverseMuted }]}>Year {data.year}</Text>
+            </View>
+            <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]} onPress={onClose} accessibilityLabel="Close">
+              <Ionicons name="close" size={22} color={colors.textInverse} />
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
 
         {periods.length > 0 ? (
           <FlatList
@@ -89,7 +94,7 @@ const PeriodsModal = ({ visible, onClose, type, data, colors }) => {
         ) : (
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {type === 'good' 
+              {type === 'good'
                 ? 'No particularly protected periods found this year'
                 : 'No highly vulnerable periods found this year'
               }
@@ -100,10 +105,10 @@ const PeriodsModal = ({ visible, onClose, type, data, colors }) => {
           </View>
         )}
 
-        <View style={styles.footer}>
+        <SafeAreaView edges={['bottom']} style={[styles.footer, { backgroundColor: colors.surfaceRaised, borderTopColor: colors.cardBorder }]}>
           <View style={styles.legendContainer}>
             <Text style={[styles.legendTitle, { color: colors.text }]}>
-              Vulnerability Scale:
+              Vulnerability scale
             </Text>
             <View style={styles.legendItems}>
               <View style={styles.legendItem}>
@@ -126,7 +131,7 @@ const PeriodsModal = ({ visible, onClose, type, data, colors }) => {
               </View>
             </View>
           </View>
-        </View>
+        </SafeAreaView>
       </LinearGradient>
     </Modal>
   );
@@ -137,38 +142,38 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    padding: 20,
-    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    flexDirection: 'row',
     alignItems: 'center',
-    position: 'relative',
+    justifyContent: 'space-between',
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
+  eyebrow: {
+    ...typographyTokens.eyebrow,
     marginBottom: 4,
   },
+  title: {
+    ...typographyTokens.display,
+    fontSize: 28,
+    lineHeight: 32,
+  },
   subtitle: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '500',
+    marginTop: 3,
   },
   closeButton: {
-    position: 'absolute',
-    top: 60,
-    right: 20,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  closeButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   listContainer: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 20,
   },
   periodCard: {
     borderRadius: 12,
@@ -192,7 +197,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   scoreText: {
-    color: '#ffffff',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -224,12 +228,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     padding: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderTopWidth: 1,
   },
   legendContainer: {
     alignItems: 'center',
@@ -241,6 +241,8 @@ const styles = StyleSheet.create({
   },
   legendItems: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: 16,
   },
   legendItem: {

@@ -38,6 +38,7 @@ import { openRazorpayCheckout, openRazorpaySubscriptionCheckout } from '../platf
 import { useAuthGate } from '../auth/AuthGateContext';
 import { useFocusEffect } from '@react-navigation/native';
 import AppAlertModal from '../components/Common/AppAlertModal';
+import { typographyTokens } from '../theme/tokens';
 import {
   getStoredGooglePlayUserId,
   removePendingGooglePlaySubscription,
@@ -380,7 +381,6 @@ const CreditScreen = ({ navigation, route }) => {
   const iapCallbacksRef = useRef({});
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
   const scrollViewRef = useRef(null);
   const astrologerSectionYRef = useRef(0);
   const creditHeaderTitle =
@@ -723,23 +723,6 @@ const CreditScreen = ({ navigation, route }) => {
       }),
     ]).start();
     
-    // Pulse animation for credit balance
-    const pulseLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.05,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulseLoop.start();
-    
     // Refresh credits + history when screen comes into focus.
     // Android: sync with Google Play. Web: Razorpay catalog only (never Play IAP).
     const unsubscribe = navigation.addListener('focus', () => {
@@ -768,7 +751,6 @@ const CreditScreen = ({ navigation, route }) => {
     });
 
     return () => {
-      pulseLoop.stop();
       unsubscribe();
     };
   }, [navigation, iapReady, productIds, subscriptionProductIds]);
@@ -1834,15 +1816,11 @@ const CreditScreen = ({ navigation, route }) => {
   };
 
 
-  const bgGradient = isDark
-    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd]
-    : [colors.gradientStart, colors.gradientMid];
-  const balanceCardGradient = isDark
-    ? [colors.cardBackground, colors.surface]
-    : [colors.cardBackground, colors.backgroundSecondary];
+  const bgGradient = [colors.background, colors.backgroundSecondary, colors.background];
+  const balanceCardGradient = [colors.headerSurface, colors.surfaceInverse];
   const promoCardBg = colors.cardBackground;
-  const promoInputBg = isDark ? colors.surface : colors.backgroundSecondary;
-  const backButtonBg = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.9)';
+  const promoInputBg = colors.surfaceMuted;
+  const backButtonBg = colors.surfaceMuted;
 
   const renderTransaction = ({ item }) => (
     <View style={styles.transactionItem}>
@@ -1909,7 +1887,7 @@ const CreditScreen = ({ navigation, route }) => {
               />
             }
           >
-            {/* Header */}
+            {/* Editorial task header */}
             <Animated.View
               style={[
                 styles.header,
@@ -1927,17 +1905,7 @@ const CreditScreen = ({ navigation, route }) => {
               </TouchableOpacity>
 
               <View style={styles.headerContent}>
-                <View style={styles.cosmicOrb}>
-                  <LinearGradient
-                    colors={[colors.primary, colors.accent, colors.primary]}
-                    style={styles.orbGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
-                    <Ionicons name="diamond" size={32} color="white" />
-                  </LinearGradient>
-                </View>
-
+                <Text style={[styles.headerEyebrow, { color: colors.primary }]}>YOUR ASTROROSHNI WALLET</Text>
                 <Text style={[styles.headerTitle, { color: colors.text }]}>{creditHeaderTitle}</Text>
                 <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{creditHeaderSubtitle}</Text>
               </View>
@@ -1950,7 +1918,7 @@ const CreditScreen = ({ navigation, route }) => {
                 androidGlassFixStyle,
                 {
                   opacity: fadeAnim,
-                  transform: [{ scale: pulseAnim }]
+                  borderColor: colors.cosmicLine,
                 }
               ]}
             >
@@ -1958,27 +1926,36 @@ const CreditScreen = ({ navigation, route }) => {
                 colors={balanceCardGradient}
                 style={styles.balanceGradient}
               >
+                <View style={styles.balanceTopRow}>
+                  <View style={[styles.balanceSeal, { borderColor: colors.cosmicLine, backgroundColor: colors.cosmicRaised }]}>
+                    <Ionicons name="sparkles-outline" size={21} color={colors.accentSoft} />
+                  </View>
+                  <View style={styles.balanceStatus}>
+                    <View style={[styles.balanceStatusDot, { backgroundColor: colors.accent }]} />
+                    <Text style={[styles.balanceStatusText, { color: colors.textInverseMuted }]}>AVAILABLE NOW</Text>
+                  </View>
+                </View>
                 <View style={styles.balanceContent}>
-                  <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>{t('credits.page.yourBalance')}</Text>
-                  <Text style={[styles.balanceAmount, { color: colors.primary }]}>{credits}</Text>
-                  <Text style={[styles.balanceCreditsText, { color: colors.textTertiary }]}>{t('credits.page.creditsLabel')}</Text>
+                  <Text style={[styles.balanceLabel, { color: colors.textInverseMuted }]}>{t('credits.page.yourBalance')}</Text>
+                  <View style={styles.balanceAmountRow}>
+                    <Text style={[styles.balanceAmount, { color: colors.textInverse }]}>{credits}</Text>
+                    <Text style={[styles.balanceCreditsText, { color: colors.accentSoft }]}>{t('credits.page.creditsLabel')}</Text>
+                  </View>
+                  <Text style={[styles.balanceHint, { color: colors.textInverseMuted }]}>Use across Tara conversations, reports and advanced chart tools.</Text>
                 </View>
-
-                <View style={styles.balanceDecoration}>
-                  <View style={[styles.decorationCircle, { backgroundColor: isDark ? 'rgba(249,115,22,0.08)' : 'rgba(255,107,53,0.05)' }]} />
-                  <View style={[styles.decorationCircle, styles.decorationCircle2, { backgroundColor: isDark ? 'rgba(249,115,22,0.12)' : 'rgba(255,107,53,0.08)' }]} />
-                  <View style={[styles.decorationCircle, styles.decorationCircle3, { backgroundColor: isDark ? 'rgba(249,115,22,0.15)' : 'rgba(255,107,53,0.12)' }]} />
-                </View>
+                <View style={[styles.balanceArc, styles.balanceArcOuter, { borderColor: colors.cosmicLine }]} />
+                <View style={[styles.balanceArc, styles.balanceArcInner, { borderColor: colors.cosmicLine }]} />
               </LinearGradient>
             </Animated.View>
 
             {/* Buy credits (Google Play) - Android only; products fetched from backend/Play */}
             {Platform.OS === 'android' && (
               <View style={styles.buySection}>
+                <Text style={[styles.sectionEyebrow, { color: colors.primary }]}>TOP UP</Text>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('credits.page.chooseYourPackWithTara')}</Text>
                 {showPackRelaunchBanner ? (
-                  <View style={[styles.packRelaunchBanner, { backgroundColor: isDark ? 'rgba(34,197,94,0.16)' : 'rgba(34,197,94,0.1)', borderColor: isDark ? 'rgba(34,197,94,0.45)' : 'rgba(22,163,74,0.35)' }]}>
-                    <Ionicons name="gift-outline" size={18} color="#16a34a" />
+                  <View style={[styles.packRelaunchBanner, { backgroundColor: colors.surfaceMuted, borderColor: colors.success }]}>
+                    <Ionicons name="gift-outline" size={18} color={colors.success} />
                     <Text style={[styles.packRelaunchText, { color: colors.text }]}>
                       {t('credits.page.packRelaunchBanner')}
                     </Text>
@@ -1996,7 +1973,7 @@ const CreditScreen = ({ navigation, route }) => {
                     {(() => {
                       const firstEligible = googlePlayProducts.map(getFirstPurchaseBonus).find((b) => b.eligible);
                       return firstEligible ? (
-                        <View style={[styles.firstPurchaseBonusBanner, { backgroundColor: isDark ? 'rgba(249,115,22,0.16)' : 'rgba(255,107,53,0.1)', borderColor: colors.primary }]}>
+                        <View style={[styles.firstPurchaseBonusBanner, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}>
                           <Ionicons name="flash-outline" size={18} color={colors.primary} />
                           <Text style={[styles.firstPurchaseBonusText, { color: colors.text }]}>
                             Limited offer: get {formatFirstPurchaseBonusLabel(firstEligible)} on your first pack.
@@ -2038,12 +2015,15 @@ const CreditScreen = ({ navigation, route }) => {
                             disabled={purchasingProductId === product.product_id}
                           >
                             <View style={styles.creditPackWideTop}>
+                              <View style={[styles.creditPackMedallion, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
+                                <Ionicons name="sparkles" size={18} color={colors.onAccent} />
+                              </View>
                               <View style={{ flex: 1 }}>
                                 <View style={styles.creditPackNameRow}>
                                   <Text style={[styles.creditPackName, { color: colors.text }]}>{packName}</Text>
                                   {badge ? (
                                     <View style={[styles.creditPackBadge, { backgroundColor: colors.primary }]}>
-                                      <Text style={styles.creditPackBadgeText}>{badge}</Text>
+                                      <Text style={[styles.creditPackBadgeText, { color: colors.onPrimary }]}>{badge}</Text>
                                     </View>
                                   ) : null}
                                 </View>
@@ -2080,9 +2060,10 @@ const CreditScreen = ({ navigation, route }) => {
                                 ) : null}
                               </View>
                               <View style={[styles.creditPackButton, { backgroundColor: colors.primary }]}>
-                                <Text style={styles.creditPackButtonText}>
+                                <Text style={[styles.creditPackButtonText, { color: colors.onPrimary }]}>
                                   {purchasingProductId === product.product_id ? t('credits.page.processing') : t('credits.page.buy')}
                                 </Text>
+                                <Ionicons name="arrow-forward" size={14} color={colors.onPrimary} />
                               </View>
                             </View>
                           </TouchableOpacity>
@@ -2097,6 +2078,7 @@ const CreditScreen = ({ navigation, route }) => {
             {/* Buy credits (Razorpay Checkout.js) — Expo Web / mobile browsers */}
             {Platform.OS === 'web' && (
               <View style={styles.buySection}>
+                <Text style={[styles.sectionEyebrow, { color: colors.primary }]}>TOP UP</Text>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>
                   {t('credits.page.chooseYourPackWithTara')}
                 </Text>
@@ -2145,6 +2127,9 @@ const CreditScreen = ({ navigation, route }) => {
                           disabled={purchasingRazorpayCredits !== null}
                         >
                           <View style={styles.creditPackWideTop}>
+                            <View style={[styles.creditPackMedallion, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
+                              <Ionicons name="sparkles" size={18} color={colors.onAccent} />
+                            </View>
                             <View style={{ flex: 1 }}>
                               <View style={styles.creditPackNameRow}>
                                 <Text style={[styles.creditPackName, { color: colors.text }]}>
@@ -2152,7 +2137,7 @@ const CreditScreen = ({ navigation, route }) => {
                                 </Text>
                                 {badge ? (
                                   <View style={[styles.creditPackBadge, { backgroundColor: colors.primary }]}>
-                                    <Text style={styles.creditPackBadgeText}>{badge}</Text>
+                                    <Text style={[styles.creditPackBadgeText, { color: colors.onPrimary }]}>{badge}</Text>
                                   </View>
                                 ) : null}
                               </View>
@@ -2188,11 +2173,12 @@ const CreditScreen = ({ navigation, route }) => {
                               ) : null}
                             </View>
                             <View style={[styles.creditPackButton, { backgroundColor: colors.primary }]}>
-                              <Text style={styles.creditPackButtonText}>
+                              <Text style={[styles.creditPackButtonText, { color: colors.onPrimary }]}>
                                 {purchasingRazorpayCredits === pack.credits
                                   ? t('credits.page.processing')
                                   : t('credits.page.buy')}
                               </Text>
+                              <Ionicons name="arrow-forward" size={14} color={colors.onPrimary} />
                             </View>
                           </View>
                         </TouchableOpacity>
@@ -2212,7 +2198,7 @@ const CreditScreen = ({ navigation, route }) => {
               >
                 <View style={[styles.vipDiscountPanel, androidGlassFixStyle, { backgroundColor: promoCardBg, borderColor: colors.primary }]}>
                   <View style={styles.vipDiscountHeader}>
-                    <View style={[styles.vipDiscountIcon, { backgroundColor: isDark ? 'rgba(249,115,22,0.18)' : 'rgba(234,88,12,0.1)' }]}>
+                    <View style={[styles.vipDiscountIcon, { backgroundColor: colors.selectionSurface }]}>
                       <Ionicons name="school-outline" size={23} color={colors.primary} />
                     </View>
                     <View style={styles.vipDiscountCopy}>
@@ -2226,7 +2212,7 @@ const CreditScreen = ({ navigation, route }) => {
                   {astrologerSubscriptionDetails ? (
                     <>
                       <View style={[styles.subscriptionCardDates, styles.vipDiscountDates, { borderTopColor: colors.cardBorder }]}>
-                        <Text style={[styles.vipPlanRowTitle, { color: colors.success || '#16a34a' }]}>Active</Text>
+                        <Text style={[styles.vipPlanRowTitle, { color: colors.success }]}>Active</Text>
                         {astrologerSubscriptionDetails.end_date ? (
                           <Text style={[styles.subscriptionCardDateLabel, { color: colors.textTertiary }]}>
                             Renews or remains available until {formatSubscriptionDate(astrologerSubscriptionDetails.end_date, dateLocale)}
@@ -2235,8 +2221,8 @@ const CreditScreen = ({ navigation, route }) => {
                       </View>
                       {astrologerSubscriptionDetails.cancel_at_period_end ? (
                         <View style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, marginTop: 12 }]}>
-                          <Ionicons name="checkmark-circle-outline" size={16} color={colors.success || '#16a34a'} />
-                          <Text style={[styles.manageSubscriptionLinkText, { color: colors.success || '#16a34a' }]}>
+                          <Ionicons name="checkmark-circle-outline" size={16} color={colors.success} />
+                          <Text style={[styles.manageSubscriptionLinkText, { color: colors.success }]}>
                             Cancellation scheduled · access remains until the date above
                           </Text>
                         </View>
@@ -2308,7 +2294,7 @@ const CreditScreen = ({ navigation, route }) => {
                                   ? handleSubscribePress(plan)
                                   : handleBuyRazorpaySubscription(plan)}
                               >
-                                <Text style={styles.vipPlanRowButtonText}>{purchasing ? 'Processing…' : 'Subscribe'}</Text>
+                                <Text style={[styles.vipPlanRowButtonText, { color: colors.onPrimary }]}>{purchasing ? 'Processing…' : 'Subscribe'}</Text>
                               </TouchableOpacity>
                             </View>
                           );
@@ -2325,7 +2311,7 @@ const CreditScreen = ({ navigation, route }) => {
               <View style={styles.buySection}>
                 <View style={[styles.vipDiscountPanel, androidGlassFixStyle, { backgroundColor: promoCardBg, borderColor: colors.cardBorder }]}>
                   <View style={styles.vipDiscountHeader}>
-                    <View style={[styles.vipDiscountIcon, { backgroundColor: isDark ? 'rgba(249,115,22,0.16)' : 'rgba(255,107,53,0.1)' }]}>
+                    <View style={[styles.vipDiscountIcon, { backgroundColor: colors.selectionSurface }]}>
                       <Ionicons name="shield-checkmark-outline" size={22} color={colors.primary} />
                     </View>
                     <View style={styles.vipDiscountCopy}>
@@ -2361,7 +2347,7 @@ const CreditScreen = ({ navigation, route }) => {
 
                   <View style={styles.vipDiscountActions}>
                     <TouchableOpacity
-                      style={[styles.vipDiscountPrimaryAction, { backgroundColor: isDark ? 'rgba(249,115,22,0.16)' : 'rgba(255,107,53,0.1)' }]}
+                      style={[styles.vipDiscountPrimaryAction, { backgroundColor: colors.selectionSurface }]}
                       onPress={() => setVipPlansExpanded((open) => !open)}
                     >
                       <Text style={[styles.vipDiscountPrimaryActionText, { color: colors.primary }]}>
@@ -2434,7 +2420,7 @@ const CreditScreen = ({ navigation, route }) => {
                                 </Text>
                               </View>
                               <View style={[styles.vipPlanRowButton, { backgroundColor: isCurrentPlan ? colors.textTertiary : colors.primary }]}>
-                                <Text style={styles.vipPlanRowButtonText}>
+                                <Text style={[styles.vipPlanRowButtonText, { color: colors.onPrimary }]}>
                                   {isCurrentPlan ? t('credits.page.currentPlan') : isPurchasing ? t('credits.page.processing') : t('credits.page.subscribe')}
                                 </Text>
                               </View>
@@ -2473,6 +2459,7 @@ const CreditScreen = ({ navigation, route }) => {
 
             {/* Promo Code Section */}
             <View style={styles.promoSection}>
+              <Text style={[styles.sectionEyebrow, { color: colors.primary }]}>HAVE A CODE?</Text>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('credits.page.promoHeading')}</Text>
               <View style={[styles.promoCard, androidGlassFixStyle, { backgroundColor: promoCardBg, borderWidth: (isDark || Platform.OS === 'android') ? 1 : 0, borderColor: colors.cardBorder }]}>
                 <View style={[styles.promoInputContainer, { backgroundColor: promoInputBg, borderColor: colors.cardBorder }]}>
@@ -2500,7 +2487,7 @@ const CreditScreen = ({ navigation, route }) => {
                     colors={redeeming ? [colors.textTertiary, colors.textSecondary] : [colors.primary, colors.secondary]}
                     style={styles.redeemGradient}
                   >
-                    <Text style={styles.redeemText}>
+                    <Text style={[styles.redeemText, { color: colors.onPrimary }]}>
                       {redeeming ? t('credits.page.redeeming') : t('credits.page.redeem')}
                     </Text>
                   </LinearGradient>
@@ -2510,6 +2497,7 @@ const CreditScreen = ({ navigation, route }) => {
 
             {/* Transaction History */}
             <View style={styles.historySection}>
+              <Text style={[styles.sectionEyebrow, { color: colors.primary }]}>ACTIVITY</Text>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('credits.page.transactionHistory')}</Text>
               {history.length > 0 ? (
                 <View style={[styles.historyCard, androidGlassFixStyle, { backgroundColor: promoCardBg, borderWidth: (isDark || Platform.OS === 'android') ? 1 : 0, borderColor: colors.cardBorder }]}>
@@ -2547,17 +2535,17 @@ const CreditScreen = ({ navigation, route }) => {
         >
           <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={styles.modalContentWrap}>
             <View style={[styles.purchaseModalCard, androidGlassFixStyle, { backgroundColor: isDark ? colors.backgroundSecondary : colors.cardBackground, borderColor: colors.cardBorder }]}>
-              <View style={[styles.purchaseModalIconWrap, { backgroundColor: purchaseModal.type === 'error' ? (isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.12)') : purchaseModal.type === 'already_credited' ? (isDark ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.12)') : (isDark ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.12)') }]}>
+              <View style={[styles.purchaseModalIconWrap, { backgroundColor: colors.surfaceMuted, borderColor: purchaseModal.type === 'error' ? colors.error : purchaseModal.type === 'already_credited' ? colors.info : colors.success }]}>
                 <Ionicons
                   name={purchaseModal.type === 'error' ? 'alert-circle' : purchaseModal.type === 'already_credited' ? 'information-circle' : 'checkmark-circle'}
                   size={48}
-                  color={purchaseModal.type === 'error' ? '#ef4444' : purchaseModal.type === 'already_credited' ? '#3b82f6' : colors.success}
+                  color={purchaseModal.type === 'error' ? colors.error : purchaseModal.type === 'already_credited' ? colors.info : colors.success}
                 />
               </View>
               <Text style={[styles.purchaseModalTitle, { color: colors.text }]}>{purchaseModal.title}</Text>
               <Text style={[styles.purchaseModalMessage, { color: colors.textSecondary }]}>{purchaseModal.message}</Text>
               {purchaseModal.creditsAdded > 0 && (
-                <View style={[styles.purchaseModalCreditsBadge, { backgroundColor: isDark ? 'rgba(34,197,94,0.2)' : 'rgba(34,197,94,0.15)' }]}>
+                <View style={[styles.purchaseModalCreditsBadge, { backgroundColor: colors.surfaceMuted, borderColor: colors.success }]}>
                   <Text style={[styles.purchaseModalCreditsText, { color: colors.success }]}>{t('credits.page.modalCreditsAdded', { count: purchaseModal.creditsAdded })}</Text>
                 </View>
               )}
@@ -2567,10 +2555,10 @@ const CreditScreen = ({ navigation, route }) => {
                 activeOpacity={0.9}
               >
                 <LinearGradient
-                  colors={purchaseModal.type === 'error' ? [colors.primary, colors.secondary] : [colors.success, '#22c55e']}
+                  colors={purchaseModal.type === 'error' ? [colors.primary, colors.primaryStrong] : [colors.success, colors.primaryStrong]}
                   style={styles.purchaseModalButton}
                 >
-                  <Text style={styles.purchaseModalButtonText}>{t('credits.page.modalGotIt')}</Text>
+                  <Text style={[styles.purchaseModalButtonText, { color: colors.onPrimary }]}>{t('credits.page.modalGotIt')}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -2608,20 +2596,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    alignItems: 'flex-start',
+    paddingHorizontal: 24,
+    paddingTop: 18,
+    paddingBottom: 18,
     position: 'relative',
   },
   backButton: {
-    position: 'absolute',
-    left: 20,
-    top: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 24,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -2633,46 +2620,29 @@ const styles = StyleSheet.create({
     }),
   },
   headerContent: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    maxWidth: 420,
   },
-  cosmicOrb: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#ff6b35',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-      },
-      android: { elevation: 0 },
-    }),
-  },
-  orbGradient: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
+  headerEyebrow: {
+    ...typographyTokens.eyebrow,
+    marginBottom: 10,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: '600',
-    marginBottom: 4,
+    ...typographyTokens.title,
+    fontSize: 42,
+    lineHeight: 46,
+    marginBottom: 8,
   },
   headerSubtitle: {
-    fontSize: 16,
-    fontStyle: 'italic',
+    ...typographyTokens.bodyMd,
+    fontSize: 15,
   },
   balanceCard: {
-    marginHorizontal: 20,
-    marginBottom: 24,
-    borderRadius: 20,
+    marginHorizontal: 24,
+    marginBottom: 32,
+    borderRadius: 28,
     overflow: 'hidden',
+    borderWidth: 1,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -2684,27 +2654,71 @@ const styles = StyleSheet.create({
     }),
   },
   balanceGradient: {
+    minHeight: 220,
     padding: 24,
     position: 'relative',
     overflow: 'hidden',
   },
-  balanceContent: {
+  balanceTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 28,
+    zIndex: 2,
+  },
+  balanceSeal: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  balanceStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  balanceStatusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  balanceStatusText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.6,
+  },
+  balanceContent: {
+    alignItems: 'flex-start',
     zIndex: 2,
   },
   balanceLabel: {
-    fontSize: 16,
-    marginBottom: 8,
-    fontWeight: '500',
+    fontSize: 12,
+    letterSpacing: 1.3,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+    fontWeight: '800',
+  },
+  balanceAmountRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 10,
   },
   balanceAmount: {
-    fontSize: 48,
-    fontWeight: '600',
-    marginBottom: 4,
+    ...typographyTokens.display,
+    fontSize: 58,
+    lineHeight: 64,
   },
   balanceCreditsText: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  balanceHint: {
+    fontSize: 13,
+    lineHeight: 19,
+    maxWidth: 280,
+    marginTop: 7,
   },
   subscriptionCardDates: {
     borderTopWidth: 1,
@@ -2729,45 +2743,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  balanceDecoration: {
+  balanceArc: {
     position: 'absolute',
-    right: -20,
-    top: -20,
+    borderWidth: 1,
+    borderRadius: 999,
+  },
+  balanceArcOuter: {
+    width: 220,
+    height: 220,
+    right: -105,
+    top: -95,
     zIndex: 1,
   },
-  decorationCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    position: 'absolute',
-  },
-  decorationCircle2: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 107, 53, 0.08)',
-    top: 20,
-    right: 20,
-  },
-  decorationCircle3: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 107, 53, 0.12)',
-    top: 40,
-    right: 40,
+  balanceArcInner: {
+    width: 150,
+    height: 150,
+    right: -70,
+    top: -60,
+    zIndex: 1,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingBottom: 150,
+    width: '100%',
+    maxWidth: 620,
+    alignSelf: 'center',
   },
 
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '600',
+  sectionEyebrow: {
+    ...typographyTokens.eyebrow,
     marginBottom: 8,
+  },
+  sectionTitle: {
+    ...typographyTokens.sectionTitle,
+    marginBottom: 14,
   },
   sectionSubtitle: {
     fontSize: 16,
@@ -2776,12 +2787,12 @@ const styles = StyleSheet.create({
   },
 
   promoSection: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    paddingHorizontal: 24,
+    marginBottom: 28,
   },
   buySection: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    paddingHorizontal: 24,
+    marginBottom: 28,
   },
   buyProductGrid: {
     flexDirection: 'row',
@@ -2798,10 +2809,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
   },
   firstPurchaseBonusText: {
     flex: 1,
@@ -2814,10 +2825,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
   },
   packRelaunchText: {
     flex: 1,
@@ -2826,18 +2837,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   buyProductStack: {
-    gap: 12,
+    gap: 10,
   },
   creditPackCardWide: {
     width: '100%',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1,
   },
   creditPackWideTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
+  },
+  creditPackMedallion: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   creditPackNameRow: {
     flexDirection: 'row',
@@ -2847,7 +2866,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   creditPackName: {
-    fontSize: 16,
+    ...typographyTokens.display,
+    fontSize: 19,
     fontWeight: '600',
   },
   creditPackBadge: {
@@ -2856,13 +2876,13 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   creditPackBadgeText: {
-    color: '#fff',
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   creditPackPricePrimary: {
-    fontSize: 28,
-    fontWeight: '600',
+    fontSize: 21,
+    fontWeight: '800',
     marginBottom: 2,
   },
   creditPackCreditsSecondary: {
@@ -2907,18 +2927,20 @@ const styles = StyleSheet.create({
   creditPackButton: {
     alignSelf: 'flex-start',
     borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   creditPackButtonText: {
-    color: '#fff',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '800',
   },
   vipDiscountPanel: {
     borderWidth: 1,
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 22,
+    padding: 18,
   },
   vipDiscountHeader: {
     flexDirection: 'row',
@@ -2936,7 +2958,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   vipDiscountTitle: {
-    fontSize: 17,
+    ...typographyTokens.display,
+    fontSize: 19,
     fontWeight: '600',
     marginBottom: 6,
   },
@@ -2993,8 +3016,8 @@ const styles = StyleSheet.create({
   },
   vipPlanRow: {
     borderWidth: 1,
-    borderRadius: 14,
-    padding: 12,
+    borderRadius: 18,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
@@ -3024,16 +3047,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   vipPlanRowButtonText: {
-    color: '#fff',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '800',
   },
   vipManageActions: {
     marginTop: 12,
   },
   promoCard: {
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 22,
+    padding: 18,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -3047,7 +3069,7 @@ const styles = StyleSheet.create({
   promoInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 16,
     paddingHorizontal: 16,
     marginBottom: 16,
     borderWidth: 1,
@@ -3061,27 +3083,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   redeemButton: {
-    borderRadius: 12,
+    borderRadius: 999,
     overflow: 'hidden',
   },
   redeemGradient: {
-    paddingVertical: 16,
+    paddingVertical: 14,
     alignItems: 'center',
   },
   redeemText: {
-    color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '800',
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   historySection: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingBottom: 40,
   },
   historyCard: {
-    borderRadius: 16,
+    borderRadius: 22,
     overflow: 'hidden',
     ...Platform.select({
       ios: {
@@ -3096,7 +3117,7 @@ const styles = StyleSheet.create({
   transactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: 18,
   },
   transactionIcon: {
     marginRight: 16,
@@ -3150,8 +3171,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   emptyState: {
-    borderRadius: 16,
-    padding: 40,
+    borderRadius: 22,
+    padding: 36,
     alignItems: 'center',
     ...Platform.select({
       ios: {
@@ -3185,7 +3206,7 @@ const styles = StyleSheet.create({
     maxWidth: 340,
   },
   purchaseModalCard: {
-    borderRadius: 24,
+    borderRadius: 28,
     padding: 28,
     alignItems: 'center',
     borderWidth: 1,
@@ -3206,10 +3227,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
+    borderWidth: 1,
   },
   purchaseModalTitle: {
-    fontSize: 22,
-    fontWeight: '600',
+    ...typographyTokens.sectionTitle,
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -3224,6 +3245,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12,
     marginBottom: 20,
+    borderWidth: 1,
   },
   purchaseModalCreditsText: {
     fontSize: 18,
@@ -3240,9 +3262,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   purchaseModalButtonText: {
-    color: '#fff',
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '800',
   },
 });
 

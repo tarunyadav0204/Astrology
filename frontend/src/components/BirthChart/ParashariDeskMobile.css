@@ -417,6 +417,7 @@
 }
 
 .pdm__chart svg [stroke="#111111"] { stroke: var(--color-text) !important; }
+.pdm__chart svg [fill="#2d3436"] { fill: var(--color-text) !important; }
 .pdm__chart svg :is([fill="#333"], [fill="#666"]) { fill: var(--color-text-muted) !important; }
 .pdm__chart svg [fill="#9f1239"] { fill: var(--color-brand) !important; }
 

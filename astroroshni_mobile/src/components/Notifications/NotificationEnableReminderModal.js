@@ -29,6 +29,7 @@ const OPEN_DELAY_MS = 1600;
 export default function NotificationEnableReminderModal({
   homeActive,
   fomoTriggerNonce = 0,
+  allowGeneralPrompt = false,
 }) {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
@@ -40,7 +41,9 @@ export default function NotificationEnableReminderModal({
   const handledFomoTriggerRef = useRef(0);
 
   useEffect(() => {
-    if (!homeActive || Platform.OS === 'ios' || !Device.isDevice) {
+    // A generic permission wall during first paint damages trust. The app now
+    // asks only after a contextual success moment unless explicitly enabled.
+    if (!allowGeneralPrompt || !homeActive || Platform.OS === 'ios' || !Device.isDevice) {
       if (timerRef.current) clearTimeout(timerRef.current);
       setVisible(false);
       return;
@@ -62,7 +65,7 @@ export default function NotificationEnableReminderModal({
       cancelled = true;
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [homeActive]);
+  }, [allowGeneralPrompt, homeActive]);
 
   useEffect(() => {
     if (
@@ -168,18 +171,18 @@ export default function NotificationEnableReminderModal({
               <Text style={styles.primaryBtnText}>
                 {variant === 'fomo'
                   ? t('fomoHome.notificationEnable')
-                  : 'Turn on notifications'}
+                  : t('premiumUi.chat.turnOnNotifications')}
               </Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} onPress={onNotNow} disabled={busy}>
             <Text style={[styles.secondaryBtnText, { color: colors.textSecondary }]}>
-              {variant === 'fomo' ? t('fomoHome.notificationLater') : 'Not now'}
+              {variant === 'fomo' ? t('fomoHome.notificationLater') : t('chat.insufficientCreditsLater')}
             </Text>
           </TouchableOpacity>
           {variant !== 'fomo' ? (
             <TouchableOpacity style={styles.neverBtn} onPress={onNeverAgain} disabled={busy}>
-              <Text style={[styles.neverBtnText, { color: colors.textSecondary }]}>Don't ask again</Text>
+              <Text style={[styles.neverBtnText, { color: colors.textSecondary }]}>{t('premiumUi.chat.dontAskAgain')}</Text>
             </TouchableOpacity>
           ) : null}
         </View>

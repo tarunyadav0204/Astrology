@@ -4,18 +4,19 @@ import { COLORS } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-const NativeSelectorChip = ({ 
-  birthData, 
-  onPress, 
-  style, 
+const NativeSelectorChip = ({
+  birthData,
+  onPress,
+  style,
   textStyle,
+  iconColor,
   maxLength = 12,
-  showIcon = true 
+  showIcon = true
 }) => {
   const { theme, colors, isPanditMode } = useTheme();
   if (!birthData) return null;
 
-  const displayName = birthData.name?.slice(0, maxLength) + 
+  const displayName = birthData.name?.slice(0, maxLength) +
     (birthData.name?.length > maxLength ? '...' : '');
 
   const chipBg = theme === 'dark'
@@ -30,8 +31,8 @@ const NativeSelectorChip = ({
       : 'rgba(249, 115, 22, 0.2)';
 
   return (
-    <TouchableOpacity 
-      onPress={onPress} 
+    <TouchableOpacity
+      onPress={onPress}
       style={[
         styles.nameChip,
         {
@@ -46,7 +47,7 @@ const NativeSelectorChip = ({
       <Text style={[styles.nameChipText, { color: colors.textSecondary }, textStyle]}>
         {displayName}
       </Text>
-      <Ionicons name="chevron-down" size={12} color={colors.textTertiary} style={styles.dropdownIcon} />
+      <Ionicons name="chevron-down" size={12} color={iconColor || colors.textTertiary} style={styles.dropdownIcon} />
     </TouchableOpacity>
   );
 };

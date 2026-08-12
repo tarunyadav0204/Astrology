@@ -13,6 +13,7 @@ import { useAuthGate } from '../auth/AuthGateContext';
 import { pricingAPI } from '../services/api';
 import WebDatePickerModal from './Common/WebDatePickerModal';
 import { useTheme } from '../context/ThemeContext';
+import FocusedStatusBar from './Common/FocusedStatusBar';
 import { trackAstrologyEvent } from '../utils/analytics';
 import { useTranslation } from 'react-i18next';
 
@@ -29,16 +30,16 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
   const { credits, fetchBalance } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
   const { theme, colors } = useTheme();
-  const isDark = theme === 'dark';
-  const accent = isDark ? (config?.gradient?.[0] || colors.primary) : colors.primary;
+  const isDark = colors.statusBarStyle === 'light-content';
+  const accent = colors.primary;
   const ui = {
     text: colors.text,
     muted: colors.textSecondary,
-    cardBg: isDark ? 'rgba(255,255,255,0.1)' : colors.cardBackground,
-    cardBorder: isDark ? 'rgba(255,255,255,0.2)' : colors.cardBorder,
-    insetBg: isDark ? 'rgba(0,0,0,0.3)' : colors.backgroundSecondary,
-    softBg: isDark ? 'rgba(255,255,255,0.08)' : colors.backgroundSecondary,
-    resultBg: isDark ? 'rgba(255,255,255,0.05)' : colors.cardBackground,
+    cardBg: colors.cardBackground,
+    cardBorder: colors.cardBorder,
+    insetBg: colors.surfaceMuted,
+    softBg: colors.surfaceRaised,
+    resultBg: colors.cardBackground,
   };
   
   const [loading, setLoading] = useState(false);
@@ -280,9 +281,8 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {isDark ? (
-        <LinearGradient colors={['#120E24', '#261C45']} style={StyleSheet.absoluteFill} />
-      ) : null}
+      <LinearGradient colors={[colors.gradientStart, colors.gradientMid, colors.gradientEnd]} style={StyleSheet.absoluteFill} />
+      <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
       <SafeAreaView style={styles.safeArea}>
           <ScrollView contentContainerStyle={styles.scroll}>
             
@@ -344,39 +344,20 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
               onPress={calculate} 
               disabled={loading || credits < creditInfo.cost}
             >
-              {isDark ? (
-                <LinearGradient 
-                  colors={credits >= creditInfo.cost ? config.gradient : ['#666', '#888']} 
-                  style={styles.btnGrad}
-                >
+              <LinearGradient
+                colors={credits >= creditInfo.cost ? [colors.primary, colors.primaryStrong] : [colors.surfaceMuted, colors.backgroundTertiary]}
+                style={styles.btnGrad}
+              >
                   {loading ? (
-                    <ActivityIndicator color="#fff"/>
+                    <ActivityIndicator color={colors.onPrimary}/>
                   ) : (
-                    <Text style={styles.btnText}>
+                    <Text style={[styles.btnText, { color: credits >= creditInfo.cost ? colors.onPrimary : colors.textSecondary }]}>
                       {credits >= creditInfo.cost
                         ? t('muhurat.common.findAuspiciousTime', 'Find Auspicious Time')
                         : t('muhurat.common.insufficientCredits', 'Insufficient Credits')}
                     </Text>
                   )}
-                </LinearGradient>
-              ) : (
-                <View
-                  style={[
-                    styles.btnGrad,
-                    { backgroundColor: credits >= creditInfo.cost ? colors.primary : colors.backgroundTertiary },
-                  ]}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="#fff"/>
-                  ) : (
-                    <Text style={styles.btnText}>
-                      {credits >= creditInfo.cost
-                        ? t('muhurat.common.findAuspiciousTime', 'Find Auspicious Time')
-                        : t('muhurat.common.insufficientCredits', 'Insufficient Credits')}
-                    </Text>
-                  )}
-                </View>
-              )}
+              </LinearGradient>
             </TouchableOpacity>
 
             {results && (

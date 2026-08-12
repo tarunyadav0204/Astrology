@@ -6,26 +6,26 @@ import { useTheme } from '../../context/ThemeContext';
 
 const AnimatedG = Animated.createAnimatedComponent(G);
 
-const SouthIndianChart = ({ 
-  chartData, 
+const SouthIndianChart = ({
+  chartData,
   chartType,
-  showDegreeNakshatra = false, 
-  rotatedAscendant = null, 
-  onRotate, 
-  cosmicTheme = false, 
-  showKarakas = false, 
+  showDegreeNakshatra = false,
+  rotatedAscendant = null,
+  onRotate,
+  cosmicTheme = false,
+  showKarakas = false,
   karakas = null,
   size = null, // PWA/web: explicit pixel square (avoids % SVG collapse)
 }) => {
   const [contextMenu, setContextMenu] = useState({ show: false, rashiIndex: null, signName: null });
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
-  
+
   const lastDataRef = useRef(null);
 
   useEffect(() => {
     if (!chartData) return;
-    
+
     // Deep compare chartData to prevent unnecessary animation resets
     const dataString = JSON.stringify({
       planets: chartData.planets,
@@ -40,11 +40,11 @@ const SouthIndianChart = ({
     lastDataRef.current = dataString;
   }, [chartData, chartType, rotatedAscendant]);
   const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
-  
+
   // Fixed sign positions in South Indian chart
   const gridPositions = [
     { x: 0, y: 0, width: 85, height: 85, sign: 11 },     // Pisces
-    { x: 85, y: 0, width: 85, height: 85, sign: 0 },     // Aries  
+    { x: 85, y: 0, width: 85, height: 85, sign: 0 },     // Aries
     { x: 170, y: 0, width: 85, height: 85, sign: 1 },    // Taurus
     { x: 255, y: 0, width: 85, height: 85, sign: 2 },    // Gemini
     { x: 0, y: 85, width: 85, height: 85, sign: 10 },    // Aquarius
@@ -112,21 +112,19 @@ const SouthIndianChart = ({
     if (status === 'exalted') return '#22c55e';      // green
     if (status === 'debilitated') return '#ef4444';  // red
     // Normal planets: theme-aware
-    return theme === 'dark'
-      ? (colors.text || '#ffffff')
-      : '#333';
+    return cosmicTheme ? colors.chartText : (theme === 'dark' ? (colors.text || '#ffffff') : '#333');
   };
 
   const getPlanetsInSign = (signIndex) => {
     if (!chartData || !chartData.planets || signIndex === -1) return [];
     const planetsInSign = [];
-    
+
     // Add regular planets (exclude InduLagna as it's handled separately)
     Object.entries(chartData.planets)
       .filter(([name, data]) => data.sign === signIndex && name !== 'InduLagna')
       .forEach(([name, data]) => {
         let symbol = t(`planets.${name}`, name.substring(0, 2));
-        
+
         // Add Karaka abbreviation if showKarakas is true
         if (showKarakas && karakas && typeof karakas === 'object') {
           const karaka = Object.entries(karakas).find(([_, karakaData]) => karakaData?.planet === name);
@@ -143,7 +141,7 @@ const SouthIndianChart = ({
             if (karakaAbbr) symbol += `(${karakaAbbr})`;
           }
         }
-        
+
         const status = getPlanetStatus(name, signIndex);
         if (status === 'exalted') symbol += '↑';
         if (status === 'debilitated') symbol += '↓';
@@ -161,7 +159,7 @@ const SouthIndianChart = ({
           formattedDegreeFull: formatDegreeFull(data.degree ?? 0)
         });
       });
-    
+
     // Add InduLagna if it's in this sign
     if (chartData.planets?.InduLagna && chartData.planets.InduLagna.sign === signIndex) {
       planetsInSign.push({
@@ -177,18 +175,18 @@ const SouthIndianChart = ({
         formattedDegreeFull: formatDegreeFull(chartData.planets.InduLagna.degree ?? 0)
       });
     }
-    
+
     return planetsInSign;
   };
 
   const getHouseNumber = (signIndex) => {
     if (!chartData.houses || signIndex === -1) return '';
-    
+
     if (rotatedAscendant !== null) {
       const offset = (signIndex - rotatedAscendant + 12) % 12;
       return offset + 1;
     }
-    
+
     for (let i = 0; i < chartData.houses.length; i++) {
       if (chartData.houses[i].sign === signIndex) {
         return i + 1;
@@ -213,29 +211,27 @@ const SouthIndianChart = ({
       >
         <Defs>
           <ClipPath id="southChartClip">
-            <Rect 
-              x="0" y="0" width="340" height="340" 
+            <Rect
+              x="0" y="0" width="340" height="340"
               rx={cosmicTheme ? "16" : "0"}
               ry={cosmicTheme ? "16" : "0"}
             />
           </ClipPath>
         </Defs>
 
-        {/* Outer border */}
-        <Rect 
-          x="1.5" y="1.5" width="337" height="337" 
-          fill="none" 
-          stroke={
-            cosmicTheme
-              ? "rgba(255, 107, 53, 0.9)"
-              : theme === 'dark'
-                ? (colors.cardBorder || 'rgba(148, 163, 184, 0.8)')
-                : "#ff6f00"
-          }
-          strokeWidth="3"
-          rx={cosmicTheme ? "16" : "0"}
-          ry={cosmicTheme ? "16" : "0"}
-        />
+        {/* The premium stage supplies the single outer perimeter. */}
+        {!cosmicTheme ? (
+          <Rect
+            x="1.5" y="1.5" width="337" height="337"
+            fill="none"
+            stroke={theme === 'dark'
+              ? (colors.cardBorder || 'rgba(148, 163, 184, 0.8)')
+              : "#ff6f00"}
+            strokeWidth="3"
+            rx="0"
+            ry="0"
+          />
+        ) : null}
 
         <G clipPath="url(#southChartClip)" pointerEvents="none">
           {/* Grid lines */}
@@ -261,57 +257,57 @@ const SouthIndianChart = ({
               y2={p.y2}
               stroke={
                 cosmicTheme
-                  ? "rgba(255, 138, 101, 0.6)"
+                  ? colors.chartLine
                   : theme === 'dark'
                     ? 'rgba(148, 163, 184, 0.6)'
                     : "#ff8a65"
               }
-              strokeWidth="2"
+              strokeWidth={cosmicTheme ? "1" : "2"}
             />
           ))}
           <Line
             x1="0" y1="85" x2="340" y2="85"
             stroke={
               cosmicTheme
-                ? "rgba(255, 107, 53, 0.9)"
+                ? colors.chartLine
                 : theme === 'dark'
                   ? (colors.cardBorder || 'rgba(148, 163, 184, 0.9)')
                   : "#ff6f00"
             }
-            strokeWidth="3"
+            strokeWidth={cosmicTheme ? "1.5" : "3"}
           />
           <Line
             x1="0" y1="255" x2="340" y2="255"
             stroke={
               cosmicTheme
-                ? "rgba(255, 107, 53, 0.9)"
+                ? colors.chartLine
                 : theme === 'dark'
                   ? (colors.cardBorder || 'rgba(148, 163, 184, 0.9)')
                   : "#ff6f00"
             }
-            strokeWidth="3"
+            strokeWidth={cosmicTheme ? "1.5" : "3"}
           />
           <Line
             x1="85" y1="0" x2="85" y2="340"
             stroke={
               cosmicTheme
-                ? "rgba(255, 107, 53, 0.9)"
+                ? colors.chartLine
                 : theme === 'dark'
                   ? (colors.cardBorder || 'rgba(148, 163, 184, 0.9)')
                   : "#ff6f00"
             }
-            strokeWidth="3"
+            strokeWidth={cosmicTheme ? "1.5" : "3"}
           />
           <Line
             x1="255" y1="0" x2="255" y2="340"
             stroke={
               cosmicTheme
-                ? "rgba(255, 107, 53, 0.9)"
+                ? colors.chartLine
                 : theme === 'dark'
                   ? (colors.cardBorder || 'rgba(148, 163, 184, 0.9)')
                   : "#ff6f00"
             }
-            strokeWidth="3"
+            strokeWidth={cosmicTheme ? "1.5" : "3"}
           />
         </G>
 
@@ -319,75 +315,75 @@ const SouthIndianChart = ({
         {gridPositions.map((pos, index) => {
           const planetsInSign = getPlanetsInSign(pos.sign);
           const houseNumber = getHouseNumber(pos.sign);
-          
+
           return (
             <G key={index}>
               {/* Hit area for the entire cell */}
-              <Rect 
-                x={pos.x} y={pos.y} width={pos.width} height={pos.height} 
-                fill="transparent" 
+              <Rect
+                x={pos.x} y={pos.y} width={pos.width} height={pos.height}
+                fill="transparent"
                 onPress={() => setContextMenu({ show: true, rashiIndex: pos.sign, signName: rashiNames[pos.sign] })}
               />
-              
+
               {/* House number */}
-              <SvgText 
-                x={pos.x + 8} 
-                y={pos.y + 18} 
-                fontSize="12" 
+              <SvgText
+                x={pos.x + 8}
+                y={pos.y + 18}
+                fontSize="12"
                 fill={
                   houseNumber === 1
-                    ? (theme === 'dark' ? (colors.primary || '#e91e63') : '#e91e63')
-                    : (theme === 'dark' ? (colors.text || '#e5e7eb') : '#333')
+                    ? (cosmicTheme ? colors.primary : (theme === 'dark' ? (colors.primary || '#e91e63') : '#e91e63'))
+                    : (cosmicTheme ? colors.chartTextMuted : (theme === 'dark' ? (colors.text || '#e5e7eb') : '#333'))
                 }
                 fontWeight={houseNumber === 1 ? "900" : "bold"}
                 pointerEvents="none">
                 {houseNumber}
               </SvgText>
-              
+
               {/* Ascendant marker for house 1 */}
               {houseNumber === 1 && (
                 <G>
-                  <SvgText 
-                    x={pos.x + pos.width - 8} 
-                    y={pos.y + pos.height - 20} 
-                    fontSize="9" 
-                    fill="#e91e63" 
-                    fontWeight="900" 
+                  <SvgText
+                    x={pos.x + pos.width - 8}
+                    y={pos.y + pos.height - 20}
+                    fontSize="9"
+                    fill={cosmicTheme ? colors.primary : "#e91e63"}
+                    fontWeight="900"
                     textAnchor="end">
                     ASC
                   </SvgText>
                   {(chartData?.ascendant ?? null) != null && (
-                    <SvgText 
-                      x={pos.x + pos.width - 8} 
-                      y={pos.y + pos.height - 8} 
-                      fontSize="7" 
-                      fill="#666" 
-                      fontWeight="500" 
+                    <SvgText
+                      x={pos.x + pos.width - 8}
+                      y={pos.y + pos.height - 8}
+                      fontSize="7"
+                      fill={cosmicTheme ? colors.chartTextMuted : "#666"}
+                      fontWeight="500"
                       textAnchor="end">
                       {formatDegree(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
                     </SvgText>
                   )}
                 </G>
               )}
-              
+
               {/* Planets */}
               {planetsInSign.map((planet, pIndex) => (
                 <G key={pIndex}>
-                  <SvgText 
-                    x={pos.x + pos.width / 2} 
-                    y={pos.y + 20 + (pIndex * 20)} 
-                    fontSize={showKarakas ? "10" : "12"} 
+                  <SvgText
+                    x={pos.x + pos.width / 2}
+                    y={pos.y + 20 + (pIndex * 20)}
+                    fontSize={showKarakas ? "10" : "12"}
                     fill={getPlanetColor(planet.name, pos.sign)}
                     fontWeight="bold"
                     textAnchor="middle">
                     {planet.symbol}
                   </SvgText>
                   {showDegreeNakshatra && (
-                    <SvgText 
-                      x={pos.x + pos.width / 2} 
-                      y={pos.y + 31 + (pIndex * 20)} 
-                      fontSize="8" 
-                      fill={theme === 'dark' ? (colors.textSecondary || 'rgba(148, 163, 184, 0.9)') : "#666"}
+                    <SvgText
+                      x={pos.x + pos.width / 2}
+                      y={pos.y + 31 + (pIndex * 20)}
+                      fontSize="8"
+                      fill={cosmicTheme ? colors.chartTextMuted : (theme === 'dark' ? (colors.textSecondary || 'rgba(148, 163, 184, 0.9)') : "#666")}
                       fontWeight="500"
                       textAnchor="middle">
                       {planet.formattedDegree} {planet.shortNakshatra}
@@ -399,7 +395,7 @@ const SouthIndianChart = ({
           );
         })}
       </Svg>
-      
+
       {/* Context Menu Modal */}
       <Modal
         visible={contextMenu.show}
@@ -407,7 +403,7 @@ const SouthIndianChart = ({
         animationType="fade"
         onRequestClose={() => setContextMenu({ show: false, rashiIndex: null, signName: null })}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={() => setContextMenu({ show: false, rashiIndex: null, signName: null })}
@@ -427,7 +423,7 @@ const SouthIndianChart = ({
           </View>
         </TouchableOpacity>
       </Modal>
-      
+
       <Text style={[
         styles.instructionText,
         cosmicTheme && styles.instructionTextCosmic,

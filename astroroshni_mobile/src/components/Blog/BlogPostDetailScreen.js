@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Image,
   Dimensions,
-  StatusBar,
   Share,
   Platform,
 } from 'react-native';
@@ -20,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { blogAPI } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
 import { appLocaleForI18n } from '../../utils/appLocale';
+import FocusedStatusBar from '../Common/FocusedStatusBar';
 
 const { width } = Dimensions.get('window');
 
@@ -66,7 +66,7 @@ export default function BlogPostDetailScreen({ route, navigation }) {
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color="#ff6b35" style={styles.loader} />
+        <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
       </View>
     );
   }
@@ -76,18 +76,18 @@ export default function BlogPostDetailScreen({ route, navigation }) {
       <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={{ color: colors.textSecondary }}>{t('blog.postNotFound')}</Text>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 20 }}>
-          <Text style={{ color: '#ff6b35', fontWeight: '700' }}>{t('blog.goBack')}</Text>
+          <Text style={{ color: colors.primary, fontWeight: '700' }}>{t('blog.goBack')}</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const isDark = theme === 'dark';
-  const textColor = isDark ? '#e5e7eb' : '#374151';
-  const headingColor = isDark ? '#ffffff' : '#111827';
-  const mutedColor = isDark ? '#9ca3af' : '#6b7280';
-  const borderColor = isDark ? '#374151' : '#e5e7eb';
-  const cardBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)';
+  const isDark = colors.colorScheme === 'dark';
+  const textColor = colors.text;
+  const headingColor = colors.text;
+  const mutedColor = colors.textSecondary;
+  const borderColor = colors.cardBorder;
+  const cardBg = colors.surfaceMuted;
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -130,7 +130,7 @@ export default function BlogPostDetailScreen({ route, navigation }) {
             line-height: 1.25;
             padding: 0.75rem 1rem 0.75rem 1.25rem;
             padding-left: 1.25rem;
-            border-left: 4px solid #ff6b35;
+            border-left: 4px solid ${colors.primary};
             background: ${cardBg};
             border-radius: 0 12px 12px 0;
           }
@@ -143,7 +143,7 @@ export default function BlogPostDetailScreen({ route, navigation }) {
             margin-bottom: 0.75rem;
             line-height: 1.3;
             padding: 0.6rem 0 0.6rem 1.15rem;
-            border-left: 4px solid #ff6b35;
+            border-left: 4px solid ${colors.primary};
             background: ${cardBg};
             border-radius: 0 10px 10px 0;
           }
@@ -156,7 +156,7 @@ export default function BlogPostDetailScreen({ route, navigation }) {
             margin-bottom: 0.5rem;
             line-height: 1.35;
             padding: 0.5rem 0 0.5rem 1rem;
-            border-left: 3px solid #ff6b35;
+            border-left: 3px solid ${colors.primary};
             background: ${cardBg};
             border-radius: 0 8px 8px 0;
           }
@@ -168,7 +168,7 @@ export default function BlogPostDetailScreen({ route, navigation }) {
             margin-bottom: 0.5rem;
             line-height: 1.4;
             padding: 0.45rem 0 0.45rem 0.9rem;
-            border-left: 3px solid rgba(255, 107, 53, 0.7);
+            border-left: 3px solid ${colors.accent};
             border-radius: 0 6px 6px 0;
             background: ${cardBg};
           }
@@ -178,9 +178,9 @@ export default function BlogPostDetailScreen({ route, navigation }) {
           }
           p:empty { display: none; }
           a {
-            color: #ff6b35;
+            color: ${colors.primary};
             text-decoration: none;
-            border-bottom: 1px solid rgba(255, 107, 53, 0.4);
+            border-bottom: 1px solid ${colors.cardBorder};
             font-weight: 600;
           }
           strong {
@@ -207,11 +207,11 @@ export default function BlogPostDetailScreen({ route, navigation }) {
             width: 6px;
             height: 6px;
             border-radius: 50%;
-            background: #ff6b35;
+            background: ${colors.primary};
           }
           ol li { margin-bottom: 0.5rem; line-height: 1.6; }
           blockquote {
-            border-left: 4px solid #ff6b35;
+            border-left: 4px solid ${colors.primary};
             padding: 1rem 1.25rem;
             margin: 1.5rem 0;
             font-style: italic;
@@ -238,7 +238,7 @@ export default function BlogPostDetailScreen({ route, navigation }) {
           }
           thead { display: table-header-group; }
           tr:first-child td, tr:first-child th {
-            background: rgba(255, 107, 53, 0.12);
+            background: ${colors.surfaceMuted};
             color: ${headingColor};
             font-weight: 700;
             font-size: 0.9rem;
@@ -252,7 +252,7 @@ export default function BlogPostDetailScreen({ route, navigation }) {
             text-align: left;
             vertical-align: top;
             word-break: break-word;
-            background: ${isDark ? 'rgba(255,255,255,0.02)' : '#fff'};
+            background: ${colors.surfaceRaised};
           }
           tr:not(:first-child) td, tr:not(:first-child) th { border-top: none; }
           td:first-child, th:first-child { border-left: none; }
@@ -344,19 +344,19 @@ export default function BlogPostDetailScreen({ route, navigation }) {
     </html>
   `;
 
-  const headerBackground = theme === 'dark' ? colors.background : '#ff6b35';
+  const headerBackground = colors.headerSurface;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: headerBackground }]}>
-      <StatusBar barStyle="light-content" backgroundColor={headerBackground} />
+      <FocusedStatusBar backgroundColor={headerBackground} />
 
       <View style={[styles.topHeader, { backgroundColor: headerBackground }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.topHeaderButton}>
-          <Ionicons name="arrow-back" size={22} color="#fff" />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.topHeaderButton, { borderColor: colors.cosmicLine || colors.cardBorder }]}>
+          <Ionicons name="arrow-back" size={22} color={colors.textInverse} />
         </TouchableOpacity>
-        <Text style={styles.topHeaderTitle}>{t('blog.detailNavTitle')}</Text>
-        <TouchableOpacity onPress={handleShare} style={styles.topHeaderButton}>
-          <Ionicons name="share-social" size={20} color="#fff" />
+        <View style={styles.topHeaderCopy}><Text style={[styles.topHeaderEyebrow, { color: colors.accent }]}>{t('knowledgeSupport.article')}</Text><Text style={[styles.topHeaderTitle, { color: colors.textInverse }]}>{t('blog.detailNavTitle')}</Text></View>
+        <TouchableOpacity onPress={handleShare} style={[styles.topHeaderButton, { borderColor: colors.cosmicLine || colors.cardBorder }]}>
+          <Ionicons name="share-social" size={20} color={colors.textInverse} />
         </TouchableOpacity>
       </View>
 
@@ -369,16 +369,16 @@ export default function BlogPostDetailScreen({ route, navigation }) {
           {post.featured_image ? (
             <Image source={{ uri: post.featured_image }} style={styles.headerImage} />
           ) : (
-            <LinearGradient colors={['#ff6b35', '#ea580c', '#ec4899']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerImagePlaceholder}>
-              <Ionicons name="newspaper-outline" size={64} color="rgba(255,255,255,0.95)" />
+            <LinearGradient colors={[colors.cosmicSurface, colors.cosmicRaised]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerImagePlaceholder}>
+              <Ionicons name="book-outline" size={58} color={colors.accent} />
             </LinearGradient>
           )}
         </View>
 
         <View style={[styles.contentContainer, { backgroundColor: colors.background }, theme === 'light' && styles.contentCardShadow]}>
           <View style={styles.metaContainer}>
-            <View style={[styles.categoryBadge, theme === 'dark' && styles.categoryBadgeDark]}>
-              <Text style={styles.categoryText}>{post.category || t('blog.defaultCategory')}</Text>
+            <View style={[styles.categoryBadge, { backgroundColor: colors.accentSoft }]}>
+              <Text style={[styles.categoryText, { color: colors.onAccent }]}>{post.category || t('blog.defaultCategory')}</Text>
             </View>
             <Text style={[styles.dateText, { color: colors.textSecondary }]}>
               {new Date(post.published_at).toLocaleDateString(dateLocale, {
@@ -391,9 +391,9 @@ export default function BlogPostDetailScreen({ route, navigation }) {
 
           <Text style={[styles.title, { color: colors.text }]}>{post.title}</Text>
 
-          <View style={[styles.authorContainer, theme === 'dark' && styles.authorStripDark]}>
-            <View style={styles.authorAvatar}>
-              <Text style={styles.authorAvatarText}>A</Text>
+          <View style={[styles.authorContainer, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+            <View style={[styles.authorAvatar, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.authorAvatarText, { color: colors.onPrimary }]}>A</Text>
             </View>
             <Text style={[styles.authorName, { color: colors.textSecondary }]}>{t('blog.authorTeam')}</Text>
           </View>
@@ -403,8 +403,8 @@ export default function BlogPostDetailScreen({ route, navigation }) {
               style={[
                 styles.excerptContainer,
                 {
-                  backgroundColor: isDark ? 'rgba(15,23,42,0.9)' : '#fff',
-                  borderColor: isDark ? 'rgba(248,250,252,0.08)' : 'rgba(15,23,42,0.06)',
+                  backgroundColor: colors.surfaceRaised,
+                  borderColor: colors.cardBorder,
                   shadowColor: '#000',
                   shadowOpacity: isDark ? 0.35 : 0.18,
                   shadowRadius: 18,
@@ -414,8 +414,8 @@ export default function BlogPostDetailScreen({ route, navigation }) {
               ]}
             >
               <View style={styles.excerptPillRow}>
-                <View style={styles.excerptChip}>
-                  <Text style={styles.excerptChipText}>{t('blog.keyTakeaway')}</Text>
+                <View style={[styles.excerptChip, { backgroundColor: colors.accentSoft }]}>
+                  <Text style={[styles.excerptChipText, { color: colors.onAccent }]}>{t('blog.keyTakeaway')}</Text>
                 </View>
               </View>
               <Text style={[styles.excerptText, { color: colors.text }]}>{post.excerpt}</Text>
@@ -448,24 +448,23 @@ export default function BlogPostDetailScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   topHeader: {
-    height: 48,
-    paddingHorizontal: 16,
+    minHeight: 78,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   topHeaderButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  topHeaderTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
+  topHeaderCopy: { flex: 1, paddingHorizontal: 14 },
+  topHeaderEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1.7 },
+  topHeaderTitle: { fontSize: 20, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '600', marginTop: 2 },
   loader: {
     flex: 1,
     justifyContent: 'center',
@@ -473,10 +472,10 @@ const styles = StyleSheet.create({
   },
   scrollView: { flex: 1 },
   imageContainer: {
-    width: '100%',
+    width: undefined,
     height: 240,
     position: 'relative',
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     marginTop: 16,
     marginBottom: 0,
     borderRadius: 24,
@@ -534,11 +533,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
   },
-  categoryBadgeDark: {
-    backgroundColor: 'rgba(255, 107, 53, 0.2)',
-  },
   categoryText: {
-    color: '#ff6b35',
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -561,21 +556,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 14,
-  },
-  authorStripDark: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
   },
   authorAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#ff6b35',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   authorAvatarText: {
-    color: '#fff',
     fontWeight: '700',
     fontSize: 15,
   },
@@ -604,14 +595,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: '#f97316',
   },
   excerptChipText: {
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
     textTransform: 'uppercase',
-    color: '#1f2937',
   },
   excerptLabel: {
     fontSize: 12,

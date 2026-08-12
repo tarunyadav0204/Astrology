@@ -333,6 +333,7 @@
     "close": "关闭"
   },
   "authOnboarding": {
+    "welcomeEyebrow": "你的吠陀指南", "welcomeHero": "认识 Tara。\n读懂你的人生。", "welcomeHeroBody": "通过帕拉沙里、纳迪、杰米尼和 KP 综合解读完整命盘，并转化为清晰指引。", "analysisLayers": "分析层", "vedicSystems": "吠陀体系", "createAccount": "创建账户", "signIn": "登录", "languageEyebrow": "打造你的体验", "legalPrefix": "继续即表示你同意我们的", "terms": "服务条款", "and": "和", "privacy": "隐私政策",
     "chooseLanguageTitle": "选择您的语言",
     "chooseLanguageSubtitle": "我们将在整个应用中使用此设置。您可以随时在「个人资料」中更改。",
     "continue": "继续",

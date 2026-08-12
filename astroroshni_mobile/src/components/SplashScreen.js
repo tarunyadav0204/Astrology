@@ -3,8 +3,18 @@ import { View, StyleSheet, Animated, Image, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'react-native';
+import { THEME_PALETTES, normalizeThemeId } from '../theme/tokens';
 
-const SplashScreen = () => {
+const SplashScreen = ({ themeId = 'heritage', panditMode = false }) => {
+  const resolvedThemeId = panditMode ? 'pandit' : normalizeThemeId(themeId);
+  const colors = THEME_PALETTES[resolvedThemeId] || THEME_PALETTES.heritage;
+  const splashSurface = colors.cosmicSurface || colors.headerSurface || colors.background;
+  const splashRaised = colors.cosmicRaised || colors.surfaceInverse || splashSurface;
+  const splashAccent = colors.accent || colors.primary;
+  const splashText = colors.textInverse || colors.onPrimary || colors.text;
+  const splashTextMuted = colors.textInverseMuted || colors.textSecondary;
+  const splashLine = colors.cosmicLine || colors.cardBorder;
+  const splashGlow = colors.cosmicGlow || colors.accentSoft || colors.primary;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -45,12 +55,21 @@ const SplashScreen = () => {
   }, []);
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a0033" />
-      <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.gradientBg}>
+    <View style={[styles.container, { backgroundColor: splashSurface }]}>
+      <StatusBar barStyle="light-content" backgroundColor={splashSurface} />
+      <LinearGradient
+        colors={[splashSurface, splashRaised, splashSurface]}
+        locations={[0, 0.52, 1]}
+        style={styles.gradientBg}
+      >
+        <View pointerEvents="none" style={[styles.orbit, styles.orbitLarge, { borderColor: splashLine }]} />
+        <View pointerEvents="none" style={[styles.orbit, styles.orbitSmall, { borderColor: splashLine }]} />
         <SafeAreaView style={styles.safeArea}>
           <Animated.View style={[styles.content, {opacity: fadeAnim, transform: [{translateY: slideAnim}]}]}>
             <Animated.View style={[styles.logoContainer, {
+                backgroundColor: splashRaised,
+                borderColor: splashAccent,
+                shadowColor: splashGlow,
                 shadowOpacity: glowAnim.interpolate({
                     inputRange: [0, 1],
                     outputRange: [0.6, 1],
@@ -72,8 +91,10 @@ const SplashScreen = () => {
                 resizeMode="contain"
               />
             </Animated.View>
-            <Text style={styles.title}>AstroRoshni</Text>
-            <Text style={styles.subtitle}>Your Cosmic Guide</Text>
+            <Text style={[styles.eyebrow, { color: splashAccent }]}>THE VEDIC SKY, INTERPRETED</Text>
+            <Text style={[styles.title, { color: splashText }]}>AstroRoshni</Text>
+            <Text style={[styles.subtitle, { color: splashTextMuted }]}>Your Vedic guide</Text>
+            <View style={[styles.rule, { backgroundColor: splashAccent }]} />
           </Animated.View>
         </SafeAreaView>
       </LinearGradient>
@@ -95,39 +116,73 @@ const styles = StyleSheet.create({
   },
   content: {
     alignItems: 'center',
+    paddingHorizontal: 32,
   },
   logoContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    marginBottom: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    width: 112,
+    height: 112,
+    borderRadius: 32,
+    marginBottom: 28,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#ff6b35',
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
   },
   logoImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 92,
+    height: 92,
+    borderRadius: 26,
+  },
+  eyebrow: {
+    marginBottom: 12,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '800',
+    letterSpacing: 2.1,
+    textAlign: 'center',
   },
   title: {
-    fontSize: 40,
-    fontWeight: '800',
-    color: '#ffffff',
+    fontFamily: 'serif',
+    fontSize: 43,
+    lineHeight: 50,
+    fontWeight: '500',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
   subtitle: {
-    fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.6,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
+  },
+  rule: {
+    width: 44,
+    height: 1,
+    marginTop: 22,
+    opacity: 0.78,
+  },
+  orbit: {
+    position: 'absolute',
+    borderWidth: 1,
+    borderRadius: 999,
+    opacity: 0.75,
+  },
+  orbitLarge: {
+    width: 310,
+    height: 310,
+    top: -170,
+    right: -110,
+  },
+  orbitSmall: {
+    width: 176,
+    height: 176,
+    bottom: -82,
+    left: -68,
   },
 });
 
