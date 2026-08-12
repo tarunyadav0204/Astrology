@@ -472,7 +472,7 @@ function App() {
                   <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
                         <div className="auth-experience" style={{ marginBottom: '20px' }}>
                           <p className="auth-experience__eyebrow">Your chart, remembered</p>
-                          <h2 className="auth-experience__title" style={{ textAlign: 'center', color: '#e91e63', marginBottom: '20px' }}>Welcome to AstroRoshni</h2>
+                          <h2 className="auth-experience__title">Welcome to AstroRoshni</h2>
                           <p className="auth-experience__lead">Sign in to continue with your saved Kundlis, personal timing and Tara conversations.</p>
                           <div className="auth-experience__tabs" style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
                             <button 

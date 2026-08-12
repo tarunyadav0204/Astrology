@@ -204,7 +204,6 @@ const BirthForm = ({
       setBirthData(selectedBirthData);
       
       setChartData(enhancedChartData);
-      toast.success('Chart loaded successfully!');
       
       // Call onSubmit to trigger parent component logic
       if (onSubmit) {

@@ -6687,7 +6687,7 @@ export default function ChatScreen({ navigation, route }) {
                     </View>
                     <View style={styles.drawerHeaderActions}>
                       <TouchableOpacity
-                        style={[styles.drawerCloseButton, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}
+                        style={[styles.drawerCloseButton, { backgroundColor: colors.selectionControl, borderColor: colors.selectionBorder }]}
                         onPress={openQuickThemePicker}
                         accessibilityRole="button"
                         accessibilityLabel={t('themeDiscovery.title')}

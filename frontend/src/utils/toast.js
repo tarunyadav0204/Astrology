@@ -11,20 +11,21 @@ export const showToast = (message, type = 'success', duration = 2000) => {
     toast.className = `toast-notification toast-${type}`;
     toast.textContent = message;
     
-    // Get background color based on type
-    let backgroundColor;
+    // Keep the toast surface theme-aware; the semantic side accent communicates
+    // status without replacing the active theme with a fixed bright panel.
+    let accentColor;
     switch(type) {
         case 'success':
-            backgroundColor = '#4CAF50';
+            accentColor = 'var(--color-success)';
             break;
         case 'error':
-            backgroundColor = '#f44336';
+            accentColor = 'var(--color-danger)';
             break;
         case 'info':
-            backgroundColor = '#2196F3';
+            accentColor = 'var(--color-info)';
             break;
         default:
-            backgroundColor = '#4CAF50';
+            accentColor = 'var(--color-success)';
     }
     
     // Style the toast
@@ -32,14 +33,16 @@ export const showToast = (message, type = 'success', duration = 2000) => {
         position: 'fixed',
         top: '20px',
         right: '20px',
-        background: backgroundColor,
-        color: 'white',
+        background: 'var(--color-surface-raised)',
+        color: 'var(--color-text)',
+        border: '1px solid var(--color-border)',
+        borderLeft: `4px solid ${accentColor}`,
         padding: '12px 20px',
         borderRadius: '8px',
         fontSize: '14px',
         fontWeight: '500',
         zIndex: '100000',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        boxShadow: 'var(--shadow-card)',
         transform: 'translateX(100%)',
         transition: 'transform 0.3s ease',
         maxWidth: '300px',

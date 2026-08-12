@@ -32,6 +32,8 @@ function formatWhen(iso, locale) {
 export default function NudgeInboxScreen({ navigation }) {
   const { colors } = useTheme();
   const { t, i18n } = useTranslation();
+  const inverseText = colors.onSurfaceInverse || colors.textInverse;
+  const inverseTextMuted = colors.onSurfaceInverseMuted || colors.textInverseMuted;
   const dateLocale = appLocaleForI18n(i18n.language);
   const [items, setItems] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -234,8 +236,8 @@ export default function NudgeInboxScreen({ navigation }) {
               <View style={[styles.heroRing, styles.heroRingLarge, { borderColor: colors.cosmicLine }]} />
               <View style={[styles.heroRing, styles.heroRingSmall, { borderColor: colors.cosmicLine }]} />
               <Text style={[styles.heroEyebrow, { color: colors.accent }]}>{t('notificationInbox.eyebrow', 'YOUR ASTROLOGY DESK')}</Text>
-              <Text style={[styles.heroTitle, { color: colors.textInverse }]}>{unreadCount > 0 ? t('notificationInbox.unreadCount', { count: unreadCount, defaultValue: '{{count}} unread updates' }) : t('notificationInbox.allCaughtUp', 'You are all caught up')}</Text>
-              <Text style={[styles.heroBody, { color: colors.textInverseMuted }]}>{t('notificationInbox.heroBody', 'Personal readings, timing alerts and AstroRoshni updates—kept together in one calm place.')}</Text>
+              <Text style={[styles.heroTitle, { color: inverseText }]}>{unreadCount > 0 ? t('notificationInbox.unreadCount', { count: unreadCount, defaultValue: '{{count}} unread updates' }) : t('notificationInbox.allCaughtUp', 'You are all caught up')}</Text>
+              <Text style={[styles.heroBody, { color: inverseTextMuted }]}>{t('notificationInbox.heroBody', 'Personal readings, timing alerts and AstroRoshni updates—kept together in one calm place.')}</Text>
             </View>
           }
           contentContainerStyle={[styles.listContent, items.length === 0 && styles.emptyListContent]}

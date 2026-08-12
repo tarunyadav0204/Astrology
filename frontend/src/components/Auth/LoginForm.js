@@ -90,7 +90,6 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
         }));
       }
       
-      toast.success('Login successful!');
       onLogin(userWithAdmin);
     } catch (error) {
       toast.error(error.message || 'Login failed');
@@ -263,7 +262,6 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
         // Auto-login with saved user data
         localStorage.setItem('token', userData.token);
         localStorage.setItem('user', JSON.stringify(userData));
-        toast.success('Biometric login successful!');
         onLogin(userData);
       }
     } catch (error) {

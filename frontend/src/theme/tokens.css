@@ -60,6 +60,36 @@
   --color-chart-line: color-mix(in srgb, var(--color-text) 62%, transparent);
 }
 
+/* Toasts are reserved for actionable feedback (errors, warnings and background
+   results). Routine navigation such as signing in or selecting a chart is
+   confirmed by the destination UI and should not produce a toast. */
+[data-theme] .Toastify__toast-container {
+  --toastify-color-light: var(--color-surface-raised);
+  --toastify-text-color-light: var(--color-text);
+  --toastify-color-progress-success: var(--color-success);
+  --toastify-color-progress-warning: var(--color-warning);
+  --toastify-color-progress-error: var(--color-danger);
+  --toastify-color-progress-info: var(--color-info);
+}
+
+[data-theme] .Toastify__toast {
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-body);
+}
+
+[data-theme] .Toastify__close-button {
+  color: var(--color-text-muted);
+}
+
+[data-theme] .Toastify__toast--success .Toastify__toast-icon { color: var(--color-success); }
+[data-theme] .Toastify__toast--warning .Toastify__toast-icon { color: var(--color-warning); }
+[data-theme] .Toastify__toast--error .Toastify__toast-icon { color: var(--color-danger); }
+[data-theme] .Toastify__toast--info .Toastify__toast-icon { color: var(--color-info); }
+
 :root,
 [data-theme='heritage'] {
   color-scheme: light;

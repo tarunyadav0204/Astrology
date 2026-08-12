@@ -1318,6 +1318,11 @@ body.modern-homepage-active {
   letter-spacing: 0.12em;
 }
 
+.mh-tool-card:hover .mh-tool-card__index,
+.mh-tool-card:focus-visible .mh-tool-card__index {
+  color: color-mix(in srgb, var(--color-on-brand) 68%, transparent);
+}
+
 .mh-tool-card__code {
   width: 52px;
   height: 52px;
@@ -1333,7 +1338,7 @@ body.modern-homepage-active {
 .mh-tool-card strong { font-family: var(--mh-display); font-size: 21px; font-weight: 400; }
 .mh-tool-card p { margin: 9px 0 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.55; }
 .mh-tool-card:hover p,
-.mh-tool-card:focus-visible p { color: rgba(255, 248, 238, 0.68); }
+.mh-tool-card:focus-visible p { color: color-mix(in srgb, var(--color-on-brand) 74%, transparent); }
 .mh-tool-card i { position: absolute; top: 25px; right: 25px; font-style: normal; opacity: 0; }
 .mh-tool-card:hover i,
 .mh-tool-card:focus-visible i { opacity: 1; }

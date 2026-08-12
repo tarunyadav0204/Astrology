@@ -372,6 +372,8 @@ export const THEME_PALETTES = Object.freeze({
     surfaceRaised: '#26121e',
     surfaceMuted: '#321522',
     surfaceInverse: '#fff8ec',
+    onSurfaceInverse: '#160a10',
+    onSurfaceInverseMuted: 'rgba(22, 10, 16, 0.68)',
     headerSurface: '#120810',
     text: '#fff8ec',
     textSecondary: 'rgba(255, 248, 236, 0.70)',
