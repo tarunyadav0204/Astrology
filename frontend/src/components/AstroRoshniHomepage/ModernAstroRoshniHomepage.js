@@ -348,7 +348,7 @@ const ModernAstroRoshniHomepage = ({
         onAdminClick={onAdminClick}
       />
 
-      <main className="mh-scroll">
+      <main className="mh-scroll" data-seo-page="home">
         <section className="mh-chapter mh-hero" id="top">
           <div className="mh-ambient mh-ambient--one" aria-hidden></div>
           <div className="mh-ambient mh-ambient--two" aria-hidden></div>

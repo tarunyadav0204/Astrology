@@ -263,16 +263,20 @@ async function prerenderRoutes() {
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
         await page.waitForSelector('#root', { timeout: 15000 });
         if (routePath === '/') {
-          await page.waitForFunction(
-            () => document.body.innerText.includes('Ask Tara your questions')
-              && document.body.innerText.includes('Frequently asked questions'),
-            { timeout: 30000 }
+          // Use structural markers rather than marketing copy. Homepage wording changes
+          // frequently, while these attributes form the prerender readiness contract.
+          await page.waitForSelector(
+            '[data-seo-page="home"] #mh-faq-title',
+            { timeout: 30000 },
           );
         }
         await new Promise((r) => setTimeout(r, 1000));
         const html = await page.content();
-        if (routePath === '/' && !html.includes('Ask Tara your questions')) {
-          throw new Error('homepage marker missing after render');
+        if (
+          routePath === '/' &&
+          (!html.includes('data-seo-page="home"') || !html.includes('id="mh-faq-title"'))
+        ) {
+          throw new Error('homepage structural markers missing after render');
         }
         const out = outputPathForRoute(routePath);
         fs.mkdirSync(path.dirname(out), { recursive: true });
@@ -296,8 +300,8 @@ async function prerenderRoutes() {
       const idxPath = path.join(BUILD_DIR, 'index.html');
       const finalHtml = fs.readFileSync(idxPath, 'utf8');
       if (
-        !finalHtml.includes('Ask Tara your questions') ||
-        !finalHtml.includes('Frequently asked questions')
+        !finalHtml.includes('data-seo-page="home"') ||
+        !finalHtml.includes('id="mh-faq-title"')
       ) {
         throw new Error(
           '[seo] build/index.html is missing prerendered homepage markers. Crawlers would see an empty #root.',
