@@ -22,7 +22,7 @@ html {
   padding: 0;
   overflow: visible;
   overscroll-behavior: none;
-  background-color: #1a0033;
+  background-color: var(--ar-shell-bg, #2d0c1c);
 }
 
 body {
@@ -42,7 +42,7 @@ body {
   padding: 0;
   overflow: visible;
   overscroll-behavior: none;
-  background-color: #1a0033;
+  background-color: var(--ar-shell-bg, #2d0c1c);
   box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   -webkit-tap-highlight-color: transparent;
@@ -62,7 +62,7 @@ body {
   min-height: 100%;
   max-height: none;
   overflow: hidden;
-  background-color: #1a0033;
+  background-color: var(--ar-shell-bg, #2d0c1c);
 }
 
 /* Outer RN Web wrappers must fill the shell and pass height down. */

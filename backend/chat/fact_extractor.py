@@ -239,20 +239,23 @@ If no USER-STATED facts found, return empty array: []
             conn.commit()
         return inserted
 
-    def get_facts(self, birth_chart_id: int) -> Dict[str, List[str]]:
-        """Retrieve all facts for a birth chart, filtering out old temporary events"""
+    def get_facts(self, birth_chart_id: int, user_id: int) -> Dict[str, List[str]]:
+        """Retrieve facts only when the chart belongs to the requesting user."""
         from datetime import datetime, timedelta
 
         with get_conn() as conn:
             cur = execute(
                 conn,
                 """
-                SELECT category, fact, extracted_at
-                FROM user_facts
-                WHERE birth_chart_id = %s
-                ORDER BY extracted_at DESC
+                SELECT uf.category, uf.fact, uf.extracted_at
+                FROM user_facts AS uf
+                INNER JOIN birth_charts AS bc
+                    ON bc.id = uf.birth_chart_id
+                   AND bc.userid = %s
+                WHERE uf.birth_chart_id = %s
+                ORDER BY uf.extracted_at DESC
                 """,
-                (birth_chart_id,),
+                (user_id, birth_chart_id),
             )
             rows = cur.fetchall()
 

@@ -54,15 +54,16 @@ async function restoreConsumerLanguage() {
 // `colors` object from useTheme rather than choosing a palette directly.
 export const THEMES = THEME_PALETTES;
 
-/** PWA / Expo Web: browser & installed-app chrome (Android status bar) follows theme. */
+/** PWA / Expo Web: the iPhone safe-area shell and browser chrome follow theme. */
 function syncWebChromeTheme(themeId) {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return;
   const palette = THEME_PALETTES[themeId] || THEME_PALETTES.heritage;
-  const shellBg = palette.background;
-  const bottomSafe = (
-    document.documentElement.style.getPropertyValue('--ar-bottom-safe-color') || ''
-  ).trim();
-  const chromeBg = bottomSafe || shellBg;
+  // The document shell is what iOS exposes above and below the React tree in
+  // standalone mode. It must be the persistent header tone, never a screen's
+  // light canvas, otherwise Home/Profile show white safe-area bands while Chat
+  // appears correct only because it paints its own inset.
+  const shellBg = palette.headerSurface;
+  const chromeBg = palette.headerSurface;
   let meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) {
     meta = document.createElement('meta');
@@ -79,7 +80,9 @@ function syncWebChromeTheme(themeId) {
     appleBar.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
     document.head.appendChild(appleBar);
   }
-  appleBar.setAttribute('content', palette.colorScheme === 'dark' ? 'black-translucent' : 'default');
+  // `default` forces a white iOS status bar even for a dark header in light
+  // themes. Translucent lets the themed document shell show through.
+  appleBar.setAttribute('content', 'black-translucent');
   document.documentElement.style.backgroundColor = shellBg;
   document.documentElement.style.setProperty('--ar-shell-bg', shellBg);
   document.documentElement.style.colorScheme = palette.colorScheme || 'light';

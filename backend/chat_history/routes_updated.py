@@ -662,7 +662,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             user_facts = {}
             if birth_chart_id:
                 fact_extractor = FactExtractor()
-                user_facts = fact_extractor.get_facts(birth_chart_id)
+                user_facts = fact_extractor.get_facts(birth_chart_id, user_id)
         
         # Inject user facts into context
         if user_facts:

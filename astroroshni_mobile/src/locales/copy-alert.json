@@ -1,0 +1,13 @@
+{
+  "english": {"successTitle":"Copied","successBody":"The message is ready on your clipboard.","failedTitle":"Couldn’t copy","failedBody":"This message could not be copied. Please try again."},
+  "hindi": {"successTitle":"कॉपी हो गया","successBody":"संदेश आपके क्लिपबोर्ड पर तैयार है।","failedTitle":"कॉपी नहीं हो सका","failedBody":"यह संदेश कॉपी नहीं हो सका। कृपया फिर प्रयास करें।"},
+  "es": {"successTitle":"Copiado","successBody":"El mensaje está listo en tu portapapeles.","failedTitle":"No se pudo copiar","failedBody":"No se pudo copiar este mensaje. Inténtalo de nuevo."},
+  "fr": {"successTitle":"Copié","successBody":"Le message est prêt dans votre presse-papiers.","failedTitle":"Copie impossible","failedBody":"Ce message n’a pas pu être copié. Réessayez."},
+  "german": {"successTitle":"Kopiert","successBody":"Die Nachricht befindet sich jetzt in deiner Zwischenablage.","failedTitle":"Kopieren fehlgeschlagen","failedBody":"Diese Nachricht konnte nicht kopiert werden. Bitte versuche es erneut."},
+  "russian": {"successTitle":"Скопировано","successBody":"Сообщение сохранено в буфере обмена.","failedTitle":"Не удалось скопировать","failedBody":"Сообщение не скопировано. Попробуйте ещё раз."},
+  "chinese": {"successTitle":"已复制","successBody":"消息已复制到剪贴板。","failedTitle":"无法复制","failedBody":"无法复制此消息，请重试。"},
+  "tamil": {"successTitle":"நகலெடுக்கப்பட்டது","successBody":"செய்தி உங்கள் கிளிப்போர்டில் தயாராக உள்ளது.","failedTitle":"நகலெடுக்க முடியவில்லை","failedBody":"இந்த செய்தியை நகலெடுக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்."},
+  "telugu": {"successTitle":"కాపీ అయింది","successBody":"సందేశం మీ క్లిప్‌బోర్డ్‌లో సిద్ధంగా ఉంది.","failedTitle":"కాపీ కాలేదు","failedBody":"ఈ సందేశాన్ని కాపీ చేయలేకపోయాం. మళ్లీ ప్రయత్నించండి."},
+  "gujarati": {"successTitle":"કૉપી થયું","successBody":"સંદેશ તમારા ક્લિપબોર્ડ પર તૈયાર છે.","failedTitle":"કૉપી ન થયું","failedBody":"આ સંદેશ કૉપી થઈ શક્યો નથી. ફરી પ્રયાસ કરો."},
+  "marathi": {"successTitle":"कॉपी झाले","successBody":"संदेश तुमच्या क्लिपबोर्डवर तयार आहे.","failedTitle":"कॉपी करता आले नाही","failedBody":"हा संदेश कॉपी करता आला नाही. पुन्हा प्रयत्न करा."}
+}

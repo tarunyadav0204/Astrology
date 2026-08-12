@@ -1320,6 +1320,7 @@ export default function ChatScreen({ navigation, route }) {
   const [partnershipModalCost, setPartnershipModalCost] = useState(2);
   const [showMundaneModal, setShowMundaneModal] = useState(false);
   const [mundaneModalCost, setMundaneModalCost] = useState(1);
+
   const [podcastPromoVisible, setPodcastPromoVisible] = useState(false);
   const [podcastPromoMessageId, setPodcastPromoMessageId] = useState(null);
   const [podcastAutoLaunchKey, setPodcastAutoLaunchKey] = useState(0);
@@ -2246,6 +2247,40 @@ export default function ChatScreen({ navigation, route }) {
     });
   };
 
+  const exitPartnershipMode = () => {
+    const activeChartName = birthData?.name || t('premiumUi.chatScreen.native');
+    const transitionMessage = {
+      id: `mode_transition_${Date.now()}`,
+      role: 'assistant',
+      timestamp: new Date().toISOString(),
+      setupType: 'single-chart-transition',
+      activeChartName,
+      content: t('partnershipExit.body', { name: activeChartName }),
+    };
+
+    keepChatOpenAfterAskEntryRef.current = true;
+    setPartnershipMode(false);
+    setIsInstantAnalysis(false);
+    setIsPremiumAnalysis(false);
+    setShowModeSelector(false);
+    setShowPartnershipSetupModal(false);
+    setNativeChart(null);
+    setPartnerChart(null);
+    setPartnershipRelation('');
+    setPartnershipStep(0);
+    setPartnershipSubStep(0);
+    setIsTypingOtherRelation(false);
+    setOtherRelationText('');
+    setNativeSearchQuery('');
+    setInputText('');
+    setSessionId(null);
+    setLoading(false);
+    setIsTyping(false);
+    setPendingMessages(new Set());
+    setMessagesWithStorage([transitionMessage]);
+    setShowGreeting(false);
+  };
+
   // Load messages when screen focuses - but don't interfere with ongoing polling
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -2554,15 +2589,20 @@ export default function ChatScreen({ navigation, route }) {
           style={styles.modalOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={[styles.partnershipModalContent, { backgroundColor: colors.background }]}>
+          <View style={[styles.partnershipModalContent, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Text style={{ fontSize: 20 }}>🤝</Text>
-                <Text style={[styles.modalTitle, { color: colors.text, fontSize: 18 }]}>{t('premiumUi.chatScreen.partnershipSetup')}</Text>
+                <View style={[styles.partnershipModalIcon, { backgroundColor: colors.accentSoft }]}>
+                  <Ionicons name="people-outline" size={20} color={colors.accent} />
+                </View>
+                <View>
+                  <Text style={[styles.partnershipModalEyebrow, { color: colors.accent }]}>{t('premiumUi.chatScreen.partnershipAnalysis')}</Text>
+                  <Text style={[styles.modalTitle, { color: colors.text, fontSize: 20 }]}>{t('premiumUi.chatScreen.partnershipSetup')}</Text>
+                </View>
               </View>
               <TouchableOpacity
                 onPress={() => setShowPartnershipSetupModal(false)}
-                style={{ backgroundColor: colors.border, padding: 6, borderRadius: 20 }}
+                style={[styles.partnershipModalClose, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}
               >
                 <Ionicons name="close" size={20} color={colors.text} />
               </TouchableOpacity>
@@ -2578,8 +2618,8 @@ export default function ChatScreen({ navigation, route }) {
                 <TouchableOpacity
                   style={[
                     styles.setupSlot,
-                    partnershipStep === 0 && styles.setupSlotActive,
-                    isNativeSet && styles.setupSlotFilled
+                    { backgroundColor: colors.surface, borderColor: partnershipStep === 0 ? colors.accent : colors.cardBorder },
+                    isNativeSet && { backgroundColor: colors.selectionSurface }
                   ]}
                   onPress={() => {
                     setPartnershipStep(0);
@@ -2590,24 +2630,24 @@ export default function ChatScreen({ navigation, route }) {
                     setNativeSearchQuery('');
                   }}
                 >
-                  <View style={styles.setupSlotIcon}>
-                    <Text>{isNativeSet ? '👤' : '1️⃣'}</Text>
+                  <View style={[styles.setupSlotIcon, { backgroundColor: colors.accentSoft }]}>
+                    <Text style={[styles.setupSlotNumber, { color: colors.accent }]}>{isNativeSet ? '✓' : '01'}</Text>
                   </View>
                   <View style={styles.setupSlotContent}>
-                    <Text style={styles.setupSlotLabel}>{t('premiumUi.chatScreen.firstPerson')}</Text>
-                    <Text style={isNativeSet ? styles.setupSlotValue : styles.setupSlotPlaceholder} numberOfLines={1}>
+                    <Text style={[styles.setupSlotLabel, { color: colors.textTertiary }]}>{t('premiumUi.chatScreen.firstPerson')}</Text>
+                    <Text style={[isNativeSet ? styles.setupSlotValue : styles.setupSlotPlaceholder, { color: isNativeSet ? colors.text : colors.textSecondary }]} numberOfLines={1}>
                       {isNativeSet ? nativeChart.name : 'Select from list below...'}
                     </Text>
                   </View>
-                  {isNativeSet && <Ionicons name="checkmark-circle" size={20} color="#ff6b35" />}
+                  {isNativeSet && <Ionicons name="checkmark-circle" size={20} color={colors.accent} />}
                 </TouchableOpacity>
 
                 {/* Slot 2: Partner */}
                 <TouchableOpacity
                   style={[
                     styles.setupSlot,
-                    partnershipStep === 1 && styles.setupSlotActive,
-                    isPartnerSet && styles.setupSlotFilled,
+                    { backgroundColor: colors.surface, borderColor: partnershipStep === 1 ? colors.accent : colors.cardBorder },
+                    isPartnerSet && { backgroundColor: colors.selectionSurface },
                     !isNativeSet && { opacity: 0.5 }
                   ]}
                   onPress={() => {
@@ -2621,24 +2661,24 @@ export default function ChatScreen({ navigation, route }) {
                   }}
                   disabled={!isNativeSet}
                 >
-                  <View style={styles.setupSlotIcon}>
-                    <Text>{isPartnerSet ? '👫' : '2️⃣'}</Text>
+                  <View style={[styles.setupSlotIcon, { backgroundColor: colors.accentSoft }]}>
+                    <Text style={[styles.setupSlotNumber, { color: colors.accent }]}>{isPartnerSet ? '✓' : '02'}</Text>
                   </View>
                   <View style={styles.setupSlotContent}>
-                    <Text style={styles.setupSlotLabel}>{t('premiumUi.chatScreen.partnerPerson')}</Text>
-                    <Text style={isPartnerSet ? styles.setupSlotValue : styles.setupSlotPlaceholder} numberOfLines={1}>
+                    <Text style={[styles.setupSlotLabel, { color: colors.textTertiary }]}>{t('premiumUi.chatScreen.partnerPerson')}</Text>
+                    <Text style={[isPartnerSet ? styles.setupSlotValue : styles.setupSlotPlaceholder, { color: isPartnerSet ? colors.text : colors.textSecondary }]} numberOfLines={1}>
                       {isPartnerSet ? partnerChart.name : (isNativeSet ? 'Select from list below...' : 'Complete Step 1 first')}
                     </Text>
                   </View>
-                  {isPartnerSet && <Ionicons name="checkmark-circle" size={20} color="#ff6b35" />}
+                  {isPartnerSet && <Ionicons name="checkmark-circle" size={20} color={colors.accent} />}
                 </TouchableOpacity>
 
                 {/* Slot 3: Relationship */}
                 <TouchableOpacity
                   style={[
                     styles.setupSlot,
-                    partnershipStep === 2 && styles.setupSlotActive,
-                    isRelationSet && styles.setupSlotFilled,
+                    { backgroundColor: colors.surface, borderColor: partnershipStep === 2 ? colors.accent : colors.cardBorder },
+                    isRelationSet && { backgroundColor: colors.selectionSurface },
                     !isPartnerSet && { opacity: 0.5 }
                   ]}
                   onPress={() => {
@@ -2651,16 +2691,16 @@ export default function ChatScreen({ navigation, route }) {
                   }}
                   disabled={!isPartnerSet}
                 >
-                  <View style={styles.setupSlotIcon}>
-                    <Text>{isRelationSet ? '💍' : '3️⃣'}</Text>
+                  <View style={[styles.setupSlotIcon, { backgroundColor: colors.accentSoft }]}>
+                    <Text style={[styles.setupSlotNumber, { color: colors.accent }]}>{isRelationSet ? '✓' : '03'}</Text>
                   </View>
                   <View style={styles.setupSlotContent}>
-                    <Text style={styles.setupSlotLabel}>{t('premiumUi.chatScreen.relationshipStatus')}</Text>
-                    <Text style={isRelationSet ? styles.setupSlotValue : styles.setupSlotPlaceholder} numberOfLines={1}>
+                    <Text style={[styles.setupSlotLabel, { color: colors.textTertiary }]}>{t('premiumUi.chatScreen.relationshipStatus')}</Text>
+                    <Text style={[isRelationSet ? styles.setupSlotValue : styles.setupSlotPlaceholder, { color: isRelationSet ? colors.text : colors.textSecondary }]} numberOfLines={1}>
                       {isRelationSet ? partnershipRelation : (isPartnerSet ? 'Select or describe relationship...' : 'Complete Step 2 first')}
                     </Text>
                   </View>
-                  {isRelationSet && <Ionicons name="checkmark-circle" size={20} color="#ff6b35" />}
+                  {isRelationSet && <Ionicons name="checkmark-circle" size={20} color={colors.accent} />}
                 </TouchableOpacity>
               </View>
 
@@ -2705,7 +2745,7 @@ export default function ChatScreen({ navigation, route }) {
                           <TouchableOpacity
                             style={[
                               styles.setupSelectorChip,
-                              { backgroundColor: '#ff6b3515', borderColor: '#ff6b35' },
+                              { backgroundColor: colors.selectionSurface, borderColor: colors.cardBorder },
                               chart.id === 'add-new' && chart.isEmpty === false && { opacity: 0.6 }
                             ]}
                             onPress={() => {
@@ -2749,7 +2789,7 @@ export default function ChatScreen({ navigation, route }) {
                           <TouchableOpacity
                             style={[
                               styles.setupSelectorChip,
-                              { backgroundColor: '#ff6b3515', borderColor: '#ff6b35' },
+                              { backgroundColor: colors.selectionSurface, borderColor: colors.cardBorder },
                               chart.id === 'add-new' && chart.isEmpty === false && { opacity: 0.6 }
                             ]}
                             onPress={() => {
@@ -2778,7 +2818,7 @@ export default function ChatScreen({ navigation, route }) {
                   {isTypingOtherRelation ? (
                     <View style={styles.otherRelationContainer}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                        <Text style={[styles.setupHelperText, { color: '#ff6b35', fontWeight: '700', fontSize: 13, marginBottom: 0 }]}>
+                        <Text style={[styles.setupHelperText, { color: colors.accent, fontWeight: '700', fontSize: 13, marginBottom: 0 }]}>
                           {t('premiumUi.chatScreen.describeRelationship')}
                         </Text>
                         <TouchableOpacity
@@ -2787,7 +2827,7 @@ export default function ChatScreen({ navigation, route }) {
                             setOtherRelationText('');
                           }}
                         >
-                          <Text style={{ color: '#ff6b35', fontSize: 11, fontWeight: '600', textDecorationLine: 'underline' }}>← {t('premiumUi.common.goBack')}</Text>
+                          <Text style={{ color: colors.accent, fontSize: 11, fontWeight: '600' }}>← {t('premiumUi.common.goBack')}</Text>
                         </TouchableOpacity>
                       </View>
                       <View style={styles.otherInputWrapper}>
@@ -2802,6 +2842,7 @@ export default function ChatScreen({ navigation, route }) {
                         <TouchableOpacity
                           style={[
                             styles.otherDoneButton,
+                            { backgroundColor: colors.primaryStrong },
                             !otherRelationText.trim() && { opacity: 0.5 }
                           ]}
                           onPress={() => {
@@ -2827,7 +2868,7 @@ export default function ChatScreen({ navigation, route }) {
                       return (
                         <View>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                            <Text style={[styles.setupHelperText, { color: '#ff6b35', fontWeight: '700', fontSize: 13, marginBottom: 0 }]}>
+                            <Text style={[styles.setupHelperText, { color: colors.accent, fontWeight: '700', fontSize: 13, marginBottom: 0 }]}>
                               {subStep.prompt}
                             </Text>
                             <TouchableOpacity
@@ -2836,7 +2877,7 @@ export default function ChatScreen({ navigation, route }) {
                                 setPartnershipSubStep(0);
                               }}
                             >
-                              <Text style={{ color: '#ff6b35', fontSize: 11, fontWeight: '600', textDecorationLine: 'underline' }}>← {t('premiumUi.common.goBack')}</Text>
+                              <Text style={{ color: colors.accent, fontSize: 11, fontWeight: '600' }}>← {t('premiumUi.common.goBack')}</Text>
                             </TouchableOpacity>
                           </View>
                           <GHFlatList
@@ -2847,7 +2888,7 @@ export default function ChatScreen({ navigation, route }) {
                             contentContainerStyle={styles.setupSelectorScroll}
                             renderItem={({ item }) => (
                               <TouchableOpacity
-                                style={[styles.setupSelectorChip, { backgroundColor: '#ff6b3515', borderColor: '#ff6b35', minWidth: 100 }]}
+                                style={[styles.setupSelectorChip, { backgroundColor: colors.selectionSurface, borderColor: colors.cardBorder, minWidth: 100 }]}
                                 onPress={() => handleRelationshipSelect(item)}
                               >
                                 <Text style={[styles.setupSelectorText, { color: colors.text }]}>{item.label}</Text>
@@ -2868,7 +2909,7 @@ export default function ChatScreen({ navigation, route }) {
                           contentContainerStyle={styles.setupSelectorScroll}
                           renderItem={({ item: relation }) => (
                             <TouchableOpacity
-                              style={[styles.setupSelectorChip, { backgroundColor: '#ff6b3515', borderColor: '#ff6b35' }]}
+                              style={[styles.setupSelectorChip, { backgroundColor: colors.selectionSurface, borderColor: colors.cardBorder }]}
                               onPress={() => handleRelationshipSelect(relation.label)}
                             >
                               <Text style={[styles.setupSelectorText, { color: colors.text }]}>{relation.label}</Text>
@@ -2886,7 +2927,7 @@ export default function ChatScreen({ navigation, route }) {
 
               {partnershipStep === 3 && (
                 <TouchableOpacity
-                  style={styles.setupConfirmButton}
+                  style={[styles.setupConfirmButton, { backgroundColor: colors.primaryStrong }]}
                   onPress={() => {
                     // Add confirmation message to chat
                     const confirmMsg = {
@@ -2905,10 +2946,10 @@ export default function ChatScreen({ navigation, route }) {
                     }, 100);
                   }}
                 >
-                  <LinearGradient colors={['#ff6b35', '#f97316']} style={styles.setupConfirmGradient}>
+                  <View style={styles.setupConfirmGradient}>
                     <Text style={styles.setupConfirmText}>{t('premiumUi.chatScreen.readyAnalysis')} ✨</Text>
                     <Ionicons name="arrow-forward" size={20} color="#fff" />
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               )}
 
@@ -2923,7 +2964,7 @@ export default function ChatScreen({ navigation, route }) {
                     setPartnershipSubStep(0);
                   }}
                 >
-                  <Text style={styles.setupResetText}>{t('premiumUi.chatScreen.resetSetup')}</Text>
+                  <Text style={[styles.setupResetText, { color: colors.textSecondary }]}>{t('premiumUi.chatScreen.resetSetup')}</Text>
                 </TouchableOpacity>
               )}
             </GHScrollView>
@@ -5384,23 +5425,14 @@ export default function ChatScreen({ navigation, route }) {
                   </View>
                 </View>
               ) : isMundane ? (
-                <View style={styles.partnershipChipsContainer}>
-                  <TouchableOpacity
-                    onPress={() => setShowCountryPicker(true)}
-                    style={[styles.nameChip, styles.compactChip]}
-                  >
-                    <Text style={[styles.compactChipText, { color: colors.textInverseMuted }]}>
-                      {selectedCountry.name}
+                <View style={styles.activeChatTitleWrap}>
+                  <View style={[styles.activeChatDot, { backgroundColor: colors.accent }]} />
+                  <View style={styles.activeChatTitleCopy}>
+                    <Text style={[styles.activeChatTitle, { color: colors.textInverse }]}>{t('premiumUi.chatScreen.globalMarkets')}</Text>
+                    <Text style={[styles.activeChatSubtitle, { color: colors.textInverseMuted }]} numberOfLines={1}>
+                      {mundaneContext?.event_name || selectedCountry.name}
                     </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setShowYearPicker(true)}
-                    style={[styles.nameChip, styles.compactChip]}
-                  >
-                    <Text style={[styles.compactChipText, { color: colors.textInverseMuted }]}>
-                      {selectedYear}
-                    </Text>
-                  </TouchableOpacity>
+                  </View>
                 </View>
               ) : !partnershipMode ? (
                 <View style={styles.activeChatTitleWrap}>
@@ -5413,29 +5445,14 @@ export default function ChatScreen({ navigation, route }) {
                   </View>
                 </View>
               ) : (
-                <View style={styles.partnershipChipsContainer}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSelectingFor('native');
-                      setShowChartPicker(true);
-                    }}
-                    style={[styles.nameChip, styles.nativeChip, styles.compactChip]}
-                  >
-                    <Text style={styles.compactChipText}>
-                      {nativeChart?.name?.slice(0, 6) || 'Native'}{nativeChart?.name?.length > 6 ? '..' : ''}
+                <View style={styles.activeChatTitleWrap}>
+                  <View style={[styles.activeChatDot, { backgroundColor: colors.accent }]} />
+                  <View style={styles.activeChatTitleCopy}>
+                    <Text style={[styles.activeChatTitle, { color: colors.textInverse }]}>{t('premiumUi.chatScreen.partnershipAnalysis')}</Text>
+                    <Text style={[styles.activeChatSubtitle, { color: colors.textInverseMuted }]} numberOfLines={1}>
+                      {nativeChart?.name || t('premiumUi.chatScreen.native')} × {partnerChart?.name || t('premiumUi.chatScreen.partner')}
                     </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSelectingFor('partner');
-                      setShowChartPicker(true);
-                    }}
-                    style={[styles.nameChip, styles.partnerChip, styles.compactChip]}
-                  >
-                    <Text style={styles.compactChipText}>
-                      {partnerChart?.name?.slice(0, 6) || 'Partner'}{partnerChart?.name?.length > 6 ? '..' : ''}
-                    </Text>
-                  </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </View>
@@ -5633,48 +5650,48 @@ export default function ChatScreen({ navigation, route }) {
             style={styles.keyboardAvoidingView}
             enabled={false}
           >
-          {partnershipMode && (
-            <View style={styles.floatingBadgesContainer}>
+          {(partnershipMode || isMundane) && (
+            <View style={[styles.modeContextCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+              <View style={[styles.modeContextIcon, { backgroundColor: colors.accentSoft }]}>
+                <Ionicons name={partnershipMode ? 'people-outline' : 'earth-outline'} size={20} color={colors.accent} />
+              </View>
+              <View style={styles.modeContextCopy}>
+                <Text style={[styles.modeContextEyebrow, { color: colors.accent }]}>
+                  {partnershipMode ? t('premiumUi.chatScreen.partnershipAnalysis') : t('premiumUi.chatScreen.globalMarkets')}
+                </Text>
+                <Text style={[styles.modeContextTitle, { color: colors.text }]} numberOfLines={1}>
+                  {partnershipMode
+                    ? `${nativeChart?.name || t('premiumUi.chatScreen.native')} × ${partnerChart?.name || t('premiumUi.chatScreen.partner')}`
+                    : (mundaneContext?.event_name || selectedCountry.name)}
+                </Text>
+                <Text style={[styles.modeContextMeta, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {partnershipMode
+                    ? (partnershipRelation || t('premiumUi.chatScreen.relationshipStatus'))
+                    : [mundaneContext?.entities?.join(', '), mundaneContext?.period || selectedYear].filter(Boolean).join(' · ')}
+                </Text>
+              </View>
               <TouchableOpacity
-                style={styles.floatingChangeBadge}
+                style={[styles.modeContextAction, { borderColor: colors.cardBorder }]}
                 onPress={() => {
-                  setShowPartnershipSetupModal(true);
+                  if (partnershipMode) setShowPartnershipSetupModal(true);
+                  else navigation.navigate('MundaneHub');
                 }}
                 activeOpacity={0.8}
               >
-                <Ionicons name="create-outline" size={14} color="#ff6b35" />
-                <Text style={styles.changeBadgeText}>{t('premiumUi.chatScreen.changePartnership')}</Text>
+                <Ionicons name="options-outline" size={18} color={colors.text} />
               </TouchableOpacity>
-
-              <View style={styles.floatingPartnershipBadge}>
-                <View style={styles.partnershipBadgeTextContent}>
-                  <LinearGradient
-                    colors={['#ec4899', '#f472b6']}
-                    style={styles.partnershipBadgeGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                  >
-                    <Text style={[styles.partnershipBadgeText, { color: COLORS.white }]}>👥 {t('premiumUi.chatScreen.partnershipMode')}</Text>
-                  </LinearGradient>
-                </View>
-                <TouchableOpacity
-                  style={styles.partnershipBadgeClose}
+              <TouchableOpacity
+                  style={styles.modeContextClose}
                   onPress={() => {
-                    setPartnershipMode(false);
-                    setIsInstantAnalysis(false);
-                    setIsPremiumAnalysis(false);
-                    setShowModeSelector(false);
-                    setNativeChart(null);
-                    setPartnerChart(null);
-                    setPartnershipRelation('');
-                    setIsTypingOtherRelation(false);
-                    setOtherRelationText('');
-                    setNativeSearchQuery('');
+                    if (isMundane) {
+                      setIsMundane(false);
+                      setMundaneContext(null);
+                    }
+                    if (partnershipMode) exitPartnershipMode();
                   }}
                 >
-                  <Ionicons name="close" size={18} color="#f472b6" />
+                  <Ionicons name="close" size={19} color={colors.textSecondary} />
                 </TouchableOpacity>
-              </View>
             </View>
           )}
           <FlatList
@@ -5824,27 +5841,55 @@ export default function ChatScreen({ navigation, route }) {
 
               if (item.setupType === 'partnership' && partnershipMode) {
                 return (
-                  <View style={{ marginBottom: 16 }}>
-                    <LinearGradient
-                      colors={['rgba(255, 107, 53, 0.1)', 'rgba(249, 115, 22, 0.05)']}
-                      style={{ borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255, 107, 53, 0.2)' }}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                        <View style={{ backgroundColor: '#ff6b3520', padding: 8, borderRadius: 12 }}>
-                          <Text style={{ fontSize: 18 }}>🤝</Text>
+                  <View style={[styles.partnershipSummaryCard, {
+                    backgroundColor: colors.surfaceRaised,
+                    borderColor: colors.cardBorder,
+                    elevation: getCardElevation(1),
+                  }]}>
+                      <View style={styles.partnershipSummaryHeader}>
+                        <View style={[styles.partnershipSummaryIcon, { backgroundColor: colors.accentSoft }]}>
+                          <Ionicons name="people-outline" size={21} color={colors.onAccent} />
                         </View>
-                        <View>
-                          <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>{t('premiumUi.chatScreen.partnershipAnalysis')}</Text>
-                          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{t('premiumUi.chatScreen.setupComplete')}</Text>
+                        <View style={styles.partnershipSummaryCopy}>
+                          <Text style={[styles.partnershipSummaryEyebrow, { color: colors.accent }]}>{t('premiumUi.chatScreen.setupComplete')}</Text>
+                          <Text style={[styles.partnershipSummaryTitle, { color: colors.text }]}>{t('premiumUi.chatScreen.partnershipAnalysis')}</Text>
+                          {(nativeChart?.name || partnerChart?.name) ? (
+                            <Text style={[styles.partnershipSummaryMeta, { color: colors.textSecondary }]} numberOfLines={1}>
+                              {nativeChart?.name || t('premiumUi.chatScreen.native')} × {partnerChart?.name || t('premiumUi.chatScreen.partner')}
+                            </Text>
+                          ) : null}
                         </View>
+                        <Ionicons name="checkmark-circle" size={21} color={colors.accent} />
                       </View>
                       <TouchableOpacity
-                        style={{ backgroundColor: '#ff6b3520', paddingVertical: 10, borderRadius: 12, alignItems: 'center', marginTop: 8 }}
+                        style={[styles.partnershipSummaryAction, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}
                         onPress={() => setShowPartnershipSetupModal(true)}
                       >
-                        <Text style={{ color: '#ff6b35', fontWeight: '700', fontSize: 13 }}>{t('premiumUi.chatScreen.editSetup')} ✏️</Text>
+                        <Ionicons name="options-outline" size={16} color={colors.selectionText} />
+                        <Text style={[styles.partnershipSummaryActionText, { color: colors.selectionText }]}>{t('premiumUi.chatScreen.editSetup')}</Text>
                       </TouchableOpacity>
-                    </LinearGradient>
+                  </View>
+                );
+              }
+
+              if (item.setupType === 'single-chart-transition') {
+                return (
+                  <View style={[styles.modeTransitionCard, {
+                    backgroundColor: colors.surfaceRaised,
+                    borderColor: colors.cardBorder,
+                    elevation: getCardElevation(1),
+                  }]}>
+                    <View style={[styles.modeTransitionIcon, { backgroundColor: colors.accentSoft }]}>
+                      <Ionicons name="person-outline" size={21} color={colors.onAccent} />
+                    </View>
+                    <View style={styles.modeTransitionCopy}>
+                      <Text style={[styles.modeTransitionEyebrow, { color: colors.accent }]}>{t('partnershipExit.eyebrow')}</Text>
+                      <Text style={[styles.modeTransitionTitle, { color: colors.text }]}>{t('partnershipExit.title')}</Text>
+                      <Text style={[styles.modeTransitionBody, { color: colors.textSecondary }]}>
+                        {t('partnershipExit.body', { name: item.activeChartName || birthData?.name || t('premiumUi.chatScreen.native') })}
+                      </Text>
+                    </View>
+                    <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
                   </View>
                 );
               }
@@ -6325,9 +6370,7 @@ export default function ChatScreen({ navigation, route }) {
                 if (!partnershipMode) {
                   openPartnershipModal(partnershipCost);
                 } else {
-                  setPartnershipMode(false);
-                  setNativeChart(null);
-                  setPartnerChart(null);
+                  exitPartnershipMode();
                 }
               }}
             >
@@ -7007,10 +7050,8 @@ export default function ChatScreen({ navigation, route }) {
                           openPartnershipModal(partnershipCost);
                           closeMenuDrawer();
                         } else {
-                          setPartnershipMode(false);
-                          setNativeChart(null);
-                          setPartnerChart(null);
                           closeMenuDrawer();
+                          exitPartnershipMode();
                         }
                       }}
                     >
@@ -7651,7 +7692,7 @@ export default function ChatScreen({ navigation, route }) {
           : 'Partnership mode uses credits per question for compatibility study between two charts.'}
         cost={partnershipModalCost}
         credits={credits}
-        confirmLabel="Continue"
+        iconName="people-outline"
       />
       <ConfirmCreditsModal
         visible={showMundaneModal}
@@ -7663,7 +7704,7 @@ export default function ChatScreen({ navigation, route }) {
           : 'Global Markets & Events analysis uses credits per question for deep mundane chart study of nations, markets, and world events.'}
         cost={mundaneModalCost}
         credits={credits}
-        confirmLabel="Continue"
+        iconName="earth-outline"
       />
       {renderPartnershipSetupModal()}
       </LinearGradient>
@@ -8869,11 +8910,10 @@ const styles = StyleSheet.create({
     maxHeight: '90%',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.3)',
     elevation: 20,
-    shadowColor: '#ff6b35',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.22,
     shadowRadius: 20,
   },
   modalHeader: {
@@ -8883,7 +8923,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 107, 53, 0.1)',
+    borderBottomColor: 'rgba(127, 110, 100, 0.18)',
   },
   modalTitle: {
     fontSize: 20,
@@ -9515,6 +9555,102 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 5,
   },
+  partnershipSummaryCard: {
+    marginBottom: 16,
+    borderRadius: 22,
+    padding: 15,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+  },
+  partnershipSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+  },
+  partnershipSummaryIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  partnershipSummaryCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  partnershipSummaryEyebrow: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    marginBottom: 3,
+  },
+  partnershipSummaryTitle: {
+    fontFamily: typographyTokens.displayFamily,
+    fontSize: 20,
+    lineHeight: 23,
+  },
+  partnershipSummaryMeta: {
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 3,
+  },
+  partnershipSummaryAction: {
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  partnershipSummaryActionText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modeTransitionCard: {
+    marginBottom: 16,
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 11,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+  },
+  modeTransitionIcon: {
+    width: 43,
+    height: 43,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeTransitionCopy: { flex: 1, minWidth: 0 },
+  modeTransitionEyebrow: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    marginBottom: 3,
+  },
+  modeTransitionTitle: {
+    fontFamily: typographyTokens.displayFamily,
+    fontSize: 20,
+    lineHeight: 23,
+  },
+  modeTransitionBody: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
+  },
   partnershipSetupTitle: {
     fontSize: 20,
     fontWeight: '800',
@@ -9575,7 +9711,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     elevation: 4,
-    shadowColor: '#ff6b35',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -9641,6 +9777,78 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 8,
     gap: 8,
+  },
+  modeContextCard: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 6,
+    minHeight: 76,
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingHorizontal: 13,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+  },
+  modeContextIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modeContextCopy: { flex: 1, minWidth: 0 },
+  modeContextEyebrow: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+    marginBottom: 3,
+  },
+  modeContextTitle: {
+    fontFamily: typographyTokens.displayFamily,
+    fontSize: 17,
+    lineHeight: 20,
+  },
+  modeContextMeta: { fontSize: 11, marginTop: 2 },
+  modeContextAction: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modeContextClose: {
+    width: 28,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  partnershipModalIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  partnershipModalEyebrow: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  partnershipModalClose: {
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  setupSlotNumber: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
   floatingChangeBadge: {
     backgroundColor: 'rgba(255, 107, 53, 0.1)',

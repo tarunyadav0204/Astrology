@@ -22,6 +22,10 @@ import accountSecurityActions from './account-security-actions.json';
 import authDeep from './auth-deep.json';
 import homeRecommendations from './home-recommendations.json';
 import appUpdate from './app-update.json';
+import chatModes from './chat-modes.json';
+import creditConfirmation from './credit-confirmation.json';
+import copyAlert from './copy-alert.json';
+import partnershipExit from './partnership-exit.json';
 
 // The original premium-ui import accumulated a shifted chatScreen block: the
 // English key contains German, German contains Russian, and the later Indic
@@ -73,6 +77,38 @@ const normalizedPremiumUi = Object.fromEntries(
   [fr, authDeep.fr], [ru, authDeep.russian], [zh, authDeep.chinese],
 ].forEach(([baseCopy, deepCopy]) => {
   baseCopy.authDeep = deepCopy;
+});
+
+[
+  [en, chatModes.english], [es, chatModes.es], [hi, chatModes.hindi], [tamil, chatModes.tamil],
+  [te, chatModes.telugu], [gu, chatModes.gujarati], [mr, chatModes.marathi], [de, chatModes.german],
+  [fr, chatModes.fr], [ru, chatModes.russian], [zh, chatModes.chinese],
+].forEach(([baseCopy, modeCopy]) => {
+  baseCopy.chatModes = modeCopy;
+});
+
+[
+  [en, creditConfirmation.english], [es, creditConfirmation.es], [hi, creditConfirmation.hindi], [tamil, creditConfirmation.tamil],
+  [te, creditConfirmation.telugu], [gu, creditConfirmation.gujarati], [mr, creditConfirmation.marathi], [de, creditConfirmation.german],
+  [fr, creditConfirmation.fr], [ru, creditConfirmation.russian], [zh, creditConfirmation.chinese],
+].forEach(([baseCopy, confirmationCopy]) => {
+  baseCopy.creditConfirmation = confirmationCopy;
+});
+
+[
+  [en, copyAlert.english], [es, copyAlert.es], [hi, copyAlert.hindi], [tamil, copyAlert.tamil],
+  [te, copyAlert.telugu], [gu, copyAlert.gujarati], [mr, copyAlert.marathi], [de, copyAlert.german],
+  [fr, copyAlert.fr], [ru, copyAlert.russian], [zh, copyAlert.chinese],
+].forEach(([baseCopy, alertCopy]) => {
+  baseCopy.copyAlert = alertCopy;
+});
+
+[
+  [en, partnershipExit.english], [es, partnershipExit.es], [hi, partnershipExit.hindi], [tamil, partnershipExit.tamil],
+  [te, partnershipExit.telugu], [gu, partnershipExit.gujarati], [mr, partnershipExit.marathi], [de, partnershipExit.german],
+  [fr, partnershipExit.fr], [ru, partnershipExit.russian], [zh, partnershipExit.chinese],
+].forEach(([baseCopy, exitCopy]) => {
+  baseCopy.partnershipExit = exitCopy;
 });
 
 i18n

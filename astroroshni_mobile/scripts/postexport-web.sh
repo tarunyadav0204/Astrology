@@ -65,12 +65,12 @@ html = re.sub(
 if 'name="theme-color"' in html:
     html = re.sub(
         r'(<meta\s+name="theme-color"[^>]*content=")[^"]*(")',
-        r'\1#1a0033\2',
+        r'\1#2d0c1c\2',
         html,
         flags=re.I,
     )
 else:
-    html = html.replace('</head>', '<meta name="theme-color" content="#1a0033" />\n</head>', 1)
+    html = html.replace('</head>', '<meta name="theme-color" content="#2d0c1c" />\n</head>', 1)
 # Mark shell for debugging / edge verification
 if 'data-ar-shell=' not in html:
     html = html.replace('<html lang="en">', '<html lang="en" data-ar-shell="expo-web">', 1)
@@ -122,8 +122,8 @@ cat > "$DIST/expo-manifest.webmanifest" <<'EOF'
   "scope": "/mobile/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#1a0033",
-  "theme_color": "#1a0033",
+  "background_color": "#2d0c1c",
+  "theme_color": "#2d0c1c",
   "icons": [
     {
       "src": "/mobile/pwa-icon-192.png",

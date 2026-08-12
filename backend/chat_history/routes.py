@@ -109,6 +109,37 @@ def _birth_chart_id_from_birth_details(bd) -> int | None:
     return None
 
 
+def _normalize_birth_chart_id(value) -> int | None:
+    """Return a positive chart id, rejecting lossy or ambiguous values."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        raise HTTPException(status_code=422, detail="birth_chart_id must be a positive integer")
+    try:
+        chart_id = int(value)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="birth_chart_id must be a positive integer")
+    if chart_id <= 0 or (isinstance(value, float) and not value.is_integer()):
+        raise HTTPException(status_code=422, detail="birth_chart_id must be a positive integer")
+    if isinstance(value, str) and str(chart_id) != value.strip():
+        raise HTTPException(status_code=422, detail="birth_chart_id must be a positive integer")
+    return chart_id
+
+
+def _require_birth_chart_owner(conn, birth_chart_id: int | None, user_id: int) -> None:
+    """Prevent a chat session from being bound to another user's chart."""
+    if birth_chart_id is None:
+        return
+    cur = execute(
+        conn,
+        "SELECT id FROM birth_charts WHERE id = %s AND userid = %s",
+        (birth_chart_id, user_id),
+    )
+    if not cur.fetchone():
+        # Do not reveal whether a chart owned by another account exists.
+        raise HTTPException(status_code=404, detail="Birth chart not found")
+
+
 def _debug_preview(value, limit: int = 240) -> str:
     text = " ".join(str(value or "").split())
     if len(text) <= limit:
@@ -1108,9 +1139,10 @@ def init_chat_tables():
 async def create_chat_session(request: dict, current_user = Depends(get_current_user)):
     """Create a new chat session"""
     session_id = str(uuid.uuid4())
-    birth_chart_id = request.get("birth_chart_id")
+    birth_chart_id = _normalize_birth_chart_id(request.get("birth_chart_id"))
 
     with get_conn() as conn:
+        _require_birth_chart_owner(conn, birth_chart_id, current_user.userid)
         execute(
             conn,
             "INSERT INTO chat_sessions (session_id, user_id, birth_chart_id) VALUES (%s, %s, %s)",
@@ -1774,6 +1806,9 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             raise HTTPException(status_code=404, detail="Session not found")
         session_birth_chart_id = session[1] if len(session) > 1 else None
 
+        # Defense in depth for sessions created before chart ownership was enforced.
+        _require_birth_chart_owner(conn, session_birth_chart_id, current_user.userid)
+
         if session_birth_chart_id is not None:
             requested_chart_id = _birth_chart_id_from_birth_details(birth_details)
             if requested_chart_id is not None and int(session_birth_chart_id) != int(requested_chart_id):
@@ -2140,6 +2175,9 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         if not session or session[0] != current_user.userid:
             raise HTTPException(status_code=404, detail="Session not found")
         session_birth_chart_id = session[1] if len(session) > 1 else None
+
+        # Defense in depth for sessions created before chart ownership was enforced.
+        _require_birth_chart_owner(conn, session_birth_chart_id, current_user.userid)
 
         # Reject stale client: session thread is for one chart; birth_details must not claim another.
         if session_birth_chart_id is not None:
@@ -3390,7 +3428,11 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         if birth_chart_id and not is_instant_chat:
             fact_extractor = FactExtractor()
             facts_start = time.time()
-            all_user_facts = await asyncio.to_thread(fact_extractor.get_facts, birth_chart_id)
+            all_user_facts = await asyncio.to_thread(
+                fact_extractor.get_facts,
+                birth_chart_id,
+                user_id,
+            )
             _chat_log_event(
                 "chat_processing_phase",
                 message_id=message_id,

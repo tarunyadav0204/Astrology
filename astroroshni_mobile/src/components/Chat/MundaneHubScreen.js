@@ -16,9 +16,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme, ThemedStatusBar } from '../../context/ThemeContext';
 import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
@@ -27,6 +26,7 @@ import { COUNTRIES } from '../../utils/mundaneConstants';
 import { mundaneAPI } from '../../services/api';
 import locationCache from '../../services/locationCache';
 import { API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { typographyTokens } from '../../theme/tokens';
 
 const { width } = Dimensions.get('window');
 
@@ -34,7 +34,7 @@ const MUNDANE_CATEGORIES = [
   {
     id: 'sports',
     title: 'Sports & Competition',
-    icon: '🏏',
+    icon: 'trophy-outline',
     gradient: ['#F59E0B', '#D97706'],
     description: 'Predict match outcomes, tournaments, and player performance.',
     fields: ['event_name', 'entities', 'event_date', 'event_time']
@@ -42,7 +42,7 @@ const MUNDANE_CATEGORIES = [
   {
     id: 'markets',
     title: 'Markets & Finance',
-    icon: '📈',
+    icon: 'trending-up-outline',
     gradient: ['#10B981', '#059669'],
     description: 'Analyze stock markets, commodities, and economic trends.',
     fields: ['event_name', 'entities', 'event_date', 'period']
@@ -50,7 +50,7 @@ const MUNDANE_CATEGORIES = [
   {
     id: 'politics',
     title: 'Politics & Elections',
-    icon: '🗳️',
+    icon: 'podium-outline',
     gradient: ['#6366F1', '#4F46E5'],
     description: 'Forecast election results, regime changes, and policy impacts.',
     fields: ['event_name', 'entities', 'event_date']
@@ -58,7 +58,7 @@ const MUNDANE_CATEGORIES = [
   {
     id: 'war',
     title: 'War & Geopolitics',
-    icon: '🛡️',
+    icon: 'shield-outline',
     gradient: ['#EF4444', '#DC2626'],
     description: 'Evaluate border tensions, conflict risks, and global stability.',
     fields: ['event_name', 'entities', 'event_date']
@@ -66,7 +66,7 @@ const MUNDANE_CATEGORIES = [
   {
     id: 'general',
     title: 'General Events',
-    icon: '🌍',
+    icon: 'earth-outline',
     gradient: ['#6B7280', '#4B5563'],
     description: 'Natural events, launches, or any major world occurrence.',
     fields: ['event_name', 'event_date', 'event_time']
@@ -75,7 +75,7 @@ const MUNDANE_CATEGORIES = [
 
 export default function MundaneHubScreen({ navigation }) {
   useAnalytics('MundaneHubScreen');
-  const { theme, colors } = useTheme();
+  const { theme, colors, getCardElevation } = useTheme();
   const isDark = theme === 'dark';
   const { credits } = useCredits();
   const { t } = useTranslation();
@@ -285,7 +285,7 @@ export default function MundaneHubScreen({ navigation }) {
     } else {
       // Prioritize selected entities (country objects) for chart lookups
       entityList = formData.selectedEntities.map(e => e.name);
-      
+
       // Also include any free-text entities if they aren't duplicates
       const freeTextEntities = formData.entities.split(',').map(e => e.trim()).filter(e => e.length > 0);
       freeTextEntities.forEach(e => {
@@ -333,16 +333,23 @@ export default function MundaneHubScreen({ navigation }) {
   };
 
   const renderCategoryList = () => (
-    <ScrollView 
+    <ScrollView
       style={styles.scrollView}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.heroSection}>
-        <Text style={[styles.heroTitle, { color: colors.text }]}>World Events Hub</Text>
-        <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-          Select a category to begin your elite mundane analysis
+      <View style={[styles.heroSection, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
+        <View style={[styles.heroOrbit, { borderColor: colors.cosmicLine }]} />
+        <Text style={[styles.heroEyebrow, { color: colors.accent }]}>{t('chatModes.globalEyebrow')}</Text>
+        <Text style={[styles.heroTitle, { color: colors.textInverse }]}>{t('chatModes.globalTitle')}</Text>
+        <Text style={[styles.heroSubtitle, { color: colors.textInverseMuted }]}>
+          {t('chatModes.globalBody')}
         </Text>
+      </View>
+
+      <View style={styles.collectionHeading}>
+        <Text style={[styles.collectionEyebrow, { color: colors.accent }]}>{t('chatModes.chooseField')}</Text>
+        <Text style={[styles.collectionTitle, { color: colors.text }]}>{t('chatModes.readingQuestion')}</Text>
       </View>
 
       <View style={styles.categoryGrid}>
@@ -351,21 +358,18 @@ export default function MundaneHubScreen({ navigation }) {
             key={cat.id}
             onPress={() => handleCategorySelect(cat)}
             activeOpacity={0.8}
-            style={styles.categoryCard}
+            style={[styles.categoryCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder, elevation: getCardElevation(1) }]}
           >
-            <LinearGradient
-              colors={isDark ? ['#1e293b', '#0f172a'] : ['#ffffff', '#f8fafc']}
-              style={[styles.cardGradient, { borderColor: isDark ? '#334155' : '#e2e8f0' }]}
-            >
+            <View style={styles.cardGradient}>
               <View style={styles.cardHeader}>
-                <LinearGradient colors={cat.gradient} style={styles.iconCircle}>
-                  <Text style={styles.iconText}>{cat.icon}</Text>
-                </LinearGradient>
+                <View style={[styles.iconCircle, { backgroundColor: colors.accentSoft }]}>
+                  <Ionicons name={cat.icon} size={22} color={colors.accent} />
+                </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
               </View>
               <Text style={[styles.catTitle, { color: colors.text }]}>{cat.title}</Text>
               <Text style={[styles.catDesc, { color: colors.textSecondary }]}>{cat.description}</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         ))}
       </View>
@@ -375,29 +379,32 @@ export default function MundaneHubScreen({ navigation }) {
   const renderForm = () => {
     const cat = selectedCategory;
     return (
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex1}
       >
-        <ScrollView 
+        <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
           <Animated.View style={[styles.formContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <View style={styles.formHeader}>
-              <LinearGradient colors={cat.gradient} style={styles.smallIconCircle}>
-                <Text style={styles.smallIconText}>{cat.icon}</Text>
-              </LinearGradient>
-              <Text style={[styles.formTitle, { color: colors.text }]}>{cat.title}</Text>
+            <View style={[styles.formHeader, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
+              <View style={[styles.smallIconCircle, { backgroundColor: colors.cosmicGlow }]}>
+                <Ionicons name={cat.icon} size={20} color={colors.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.formEyebrow, { color: colors.accent }]}>{t('chatModes.readingContext')}</Text>
+                <Text style={[styles.formTitle, { color: colors.textInverse }]}>{cat.title}</Text>
+              </View>
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
                 {cat.id === 'sports' ? 'Match location (country)' : 'Primary country of analysis'}
               </Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => { setCountryPickerTarget('location'); setShowCountryPicker(true); }}
-                style={[styles.input, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', borderColor: isDark ? '#334155' : '#e2e8f0', justifyContent: 'center' }]}
+                style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.cardBorder, justifyContent: 'center' }]}
               >
                 <Text style={{ color: colors.text }}>{formData.country.name}</Text>
               </TouchableOpacity>
@@ -413,7 +420,7 @@ export default function MundaneHubScreen({ navigation }) {
                 <Text style={[styles.label, { color: colors.textSecondary }]}>Venue city / stadium area</Text>
                 <TouchableOpacity
                   onPress={() => setShowVenuePicker(true)}
-                  style={[styles.input, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', borderColor: isDark ? '#334155' : '#e2e8f0', justifyContent: 'center' }]}
+                  style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.cardBorder, justifyContent: 'center' }]}
                 >
                   <Text style={{ color: formData.venue_name ? colors.text : colors.textTertiary }}>
                     {formData.venue_name || 'Search actual match venue'}
@@ -435,7 +442,7 @@ export default function MundaneHubScreen({ navigation }) {
                     : 'Event Name'}
                 </Text>
                 <TextInput
-                  style={[styles.input, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', color: colors.text, borderColor: isDark ? '#334155' : '#e2e8f0' }]}
+                  style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.cardBorder }]}
                   placeholder={
                     cat.id === 'sports'
                       ? 'e.g. ICC World Cup Final'
@@ -458,17 +465,17 @@ export default function MundaneHubScreen({ navigation }) {
               cat.id === 'sports' ? (
                 <View style={styles.inputGroup}>
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Teams (countries)</Text>
-                  
-                  <TouchableOpacity 
+
+                  <TouchableOpacity
                     onPress={() => { setCountryPickerTarget('teamA'); setShowCountryPicker(true); }}
-                    style={[styles.input, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', borderColor: isDark ? '#334155' : '#e2e8f0', justifyContent: 'center', marginBottom: 10 }]}
+                    style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.cardBorder, justifyContent: 'center', marginBottom: 10 }]}
                   >
                     <Text style={{ color: colors.text }}>Team A: {formData.teamACountry.name}</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     onPress={() => { setCountryPickerTarget('teamB'); setShowCountryPicker(true); }}
-                    style={[styles.input, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', borderColor: isDark ? '#334155' : '#e2e8f0', justifyContent: 'center' }]}
+                    style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.cardBorder, justifyContent: 'center' }]}
                   >
                     <Text style={{ color: colors.text }}>Team B: {formData.teamBCountry.name}</Text>
                   </TouchableOpacity>
@@ -488,12 +495,12 @@ export default function MundaneHubScreen({ navigation }) {
                           ? 'Nations Involved in Conflict (MANDATORY)'
                           : 'Involved Nations / Regions'}
                   </Text>
-                  
+
                   {/* Selected Nations Chips Container */}
-                  <View style={[styles.entityChipsContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]}>
+                  <View style={[styles.entityChipsContainer, { backgroundColor: colors.surfaceMuted }]}>
                     <View style={styles.entityChips}>
                       {formData.selectedEntities.map((ent) => (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                           key={ent.name}
                           onPress={() => {
                             setFormData({
@@ -507,9 +514,9 @@ export default function MundaneHubScreen({ navigation }) {
                           <Ionicons name="close-circle" size={18} color={colors.primary} />
                         </TouchableOpacity>
                       ))}
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         onPress={() => { setCountryPickerTarget('multi'); setShowCountryPicker(true); }}
-                        style={[styles.addEntityButton, { borderColor: colors.primary, backgroundColor: isDark ? '#1e293b' : '#fff' }]}
+                        style={[styles.addEntityButton, { borderColor: colors.primary, backgroundColor: colors.surface }]}
                       >
                         <Ionicons name="add-circle" size={20} color={colors.primary} />
                         <Text style={[styles.addEntityText, { color: colors.primary }]}>Add Involved Nation</Text>
@@ -521,7 +528,7 @@ export default function MundaneHubScreen({ navigation }) {
                     Specific Alliances / Blocs / Non-Nation Groups (optional)
                   </Text>
                   <TextInput
-                    style={[styles.input, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', color: colors.text, borderColor: isDark ? '#334155' : '#e2e8f0' }]}
+                    style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.cardBorder }]}
                     placeholder={
                       cat.id === 'markets'
                         ? 'e.g. NIFTY 50, Bank Nifty, S&P 500, Gold'
@@ -553,9 +560,9 @@ export default function MundaneHubScreen({ navigation }) {
             {cat.fields.includes('event_date') && (
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.textSecondary }]}>Date</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setShowDatePicker(true)}
-                  style={[styles.input, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', borderColor: isDark ? '#334155' : '#e2e8f0', justifyContent: 'center' }]}
+                  style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.cardBorder, justifyContent: 'center' }]}
                 >
                   <Text style={{ color: colors.text }}>{formData.event_date.toDateString()}</Text>
                 </TouchableOpacity>
@@ -576,9 +583,9 @@ export default function MundaneHubScreen({ navigation }) {
             {cat.fields.includes('event_time') && (
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.textSecondary }]}>Start Time (Approx)</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setShowTimePicker(true)}
-                  style={[styles.input, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', borderColor: isDark ? '#334155' : '#e2e8f0', justifyContent: 'center' }]}
+                  style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.cardBorder, justifyContent: 'center' }]}
                 >
                   {(() => {
                     const hours = String(formData.event_time.getHours()).padStart(2, '0');
@@ -613,11 +620,11 @@ export default function MundaneHubScreen({ navigation }) {
                       key={p}
                       onPress={() => setFormData({...formData, period: p})}
                       style={[
-                        styles.periodButton, 
-                        { backgroundColor: formData.period === p ? colors.primary : (isDark ? '#1e293b' : '#f1f5f9') }
+                        styles.periodButton,
+                        { backgroundColor: formData.period === p ? colors.selectionControl : colors.surface, borderColor: colors.cardBorder }
                       ]}
                     >
-                      <Text style={[styles.periodText, { color: formData.period === p ? '#fff' : colors.textSecondary }]}>{p}</Text>
+                      <Text style={[styles.periodText, { color: formData.period === p ? colors.onPrimary : colors.textSecondary }]}>{p}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -628,13 +635,10 @@ export default function MundaneHubScreen({ navigation }) {
               onPress={handleStartAnalysis}
               style={styles.startButton}
             >
-              <LinearGradient
-                colors={[colors.primary, colors.secondary]}
-                style={styles.startGradient}
-              >
-                <Text style={styles.startText}>Analyze Astrologically</Text>
-                <Ionicons name="sparkles" size={20} color="#fff" />
-              </LinearGradient>
+              <View style={[styles.startGradient, { backgroundColor: colors.primaryStrong }]}>
+                <Text style={[styles.startText, { color: colors.onPrimary }]}>Ask Tara</Text>
+                <Ionicons name="sparkles" size={20} color={colors.onPrimary} />
+              </View>
             </TouchableOpacity>
 
             <View style={styles.proTip}>
@@ -650,25 +654,25 @@ export default function MundaneHubScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
-      <LinearGradient 
-        colors={isDark ? ['#020617', '#0f172a'] : ['#f8fafc', '#f1f5f9']} 
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ThemedStatusBar />
+      <LinearGradient
+        colors={[colors.background, colors.backgroundSecondary]}
         style={styles.flex1}
       >
         <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
-            <TouchableOpacity 
+          <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cosmicLine }]}>
+            <TouchableOpacity
               onPress={() => selectedCategory ? setSelectedCategory(null) : navigation.goBack()}
               style={styles.backButton}
             >
-              <Ionicons name="arrow-back" size={24} color={colors.text} />
+              <Ionicons name="arrow-back" size={22} color={colors.textInverse} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
+            <Text style={[styles.headerTitle, { color: colors.textInverse }]}>
               {selectedCategory ? 'Event Details' : 'Global Markets & Events'}
             </Text>
-            <View style={styles.creditBadge}>
-              <Text style={styles.creditText}>💳 {credits}</Text>
+            <View style={[styles.creditBadge, { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine }]}>
+              <Text style={[styles.creditText, { color: colors.textInverse }]}>{credits}</Text>
             </View>
           </View>
 
@@ -692,8 +696,8 @@ export default function MundaneHubScreen({ navigation }) {
                   <Ionicons name="close" size={24} color={colors.text} />
                 </TouchableOpacity>
               </View>
-              
-              <View style={[styles.searchBar, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
+
+              <View style={[styles.searchBar, { backgroundColor: colors.surface }]}>
                 <Ionicons name="search" size={20} color={colors.textTertiary} />
                 <TextInput
                   style={[styles.searchInput, { color: colors.text }]}
@@ -721,7 +725,7 @@ export default function MundaneHubScreen({ navigation }) {
 
                   return (
                     <TouchableOpacity
-                      style={[styles.countryItem, { borderBottomColor: isDark ? '#1e293b' : '#f1f5f9' }]}
+                      style={[styles.countryItem, { borderBottomColor: colors.cardBorder }]}
                       onPress={() => {
                         if (countryPickerTarget === 'teamA') {
                           setFormData({ ...formData, teamACountry: item });
@@ -775,7 +779,7 @@ export default function MundaneHubScreen({ navigation }) {
                 </TouchableOpacity>
               </View>
 
-              <View style={[styles.searchBar, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
+              <View style={[styles.searchBar, { backgroundColor: colors.surface }]}>
                 <Ionicons name="search" size={20} color={colors.textTertiary} />
                 <TextInput
                   style={[styles.searchInput, { color: colors.text }]}
@@ -791,7 +795,7 @@ export default function MundaneHubScreen({ navigation }) {
                 keyExtractor={(item) => item.id || item.name}
                 renderItem={({ item }) => (
                   <TouchableOpacity
-                    style={[styles.countryItem, { borderBottomColor: isDark ? '#1e293b' : '#f1f5f9' }]}
+                    style={[styles.countryItem, { borderBottomColor: colors.cardBorder }]}
                     onPress={() => handleVenueSelect(item)}
                   >
                     <View style={{ flex: 1, paddingRight: 12 }}>
@@ -839,6 +843,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 15,
+    borderBottomWidth: 1,
   },
   backButton: {
     padding: 8,
@@ -848,10 +853,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   creditBadge: {
-    backgroundColor: 'rgba(245, 158, 11, 0.2)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    borderWidth: 1,
   },
   creditText: {
     fontSize: 14,
@@ -868,35 +873,52 @@ const styles = StyleSheet.create({
   heroSection: {
     marginTop: 20,
     marginBottom: 30,
-    alignItems: 'center',
+    paddingHorizontal: 25,
+    paddingVertical: 30,
+    borderRadius: 28,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  heroOrbit: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    borderWidth: 1,
+    right: -65,
+    top: -80,
+  },
+  heroEyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
+    marginBottom: 12,
   },
   heroTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 8,
+    fontFamily: typographyTokens.displayFamily,
+    fontSize: 38,
+    lineHeight: 42,
+    maxWidth: 290,
+    marginBottom: 13,
   },
   heroSubtitle: {
-    fontSize: 15,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 21,
+    maxWidth: 320,
   },
+  collectionHeading: { marginBottom: 16 },
+  collectionEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 2, marginBottom: 6 },
+  collectionTitle: { fontFamily: typographyTokens.displayFamily, fontSize: 28, lineHeight: 32 },
   categoryGrid: {
     gap: 16,
   },
   categoryCard: {
     borderRadius: 20,
     overflow: 'hidden',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    borderWidth: 1,
   },
   cardGradient: {
     padding: 20,
-    borderWidth: 1,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -915,8 +937,8 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   catTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontFamily: typographyTokens.displayFamily,
+    fontSize: 21,
     marginBottom: 6,
   },
   catDesc: {
@@ -930,9 +952,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 25,
-    backgroundColor: 'rgba(255,255,255,0.05)',
     padding: 15,
-    borderRadius: 15,
+    borderRadius: 20,
+    borderWidth: 1,
   },
   smallIconCircle: {
     width: 40,
@@ -946,9 +968,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   formTitle: {
+    fontFamily: typographyTokens.displayFamily,
     fontSize: 22,
-    fontWeight: '700',
   },
+  formEyebrow: { fontSize: 9, fontWeight: '800', letterSpacing: 1.5, marginBottom: 3 },
   inputGroup: {
     marginBottom: 20,
   },
@@ -980,6 +1003,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     minWidth: '47%',
     alignItems: 'center',
+    borderWidth: 1,
   },
   periodText: {
     fontSize: 14,
@@ -989,11 +1013,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
     borderRadius: 20,
     overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
   },
   startGradient: {
     flexDirection: 'row',

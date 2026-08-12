@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
   heroTitle: { fontSize: 40, lineHeight: 42, marginBottom: 14 },
   heroBody: { fontSize: 13, lineHeight: 20, fontWeight: '500' },
   orbitMotif: { position: 'absolute', right: -18, top: 44, opacity: 0.58 },
-  heroActions: { position: 'absolute', left: 24, right: 24, bottom: 24, flexDirection: 'row', gap: 10 },
+  heroActions: { marginTop: 22, flexDirection: 'row', gap: 10, zIndex: 2 },
   primaryAction: { height: 48, paddingHorizontal: 18, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, flex: 1 },
   primaryActionText: { fontSize: 14, fontWeight: '900' },
   secondaryAction: { height: 48, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },

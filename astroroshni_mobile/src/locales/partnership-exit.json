@@ -1,0 +1,13 @@
+{
+  "english": {"eyebrow":"MODE UPDATED","title":"Partnership mode exited","body":"Single-chart mode is now active for {{name}}. Your next question will use this birth chart only."},
+  "hindi": {"eyebrow":"मोड बदल गया","title":"साझेदारी मोड बंद हुआ","body":"अब {{name}} के लिए एकल-कुंडली मोड सक्रिय है। आपका अगला प्रश्न केवल इसी जन्म कुंडली का उपयोग करेगा।"},
+  "es": {"eyebrow":"MODO ACTUALIZADO","title":"Modo de pareja cerrado","body":"El modo de carta única está activo para {{name}}. Tu próxima pregunta usará solo esta carta natal."},
+  "fr": {"eyebrow":"MODE MIS À JOUR","title":"Mode partenariat quitté","body":"Le mode thème unique est maintenant actif pour {{name}}. Votre prochaine question utilisera uniquement ce thème natal."},
+  "german": {"eyebrow":"MODUS AKTUALISIERT","title":"Partnerschaftsmodus beendet","body":"Der Einzelhoroskop-Modus ist jetzt für {{name}} aktiv. Die nächste Frage verwendet nur dieses Geburtshoroskop."},
+  "russian": {"eyebrow":"РЕЖИМ ОБНОВЛЁН","title":"Режим отношений завершён","body":"Для {{name}} включён режим одной карты. Следующий вопрос будет основан только на этой натальной карте."},
+  "chinese": {"eyebrow":"模式已更新","title":"已退出关系模式","body":"{{name}} 的单星盘模式现已启用。下一个问题将只使用此出生星盘。"},
+  "tamil": {"eyebrow":"முறை மாற்றப்பட்டது","title":"உறவு முறையிலிருந்து வெளியேறியது","body":"{{name}}-க்கு ஒற்றை ஜாதக முறை இப்போது செயலிலுள்ளது. அடுத்த கேள்விக்கு இந்தப் பிறப்பு ஜாதகம் மட்டுமே பயன்படுத்தப்படும்."},
+  "telugu": {"eyebrow":"మోడ్ మారింది","title":"సంబంధ మోడ్ ముగిసింది","body":"{{name}} కోసం ఒకే జాతక మోడ్ ఇప్పుడు సక్రియంగా ఉంది. తదుపరి ప్రశ్నకు ఈ జన్మ జాతకం మాత్రమే ఉపయోగించబడుతుంది."},
+  "gujarati": {"eyebrow":"મોડ બદલાયો","title":"સંબંધ મોડ બંધ થયો","body":"હવે {{name}} માટે એકલ કુંડળી મોડ સક્રિય છે. તમારો આગળનો પ્રશ્ન માત્ર આ જન્મકુંડળીનો ઉપયોગ કરશે."},
+  "marathi": {"eyebrow":"मोड बदलला","title":"नातेसंबंध मोड बंद झाला","body":"आता {{name}} साठी एकल-कुंडली मोड सक्रिय आहे. पुढील प्रश्नासाठी फक्त ही जन्मकुंडली वापरली जाईल."}
+}

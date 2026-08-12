@@ -5,14 +5,12 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  Dimensions,
   Pressable,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
-
-const { width } = Dimensions.get('window');
+import { useTranslation } from 'react-i18next';
+import { typographyTokens } from '../theme/tokens';
 
 /**
  * Modal that shows credits to be charged and current balance, with Cancel/Confirm.
@@ -26,17 +24,12 @@ export default function ConfirmCreditsModal({
   description,
   cost,
   credits,
-  confirmLabel = 'Continue',
+  confirmLabel,
+  iconName = 'card-outline',
 }) {
-  const { theme, colors } = useTheme();
-  const isDark = theme === 'dark';
-
-  const modalGradient = isDark
-    ? ['rgba(26, 0, 51, 0.95)', 'rgba(77, 44, 109, 0.95)']
-    : [colors.cardBackground, colors.backgroundSecondary];
-  const confirmGradientColors = ['#9333ea', '#a855f7'];
-  const overlayBg = 'rgba(0, 0, 0, 0.7)';
-  const creditInfoBg = colors.surface;
+  const { colors, getCardElevation } = useTheme();
+  const { t } = useTranslation();
+  const actionLabel = confirmLabel || t('creditConfirmation.continue');
 
   if (!visible) return null;
 
@@ -47,24 +40,45 @@ export default function ConfirmCreditsModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <Pressable style={[styles.overlay, { backgroundColor: overlayBg }]} onPress={onClose}>
+      <Pressable style={[styles.overlay, { backgroundColor: colors.overlay }]} onPress={onClose}>
         <Pressable style={styles.outer} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.modalContainer}>
-            <LinearGradient colors={modalGradient} style={styles.modalContent}>
-              <View style={styles.iconRow}>
-                <Ionicons name="people" size={28} color={colors.accent || '#ec4899'} />
+          <View style={[styles.modalContainer, {
+            backgroundColor: colors.surfaceRaised,
+            borderColor: colors.cardBorder,
+            elevation: getCardElevation(4),
+          }]}>
+            <View style={[styles.modalAccentLine, { backgroundColor: colors.accent }]} />
+            <View style={styles.modalContent}>
+              <TouchableOpacity
+                style={[styles.closeButton, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}
+                onPress={onClose}
+                accessibilityRole="button"
+                accessibilityLabel={t('creditConfirmation.cancel')}
+              >
+                <Ionicons name="close" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+              <View style={[styles.iconRow, { backgroundColor: colors.accentSoft }]}>
+                <Ionicons name={iconName} size={25} color={colors.onAccent || colors.text} />
               </View>
+              <Text style={[styles.eyebrow, { color: colors.accent }]}>{t('creditConfirmation.eyebrow')}</Text>
               <Text style={[styles.modalTitle, { color: colors.text }]}>{title}</Text>
               <Text style={[styles.modalText, { color: colors.textSecondary }]}>
                 {description}
               </Text>
 
-              <View style={[styles.modalCreditInfo, { backgroundColor: creditInfoBg }]}>
-                <Text style={[styles.modalCreditText, { color: colors.text }]}>
-                  💳 Credits to be charged: {cost}
-                </Text>
-                <Text style={[styles.modalBalanceText, { color: colors.textSecondary }]}>
-                  Current balance: {credits}
+              <View style={[styles.modalCreditInfo, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}>
+                <View style={styles.creditPrimaryRow}>
+                  <View style={[styles.creditGlyph, { backgroundColor: colors.selectionControl }]}>
+                    <Ionicons name="card-outline" size={18} color={colors.selectionText} />
+                  </View>
+                  <View style={styles.creditCopy}>
+                    <Text style={[styles.creditLabel, { color: colors.selectionTextMuted }]}>{t('creditConfirmation.chargeLabel')}</Text>
+                    <Text style={[styles.modalCreditText, { color: colors.selectionText }]}>{t('creditConfirmation.creditCount', { count: cost })}</Text>
+                  </View>
+                </View>
+                <View style={[styles.balanceDivider, { backgroundColor: colors.selectionBorder }]} />
+                <Text style={[styles.modalBalanceText, { color: colors.selectionTextMuted }]}>
+                  {t('creditConfirmation.balance', { count: credits })}
                 </Text>
               </View>
 
@@ -72,19 +86,20 @@ export default function ConfirmCreditsModal({
                 <TouchableOpacity
                   style={[
                     styles.modalCancelButton,
-                    { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface },
+                    { backgroundColor: colors.surface, borderColor: colors.cardBorder },
                   ]}
                   onPress={onClose}
                 >
-                  <Text style={[styles.modalCancelText, { color: colors.text }]}>Cancel</Text>
+                  <Text style={[styles.modalCancelText, { color: colors.text }]}>{t('creditConfirmation.cancel')}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.modalConfirmButton} onPress={onConfirm}>
-                  <LinearGradient colors={confirmGradientColors} style={styles.modalConfirmGradient}>
-                    <Text style={styles.modalConfirmText}>{confirmLabel}</Text>
-                  </LinearGradient>
+                <TouchableOpacity style={[styles.modalConfirmButton, { backgroundColor: colors.primaryStrong }]} onPress={onConfirm}>
+                  <View style={styles.modalConfirmGradient}>
+                    <Text style={[styles.modalConfirmText, { color: colors.onPrimary }]}>{actionLabel}</Text>
+                    <Ionicons name="arrow-forward" size={17} color={colors.onPrimary} />
+                  </View>
                 </TouchableOpacity>
               </View>
-            </LinearGradient>
+            </View>
           </View>
         </Pressable>
       </Pressable>
@@ -99,47 +114,82 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   outer: {
-    width: width * 0.88,
-    maxWidth: 360,
+    width: '88%',
+    maxWidth: 410,
   },
   modalContainer: {
-    borderRadius: 16,
+    borderRadius: 28,
     overflow: 'hidden',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.28,
+    shadowRadius: 30,
   },
+  modalAccentLine: { height: 4, width: '100%' },
   modalContent: {
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 22,
     alignItems: 'center',
   },
   iconRow: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  closeButton: {
+    position: 'absolute',
+    right: 16,
+    top: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eyebrow: {
+    ...typographyTokens.eyebrow,
+    fontSize: 9,
     marginBottom: 8,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 12,
+    ...typographyTokens.display,
+    fontSize: 28,
+    lineHeight: 32,
+    marginBottom: 10,
     textAlign: 'center',
   },
   modalText: {
     fontSize: 15,
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 20,
+    marginBottom: 22,
+    maxWidth: 320,
   },
   modalCreditInfo: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
+    padding: 15,
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 20,
     width: '100%',
   },
+  creditPrimaryRow: { flexDirection: 'row', alignItems: 'center' },
+  creditGlyph: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', marginRight: 11 },
+  creditCopy: { flex: 1 },
+  creditLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 2 },
   modalCreditText: {
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 4,
+    fontSize: 17,
+    fontWeight: '700',
   },
+  balanceDivider: { height: StyleSheet.hairlineWidth, marginVertical: 12 },
   modalBalanceText: {
-    fontSize: 14,
-    textAlign: 'center',
+    fontSize: 12,
+    textAlign: 'right',
   },
   modalButtons: {
     flexDirection: 'row',
@@ -152,6 +202,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 12,
     alignItems: 'center',
+    borderWidth: 1,
   },
   modalCancelText: {
     fontSize: 16,
@@ -168,9 +219,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     width: '100%',
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   modalConfirmText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },

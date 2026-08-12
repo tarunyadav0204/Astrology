@@ -34,6 +34,7 @@ import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 import { useCredits } from '../../credits/CreditContext';
 import { useAuthGate } from '../../auth/AuthGateContext';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
+import AppAlertModal from '../Common/AppAlertModal';
 import PodcastPlayerModal from '../PodcastPlayerModal';
 import { creditAPI } from '../../services/api';
 import {
@@ -114,6 +115,7 @@ function MessageBubble({
   const standardChatCost = Math.max(1, Number(pricing?.chat ?? pricing?.standard ?? 1) || 1);
   const [detailUnlocked, setDetailUnlocked] = useState(false);
   const [showRevealCreditsModal, setShowRevealCreditsModal] = useState(false);
+  const [copyAlert, setCopyAlert] = useState({ visible: false, error: false });
   const blurShownTrackedRef = useRef(false);
   // Init from the played-ids set so FlatList remounts do not flash translateY:50 for one frame
   // (that looked like the long answer bouncing between sections while reading).
@@ -569,10 +571,10 @@ function MessageBubble({
         .trim();
 
       await Clipboard.setStringAsync(cleanText);
-      Alert.alert('Copied!', 'Message copied to clipboard');
+      setCopyAlert({ visible: true, error: false });
     } catch (error) {
       console.error('[MessageBubble] Failed to copy message', error);
-      Alert.alert('Copy failed', 'Unable to copy this message. Please try again.');
+      setCopyAlert({ visible: true, error: true });
     }
   };
 
@@ -1628,118 +1630,6 @@ function MessageBubble({
           {renderedElements}
         </View>
 
-        {/* Reading actions follow the answer, like an editorial utility bar. */}
-        {!message.isTyping && message.role === 'assistant' && !message.isWelcome && !isNativeGate && (message.messageId || message.content) && (
-          <View style={styles.actionButtons}>
-            {message.showRestartButton && (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.restartButton]}
-                onPress={() => onRestart && onRestart(message.messageId)}
-              >
-                <Ionicons name="refresh" size={16} color="#ff6b35" />
-              </TouchableOpacity>
-            )}
-            {message.showSendRetryButton && !message.messageId && (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.restartButton]}
-                onPress={() => onSendRetry && onSendRetry(message)}
-              >
-                <Ionicons name="refresh" size={16} color="#ff6b35" />
-              </TouchableOpacity>
-            )}
-            <>
-              {!(isPlayingPodcast || isPausedPodcast) && (
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.listenPodcastButton]}
-                  onPress={onPodcastButtonPress}
-                  disabled={isLoadingPodcast}
-                >
-                  {isLoadingPodcast ? (
-                    <ActivityIndicator size="small" color="#ff6b35" />
-                  ) : (
-                    <Ionicons name="radio-outline" size={17} color="#ff6b35" />
-                  )}
-                </TouchableOpacity>
-              )}
-              {(isPlayingPodcast || isPausedPodcast) && (
-                <>
-                  {isPlayingPodcast && (
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={handlePausePodcast}
-                    >
-                      <Ionicons name="pause" size={16} color="#ff6b35" />
-                    </TouchableOpacity>
-                  )}
-                  {isPausedPodcast && (
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={onPodcastButtonPress}
-                    >
-                      <Ionicons name="play" size={16} color="#666" />
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={handleStopPodcast}
-                  >
-                    <Ionicons name="stop-circle" size={16} color="#666" />
-                  </TouchableOpacity>
-                </>
-              )}
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={sharePodcastAudio}
-                disabled={isSharingPodcast || isLoadingPodcast}
-              >
-                {isSharingPodcast ? (
-                  <ActivityIndicator size="small" color="#666" />
-                ) : (
-                  <Ionicons name="share-outline" size={16} color="#666" />
-                )}
-              </TouchableOpacity>
-            </>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={copyToClipboard}
-            >
-              <Ionicons name="copy-outline" size={16} color="#666" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={shareMessage}
-            >
-              <Ionicons name="share-social-outline" size={16} color="#666" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.pdfButton]}
-              onPress={sharePDF}
-              disabled={isGeneratingPDF}
-            >
-              {isGeneratingPDF ? (
-                <ActivityIndicator size="small" color={COLORS.primary} />
-              ) : (
-                <Ionicons name="document-text-outline" size={16} color="#666" />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.deleteButton]}
-              onPress={() => {
-                Alert.alert(
-                  'Delete Message',
-                  'Are you sure you want to delete this message?',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete', style: 'destructive', onPress: deleteMessage }
-                  ]
-                );
-              }}
-            >
-              <Ionicons name="trash-outline" size={16} color="#666" />
-            </TouchableOpacity>
-          </View>
-        )}
-
         {/* Summary Image */}
         {message.summary_image && (
           <TouchableOpacity
@@ -2408,6 +2298,16 @@ function MessageBubble({
         cost={podcastCost ?? 2}
         credits={credits ?? 0}
         confirmLabel={t('common.continue', 'Continue')}
+      />
+
+      <AppAlertModal
+        visible={copyAlert.visible}
+        variant={copyAlert.error ? 'error' : 'success'}
+        icon={copyAlert.error ? 'alert-circle-outline' : 'copy-outline'}
+        title={t(copyAlert.error ? 'copyAlert.failedTitle' : 'copyAlert.successTitle')}
+        message={t(copyAlert.error ? 'copyAlert.failedBody' : 'copyAlert.successBody')}
+        onPrimaryPress={() => setCopyAlert({ visible: false, error: false })}
+        onRequestClose={() => setCopyAlert({ visible: false, error: false })}
       />
 
       <PodcastPlayerModal

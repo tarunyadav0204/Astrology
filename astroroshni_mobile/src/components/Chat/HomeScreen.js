@@ -45,7 +45,7 @@ import FomoHomeEntryCard from './FomoHomeEntryCard';
 import KpTodayCarousel from './KpTodayCarousel';
 import PanditHomePanel from '../Pandit/PanditHomePanel';
 import PremiumTodayOverview, { PremiumExploreIntro } from '../Home/PremiumTodayOverview';
-import { getWebBottomInset, refreshWebShellHeight, setWebBottomSafeColor } from '../../platform/webSafeArea';
+import { getWebBottomInset, refreshWebShellHeight } from '../../platform/webSafeArea';
 
 let createPortal = null;
 if (Platform.OS === 'web') {
@@ -540,17 +540,6 @@ export default function HomeScreen({
       return () => setHomeTabsVisible(false);
     }, [])
   );
-
-  // Sync theme-color / html bottom tint only — do not inject an overlay bar.
-  useEffect(() => {
-    if (Platform.OS !== 'web') return undefined;
-    if (homeTabsVisible) {
-      setWebBottomSafeColor(tabSafeColor);
-    } else {
-      setWebBottomSafeColor(null);
-    }
-    return () => setWebBottomSafeColor(null);
-  }, [homeTabsVisible, tabSafeColor]);
 
   useFocusEffect(
     React.useCallback(() => {

@@ -1,0 +1,13 @@
+{
+  "english": {"eyebrow":"CREDIT CONFIRMATION","chargeLabel":"This action will use","creditCount":"{{count}} credits","balance":"Current balance: {{count}}","cancel":"Cancel","continue":"Continue"},
+  "hindi": {"eyebrow":"क्रेडिट पुष्टि","chargeLabel":"इस कार्य में लगेंगे","creditCount":"{{count}} क्रेडिट","balance":"वर्तमान शेष: {{count}}","cancel":"रद्द करें","continue":"जारी रखें"},
+  "es": {"eyebrow":"CONFIRMACIÓN DE CRÉDITOS","chargeLabel":"Esta acción utilizará","creditCount":"{{count}} créditos","balance":"Saldo actual: {{count}}","cancel":"Cancelar","continue":"Continuar"},
+  "fr": {"eyebrow":"CONFIRMATION DES CRÉDITS","chargeLabel":"Cette action utilisera","creditCount":"{{count}} crédits","balance":"Solde actuel : {{count}}","cancel":"Annuler","continue":"Continuer"},
+  "german": {"eyebrow":"GUTHABEN BESTÄTIGEN","chargeLabel":"Diese Aktion kostet","creditCount":"{{count}} Guthaben","balance":"Aktuelles Guthaben: {{count}}","cancel":"Abbrechen","continue":"Weiter"},
+  "russian": {"eyebrow":"ПОДТВЕРЖДЕНИЕ КРЕДИТОВ","chargeLabel":"Будет использовано","creditCount":"Кредитов: {{count}}","balance":"Текущий баланс: {{count}}","cancel":"Отмена","continue":"Продолжить"},
+  "chinese": {"eyebrow":"积分确认","chargeLabel":"本次操作将使用","creditCount":"{{count}} 积分","balance":"当前余额：{{count}}","cancel":"取消","continue":"继续"},
+  "tamil": {"eyebrow":"கிரெடிட் உறுதிப்படுத்தல்","chargeLabel":"இந்த செயலுக்கு","creditCount":"{{count}} கிரெடிட்கள்","balance":"தற்போதைய இருப்பு: {{count}}","cancel":"ரத்து செய்","continue":"தொடரவும்"},
+  "telugu": {"eyebrow":"క్రెడిట్ నిర్ధారణ","chargeLabel":"ఈ చర్యకు","creditCount":"{{count}} క్రెడిట్లు","balance":"ప్రస్తుత మిగులు: {{count}}","cancel":"రద్దు చేయి","continue":"కొనసాగించు"},
+  "gujarati": {"eyebrow":"ક્રેડિટ પુષ્ટિ","chargeLabel":"આ કાર્યમાં વપરાશે","creditCount":"{{count}} ક્રેડિટ","balance":"વર્તમાન બેલેન્સ: {{count}}","cancel":"રદ કરો","continue":"ચાલુ રાખો"},
+  "marathi": {"eyebrow":"क्रेडिट पुष्टी","chargeLabel":"या कृतीसाठी लागतील","creditCount":"{{count}} क्रेडिट","balance":"सध्याची शिल्लक: {{count}}","cancel":"रद्द करा","continue":"पुढे चला"}
+}

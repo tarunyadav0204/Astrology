@@ -215,7 +215,10 @@ export function installWebViewportHeightLock() {
     return () => {};
   }
 
-  const apply = () => refreshWebShellHeight();
+  const apply = () => {
+    refreshWebShellHeight();
+    refreshWebThemeChrome();
+  };
 
   apply();
   // Re-apply after first paint — iOS often reports a wrong height before chrome settles.
@@ -278,11 +281,11 @@ export function setWebBottomSafeColor(color) {
 
   styleEl.textContent = `
     html {
-      background-color: var(--ar-shell-bg, #1a0033) !important;
+      background-color: var(--ar-shell-bg, #2d0c1c) !important;
       background-image: linear-gradient(
         to bottom,
-        var(--ar-shell-bg, #1a0033) 0%,
-        var(--ar-shell-bg, #1a0033) calc(100% - 34px),
+        var(--ar-shell-bg, #2d0c1c) 0%,
+        var(--ar-shell-bg, #2d0c1c) calc(100% - 34px),
         ${color} calc(100% - 34px),
         ${color} 100%
       ) !important;
@@ -323,14 +326,38 @@ export function setWebBottomSafeColor(color) {
   const meta = document.querySelector('meta[name="theme-color"]:not([media])');
   if (meta) {
     if (meta.dataset.arPrevThemeColor == null) {
-      meta.dataset.arPrevThemeColor = meta.getAttribute('content') || '#1a0033';
+      meta.dataset.arPrevThemeColor = meta.getAttribute('content') || '#2d0c1c';
     }
     meta.setAttribute('content', color);
   }
   document.querySelectorAll('meta[name="theme-color"][media]').forEach((m) => {
     if (m.dataset.arPrevThemeColor == null) {
-      m.dataset.arPrevThemeColor = m.getAttribute('content') || '#1a0033';
+      m.dataset.arPrevThemeColor = m.getAttribute('content') || '#2d0c1c';
     }
     m.setAttribute('content', color);
   });
+}
+
+/**
+ * Reassert the globally themed PWA chrome after Safari restores a suspended
+ * standalone app. iOS can recreate the document safe-area using stale manifest
+ * colors before React paints; this keeps top and bottom bands in sync.
+ */
+export function refreshWebThemeChrome() {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  const shellColor = window.getComputedStyle(document.documentElement)
+    .getPropertyValue('--ar-shell-bg')
+    .trim();
+  if (!shellColor) return;
+
+  document.documentElement.style.backgroundColor = shellColor;
+  if (document.body) document.body.style.backgroundColor = shellColor;
+  const root = document.getElementById('root');
+  if (root) root.style.backgroundColor = shellColor;
+
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+    meta.setAttribute('content', shellColor);
+  });
+  const appleBar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+  if (appleBar) appleBar.setAttribute('content', 'black-translucent');
 }
