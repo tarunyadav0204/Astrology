@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sys
+import subprocess
 from pathlib import Path
 
 
@@ -12,8 +13,42 @@ SKIP_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".venv", "__pycache_
 SKIP_FILES = {"wealth_routes_broken.py"}
 
 
+def git_tracked_sources(root: Path):
+    """Return release-owned Python sources when root belongs to a Git checkout."""
+    try:
+        repo_root = Path(
+            subprocess.check_output(
+                ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+                stderr=subprocess.DEVNULL,
+                text=True,
+            ).strip()
+        ).resolve()
+        relative_root = root.relative_to(repo_root)
+        output = subprocess.check_output(
+            ["git", "-C", str(repo_root), "ls-files", "-z", "--", str(relative_root)],
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.CalledProcessError, ValueError):
+        return None
+
+    return [
+        (repo_root / raw.decode("utf-8", errors="surrogateescape")).resolve()
+        for raw in output.split(b"\0")
+        if raw and raw.endswith(b".py")
+    ]
+
+
 def iter_sources(root: Path):
-    for path in root.rglob("*.py"):
+    # A production checkout can contain runtime or stale untracked artifacts.
+    # `git reset --hard` intentionally leaves those files alone, but they are not
+    # part of the release and must not make validation differ from CI checkout.
+    candidates = git_tracked_sources(root)
+    if candidates is None:
+        candidates = root.rglob("*.py")
+
+    for path in candidates:
+        if not path.is_file():
+            continue
         relative_parts = path.relative_to(root).parts
         if any(part in SKIP_DIRECTORIES for part in relative_parts):
             continue
@@ -32,7 +67,7 @@ def main() -> int:
         try:
             source = path.read_bytes()
             compile(source, str(path), "exec", dont_inherit=True)
-        except (OSError, SyntaxError) as exc:
+        except (OSError, SyntaxError, ValueError) as exc:
             failures.append(f"{path}: {exc}")
 
     if failures:

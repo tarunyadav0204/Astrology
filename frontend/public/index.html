@@ -8,11 +8,11 @@
     /* Apply the saved semantic theme before CSS/React to prevent a color flash. */
     (function () {
       try {
-        var allowed = ['heritage', 'midnight', 'obsidian', 'aurora', 'oliveGold', 'oxfordTan', 'mistyRose', 'clarity', 'monochrome'];
+        var allowed = ['heritage', 'midnight', 'obsidian', 'aurora', 'deepLagoon', 'oliveGold', 'oxfordTan', 'mistyRose', 'clarity', 'monochrome'];
         var saved = localStorage.getItem('astroroshni_theme');
         var theme = allowed.indexOf(saved) >= 0 ? saved : 'heritage';
-        var colors = { heritage: '#210b17', midnight: '#100b17', obsidian: '#120810', aurora: '#082732', oliveGold: '#4f4b38', oxfordTan: '#002147', mistyRose: '#633e49', clarity: '#265f56', monochrome: '#050505' };
-        var colorSchemes = { heritage: 'light', midnight: 'dark', obsidian: 'dark', aurora: 'light', oliveGold: 'light', oxfordTan: 'dark', mistyRose: 'light', clarity: 'light', monochrome: 'light' };
+        var colors = { heritage: '#210b17', midnight: '#100b17', obsidian: '#120810', aurora: '#082732', deepLagoon: '#0f2a2a', oliveGold: '#4f4b38', oxfordTan: '#002147', mistyRose: '#633e49', clarity: '#265f56', monochrome: '#050505' };
+        var colorSchemes = { heritage: 'light', midnight: 'dark', obsidian: 'dark', aurora: 'light', deepLagoon: 'light', oliveGold: 'light', oxfordTan: 'dark', mistyRose: 'light', clarity: 'light', monochrome: 'light' };
         document.documentElement.setAttribute('data-theme', theme);
         document.documentElement.style.colorScheme = colorSchemes[theme];
         var themeColor = document.querySelector('meta[name="theme-color"]');

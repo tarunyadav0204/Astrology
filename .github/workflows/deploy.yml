@@ -124,7 +124,7 @@ jobs:
             # Prefix patterns must not use a trailing `$` after `backend/` / `play_payment_service/`
             # or only the exact directory path would match (never files under it).
             if printf '%s\n' "${changed_files}" | grep -E -q \
-              '^backend/|^deploy\.sh$|^scripts/(deploy-release|build-gce-release-image|prepare-image-release|bootstrap-runtime|gce-startup-bootstrap|install_runtime_watchdog)\.sh$|^\.github/workflows/deploy\.yml$'; then
+              '^backend/|^deploy\.sh$|^scripts/check_backend_syntax\.py$|^scripts/(deploy-release|build-gce-release-image|prepare-image-release|bootstrap-runtime|gce-startup-bootstrap|install_runtime_watchdog)\.sh$|^\.github/workflows/deploy\.yml$'; then
               backend_required=true
             fi
 

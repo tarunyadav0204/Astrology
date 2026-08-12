@@ -284,6 +284,65 @@
   --color-cosmic-glow: rgba(11, 111, 232, 0.22);
 }
 
+[data-theme='deepLagoon'] {
+  color-scheme: light;
+  --color-canvas: #d9faf4;
+  --color-canvas-subtle: #effffc;
+  --color-surface: #f5fffc;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #ccefe9;
+  --color-surface-inverse: #0f2a2a;
+  --color-surface-inverse-raised: #173a39;
+  --color-header-surface: #0a2221;
+  --color-header-surface-raised: #103230;
+  --color-header-text: #e8fffa;
+  --color-header-text-muted: rgba(232, 255, 250, 0.72);
+  --color-header-border: rgba(114, 228, 213, 0.22);
+  --color-text: #0b2927;
+  --color-text-muted: rgba(11, 41, 39, 0.68);
+  --color-text-subtle: rgba(11, 41, 39, 0.48);
+  --color-text-inverse: #e8fffa;
+  --color-text-inverse-muted: rgba(232, 255, 250, 0.7);
+  --color-brand: #00bfa6;
+  --color-brand-hover: #18d1b7;
+  --color-brand-active: #008f7d;
+  --color-on-brand: #071f1d;
+  --color-accent: #00bfa6;
+  --color-accent-soft: #9be8dc;
+  --color-on-accent: #0b2927;
+  --color-border: rgba(15, 42, 42, 0.16);
+  --color-border-strong: rgba(15, 42, 42, 0.32);
+  --color-border-inverse: rgba(232, 255, 250, 0.2);
+  --color-focus: #00a992;
+  --color-overlay: rgba(3, 18, 17, 0.88);
+  --color-success: #17785f;
+  --color-warning: #94661d;
+  --color-danger: #a63f56;
+  --color-info: #167c80;
+  --shadow-sm: 0 8px 24px rgba(15, 42, 42, 0.09);
+  --shadow-card: 0 24px 65px rgba(15, 42, 42, 0.14);
+  --shadow-modal: 0 38px 110px rgba(1, 11, 10, 0.68);
+  --planet-sun: #e7b96f;
+  --planet-moon: #a8d8d2;
+  --planet-mars: #ee7a78;
+  --planet-mercury: #42d7a8;
+  --planet-jupiter: #d6b462;
+  --planet-venus: #de91bd;
+  --planet-saturn: #8aa7a4;
+  --planet-rahu: #9b93d4;
+  --planet-ketu: #c28d68;
+  --color-cosmic-surface: #071e1d;
+  --color-cosmic-surface-raised: rgba(16, 50, 48, 0.96);
+  --color-cosmic-text: #e8fffa;
+  --color-cosmic-text-muted: rgba(232, 255, 250, 0.64);
+  --color-cosmic-line: rgba(114, 228, 213, 0.28);
+  --color-cosmic-line-strong: rgba(85, 216, 199, 0.52);
+  --color-cosmic-glow: rgba(0, 191, 166, 0.24);
+  --color-chart-text: #0b2927;
+  --color-chart-text-muted: rgba(11, 41, 39, 0.6);
+  --color-chart-line: rgba(15, 42, 42, 0.36);
+}
+
 [data-theme='oliveGold'] {
   color-scheme: light;
   --color-canvas: #f2eac9;

@@ -32,6 +32,13 @@ export const THEMES = Object.freeze([
     preview: { canvas: '#f3f7f6', surface: '#0b6fe8', accent: '#32cb0b', border: 'rgba(8, 58, 68, 0.22)' },
   },
   {
+    id: 'deepLagoon',
+    label: 'Deep Lagoon',
+    colorScheme: 'light',
+    themeColor: '#0f2a2a',
+    preview: { canvas: '#d9faf4', surface: '#0f2a2a', accent: '#00bfa6', border: 'rgba(15, 42, 42, 0.24)' },
+  },
+  {
     id: 'oliveGold',
     label: 'Olive Gold',
     colorScheme: 'light',
