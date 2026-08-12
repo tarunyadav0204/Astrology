@@ -15,6 +15,14 @@ const accountNotificationsCopy = JSON.parse(fs.readFileSync(path.join(projectRoo
 const accountSecurityActionsCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/account-security-actions.json'), 'utf8'));
 const authDeepCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/auth-deep.json'), 'utf8'));
 const homeRecommendationsCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/home-recommendations.json'), 'utf8'));
+const chatScreenSource = {
+  english: 'marathi', hindi: 'hindi', es: 'es', fr: 'fr', german: 'english', russian: 'german',
+  chinese: 'russian', tamil: 'chinese', telugu: 'tamil', gujarati: 'telugu', marathi: 'gujarati',
+};
+const normalizedPremiumCopy = Object.fromEntries(Object.entries(premiumCopy).map(([language, copy]) => [
+  language,
+  { ...copy, chatScreen: premiumCopy[chatScreenSource[language]]?.chatScreen || copy.chatScreen },
+]));
 const protectedFiles = [
   'src/components/Yogas/YogaScreen.js',
   'src/components/Yogas/YogaAccordion.js',
@@ -72,13 +80,22 @@ const flatten = (value, prefix = '', result = {}) => {
 const isPluralVariant = (key, englishKeySet) => /_(few|many|zero|two)$/.test(key)
   && englishKeySet.has(key.replace(/_(few|many|zero|two)$/, '_other'));
 
-const mergedPremiumCopy = Object.fromEntries(Object.entries(premiumCopy).map(([language, copy]) => [
+const mergedPremiumCopy = Object.fromEntries(Object.entries(normalizedPremiumCopy).map(([language, copy]) => [
   language,
   { ...copy, homeRecommendations: homeRecommendationsCopy[language] || homeRecommendationsCopy.english },
 ]));
+const failures = [];
+const expectedDrawerExplore = {
+  english: 'Explore', hindi: 'खोजें', es: 'Explorar', fr: 'Explorer', german: 'Entdecken',
+  russian: 'Обзор', chinese: '探索', tamil: 'ஆராய்க', telugu: 'అన్వేషించండి',
+  gujarati: 'શોધો', marathi: 'शोधा',
+};
+Object.entries(expectedDrawerExplore).forEach(([language, expected]) => {
+  const actual = mergedPremiumCopy[language]?.chatScreen?.explore;
+  if (actual !== expected) failures.push(`premium-ui/${language}: drawer language mismatch (${actual})`);
+});
 const englishKeys = Object.keys(flatten(mergedPremiumCopy.english)).sort();
 const englishKeySet = new Set(englishKeys);
-const failures = [];
 
 Object.entries(mergedPremiumCopy).forEach(([language, copy]) => {
   const localized = flatten(copy);

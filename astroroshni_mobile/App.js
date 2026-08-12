@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 import { NavigationContainer, getPathFromState, getStateFromPath } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { StatusBar, View, ActivityIndicator, Animated, Text, TouchableOpacity, Linking, ScrollView } from 'react-native';
+import { StatusBar, View, ActivityIndicator, Animated, Text, TouchableOpacity, Linking, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
+import { useTranslation } from 'react-i18next';
 
 import i18n from './src/locales/i18n';
 
@@ -75,7 +76,7 @@ import SupportScreen from './src/components/Support/SupportScreen';
 import MembershipComparisonScreen from './src/components/Support/MembershipComparisonScreen';
 import { CreditProvider } from './src/credits/CreditContext';
 import { AuthGateProvider } from './src/auth/AuthGateContext';
-import { ThemeProvider, ThemedStatusBar } from './src/context/ThemeContext';
+import { ThemeProvider, ThemedStatusBar, useTheme } from './src/context/ThemeContext';
 import { ErrorProvider } from './src/context/ErrorContext';
 import { storage } from './src/services/storage';
 import SplashScreen from './src/components/SplashScreen';
@@ -94,6 +95,110 @@ import WebAlertProvider from './src/platform/WebAlertProvider';
 // Push notifications: imported lazily in useEffect to avoid touching native module at launch (reduces iOS device crash risk).
 
 const Stack = createStackNavigator();
+
+function ForceUpdateScreen({ info, onUpdate }) {
+  const { colors, typography } = useTheme();
+  const { t } = useTranslation();
+  const releaseNotes = info?.releaseNotes;
+  const platformLabel = info?.platform === 'ios' ? 'iOS' : 'Android';
+
+  return (
+    <View style={[forceUpdateStyles.screen, { backgroundColor: colors.background }]}>
+      <ThemedStatusBar />
+      <View
+        pointerEvents="none"
+        style={[
+          forceUpdateStyles.orbit,
+          forceUpdateStyles.orbitLarge,
+          { borderColor: colors.cosmicLine },
+        ]}
+      />
+      <View
+        pointerEvents="none"
+        style={[
+          forceUpdateStyles.orbit,
+          forceUpdateStyles.orbitSmall,
+          { borderColor: colors.cosmicLine },
+        ]}
+      />
+
+      <ScrollView
+        contentContainerStyle={forceUpdateStyles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View
+          style={[
+            forceUpdateStyles.hero,
+            { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine },
+          ]}
+        >
+          <View style={[forceUpdateStyles.heroRule, { backgroundColor: colors.accent }]} />
+          <Text style={[forceUpdateStyles.eyebrow, typography?.eyebrow, { color: colors.accent }]}>{t('appUpdate.eyebrow')}</Text>
+          <Text style={[forceUpdateStyles.title, { color: colors.textInverse }]}>{t('appUpdate.title')}</Text>
+          <Text style={[forceUpdateStyles.heroBody, { color: colors.textInverseMuted }]}>{t('appUpdate.body')}</Text>
+
+          <View style={[forceUpdateStyles.versionTrack, { borderColor: colors.cosmicLine }]}>
+            <View style={forceUpdateStyles.versionItem}>
+              <Text style={[forceUpdateStyles.versionLabel, { color: colors.textInverseMuted }]}>{t('appUpdate.yourVersion')}</Text>
+              <Text style={[forceUpdateStyles.versionValue, { color: colors.textInverse }]}>{info?.currentVersion || '—'}</Text>
+            </View>
+            <Text style={[forceUpdateStyles.versionArrow, { color: colors.accent }]}>→</Text>
+            <View style={[forceUpdateStyles.versionItem, forceUpdateStyles.versionItemEnd]}>
+              <Text style={[forceUpdateStyles.versionLabel, { color: colors.textInverseMuted }]}>{t('appUpdate.required')}</Text>
+              <Text style={[forceUpdateStyles.versionValue, { color: colors.accent }]}>{info?.minVersion || '—'}</Text>
+            </View>
+          </View>
+        </View>
+
+        {releaseNotes ? (
+          <View style={[forceUpdateStyles.notes, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <Text style={[forceUpdateStyles.notesEyebrow, typography?.eyebrow, { color: colors.primary }]}>{t('appUpdate.whatsNew')}</Text>
+            <Text style={[forceUpdateStyles.notesBody, { color: colors.text }]}>{releaseNotes}</Text>
+          </View>
+        ) : null}
+
+        <TouchableOpacity
+          onPress={onUpdate}
+          activeOpacity={0.86}
+          style={[forceUpdateStyles.updateButton, { backgroundColor: colors.primaryStrong }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('appUpdate.accessibility', { platform: platformLabel })}
+        >
+          <Text style={[forceUpdateStyles.updateButtonText, { color: colors.onPrimary }]}>{t('appUpdate.update')}</Text>
+          <Text style={[forceUpdateStyles.updateArrow, { color: colors.onPrimary }]}>↗</Text>
+        </TouchableOpacity>
+        <Text style={[forceUpdateStyles.storeHint, { color: colors.textTertiary }]}>{t('appUpdate.opensStore', { store: t(platformLabel === 'iOS' ? 'appUpdate.appStore' : 'appUpdate.playStore') })}</Text>
+      </ScrollView>
+    </View>
+  );
+}
+
+const forceUpdateStyles = StyleSheet.create({
+  screen: { flex: 1, overflow: 'hidden' },
+  scrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 22, paddingVertical: 42 },
+  orbit: { position: 'absolute', borderWidth: 1, borderRadius: 999 },
+  orbitLarge: { width: 310, height: 310, right: -155, top: -105 },
+  orbitSmall: { width: 180, height: 180, left: -105, bottom: 20 },
+  hero: { width: '100%', maxWidth: 460, alignSelf: 'center', padding: 28, borderWidth: 1, borderRadius: 30, overflow: 'hidden' },
+  heroRule: { width: 54, height: 2, marginBottom: 24 },
+  eyebrow: { fontSize: 11, lineHeight: 15, fontWeight: '800', letterSpacing: 2.1, marginBottom: 14 },
+  title: { fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontSize: 44, lineHeight: 48, fontWeight: '500', marginBottom: 18 },
+  heroBody: { fontSize: 16, lineHeight: 25, marginBottom: 26 },
+  versionTrack: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, paddingTop: 20 },
+  versionItem: { flex: 1 },
+  versionItemEnd: { alignItems: 'flex-end' },
+  versionLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1.3, marginBottom: 5 },
+  versionValue: { fontSize: 22, lineHeight: 28, fontWeight: '700' },
+  versionArrow: { fontSize: 22, paddingHorizontal: 16 },
+  notes: { width: '100%', maxWidth: 460, alignSelf: 'center', borderWidth: 1, borderRadius: 22, padding: 20, marginTop: 16 },
+  notesEyebrow: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 1.7, marginBottom: 9 },
+  notesBody: { fontSize: 15, lineHeight: 23 },
+  updateButton: { width: '100%', maxWidth: 460, minHeight: 58, alignSelf: 'center', borderRadius: 999, marginTop: 20, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  updateButtonText: { fontSize: 16, lineHeight: 22, fontWeight: '800' },
+  updateArrow: { position: 'absolute', right: 23, fontSize: 20 },
+  storeHint: { marginTop: 12, textAlign: 'center', fontSize: 12, lineHeight: 18 },
+});
 
 /** Production Expo Web lives at /mobile/; local `expo start --web` stays at /. */
 function isMobileWebShell() {
@@ -695,52 +800,11 @@ export default function App() {
   }
 
   if (forceUpdateInfo) {
-    const rn = forceUpdateInfo.releaseNotes;
     return (
       <SafeAreaProvider>
-        <StatusBar barStyle="dark-content" backgroundColor="#ffedd5" />
-        <View style={{ flex: 1, backgroundColor: '#fff7ed', padding: 24 }}>
-          <ScrollView
-            contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 24 }}
-            keyboardShouldPersistTaps="handled"
-          >
-            <Text style={{ fontSize: 24, fontWeight: '700', marginBottom: 12, textAlign: 'center', color: '#7c2d12' }}>
-              Update required
-            </Text>
-            <Text style={{ fontSize: 15, textAlign: 'center', color: '#7c2d12', marginBottom: rn ? 16 : 24 }}>
-              A new version of AstroRoshni is available. Please update the app to continue.
-            </Text>
-            {rn ? (
-              <View
-                style={{
-                  width: '100%',
-                  maxWidth: 400,
-                  backgroundColor: '#ffedd5',
-                  borderRadius: 12,
-                  padding: 16,
-                  marginBottom: 24,
-                  borderWidth: 1,
-                  borderColor: '#fdba74',
-                }}
-              >
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#9a3412', marginBottom: 8 }}>{'What\u2019s new'}</Text>
-                <Text style={{ fontSize: 14, lineHeight: 22, color: '#431407' }}>{rn}</Text>
-              </View>
-            ) : null}
-            <TouchableOpacity
-              onPress={handleUpdatePress}
-              style={{
-                backgroundColor: '#f97316',
-                borderRadius: 999,
-                paddingHorizontal: 24,
-                paddingVertical: 12,
-                alignSelf: 'center',
-              }}
-            >
-              <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '600' }}>Update app</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
+        <ThemeProvider initialTheme={initialTheme} initialPanditMode={initialPanditMode}>
+          <ForceUpdateScreen info={forceUpdateInfo} onUpdate={handleUpdatePress} />
+        </ThemeProvider>
       </SafeAreaProvider>
     );
   }
