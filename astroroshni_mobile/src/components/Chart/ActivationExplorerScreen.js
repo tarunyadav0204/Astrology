@@ -3,13 +3,14 @@ import {
   ActivityIndicator,
   Modal,
   Platform,
-  SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -152,25 +153,25 @@ export default function ActivationExplorerScreen({ navigation, route }) {
   const { colors, theme, androidLightCardFixStyle } = useTheme();
   const isDark = theme === 'dark';
   const ui = {
-    surface: isDark ? '#28143b' : '#ffffff',
-    surfaceRaised: isDark ? '#321a48' : '#fffaf6',
-    surfaceMuted: isDark ? 'rgba(255,255,255,0.055)' : '#f8f5f2',
-    border: isDark ? 'rgba(255,255,255,0.11)' : 'rgba(28,25,23,0.09)',
-    header: isDark ? '#1e0a30' : '#fffaf7',
+    surface: colors.surfaceRaised,
+    surfaceRaised: colors.surface,
+    surfaceMuted: colors.surfaceMuted,
+    border: colors.cardBorder,
+    header: colors.headerSurface,
   };
   const activationColors = {
-    fully_reinforced: '#f97316',
-    dasha_transit_activated: isDark ? '#c2410c' : '#fb923c',
-    dasha_connected: isDark ? 'rgba(249,115,22,0.24)' : '#ffedd5',
-    transit_only: isDark ? 'rgba(255,255,255,0.10)' : '#e7e5e4',
-    dormant: isDark ? 'rgba(255,255,255,0.035)' : '#f5f5f4',
+    fully_reinforced: colors.selectionControl,
+    dasha_transit_activated: colors.primary,
+    dasha_connected: colors.cosmicGlow,
+    transit_only: colors.surfaceMuted,
+    dormant: colors.backgroundTertiary,
   };
   const activationTextColors = {
-    fully_reinforced: '#ffffff',
-    dasha_transit_activated: '#ffffff',
-    dasha_connected: isDark ? '#fed7aa' : '#7c2d12',
-    transit_only: isDark ? 'rgba(255,255,255,0.78)' : '#57534e',
-    dormant: isDark ? 'rgba(255,255,255,0.42)' : '#a8a29e',
+    fully_reinforced: isDark ? colors.textInverse : colors.selectionText,
+    dasha_transit_activated: isDark ? colors.textInverse : colors.onPrimary,
+    dasha_connected: isDark ? colors.textInverse : colors.text,
+    transit_only: isDark ? colors.textInverseMuted : colors.textSecondary,
+    dormant: isDark ? colors.textInverseMuted : colors.textTertiary,
   };
   const [birthData, setBirthData] = useState(route?.params?.birthData || null);
   const [d1ChartData, setD1ChartData] = useState(route?.params?.chartData || null);
@@ -257,11 +258,12 @@ export default function ActivationExplorerScreen({ navigation, route }) {
   const chartHouseActivation = useMemo(() => displayedHouseRows.reduce((map, row) => {
     map[row.house] = {
       fill: activationColors[row.state] || activationColors.dormant,
+      text: activationTextColors[row.state] || colors.text,
       dot: OUTCOME_COLORS[row.outcome?.tone || 'neutral'],
       state: row.state,
     };
     return map;
-  }, {}), [displayedHouseRows, activationColors]);
+  }, {}), [displayedHouseRows, activationColors, activationTextColors, colors.text]);
   const promise = (result?.natal_promises || []).find((row) => row.house === selectedHouse?.house);
   const currentWindow = selectedHouse?.window || currentRows[0]?.window;
   const currentCandidates = (result?.candidates || []).filter((candidate) =>
@@ -378,20 +380,23 @@ export default function ActivationExplorerScreen({ navigation, route }) {
   ];
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}> 
-      <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid] : [colors.gradientStart, colors.gradientMid]} style={StyleSheet.absoluteFill} />
-      <View style={[styles.header, { backgroundColor: ui.header, borderBottomColor: ui.border }]}>
-        <TouchableOpacity style={[styles.headerButton, { backgroundColor: ui.surfaceMuted }]} onPress={() => navigation.goBack()} accessibilityLabel="Go back">
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+    <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} translucent={false} />
+      <LinearGradient colors={[colors.gradientStart, colors.gradientMid, colors.gradientEnd]} style={StyleSheet.absoluteFill} />
+      <SafeAreaView edges={['top']} style={{ backgroundColor: colors.headerSurface }}>
+      <View style={[styles.header, { backgroundColor: ui.header, borderBottomColor: colors.cosmicLine }]}>
+        <TouchableOpacity style={[styles.headerButton, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]} onPress={() => navigation.goBack()} accessibilityLabel="Go back">
+          <Ionicons name="arrow-back" size={24} color={colors.textInverse} />
         </TouchableOpacity>
         <View style={styles.headerCopy}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>What’s active now?</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>{birthData?.name || 'Selected chart'} · your chart explained</Text>
+          <Text style={[styles.headerTitle, { color: colors.textInverse }]}>What’s active now?</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textInverseMuted }]} numberOfLines={1}>{birthData?.name || 'Selected chart'} · your chart explained</Text>
         </View>
-        <TouchableOpacity style={[styles.headerButton, { backgroundColor: ui.surfaceMuted }]} onPress={loadExplorer} accessibilityLabel="Recalculate">
-          <Ionicons name="refresh" size={22} color={colors.text} />
+        <TouchableOpacity style={[styles.headerButton, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]} onPress={loadExplorer} accessibilityLabel="Recalculate">
+          <Ionicons name="refresh" size={22} color={colors.textInverse} />
         </TouchableOpacity>
       </View>
+      </SafeAreaView>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[card, styles.controls]}>
@@ -401,7 +406,7 @@ export default function ActivationExplorerScreen({ navigation, route }) {
             <TouchableOpacity onPress={() => shiftDate(1)} style={[styles.miniButton, { backgroundColor: ui.surfaceMuted }]}><Ionicons name="chevron-forward" size={18} color={colors.text} /></TouchableOpacity>
           </View>
           <View style={styles.segmentRow}>
-            {[30, 90, 180].map((days) => <TouchableOpacity key={days} onPress={() => setHorizonDays(days)} style={[styles.segment, { borderColor: horizonDays === days ? colors.primary : ui.border, backgroundColor: horizonDays === days ? colors.primary : ui.surfaceMuted }]}><Text style={[styles.segmentText, { color: horizonDays === days ? '#fff' : colors.textSecondary }]}>{days} days</Text></TouchableOpacity>)}
+            {[30, 90, 180].map((days) => <TouchableOpacity key={days} onPress={() => setHorizonDays(days)} style={[styles.segment, { borderColor: horizonDays === days ? colors.selectionBorder : ui.border, backgroundColor: horizonDays === days ? colors.selectionSurface : ui.surfaceMuted }]}><Text style={[styles.segmentText, { color: horizonDays === days ? colors.selectionText : colors.textSecondary }]}>{days} days</Text></TouchableOpacity>)}
           </View>
         </View>
 
@@ -425,14 +430,14 @@ export default function ActivationExplorerScreen({ navigation, route }) {
         </View> : null}
 
         {!loading && result ? <>
-          <LinearGradient colors={isDark ? ['#3b1d52', '#28143b'] : ['#fff0e4', '#ffffff']} style={[styles.card, styles.dashaCard, { borderColor: ui.border }]}>
+          <LinearGradient colors={[colors.cosmicRaised, colors.surfaceRaised]} style={[styles.card, styles.dashaCard, { borderColor: colors.cosmicLine }]}>
             <Text style={[styles.eyebrow, { color: colors.textSecondary }]}>YOUR CURRENT TIMING CYCLE</Text>
             <Text style={[styles.dashaChain, { color: colors.text }]}>{currentWindow?.mahadasha || '—'} <Text style={{ color: colors.primary }}>major →</Text> {currentWindow?.antardasha || '—'} <Text style={{ color: colors.primary }}>sub-period →</Text> {currentWindow?.pratyantardasha || '—'}</Text>
             <Text style={[styles.meta, { color: colors.textSecondary }]}>{shortDate(currentWindow?.start_date)} – {shortDate(currentWindow?.end_date)} · {currentRows.filter((row) => !['transit_only', 'dormant'].includes(row.state)).length} houses active now · based on D1</Text>
           </LinearGradient>
 
           <View style={[styles.viewTabs, { backgroundColor: ui.surfaceMuted, borderColor: ui.border }]}>
-            {[['houses', 'House by House'], ['manifestations', 'Combined Life Themes']].map(([key, label]) => <TouchableOpacity key={key} onPress={() => setActiveTab(key)} style={[styles.viewTab, activeTab === key && { backgroundColor: colors.primary }]}><Text style={[styles.viewTabText, { color: activeTab === key ? '#fff' : colors.textSecondary }]}>{label}</Text></TouchableOpacity>)}
+            {[['houses', 'House by House'], ['manifestations', 'Combined Life Themes']].map(([key, label]) => <TouchableOpacity key={key} onPress={() => setActiveTab(key)} style={[styles.viewTab, activeTab === key && { backgroundColor: colors.selectionSurface }]}><Text style={[styles.viewTabText, { color: activeTab === key ? colors.selectionText : colors.textSecondary }]}>{label}</Text></TouchableOpacity>)}
           </View>
 
           {activeTab === 'houses' ? <>
@@ -459,7 +464,7 @@ export default function ActivationExplorerScreen({ navigation, route }) {
 
           {selectedHouse ? <View style={card}>
             <View style={styles.detailHeading}><View style={{ flex: 1 }}><Text style={[styles.eyebrow, { color: colors.primary }]}>HOUSE {selectedHouse.house}</Text><Text style={[styles.sectionTitle, { color: colors.text }]}>{HOUSE_LABELS[selectedHouse.house]}</Text><Text style={[styles.meta, { color: colors.textSecondary }]}>{STATE_EXPLANATIONS[selectedHouse.state]} · {OUTCOME_LABELS[selectedHouse.outcome?.tone]}</Text></View><View style={[styles.band, { backgroundColor: `${colors.primary}18` }]}><Text style={{ color: colors.primary, fontWeight: '600', textAlign: 'center', fontSize: 11 }}>{BAND_LABELS[selectedHouse.activation?.band] || 'Chart agreement unavailable'}</Text></View></View>
-            {selectedHouseWindows.length > 1 ? <View style={styles.windowPicker}><Text style={[styles.reasonTitle, { color: colors.text }]}>Inspect a timing window</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.windowPickerRow}>{selectedHouseWindows.map((row) => { const active = row.window.start_date === selectedHouse.window?.start_date; return <TouchableOpacity key={`${row.window.start_date}-${row.window.end_date}`} onPress={() => setSelectedWindowStart(row.window.start_date)} style={[styles.windowChip, { borderColor: active ? colors.primary : colors.cardBorder, backgroundColor: active ? colors.primary : colors.cardBackground }]}><Text style={[styles.windowChipText, { color: active ? '#fff' : colors.textSecondary }]}>{shortDate(row.window.start_date)} – {shortDate(row.window.end_date)}</Text></TouchableOpacity>; })}</ScrollView></View> : null}
+            {selectedHouseWindows.length > 1 ? <View style={styles.windowPicker}><Text style={[styles.reasonTitle, { color: colors.text }]}>Inspect a timing window</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.windowPickerRow}>{selectedHouseWindows.map((row) => { const active = row.window.start_date === selectedHouse.window?.start_date; return <TouchableOpacity key={`${row.window.start_date}-${row.window.end_date}`} onPress={() => setSelectedWindowStart(row.window.start_date)} style={[styles.windowChip, { borderColor: active ? colors.selectionBorder : colors.cardBorder, backgroundColor: active ? colors.selectionSurface : colors.cardBackground }]}><Text style={[styles.windowChipText, { color: active ? colors.selectionText : colors.textSecondary }]}>{shortDate(row.window.start_date)} – {shortDate(row.window.end_date)}</Text></TouchableOpacity>; })}</ScrollView></View> : null}
             <Text style={[styles.subheading, { color: colors.text }]}>Why this house matters now</Text>
             {[
               ['1', 'Birth-chart foundation', promise ? `${promise.lord} rules this house; planets placed here: ${promise.occupants?.join(', ') || 'none'}; planets aspecting it: ${promise.aspecting_planets?.join(', ') || 'none'}.` : 'Birth-chart foundation is unavailable.'],
@@ -479,15 +484,15 @@ export default function ActivationExplorerScreen({ navigation, route }) {
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Life themes coming into focus</Text>
             <Text style={[styles.sectionIntro, { color: colors.textSecondary }]}>Houses are grouped only when they overlap in time, share a coherent planetary delivery chain and form a recognised event relationship.</Text>
             {manifestationWindows.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.manifestationWindowPickerRow}>
-              <TouchableOpacity onPress={() => setSelectedManifestationWindow('all')} style={[styles.windowChip, { borderColor: selectedManifestationWindow === 'all' ? colors.primary : colors.cardBorder, backgroundColor: selectedManifestationWindow === 'all' ? colors.primary : colors.cardBackground }]}>
-                <Text style={[styles.windowChipText, { color: selectedManifestationWindow === 'all' ? '#fff' : colors.textSecondary }]}>All windows</Text>
+              <TouchableOpacity onPress={() => setSelectedManifestationWindow('all')} style={[styles.windowChip, { borderColor: selectedManifestationWindow === 'all' ? colors.selectionBorder : colors.cardBorder, backgroundColor: selectedManifestationWindow === 'all' ? colors.selectionSurface : colors.cardBackground }]}>
+                <Text style={[styles.windowChipText, { color: selectedManifestationWindow === 'all' ? colors.selectionText : colors.textSecondary }]}>All windows</Text>
               </TouchableOpacity>
               {manifestationWindows.map((window) => {
                 const key = `${window.start}:${window.end}`;
                 const active = selectedManifestationWindow === key;
                 const isCurrent = window.start <= asOf && window.end >= asOf;
-                return <TouchableOpacity key={key} onPress={() => setSelectedManifestationWindow(key)} style={[styles.windowChip, { borderColor: active ? colors.primary : colors.cardBorder, backgroundColor: active ? colors.primary : colors.cardBackground }]}>
-                  <Text style={[styles.windowChipText, { color: active ? '#fff' : colors.textSecondary }]}>{isCurrent ? 'Active now · ' : ''}{shortDate(window.start)} – {shortDate(window.end)}</Text>
+                return <TouchableOpacity key={key} onPress={() => setSelectedManifestationWindow(key)} style={[styles.windowChip, { borderColor: active ? colors.selectionBorder : colors.cardBorder, backgroundColor: active ? colors.selectionSurface : colors.cardBackground }]}>
+                  <Text style={[styles.windowChipText, { color: active ? colors.selectionText : colors.textSecondary }]}>{isCurrent ? 'Active now · ' : ''}{shortDate(window.start)} – {shortDate(window.end)}</Text>
                 </TouchableOpacity>;
               })}
             </ScrollView> : null}
@@ -561,7 +566,7 @@ export default function ActivationExplorerScreen({ navigation, route }) {
       </ScrollView>
       <Modal visible={showOutcomeReasons} transparent animationType="slide" onRequestClose={() => setShowOutcomeReasons(false)}>
         <View style={styles.modalBackdrop}>
-          <SafeAreaView style={[styles.reasonSheet, { backgroundColor: isDark ? '#241333' : '#ffffff' }]}>
+          <SafeAreaView edges={['bottom']} style={[styles.reasonSheet, { backgroundColor: colors.surfaceRaised }]}>
             <View style={[styles.reasonSheetHeader, { borderColor: colors.cardBorder }]}>
               <View style={{ flex: 1 }}><Text style={[styles.eyebrow, { color: colors.primary }]}>HOUSE {selectedHouse?.house || '—'}</Text><Text style={[styles.sectionTitle, { color: colors.text }]}>Why this result?</Text><Text style={[styles.meta, { color: colors.textSecondary }]}>{OUTCOME_LABELS[selectedHouse?.outcome?.tone] || 'Unclear'}</Text></View>
               <TouchableOpacity onPress={() => setShowOutcomeReasons(false)} style={styles.modalClose} accessibilityLabel="Close reasons"><Ionicons name="close" size={24} color={colors.text} /></TouchableOpacity>
@@ -577,7 +582,7 @@ export default function ActivationExplorerScreen({ navigation, route }) {
           </SafeAreaView>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -597,6 +602,7 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
   },
   headerCopy: { flex: 1, alignItems: 'flex-start' },
   headerTitle: { fontSize: 20, lineHeight: 25, fontWeight: '700', letterSpacing: -0.35 },

@@ -27,6 +27,7 @@ import creditConfirmation from './credit-confirmation.json';
 import copyAlert from './copy-alert.json';
 import partnershipExit from './partnership-exit.json';
 import themeDiscovery from './theme-discovery.json';
+import planetaryPositions from './planetary-positions.json';
 
 // The original premium-ui import accumulated a shifted chatScreen block: the
 // English key contains German, German contains Russian, and the later Indic
@@ -55,6 +56,10 @@ const normalizedPremiumUi = Object.fromEntries(
     },
   ]),
 );
+
+Object.entries(normalizedPremiumUi).forEach(([language, copy]) => {
+  copy.planetaryPositions = planetaryPositions[language] || planetaryPositions.english;
+});
 
 [
   [en, accountSecurityActions.english],

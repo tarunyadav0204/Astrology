@@ -328,7 +328,18 @@ export function PremiumExploreIntro({
   return (
     <View style={styles.exploreIntroWrap}>
       <View style={[styles.exploreHero, { backgroundColor: colors.surfaceInverse, borderColor: colors.cosmicLine }]}>
-        <Text style={[typography.eyebrow, { color: colors.accent, marginBottom: 12 }]}>{t('premiumUi.home.vedicStudio')}</Text>
+        <View pointerEvents="none" style={styles.exploreHeroLinework} accessibilityElementsHidden>
+          <View style={[styles.exploreHeroOrbit, styles.exploreHeroOrbitLarge, { borderColor: colors.onSurfaceInverseMuted || colors.cosmicLine }]} />
+          <View style={[styles.exploreHeroOrbit, styles.exploreHeroOrbitSmall, { borderColor: colors.onSurfaceInverseMuted || colors.cosmicLine }]} />
+          <View style={[styles.exploreHeroMeridian, { backgroundColor: colors.onSurfaceInverseMuted || colors.cosmicLine }]} />
+          <View style={[styles.exploreHeroBaseline, { backgroundColor: colors.onSurfaceInverseMuted || colors.cosmicLine }]} />
+        </View>
+        <View style={styles.exploreHeroEyebrowRow}>
+          <View style={[styles.exploreHeroEyebrowRule, { backgroundColor: colors.onSurfaceInverseMuted || colors.onSurfaceInverse }]} />
+          <Text style={[typography.eyebrow, { color: colors.onSurfaceInverseMuted || colors.onSurfaceInverse }]}>
+            {t('premiumUi.home.vedicStudio')}
+          </Text>
+        </View>
         <Text style={[typography.title, styles.exploreHeroTitle, { color: colors.onSurfaceInverse }]}>{t('premiumUi.home.exploreWith')}{`\n`}{t('premiumUi.home.purpose')}</Text>
         <Text style={[styles.exploreHeroBody, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.home.studioBody')}</Text>
       </View>
@@ -401,7 +412,15 @@ const styles = StyleSheet.create({
   exploreTitle: { fontSize: 14, fontWeight: '900', marginBottom: 4 },
   exploreSub: { fontSize: 11, lineHeight: 15, fontWeight: '500', maxWidth: 280 },
   exploreIntroWrap: { gap: 22 },
-  exploreHero: { minHeight: 260, marginHorizontal: -20, marginTop: -10, borderBottomLeftRadius: 30, borderBottomRightRadius: 30, borderWidth: 0, paddingHorizontal: 36, paddingVertical: 34, justifyContent: 'center' },
+  exploreHero: { minHeight: 260, marginHorizontal: -20, marginTop: -10, borderBottomLeftRadius: 30, borderBottomRightRadius: 30, borderWidth: 0, paddingHorizontal: 36, paddingVertical: 34, justifyContent: 'center', overflow: 'hidden' },
+  exploreHeroLinework: { ...StyleSheet.absoluteFillObject, opacity: 0.26 },
+  exploreHeroOrbit: { position: 'absolute', borderWidth: 1 },
+  exploreHeroOrbitLarge: { width: 196, height: 196, borderRadius: 98, right: -62, top: -90 },
+  exploreHeroOrbitSmall: { width: 124, height: 124, borderRadius: 62, right: -18, top: -48 },
+  exploreHeroMeridian: { position: 'absolute', width: StyleSheet.hairlineWidth, height: 174, right: 54, top: -24, transform: [{ rotate: '28deg' }] },
+  exploreHeroBaseline: { position: 'absolute', height: StyleSheet.hairlineWidth, left: 36, right: 36, bottom: 20 },
+  exploreHeroEyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 12 },
+  exploreHeroEyebrowRule: { width: 24, height: StyleSheet.hairlineWidth },
   exploreHeroTitle: { fontSize: 38, lineHeight: 41, marginBottom: 14 },
   exploreHeroBody: { fontSize: 13, lineHeight: 20, maxWidth: 330, fontWeight: '500' },
   studioDirectory: { borderWidth: 1, borderRadius: 22, overflow: 'hidden' },

@@ -627,9 +627,9 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
             <Ionicons
               name={mode.icon}
               size={17}
-              color={isActive ? colors.primary : colors.textSecondary}
+              color={isActive ? colors.selectionText : colors.textSecondary}
             />
-            <Text style={[styles.analysisModeTabText, { color: isActive ? colors.primary : colors.textSecondary }]}>
+            <Text style={[styles.analysisModeTabText, { color: isActive ? colors.selectionText : colors.textSecondary }]}>
               {mode.label}
             </Text>
           </TouchableOpacity>
@@ -680,7 +680,7 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
     <View style={[styles.analysisPanelCard, themedSurface]}>
       <View style={styles.analysisPanelHeader}>
         <View style={[styles.analysisPanelIcon, { backgroundColor: colors.selectionSurface }]}>
-          <Ionicons name="person-circle-outline" size={24} color={colors.primary} />
+          <Ionicons name="person-circle-outline" size={24} color={colors.selectionText} />
         </View>
         <View style={styles.analysisPanelTitleBlock}>
           <Text style={[styles.analysisPanelTitle, { color: colors.text }]}>Birth Chart Ashtakvarga Study</Text>
@@ -710,7 +710,7 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
         <View style={[styles.analysisPanelCard, themedSurface]}>
           <View style={styles.analysisPanelHeader}>
             <View style={[styles.analysisPanelIcon, { backgroundColor: colors.selectionSurface }]}>
-              <Ionicons name="today-outline" size={24} color={colors.primary} />
+              <Ionicons name="today-outline" size={24} color={colors.selectionText} />
             </View>
             <View style={styles.analysisPanelTitleBlock}>
               <Text style={[styles.analysisPanelTitle, { color: colors.text }]}>Transit Ashtakvarga Study</Text>
@@ -777,7 +777,7 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
     return (
       <View key={message.id} style={styles.askAssistantBubbleRow}>
         <View style={[styles.askAssistantAvatar, { backgroundColor: colors.selectionSurface }]}>
-          <Ionicons name="sparkles-outline" size={16} color={colors.primary} />
+          <Ionicons name="sparkles-outline" size={16} color={colors.selectionText} />
         </View>
         <View style={[styles.askAssistantBubble, themedMutedSurface]}>
           {headline ? (
@@ -827,7 +827,7 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
         {askMessages.length === 0 ? (
           <View style={styles.askAssistantBubbleRow}>
             <View style={[styles.askAssistantAvatar, { backgroundColor: colors.selectionSurface }]}>
-              <Ionicons name="sparkles-outline" size={16} color={colors.primary} />
+              <Ionicons name="sparkles-outline" size={16} color={colors.selectionText} />
             </View>
             <View style={[styles.askAssistantBubble, themedMutedSurface]}>
               <Text style={[styles.askAssistantHeadline, { color: colors.text }]}>
@@ -1529,7 +1529,7 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
         <LinearGradient colors={[colors.background, colors.backgroundSecondary, colors.background]} style={styles.loadingGradient}>
           <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
             <View style={[styles.loadingSeal, { borderColor: colors.selectionBorder, backgroundColor: colors.selectionSurface }]}>
-              <Ionicons name="grid-outline" size={30} color={colors.primary} />
+              <Ionicons name="grid-outline" size={30} color={colors.selectionText} />
             </View>
           </Animated.View>
           <Text style={[styles.loadingTitle, { color: colors.text }]}>Reading the bindus</Text>

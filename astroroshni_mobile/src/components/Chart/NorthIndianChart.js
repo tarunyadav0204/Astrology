@@ -173,11 +173,12 @@ const NorthIndianChart = ({
     return 'normal';
   };
 
-  const getPlanetColor = (planet) => {
+  const getPlanetColor = (planet, houseNumber) => {
     if (planet.name === 'InduLagna') return '#9c27b0';
     const status = getPlanetStatus(planet);
     if (status === 'exalted') return '#22c55e';
     if (status === 'debilitated') return '#ef4444';
+    if (houseActivation?.[houseNumber]?.text) return houseActivation[houseNumber].text;
     return cosmicTheme
       ? themedChartText
       : (theme === 'dark' ? '#fff' : '#2d3436');
@@ -376,6 +377,7 @@ const NorthIndianChart = ({
           const rashiIndex = getRashiForHouse(houseIndex);
           const planetsInHouse = getPlanetsInHouse(houseIndex);
           const houseData = getHouseData(houseNumber);
+          const activatedHouseText = houseActivation?.[houseNumber]?.text;
 
           return (
             <G key={houseNumber}>
@@ -432,18 +434,18 @@ const NorthIndianChart = ({
                    houseNumber === 12 ? houseData.center.y + 20 :
                    houseNumber === 5 ? houseData.center.y + 10 : houseData.center.y + 5}
                 fontSize="18"
-                fill={cosmicTheme ?
+                fill={activatedHouseText || (cosmicTheme ?
                   (rashiIndex === (chartData?.houses?.[0]?.sign ?? 0) ? colors.primary : themedChartTextMuted) :
-                  (rashiIndex === (chartData?.houses?.[0]?.sign ?? 0) ? "#e91e63" : (theme === 'dark' ? "#fff" : "#333"))}
+                  (rashiIndex === (chartData?.houses?.[0]?.sign ?? 0) ? "#e91e63" : (theme === 'dark' ? "#fff" : "#333")))}
                 fontWeight={rashiIndex === (chartData?.houses?.[0]?.sign ?? 0) ? "900" : "bold"}>
                 {rashiIndex + 1}
               </SvgText>
 
               {houseNumber === 1 && (
                 <G>
-                  <SvgText x={houseData.center.x + 25} y={houseData.center.y + 35} fontSize="12" fill={cosmicTheme ? colors.primary : "#e91e63"} fontWeight="900" textAnchor="middle">ASC</SvgText>
+                  <SvgText x={houseData.center.x + 25} y={houseData.center.y + 35} fontSize="12" fill={activatedHouseText || (cosmicTheme ? colors.primary : "#e91e63")} fontWeight="900" textAnchor="middle">ASC</SvgText>
                   {(chartData?.ascendant ?? null) != null && (
-                    <SvgText x={houseData.center.x + 25} y={houseData.center.y + 50} fontSize="8" fill={cosmicTheme ? themedChartTextMuted : (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "#666")} fontWeight="500" textAnchor="middle">
+                    <SvgText x={houseData.center.x + 25} y={houseData.center.y + 50} fontSize="8" fill={activatedHouseText || (cosmicTheme ? themedChartTextMuted : (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "#666"))} fontWeight="500" textAnchor="middle">
                       {formatDegree(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
                     </SvgText>
                   )}
@@ -580,7 +582,7 @@ const NorthIndianChart = ({
                       x={planetX}
                       y={planetY - 8}
                       fontSize={showKarakas ? (totalPlanets > 4 ? "8" : totalPlanets > 2 ? "10" : "11") : (totalPlanets > 4 ? "10" : totalPlanets > 2 ? "12" : "14")}
-                      fill={getPlanetColor(planet)}
+                      fill={getPlanetColor(planet, houseNumber)}
                       fontWeight="900"
                       textAnchor="middle"
                       onPress={() => handlePlanetPress(planet)}>
@@ -591,7 +593,7 @@ const NorthIndianChart = ({
                         x={planetX}
                         y={planetY + 8}
                         fontSize={totalPlanets > 4 ? "7" : totalPlanets > 2 ? "9" : "10"}
-                        fill={cosmicTheme ? themedChartTextMuted : "#666"}
+                        fill={activatedHouseText || (cosmicTheme ? themedChartTextMuted : "#666")}
                         fontWeight="500"
                         textAnchor="middle"
                         onPress={() => handlePlanetPress(planet)}>

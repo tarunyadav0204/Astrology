@@ -1,14 +1,15 @@
 import React from 'react';
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
+import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 
 const PlanetaryPositionsScreen = ({ navigation, route }) => {
-  const { theme, colors } = useTheme();
-  const isDark = theme === 'dark';
+  const { colors } = useTheme();
+  const { t } = useTranslation();
   const { chartData, birthData } = route.params || {};
   React.useEffect(() => {
     if (!birthData?.name) {
@@ -16,9 +17,6 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     }
   }, [birthData, navigation]);
 
-  const screenGradient = isDark
-    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd]
-    : [colors.gradientStart, colors.gradientMid, colors.gradientEnd];
   const [activeTab, setActiveTab] = React.useState('planets');
   const [karakas, setKarakas] = React.useState(null);
   const [jaiminiLagnas, setJaiminiLagnas] = React.useState(null);
@@ -227,60 +225,60 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     <TouchableOpacity
       style={[
         styles.tabButton,
-        { backgroundColor: active ? colors.primary : (isDark ? colors.surface : colors.cardBackground), borderColor: active ? colors.primary : colors.cardBorder },
+        {
+          backgroundColor: active ? colors.selectionSurface : colors.surfaceRaised,
+          borderColor: active ? colors.selectionBorder : colors.cardBorder,
+        },
         active && styles.tabButtonActive,
       ]}
       onPress={() => setActiveTab(value)}
     >
       <Text style={[styles.tabEmoji, active && styles.tabEmojiActive]}>{emoji}</Text>
-      <Text style={[styles.tabLabel, { color: active ? '#fff' : colors.text }, active && styles.tabLabelActive]}>{label}</Text>
+      <Text style={[styles.tabLabel, { color: active ? colors.selectionText : colors.textSecondary }, active && styles.tabLabelActive]}>{label}</Text>
     </TouchableOpacity>
   );
 
   // Planet Card Component
-  const planetCardGradient = isDark ? [colors.cardBackground, colors.surface] : [colors.cardBackground, colors.backgroundSecondary];
   const PlanetCard = ({ planet }) => (
-    <View style={styles.card}>
-      <LinearGradient colors={planetCardGradient} style={[styles.cardGradient, { borderColor: colors.cardBorder }]}>
+    <View style={[styles.card, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
         <View style={styles.cardHeader}>
           <View style={styles.planetInfo}>
-            <Text style={styles.planetEmoji}>{planetEmojis[planet.name]}</Text>
+            <View style={[styles.planetSeal, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}>
+              <Text style={[styles.planetEmoji, { color: colors.selectionText }]}>{planetEmojis[planet.name]}</Text>
+            </View>
             <View>
               <Text style={[styles.planetName, { color: colors.text }]}>{planet.name}</Text>
-              {planet.retrograde && <Text style={[styles.retrogradeTag, { color: colors.error }]}>Retrograde</Text>}
+              {planet.retrograde && <Text style={[styles.retrogradeTag, { color: colors.error }]}>{t('premiumUi.planetaryPositions.retrograde', 'Retrograde')}</Text>}
             </View>
           </View>
-          <View style={[styles.houseTag, { backgroundColor: colors.primary }]}>
-            <Text style={styles.houseText}>House {planet.house}</Text>
+          <View style={[styles.houseTag, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}>
+            <Text style={[styles.houseText, { color: colors.selectionText }]}>{t('premiumUi.planetaryPositions.house', 'House {{number}}', { number: planet.house })}</Text>
           </View>
         </View>
         <View style={[styles.divider, { backgroundColor: colors.cardBorder }]} />
         <View style={styles.detailsGrid}>
           <View style={styles.detailItem}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Rashi</Text>
+            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.rashi', 'Rashi')}</Text>
             <View style={styles.rashiContainer}>
               <Text style={styles.rashiIcon}>{rashiIcons[planet.sign]}</Text>
               <Text style={[styles.detailValue, { color: colors.text }]}>{rashiNames[planet.sign]}</Text>
             </View>
           </View>
           <View style={styles.detailItem}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Degree</Text>
+            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.degree', 'Degree')}</Text>
             <Text style={[styles.detailValue, { color: colors.text }]}>{planet.degree.toFixed(2)}°</Text>
           </View>
           <View style={styles.detailItemFull}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Nakshatra</Text>
-            <Text style={[styles.detailValue, { color: colors.text }]}>{planet.nakshatra} - Pada {planet.pada}</Text>
+            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.nakshatra', 'Nakshatra')}</Text>
+            <Text style={[styles.detailValue, styles.detailValueWide, { color: colors.text }]}>{planet.nakshatra} · {t('premiumUi.planetaryPositions.pada', 'Pada {{number}}', { number: planet.pada })}</Text>
           </View>
         </View>
-      </LinearGradient>
     </View>
   );
 
   // Lagna Card Component
-  const lagnaCardGradient = isDark ? [colors.backgroundSecondary, colors.cardBackground] : [colors.backgroundSecondary, colors.cardBackground];
   const LagnaCard = ({ lagna }) => (
-    <View style={styles.card}>
-      <LinearGradient colors={lagnaCardGradient} style={[styles.cardGradient, { borderColor: colors.cardBorder }]}>
+    <View style={[styles.card, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
         <View style={styles.cardHeader}>
           <View style={styles.planetInfo}>
             <Text style={styles.planetEmoji}>{planetEmojis[lagna.name] || '⭐'}</Text>
@@ -291,14 +289,14 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
               )}
             </View>
           </View>
-          <View style={[styles.houseTag, { backgroundColor: colors.primary }]}>
-            <Text style={styles.houseText}>House {lagna.house}</Text>
+          <View style={[styles.houseTag, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}>
+            <Text style={[styles.houseText, { color: colors.selectionText }]}>{t('premiumUi.planetaryPositions.house', 'House {{number}}', { number: lagna.house })}</Text>
           </View>
         </View>
         <View style={[styles.divider, { backgroundColor: colors.cardBorder }]} />
         <View style={styles.detailsGrid}>
           <View style={styles.detailItem}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Rashi</Text>
+            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.rashi', 'Rashi')}</Text>
             <View style={styles.rashiContainer}>
               <Text style={styles.rashiIcon}>{rashiIcons[lagna.sign]}</Text>
               <Text style={[styles.detailValue, { color: colors.text }]}>{rashiNames[lagna.sign]}</Text>
@@ -307,17 +305,16 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
           {!lagna.isJaimini && (
             <>
               <View style={styles.detailItem}>
-                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Degree</Text>
+                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.degree', 'Degree')}</Text>
                 <Text style={[styles.detailValue, { color: colors.text }]}>{lagna.degree.toFixed(2)}°</Text>
               </View>
               <View style={styles.detailItemFull}>
-                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Nakshatra</Text>
-                <Text style={[styles.detailValue, { color: colors.text }]}>{lagna.nakshatra} - Pada {lagna.pada}</Text>
+                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.nakshatra', 'Nakshatra')}</Text>
+                <Text style={[styles.detailValue, styles.detailValueWide, { color: colors.text }]}>{lagna.nakshatra} · {t('premiumUi.planetaryPositions.pada', 'Pada {{number}}', { number: lagna.pada })}</Text>
               </View>
             </>
           )}
         </View>
-      </LinearGradient>
     </View>
   );
 
@@ -358,7 +355,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
               displayName = value.planet || value.name || 'Unknown';
             }
             return (
-              <View key={karaka} style={[styles.karakaCard, { backgroundColor: isDark ? 'rgba(249, 115, 22, 0.1)' : 'rgba(234, 88, 12, 0.08)', borderColor: isDark ? 'rgba(249, 115, 22, 0.3)' : colors.cardBorder }]}>
+              <View key={karaka} style={[styles.karakaCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
                 <Text style={[styles.karakaName, { color: colors.textSecondary }]}>{karaka}</Text>
                 <Text style={[styles.karakaPlanet, { color: colors.text }]}>{planetEmojis[displayName] || '⭐'} {displayName}</Text>
               </View>
@@ -390,8 +387,8 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
         );
       }
 
-      const specialCardBg = isDark ? 'rgba(236, 72, 153, 0.08)' : 'rgba(219, 39, 119, 0.08)';
-      const specialCardBorder = isDark ? 'rgba(236, 72, 153, 0.2)' : colors.cardBorder;
+      const specialCardBg = colors.surfaceRaised;
+      const specialCardBorder = colors.cardBorder;
       return (
         <View>
           {/* Yogi Points */}
@@ -503,73 +500,90 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
-      <LinearGradient colors={screenGradient} style={styles.gradient}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={colors.primary} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} translucent={false} />
+        <SafeAreaView edges={['top']} style={[styles.safeArea, { backgroundColor: colors.headerSurface }]}>
+          <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cosmicLine }]}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}>
+              <Ionicons name="arrow-back" size={22} color={colors.textInverse} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Planetary Positions</Text>
+            <View style={styles.headerCopy}>
+              <Text style={[styles.headerTitle, { color: colors.textInverse }]}>{t('premiumUi.planetaryPositions.title', 'Planetary Positions')}</Text>
+              <Text style={[styles.headerSubtitle, { color: colors.textInverseMuted }]} numberOfLines={1}>{birthData?.name || t('premiumUi.planetaryPositions.selectedChart', 'Selected chart')}</Text>
+            </View>
             <View style={styles.placeholder} />
           </View>
+        </SafeAreaView>
 
-          {/* Tab Bar */}
-          <View style={[styles.tabBar, { borderBottomColor: colors.cardBorder }]}>
+          <View style={[styles.hero, { backgroundColor: colors.surfaceInverse, borderColor: colors.cosmicLine }]}>
+            <View pointerEvents="none" style={styles.heroLinework}>
+              <View style={[styles.heroOrbit, styles.heroOrbitLarge, { borderColor: colors.onSurfaceInverseMuted }]} />
+              <View style={[styles.heroOrbit, styles.heroOrbitSmall, { borderColor: colors.onSurfaceInverseMuted }]} />
+            </View>
+            <Text style={[styles.heroEyebrow, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.planetaryPositions.skyMap', 'YOUR CELESTIAL MAP')}</Text>
+            <Text style={[styles.heroTitle, { color: colors.onSurfaceInverse }]}>{t('premiumUi.planetaryPositions.heroTitle', 'The sky at your birth.')}</Text>
+            <Text style={[styles.heroBody, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.planetaryPositions.heroBody', 'Read each planet through its sign, house, exact degree and nakshatra placement.')}</Text>
+            <View style={[styles.heroMeta, { borderTopColor: colors.onSurfaceInverseMuted }]}>
+              <Text style={[styles.heroMetaText, { color: colors.onSurfaceInverse }]}>{t('premiumUi.planetaryPositions.positionCount', '{{count}} planetary positions', { count: planets.length })}</Text>
+              <Text style={[styles.heroMetaText, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.planetaryPositions.sidereal', 'Sidereal · Lahiri')}</Text>
+            </View>
+          </View>
+
+          <View style={[styles.tabBar, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
             <GHScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
-              <TabButton label="Planets" emoji="🪐" value="planets" active={activeTab === 'planets'} />
-              <TabButton label="Karakas" emoji="🔱" value="karakas" active={activeTab === 'karakas'} />
-              <TabButton label="Lagnas" emoji="🎯" value="lagnas" active={activeTab === 'lagnas'} />
-              <TabButton label="Special" emoji="✨" value="special" active={activeTab === 'special'} />
+              <TabButton label={t('premiumUi.planetaryPositions.tabs.planets', 'Planets')} emoji="🪐" value="planets" active={activeTab === 'planets'} />
+              <TabButton label={t('premiumUi.planetaryPositions.tabs.karakas', 'Karakas')} emoji="🔱" value="karakas" active={activeTab === 'karakas'} />
+              <TabButton label={t('premiumUi.planetaryPositions.tabs.lagnas', 'Lagnas')} emoji="🎯" value="lagnas" active={activeTab === 'lagnas'} />
+              <TabButton label={t('premiumUi.planetaryPositions.tabs.special', 'Special')} emoji="✨" value="special" active={activeTab === 'special'} />
             </GHScrollView>
           </View>
 
-          {/* Tab Content */}
           <GHScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
             {renderTabContent()}
-            <View style={{ height: 20 }} />
+            <View style={{ height: 32 }} />
           </GHScrollView>
-        </SafeAreaView>
-      </LinearGradient>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  gradient: { flex: 1 },
-  safeArea: { flex: 1 },
+  safeArea: {},
   header: {
+    minHeight: 72,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'transparent',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
+  headerCopy: { flex: 1, alignItems: 'center', paddingHorizontal: 10 },
+  headerTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 21, lineHeight: 25 },
+  headerSubtitle: { fontSize: 11, lineHeight: 15, marginTop: 2, fontWeight: '600' },
   placeholder: { width: 40 },
-  
-  // Tab Bar Styles
+  hero: { minHeight: 190, marginHorizontal: 18, marginTop: 16, padding: 22, borderWidth: 1, borderRadius: 26, overflow: 'hidden' },
+  heroLinework: { ...StyleSheet.absoluteFillObject, opacity: 0.25 },
+  heroOrbit: { position: 'absolute', borderWidth: 1 },
+  heroOrbitLarge: { width: 190, height: 190, borderRadius: 95, right: -70, top: -92 },
+  heroOrbitSmall: { width: 116, height: 116, borderRadius: 58, right: -18, top: -48 },
+  heroEyebrow: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 1.5, marginBottom: 10 },
+  heroTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 31, lineHeight: 35, maxWidth: '82%' },
+  heroBody: { fontSize: 13, lineHeight: 19, fontWeight: '500', maxWidth: '88%', marginTop: 10 },
+  heroMeta: { marginTop: 18, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
+  heroMetaText: { fontSize: 10, lineHeight: 14, fontWeight: '700', letterSpacing: 0.4 },
   tabBar: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+    marginHorizontal: 18,
+    marginTop: 14,
+    padding: 5,
+    borderWidth: 1,
+    borderRadius: 18,
   },
   tabScrollContent: {
     gap: 8,
@@ -577,9 +591,10 @@ const styles = StyleSheet.create({
   tabButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    minHeight: 42,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 14,
     borderWidth: 1,
     gap: 6,
   },
@@ -591,29 +606,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   tabLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '800',
   },
   tabLabelActive: {},
 
   scrollView: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingTop: 16,
   },
   card: {
-    marginBottom: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  cardGradient: {
-    padding: 16,
+    marginBottom: 11,
+    borderRadius: 20,
     borderWidth: 1,
+    padding: 15,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12 },
+      android: { elevation: 1 },
+      default: { boxShadow: '0 5px 18px rgba(0,0,0,0.06)' },
+    }),
   },
   cardHeader: {
     flexDirection: 'row',
@@ -627,13 +640,9 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
-  planetEmoji: {
-    fontSize: 32,
-  },
-  planetName: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
+  planetSeal: { width: 44, height: 44, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  planetEmoji: { fontSize: 24 },
+  planetName: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 21, lineHeight: 25 },
   retrogradeTag: {
     fontSize: 10,
     fontWeight: '600',
@@ -645,13 +654,13 @@ const styles = StyleSheet.create({
   },
   houseTag: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
   },
   houseText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#ffffff',
   },
   divider: {
     height: 1,
@@ -677,7 +686,9 @@ const styles = StyleSheet.create({
   detailValue: {
     fontSize: 14,
     fontWeight: '700',
+    textAlign: 'right',
   },
+  detailValueWide: { flex: 1, marginLeft: 18 },
   rashiContainer: {
     flexDirection: 'row',
     alignItems: 'center',
