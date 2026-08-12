@@ -114,6 +114,7 @@ def reduce_daily_context(
             "category": intent.get("category"),
             "analysis_type": intent.get("analysis_type"),
             "specific_date": extracted_context.get("specific_date") or intent.get("dasha_as_of"),
+            "specific_date_basis": extracted_context.get("specific_date_basis"),
             "daily_micro_intent": micro_intent,
         },
         "birth_summary": _compact_birth_summary(context),

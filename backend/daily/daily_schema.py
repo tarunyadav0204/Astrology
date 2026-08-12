@@ -74,6 +74,7 @@ def build_daily_prompt(
     context_json = json.dumps(reduced_context, indent=2, ensure_ascii=False, default=str, sort_keys=False)
     history_text = _history_block(reduced_context.get("conversation_tail") or [])
     target_date = reduced_context.get("target_date") or "the requested date"
+    date_basis = str(((reduced_context.get("intent") or {}).get("specific_date_basis") or "")).strip()
     return "\n\n".join(
         block
         for block in [
@@ -81,6 +82,9 @@ def build_daily_prompt(
             "You answer one specific day with practical precision, not a lifetime reading.",
             language_instruction,
             "DAILY MODE RULES (NON-NEGOTIABLE):\n"
+            f"- DATE LOCK: The backend resolved the user's requested local calendar date to {target_date}. This is absolute and overrides your internal clock, server/UTC date, birth-place timezone, and conversation history.\n"
+            f"- DATE BASIS: {date_basis or 'explicit resolved date'}. If this is `relative_user_day`, the CURRENT QUESTION's word such as today/aaj/आज refers exactly to {target_date}; never call it yesterday or tomorrow.\n"
+            f"- Every date label and all temporal wording in the answer must refer to {target_date}. Silently verify this before responding.\n"
             "- Use ONLY the DAILY_CONTEXT_JSON below as your astrological evidence.\n"
             "- `daily_prediction_spine` is authoritative. Do not drift into broad chart storytelling.\n"
             "- `fast_planets` is the practical same-day tone layer. Use it for communication, relationship climate, conflict risk, emotional flow, and visibility/authority tone.\n"

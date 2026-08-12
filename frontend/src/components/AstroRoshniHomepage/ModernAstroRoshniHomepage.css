@@ -1763,13 +1763,13 @@ body.modern-homepage-active {
   gap: 12px;
   color: var(--color-header-text);
   font-family: var(--mh-display);
-  font-size: 22px;
+  font-size: 25px;
 }
 
 .mh-footer__logo img {
-  width: 42px;
-  height: 42px;
-  border-radius: 11px;
+  width: 50px;
+  height: 50px;
+  border-radius: 13px;
   box-shadow: 0 8px 28px color-mix(in srgb, var(--mh-gold) 18%, transparent);
 }
 

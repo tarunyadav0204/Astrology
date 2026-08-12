@@ -450,6 +450,27 @@ def _extract_specific_date_from_question(user_question: str, *, now: datetime) -
     return None
 
 
+def _build_relative_date_prompt_contract(current_date: str) -> str:
+    """Build an explicit user-local calendar contract for the intent LLM."""
+    anchor = datetime.strptime(current_date, "%Y-%m-%d")
+    yesterday = (anchor - timedelta(days=1)).strftime("%Y-%m-%d")
+    tomorrow = (anchor + timedelta(days=1)).strftime("%Y-%m-%d")
+    day_after_tomorrow = (anchor + timedelta(days=2)).strftime("%Y-%m-%d")
+    return f"""
+AUTHORITATIVE USER-LOCAL CALENDAR (NON-NEGOTIABLE):
+- The request's timezone and client timestamp have already been resolved by the backend.
+- TODAY = {current_date}
+- YESTERDAY = {yesterday}
+- TOMORROW = {tomorrow}
+- DAY AFTER TOMORROW = {day_after_tomorrow}
+- This calendar overrides your internal clock, training-time date, server date, UTC date, birth-place timezone, and dates mentioned in conversation history.
+- Interpret equivalent relative-day words in every language/script using this same calendar (for example today / aaj / आज all mean {current_date}).
+- When the CURRENT QUESTION asks for one of these relative days, copy the corresponding ISO date above exactly into `extracted_context.specific_date`; do not calculate it again and do not shift it at midnight or for UTC.
+- For such a question set `mode="PREDICT_DAILY"`, `daily_intent_confirmed=true`, and `specific_date_basis="relative_user_day"`.
+- Before returning JSON, silently audit this invariant: a relative-day phrase in the CURRENT QUESTION and `specific_date` must point to the same row above. If they differ, correct `specific_date` before returning.
+""".strip()
+
+
 def _extract_month_window_from_question(user_question: str, *, now: datetime) -> dict[str, Any] | None:
     q = (user_question or "").strip()
     if not q:
@@ -1385,7 +1406,8 @@ You are AstroRoshni's multilingual semantic intent router for instant/speech ast
 Return ONLY valid JSON. Do not explain. Do not generate chart insights or birth-detail requests.
 
 App language fallback: {app_language}
-Today: {current_date}; current year: {current_year}; current month: {current_month}
+{_build_relative_date_prompt_contract(current_date)}
+Current year: {current_year}; current month: {current_month}
 
 {clarification_limit_text}
 {force_ready_instruction}
@@ -1431,6 +1453,7 @@ self, spouse, wife, husband, partner, child, first_child, second_child, third_ch
 Use self only when the question is about the native directly. If the user asks about "my wife", "my husband", "spouse", "partner", child, parent, or sibling, use that person as target_subject_key.
 
 Date/time rules:
+- The AUTHORITATIVE USER-LOCAL CALENDAR above is the sole authority for relative-day phrases in the CURRENT QUESTION.
 - Use current date only to resolve relative dates; never set specific_date just because today is available.
 - Date ranges/periods are not daily; put them in extracted_context.timeframe.
 - specific_date_basis: explicit_user_day, relative_user_day, or not_date_bound.
@@ -1580,8 +1603,9 @@ Language rule:
 - If you return `clarification_question`, write it in the same language/script style as the current user question.
 - If unclear, fall back to app language "{app_language}".
 
+{_build_relative_date_prompt_contract(current_date)}
+
 Current date context:
-- Today: {current_date}
 - Current year: {current_year}
 - Current month: {current_month}
 
@@ -1593,6 +1617,7 @@ Current date context:
 Current question: "{user_question}"
 
 Rules:
+- The AUTHORITATIVE USER-LOCAL CALENDAR above is the sole authority for relative-day phrases in the CURRENT QUESTION.
 - Use `PREDICT_DAILY` for today/tomorrow/exact-day questions.
 - Use `PREDICT_PERIOD_OUTLOOK` for "next 3 months", "this year", "coming months" style outlooks.
 - Use `LIFESPAN_EVENT_TIMING` for simple "when will X happen?" timing questions.
@@ -2032,12 +2057,13 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
         {clarification_format_instruction}
         {language_instruction}
 
+        {_build_relative_date_prompt_contract(current_date)}
+
         CURRENT DATE CONTEXT:
-        - Today's Date: {current_date}
         - Current Year: {current_year}
         - Current Month: {current_month}
         
-        IMPORTANT: When user asks about "next 3 months", "next 6 months", or relative time periods, calculate from TODAY'S DATE ({current_date}).
+        IMPORTANT: The AUTHORITATIVE USER-LOCAL CALENDAR above is the sole authority for relative-day wording in the CURRENT QUESTION. When user asks about "next 3 months", "next 6 months", or relative time periods, calculate from TODAY ({current_date}).
         Example: If today is 2024-12-20 and user asks "next 3 months", that means January-March 2025, NOT 2024.
         {history_text}
         {facts_text}

@@ -6397,9 +6397,34 @@ export default function ChatScreen({ navigation, route }) {
           animationType="slide"
           onRequestClose={() => setShowLanguageModal(false)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>🌐 {t('languageModal.title')}</Text>
+          <View style={[styles.modalOverlay, styles.languageModalOverlay, { backgroundColor: colors.overlay }]}>
+            <View
+              style={[
+                styles.modalContent,
+                styles.languageModalContent,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.cardBorder,
+                  shadowColor: colors.cosmicSurface,
+                },
+              ]}
+            >
+              <View style={styles.languageModalHeader}>
+                <View
+                  style={[
+                    styles.languageModalIcon,
+                    {
+                      backgroundColor: colors.selectionSurface,
+                      borderColor: colors.selectionBorder,
+                    },
+                  ]}
+                >
+                  <Ionicons name="language-outline" size={22} color={colors.primary} />
+                </View>
+                <Text style={[styles.modalTitle, styles.languageModalTitle, { color: colors.text }]}>
+                  {t('languageModal.title')}
+                </Text>
+              </View>
               <ScrollView
                 style={styles.languageModalScrollView}
                 contentContainerStyle={styles.languageModalScrollContent}
@@ -6411,21 +6436,39 @@ export default function ChatScreen({ navigation, route }) {
                     key={lang.code}
                     style={[
                       styles.languageOption,
-                      language === lang.code && styles.languageOptionSelected
+                      {
+                        backgroundColor: colors.surfaceMuted,
+                        borderColor: colors.cardBorder,
+                      },
+                      language === lang.code && {
+                        backgroundColor: colors.selectionSurface,
+                        borderColor: colors.selectionBorder,
+                      },
                     ]}
                     onPress={() => handleLanguageChange(lang.code)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: language === lang.code }}
                   >
-                    <Text style={styles.languageText}>
+                    <Text style={[styles.languageText, { color: colors.text }]}>
                       {lang.flag} {lang.name}
                     </Text>
+                    {language === lang.code ? (
+                      <View style={[styles.languageSelectedMark, { backgroundColor: colors.primary }]}>
+                        <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
+                      </View>
+                    ) : (
+                      <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+                    )}
                   </TouchableOpacity>
                 ))}
               </ScrollView>
               <TouchableOpacity
-                style={styles.modalCloseButton}
+                style={[styles.modalCloseButton, { backgroundColor: colors.primary }]}
                 onPress={() => setShowLanguageModal(false)}
               >
-                <Text style={styles.modalCloseText}>{t('languageModal.close')}</Text>
+                <Text style={[styles.modalCloseText, { color: colors.onPrimary }]}>
+                  {t('languageModal.close')}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -7808,14 +7851,14 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif', default: 'serif' }),
-    fontSize: 20,
+    fontSize: 23,
     fontWeight: '600',
     textAlign: 'center',
   },
   headerLogoContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 50,
+    height: 50,
+    borderRadius: 15,
     backgroundColor: 'rgba(215, 184, 120, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -7828,9 +7871,9 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   headerLogo: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
   },
   nameChip: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
@@ -9100,33 +9143,67 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: COLORS.accent,
     textAlign: 'center',
     marginBottom: 24,
+  },
+  languageModalContent: {
+    width: '92%',
+    maxWidth: 520,
+    maxHeight: '82%',
+    borderRadius: 28,
+    padding: 20,
+  },
+  languageModalOverlay: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  languageModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  languageModalIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  languageModalTitle: {
+    marginBottom: 0,
+    textAlign: 'left',
   },
   languageModalScrollView: {
     maxHeight: 320,
   },
   languageModalScrollContent: {
-    paddingRight: 8,
     paddingBottom: 8,
   },
   languageOption: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: COLORS.lightGray,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  languageOptionSelected: {
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-    borderColor: COLORS.accent,
+    minHeight: 64,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 18,
+    marginBottom: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   languageText: {
+    flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.black,
+  },
+  languageSelectedMark: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   menuOption: {
     marginBottom: 7,
@@ -9165,19 +9242,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   modalCloseButton: {
-    backgroundColor: COLORS.accent,
-    padding: 16,
-    borderRadius: 12,
+    minHeight: 54,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 18,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 16,
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
   },
   modalCloseText: {
-    color: COLORS.white,
     fontSize: 16,
     fontWeight: '700',
   },

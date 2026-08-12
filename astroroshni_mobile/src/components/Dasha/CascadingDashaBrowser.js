@@ -2304,9 +2304,14 @@ const CascadingDashaBrowser = ({
   const renderBrowserHeader = (centerContent) => {
     if (embedded) return null;
     return (
-      <View style={[styles.header, { backgroundColor: dashaColors.surface, borderBottomColor: dashaColors.border }]}>
-        <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: dashaColors.softControl }]}>
-          <Icon name="arrow-back" size={22} color={colors.text} />
+      <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cosmicLine }]}>
+        <TouchableOpacity
+          onPress={onClose}
+          style={[styles.closeButton, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back', 'Back')}
+        >
+          <Icon name="arrow-back" size={22} color={colors.textInverse} />
         </TouchableOpacity>
         {centerContent}
         <View style={styles.placeholder} />
@@ -2316,10 +2321,10 @@ const CascadingDashaBrowser = ({
 
   const renderShellBody = (headerCenter, body) => (
     <View
-      style={{ flex: 1, backgroundColor: dashaColors.background, paddingTop: embedded ? 0 : insets.top }}
+      style={{ flex: 1, backgroundColor: dashaColors.background }}
       {...(embedded ? {} : modalSwipeHandlers)}
     >
-      {!embedded ? <StatusBar barStyle={colors.statusBarStyle} /> : null}
+      {!embedded ? <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} translucent={false} /> : null}
       {!embedded ? (
         <PanGestureHandler onHandlerStateChange={handleEdgeSwipeClose}>
           <View style={styles.edgeSwipeZone} />
@@ -2334,7 +2339,7 @@ const CascadingDashaBrowser = ({
   if (isActive && (!birthData || !birthData.name)) {
     return wrapShell(
       renderShellBody(
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>,
+        <Text style={[styles.headerTitle, { color: colors.textInverse }]}>{t('dasha.browserTitle')}</Text>,
         <View style={[styles.loadingContainer, { justifyContent: 'center', paddingHorizontal: 24 }]}>
           <Text style={[styles.loadingText, { color: colors.text, textAlign: 'center', marginBottom: 8 }]}>
             {t('dasha.birthDataRequired', 'Birth data is required to view dashas.')}
@@ -2366,7 +2371,7 @@ const CascadingDashaBrowser = ({
   if (loading) {
     return wrapShell(
       renderShellBody(
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>,
+        <Text style={[styles.headerTitle, { color: colors.textInverse }]}>{t('dasha.browserTitle')}</Text>,
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('dasha.loading')}</Text>
@@ -2378,7 +2383,7 @@ const CascadingDashaBrowser = ({
   if (error) {
     return wrapShell(
       renderShellBody(
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>,
+        <Text style={[styles.headerTitle, { color: colors.textInverse }]}>{t('dasha.browserTitle')}</Text>,
         <View style={styles.errorContainer}>
           <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
           <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={fetchCascadingDashas}>
@@ -2392,7 +2397,7 @@ const CascadingDashaBrowser = ({
   return wrapShell(
     renderShellBody(
       <View style={styles.headerCenter}>
-        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+        <Text style={[styles.headerTitle, { color: colors.textInverse }]} numberOfLines={1}>
           {t('dasha.browserTitle')}
         </Text>
         {birthData ? (
@@ -2401,7 +2406,12 @@ const CascadingDashaBrowser = ({
             onPress={handleSelectNative}
             maxLength={12}
             showIcon={false}
-            style={styles.headerNativeChip}
+            style={[
+              styles.headerNativeChip,
+              { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine },
+            ]}
+            textStyle={{ color: colors.textInverseMuted }}
+            iconColor={colors.accent}
           />
         ) : null}
       </View>,
@@ -2451,20 +2461,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: COLORS.surface,
+    minHeight: 88,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
   },
   closeButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: COLORS.lightGray,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 23,
+    lineHeight: 27,
+    fontWeight: '600',
   },
   headerCenter: {
     flex: 1,
@@ -2473,12 +2487,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   headerNativeChip: {
-    marginTop: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    marginTop: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
   },
   placeholder: {
-    width: 40,
+    width: 44,
   },
   content: {
     flex: 1,

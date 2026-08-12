@@ -121,9 +121,9 @@ export default function PremiumTodayOverview({
   return (
     <View style={styles.container}>
       <View style={styles.identityRow}>
-        <View>
+        <View style={styles.identityCopy}>
           <Text style={[styles.eyebrow, typography.eyebrow, { color: colors.textTertiary }]}>{t('premiumUi.home.yourSky')} · {formatToday(i18n.resolvedLanguage || i18n.language)}</Text>
-          <Text style={[styles.identity, { color: colors.text }]}>{t('premiumUi.home.hello', { name: displayName })}</Text>
+          <Text style={[styles.identity, { color: colors.text }]} numberOfLines={1}>{t('premiumUi.home.hello', { name: displayName })}</Text>
         </View>
         <TouchableOpacity
           onPress={hasChart ? onSelectNative : onCreateChart}
@@ -133,7 +133,12 @@ export default function PremiumTodayOverview({
           <View style={[styles.avatar, { backgroundColor: colors.accentSoft }]}>
             <Text style={[styles.avatarText, { color: colors.onAccent }]}>{displayName.slice(0, 1).toUpperCase()}</Text>
           </View>
-          <Text style={[styles.profileButtonText, { color: colors.text }]} numberOfLines={1}>
+          <Text
+            style={[styles.profileButtonText, { color: colors.text }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
             {hasChart ? t('premiumUi.home.changeChart') : t('premiumUi.home.addChart')}
           </Text>
           <Ionicons name="chevron-down" size={14} color={colors.textTertiary} />
@@ -351,9 +356,10 @@ export function PremiumExploreIntro({
 const styles = StyleSheet.create({
   container: { gap: 18 },
   identityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  identityCopy: { flex: 1, minWidth: 0 },
   eyebrow: { fontSize: 9, marginBottom: 6 },
   identity: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 23, lineHeight: 28 },
-  profileButton: { maxWidth: 152, flexDirection: 'row', alignItems: 'center', gap: 7, padding: 6, paddingRight: 10, borderWidth: 1, borderRadius: 999 },
+  profileButton: { width: 148, flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 7, padding: 6, paddingRight: 10, borderWidth: 1, borderRadius: 999 },
   avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 15, fontWeight: '700' },
   profileButtonText: { maxWidth: 78, fontSize: 11, fontWeight: '800' },

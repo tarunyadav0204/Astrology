@@ -1,7 +1,7 @@
 .mh-nav.ar-modern-nav {
   position: relative;
   z-index: var(--z-header, 100);
-  height: 72px;
+  height: 78px;
   color: var(--color-header-text, #fff8ee);
   background: color-mix(in srgb, var(--color-header-surface, #210b17) 96%, transparent);
   border-bottom: 1px solid var(--color-header-border, rgba(234, 216, 173, 0.14));
@@ -34,15 +34,15 @@
   text-decoration: none;
   white-space: nowrap;
   font-family: var(--font-display, Georgia, serif);
-  font-size: 22px;
+  font-size: 25px;
   font-weight: 600;
   letter-spacing: -0.025em;
 }
 
 .ar-modern-nav .mh-brand__mark {
-  width: 48px;
-  height: 48px;
-  flex: 0 0 48px;
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
   position: relative;
   display: grid;
   place-items: center;
@@ -66,8 +66,8 @@
 }
 
 .ar-modern-nav .mh-brand img {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   display: block;
   border-radius: 11px;
   filter: var(--theme-brand-image-filter, none);
@@ -522,8 +522,8 @@
   border-top: 1px solid var(--color-header-border, rgba(234, 216, 173, 0.1));
 }
 
-.ar-modern-nav.ar-modern-nav--with-native { height: 118px; }
-.ar-modern-nav--with-native .mh-nav__inner { height: 72px; }
+.ar-modern-nav.ar-modern-nav--with-native { height: 124px; }
+.ar-modern-nav--with-native .mh-nav__inner { height: 78px; }
 .ar-modern-nav .mh-native-bar__label { color: var(--color-header-text-muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; }
 .ar-modern-nav .mh-native-bar__subject { min-width: 0; display: flex; align-items: center; gap: 9px; color: inherit; background: transparent; border: 0; text-align: left; cursor: pointer; }
 .ar-modern-nav .mh-native-bar__subject > i { width: 25px; height: 25px; flex: 0 0 auto; display: grid; place-content: center; color: var(--color-on-accent); background: var(--color-accent); border-radius: 50%; font-style: normal; font-family: var(--font-display); font-size: 12px; }
@@ -545,17 +545,17 @@
 }
 
 @media (max-width: 640px) {
-  .ar-modern-nav { height: 64px; }
+  .ar-modern-nav { height: 68px; }
   .ar-modern-nav .mh-nav__inner { padding: 0 16px; }
-  .ar-modern-nav .mh-brand { gap: 10px; font-size: 19px; }
-  .ar-modern-nav .mh-brand__mark { width: 42px; height: 42px; flex-basis: 42px; border-radius: 12px; }
+  .ar-modern-nav .mh-brand { gap: 10px; font-size: 21px; }
+  .ar-modern-nav .mh-brand__mark { width: 46px; height: 46px; flex-basis: 46px; border-radius: 12px; }
   .ar-modern-nav .mh-brand__mark::after { border-radius: 10px; }
-  .ar-modern-nav .mh-brand img { width: 38px; height: 38px; border-radius: 9px; }
+  .ar-modern-nav .mh-brand img { width: 44px; height: 44px; border-radius: 10px; }
   .ar-modern-nav .mh-nav__actions .mh-primary-button--nav { display: none; }
   .ar-modern-nav .mh-nav__actions .mh-theme-menu { display: none; }
   .ar-modern-nav .mh-account-menu summary strong { display: none; }
-  .ar-modern-nav.ar-modern-nav--with-native { height: 116px; }
-  .ar-modern-nav--with-native .mh-nav__inner { height: 64px; }
+  .ar-modern-nav.ar-modern-nav--with-native { height: 120px; }
+  .ar-modern-nav--with-native .mh-nav__inner { height: 68px; }
   .ar-modern-nav .mh-native-bar { padding: 0 16px; gap: 10px; }
   .ar-modern-nav .mh-native-bar__label,
   .ar-modern-nav .mh-native-bar__subject small { display: none; }

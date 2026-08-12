@@ -102,10 +102,10 @@ const EMPTY_REPORT_BRANDING = {
 };
 
 const HISTORY_STATUS_META = {
-  completed: { icon: 'checkmark-circle', tint: '#22c55e' },
-  processing: { icon: 'hourglass-outline', tint: '#f59e0b' },
-  pending: { icon: 'time-outline', tint: '#f59e0b' },
-  failed: { icon: 'close-circle', tint: '#f43f5e' },
+  completed: { icon: 'checkmark-circle', colorRole: 'success' },
+  processing: { icon: 'hourglass-outline', colorRole: 'warning' },
+  pending: { icon: 'time-outline', colorRole: 'warning' },
+  failed: { icon: 'close-circle', colorRole: 'error' },
 };
 
 const normalizeHistoryStatus = (value) => String(value || '').trim().toLowerCase();
@@ -196,7 +196,6 @@ const NativePreviewCard = ({
   chart,
   onPress,
   isEmpty,
-  theme,
   colors,
   icon,
   accent,
@@ -209,10 +208,8 @@ const NativePreviewCard = ({
     style={[
       styles.nativeCard,
       {
-        backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : colors.surface,
-        borderColor: isEmpty
-          ? (theme === 'dark' ? 'rgba(251,113,133,0.35)' : 'rgba(249,115,22,0.28)')
-          : (theme === 'dark' ? 'rgba(255,255,255,0.12)' : colors.cardBorder),
+        backgroundColor: colors.surface,
+        borderColor: isEmpty ? colors.selectionBorder : colors.cardBorder,
         borderStyle: isEmpty ? 'dashed' : 'solid',
       },
     ]}
@@ -231,15 +228,17 @@ const NativePreviewCard = ({
         {isEmpty ? emptyHint : slotLabel}
       </Text>
     </View>
-    <Ionicons name={isEmpty ? 'add-circle-outline' : 'checkmark-circle'} size={22} color={isEmpty ? accent : '#22c55e'} />
+    <Ionicons name={isEmpty ? 'add-circle-outline' : 'checkmark-circle'} size={22} color={isEmpty ? accent : colors.success} />
   </TouchableOpacity>
 );
 
 export default function ReportsStudioScreen({ navigation, route }) {
   const { t, i18n } = useTranslation();
   useAnalytics('ReportsStudioScreen');
-  const { theme, colors } = useTheme();
-  const isDark = theme === 'dark';
+  const { colors } = useTheme();
+  const primaryGradient = [colors.primaryStrong, colors.primary];
+  const disabledGradient = [colors.surfaceMuted, colors.backgroundTertiary];
+  const successGradient = [colors.success, colors.primaryStrong];
   const { pricing, pricingOriginal, credits, fetchBalance } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
 
@@ -1309,16 +1308,16 @@ export default function ReportsStudioScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.headerSurface} />
       <LinearGradient
-        colors={isDark ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd] : [colors.background, colors.backgroundSecondary, colors.backgroundTertiary]}
+        colors={[colors.gradientStart, colors.gradientMid, colors.gradientEnd]}
         style={styles.gradient}
       >
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
             <View style={styles.headerTopRow}>
               <TouchableOpacity
-                style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]}
+                style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
                 onPress={() => goBackOrHome(navigation)}
                 accessibilityRole="button"
                 accessibilityLabel={t('common.back', 'Back')}
@@ -1338,8 +1337,8 @@ export default function ReportsStudioScreen({ navigation, route }) {
                   style={[
                     styles.creditButton,
                     {
-                      backgroundColor: isDark ? 'rgba(255, 107, 53, 0.2)' : 'rgba(249, 115, 22, 0.12)',
-                      borderColor: isDark ? 'rgba(255, 107, 53, 0.4)' : 'rgba(249, 115, 22, 0.35)',
+                      backgroundColor: colors.selectionSurface,
+                      borderColor: colors.selectionBorder,
                     },
                   ]}
                   onPress={() => navigation.navigate('Credits')}
@@ -1350,7 +1349,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => navigation.navigate('ReportHistory')}
-                  style={[styles.historyButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : colors.surface }]}
+                  style={[styles.historyButton, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
                   accessibilityRole="button"
                   accessibilityLabel={t('reports.historyTitle', 'Report History')}
                 >
@@ -1369,7 +1368,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
               <TouchableOpacity
                 activeOpacity={0.9}
                 onPress={handleResumeBannerPress}
-                style={styles.resumeBanner}
+                style={[styles.resumeBanner, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}
                 accessibilityRole="button"
                 accessibilityLabel={resumeLabel}
               >
@@ -1377,35 +1376,35 @@ export default function ReportsStudioScreen({ navigation, route }) {
                   styles.heroStatusIcon,
                   {
                     backgroundColor: isSessionCompleted
-                      ? 'rgba(34,197,94,0.2)'
+                      ? `${colors.success}30`
                       : isSessionFailed
-                        ? 'rgba(244,63,94,0.2)'
-                        : 'rgba(255,255,255,0.18)',
+                        ? `${colors.error}30`
+                        : colors.cosmicGlow,
                   },
                 ]}>
                   <Ionicons
                     name={isSessionCompleted ? 'checkmark-circle' : isSessionFailed ? 'alert-circle' : 'hourglass-outline'}
                     size={14}
-                    color={isSessionCompleted ? '#86efac' : isSessionFailed ? '#fda4af' : '#fff'}
+                    color={isSessionCompleted ? colors.success : isSessionFailed ? colors.error : colors.textInverse}
                   />
                 </View>
                 <View style={styles.heroStatusTextWrap}>
-                  <Text style={styles.heroStatusTitle} numberOfLines={1}>
+                  <Text style={[styles.heroStatusTitle, { color: colors.textInverse }]} numberOfLines={1}>
                     {isSessionCompleted
                       ? t('reports.heroStatusReady', 'Report ready')
                       : isSessionFailed
                         ? t('reports.heroStatusFailed', 'Last report failed')
                         : t('reports.heroStatusPreparing', 'Preparing report')}
                   </Text>
-                  <Text style={styles.heroStatusSubtitle} numberOfLines={1}>
+                  <Text style={[styles.heroStatusSubtitle, { color: colors.textInverseMuted }]} numberOfLines={1}>
                     {isSessionRunning && !sessionMatchesCurrentPair
                       ? `${reportSession?.selectedPersonA?.name || 'Person A'} · ${reportSession?.selectedPersonB?.name || 'Person B'}`
                       : resumeActionLabel}
                   </Text>
                 </View>
-                <View style={styles.heroStatusAction}>
-                  <Text style={styles.heroStatusActionText}>{resumeActionLabel}</Text>
-                  <Ionicons name="chevron-forward" size={12} color="#fff" />
+                <View style={[styles.heroStatusAction, { backgroundColor: colors.cosmicGlow }]}>
+                  <Text style={[styles.heroStatusActionText, { color: colors.textInverse }]}>{resumeActionLabel}</Text>
+                  <Ionicons name="chevron-forward" size={12} color={colors.textInverse} />
                 </View>
               </TouchableOpacity>
             ) : null}
@@ -1421,7 +1420,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                         {
                           backgroundColor: step - 1 < stepIndex
                             ? colors.primary
-                            : (isDark ? 'rgba(255,255,255,0.12)' : colors.cardBorder),
+                            : colors.cardBorder,
                         },
                       ]}
                     />
@@ -1433,14 +1432,14 @@ export default function ReportsStudioScreen({ navigation, route }) {
                         {
                           backgroundColor: step <= stepIndex
                             ? colors.primary
-                            : (isDark ? 'rgba(255,255,255,0.15)' : colors.cardBorder),
+                            : colors.surfaceMuted,
                         },
                       ]}
                     >
                       {step < stepIndex ? (
-                        <Ionicons name="checkmark" size={14} color="#fff" />
+                        <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
                       ) : (
-                        <Text style={styles.stepperDotText}>{step}</Text>
+                        <Text style={[styles.stepperDotText, { color: step <= stepIndex ? colors.onPrimary : colors.textSecondary }]}>{step}</Text>
                       )}
                     </View>
                     <Text
@@ -1464,7 +1463,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                         {
                           backgroundColor: step < stepIndex
                             ? colors.primary
-                            : (isDark ? 'rgba(255,255,255,0.12)' : colors.cardBorder),
+                            : colors.cardBorder,
                         },
                       ]}
                     />
@@ -1516,20 +1515,20 @@ export default function ReportsStudioScreen({ navigation, route }) {
                             styles.reportTypeCard,
                             {
                               backgroundColor: selected
-                                ? `${item.gradient?.[0] || colors.primary}18`
-                                : (isDark ? 'rgba(255,255,255,0.06)' : colors.surface),
-                              borderColor: selected ? item.gradient?.[0] || colors.primary : (isDark ? 'rgba(255,255,255,0.12)' : colors.cardBorder),
+                                ? colors.selectionSurface
+                                : colors.surface,
+                              borderColor: selected ? colors.selectionBorder : colors.cardBorder,
                             },
                           ]}
                         >
-                          <LinearGradient colors={item.gradient || [colors.primary, colors.secondary]} style={styles.reportTypeIcon}>
+                          <LinearGradient colors={selected ? primaryGradient : [colors.accentSoft, colors.selectionControl]} style={styles.reportTypeIcon}>
                             <Text style={styles.reportTypeEmoji}>{item.icon || '📄'}</Text>
                           </LinearGradient>
                           <View style={styles.reportTypeBody}>
                             <View style={styles.reportTypeTopRow}>
                               <Text style={[styles.reportTypeTitle, { color: colors.text }]}>{item.title}</Text>
                               {selected ? (
-                                <Ionicons name="checkmark-circle" size={18} color={item.gradient?.[0] || colors.primary} />
+                                <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
                               ) : null}
                             </View>
                             <Text style={[styles.reportTypeSubtitle, { color: colors.textSecondary }]}>{item.subtitle}</Text>
@@ -1556,8 +1555,8 @@ export default function ReportsStudioScreen({ navigation, route }) {
                             style={[
                               styles.upcomingChip,
                               {
-                                backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.surface,
-                                borderColor: isDark ? 'rgba(255,255,255,0.1)' : colors.cardBorder,
+                                backgroundColor: colors.surfaceMuted,
+                                borderColor: colors.cardBorder,
                               },
                             ]}
                           >
@@ -1578,11 +1577,11 @@ export default function ReportsStudioScreen({ navigation, route }) {
                       style={[styles.stepPrimaryButton, !step1Ready && styles.stepPrimaryButtonDisabled]}
                     >
                       <LinearGradient
-                        colors={step1Ready ? ['#fb7185', '#f97316'] : ['#94a3b8', '#64748b']}
+                        colors={step1Ready ? primaryGradient : disabledGradient}
                         style={styles.stepPrimaryGradient}
                       >
-                        <Text style={styles.stepPrimaryText}>{t('reports.continue', 'Continue')}</Text>
-                        <Ionicons name="arrow-forward" size={16} color="#fff" />
+                        <Text style={[styles.stepPrimaryText, { color: step1Ready ? colors.onPrimary : colors.textSecondary }]}>{t('reports.continue', 'Continue')}</Text>
+                        <Ionicons name="arrow-forward" size={16} color={step1Ready ? colors.onPrimary : colors.textSecondary} />
                       </LinearGradient>
                     </TouchableOpacity>
                   </View>
@@ -1600,7 +1599,6 @@ export default function ReportsStudioScreen({ navigation, route }) {
                           chart={selectedPersonA}
                           isEmpty={!selectedPersonA}
                           onPress={() => openNativeSelector('personA')}
-                          theme={theme}
                           colors={colors}
                           icon="👤"
                           accent={colors.primary}
@@ -1608,7 +1606,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                           emptyHint={t('reports.tapToChoose', 'Tap to choose')}
                         />
                         <View style={styles.swapInlineRow}>
-                          <View style={[styles.swapDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.cardBorder }]} />
+                          <View style={[styles.swapDivider, { backgroundColor: colors.cardBorder }]} />
                           <TouchableOpacity
                             activeOpacity={0.8}
                             onPress={swapCharts}
@@ -1616,8 +1614,8 @@ export default function ReportsStudioScreen({ navigation, route }) {
                             style={[
                               styles.swapFab,
                               {
-                                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : colors.surface,
-                                borderColor: isDark ? 'rgba(255,255,255,0.12)' : colors.cardBorder,
+                                backgroundColor: colors.surface,
+                                borderColor: colors.cardBorder,
                                 opacity: selectedPersonA && selectedPersonB ? 1 : 0.45,
                               },
                             ]}
@@ -1626,7 +1624,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                           >
                             <Ionicons name="swap-vertical" size={16} color={colors.textSecondary} />
                           </TouchableOpacity>
-                          <View style={[styles.swapDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.cardBorder }]} />
+                          <View style={[styles.swapDivider, { backgroundColor: colors.cardBorder }]} />
                         </View>
                         <NativePreviewCard
                           title={t('reports.selectPersonB', 'Select the other chart')}
@@ -1634,10 +1632,9 @@ export default function ReportsStudioScreen({ navigation, route }) {
                           chart={selectedPersonB}
                           isEmpty={!selectedPersonB}
                           onPress={() => openNativeSelector('personB')}
-                          theme={theme}
                           colors={colors}
                           icon="💞"
-                          accent="#fb7185"
+                          accent={colors.secondary}
                           slotLabel={t('reports.personB', 'Other person')}
                           emptyHint={t('reports.tapToChoose', 'Tap to choose')}
                         />
@@ -1659,16 +1656,15 @@ export default function ReportsStudioScreen({ navigation, route }) {
                         chart={selectedPersonA}
                         isEmpty={!selectedPersonA}
                         onPress={() => openNativeSelector('personA')}
-                        theme={theme}
                         colors={colors}
                         icon={selectedReportType === 'health' ? '🏥' : '💰'}
-                        accent={selectedReportType === 'health' ? '#22c55e' : '#0EA5E9'}
+                        accent={selectedReportType === 'health' ? colors.success : colors.info}
                         slotLabel={t('reports.personA', 'You')}
                         emptyHint={t('reports.tapToChoose', 'Tap to choose')}
                       />
                     </View>
                   ) : (
-                    <View style={[styles.comingSoonPanel, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.surface, borderColor: colors.cardBorder }]}>
+                    <View style={[styles.comingSoonPanel, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}> 
                       <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
                       <Text style={[styles.comingSoonText, { color: colors.textSecondary }]}>
                         {t('reports.comingSoonPairing', 'This report type will get its own chart flow soon. Partnership, Wealth, and Health are live now.')}
@@ -1678,7 +1674,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                   <View style={styles.stepActions}>
                     <TouchableOpacity
                       onPress={goToPreviousStep}
-                      style={[styles.stepSecondaryButton, { borderColor: colors.cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface }]}
+                      style={[styles.stepSecondaryButton, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
                     >
                       <Text style={[styles.stepSecondaryText, { color: colors.text }]}>{t('reports.back', 'Back')}</Text>
                     </TouchableOpacity>
@@ -1688,11 +1684,11 @@ export default function ReportsStudioScreen({ navigation, route }) {
                       style={[styles.stepPrimaryButton, !step2Ready && styles.stepPrimaryButtonDisabled]}
                     >
                       <LinearGradient
-                        colors={step2Ready ? ['#fb7185', '#f97316'] : ['#94a3b8', '#64748b']}
+                        colors={step2Ready ? primaryGradient : disabledGradient}
                         style={styles.stepPrimaryGradient}
                       >
-                        <Text style={styles.stepPrimaryText}>{t('reports.continue', 'Continue')}</Text>
-                        <Ionicons name="arrow-forward" size={16} color="#fff" />
+                        <Text style={[styles.stepPrimaryText, { color: step2Ready ? colors.onPrimary : colors.textSecondary }]}>{t('reports.continue', 'Continue')}</Text>
+                        <Ionicons name="arrow-forward" size={16} color={step2Ready ? colors.onPrimary : colors.textSecondary} />
                       </LinearGradient>
                     </TouchableOpacity>
                   </View>
@@ -1705,8 +1701,8 @@ export default function ReportsStudioScreen({ navigation, route }) {
                     style={[
                       styles.reviewCard,
                       {
-                        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface,
-                        borderColor: isDark ? 'rgba(255,255,255,0.12)' : colors.cardBorder,
+                        backgroundColor: colors.surface,
+                        borderColor: colors.cardBorder,
                       },
                     ]}
                   >
@@ -1750,8 +1746,8 @@ export default function ReportsStudioScreen({ navigation, route }) {
                     style={[
                       styles.languageCard,
                       {
-                        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface,
-                        borderColor: isDark ? 'rgba(255,255,255,0.12)' : colors.cardBorder,
+                        backgroundColor: colors.surface,
+                        borderColor: colors.cardBorder,
                       },
                     ]}
                   >
@@ -1777,8 +1773,8 @@ export default function ReportsStudioScreen({ navigation, route }) {
                       style={[
                         styles.brandingCard,
                         {
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface,
-                          borderColor: isDark ? 'rgba(255,255,255,0.12)' : colors.cardBorder,
+                          backgroundColor: colors.surface,
+                          borderColor: colors.cardBorder,
                         },
                       ]}
                     >
@@ -1805,15 +1801,15 @@ export default function ReportsStudioScreen({ navigation, route }) {
                             value={String(reportBranding[key] || '')}
                             onChangeText={(text) => updateBrandingField(key, text)}
                             placeholder={placeholder}
-                            placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : '#94a3b8'}
+                            placeholderTextColor={colors.textTertiary}
                             autoCapitalize={key === 'email' || key === 'website' ? 'none' : 'words'}
                             keyboardType={key === 'phone' ? 'phone-pad' : (key === 'email' ? 'email-address' : 'default')}
                             style={[
                               styles.brandingInput,
                               {
                                 color: colors.text,
-                                borderColor: isDark ? 'rgba(255,255,255,0.14)' : colors.cardBorder,
-                                backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
+                                borderColor: colors.cardBorder,
+                                backgroundColor: colors.backgroundSecondary,
                               },
                             ]}
                           />
@@ -1829,7 +1825,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                   <View style={styles.stepActions}>
                     <TouchableOpacity
                       onPress={goToPreviousStep}
-                      style={[styles.stepSecondaryButton, { borderColor: colors.cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface }]}
+                      style={[styles.stepSecondaryButton, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
                     >
                       <Text style={[styles.stepSecondaryText, { color: colors.text }]}>{t('reports.back', 'Back')}</Text>
                     </TouchableOpacity>
@@ -1841,11 +1837,11 @@ export default function ReportsStudioScreen({ navigation, route }) {
                         style={[styles.stepPrimaryButton, loadingReport && styles.stepPrimaryButtonDisabled]}
                       >
                         <LinearGradient
-                          colors={loadingReport ? ['#94a3b8', '#64748b'] : ['#22c55e', '#16a34a']}
+                          colors={loadingReport ? disabledGradient : successGradient}
                           style={styles.stepPrimaryGradient}
                         >
-                          {loadingReport ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="document-text-outline" size={18} color="#fff" />}
-                          <Text style={styles.stepPrimaryText}>
+                          {loadingReport ? <ActivityIndicator size="small" color={colors.textSecondary} /> : <Ionicons name="document-text-outline" size={18} color={colors.onPrimary} />}
+                          <Text style={[styles.stepPrimaryText, { color: loadingReport ? colors.textSecondary : colors.onPrimary }]}>
                             {t('reports.openExisting', 'Open report')}
                           </Text>
                         </LinearGradient>
@@ -1858,11 +1854,11 @@ export default function ReportsStudioScreen({ navigation, route }) {
                         style={[styles.stepPrimaryButton, (!readyToGenerate || checkingExistingReport) && styles.stepPrimaryButtonDisabled]}
                       >
                         <LinearGradient
-                          colors={(readyToGenerate && !checkingExistingReport) ? ['#fb7185', '#f97316'] : ['#94a3b8', '#64748b']}
+                          colors={(readyToGenerate && !checkingExistingReport) ? primaryGradient : disabledGradient}
                           style={styles.stepPrimaryGradient}
                         >
-                          {(loadingReport || checkingExistingReport) ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="sparkles" size={18} color="#fff" />}
-                          <Text style={styles.stepPrimaryText}>
+                          {(loadingReport || checkingExistingReport) ? <ActivityIndicator size="small" color={colors.textSecondary} /> : <Ionicons name="sparkles" size={18} color={colors.onPrimary} />}
+                          <Text style={[styles.stepPrimaryText, { color: (readyToGenerate && !checkingExistingReport) ? colors.onPrimary : colors.textSecondary }]}>
                             {loadingReport
                               ? t('reports.generating', 'Generating your report...')
                               : checkingExistingReport
@@ -1884,7 +1880,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                         styles.regenerateButton,
                         {
                           borderColor: colors.cardBorder,
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface,
+                          backgroundColor: colors.surface,
                           opacity: loadingReport ? 0.6 : 1,
                         },
                       ]}
@@ -1903,26 +1899,26 @@ export default function ReportsStudioScreen({ navigation, route }) {
             </View>
 
             {showProgressCard ? (
-              <View style={[styles.statusCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface, borderColor: isDark ? 'rgba(255,255,255,0.12)' : colors.cardBorder }]}>
+              <View style={[styles.statusCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}> 
                 <View style={styles.statusTopRow}>
                   <Ionicons
                     name={loadingReport ? 'hourglass-outline' : reportDocument ? 'sparkles-outline' : 'sparkles-outline'}
                     size={18}
-                    color={reportError ? '#f43f5e' : colors.primary}
+                    color={reportError ? colors.error : colors.primary}
                   />
                   <Text style={[styles.statusText, { color: colors.text }]}>{statusMessage}</Text>
                 </View>
                 {reportError ? (
-                  <Text style={[styles.errorText, { color: '#f43f5e' }]}>{reportError}</Text>
+                  <Text style={[styles.errorText, { color: colors.error }]}>{reportError}</Text>
                 ) : null}
               </View>
             ) : null}
 
               {showSuccessCard ? (
-                <View style={[styles.successCard, { backgroundColor: isDark ? 'rgba(34,197,94,0.08)' : 'rgba(34,197,94,0.08)', borderColor: isDark ? 'rgba(34,197,94,0.28)' : 'rgba(34,197,94,0.22)' }]}>
+                <View style={[styles.successCard, { backgroundColor: `${colors.success}12`, borderColor: `${colors.success}44` }]}> 
                   <View style={styles.successHeaderRow}>
                     <View style={styles.successIconWrap}>
-                      <Ionicons name="checkmark-circle" size={22} color="#16a34a" />
+                      <Ionicons name="checkmark-circle" size={22} color={colors.success} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.successTitle, { color: colors.text }]}>
@@ -1936,9 +1932,9 @@ export default function ReportsStudioScreen({ navigation, route }) {
                   </View>
                   <NotificationEnableBanner reason="report_ready" active={showSuccessCard} style={{ marginTop: 10, marginBottom: 4 }} />
                   <View style={styles.actionRow}>
-                    <TouchableOpacity onPress={openGeneratedReport} style={styles.actionButton}>
-                      <Ionicons name="document-text-outline" size={16} color="#fff" />
-                      <Text style={styles.actionButtonText}>{t('reports.openPdf', 'Open PDF')}</Text>
+                    <TouchableOpacity onPress={openGeneratedReport} style={[styles.actionButton, { backgroundColor: colors.primary }]}> 
+                      <Ionicons name="document-text-outline" size={16} color={colors.onPrimary} />
+                      <Text style={[styles.actionButtonText, { color: colors.onPrimary }]}>{t('reports.openPdf', 'Open PDF')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={async () => {
@@ -1956,7 +1952,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                           );
                         }
                       }}
-                      style={[styles.actionButton, styles.actionButtonSecondary, { borderColor: colors.cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface }]}
+                      style={[styles.actionButton, styles.actionButtonSecondary, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
                     >
                       <Ionicons name="share-outline" size={16} color={colors.text} />
                       <Text style={[styles.actionButtonText, { color: colors.text }]}>{t('reports.sharePdf', 'Share')}</Text>
@@ -2019,11 +2015,11 @@ export default function ReportsStudioScreen({ navigation, route }) {
               </View>
 
               {loadingPastReports ? (
-                <View style={[styles.pastReportsEmpty, { borderColor: colors.cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : colors.surface }]}>
+                <View style={[styles.pastReportsEmpty, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}> 
                   <ActivityIndicator color={colors.primary} />
                 </View>
               ) : pastReports.length === 0 ? (
-                <View style={[styles.pastReportsEmpty, { borderColor: colors.cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : colors.surface }]}>
+                <View style={[styles.pastReportsEmpty, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}> 
                   <Ionicons name="documents-outline" size={22} color={colors.textSecondary} />
                   <Text style={[styles.pastReportsEmptyTitle, { color: colors.text }]}>
                     {t('reports.historyEmptyTitle', 'No reports yet')}
@@ -2036,6 +2032,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                 pastReports.map((item) => {
                   const typeMeta = reportTypeMap.get(item.report_type) || REPORT_TYPE_FALLBACKS[0];
                   const statusMeta = HISTORY_STATUS_META[normalizeHistoryStatus(item.status)] || HISTORY_STATUS_META.pending;
+                  const statusColor = colors[statusMeta.colorRole] || colors.warning;
                   const isOpening = openingPastReportId === item.report_id;
                   const isCompleted = normalizeHistoryStatus(item.status) === 'completed';
                   const dateLabel = formatHistoryDate(
@@ -2048,13 +2045,13 @@ export default function ReportsStudioScreen({ navigation, route }) {
                       style={[
                         styles.pastReportCard,
                         {
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface,
-                          borderColor: isDark ? 'rgba(255,255,255,0.12)' : colors.cardBorder,
+                          backgroundColor: colors.surface,
+                          borderColor: colors.cardBorder,
                         },
                       ]}
                     >
                       <View style={styles.pastReportTopRow}>
-                        <View style={[styles.pastReportIconWrap, { backgroundColor: `${(typeMeta.gradient || ['#f97316'])[0]}18` }]}>
+                        <View style={[styles.pastReportIconWrap, { backgroundColor: colors.accentSoft }]}> 
                           <Text style={styles.pastReportIconText}>{typeMeta.icon || '📄'}</Text>
                         </View>
                         <View style={{ flex: 1, minWidth: 0 }}>
@@ -2067,9 +2064,9 @@ export default function ReportsStudioScreen({ navigation, route }) {
                               : item.person_a_name || item.subtitle || t('reports.historySubtitleFallback', 'Generated report')}
                           </Text>
                           <View style={styles.pastReportMetaRow}>
-                            <View style={[styles.pastReportStatusPill, { backgroundColor: `${statusMeta.tint}18` }]}>
-                              <Ionicons name={statusMeta.icon} size={12} color={statusMeta.tint} />
-                              <Text style={[styles.pastReportStatusText, { color: statusMeta.tint }]}>
+                            <View style={[styles.pastReportStatusPill, { backgroundColor: `${statusColor}18` }]}> 
+                              <Ionicons name={statusMeta.icon} size={12} color={statusColor} />
+                              <Text style={[styles.pastReportStatusText, { color: statusColor }]}> 
                                 {t(`reports.status.${normalizeHistoryStatus(item.status)}`, item.status || 'pending')}
                               </Text>
                             </View>
@@ -2097,9 +2094,9 @@ export default function ReportsStudioScreen({ navigation, route }) {
                           ]}
                         >
                           {isOpening ? (
-                            <ActivityIndicator color="#fff" size="small" />
+                            <ActivityIndicator color={colors.onPrimary} size="small" />
                           ) : (
-                            <Text style={styles.pastReportPrimaryBtnText}>{t('reports.openPdf', 'Open PDF')}</Text>
+                            <Text style={[styles.pastReportPrimaryBtnText, { color: colors.onPrimary }]}>{t('reports.openPdf', 'Open PDF')}</Text>
                           )}
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -2109,7 +2106,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                             styles.pastReportSecondaryBtn,
                             {
                               borderColor: colors.cardBorder,
-                              backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : colors.surface,
+                              backgroundColor: colors.surface,
                             },
                             (isOpening || !isCompleted) && styles.pastReportBtnDisabled,
                           ]}
@@ -2147,7 +2144,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
 
           <Modal visible={showLanguageModal} transparent animationType="fade" onRequestClose={() => setShowLanguageModal(false)}>
             <View style={styles.modalOverlay}>
-              <View style={[styles.modalCard, { backgroundColor: colors.background }]}>
+              <View style={[styles.modalCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.cardBorder }]}> 
                 <View style={styles.modalHeader}>
                   <Text style={[styles.modalTitle, { color: colors.text }]}>
                     {t('reports.languageModalTitle', 'Choose report language')}
@@ -2170,7 +2167,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
                           styles.languageOption,
                           {
                             borderColor: selected ? colors.primary : colors.cardBorder,
-                            backgroundColor: selected ? `${colors.primary}12` : colors.surface,
+                            backgroundColor: selected ? colors.selectionSurface : colors.surface,
                           },
                         ]}
                       >
@@ -2212,6 +2209,7 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
   },
   headerActionsRow: {
     flexDirection: 'row',
@@ -2241,6 +2239,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
   },
   historyButtonText: { fontSize: 10, fontWeight: '900' },
   scroll: { flex: 1 },
@@ -2359,7 +2358,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   pastReportPrimaryBtnText: {
-    color: '#fff',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -2388,9 +2386,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 16,
-    backgroundColor: 'rgba(15, 23, 42, 0.92)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
   },
   heroStatusChip: {
     marginTop: -12,
@@ -2417,12 +2413,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   heroStatusTitle: {
-    color: '#fff',
     fontSize: 12,
     fontWeight: '800',
   },
   heroStatusSubtitle: {
-    color: 'rgba(255,255,255,0.72)',
     fontSize: 10,
     fontWeight: '600',
     marginTop: 1,
@@ -2434,10 +2428,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.14)',
   },
   heroStatusActionText: {
-    color: '#fff',
     fontSize: 10,
     fontWeight: '800',
   },
@@ -2464,7 +2456,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepperDotText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  stepperDotText: { fontWeight: '800', fontSize: 12 },
   stepperLabel: { fontSize: 11, marginTop: 6, textAlign: 'center' },
   stepperLine: {
     position: 'absolute',
@@ -2514,7 +2506,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   stepPrimaryText: {
-    color: '#fff',
     fontWeight: '800',
     fontSize: 13,
   },
@@ -2737,7 +2728,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fb7185',
     flexDirection: 'row',
     gap: 6,
   },
@@ -2751,7 +2741,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  actionButtonText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  actionButtonText: { fontWeight: '800', fontSize: 13 },
   retryLink: {
     marginTop: 12,
     alignItems: 'center',
@@ -2800,6 +2790,7 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 24,
     padding: 16,
+    borderWidth: 1,
   },
   modalHeader: {
     flexDirection: 'row',

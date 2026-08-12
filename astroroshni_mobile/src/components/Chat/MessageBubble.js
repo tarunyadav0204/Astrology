@@ -977,8 +977,8 @@ function MessageBubble({
             key={`bold-${keyPrefix}-${boldIndex}`}
             style={[
               styles.boldText,
-              { color: colors.text },
               baseTextStyle,
+              { color: colors.text },
               message.role === 'user' && styles.userText,
               message.role === 'user' && { fontWeight: '700' },
               tone,
@@ -998,8 +998,8 @@ function MessageBubble({
                 key={`italic-${keyPrefix}-${boldIndex}-${italicIndex}`}
                 style={[
                   styles.regularText,
-                  { color: colors.text },
                   baseTextStyle,
+                  { color: colors.text },
                   { fontStyle: 'italic' },
                   message.role === 'user' && styles.userText,
                   tone,
@@ -1109,7 +1109,7 @@ function MessageBubble({
 
   const renderTextWithBold = (text, startIndex, role, baseTextStyle) => {
     const textStyle = baseTextStyle
-      ? [styles.regularText, { color: colors.text }, baseTextStyle, message.role === 'user' && styles.userText]
+      ? [styles.regularText, baseTextStyle, { color: colors.text }, message.role === 'user' && styles.userText]
       : [styles.regularText, { color: colors.text }, message.role === 'user' && styles.userText];
     const raw = (text || '');
     const lines = raw.split('\n');
@@ -1303,12 +1303,22 @@ function MessageBubble({
             elements.push(
               <View key={`list-${currentIndex++}`} style={styles.listItem}>
                 {isNumbered ? (
-                  <View style={styles.numberCircle}>
-                    <Text style={styles.numberText}>{number}</Text>
+                  <View
+                    style={[
+                      styles.numberCircle,
+                      { backgroundColor: colors.primary, shadowColor: colors.primary },
+                    ]}
+                  >
+                    <Text style={[styles.numberText, { color: colors.onPrimary }]}>{number}</Text>
                   </View>
                 ) : (
                   <View style={styles.bulletContainer}>
-                    <View style={styles.bulletDot} />
+                    <View
+                      style={[
+                        styles.bulletDot,
+                        { backgroundColor: colors.primary, shadowColor: colors.primary },
+                      ]}
+                    />
                   </View>
                 )}
                 <View style={styles.listContent}>
@@ -2551,7 +2561,6 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     fontSize: 15,
     lineHeight: 22,
     marginVertical: 2,
-    color: '#2c3e50',
     flexShrink: 1,
   },
   userText: {
@@ -2561,7 +2570,6 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     fontSize: 15,
     lineHeight: 22,
     fontWeight: '700',
-    color: '#2c3e50',
     flexShrink: 1,
   },
   sentimentPositive: {
@@ -2628,19 +2636,16 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#ff6b35',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
     marginTop: 2,
-    shadowColor: '#ff6b35',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
     elevation: 3,
   },
   numberText: {
-    color: '#ffffff',
     fontSize: 11,
     fontWeight: '800',
   },
@@ -2655,8 +2660,6 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#ff6b35',
-    shadowColor: '#ff6b35',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 3,
@@ -2674,7 +2677,6 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   listText: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#2c3e50',
     flexShrink: 1,
   },
   quickAnswerWrapper: {
@@ -2769,7 +2771,6 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   },
   cardText: {
     fontSize: 15,
-    color: Platform.OS === 'android' ? '#2c3e50' : '#2c3e50',
     lineHeight: 22,
     zIndex: 1,
   },
