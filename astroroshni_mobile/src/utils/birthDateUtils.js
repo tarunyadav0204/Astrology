@@ -24,6 +24,30 @@ export function parseCalendarDateInput(str) {
 }
 
 /**
+ * Normalize a saved birth date for API payloads without shifting its calendar
+ * day across time zones. Older app versions stored Date objects, which become
+ * full ISO timestamps in AsyncStorage; current APIs expect YYYY-MM-DD.
+ *
+ * @param {Date|string|undefined|null} value
+ * @returns {string}
+ */
+export function normalizeCalendarDateForApi(value) {
+  if (value == null || value === '') return '';
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  }
+
+  const raw = String(value).trim();
+  const calendarPrefix = /^(\d{4}-\d{2}-\d{2})(?:$|T|\s)/.exec(raw);
+  if (calendarPrefix) return calendarPrefix[1];
+
+  const parsed = parseCalendarDateInput(raw);
+  if (!parsed || Number.isNaN(parsed.getTime())) return raw;
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+}
+
+/**
  * @param {string|undefined|null} dateStr
  * @param {Intl.DateTimeFormatOptions} [options]
  * @param {string} [locale]

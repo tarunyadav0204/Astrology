@@ -1276,6 +1276,13 @@ export const pricingAPI = {
   },
 };
 
+export const muhuratAPI = {
+  calculateChildbirth: (payload) =>
+    api.post(getEndpoint('/muhurat/childbirth-planner'), payload, AUTH_LOCAL_ERROR_CONFIG),
+  calculate: (endpoint, payload) =>
+    api.post(getEndpoint(endpoint), payload, AUTH_LOCAL_ERROR_CONFIG),
+};
+
 export const lifeEventsAPI = {
   scanLifeEvents: (birthData, startAge = 18, endAge = 50) => 
     api.post(getEndpoint('/scan-life-events'), {

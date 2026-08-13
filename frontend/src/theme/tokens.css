@@ -64,6 +64,7 @@
    results). Routine navigation such as signing in or selecting a chart is
    confirmed by the destination UI and should not produce a toast. */
 [data-theme] .Toastify__toast-container {
+  z-index: var(--z-toast);
   --toastify-color-light: var(--color-surface-raised);
   --toastify-text-color-light: var(--color-text);
   --toastify-color-progress-success: var(--color-success);

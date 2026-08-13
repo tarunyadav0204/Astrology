@@ -1,15 +1,28 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
+from datetime import date
 from calculators.muhurat_calculator import MuhuratCalculator
 from auth import get_current_user, User
 from credits.credit_service import CreditService
 from utils.timezone_service import parse_timezone_offset
 import swisseph as swe
+import logging
 
 router = APIRouter(prefix="/muhurat", tags=["muhurat"])
 _calculator = None
 credit_service = CreditService()
+logger = logging.getLogger(__name__)
+
+
+def _parse_calendar_date(value: str) -> date:
+    """Accept both canonical dates and legacy client ISO timestamps."""
+    raw = str(value or "").strip()
+    calendar_part = raw.split("T", 1)[0].split(" ", 1)[0]
+    try:
+        return date.fromisoformat(calendar_part)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Birth date must be YYYY-MM-DD or an ISO timestamp") from exc
 
 
 def get_muhurat_calculator():
@@ -77,7 +90,11 @@ async def _process_muhurat(request, current_user, feature_name, calc_method):
         tz_offset = parse_timezone_offset(tz, lat, lon)
         utc_hour = hour - tz_offset
         
-        jd = swe.julday(int(dob.split('-')[0]), int(dob.split('-')[1]), int(dob.split('-')[2]), utc_hour)
+        birth_date = _parse_calendar_date(dob)
+        # Pass the canonical value downstream as well. Vehicle Muhurat uses the
+        # birth data again for its personalised fourth-house calculation.
+        dob = birth_date.isoformat()
+        jd = swe.julday(birth_date.year, birth_date.month, birth_date.day, utc_hour)
         # Set Lahiri Ayanamsa for accurate Vedic calculations
         swe.set_sid_mode(swe.SIDM_LAHIRI)
         moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
@@ -137,6 +154,11 @@ async def _process_muhurat(request, current_user, feature_name, calc_method):
             "credits_deducted": result and result.get('recommendations') and len(result['recommendations']) > 0
         }
     except Exception as e:
+        logger.exception(
+            "Muhurat calculation failed for feature=%s user_id=%s",
+            feature_name,
+            getattr(current_user, "userid", None),
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- ENDPOINTS ---

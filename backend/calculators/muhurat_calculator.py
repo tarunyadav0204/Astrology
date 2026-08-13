@@ -325,6 +325,8 @@ class MuhuratCalculator:
                 good_lagnas, planet_positions if check_4th_house else None,
                 choghadiya_data, natal_context=natal_context,
                 karaka_planet=karaka_planet,
+                category=category,
+                check_4th_house=check_4th_house,
             )
             
             if day_slots:
@@ -553,6 +555,93 @@ class MuhuratCalculator:
             cautions.append('No major electional pressure factor was detected in the evaluated rules.')
         return max(0, min(100, int(score))), reasons, blocking, positives, cautions, score_breakdown
 
+    def _evaluate_generic_slot(self, jd, lagna_sign, category, check_4th_house=False,
+                               karaka_planet=None):
+        """Score non-vehicle elections without applying vehicle-only rules."""
+        positions = self._sidereal_positions(jd)
+        signs = {planet: int(value / 30) for planet, value in positions.items()}
+        score = 50
+        reasons = []
+        positives = []
+        cautions = []
+        blocking = []
+        score_breakdown = [{'factor': 'Base election score', 'points': 50}]
+
+        lagna_lord = self._sign_lord(lagna_sign)
+        dignity, label = self._dignity_score(lagna_lord, signs[lagna_lord])
+        score += dignity
+        lagna_reason = (
+            f"Lagna lord {self._planet_name(lagna_lord)} is in "
+            f"{self._sign_name(signs[lagna_lord])} ({label})."
+        )
+        reasons.append(lagna_reason)
+        (positives if dignity >= 0 else cautions).append(lagna_reason)
+        score_breakdown.append({'factor': 'Lagna lord dignity', 'points': dignity})
+
+        if check_4th_house:
+            fourth_sign = (lagna_sign + 3) % 12
+            fourth_lord = self._sign_lord(fourth_sign)
+            fourth_dignity, fourth_label = self._dignity_score(
+                fourth_lord, signs[fourth_lord]
+            )
+            fourth_points = round(fourth_dignity * 0.75)
+            score += fourth_points
+            fourth_reason = (
+                f"Election 4th lord {self._planet_name(fourth_lord)} is in "
+                f"{self._sign_name(signs[fourth_lord])} ({fourth_label})."
+            )
+            reasons.append(fourth_reason)
+            (positives if fourth_points >= 0 else cautions).append(fourth_reason)
+            score_breakdown.append({
+                'factor': 'Election 4th-lord dignity',
+                'points': fourth_points,
+            })
+
+            malefics = (swe.SUN, swe.MARS, swe.SATURN, swe.MEAN_NODE, self.KETU_KEY)
+            if any(signs[planet] == fourth_sign for planet in malefics):
+                score -= 12
+                caution = 'A natural malefic occupies the election 4th house.'
+                reasons.append(caution)
+                cautions.append(caution)
+                score_breakdown.append({
+                    'factor': 'Malefic in election 4th house',
+                    'points': -12,
+                })
+            else:
+                score += 6
+                positive = 'The election 4th house is free from natural malefic occupation.'
+                reasons.append(positive)
+                positives.append(positive)
+                score_breakdown.append({
+                    'factor': 'Unafflicted election 4th house',
+                    'points': 6,
+                })
+
+        if karaka_planet is not None:
+            karaka_sign = signs[karaka_planet]
+            karaka_dignity, karaka_label = self._dignity_score(
+                karaka_planet, karaka_sign
+            )
+            karaka_points = round(karaka_dignity * 0.5)
+            score += karaka_points
+            karaka_name = self._planet_name(karaka_planet)
+            karaka_reason = (
+                f"{karaka_name}, the relevant karaka, is in "
+                f"{self._sign_name(karaka_sign)} ({karaka_label})."
+            )
+            reasons.append(karaka_reason)
+            (positives if karaka_points >= 0 else cautions).append(karaka_reason)
+            score_breakdown.append({
+                'factor': f'{karaka_name} dignity',
+                'points': karaka_points,
+            })
+
+        if not cautions:
+            cautions.append(
+                f'No major {category.lower()} electional pressure factor was detected in the evaluated rules.'
+            )
+        return max(0, min(100, int(score))), reasons, blocking, positives, cautions, score_breakdown
+
     @staticmethod
     def _planet_name(planet):
         return {swe.SUN: 'Sun', swe.MOON: 'Moon', swe.MERCURY: 'Mercury', swe.VENUS: 'Venus',
@@ -569,7 +658,10 @@ class MuhuratCalculator:
             'natal_moon_sign': self._sign_name(context['moon_sign']),
         }
 
-    def _find_lagnas_detailed(self, date_obj, lat, lon, timezone_str, good_lagnas, planet_positions, choghadiya_data, natal_context=None, karaka_planet=swe.VENUS):
+    def _find_lagnas_detailed(self, date_obj, lat, lon, timezone_str, good_lagnas,
+                              planet_positions, choghadiya_data, natal_context=None,
+                              karaka_planet=None, category='Muhurat',
+                              check_4th_house=False):
         jd = swe.julday(int(date_obj.year), int(date_obj.month), int(date_obj.day), 12.0)
         geopos = (float(lon), float(lat), 0.0)
         
@@ -620,9 +712,18 @@ class MuhuratCalculator:
             if choghadiya_data and not self._is_good_choghadiya_hour(float(hour), choghadiya_data):
                 continue
 
-            score, reasons, blocking, positives, cautions, score_breakdown = self._evaluate_vehicle_slot(
-                jd_hour, lagna_sign, natal_context, karaka_planet
-            )
+            if category == 'Vehicle Purchase':
+                score, reasons, blocking, positives, cautions, score_breakdown = self._evaluate_vehicle_slot(
+                    jd_hour, lagna_sign, natal_context, karaka_planet
+                )
+            else:
+                score, reasons, blocking, positives, cautions, score_breakdown = self._evaluate_generic_slot(
+                    jd_hour,
+                    lagna_sign,
+                    category,
+                    check_4th_house=check_4th_house,
+                    karaka_planet=karaka_planet,
+                )
             # Hard electional defects are not softened by a high score.
             if blocking:
                 continue
@@ -637,7 +738,7 @@ class MuhuratCalculator:
                 'positives': positives,
                 'cautions': cautions,
                 'score_breakdown': score_breakdown,
-                'rationale': f"Selected because this slot passed all hard vehicle-Muhurat rules and scored {score}/100 after balancing supportive and cautionary factors.",
+                'rationale': f"Selected because this slot passed the {category} timing rules and scored {score}/100 after balancing supportive and cautionary factors.",
             })
         
         return slots

@@ -284,7 +284,6 @@ function AuthenticatedRootShell({
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        style={{ zIndex: 20000 }}
       />
     </div>
   );
@@ -1532,7 +1531,7 @@ function App() {
             <Route path="/astroroshni" element={<AstroRoshniPage />} />
               </Routes>
             </Suspense>
-            <ToastContainer style={{ zIndex: 20000 }} />
+            <ToastContainer />
           </CreditProvider>
         </AstrologyProvider>
       </Router>

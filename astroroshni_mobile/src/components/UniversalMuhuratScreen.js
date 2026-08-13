@@ -6,16 +6,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { storage } from '../services/storage';
-import { API_BASE_URL, getEndpoint } from '../utils/constants';
 import LocationPicker from './LocationPicker';
 import { useCredits } from '../credits/CreditContext';
 import { useAuthGate } from '../auth/AuthGateContext';
-import { pricingAPI } from '../services/api';
+import { pricingAPI, muhuratAPI } from '../services/api';
 import WebDatePickerModal from './Common/WebDatePickerModal';
 import { useTheme } from '../context/ThemeContext';
 import FocusedStatusBar from './Common/FocusedStatusBar';
 import { trackAstrologyEvent } from '../utils/analytics';
 import { useTranslation } from 'react-i18next';
+import { normalizeCalendarDateForApi } from '../utils/birthDateUtils';
 
 const isWeb = Platform.OS === 'web';
 
@@ -171,8 +171,6 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
   const performCalculation = async () => {
     setLoading(true);
     try {
-      const token = await storage.getAuthToken();
-      
       const toLocalDateKey = (d) => {
         const y = d.getFullYear();
         const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -186,30 +184,15 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
         latitude: parseFloat(location.latitude),
         longitude: parseFloat(location.longitude),
         
-        user_dob: userProfile.date,
+        user_dob: normalizeCalendarDateForApi(userProfile.date),
         user_time: userProfile.time,
         user_lat: parseFloat(userProfile.latitude),
         user_lon: parseFloat(userProfile.longitude)
       };
 
-      const response = await fetch(`${API_BASE_URL}${getEndpoint(config.endpoint)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(payload)
-      });
-
-      const json = await response.json();
-      
-      if (response.status === 402) {
-        Alert.alert(
-          t('muhurat.common.insufficientCredits', 'Insufficient Credits'),
-          json.detail?.message || t('muhurat.common.pleaseBuyMore', 'Please buy more credits.'),
-          [
-            { text: t('muhurat.common.cancel', 'Cancel') },
-            { text: t('muhurat.common.buy', 'Buy'), onPress: () => navigation.navigate('Credits') },
-          ],
-        );
-      } else if (json.status === 'success') {
+      const response = await muhuratAPI.calculate(config.endpoint, payload);
+      const json = response?.data || response;
+      if (json.status === 'success') {
         setResults(json.data);
         await fetchBalance();
         setCreditInfo(prev => ({
@@ -217,17 +200,28 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
           current_credits: json.remaining_credits || credits - prev.cost,
           can_afford: (json.remaining_credits || credits - prev.cost) >= prev.cost
         }));
+      }
+    } catch (e) {
+      const status = e?.response?.status;
+      const detail = e?.response?.data?.detail;
+      console.error('[Muhurat] Calculation failed', { endpoint: config.endpoint, status, detail });
+      if (status === 402) {
+        Alert.alert(
+          t('muhurat.common.insufficientCredits', 'Insufficient Credits'),
+          (typeof detail === 'string' ? detail : detail?.message) || t('muhurat.common.pleaseBuyMore', 'Please buy more credits.'),
+          [
+            { text: t('muhurat.common.cancel', 'Cancel') },
+            { text: t('muhurat.common.buy', 'Buy'), onPress: () => navigation.navigate('Credits') },
+          ],
+        );
       } else {
         Alert.alert(
           t('muhurat.common.error', 'Error'),
-          t('muhurat.common.calculationFailed', 'Calculation failed.'),
+          status
+            ? t('muhurat.common.calculationFailed', 'Calculation failed.')
+            : t('muhurat.common.networkError', 'Network Error'),
         );
       }
-    } catch (e) {
-      Alert.alert(
-        t('muhurat.common.error', 'Error'),
-        t('muhurat.common.networkError', 'Network Error'),
-      );
     } finally {
       setLoading(false);
     }

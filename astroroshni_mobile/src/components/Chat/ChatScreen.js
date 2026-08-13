@@ -21,7 +21,10 @@ import {
   ActivityIndicator,
   FlatList,
 } from 'react-native';
-import { ScrollView as GHScrollView, FlatList as GHFlatList } from 'react-native-gesture-handler';
+import {
+  ScrollView as GHScrollView,
+  FlatList as GHFlatList,
+} from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,7 +36,7 @@ import PremiumConsultationContext from './PremiumConsultationContext';
 import LoadingBubble from '../LoadingBubble';
 import FeedbackComponent from './FeedbackComponent';
 import EventPeriods from './EventPeriods';
-import HomeScreen from './HomeScreen';
+import HomeScreen, { getHomeBottomTabMetrics } from './HomeScreen';
 import CalibrationCard from './CalibrationCard';
 import PremiumAnalysisModal from './PremiumAnalysisModal';
 import NotificationEnableReminderModal from '../Notifications/NotificationEnableReminderModal';
@@ -483,6 +486,7 @@ export default function ChatScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const webBottomInset =
     Platform.OS === 'web' ? getWebTabBottomPad(insets.bottom) : Math.max(0, insets.bottom || 0);
+  const homeBottomTabHeight = getHomeBottomTabMetrics(insets.bottom).totalHeight;
 
   // Mundane mode state
   const [isMundane, setIsMundane] = useState(false);
@@ -6644,27 +6648,26 @@ export default function ChatScreen({ navigation, route }) {
           }}
         />
 
-        {/* Menu Drawer */}
-        <Modal
-          visible={showMenu}
-          transparent
-          animationType="fade"
-          onRequestClose={() => {
-            closeMenuDrawer();
-          }}
-        >
-          <TouchableOpacity
-            style={styles.drawerOverlay}
-            activeOpacity={1}
-            onPress={() => {
-              closeMenuDrawer();
-            }}
+        {/* Menu Drawer: keep it inside the screen safe-area/gesture hierarchy. */}
+        {showMenu ? (
+          <View
+            style={[
+              styles.drawerOverlay,
+              showGreeting ? { bottom: homeBottomTabHeight } : null,
+            ]}
           >
+            <TouchableOpacity
+              style={styles.drawerBackdrop}
+              activeOpacity={1}
+              onPress={() => closeMenuDrawer()}
+              accessibilityRole="button"
+              accessibilityLabel={t('premiumUi.chatScreen.closeMenu')}
+            />
             <Animated.View
               style={[styles.drawerContent, {
                 transform: [{ translateX: drawerAnim }]
               }]}
-              onStartShouldSetResponder={() => true}
+              pointerEvents="auto"
             >
               <LinearGradient
                 colors={[colors.background, colors.backgroundSecondary, colors.background]}
@@ -6731,14 +6734,22 @@ export default function ChatScreen({ navigation, route }) {
                     </View>
                   </TouchableOpacity>
                 </View>
-
                 <GHScrollView
                   ref={menuScrollViewRef}
                   style={styles.menuScrollView}
-                  contentContainerStyle={styles.menuScrollContent}
-                  showsVerticalScrollIndicator={false}
-                  nestedScrollEnabled={true}
+                  contentContainerStyle={[
+                    styles.menuScrollContent,
+                    {
+                      paddingBottom: 24,
+                    },
+                  ]}
+                  showsVerticalScrollIndicator
+                  keyboardShouldPersistTaps="handled"
+                  overScrollMode="always"
+                  scrollEnabled
+                  removeClippedSubviews={false}
                 >
+                <View style={styles.drawerMenuBody}>
                   <Text style={[styles.drawerSectionLabel, { color: colors.primary }]}>{t('premiumUi.chatScreen.yourSpace')}</Text>
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
@@ -7330,11 +7341,12 @@ export default function ChatScreen({ navigation, route }) {
                       />
                     </LinearGradient>
                   </TouchableOpacity>
+                </View>
                 </GHScrollView>
               </LinearGradient>
             </Animated.View>
-          </TouchableOpacity>
-        </Modal>
+          </View>
+        ) : null}
 
 
 
@@ -9051,22 +9063,29 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   drawerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(8, 3, 7, 0.72)',
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
     flexDirection: 'row',
+    zIndex: 1000,
+    elevation: 30,
+  },
+  drawerBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(8, 3, 7, 0.72)',
   },
   drawerContent: {
     width: Math.min(screenWidth * 0.9, 380),
     height: '100%',
+    zIndex: 1,
+    elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: -8, height: 0 },
     shadowOpacity: 0.22,
     shadowRadius: 28,
-    elevation: 0,
   },
   drawerGradient: {
     flex: 1,
+    minHeight: 0,
   },
   drawerHeader: {
     alignItems: 'stretch',
@@ -9196,11 +9215,14 @@ const styles = StyleSheet.create({
   },
   menuScrollView: {
     flex: 1,
+    minHeight: 0,
   },
   menuScrollContent: {
+    paddingBottom: 44,
+  },
+  drawerMenuBody: {
     paddingHorizontal: 16,
     paddingTop: 20,
-    paddingBottom: 44,
   },
   drawerSectionLabel: {
     ...typographyTokens.eyebrow,

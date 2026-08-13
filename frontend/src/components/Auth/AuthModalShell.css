@@ -86,7 +86,7 @@
 
 /* Modern AstroRoshni homepage theme — scoped so legacy/domain auth stays unchanged. */
 body.modern-homepage-active .auth-modal-shell {
-    z-index: 100000;
+    z-index: var(--z-modal, 100000);
     padding: max(14px, env(safe-area-inset-top, 0px)) 14px max(14px, env(safe-area-inset-bottom, 0px));
     background:
         radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--color-accent) 18%, transparent), transparent 28%),

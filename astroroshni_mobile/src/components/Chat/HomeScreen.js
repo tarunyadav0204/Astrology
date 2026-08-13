@@ -335,6 +335,21 @@ const getCardScale = (index) => 1;
 /** Sign keys for ascendant description i18n (home.ascendantDescriptions.Aries etc.). */
 const ASCENDANT_SIGN_KEYS = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 
+export function getHomeBottomTabMetrics(bottomInset = 0) {
+  const contentHeight = Platform.OS === 'ios' ? 80 : Platform.OS === 'web' ? 56 : 70;
+  const safeBottom = Platform.OS === 'ios'
+    ? 10
+    : Platform.OS === 'web'
+      ? Math.min(getWebBottomInset(bottomInset), 12)
+      : Math.max(0, bottomInset || 0);
+
+  return {
+    contentHeight,
+    safeBottom,
+    totalHeight: contentHeight + safeBottom,
+  };
+}
+
 export default function HomeScreen({
   birthData,
   onOptionSelect,
@@ -349,16 +364,14 @@ export default function HomeScreen({
   const insets = useSafeAreaInsets();
   // Web: keep tab bar size normal. Home-indicator orange is applied via
   // setWebBottomSafeColor (CSS body::after below the safe edge) — not tab padding.
-  const tabContentHeight = Platform.OS === 'ios' ? 80 : Platform.OS === 'web' ? 56 : 70;
-  const tabSafeBottom =
-    Platform.OS === 'ios'
-      ? 10
-      : Platform.OS === 'web'
-        ? Math.min(getWebBottomInset(insets.bottom), 12)
-        : Math.max(0, insets.bottom || 0);
+  const {
+    contentHeight: tabContentHeight,
+    safeBottom: tabSafeBottom,
+    totalHeight: tabTotalHeight,
+  } = getHomeBottomTabMetrics(insets.bottom);
   // The tab bar overlays the page. Reserve its full height plus a comfortable
   // reveal gap so the final Today/Explore card can scroll completely above it.
-  const homeScrollBottomInset = tabContentHeight + tabSafeBottom + 32;
+  const homeScrollBottomInset = tabTotalHeight + 32;
   /** Web: portaled tabs only while Home is focused (hidden on BirthForm etc.). */
   const [homeTabsVisible, setHomeTabsVisible] = useState(true);
   useAnalytics('HomeScreen');
