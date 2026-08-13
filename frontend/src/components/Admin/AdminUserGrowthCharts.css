@@ -8,7 +8,7 @@
 }
 
 .admin-user-growth-desc {
-  color: #666;
+  color: var(--admin-text-muted);
   font-size: 0.9rem;
   margin: 0 0 20px;
   max-width: 720px;
@@ -31,8 +31,8 @@
 }
 
 .admin-user-growth-summary-card {
-  background: #f8fafc;
-  border: 1px solid #e5e7eb;
+  background: var(--admin-surface-muted);
+  border: 1px solid var(--admin-border);
   border-radius: 8px;
   padding: 10px 12px;
   display: flex;
@@ -41,13 +41,13 @@
 }
 
 .admin-user-growth-summary-card span {
-  color: #6b7280;
+  color: var(--admin-text-muted);
   font-size: 0.84rem;
 }
 
 .admin-user-growth-summary-card strong {
   font-size: 1.05rem;
-  color: #111827;
+  color: var(--admin-text);
 }
 
 .admin-user-growth-filters label {
@@ -55,7 +55,7 @@
   flex-direction: column;
   gap: 4px;
   font-size: 0.85rem;
-  color: #444;
+  color: var(--admin-text);
 }
 
 .admin-user-growth-filters label span {
@@ -105,7 +105,7 @@
 }
 
 .admin-user-growth-chart-card {
-  background: #fafafa;
+  background: var(--admin-surface-muted);
   border: 1px solid #e8e8e8;
   border-radius: 10px;
   padding: 16px 12px 8px;
@@ -130,7 +130,7 @@
 .admin-user-growth-loading {
   padding: 40px;
   text-align: center;
-  color: #666;
+  color: var(--admin-text-muted);
 }
 
 .admin-user-growth-bar-label {
@@ -144,9 +144,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: var(--admin-text-muted);
   font-size: 0.9rem;
-  background: #f9fafb;
+  background: var(--admin-surface-muted);
   border: 1px dashed #d1d5db;
   border-radius: 8px;
 }

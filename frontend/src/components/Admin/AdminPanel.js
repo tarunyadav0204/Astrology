@@ -39,7 +39,7 @@ import AdminNudgeAnalytics from './AdminNudgeAnalytics';
 import AdminIssues from './AdminIssues';
 import AdminPandits from './AdminPandits';
 import AdminGooglePlayTestimonials from './AdminGooglePlayTestimonials';
-import NavigationHeader from '../Shared/NavigationHeader';
+import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import './AdminPanel.css';
 
 function todayInIST() {
@@ -3060,9 +3060,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       : chatLlmProvider;
 
   const navigationHeaderNode = (
-    <NavigationHeader 
-      compact={true}
-      showZodiacSelector={false}
+    <ModernNavigationHeader
       user={user}
       onAdminClick={onAdminClick}
       onLogout={onLogout || (() => {
@@ -3071,8 +3069,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         handleHomeClick();
       })}
       onLogin={onLogin || (() => handleHomeClick())}
-      showLoginButton={showLoginButton}
-      onHomeClick={handleHomeClick}
+      sticky={true}
+      showNativeBar={false}
     />
   );
 
@@ -3227,7 +3225,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
       {/* Credit Sub-tabs */}
       {activeTab === 'credits' && (
-        <div className="admin-subtabs">
+        <div className="admin-subtabs admin-subtabs--credits">
           <button 
             className={`subtab ${activeSubTab === 'ledger' ? 'active' : ''}`}
             onClick={() => {

@@ -11,7 +11,7 @@
 
 .chat-errors-header h2 {
   margin: 0;
-  color: #333;
+  color: var(--admin-text);
 }
 
 .refresh-btn {
@@ -36,7 +36,7 @@
 
 .stat-card {
   flex: 1;
-  background: white;
+  background: var(--admin-surface);
   padding: 20px;
   border-radius: 8px;
   text-align: center;
@@ -51,7 +51,7 @@
 }
 
 .stat-label {
-  color: #7f8c8d;
+  color: var(--admin-text-muted);
   font-size: 0.9em;
 }
 
@@ -62,7 +62,7 @@
 }
 
 .error-card {
-  background: white;
+  background: var(--admin-surface);
   padding: 15px;
   border-radius: 8px;
   border-left: 4px solid #e74c3c;
@@ -81,7 +81,7 @@
 }
 
 .error-time {
-  color: #7f8c8d;
+  color: var(--admin-text-muted);
   font-size: 0.9em;
 }
 
@@ -109,7 +109,7 @@
 }
 
 .error-platform {
-  color: #7f8c8d;
+  color: var(--admin-text-muted);
   font-size: 0.9em;
 }
 
@@ -124,11 +124,11 @@
 }
 
 .user-question {
-  color: #555;
+  color: var(--admin-text-muted);
   font-style: italic;
   margin: 10px 0;
   padding: 10px;
-  background: #f8f9fa;
+  background: var(--admin-surface-muted);
   border-radius: 4px;
 }
 
@@ -180,12 +180,12 @@
 
 .filter-section label {
   font-weight: bold;
-  color: #333;
+  color: var(--admin-text);
 }
 
 .filter-section select {
   padding: 8px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--admin-border);
   border-radius: 4px;
   font-size: 14px;
   cursor: pointer;
@@ -199,7 +199,7 @@
 .loading, .no-errors {
   text-align: center;
   padding: 40px;
-  color: #7f8c8d;
+  color: var(--admin-text-muted);
   font-size: 1.1em;
 }
 

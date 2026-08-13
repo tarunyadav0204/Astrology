@@ -13,7 +13,7 @@
 
 .admin-header h2 {
     margin: 0;
-    color: #333;
+    color: var(--admin-text);
 }
 
 .admin-header button {
@@ -57,13 +57,13 @@
 .no-requests {
     text-align: center;
     padding: 40px;
-    color: #666;
+    color: var(--admin-text-muted);
     font-style: italic;
 }
 
 .request-admin-item {
-    background: white;
-    border: 1px solid #ddd;
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
     border-radius: 8px;
     padding: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -75,18 +75,18 @@
     align-items: center;
     margin-bottom: 15px;
     padding-bottom: 10px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--admin-border);
 }
 
 .request-header h4 {
     margin: 0;
-    color: #333;
+    color: var(--admin-text);
 }
 
 .request-id {
     font-size: 12px;
-    color: #666;
-    background: #f8f9fa;
+    color: var(--admin-text-muted);
+    background: var(--admin-surface-muted);
     padding: 4px 8px;
     border-radius: 4px;
 }
@@ -97,11 +97,11 @@
 
 .request-details p {
     margin: 8px 0;
-    color: #555;
+    color: var(--admin-text-muted);
 }
 
 .admin-controls {
-    background: #f8f9fa;
+    background: var(--admin-surface-muted);
     padding: 15px;
     border-radius: 6px;
 }
@@ -114,14 +114,14 @@
     display: block;
     margin-bottom: 5px;
     font-weight: bold;
-    color: #333;
+    color: var(--admin-text);
 }
 
 .control-group input,
 .control-group textarea {
     width: 100%;
     padding: 8px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--admin-border);
     border-radius: 4px;
     font-size: 14px;
 }

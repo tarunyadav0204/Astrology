@@ -11,7 +11,7 @@
 
 .charts-header h2 {
   margin: 0;
-  color: #333;
+  color: var(--admin-text);
 }
 
 .charts-period {
@@ -27,7 +27,7 @@
 
 .performance-filters-period .filter-label {
   font-weight: 600;
-  color: #333;
+  color: var(--admin-text);
   margin-right: 4px;
 }
 
@@ -39,12 +39,12 @@
 
 .period-btn {
   padding: 6px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--admin-border);
   border-radius: 6px;
-  background: white;
+  background: var(--admin-surface);
   font-size: 13px;
   cursor: pointer;
-  color: #333;
+  color: var(--admin-text);
 }
 
 .period-btn:hover {
@@ -70,18 +70,18 @@
   align-items: center;
   gap: 6px;
   font-weight: 500;
-  color: #333;
+  color: var(--admin-text);
 }
 
 .date-input {
   padding: 6px 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--admin-border);
   border-radius: 4px;
   font-size: 14px;
 }
 
 .chart-card {
-  background: white;
+  background: var(--admin-surface);
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
   padding: 20px;
@@ -91,13 +91,13 @@
 .chart-card h3 {
   margin: 0 0 8px 0;
   font-size: 1.1em;
-  color: #333;
+  color: var(--admin-text);
 }
 
 .chart-card .chart-subtitle {
   margin: 0 0 16px 0;
   font-size: 0.9em;
-  color: #666;
+  color: var(--admin-text-muted);
 }
 
 .chart-card .no-data,
@@ -105,7 +105,7 @@
 .loading {
   text-align: center;
   padding: 40px;
-  color: #7f8c8d;
+  color: var(--admin-text-muted);
 }
 
 .charts-error {

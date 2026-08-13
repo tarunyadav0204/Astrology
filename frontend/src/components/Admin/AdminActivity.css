@@ -9,7 +9,7 @@
 
 .admin-activity-description {
   margin-bottom: 16px;
-  color: #555;
+  color: var(--admin-text-muted);
   font-size: 14px;
 }
 
@@ -30,13 +30,13 @@
   gap: 4px;
   font-size: 12px;
   font-weight: 600;
-  color: #495057;
+  color: var(--admin-text);
 }
 
 .admin-activity-filter-row input[type="text"],
 .admin-activity-filter-row input[type="date"] {
   padding: 6px 10px;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--admin-border);
   border-radius: 4px;
   font-size: 14px;
   min-width: 120px;
@@ -66,14 +66,14 @@
 
 .admin-activity-loading {
   padding: 16px;
-  color: #666;
+  color: var(--admin-text-muted);
 }
 
 .admin-activity-table-wrap {
   overflow-x: auto;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--admin-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--admin-surface);
 }
 
 .admin-activity-table {
@@ -86,7 +86,7 @@
 .admin-activity-td {
   padding: 8px 10px;
   text-align: left;
-  border-bottom: 1px solid #dee2e6;
+  border-bottom: 1px solid var(--admin-border);
   white-space: nowrap;
   max-width: 200px;
   overflow: hidden;
@@ -94,9 +94,9 @@
 }
 
 .admin-activity-th {
-  background: #f8f9fa;
+  background: var(--admin-surface-muted);
   font-weight: 600;
-  color: #495057;
+  color: var(--admin-text);
 }
 
 .admin-activity-sortable {
@@ -105,7 +105,7 @@
 }
 
 .admin-activity-sortable:hover {
-  background: #e9ecef;
+  background: var(--admin-surface-muted);
 }
 
 .admin-activity-sort-icon {
@@ -123,13 +123,13 @@
 .admin-activity-empty {
   text-align: center;
   padding: 24px;
-  color: #6c757d;
+  color: var(--admin-text-muted);
 }
 
 .admin-activity-unique-chart-card {
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--admin-border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--admin-surface);
   padding: 16px;
   margin-bottom: 20px;
 }
@@ -145,12 +145,12 @@
 .admin-activity-unique-chart-header h3 {
   margin: 0;
   font-size: 1.05rem;
-  color: #343a40;
+  color: var(--admin-text);
 }
 
 .admin-activity-unique-chart-header span,
 .admin-activity-unique-axis-labels {
-  color: #6c757d;
+  color: var(--admin-text-muted);
   font-size: 12px;
 }
 
@@ -166,7 +166,7 @@
   flex-direction: column;
   justify-content: space-between;
   align-items: flex-end;
-  color: #6c757d;
+  color: var(--admin-text-muted);
   font-size: 12px;
   padding: 4px 0 26px;
 }
@@ -177,7 +177,7 @@
   grid-template-columns: repeat(5, minmax(64px, 1fr));
   gap: 14px;
   border-left: 1px solid #e9ecef;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--admin-border);
   padding: 4px 12px 0;
   overflow-x: auto;
 }
@@ -214,7 +214,7 @@
 
 .admin-activity-unique-x-label {
   margin-top: 8px;
-  color: #495057;
+  color: var(--admin-text);
   font-size: 12px;
   font-weight: 600;
   text-align: center;
@@ -235,13 +235,13 @@
   margin: 0 0 10px 0;
   font-size: 1.05rem;
   font-weight: 600;
-  color: #343a40;
+  color: var(--admin-text);
 }
 
 .admin-activity-distinct-count {
   margin-left: 8px;
   font-weight: 500;
-  color: #6c757d;
+  color: var(--admin-text-muted);
   font-size: 0.95rem;
 }
 
@@ -260,7 +260,7 @@
 }
 
 .admin-activity-tr-clickable:hover {
-  background: #f1f3f5;
+  background: var(--admin-surface-muted);
 }
 
 .admin-activity-tr-no-user {

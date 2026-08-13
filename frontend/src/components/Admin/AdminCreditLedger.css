@@ -4,7 +4,8 @@
   flex-direction: column;
   height: calc(100vh - 220px);
   min-height: 480px;
-  background: #f5f5f5;
+  color: var(--admin-text);
+  background: var(--admin-canvas);
 }
 
 /* ---- Main area ---- */
@@ -14,7 +15,7 @@
   flex-direction: column;
   min-width: 0;
   width: 100%;
-  background: white;
+  background: var(--admin-surface);
   overflow: hidden;
 }
 
@@ -22,8 +23,8 @@
 .search-bar {
   flex-shrink: 0;
   padding: 16px 24px;
-  background: linear-gradient(135deg, #fff8f3 0%, #fff5ee 100%);
-  border-bottom: 1px solid rgba(249, 115, 22, 0.15);
+  background: var(--admin-accent-soft);
+  border-bottom: 1px solid var(--admin-border);
 }
 
 .search-row {
@@ -44,13 +45,15 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #666;
+  color: var(--admin-text-muted);
 }
 
 .search-row input[type="date"],
 .search-row input[type="text"] {
   padding: 8px 12px;
-  border: 1px solid #e0e0e0;
+  color: var(--admin-text);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border-strong);
   border-radius: 6px;
   font-size: 14px;
   min-width: 130px;
@@ -62,14 +65,14 @@
 
 .search-row input:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.15);
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-focus) 20%, transparent);
 }
 
 .search-btn {
   padding: 8px 18px;
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-  color: white;
+  background: var(--admin-accent);
+  color: var(--admin-on-accent);
   border: none;
   border-radius: 6px;
   font-weight: 600;
@@ -81,7 +84,8 @@
 
 .search-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35);
+  background: var(--admin-accent-hover);
+  box-shadow: var(--shadow-sm);
 }
 
 .search-btn:disabled {
@@ -92,7 +96,7 @@
 .search-bar .search-hint {
   margin: 6px 0 0 0;
   font-size: 12px;
-  color: #666;
+  color: var(--admin-text-muted);
 }
 
 .search-bar .search-error {
@@ -109,6 +113,8 @@
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+  color: var(--admin-text);
+  background: var(--admin-surface);
 }
 
 .results-block {
@@ -119,13 +125,13 @@
   margin: 0 0 12px 0;
   font-size: 17px;
   font-weight: 600;
-  color: #333;
+  color: var(--admin-text);
 }
 
 .results-title .results-range,
 .results-title .results-filter {
   font-weight: 500;
-  color: #666;
+  color: var(--admin-text-muted);
   font-size: 15px;
 }
 
@@ -194,29 +200,48 @@
   gap: 8px;
   padding: 8px 12px;
   border-radius: 999px;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  color: #9a3412;
+  color: var(--admin-text);
+  background: var(--admin-surface-muted);
+  border: 1px solid var(--admin-border-strong);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   user-select: none;
+  transition: background var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast);
 }
 
 .ledger-buy-only-toggle input {
   margin: 0;
   cursor: pointer;
+  accent-color: var(--admin-accent);
+}
+
+.ledger-buy-only-toggle span {
+  color: inherit;
+  opacity: 1;
+}
+
+.ledger-buy-only-toggle:hover,
+.ledger-buy-only-toggle:has(input:checked) {
+  color: var(--admin-text);
+  background: var(--admin-accent-soft);
+  border-color: var(--admin-accent-border);
+}
+
+.ledger-buy-only-toggle:focus-within {
+  outline: 2px solid color-mix(in srgb, var(--color-focus) 42%, transparent);
+  outline-offset: 2px;
 }
 
 .no-results-msg {
   margin: 0;
   padding: 24px;
   text-align: center;
-  color: #666;
+  color: var(--admin-text-muted);
   font-size: 15px;
-  background: #fafafa;
+  background: var(--admin-surface-muted);
   border-radius: 8px;
-  border: 1px dashed #e0e0e0;
+  border: 1px dashed var(--admin-border-strong);
 }
 
 /* ---- Empty state ---- */
@@ -228,35 +253,35 @@
   min-height: 280px;
   padding: 40px;
   text-align: center;
-  background: #fafafa;
+  background: var(--admin-surface-muted);
   border-radius: 12px;
-  border: 1px dashed #e0e0e0;
+  border: 1px dashed var(--admin-border-strong);
 }
 
 .empty-state-title {
   margin: 0 0 10px 0;
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--admin-text);
 }
 
 .empty-state-text {
   margin: 0;
   font-size: 15px;
-  color: #666;
+  color: var(--admin-text-muted);
   line-height: 1.5;
   max-width: 420px;
 }
 
 .empty-state-text strong {
-  color: #333;
+  color: var(--admin-text);
 }
 
 /* ---- Tables ---- */
 .transactions-table {
   overflow-x: auto;
   border-radius: 10px;
-  border: 1px solid #eee;
+  border: 1px solid var(--admin-border);
 }
 
 .transactions-table.wrap {
@@ -266,18 +291,18 @@
 .transactions-table table {
   width: 100%;
   border-collapse: collapse;
-  background: white;
+  background: var(--admin-surface);
 }
 
 .transactions-table thead {
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  background: var(--admin-accent-soft-mid);
 }
 
 .transactions-table th {
   padding: 12px 14px;
   text-align: left;
   font-weight: 600;
-  color: white;
+  color: var(--admin-text);
   border: none;
   font-size: 12px;
   text-transform: uppercase;
@@ -286,7 +311,8 @@
 
 .transactions-table td {
   padding: 12px 14px;
-  border-bottom: 1px solid #f0f0f0;
+  color: var(--admin-text);
+  border-bottom: 1px solid var(--admin-border);
 }
 
 .transactions-table tbody tr:last-child td {
@@ -294,11 +320,11 @@
 }
 
 .transactions-table tbody tr:hover {
-  background: #fafafa;
+  background: var(--admin-surface-muted);
 }
 
 .date-cell {
-  color: #666;
+  color: var(--admin-text-muted);
   font-size: 13px;
   white-space: nowrap;
 }
@@ -327,7 +353,7 @@
 }
 
 .feature-cell {
-  color: #333;
+  color: var(--admin-text);
   font-weight: 500;
   font-size: 14px;
 }
@@ -351,7 +377,7 @@
 }
 
 .balance-cell {
-  color: #333;
+  color: var(--admin-text);
   font-weight: 600;
   font-size: 14px;
 }
@@ -360,9 +386,9 @@
 .no-transactions {
   padding: 24px;
   text-align: center;
-  color: #666;
+  color: var(--admin-text-muted);
   font-size: 14px;
-  background: #fafafa;
+  background: var(--admin-surface-muted);
   border-radius: 8px;
 }
 
@@ -406,7 +432,7 @@
 
 .admin-daily-activity .ledger-panel h2 {
   margin: 0 0 16px 0;
-  color: #333;
+  color: var(--admin-text);
   font-size: 20px;
 }
 
@@ -419,12 +445,12 @@
   align-items: center;
   gap: 8px;
   font-weight: 500;
-  color: #333;
+  color: var(--admin-text);
 }
 
 .admin-daily-activity .daily-activity-controls input[type="date"] {
   padding: 8px 12px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--admin-border);
   border-radius: 8px;
   font-size: 14px;
 }
@@ -434,14 +460,14 @@
   gap: 24px;
   margin-bottom: 20px;
   padding: 12px 16px;
-  background: #f5f5f5;
+  background: var(--admin-surface-muted);
   border-radius: 8px;
   font-size: 14px;
 }
 
 .admin-daily-activity .summary-earned { color: #2e7d32; font-weight: 600; }
 .admin-daily-activity .summary-spent { color: #c62828; font-weight: 600; }
-.admin-daily-activity .summary-count { color: #666; }
+.admin-daily-activity .summary-count { color: var(--admin-text-muted); }
 
 /* ---- Row actions menu (credit ledger) ---- */
 .ledger-col-actions {
@@ -470,17 +496,17 @@
   width: 34px;
   height: 34px;
   padding: 0;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--admin-border);
   border-radius: 8px;
-  background: #fff;
-  color: #444;
+  background: var(--admin-surface);
+  color: var(--admin-text);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
 
 .ledger-menu-trigger:hover {
-  background: #fff7ed;
-  border-color: rgba(249, 115, 22, 0.45);
+  background: var(--admin-accent-soft);
+  border-color: var(--admin-accent-border);
 }
 
 .ledger-menu-icon {
@@ -502,8 +528,8 @@
   min-width: 200px;
   max-width: min(260px, calc(100vw - 24px));
   list-style: none;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
   border-radius: 10px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }
@@ -531,11 +557,11 @@
   font-size: 14px;
   font-family: inherit;
   cursor: pointer;
-  color: #111827;
+  color: var(--admin-text);
 }
 
 .ledger-action-menu-item:hover {
-  background: #fff7ed;
+  background: var(--admin-accent-soft);
 }
 
 /* ---- User breakdown modal ---- */
@@ -554,7 +580,9 @@
 .ledger-user-modal {
   width: 100%;
   max-width: 920px;
-  background: #fff;
+  color: var(--admin-text);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
   border-radius: 14px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
   padding: 20px 22px 24px;
@@ -571,7 +599,7 @@
   gap: 10px 16px;
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--admin-border);
 }
 
 .ledger-user-modal-header h2 {
@@ -584,28 +612,29 @@
   margin: 0;
   width: 100%;
   font-size: 14px;
-  color: #64748b;
+  color: var(--admin-text-muted);
 }
 
 .ledger-user-modal-close {
   flex-shrink: 0;
   padding: 8px 14px;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  background: #f8fafc;
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  background: var(--admin-surface-muted);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .ledger-user-modal-close:hover {
-  background: #e2e8f0;
+  background: var(--admin-accent-soft);
 }
 
 .ledger-user-modal-meta {
   margin: 0 0 12px 0;
   font-size: 13px;
-  color: #64748b;
+  color: var(--admin-text-muted);
 }
 
 .ledger-user-modal-table {
@@ -622,12 +651,12 @@
   gap: 12px;
   margin-top: 16px;
   padding: 12px 4px 4px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--admin-border);
 }
 
 .ledger-pagination-info {
   font-size: 13px;
-  color: #64748b;
+  color: var(--admin-text-muted);
   font-weight: 600;
 }
 
@@ -641,19 +670,19 @@
 .ledger-pagination-page {
   font-size: 13px;
   font-weight: 600;
-  color: #334155;
+  color: var(--admin-text);
   min-width: 110px;
   text-align: center;
 }
 
 .ledger-pagination-btn {
   padding: 7px 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--admin-border);
   border-radius: 6px;
-  background: #fff;
+  background: var(--admin-surface);
   font-size: 13px;
   font-weight: 600;
-  color: #334155;
+  color: var(--admin-text);
   cursor: pointer;
 }
 

@@ -19,7 +19,7 @@
 .admin-free-answer-funnel .faf-header p {
   margin: 0;
   max-width: 36rem;
-  color: #57534e;
+  color: var(--admin-text);
   font-size: 0.9rem;
   line-height: 1.4;
 }
@@ -36,23 +36,24 @@
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.75rem;
-  color: #78716c;
+  color: var(--admin-text-muted);
 }
 
 .admin-free-answer-funnel .faf-filters input,
 .admin-free-answer-funnel .faf-filters button {
   padding: 0.4rem 0.65rem;
-  border: 1px solid #d6d3d1;
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border-strong);
   border-radius: 8px;
   font-size: 0.875rem;
-  background: #fff;
+  background: var(--admin-surface);
 }
 
 .admin-free-answer-funnel .faf-filters button {
   cursor: pointer;
-  background: #ea580c;
-  border-color: #ea580c;
-  color: #fff;
+  background: var(--admin-accent);
+  border-color: var(--admin-accent);
+  color: var(--admin-on-accent);
   font-weight: 600;
 }
 
@@ -80,8 +81,9 @@
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
+  color: var(--admin-text);
+  background: color-mix(in srgb, var(--admin-accent) 9%, var(--admin-surface));
+  border: 1px solid color-mix(in srgb, var(--admin-accent) 42%, var(--admin-border));
   border-radius: 12px;
   padding: 0.9rem 1rem;
   min-width: 11rem;
@@ -92,8 +94,8 @@
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 999px;
-  background: #ea580c;
-  color: #fff;
+  background: var(--admin-accent);
+  color: var(--admin-on-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -104,25 +106,25 @@
 
 .admin-free-answer-funnel .faf-step-label {
   font-weight: 700;
-  color: #9a3412;
+  color: var(--admin-text);
   font-size: 0.9rem;
 }
 
 .admin-free-answer-funnel .faf-step-users {
   font-size: 1.35rem;
   font-weight: 800;
-  color: #1c1917;
+  color: var(--admin-text);
   margin-top: 0.15rem;
 }
 
 .admin-free-answer-funnel .faf-step-meta {
   font-size: 0.75rem;
-  color: #78716c;
+  color: var(--admin-text-muted);
   margin-top: 0.15rem;
 }
 
 .admin-free-answer-funnel .faf-arrow {
-  color: #c2410c;
+  color: var(--admin-accent);
   font-weight: 700;
   padding: 0 0.15rem;
 }

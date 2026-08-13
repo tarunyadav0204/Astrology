@@ -11,7 +11,7 @@
 }
 
 .admin-event-timeline-history__header h2 {
-  color: #0f172a;
+  color: var(--admin-text);
   margin: 0;
 }
 
@@ -24,23 +24,23 @@
 
 .admin-event-timeline-history__filters input {
   border: 1px solid #d0d7de;
-  background: #fff;
+  background: var(--admin-surface);
   border-radius: 8px;
   padding: 8px 10px;
-  color: #0f172a;
+  color: var(--admin-text);
 }
 
 .admin-event-timeline-history__filters select {
   border: 1px solid #d0d7de;
-  background: #fff;
+  background: var(--admin-surface);
   border-radius: 8px;
   padding: 8px 10px;
-  color: #0f172a;
+  color: var(--admin-text);
 }
 
 .admin-event-timeline-history__filters button {
   border: 1px solid #d0d7de;
-  background: #fff;
+  background: var(--admin-surface);
   border-radius: 8px;
   padding: 8px 12px;
   cursor: pointer;
@@ -48,7 +48,7 @@
 
 .admin-event-timeline-history__refresh {
   border: 1px solid #d0d7de;
-  background: #fff;
+  background: var(--admin-surface);
   border-radius: 8px;
   padding: 8px 12px;
   cursor: pointer;
@@ -64,9 +64,9 @@
 
 .admin-event-timeline-history__table-wrap {
   overflow: auto;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--admin-border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--admin-surface);
 }
 
 .admin-event-timeline-history__table {
@@ -85,7 +85,7 @@
 }
 
 .admin-event-timeline-history__table th {
-  background: #f8fafc;
+  background: var(--admin-surface-muted);
   font-weight: 700;
   color: #0f172a !important;
 }
@@ -95,7 +95,7 @@
 }
 
 .admin-event-timeline-history__sub {
-  color: #64748b;
+  color: var(--admin-text-muted);
   font-size: 12px;
 }
 
@@ -106,7 +106,7 @@
 
 .admin-event-timeline-history__empty {
   text-align: center;
-  color: #64748b;
+  color: var(--admin-text-muted);
 }
 
 .admin-event-timeline-history__pager {
@@ -117,7 +117,7 @@
 
 .admin-event-timeline-history__pager button {
   border: 1px solid #d0d7de;
-  background: #fff;
+  background: var(--admin-surface);
   border-radius: 8px;
   padding: 8px 12px;
   cursor: pointer;

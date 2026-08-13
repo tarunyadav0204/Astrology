@@ -5,7 +5,7 @@
 }
 
 .admin-user-profile-lead {
-  color: #555;
+  color: var(--admin-text-muted);
   font-size: 14px;
   line-height: 1.5;
   margin: 0 0 20px;
@@ -73,8 +73,8 @@
   width: 100%;
   text-align: left;
   padding: 14px 16px;
-  background: #fff;
-  border: 1px solid #e0e0e0;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
   border-radius: 8px;
   cursor: pointer;
   font: inherit;
@@ -93,13 +93,13 @@
 
 .admin-user-profile-match-name {
   font-weight: 600;
-  color: #333;
+  color: var(--admin-text);
   font-size: 15px;
 }
 
 .admin-user-profile-match-meta {
   font-size: 13px;
-  color: #666;
+  color: var(--admin-text-muted);
 }
 
 .admin-user-profile-summary {
@@ -129,7 +129,7 @@
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 10px 16px;
   font-size: 13px;
-  color: #444;
+  color: var(--admin-text);
 }
 
 .admin-user-profile-summary-credits {
@@ -151,7 +151,7 @@
 
 .admin-user-profile-summary-credits-sub {
   font-size: 12px;
-  color: #666;
+  color: var(--admin-text-muted);
   width: 100%;
   flex-basis: 100%;
   margin-left: 0;
@@ -169,10 +169,10 @@
 
 .admin-user-profile-section {
   margin-bottom: 12px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--admin-border);
   border-radius: 10px;
   overflow: hidden;
-  background: #fff;
+  background: var(--admin-surface);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
 }
 
@@ -205,18 +205,18 @@
   margin: 0;
   font-size: 15px;
   font-weight: 600;
-  color: #333;
+  color: var(--admin-text);
 }
 
 .admin-user-profile-section-body {
   padding: 0 12px 14px;
   border-top: 1px solid #f5f5f5;
-  background: #fafafa;
+  background: var(--admin-surface-muted);
 }
 
 .admin-user-profile-section-note {
   margin: 10px 2px 12px;
-  color: #666;
+  color: var(--admin-text-muted);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -226,8 +226,8 @@
   max-height: 480px;
   overflow-y: auto;
   border-radius: 6px;
-  border: 1px solid #e0e0e0;
-  background: #fff;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-surface);
 }
 
 .admin-user-profile-table {
@@ -238,7 +238,7 @@
 
 .admin-user-profile-table th,
 .admin-user-profile-table td {
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--admin-border);
   padding: 10px 12px;
   vertical-align: top;
 }
@@ -269,7 +269,7 @@
   max-width: 420px;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #333;
+  color: var(--admin-text);
 }
 
 .admin-user-profile-table td.narrow {
@@ -283,15 +283,15 @@
   gap: 8px 16px;
   margin-bottom: 14px;
   font-size: 13px;
-  color: #444;
+  color: var(--admin-text);
 }
 
 .admin-user-profile-empty {
-  background: #fff;
+  background: var(--admin-surface);
   border: 1px dashed #e0e0e0;
   border-radius: 8px;
   padding: 14px;
-  color: #666;
+  color: var(--admin-text-muted);
   font-size: 13px;
 }
 
@@ -302,7 +302,7 @@
 }
 
 .admin-user-profile-journey-card {
-  background: #fff;
+  background: var(--admin-surface);
   border: 1px solid var(--admin-accent-border);
   border-radius: 12px;
   padding: 12px;
@@ -320,7 +320,7 @@
 .admin-user-profile-journey-card-head h4 {
   margin: 0;
   font-size: 15px;
-  color: #333;
+  color: var(--admin-text);
 }
 
 .admin-user-profile-journey-step {
@@ -336,7 +336,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #666;
+  color: var(--admin-text-muted);
   font-size: 12px;
   margin-bottom: 8px;
 }
@@ -345,7 +345,7 @@
   display: grid;
   gap: 4px;
   font-size: 13px;
-  color: #444;
+  color: var(--admin-text);
   margin-bottom: 10px;
 }
 
@@ -368,7 +368,7 @@
 .admin-user-profile-journey-paths summary {
   cursor: pointer;
   font-size: 12px;
-  color: #666;
+  color: var(--admin-text-muted);
 }
 
 .admin-user-profile-journey-paths ul {
@@ -379,11 +379,11 @@
 .admin-user-profile-journey-paths li {
   margin: 4px 0;
   font-size: 12px;
-  color: #555;
+  color: var(--admin-text-muted);
 }
 
 .admin-user-profile-journey-paths code {
-  background: #f5f5f5;
+  background: var(--admin-surface-muted);
   padding: 1px 4px;
   border-radius: 4px;
 }

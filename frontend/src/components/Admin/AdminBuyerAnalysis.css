@@ -19,7 +19,7 @@
 .admin-buyer-analysis .aba-header p {
   margin: 0;
   max-width: 40rem;
-  color: #57534e;
+  color: var(--admin-text);
   font-size: 0.9rem;
   line-height: 1.45;
 }
@@ -36,14 +36,16 @@
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.75rem;
-  color: #78716c;
+  color: var(--admin-text-muted);
 }
 
 .admin-buyer-analysis .aba-filters input,
 .admin-buyer-analysis .aba-filters select {
   min-width: 9rem;
   padding: 0.4rem 0.5rem;
-  border: 1px solid #d6d3d1;
+  color: var(--admin-text);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border-strong);
   border-radius: 6px;
   font-size: 0.875rem;
 }
@@ -52,8 +54,8 @@
   padding: 0.45rem 0.9rem;
   border: none;
   border-radius: 6px;
-  background: #ea580c;
-  color: #fff;
+  background: var(--admin-accent);
+  color: var(--admin-on-accent);
   font-weight: 600;
   cursor: pointer;
 }
@@ -66,7 +68,7 @@
 .admin-buyer-analysis .aba-meta {
   margin-bottom: 1rem;
   font-size: 0.85rem;
-  color: #57534e;
+  color: var(--admin-text);
 }
 
 .admin-buyer-analysis .aba-error {
@@ -87,27 +89,28 @@
 
 .admin-buyer-analysis .aba-kpi {
   padding: 0.85rem 1rem;
-  border: 1px solid #e7e5e4;
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
   border-radius: 10px;
-  background: #fafaf9;
+  background: var(--admin-surface-muted);
 }
 
 .admin-buyer-analysis .aba-kpi-label {
   font-size: 0.75rem;
-  color: #78716c;
+  color: var(--admin-text-muted);
   margin-bottom: 0.25rem;
 }
 
 .admin-buyer-analysis .aba-kpi-value {
   font-size: 1.15rem;
   font-weight: 700;
-  color: #1c1917;
+  color: var(--admin-text);
 }
 
 .admin-buyer-analysis .aba-kpi-sub {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #ea580c;
+  color: var(--admin-accent);
 }
 
 .admin-buyer-analysis .aba-section {
@@ -122,18 +125,18 @@
 .admin-buyer-analysis .aba-section-note {
   margin: -0.25rem 0 0.75rem;
   max-width: 48rem;
-  color: #78716c;
+  color: var(--admin-text-muted);
   font-size: 0.82rem;
   line-height: 1.45;
 }
 
 .admin-buyer-analysis .aba-muted {
-  color: #a8a29e;
+  color: var(--admin-text-muted);
 }
 
 .admin-buyer-analysis .aba-table-wrap {
   overflow-x: auto;
-  border: 1px solid #e7e5e4;
+  border: 1px solid var(--admin-border);
   border-radius: 10px;
 }
 
@@ -146,19 +149,20 @@
 .admin-buyer-analysis .aba-table th,
 .admin-buyer-analysis .aba-table td {
   padding: 0.55rem 0.7rem;
-  border-bottom: 1px solid #f5f5f4;
+  color: var(--admin-text);
+  border-bottom: 1px solid var(--admin-border);
   text-align: left;
   white-space: nowrap;
 }
 
 .admin-buyer-analysis .aba-table th {
-  background: #fafaf9;
-  color: #57534e;
+  background: var(--admin-surface-muted);
+  color: var(--admin-text);
   font-weight: 600;
 }
 
 .admin-buyer-analysis .aba-cell-sub {
-  color: #78716c;
+  color: var(--admin-text-muted);
   font-size: 0.75rem;
 }
 
@@ -189,16 +193,16 @@
 .admin-buyer-analysis .aba-billing-card {
   min-width: 200px;
   padding: 0.85rem 1rem;
-  border: 1px solid #e7e5e4;
+  border: 1px solid var(--admin-border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--admin-surface);
   font-size: 0.85rem;
-  color: #44403c;
+  color: var(--admin-text);
 }
 
 .admin-buyer-analysis .aba-billing-title {
   font-weight: 700;
   margin-bottom: 0.35rem;
-  color: #1c1917;
+  color: var(--admin-text);
   text-transform: capitalize;
 }

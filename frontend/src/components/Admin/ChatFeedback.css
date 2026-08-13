@@ -13,12 +13,12 @@
 
 .feedback-meta {
   font-size: 13px;
-  color: #64748b;
+  color: var(--admin-text-muted);
   white-space: nowrap;
 }
 
 .feedback-meta strong {
-  color: #0f172a;
+  color: var(--admin-text);
   font-weight: 700;
 }
 
@@ -39,11 +39,11 @@
   align-items: center;
   gap: 4px;
   padding: 3px 7px;
-  background: #f8fafc;
+  background: var(--admin-surface-muted);
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   font-size: 12px;
-  color: #334155;
+  color: var(--admin-text);
   white-space: nowrap;
 }
 
@@ -56,7 +56,7 @@
 
 .feedback-rating-chip .cf-rating-count {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--admin-text);
   min-width: 1ch;
 }
 
@@ -83,7 +83,7 @@
   border-radius: 6px;
   font-size: 13px;
   min-width: 140px;
-  background: #fff;
+  background: var(--admin-surface);
 }
 
 .search-input:focus,
@@ -113,8 +113,8 @@
 }
 
 .clear-btn {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--admin-surface-muted);
+  color: var(--admin-text);
   border: 1px solid #e2e8f0;
 }
 
@@ -123,7 +123,7 @@
 }
 
 .feedback-table-container {
-  background: #fff;
+  background: var(--admin-surface);
   border-radius: 10px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
@@ -135,14 +135,14 @@
 }
 
 .feedback-table th {
-  background: #f8fafc;
+  background: var(--admin-surface-muted);
   padding: 8px 12px;
   text-align: left;
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #64748b;
+  color: var(--admin-text-muted);
   border-bottom: 1px solid #e2e8f0;
 }
 
@@ -151,7 +151,7 @@
   border-bottom: 1px solid #f1f5f9;
   vertical-align: top;
   font-size: 13px;
-  color: #334155;
+  color: var(--admin-text);
 }
 
 .feedback-table tbody tr:last-child td {
@@ -159,7 +159,7 @@
 }
 
 .feedback-table tr:hover td {
-  background: #fafbfc;
+  background: var(--admin-surface-muted);
 }
 
 .rating-cell {
@@ -186,7 +186,7 @@
 .rating-number {
   margin-left: 6px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--admin-text-muted);
 }
 
 .comment-cell {
@@ -204,7 +204,7 @@
 
 .no-data {
   text-align: center;
-  color: #94a3b8;
+  color: var(--admin-text-muted);
   font-style: italic;
   padding: 32px;
 }
@@ -215,15 +215,15 @@
   align-items: center;
   gap: 4px;
   padding: 10px 12px;
-  background: #f8fafc;
+  background: var(--admin-surface-muted);
   border-top: 1px solid #e2e8f0;
 }
 
 .chat-feedback-page-btn {
   padding: 5px 10px;
   border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #334155;
+  background: var(--admin-surface);
+  color: var(--admin-text);
   border-radius: 6px;
   cursor: pointer;
   font-size: 12px;
@@ -247,7 +247,7 @@
 
 .chat-feedback-page-ellipsis {
   padding: 5px 4px;
-  color: #94a3b8;
+  color: var(--admin-text-muted);
 }
 
 .chat-feedback-container .loading,
@@ -261,7 +261,7 @@
 
 .chat-feedback-standalone-loading,
 .chat-feedback-container .loading {
-  color: #64748b;
+  color: var(--admin-text-muted);
 }
 
 .chat-feedback-standalone-error,

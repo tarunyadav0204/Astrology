@@ -227,21 +227,6 @@ export default function AdminActivity({ onOpenUserProfile }) {
   return (
     <div className="admin-activity">
       <h2>Activity</h2>
-      <p className="admin-activity-description">
-        Today&apos;s activity by default. Use filters and column headers to sort.
-        The username filter matches logged display name and also resolves <strong>name or email</strong> from the users database (so rows with empty logged name but matching user id/phone still appear).
-        Filter by <strong>Phone</strong> when User ID is missing (e.g. older activity).
-        <strong>Only errors</strong> includes unhandled server exceptions (<code>api_error</code>) and any
-        <code>api_request</code> with an HTTP status outside 2xx (4xx/5xx).{' '}
-        <strong>Error Type / Error Message / Stack Trace</strong> are only stored for{' '}
-        <code>api_error</code> rows (exceptions that bubble out of the route before FastAPI turns them into an HTTP response).
-        Typical route failures still log as <code>api_request</code> with a non-2xx <strong>Status</strong>; those columns stay empty — use Status, Metadata (request snapshot on many errors), and server logs.
-        The <strong>Users in date range</strong>{' '}
-        table lists distinct users (name and phone) who had any matching activity between the selected dates
-        (same filters as below).
-        <strong> Total API time</strong> is the sum of request <code>duration_ms</code> (server processing
-        time per logged call), not a measure of how long someone stayed in the app.
-      </p>
 
       <div className="admin-activity-filters">
         <div className="admin-activity-filter-row">

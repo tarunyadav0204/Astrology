@@ -9,7 +9,7 @@
 
 .audience-builder__hint {
   margin: 0 0 16px;
-  color: #555;
+  color: var(--admin-text-muted);
   font-size: 14px;
   max-width: 720px;
 }
@@ -28,15 +28,15 @@
   text-align: left;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  background: #fff;
-  color: #334155;
+  background: var(--admin-surface);
+  color: var(--admin-text);
   padding: 10px 12px;
   font-weight: 700;
   cursor: pointer;
 }
 
 .audience-builder__mode-tabs button span {
-  color: #64748b;
+  color: var(--admin-text-muted);
   font-size: 12px;
   font-weight: 400;
 }
@@ -63,7 +63,7 @@
   display: block;
   font-size: 12px;
   font-weight: 600;
-  color: #495057;
+  color: var(--admin-text);
   margin-bottom: 6px;
 }
 
@@ -71,7 +71,7 @@
 .audience-builder__sql-block textarea {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--admin-border);
   border-radius: 6px;
   padding: 10px 12px;
   font-size: 14px;
@@ -112,9 +112,9 @@
 }
 
 .audience-builder__secondary {
-  background: #fff;
+  background: var(--admin-surface);
   border-color: #ced4da;
-  color: #212529;
+  color: var(--admin-text);
 }
 
 .audience-builder__secondary:disabled {
@@ -123,7 +123,7 @@
 }
 
 .audience-builder__explanation {
-  background: #f8fafc;
+  background: var(--admin-surface-muted);
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 12px 14px;
@@ -133,7 +133,7 @@
 .audience-builder__explanation p {
   margin: 6px 0 0;
   font-size: 14px;
-  color: #334155;
+  color: var(--admin-text);
 }
 
 .audience-builder__warnings {
@@ -172,7 +172,7 @@
 
 .audience-builder__analytics-group-title {
   margin-bottom: 7px;
-  color: #475569;
+  color: var(--admin-text);
   font-size: 13px;
   font-weight: 700;
 }
@@ -195,12 +195,12 @@
 .audience-builder__metric-card span {
   display: block;
   margin-bottom: 8px;
-  color: #64748b;
+  color: var(--admin-text-muted);
   font-size: 12px;
 }
 
 .audience-builder__metric-card strong {
-  color: #0f172a;
+  color: var(--admin-text);
   font-size: 1.35rem;
   line-height: 1.15;
 }
@@ -208,7 +208,7 @@
 .audience-builder__analytics-empty {
   border: 1px dashed #cbd5e1;
   border-radius: 8px;
-  color: #64748b;
+  color: var(--admin-text-muted);
   padding: 28px 14px;
   text-align: center;
   font-size: 14px;
@@ -220,7 +220,7 @@
   align-items: center;
   gap: 7px;
   margin: 10px 0 12px;
-  color: #64748b;
+  color: var(--admin-text-muted);
   font-size: 12px;
 }
 
@@ -308,9 +308,9 @@
 
 .audience-builder__table-wrap {
   overflow-x: auto;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--admin-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--admin-surface);
 }
 
 .audience-builder__table {
@@ -323,19 +323,19 @@
 .audience-builder__table td {
   padding: 10px 12px;
   text-align: left;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--admin-border);
   white-space: nowrap;
 }
 
 .audience-builder__table th {
-  background: #f8f9fa;
+  background: var(--admin-surface-muted);
   font-weight: 600;
-  color: #495057;
+  color: var(--admin-text);
 }
 
 .audience-builder__empty {
   text-align: center;
-  color: #6c757d;
+  color: var(--admin-text-muted);
   padding: 28px 12px !important;
 }
 
@@ -356,15 +356,15 @@
 
 .audience-builder__page-size label,
 .audience-builder__page-range {
-  color: #475569;
+  color: var(--admin-text);
 }
 
 .audience-builder__page-size select {
-  border: 1px solid #ced4da;
+  border: 1px solid var(--admin-border);
   border-radius: 6px;
-  background: #fff;
+  background: var(--admin-surface);
   padding: 7px 9px;
-  color: #212529;
+  color: var(--admin-text);
 }
 
 @media (max-width: 600px) {
