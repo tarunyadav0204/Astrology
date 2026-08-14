@@ -684,6 +684,7 @@ export default function MundaneHubScreen({ navigation }) {
           visible={showCountryPicker}
           animationType="slide"
           transparent={true}
+          onRequestClose={() => { setShowCountryPicker(false); setCountrySearch(''); }}
         >
           <View style={[styles.modalOverlay, { backgroundColor: isDark ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.5)' }]}>
             <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
@@ -691,9 +692,17 @@ export default function MundaneHubScreen({ navigation }) {
                 <Text style={[styles.modalTitle, { color: colors.text }]}>
                   {countryPickerTarget === 'multi' ? 'Add Nations' : 'Select Country'}
                 </Text>
-                <TouchableOpacity onPress={() => { setShowCountryPicker(false); setCountrySearch(''); }}>
-                  <Text style={[styles.doneText, { color: colors.primary }]}>{countryPickerTarget === 'multi' ? 'Done' : ''}</Text>
-                  <Ionicons name="close" size={24} color={colors.text} />
+                <TouchableOpacity
+                  style={styles.modalHeaderAction}
+                  onPress={() => { setShowCountryPicker(false); setCountrySearch(''); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={countryPickerTarget === 'multi' ? 'Done adding nations' : 'Close country picker'}
+                >
+                  {countryPickerTarget === 'multi' ? (
+                    <Text style={[styles.doneText, { color: colors.primary }]}>Done</Text>
+                  ) : (
+                    <Ionicons name="close" size={24} color={colors.text} />
+                  )}
                 </TouchableOpacity>
               </View>
 
@@ -1111,7 +1120,12 @@ const styles = StyleSheet.create({
   doneText: {
     fontSize: 16,
     fontWeight: '700',
-    marginRight: 10,
+  },
+  modalHeaderAction: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   proTip: {
     flexDirection: 'row',

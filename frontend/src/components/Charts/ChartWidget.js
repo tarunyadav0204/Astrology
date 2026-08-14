@@ -7,6 +7,8 @@ import { apiService } from '../../services/apiService';
 import { WidgetContainer, WidgetHeader, WidgetTitle, StyleToggle, ChartContainer } from './ChartWidget.styles';
 import AshtakavargaModal from '../Ashtakavarga/AshtakavargaModal';
 import ShadbalaModal from '../Shadbala/ShadbalaModal';
+import './ChartMaximizedModal.css';
+import './ChartToolModal.css';
 
 const ChartWidget = ({
   title,
@@ -49,6 +51,23 @@ const ChartWidget = ({
       setInternalChartStyle(defaultStyle);
     }
   }, [defaultStyle, controlledChartStyle]);
+
+  useEffect(() => {
+    if (!showMaximized) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setShowMaximized(false);
+    };
+
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [showMaximized]);
   const [divisionalData, setDivisionalData] = useState(null);
   const [transitChartData, setTransitChartData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -489,24 +508,24 @@ const ChartWidget = ({
       
       {/* Special Points Modal */}
       {showSpecialPoints && createPortal(
-        <div style={{
+        <div className="chart-tool-modal__backdrop" style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100002,
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }} onClick={() => setShowSpecialPoints(false)}>
-          <div style={{
+          <div className="chart-tool-modal" style={{
             backgroundColor: 'white', borderRadius: '12px',
             maxWidth: '700px', width: '90%', maxHeight: '80vh',
             display: 'flex', flexDirection: 'column'
           }} onClick={e => e.stopPropagation()}>
-            <div style={{
+            <div className="chart-tool-modal__header" style={{
               padding: '20px 20px 0 20px',
               borderBottom: '1px solid #e0e0e0',
               flexShrink: 0
             }}>
               <h3 style={{ color: '#9c27b0', margin: 0 }}>Special Astrological Points</h3>
             </div>
-            <div style={{
+            <div className="chart-tool-modal__body" style={{
               padding: '20px',
               overflow: 'auto',
               flex: 1
@@ -612,14 +631,14 @@ const ChartWidget = ({
                 </div>
               )}
             </div>
-            <div style={{
+            <div className="chart-tool-modal__footer" style={{
               padding: '15px 20px',
               borderTop: '1px solid #e0e0e0',
               flexShrink: 0,
               display: 'flex',
               justifyContent: 'flex-end'
             }}>
-              <button 
+              <button className="chart-tool-modal__close"
                 onClick={() => setShowSpecialPoints(false)}
                 style={{ 
                   padding: '8px 16px', 
@@ -637,17 +656,17 @@ const ChartWidget = ({
       
       {/* Chara Karakas Modal */}
       {showCharaKarakas && createPortal(
-        <div style={{
+        <div className="chart-tool-modal__backdrop" style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100002,
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }} onClick={() => setShowCharaKarakas(false)}>
-          <div style={{
+          <div className="chart-tool-modal chart-tool-modal--wide" style={{
             backgroundColor: 'white', borderRadius: '12px',
             maxWidth: '800px', width: '90%', maxHeight: '80vh',
             display: 'flex', flexDirection: 'column'
           }} onClick={e => e.stopPropagation()}>
-            <div style={{
+            <div className="chart-tool-modal__header" style={{
               padding: '20px 20px 0 20px',
               borderBottom: '1px solid #e0e0e0',
               flexShrink: 0
@@ -663,7 +682,7 @@ const ChartWidget = ({
                 )}
               </h3>
             </div>
-            <div style={{
+            <div className="chart-tool-modal__body" style={{
               padding: '20px',
               overflow: 'auto',
               flex: 1
@@ -732,14 +751,14 @@ const ChartWidget = ({
                 </div>
               )}
             </div>
-            <div style={{
+            <div className="chart-tool-modal__footer" style={{
               padding: '15px 20px',
               borderTop: '1px solid #e0e0e0',
               flexShrink: 0,
               display: 'flex',
               justifyContent: 'flex-end'
             }}>
-              <button 
+              <button className="chart-tool-modal__close"
                 onClick={() => setShowCharaKarakas(false)}
                 style={{ 
                   padding: '8px 16px', 
@@ -757,17 +776,17 @@ const ChartWidget = ({
       
       {/* Planetary Dignities Modal */}
       {showPlanetaryDignities && createPortal(
-        <div style={{
+        <div className="chart-tool-modal__backdrop" style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100002,
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }} onClick={() => setShowPlanetaryDignities(false)}>
-          <div style={{
+          <div className="chart-tool-modal chart-tool-modal--wide" style={{
             backgroundColor: 'white', borderRadius: '12px',
             maxWidth: '800px', width: '90%', maxHeight: '80vh',
             display: 'flex', flexDirection: 'column'
           }} onClick={e => e.stopPropagation()}>
-            <div style={{
+            <div className="chart-tool-modal__header" style={{
               padding: '20px 20px 0 20px',
               borderBottom: '1px solid #e0e0e0',
               flexShrink: 0
@@ -783,7 +802,7 @@ const ChartWidget = ({
                 )}
               </h3>
             </div>
-            <div style={{
+            <div className="chart-tool-modal__body" style={{
               padding: '20px',
               overflow: 'auto',
               flex: 1
@@ -915,14 +934,14 @@ const ChartWidget = ({
               </div>
             )}
             </div>
-            <div style={{
+            <div className="chart-tool-modal__footer" style={{
               padding: '15px 20px',
               borderTop: '1px solid #e0e0e0',
               flexShrink: 0,
               display: 'flex',
               justifyContent: 'flex-end'
             }}>
-              <button 
+              <button className="chart-tool-modal__close"
                 onClick={() => setShowPlanetaryDignities(false)}
                 style={{ 
                   padding: '8px 16px', 
@@ -940,190 +959,114 @@ const ChartWidget = ({
       
       {/* Maximized Chart Modal - Rendered outside widget container */}
       {showMaximized && createPortal(
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.8)',
-          zIndex: 10000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }} onClick={() => setShowMaximized(false)}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '20px',
-            maxWidth: '90vw',
-            maxHeight: '90vh',
-            width: '800px',
-            height: '800px',
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px',
-              borderBottom: '2px solid #e91e63',
-              paddingBottom: '10px'
-            }}>
-              <h3 style={{ margin: 0, color: '#e91e63' }}>{title}</h3>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div
+          className="chart-maximized-modal__backdrop"
+          onClick={() => setShowMaximized(false)}
+        >
+          <section
+            className="chart-maximized-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chart-maximized-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="chart-maximized-modal__header">
+              <div className="chart-maximized-modal__heading">
+                <span className="chart-maximized-modal__eyebrow">Expanded chart</span>
+                <h2 id="chart-maximized-title">{title}</h2>
+              </div>
+              <div className="chart-maximized-modal__header-actions">
+                <span className="chart-maximized-modal__style-label">
+                  {CHART_CONFIG.styles[chartStyle]}
+                </span>
                 <button
-                  onClick={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
-                  style={{
-                    padding: '8px 16px',
-                    fontSize: '13px',
-                    background: 'white',
-                    color: showDegreeNakshatra ? '#e91e63' : '#666',
-                    border: `1px solid ${showDegreeNakshatra ? '#e91e63' : '#ddd'}`,
-                    borderRadius: '20px',
-                    cursor: 'pointer',
-                    fontWeight: '500',
-                    transition: 'all 0.2s ease'
-                  }}
-                  title={showDegreeNakshatra ? 'Hide degree and nakshatra' : 'Show degree and nakshatra'}
+                  type="button"
+                  className="chart-maximized-modal__close"
+                  onClick={() => setShowMaximized(false)}
+                  aria-label="Close expanded chart"
+                  title="Close"
                 >
-                  {showDegreeNakshatra ? 'Hide Details' : 'Show Details'}
+                  <span aria-hidden="true">×</span>
+                </button>
+              </div>
+            </header>
+
+            <nav className="chart-maximized-modal__toolbar" aria-label="Chart tools">
+              <div className="chart-maximized-modal__toolbar-scroll">
+                <button
+                  type="button"
+                  onClick={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
+                  className={`chart-maximized-modal__tool${showDegreeNakshatra ? ' is-active' : ''}`}
+                  title={showDegreeNakshatra ? 'Hide degree and nakshatra' : 'Show degree and nakshatra'}
+                  aria-pressed={showDegreeNakshatra}
+                >
+                  {showDegreeNakshatra ? 'Details on' : 'Details'}
                 </button>
                 {chartType === 'lagna' && (
-                  <button 
+                  <button
+                    type="button"
                     onClick={() => handleSpecialPoints()}
-                    style={{
-                      padding: '8px 16px',
-                      fontSize: '13px',
-                      background: 'white',
-                      color: '#666',
-                      border: '1px solid #ddd',
-                      borderRadius: '20px',
-                      cursor: 'pointer',
-                      fontWeight: '500',
-                      transition: 'all 0.2s ease'
-                    }}
+                    className="chart-maximized-modal__tool"
                     title="Show Dagdha Rasi, Tithi Shunya, Avayogi, Marka, Badhaka"
                   >
                     Special Points
                   </button>
                 )}
-                <button 
+                <button
+                  type="button"
                   onClick={() => handlePlanetaryDignities()}
-                  style={{
-                    padding: '8px 16px',
-                    fontSize: '13px',
-                    background: 'white',
-                    color: '#666',
-                    border: '1px solid #ddd',
-                    borderRadius: '20px',
-                    cursor: 'pointer',
-                    fontWeight: '500',
-                    transition: 'all 0.2s ease'
-                  }}
+                  className="chart-maximized-modal__tool"
                   title="Show Planetary Dignities & States"
                 >
                   Dignities
                 </button>
                 {chartType === 'lagna' && (
-                  <button 
+                  <button
+                    type="button"
                     onClick={() => handleCharaKarakas()}
-                    style={{
-                      padding: '8px 16px',
-                      fontSize: '13px',
-                      background: 'white',
-                      color: '#666',
-                      border: '1px solid #ddd',
-                      borderRadius: '20px',
-                      cursor: 'pointer',
-                      fontWeight: '500',
-                      transition: 'all 0.2s ease'
-                    }}
+                    className="chart-maximized-modal__tool"
                     title="Show Chara Karakas (Jaimini Significators)"
                   >
                     Karakas
                   </button>
                 )}
-                <button 
+                <button
+                  type="button"
                   onClick={() => setShowShadbala(true)}
-                  style={{
-                    padding: '8px 16px',
-                    fontSize: '13px',
-                    background: 'white',
-                    color: '#666',
-                    border: '1px solid #ddd',
-                    borderRadius: '20px',
-                    cursor: 'pointer',
-                    fontWeight: '500',
-                    transition: 'all 0.2s ease'
-                  }}
+                  className="chart-maximized-modal__tool"
                 >
                   Shadbala
                 </button>
-                <button 
+                <button
+                  type="button"
                   onClick={() => setShowAshtakavarga(true)}
-                  style={{
-                    padding: '8px 16px',
-                    fontSize: '13px',
-                    background: 'white',
-                    color: '#666',
-                    border: '1px solid #ddd',
-                    borderRadius: '20px',
-                    cursor: 'pointer',
-                    fontWeight: '500',
-                    transition: 'all 0.2s ease'
-                  }}
+                  className="chart-maximized-modal__tool"
                 >
                   Ashtakavarga
                 </button>
-                <button 
+                <button
+                  type="button"
                   onClick={toggleStyle}
-                  style={{
-                    padding: '8px 16px',
-                    fontSize: '13px',
-                    background: 'white',
-                    color: '#666',
-                    border: '1px solid #ddd',
-                    borderRadius: '20px',
-                    cursor: 'pointer',
-                    fontWeight: '500',
-                    transition: 'all 0.2s ease'
-                  }}
+                  className="chart-maximized-modal__tool chart-maximized-modal__tool--style"
+                  title="Switch chart style"
                 >
-                  {CHART_CONFIG.styles[chartStyle]}
-                </button>
-                <button 
-                  onClick={() => setShowMaximized(false)}
-                  style={{
-                    padding: '8px 16px',
-                    fontSize: '16px',
-                    background: '#e91e63',
-                    color: 'white',
-                    border: '1px solid #e91e63',
-                    borderRadius: '20px',
-                    cursor: 'pointer',
-                    fontWeight: '500',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  ×
+                  <span aria-hidden="true">⇄</span>
+                  {chartStyle === 'north' ? 'South Indian' : 'North Indian'}
                 </button>
               </div>
-            </div>
-            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            </nav>
+
+            <div className="chart-maximized-modal__stage">
               {loading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#666' }}>
+                <div className="chart-maximized-modal__state">
                   Calculating divisional chart...
                 </div>
               ) : !divisionalData && (chartType === 'navamsa' || chartType === 'divisional' || chartType === 'karkamsa' || chartType === 'swamsa') ? (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#e91e63' }}>
+                <div className="chart-maximized-modal__state chart-maximized-modal__state--error">
                   Failed to load divisional chart
                 </div>
               ) : chartStyle === 'north' ? (
-                <div style={{ width: '100%', height: '100%', minHeight: '600px' }}>
+                <div className="chart-maximized-modal__chart-frame">
                   <NorthIndianChart 
                     chartData={processedData}
                     chartType={chartType}
@@ -1135,7 +1078,7 @@ const ChartWidget = ({
                   />
                 </div>
               ) : (
-                <div style={{ width: '100%', height: '100%', minHeight: '600px' }}>
+                <div className="chart-maximized-modal__chart-frame">
                   <SouthIndianChart 
                     chartData={processedData}
                     chartType={chartType}
@@ -1148,7 +1091,7 @@ const ChartWidget = ({
                 </div>
               )}
             </div>
-          </div>
+          </section>
         </div>,
         document.body
       )}

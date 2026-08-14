@@ -1225,32 +1225,12 @@ const MessageBubble = ({
                 )}
                 {/* Beta Notice for Timeline Predictions */}
                 {message.role === 'assistant' && !message.isTyping && !message.isProcessing && message.message_type !== 'clarification' && !isNativeGate && (
-                    <div style={{
-                        backgroundColor: 'rgba(255, 152, 0, 0.1)',
-                        borderLeft: '3px solid #FF9800',
-                        borderRadius: '8px',
-                        padding: '10px',
-                        marginBottom: '12px',
-                        fontSize: '12px',
-                        color: '#E65100',
-                        fontWeight: '600',
-                        lineHeight: '16px'
-                    }}>
+                    <div className="chat-message-notice chat-message-notice--beta">
                         ⚠️ BETA: Timeline predictions are experimental. Use logic and discretion.
                     </div>
                 )}
                 {message.role === 'assistant' && !message.isTyping && !message.isProcessing && message.message_type !== 'clarification' && !isNativeGate && (
-                    <div style={{
-                        backgroundColor: 'rgba(156, 39, 176, 0.08)',
-                        borderLeft: '3px solid #9C27B0',
-                        borderRadius: '8px',
-                        padding: '12px',
-                        marginBottom: '12px',
-                        fontSize: '11px',
-                        color: '#6A1B9A',
-                        fontWeight: '600',
-                        lineHeight: '16px'
-                    }}>
+                    <div className="chat-message-notice chat-message-notice--disclaimer">
                         ⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.
                     </div>
                 )}
@@ -1544,22 +1524,22 @@ const MessageBubble = ({
                                 : '1px solid rgba(91, 112, 255, 0.22)',
                         }}
                     >
-                        <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.02em', color: isRemedyNextAction ? '#9a3412' : '#3347a3', marginBottom: 8 }}>
+                        <div className="remedy-next-action-card__title">
                             {isRemedyNextAction ? nextActionTitle : (nextActionTitle || 'Next step')}
                         </div>
                         {isRemedyNextAction && nextActionReason && (
-                            <div style={{ fontSize: 13, lineHeight: 1.45, color: isRemedyNextAction ? '#14532d' : '#334155', marginBottom: 10, fontWeight: 700 }}>
+                            <div className="remedy-next-action-card__reason remedy-next-action-card__reason--positive">
                                 {nextActionReason}
                             </div>
                         )}
                         {!isRemedyNextAction && nextActionReason && (
-                            <div style={{ fontSize: 14, lineHeight: 1.45, color: isRemedyNextAction ? '#7c2d12' : '#334155', marginBottom: 10 }}>
+                            <div className="remedy-next-action-card__reason">
                                 {nextActionReason}
                             </div>
                         )}
                         <button
                             type="button"
-                            className="follow-up-btn"
+                            className="follow-up-btn remedy-next-action-card__button"
                             style={followUpChipLayoutStyle}
                             onClick={() => {
                                 const nextQuestion = isRemedyNextAction

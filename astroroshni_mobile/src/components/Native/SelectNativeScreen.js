@@ -26,6 +26,48 @@ import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 
 const FAMILY_RELATION_ORDER = ['self', 'father', 'mother', 'spouse', 'child', 'sibling', 'friend', 'shared', 'other'];
 
+const getChartId = (profile) => {
+  const value = profile?.id
+    ?? profile?._id
+    ?? profile?.birth_chart_id
+    ?? profile?.birthChartId
+    ?? profile?.chart_id;
+  if (value == null || value === '' || String(value).toLowerCase() === 'self') return null;
+  return String(value);
+};
+
+const normalizeBirthDate = (value) => {
+  const raw = String(value || '').trim();
+  const isoDate = raw.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+  return isoDate || raw.toLowerCase();
+};
+
+const normalizeBirthTime = (value) => {
+  const raw = String(value || '').trim();
+  const time = raw.match(/(?:T|^)(\d{2}:\d{2}(?::\d{2})?)/)?.[1];
+  return (time || raw).slice(0, 8).toLowerCase();
+};
+
+// IDs are authoritative. The fingerprint keeps older/local saved charts working
+// without ever treating a display name as a unique chart identity.
+const getChartSelectionKey = (profile) => {
+  const id = getChartId(profile);
+  if (id) return `id:${id}`;
+
+  if (!profile) return null;
+  const latitude = profile.latitude ?? profile.lat ?? '';
+  const longitude = profile.longitude ?? profile.lon ?? profile.lng ?? '';
+  return [
+    'birth',
+    String(profile.name || '').trim().toLowerCase(),
+    normalizeBirthDate(profile.date ?? profile.birth_date),
+    normalizeBirthTime(profile.time ?? profile.birth_time),
+    String(profile.place || profile.birth_place || '').trim().toLowerCase(),
+    String(latitude),
+    String(longitude),
+  ].join('|');
+};
+
 const getRelationDisplay = (profile) => {
   const relation = String(profile?.relation || 'other').toLowerCase();
   if (profile?.relation_label) return profile.relation_label;
@@ -81,8 +123,8 @@ const groupProfilesByRelation = (profiles) => {
   return Array.from(groups.values()).sort((a, b) => a.sort - b.sort);
 };
 
-const ProfileCard = ({ profile, selectedProfile, onSelect, onMore, getZodiacSign, colors }) => {
-  const selected = selectedProfile === profile.name;
+const ProfileCard = ({ profile, selectedProfileKey, onSelect, onMore, getZodiacSign, colors }) => {
+  const selected = selectedProfileKey === getChartSelectionKey(profile);
   const cardBackground = selected ? colors.selectionSurface : colors.surface;
   const primaryText = selected ? colors.selectionText : colors.text;
   const secondaryText = selected ? colors.selectionTextMuted : colors.textSecondary;
@@ -192,7 +234,7 @@ export default function SelectNativeScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const [profiles, setProfiles] = useState([]);
-  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [selectedProfileKey, setSelectedProfileKey] = useState(null);
   const [listLoading, setListLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -246,7 +288,7 @@ export default function SelectNativeScreen({ navigation, route }) {
         setHasMore(false);
         setTotalCharts(localList.length);
         if (currentNative) {
-          setSelectedProfile(currentNative.name);
+          setSelectedProfileKey(getChartSelectionKey(currentNative));
         }
         return;
       }
@@ -266,7 +308,7 @@ export default function SelectNativeScreen({ navigation, route }) {
           .trim()
           .toLowerCase();
         profileList.push({
-          id: chart.id || chart._id,
+          id: chart.id || chart._id || chart.birth_chart_id,
           name: chart.name,
           date: chart.date,
           time: chart.time,
@@ -293,7 +335,7 @@ export default function SelectNativeScreen({ navigation, route }) {
       setTotalCharts(nativeGenderFilter ? null : (response.data?.total || 0));
       
       if (currentNative) {
-        setSelectedProfile(currentNative.name);
+        setSelectedProfileKey(getChartSelectionKey(currentNative));
       }
     } catch (error) {
       // Fallback to local storage if API fails
@@ -346,7 +388,7 @@ export default function SelectNativeScreen({ navigation, route }) {
       // Ensure profile includes id
       const profileWithId = {
         ...profile,
-        id: profile.id || profile._id
+        id: getChartId(profile),
       };
       
       if (fromProfile) {
@@ -358,26 +400,26 @@ export default function SelectNativeScreen({ navigation, route }) {
       } else if (returnTo === 'ChildbirthPlanner') {
         // Set as mother's profile for childbirth planner
         await storage.setBirthDetails(profileWithId);
-        setSelectedProfile(profile.name);
+        setSelectedProfileKey(getChartSelectionKey(profileWithId));
         navigation.navigate('ChildbirthPlanner');
       } else if (returnTo === 'KarmaAnalysis') {
         // Return to Karma Analysis with selected chart
         await storage.setBirthDetails(profileWithId);
-        setSelectedProfile(profile.name);
+        setSelectedProfileKey(getChartSelectionKey(profileWithId));
         navigation.navigate('KarmaAnalysis', { chartId: profileWithId.id });
       } else if (returnTo === 'KP') {
         // Return to KP Screen with selected chart
         await storage.setBirthDetails(profileWithId);
-        setSelectedProfile(profile.name);
+        setSelectedProfileKey(getChartSelectionKey(profileWithId));
         navigation.navigate('KPSystem', { birthDetails: profileWithId });
       } else if (returnTo === 'Yogas') {
         await storage.setBirthDetails(profileWithId);
-        setSelectedProfile(profile.name);
+        setSelectedProfileKey(getChartSelectionKey(profileWithId));
         navigation.navigate('Yogas', { birthDetails: profileWithId });
       } else if (returnTo) {
         // Return to the screen that required a native (Chart, Shadbala, SadeSati, etc.)
         await storage.setBirthDetails(profileWithId);
-        setSelectedProfile(profile.name);
+        setSelectedProfileKey(getChartSelectionKey(profileWithId));
         navigation.navigate(returnTo, {
           ...returnParams,
           birthData: profileWithId,
@@ -387,7 +429,7 @@ export default function SelectNativeScreen({ navigation, route }) {
         });
       } else {
         await storage.setBirthDetails(profileWithId);
-        setSelectedProfile(profile.name);
+        setSelectedProfileKey(getChartSelectionKey(profileWithId));
         navigation.navigate('Home', { resetToGreeting: true, stayOnGreeting: true });
       }
     } catch (error) {
@@ -674,11 +716,11 @@ export default function SelectNativeScreen({ navigation, route }) {
                     <Text style={[styles.profileGroupTitle, { color: colors.primary }]}>{group.title}</Text>
                     <View style={[styles.groupRule, { backgroundColor: colors.cardBorder }]} />
                   </View>
-                  {group.items.map((profile) => (
+                  {group.items.map((profile, profileIndex) => (
                     <ProfileCard
-                      key={profile.id}
+                      key={`${getChartSelectionKey(profile)}:${profileIndex}`}
                       profile={profile}
-                      selectedProfile={selectedProfile}
+                      selectedProfileKey={selectedProfileKey}
                       onSelect={selectProfile}
                       onMore={handleMore}
                       getZodiacSign={getZodiacSign}

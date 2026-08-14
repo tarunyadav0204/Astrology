@@ -54,8 +54,7 @@ const MUHURAT_TYPE_DEFS = [
 
 export default function MuhuratHubScreen({ navigation }) {
   const { t } = useTranslation();
-  const { theme, colors } = useTheme();
-  const isDark = colors.statusBarStyle === 'light-content';
+  const { colors } = useTheme();
   const [pricing, setPricing] = useState({});
   const [pricingOriginal, setPricingOriginal] = useState({});
 
@@ -103,8 +102,11 @@ export default function MuhuratHubScreen({ navigation }) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient colors={[colors.gradientStart, colors.gradientMid, colors.gradientEnd]} style={StyleSheet.absoluteFill} />
-      <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
-      <SafeAreaView style={styles.safeArea}>
+      <FocusedStatusBar
+        backgroundColor={colors.background}
+        barStyle={colors.statusBarStyle || 'dark-content'}
+      />
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Icon name="arrow-back" size={24} color={colors.text} />

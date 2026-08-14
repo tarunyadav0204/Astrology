@@ -1,18 +1,19 @@
 .shadbala-modal-overlay {
-  --sb-ink: #2f2522;
-  --sb-muted: #766761;
-  --sb-line: #e3d8cf;
-  --sb-panel: #fffdfa;
-  --sb-soft: #f7f0e9;
-  --sb-rose: #a5123b;
+  --sb-ink: var(--color-text);
+  --sb-muted: var(--color-text-muted);
+  --sb-line: var(--color-border);
+  --sb-panel: var(--color-surface-raised);
+  --sb-soft: var(--color-surface-muted);
+  --sb-rose: var(--color-brand);
   position: fixed;
   inset: 0;
   z-index: 100002;
   display: grid;
   place-items: center;
   padding: clamp(0.75rem, 2vw, 1.5rem);
-  background: rgba(38, 25, 24, 0.68);
-  backdrop-filter: blur(5px);
+  background: color-mix(in srgb, var(--color-surface-inverse) 72%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .shadbala-modal-content {
@@ -21,11 +22,11 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.42);
+  border: 1px solid var(--color-border-strong);
   border-radius: 18px;
   background: var(--sb-panel);
   color: var(--sb-ink);
-  box-shadow: 0 28px 80px rgba(45, 26, 26, 0.32), 0 3px 12px rgba(45, 26, 26, 0.16);
+  box-shadow: var(--shadow-modal);
 }
 
 .shadbala-modal-header {
@@ -36,10 +37,10 @@
   justify-content: space-between;
   gap: 1.5rem;
   padding: 1.15rem 1.4rem 1.05rem;
-  border-bottom: 1px solid #dbcfc6;
+  border-bottom: 1px solid var(--sb-line);
   background:
-    radial-gradient(circle at 82% 15%, rgba(165, 18, 59, 0.08), transparent 30%),
-    linear-gradient(135deg, #fffdfa 0%, #f7eee7 100%);
+    radial-gradient(circle at 82% 15%, color-mix(in srgb, var(--color-accent) 14%, transparent), transparent 30%),
+    var(--sb-panel);
 }
 
 .shadbala-modal-header::before {
@@ -64,8 +65,8 @@
 
 .shadbala-modal-header h2 {
   margin: 0;
-  color: #261c19;
-  font-family: Georgia, 'Times New Roman', serif;
+  color: var(--sb-ink);
+  font-family: var(--font-display);
   font-size: clamp(1.55rem, 3vw, 2rem);
   line-height: 1.05;
 }
@@ -83,17 +84,17 @@
   flex: 0 0 2.35rem;
   display: grid;
   place-items: center;
-  border: 1px solid #ddcfc7;
+  border: 1px solid var(--color-border-strong);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.82);
-  color: #483935;
+  background: var(--sb-soft);
+  color: var(--sb-ink);
   font-size: 1.45rem;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 3px 9px rgba(66, 39, 31, 0.06);
 }
 
-.shadbala-close-btn:hover { border-color: #c98da0; color: var(--sb-rose); background: #fff; }
+.shadbala-close-btn:hover { border-color: var(--sb-rose); color: var(--color-on-brand); background: var(--sb-rose); }
 .shadbala-close-btn:focus-visible,
 .shadbala-planet__summary:focus-visible,
 .shadbala-formulas summary:focus-visible,
@@ -105,9 +106,9 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 1.1rem 1.25rem 1.35rem;
-  background: #fbf7f3;
+  background: var(--color-canvas);
   scrollbar-width: thin;
-  scrollbar-color: #c8b7aa transparent;
+  scrollbar-color: var(--color-border-strong) transparent;
 }
 
 .shadbala-loading,
@@ -130,7 +131,7 @@
   width: 2.15rem;
   height: 2.15rem;
   margin-bottom: 0.45rem;
-  border: 3px solid #eaded6;
+  border: 3px solid var(--sb-line);
   border-top-color: var(--sb-rose);
   border-radius: 50%;
   animation: shadbala-spin 0.8s linear infinite;
@@ -189,9 +190,9 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: #362824;
-  color: #ffe9d2;
-  font-family: Georgia, 'Times New Roman', serif;
+  background: var(--color-surface-inverse);
+  color: var(--color-text-inverse);
+  font-family: var(--font-display);
 }
 .shadbala-summary-card__planet > b { width: 2.25rem; height: 2.25rem; flex: 0 0 2.25rem; font-size: 0.78rem; }
 .shadbala-summary-card__planet div { min-width: 0; display: grid; gap: 0.12rem; }
@@ -238,7 +239,7 @@
   gap: 1rem;
   padding: 0.72rem 0.9rem;
   border-bottom: 1px solid var(--sb-line);
-  background: linear-gradient(90deg, #fffdfa, #f8f0e9);
+  background: linear-gradient(90deg, var(--sb-panel), var(--sb-soft));
 }
 .shadbala-results > header div > span { color: var(--sb-rose); font-size: 0.58rem; font-weight: 850; letter-spacing: 0.08em; text-transform: uppercase; }
 .shadbala-results h3 { margin: 0.08rem 0 0; font-size: 1rem; }
@@ -254,18 +255,18 @@
 
 .shadbala-results__head {
   padding: 0.42rem 0.9rem;
-  border-bottom: 1px solid #eadfd7;
-  background: #f5eee8;
-  color: #75665f;
+  border-bottom: 1px solid var(--sb-line);
+  background: var(--sb-soft);
+  color: var(--sb-muted);
   font-size: 0.57rem;
   font-weight: 850;
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
-.shadbala-planet { border-bottom: 1px solid #ede3dc; }
+.shadbala-planet { border-bottom: 1px solid var(--sb-line); }
 .shadbala-planet:last-child { border-bottom: 0; }
-.shadbala-planet.is-expanded { background: #fffaf6; }
+.shadbala-planet.is-expanded { background: var(--sb-soft); }
 
 .shadbala-planet__summary {
   width: 100%;
@@ -276,7 +277,7 @@
   text-align: left;
   cursor: pointer;
 }
-.shadbala-planet__summary:hover { background: #faf4ee; }
+.shadbala-planet__summary:hover { background: var(--sb-soft); }
 
 .shadbala-planet__identity { display: flex; align-items: center; gap: 0.62rem; min-width: 0; }
 .shadbala-planet__identity > b { width: 1.85rem; height: 1.85rem; flex: 0 0 1.85rem; font-size: 0.67rem; }
@@ -285,26 +286,26 @@
 .shadbala-planet__strength { display: grid; gap: 0.3rem; min-width: 0; }
 .shadbala-planet__strength > span { color: var(--sb-muted); font-size: 0.67rem; }
 .shadbala-planet__strength > span strong { color: var(--sb-ink); font-size: 0.82rem; }
-.shadbala-planet__strength small { margin-left: 0.4rem; color: #8d7e77; font-size: 0.59rem; }
-.shadbala-planet__strength > i { height: 5px; overflow: hidden; border-radius: 999px; background: #eadfd7; }
-.shadbala-planet__strength > i > em { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #c97071, var(--sb-rose)); }
+.shadbala-planet__strength small { margin-left: 0.4rem; color: var(--sb-muted); font-size: 0.59rem; }
+.shadbala-planet__strength > i { height: 5px; overflow: hidden; border-radius: 999px; background: var(--sb-line); }
+.shadbala-planet__strength > i > em { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--color-accent), var(--sb-rose)); }
 
-.shadbala-planet__chevron { color: #776861; font-size: 1rem; transition: transform 0.2s ease; }
+.shadbala-planet__chevron { color: var(--sb-muted); font-size: 1rem; transition: transform 0.2s ease; }
 .shadbala-planet.is-expanded .shadbala-planet__chevron { transform: rotate(180deg); }
 
-.shadbala-planet__details { padding: 0.8rem 0.9rem 0.9rem 3.35rem; border-top: 1px solid #eadfd7; background: #faf4ee; }
+.shadbala-planet__details { padding: 0.8rem 0.9rem 0.9rem 3.35rem; border-top: 1px solid var(--sb-line); background: var(--sb-soft); }
 .shadbala-planet__details > header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.55rem; }
 .shadbala-planet__details > header strong { font-size: 0.78rem; }
 .shadbala-planet__details > header span { color: var(--sb-muted); font-size: 0.6rem; }
 
 .shadbala-components { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.45rem; }
-.shadbala-components > div { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.52rem 0.58rem; border: 1px solid #e5d9cf; border-radius: 8px; background: #fffdfa; }
+.shadbala-components > div { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.52rem 0.58rem; border: 1px solid var(--sb-line); border-radius: 8px; background: var(--sb-panel); }
 .shadbala-components span { min-width: 0; display: grid; gap: 0.08rem; }
 .shadbala-components strong { overflow: hidden; font-size: 0.67rem; text-overflow: ellipsis; white-space: nowrap; }
 .shadbala-components small { color: var(--sb-muted); font-size: 0.55rem; }
 .shadbala-components > div > b { color: var(--sb-rose); font-size: 0.72rem; }
 
-.shadbala-formulas { margin-top: 0.65rem; border: 1px solid #dfd3ca; border-radius: 8px; background: #fffdfa; }
+.shadbala-formulas { margin-top: 0.65rem; border: 1px solid var(--sb-line); border-radius: 8px; background: var(--sb-panel); }
 .shadbala-formulas > summary,
 .shadbala-guide > summary { list-style: none; cursor: pointer; }
 .shadbala-formulas > summary::-webkit-details-marker,
@@ -313,21 +314,21 @@
 .shadbala-formulas > summary::after { float: right; content: '+'; font-size: 0.85rem; }
 .shadbala-formulas[open] > summary::after { content: '−'; }
 .shadbala-formulas__list { display: grid; gap: 0.55rem; padding: 0 0.65rem 0.65rem; }
-.shadbala-formulas__list article { border-top: 1px solid #eadfd7; padding-top: 0.55rem; }
-.shadbala-formulas__list h5 { margin: 0 0 0.35rem; color: #4b3b36; font-size: 0.68rem; }
+.shadbala-formulas__list article { border-top: 1px solid var(--sb-line); padding-top: 0.55rem; }
+.shadbala-formulas__list h5 { margin: 0 0 0.35rem; color: var(--sb-ink); font-size: 0.68rem; }
 .shadbala-formulas__list p { display: grid; grid-template-columns: 80px 1fr; gap: 0.45rem; margin: 0.25rem 0; color: var(--sb-muted); font-size: 0.61rem; line-height: 1.45; }
-.shadbala-formulas code { overflow-wrap: anywhere; padding: 0.15rem 0.3rem; border-radius: 4px; background: #f2e9e2; color: #713149; font-size: 0.58rem; }
+.shadbala-formulas code { overflow-wrap: anywhere; padding: 0.15rem 0.3rem; border-radius: 4px; background: var(--sb-soft); color: var(--sb-ink); font-size: 0.58rem; }
 .shadbala-formulas__components { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.35rem; margin-top: 0.45rem; }
-.shadbala-formulas__components section { display: grid; gap: 0.18rem; padding: 0.42rem; border: 1px solid #e8ddd4; border-radius: 6px; }
-.shadbala-formulas__components b { color: #6b5a53; font-size: 0.56rem; text-transform: capitalize; }
+.shadbala-formulas__components section { display: grid; gap: 0.18rem; padding: 0.42rem; border: 1px solid var(--sb-line); border-radius: 6px; }
+.shadbala-formulas__components b { color: var(--sb-ink); font-size: 0.56rem; text-transform: capitalize; }
 .shadbala-formulas__components span { color: var(--sb-muted); font-size: 0.58rem; line-height: 1.4; }
 
-.shadbala-guide { margin-top: 0.8rem; border: 1px solid var(--sb-line); border-radius: 11px; background: #f4ece5; }
-.shadbala-guide > summary { padding: 0.65rem 0.8rem; color: #54443e; font-size: 0.7rem; font-weight: 800; }
+.shadbala-guide { margin-top: 0.8rem; border: 1px solid var(--sb-line); border-radius: 11px; background: var(--sb-soft); }
+.shadbala-guide > summary { padding: 0.65rem 0.8rem; color: var(--sb-ink); font-size: 0.7rem; font-weight: 800; }
 .shadbala-guide > summary::after { float: right; color: var(--sb-rose); content: '⌄'; }
 .shadbala-guide[open] > summary::after { transform: rotate(180deg); }
 .shadbala-guide > div { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.45rem; padding: 0 0.8rem 0.65rem; }
-.shadbala-guide > div > span { min-width: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.06rem 0.38rem; align-items: center; padding: 0.45rem; border-radius: 7px; background: rgba(255, 253, 250, 0.78); }
+.shadbala-guide > div > span { min-width: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.06rem 0.38rem; align-items: center; padding: 0.45rem; border-radius: 7px; background: var(--sb-panel); }
 .shadbala-guide > div strong { font-size: 0.63rem; }
 .shadbala-guide > div b,
 .shadbala-guide > div em { grid-column: 2; color: var(--sb-muted); font-size: 0.55rem; font-style: normal; font-weight: 600; }
@@ -336,7 +337,7 @@
 .shadbala-grade-dot--good { background: #78934e; }
 .shadbala-grade-dot--average { background: #bd7c38; }
 .shadbala-grade-dot--weak { background: #a55d48; }
-.shadbala-guide > p { margin: 0; padding: 0.65rem 0.8rem; border-top: 1px solid #e0d5cc; color: var(--sb-muted); font-size: 0.62rem; line-height: 1.5; }
+.shadbala-guide > p { margin: 0; padding: 0.65rem 0.8rem; border-top: 1px solid var(--sb-line); color: var(--sb-muted); font-size: 0.62rem; line-height: 1.5; }
 
 @media (max-width: 760px) {
   .shadbala-modal-overlay { place-items: end center; padding: 0; }

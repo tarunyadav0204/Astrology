@@ -1,83 +1,222 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-ar-fallback="recovery">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#e91e63" />
+  <meta name="theme-color" content="#2d0c1c" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="robots" content="noindex" />
-  <title>We’ll be right back — AstroRoshni</title>
+  <meta name="ar-fallback" content="recovery" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+  <title>Opening AstroRoshni</title>
   <link rel="icon" type="image/png" href="/favicon.png" />
+  <script>
+    (function applySavedTheme() {
+      var palettes = {
+        heritage:  { shell: '#2d0c1c', canvas: '#f7f1e8', surface: '#fffaf2', text: '#210b17', muted: 'rgba(33,11,23,.64)', accent: '#d7b878', primary: '#701d3f', onPrimary: '#fffaf2', line: 'rgba(69,35,46,.18)' },
+        oliveGold: { shell: '#4f4b38', canvas: '#f2eac9', surface: '#fbf5df', text: '#29281f', muted: 'rgba(41,40,31,.68)', accent: '#aaa171', primary: '#736e52', onPrimary: '#fff9e7', line: 'rgba(79,75,56,.20)' },
+        oxfordTan: { shell: '#00162f', canvas: '#001a39', surface: '#08294f', text: '#f8efe2', muted: 'rgba(248,239,226,.72)', accent: '#d2b48c', primary: '#d2b48c', onPrimary: '#001a39', line: 'rgba(210,180,140,.28)' },
+        mistyRose: { shell: '#633e49', canvas: '#ffe4e1', surface: '#fff7f4', text: '#37242c', muted: 'rgba(55,36,44,.68)', accent: '#c08081', primary: '#a85f67', onPrimary: '#fff8f5', line: 'rgba(99,62,73,.19)' },
+        midnight:  { shell: '#09060e', canvas: '#100b17', surface: '#1d1427', text: '#f8f0e4', muted: 'rgba(248,240,228,.68)', accent: '#d9bd7e', primary: '#d1789b', onPrimary: '#190d18', line: 'rgba(248,240,228,.18)' },
+        obsidian:  { shell: '#120810', canvas: '#120810', surface: '#1d1019', text: '#fff8ec', muted: 'rgba(255,248,236,.70)', accent: '#d8bc7a', primary: '#a94d70', onPrimary: '#fff8ec', line: 'rgba(216,188,122,.25)' },
+        aurora:    { shell: '#082732', canvas: '#f3f7f6', surface: '#ffffff', text: '#08202a', muted: 'rgba(8,32,42,.65)', accent: '#32cb0b', primary: '#0b6fe8', onPrimary: '#ffffff', line: 'rgba(8,39,50,.18)' },
+        deepLagoon:{ shell: '#0f2a2a', canvas: '#d9faf4', surface: '#effffb', text: '#0f2a2a', muted: 'rgba(15,42,42,.66)', accent: '#00bfa6', primary: '#007f72', onPrimary: '#ffffff', line: 'rgba(15,42,42,.20)' },
+        clarity:   { shell: '#173f39', canvas: '#f3f5f4', surface: '#ffffff', text: '#17342f', muted: 'rgba(23,52,47,.66)', accent: '#bd9145', primary: '#265f56', onPrimary: '#ffffff', line: 'rgba(38,95,86,.18)' },
+        monochrome:{ shell: '#050505', canvas: '#f4f4f2', surface: '#ffffff', text: '#0a0a0a', muted: 'rgba(10,10,10,.64)', accent: '#9a9a9a', primary: '#050505', onPrimary: '#ffffff', line: 'rgba(5,5,5,.18)' },
+        pandit:    { shell: '#4b160e', canvas: '#fff7e8', surface: '#fffdf6', text: '#2b140e', muted: 'rgba(43,20,14,.66)', accent: '#d49a36', primary: '#9a341e', onPrimary: '#ffffff', line: 'rgba(75,22,14,.20)' }
+      };
+      var saved = 'heritage';
+      try {
+        var pandit = localStorage.getItem('panditMode');
+        if (pandit === '1' || pandit === 'true') saved = 'pandit';
+        else {
+          var direct = localStorage.getItem('appTheme');
+          if (direct) saved = direct;
+          if (!direct) {
+            for (var i = 0; i < localStorage.length; i += 1) {
+              var key = localStorage.key(i) || '';
+              if (/appTheme$/i.test(key)) { saved = localStorage.getItem(key) || saved; break; }
+            }
+          }
+        }
+      } catch (_) {}
+      saved = String(saved).replace(/^['\"]|['\"]$/g, '');
+      var p = palettes[saved] || palettes.heritage;
+      var root = document.documentElement;
+      root.dataset.theme = saved;
+      Object.keys(p).forEach(function (key) { root.style.setProperty('--' + key, p[key]); });
+      root.style.backgroundColor = p.shell;
+      root.style.colorScheme = ['midnight', 'obsidian', 'oxfordTan'].indexOf(saved) >= 0 ? 'dark' : 'light';
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', p.shell);
+    }());
+  </script>
   <style>
     * { box-sizing: border-box; }
+    html, body { min-height: 100%; background: var(--shell); }
     body {
       margin: 0;
       min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1.5rem;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      color: #1a1a2e;
-      background: linear-gradient(160deg, #fdf2f7 0%, #f0f4ff 45%, #fff8f0 100%);
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: max(1.5rem, env(safe-area-inset-top)) max(1.25rem, env(safe-area-inset-right)) max(1.5rem, env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left));
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 84% 12%, color-mix(in srgb, var(--accent) 20%, transparent) 0, transparent 28rem),
+        var(--canvas);
     }
     .card {
-      max-width: 28rem;
-      width: 100%;
-      background: rgba(255, 255, 255, 0.92);
-      border-radius: 1rem;
-      padding: 2rem 1.75rem;
-      box-shadow: 0 12px 40px rgba(233, 30, 99, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+      position: relative;
+      overflow: hidden;
+      width: min(100%, 29rem);
+      padding: 2.25rem 1.75rem 2rem;
+      border: 1px solid var(--line);
+      border-radius: 1.75rem;
+      color: var(--text);
+      background: var(--surface);
+      box-shadow: 0 24px 70px color-mix(in srgb, var(--shell) 18%, transparent);
       text-align: center;
     }
-    .badge {
-      display: inline-block;
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.06em;
+    .card::before, .card::after {
+      content: "";
+      position: absolute;
+      width: 12rem;
+      height: 12rem;
+      border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .card::before { right: -6.5rem; top: -7rem; }
+    .card::after { right: -4.4rem; top: -8.7rem; }
+    .mark {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 4rem;
+      height: 4rem;
+      margin: 0 auto 1.4rem;
+      border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+      border-radius: 50%;
+      color: var(--accent);
+    }
+    .spinner {
+      width: 1.5rem;
+      height: 1.5rem;
+      border: 2px solid color-mix(in srgb, var(--accent) 28%, transparent);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .85s linear infinite;
+    }
+    .eyebrow {
+      margin: 0 0 .75rem;
+      color: var(--primary);
+      font-size: .72rem;
+      font-weight: 800;
+      letter-spacing: .18em;
       text-transform: uppercase;
-      color: #e91e63;
-      margin-bottom: 0.75rem;
     }
     h1 {
-      font-size: 1.35rem;
-      font-weight: 700;
-      margin: 0 0 0.75rem;
-      line-height: 1.3;
+      margin: 0 0 .8rem;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2rem, 8vw, 2.75rem);
+      font-weight: 500;
+      line-height: 1.02;
     }
-    p {
-      margin: 0 0 1rem;
-      font-size: 0.95rem;
-      line-height: 1.55;
-      color: #444;
-    }
-    p:last-of-type { margin-bottom: 0; }
+    p { margin: 0 auto; max-width: 23rem; color: var(--muted); font-size: .98rem; line-height: 1.6; }
+    .outage { display: none; }
+    body.confirmed .booting { display: none; }
+    body.confirmed .outage { display: block; }
     button {
-      margin-top: 1.25rem;
-      padding: 0.65rem 1.25rem;
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: #fff;
-      background: #e91e63;
-      border: none;
-      border-radius: 0.5rem;
+      margin-top: 1.5rem;
+      min-width: 9.5rem;
+      padding: .85rem 1.35rem;
+      border: 0;
+      border-radius: 999px;
+      color: var(--onPrimary);
+      background: var(--primary);
+      font: inherit;
+      font-weight: 750;
       cursor: pointer;
     }
-    button:hover { background: #c2185b; }
-    button:focus-visible { outline: 2px solid #e91e63; outline-offset: 2px; }
+    button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    .status { min-height: 1.5rem; margin-top: 1rem; font-size: .78rem; color: var(--muted); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 1.8s; } }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="badge">Maintenance</div>
-    <h1>We’re updating AstroRoshni</h1>
-    <p>
-      The site is temporarily unavailable while we deploy improvements or recover from an issue.
-      Please try again in a few minutes.
-    </p>
-    <p>
-      If you need help urgently, contact support through your usual channel.
-    </p>
-    <button type="button" onclick="window.location.reload()">Try again</button>
-  </div>
+  <main class="card" aria-live="polite">
+    <div class="mark" aria-hidden="true"><span class="spinner"></span></div>
+    <section class="booting">
+      <div class="eyebrow">Restoring your session</div>
+      <h1>Opening AstroRoshni</h1>
+      <p>Reconnecting securely. This usually takes only a moment.</p>
+    </section>
+    <section class="outage">
+      <div class="eyebrow">Connection taking longer</div>
+      <h1>We’re still trying</h1>
+      <p>AstroRoshni is not responding yet. We’ll keep checking automatically, so you do not need to close the app.</p>
+      <button type="button" id="retry">Try now</button>
+    </section>
+    <div class="status" id="status">Checking the app…</div>
+  </main>
+  <script>
+    (function recoverApp() {
+      var failures = 0;
+      var timer;
+      var status = document.getElementById('status');
+      var retry = document.getElementById('retry');
+      var sourceUrl = new URL(window.location.href);
+      if (sourceUrl.pathname === '/maintenance.html') sourceUrl.pathname = '/mobile/';
+      sourceUrl.searchParams.delete('__ar_probe');
+      sourceUrl.searchParams.delete('__ar_recover');
+
+      function schedule() {
+        var delays = [700, 1400, 2600, 4800, 8000, 12000];
+        var delay = delays[Math.min(failures, delays.length - 1)];
+        clearTimeout(timer);
+        timer = setTimeout(probe, delay);
+      }
+
+      async function probe() {
+        clearTimeout(timer);
+        status.textContent = failures ? 'Checking again…' : 'Checking the app…';
+        var probeUrl = new URL(sourceUrl.href);
+        probeUrl.searchParams.set('__ar_probe', String(Date.now()));
+        try {
+          var response = await fetch(probeUrl.href, {
+            cache: 'no-store',
+            credentials: 'same-origin',
+            headers: { 'X-AstroRoshni-Recovery': '1' }
+          });
+          var html = await response.text();
+          var fallback = /name=["']ar-fallback["']|data-ar-fallback|We(?:’|')re updating AstroRoshni/i.test(html);
+          var documentResponse = /<html[\s>]/i.test(html) && /<\/html>/i.test(html);
+          if (response.ok && documentResponse && !fallback) {
+            status.textContent = 'Connected. Opening…';
+            var launchUrl = new URL(sourceUrl.href);
+            launchUrl.searchParams.set('__ar_recover', String(Date.now()));
+            window.location.replace(launchUrl.href);
+            return;
+          }
+        } catch (_) {}
+        failures += 1;
+        if (failures >= 5) {
+          document.body.classList.add('confirmed');
+          status.textContent = 'Automatic retry is active';
+        }
+        schedule();
+      }
+
+      retry.addEventListener('click', function () {
+        document.body.classList.remove('confirmed');
+        failures = 0;
+        probe();
+      });
+      probe();
+    }());
+  </script>
 </body>
 </html>

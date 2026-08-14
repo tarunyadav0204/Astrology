@@ -507,18 +507,9 @@ const SouthIndianChart = ({
         }}
         preserveAspectRatio="xMidYMid meet"
       >
-      {/* Gradient definitions */}
-      <defs>
-        <linearGradient id="southChartGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="rgba(233, 30, 99, 0.1)" />
-          <stop offset="50%" stopColor="rgba(255, 111, 0, 0.1)" />
-          <stop offset="100%" stopColor="rgba(255, 255, 255, 0.2)" />
-        </linearGradient>
-      </defs>
-      
       {/* Outer border */}
       <rect x="0" y="0" width="340" height="340" 
-            fill="url(#southChartGradient)" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1.5"/>
+            fill="var(--color-chart-surface, var(--color-surface-raised))" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1.5"/>
       
       {/* Outer house divisions - no center grid */}
       {/* Top row divisions */}

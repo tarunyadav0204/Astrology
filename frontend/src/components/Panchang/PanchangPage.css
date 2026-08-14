@@ -2893,13 +2893,79 @@
   padding: 1rem !important;
   border: 1px solid var(--color-border) !important;
   border-radius: var(--radius-md) !important;
-  background: var(--color-canvas-subtle) !important;
+  background: var(--color-surface-raised) !important;
+  color: var(--color-text) !important;
+  line-height: 1.2;
+  text-align: center;
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+.panchang-page--themed .planet-card-compact .planet-icon,
+.panchang-page--themed .planet-card-compact .planet-name,
+.panchang-page--themed .planet-card-compact .planet-info .sign {
   color: var(--color-text) !important;
 }
-.panchang-page--themed .planet-name,
-.panchang-page--themed .sign { color: var(--color-text); }
-.panchang-page--themed .degree,
-.panchang-page--themed .ayanamsa-info { color: var(--color-text-muted); }
+.panchang-page--themed .planet-card-compact .planet-info .degree,
+.panchang-page--themed .ayanamsa-info { color: var(--color-text-muted) !important; }
+.panchang-page--themed .planet-card-compact .badge.retrograde {
+  border: 1px solid color-mix(in srgb, var(--color-brand) 42%, transparent);
+  background: color-mix(in srgb, var(--color-brand) 18%, var(--color-surface-raised));
+  color: var(--color-brand);
+}
+.panchang-page--themed .planet-card-compact .badge.combust {
+  border: 1px solid color-mix(in srgb, var(--color-danger) 42%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 16%, var(--color-surface-raised));
+  color: var(--color-danger);
+}
+
+.panchang-page--themed .planetary-summary {
+  gap: 1rem;
+}
+.panchang-page--themed .planetary-summary .summary-item {
+  min-height: 6rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+.panchang-page--themed .planetary-summary .summary-item h4 {
+  margin: 0 0 .75rem;
+  color: var(--color-text) !important;
+}
+.panchang-page--themed .planetary-summary .planet-tag {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text) !important;
+}
+.panchang-page--themed .planetary-summary .no-status { color: var(--color-text-muted); }
+
+.panchang-page--themed .general-advice h5,
+.panchang-page--themed .weekly-pattern h4 {
+  color: var(--color-brand) !important;
+}
+.panchang-page--themed .general-advice li {
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-accent);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  box-shadow: none;
+}
+.panchang-page--themed .pattern-item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+.panchang-page--themed .pattern-item .day-name { color: var(--color-text); }
+.panchang-page--themed .pattern-item .timing-info { color: var(--color-text-muted); }
+.panchang-page--themed .pattern-item.today {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-on-accent);
+}
+.panchang-page--themed .pattern-item.today .day-name,
+.panchang-page--themed .pattern-item.today .timing-info { color: var(--color-on-accent); }
 
 .panchang-page--themed .panchang-seo-section,
 .panchang-page--themed .panchang-faq-section {

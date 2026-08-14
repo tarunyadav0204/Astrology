@@ -591,7 +591,7 @@ const NorthIndianChart = ({
       >
       {/* Outer square border */}
       <rect x="5" y="5" width="390" height="390" 
-            fill="url(#chartGradient)" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1.5"/>
+            fill="var(--color-chart-surface, var(--color-surface-raised))" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1.5"/>
       
       {/* Inner diamond border */}
       <polygon points="200,5 395,200 200,395 5,200" 
@@ -614,15 +614,6 @@ const NorthIndianChart = ({
       
 
       
-      {/* Gradient definitions */}
-      <defs>
-        <linearGradient id="chartGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="rgba(233, 30, 99, 0.1)" />
-          <stop offset="50%" stopColor="rgba(255, 111, 0, 0.1)" />
-          <stop offset="100%" stopColor="rgba(255, 255, 255, 0.2)" />
-        </linearGradient>
-      </defs>
-
 
       
       {/* Instruction text */}

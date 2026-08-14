@@ -749,6 +749,9 @@ jobs:
             -x '^(mobile(/.*)?|_expo(/.*)?|expo-index\.html|assets/(node_modules|src|assets)(/.*)?)$' \
             frontend/build "gs://${GCP_FRONTEND_SITE_BUCKET}"
           gsutil -m setmeta -h "Cache-Control:no-cache" "gs://${GCP_FRONTEND_SITE_BUCKET}/**/*.html" || true
+          # The load balancer may serve this document for a transient 5xx. Never
+          # let an installed PWA retain that response as its next launch page.
+          gsutil setmeta -h "Cache-Control:no-store, max-age=0, must-revalidate" "gs://${GCP_FRONTEND_SITE_BUCKET}/maintenance.html" || true
           gsutil -m setmeta -h "Cache-Control:public, max-age=31536000, immutable" "gs://${GCP_FRONTEND_SITE_BUCKET}/static/**" || true
           gsutil -m setmeta -h "Cache-Control:public, max-age=31536000, immutable" "gs://${GCP_FRONTEND_SITE_BUCKET}/_next/static/**" || true
           gsutil -m setmeta -h "Cache-Control:public, max-age=3600" "gs://${GCP_FRONTEND_SITE_BUCKET}/manifest.json" || true

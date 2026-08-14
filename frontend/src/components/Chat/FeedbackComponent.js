@@ -100,9 +100,11 @@ const FeedbackComponent = ({ message, onFeedbackSubmitted }) => {
               <button
                 key={star}
                 onClick={() => handleStarPress(star)}
-                className="feedback-star"
+                className={`feedback-star${star <= feedback.rating ? ' is-selected' : ''}`}
+                aria-label={`${star} star${star === 1 ? '' : 's'}`}
+                aria-pressed={star <= feedback.rating}
               >
-                <span style={{ color: star <= feedback.rating ? '#FFD700' : '#999' }}>★</span>
+                <span aria-hidden="true">★</span>
               </button>
             ))}
           </div>

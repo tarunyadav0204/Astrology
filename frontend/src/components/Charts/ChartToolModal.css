@@ -1,0 +1,149 @@
+.chart-tool-modal__backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 1000200 !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: clamp(0.75rem, 2vw, 1.5rem) !important;
+  background: color-mix(in srgb, var(--color-surface-inverse) 72%, transparent) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.chart-tool-modal {
+  width: min(44rem, 100%) !important;
+  max-width: none !important;
+  max-height: min(86dvh, 56rem) !important;
+  overflow: hidden;
+  color: var(--color-text) !important;
+  background:
+    radial-gradient(circle at 96% 0%, color-mix(in srgb, var(--color-accent) 14%, transparent), transparent 19rem),
+    var(--color-surface-raised) !important;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-2xl) !important;
+  box-shadow: var(--shadow-xl) !important;
+}
+
+.chart-tool-modal--wide {
+  width: min(54rem, 100%) !important;
+}
+
+.chart-tool-modal__header {
+  min-height: 5rem;
+  display: flex;
+  align-items: flex-end;
+  padding: 1.25rem 1.5rem 1rem !important;
+  color: var(--color-text) !important;
+  background: transparent !important;
+  border-bottom: 1px solid var(--color-border) !important;
+}
+
+.chart-tool-modal__header h3 {
+  margin: 0 !important;
+  color: var(--color-text) !important;
+  font-family: var(--font-display);
+  font-size: clamp(1.55rem, 3vw, 2.15rem);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+
+.chart-tool-modal__header h3 span {
+  color: var(--color-text-muted) !important;
+  font-family: var(--font-body);
+}
+
+.chart-tool-modal__body {
+  padding: 1.35rem 1.5rem 1.5rem !important;
+  color: var(--color-text) !important;
+  scrollbar-color: var(--color-brand) transparent;
+  scrollbar-width: thin;
+}
+
+.chart-tool-modal__body div {
+  color: var(--color-text) !important;
+}
+
+.chart-tool-modal__body div[style*="background-color"] {
+  background: color-mix(in srgb, var(--color-surface) 88%, var(--color-brand) 12%) !important;
+}
+
+.chart-tool-modal__body h4,
+.chart-tool-modal__body h5 {
+  color: var(--color-brand) !important;
+}
+
+.chart-tool-modal__body h4 {
+  border-color: var(--color-brand) !important;
+}
+
+.chart-tool-modal__body span {
+  color: inherit;
+}
+
+.chart-tool-modal__body span[style*="background-color"] {
+  color: var(--color-on-brand) !important;
+  background: var(--color-brand) !important;
+  border-color: var(--color-brand) !important;
+}
+
+.chart-tool-modal__body > div > div,
+.chart-tool-modal__body [style*="border:"] {
+  border-color: var(--color-border-strong) !important;
+}
+
+.chart-tool-modal__footer {
+  min-height: 4.5rem;
+  align-items: center;
+  padding: 0.8rem 1.5rem !important;
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent) !important;
+  border-top: 1px solid var(--color-border) !important;
+}
+
+.chart-tool-modal__close {
+  min-width: 7rem;
+  min-height: 2.75rem;
+  padding: 0.7rem 1.25rem !important;
+  color: var(--color-on-brand) !important;
+  background: var(--color-brand) !important;
+  border: 1px solid var(--color-brand) !important;
+  border-radius: var(--radius-pill) !important;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.chart-tool-modal__close:hover,
+.chart-tool-modal__close:focus-visible {
+  color: var(--color-on-accent) !important;
+  background: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+  outline: none;
+}
+
+@media (max-width: 640px) {
+  .chart-tool-modal__backdrop {
+    align-items: end !important;
+    padding: 0 !important;
+  }
+
+  .chart-tool-modal {
+    width: 100% !important;
+    max-height: calc(92dvh - env(safe-area-inset-top, 0px)) !important;
+    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0 !important;
+  }
+
+  .chart-tool-modal__header,
+  .chart-tool-modal__body,
+  .chart-tool-modal__footer {
+    padding-inline: 1rem !important;
+  }
+
+  .chart-tool-modal__body [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .chart-tool-modal__footer {
+    padding-bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
