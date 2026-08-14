@@ -43,12 +43,16 @@ const NorthIndianChart = ({
   houseActivation = null,
   size = null, // PWA/web: explicit pixel square (avoids % SVG collapse)
   onDarkSurface = false,
+  gridLineColor = null,
+  gridLineWidth = null,
 }) => {
   const { theme, colors } = useTheme();
   const { t } = useTranslation();
   const themedChartText = onDarkSurface ? colors.textInverse : colors.chartText;
   const themedChartTextMuted = onDarkSurface ? colors.textInverseMuted : colors.chartTextMuted;
   const themedChartLine = onDarkSurface ? colors.cosmicLine : colors.chartLine;
+  const resolvedGridLine = gridLineColor || themedChartLine;
+  const resolvedGridLineWidth = gridLineWidth || (cosmicTheme ? 1 : 2);
 
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
 
@@ -355,16 +359,16 @@ const NorthIndianChart = ({
         <G clipPath="url(#chartClip)">
           <AnimatedLine
             x1="2" y1="2" x2="398" y2="398"
-            stroke={cosmicTheme ? themedChartLine : "#ff8a65"}
-            strokeWidth={cosmicTheme ? "1" : "2"}
+            stroke={cosmicTheme ? resolvedGridLine : "#ff8a65"}
+            strokeWidth={resolvedGridLineWidth}
             strokeDasharray="600"
             strokeDashoffset={gridStrokeDash}
             pointerEvents="none"
           />
           <AnimatedLine
             x1="398" y1="2" x2="2" y2="398"
-            stroke={cosmicTheme ? themedChartLine : "#ff8a65"}
-            strokeWidth={cosmicTheme ? "1" : "2"}
+            stroke={cosmicTheme ? resolvedGridLine : "#ff8a65"}
+            strokeWidth={resolvedGridLineWidth}
             strokeDasharray="600"
             strokeDashoffset={gridStrokeDash}
             pointerEvents="none"

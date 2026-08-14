@@ -45,15 +45,9 @@ function formatInrAmountCell(row) {
   const absCredits = Math.abs(Number(row?.amount) || 0);
   const hasServerAmount = row?.amount_inr !== null && row?.amount_inr !== undefined && row?.amount_inr !== '';
   const serverAmount = hasServerAmount ? Number(row.amount_inr) : Number.NaN;
-  const isStarterPurchase =
-    String(row?.source || '').toLowerCase() === 'razorpay' &&
-    absCredits === 24 &&
-    String(row?.description || '').toLowerCase().includes('credits_24');
   const inr = Number.isFinite(serverAmount) && serverAmount >= 0
     ? serverAmount
-    : isStarterPurchase
-      ? 24
-      : absCredits * inrPerCredit(row?.created_at || row?.date);
+    : absCredits * inrPerCredit(row?.created_at || row?.date);
   if (inr === 0) return '₹0';
   const formatted = `₹${inr.toLocaleString('en-IN')}`;
   return isLedgerCreditType(row?.type) ? `+${formatted}` : `-${formatted}`;

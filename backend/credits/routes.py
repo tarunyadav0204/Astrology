@@ -1292,6 +1292,11 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
                 is_starter = product_id == "credits_24"
                 product["is_first_purchase_offer"] = is_starter
                 if is_starter:
+                    # Google Play owns the localized checkout price. Avoid
+                    # leaking the Razorpay/admin fallback copy into the Play
+                    # catalog when Play Console is set to a different amount.
+                    product["save_percent"] = 0
+                    product["value_prop"] = "One-time first purchase pack"
                     product["first_purchase_bonus"] = {
                         "enabled": True,
                         "eligible": False,

@@ -315,6 +315,8 @@ const LoadingBubble = ({
                                 hideInstructions={true}
                                 cosmicTheme
                                 onDarkSurface
+                                gridLineColor={colors.textInverseMuted}
+                                gridLineWidth={1.5}
                             />
                         </Animated.View>
                     )}

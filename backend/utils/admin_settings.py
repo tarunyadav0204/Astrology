@@ -23,7 +23,11 @@ logger = logging.getLogger(__name__)
 
 def is_credits_setting_key(key: str) -> bool:
     normalized = str(key or "").strip()
-    return normalized.startswith("first_purchase_bonus_") or normalized.startswith("purchase_discount_")
+    return (
+        normalized.startswith("first_purchase_bonus_")
+        or normalized.startswith("first_purchase_starter_")
+        or normalized.startswith("purchase_discount_")
+    )
 
 
 def invalidate_setting_cache(key: Optional[str] = None) -> None:
@@ -856,11 +860,25 @@ def first_purchase_bonus_enabled_for_user(user_id: Optional[int]) -> bool:
 def get_first_purchase_bonus_config() -> Dict[str, Any]:
     """Admin-controlled values for the post-free-question first credit purchase bonus."""
     import json
+    from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
     percent = _parse_int_setting(get_setting("first_purchase_bonus_percent"), default=20, minimum=0, maximum=500)
     fixed = _parse_int_setting(get_setting("first_purchase_bonus_fixed_credits"), default=0, minimum=0, maximum=100000)
     max_bonus = _parse_int_setting(get_setting("first_purchase_bonus_max_bonus_credits"), default=1000, minimum=0, maximum=100000)
     window_minutes = _parse_int_setting(get_setting("first_purchase_bonus_window_minutes"), default=30, minimum=1, maximum=10080)
+    starter_enabled = _parse_bool_setting(
+        get_setting("first_purchase_starter_enabled"),
+        default=True,
+    )
+    raw_starter_price = str(get_setting("first_purchase_starter_price_rupees") or "24").strip()
+    try:
+        starter_price = Decimal(raw_starter_price)
+    except (InvalidOperation, TypeError, ValueError):
+        starter_price = Decimal("24")
+    starter_price = max(Decimal("1"), min(Decimal("100000"), starter_price))
+    starter_amount_paise = int(
+        (starter_price * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    )
     raw_pack_overrides = (get_setting("first_purchase_bonus_pack_overrides") or "").strip()
     # The first-purchase offer is intentionally one mode at a time.
     # If legacy/admin data has both set, fixed credits wins because it is the explicit amount.
@@ -893,6 +911,9 @@ def get_first_purchase_bonus_config() -> Dict[str, Any]:
         "fixed_credits": fixed,
         "max_bonus_credits": max_bonus,
         "window_minutes": window_minutes,
+        "starter_enabled": starter_enabled,
+        "starter_price_rupees": float(Decimal(starter_amount_paise) / Decimal("100")),
+        "starter_amount_paise": starter_amount_paise,
         "bonus_type": bonus_type,
         "pack_overrides": pack_overrides,
     }

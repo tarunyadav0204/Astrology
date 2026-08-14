@@ -367,6 +367,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [freeQuestionParashariOnlyEnabled, setFreeQuestionParashariOnlyEnabled] = useState(false);
   const [freeQuestionParashariOnlySaving, setFreeQuestionParashariOnlySaving] = useState(false);
   const [firstPurchaseBonusEnabled, setFirstPurchaseBonusEnabled] = useState(false);
+  const [firstPurchaseStarterEnabled, setFirstPurchaseStarterEnabled] = useState(true);
+  const [firstPurchaseStarterPriceRupees, setFirstPurchaseStarterPriceRupees] = useState('24');
   const [firstPurchaseBonusUserAllowlist, setFirstPurchaseBonusUserAllowlist] = useState('');
   const [firstPurchaseBonusPercent, setFirstPurchaseBonusPercent] = useState('20');
   const [firstPurchaseBonusFixedCredits, setFirstPurchaseBonusFixedCredits] = useState('0');
@@ -817,6 +819,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setFreeQuestionParashariOnlyEnabled(Boolean(data.free_question_parashari_only_enabled));
       const firstBonusConfig = data.first_purchase_bonus_config || {};
       setFirstPurchaseBonusEnabled(Boolean(data.first_purchase_bonus_enabled));
+      setFirstPurchaseStarterEnabled(firstBonusConfig.starter_enabled !== false);
+      setFirstPurchaseStarterPriceRupees(String(firstBonusConfig.starter_price_rupees ?? '24'));
       setFirstPurchaseBonusUserAllowlist(data.first_purchase_bonus_user_allowlist || '');
       setFirstPurchaseBonusPercent(String(firstBonusConfig.percent ?? '20'));
       setFirstPurchaseBonusFixedCredits(String(firstBonusConfig.fixed_credits ?? '0'));
@@ -1397,6 +1401,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       }, {});
       const settingsToSave = [
         ['first_purchase_bonus_enabled', firstPurchaseBonusEnabled ? 'true' : 'false', 'Feature flag for extra credits on the first credit purchase after a free chat question'],
+        ['first_purchase_starter_enabled', firstPurchaseStarterEnabled ? 'true' : 'false', 'Show the one-time 24-credit starter pack to eligible first-time purchasers'],
+        ['first_purchase_starter_price_rupees', Math.max(1, Number(firstPurchaseStarterPriceRupees) || 24), 'Razorpay/web price in INR for the one-time 24-credit starter pack'],
         ['first_purchase_bonus_user_allowlist', firstPurchaseBonusUserAllowlist, 'Optional CSV user allowlist for first purchase bonus. Empty = all users when enabled.'],
         ['first_purchase_bonus_percent', firstPurchaseBonusPercent, 'Default percentage extra credits on eligible first purchase packs. Used only when fixed extra credits is 0 and a pack override is not set.'],
         ['first_purchase_bonus_fixed_credits', firstPurchaseBonusFixedCredits, 'Default fixed extra credits on eligible first purchase packs. If greater than 0, this takes priority over percentage unless a pack override is set.'],
@@ -6191,6 +6197,42 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   />
                   <span className="toggle-slider"></span>
                 </label>
+              </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>24-credit starter pack</strong>
+                  <p>
+                    Show or hide this one-time pack without releasing a new app version. Turning it off removes it from new
+                    web, PWA and Google Play product requests; an already-paid checkout can still finish safely.
+                  </p>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={firstPurchaseStarterEnabled}
+                    onChange={(e) => setFirstPurchaseStarterEnabled(e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+                <div style={{ width: '100%', maxWidth: '420px' }}>
+                  <label>
+                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
+                      Web / Razorpay price (₹)
+                    </span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="0.01"
+                      value={firstPurchaseStarterPriceRupees}
+                      onChange={(e) => setFirstPurchaseStarterPriceRupees(e.target.value)}
+                      style={{ width: '100%', padding: '8px' }}
+                    />
+                  </label>
+                  <p className="settings-hint" style={{ marginTop: '6px' }}>
+                    Razorpay uses this amount immediately. Google Play controls its own localized SKU price, so change
+                    <code> credits_24 </code> in Play Console too; no app release is required for that price change.
+                  </p>
+                </div>
               </div>
               <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 <div className="setting-info">

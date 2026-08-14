@@ -119,10 +119,11 @@ def _auth() -> HTTPBasicAuth:
 
 def _expected_paise_for_pack(credits: int) -> int:
     """Authoritative price in paise (env override per pack)."""
-    # The starter offer is a product rule, not an admin-priced regular pack.
-    # Ignore any stale RAZORPAY_PRICE_PAISE_24 left from the retired SKU.
     if credits == FIRST_PURCHASE_STARTER_CREDITS:
-        return 2400
+        from utils.admin_settings import get_first_purchase_bonus_config
+
+        config = get_first_purchase_bonus_config()
+        return max(100, int(config.get("starter_amount_paise") or 2400))
     env_key = f"RAZORPAY_PRICE_PAISE_{credits}"
     raw = os.environ.get(env_key)
     if raw is not None and str(raw).strip().isdigit():
@@ -173,6 +174,12 @@ def get_razorpay_credit_packs(userid: Optional[int] = None) -> List[Dict[str, An
             continue
         paise = _expected_paise_for_pack(c)
         meta = CREDIT_PACK_META.get(c) or {}
+        starter_rupees = paise / 100.0
+        starter_price_per_credit = starter_rupees / FIRST_PURCHASE_STARTER_CREDITS
+        starter_saving = max(
+            0,
+            round((1 - (starter_rupees / (FIRST_PURCHASE_STARTER_CREDITS * 2))) * 100),
+        )
         pack_bonus = int(meta.get("bonus_credits") or 0)
         web_bonus = 0 if is_starter else (credit_service.calculate_web_topup_bonus_credits(c) if web_bonus_on else 0)
         packs.append(
@@ -185,14 +192,17 @@ def get_razorpay_credit_packs(userid: Optional[int] = None) -> List[Dict[str, An
                 "name": meta.get("name") or f"{c} Credits",
                 "badge": meta.get("badge"),
                 "questions": meta.get("questions"),
-                "save_percent": meta.get("save_percent") or 0,
-                "value_prop": meta.get("value_prop"),
+                "save_percent": starter_saving if is_starter else (meta.get("save_percent") or 0),
+                "value_prop": (
+                    f"{FIRST_PURCHASE_STARTER_CREDITS} credits for {_format_inr(paise)}"
+                    if is_starter else meta.get("value_prop")
+                ),
                 "pack_bonus_credits": pack_bonus,
                 "web_topup_bonus_percent": web_bonus_percent,
                 "web_topup_bonus_credits": web_bonus,
                 "total_credits": int(c) + pack_bonus + web_bonus,
                 "is_first_purchase_offer": is_starter,
-                "price_per_credit_rupees": 1 if is_starter else None,
+                "price_per_credit_rupees": round(starter_price_per_credit, 2) if is_starter else None,
             }
         )
     return packs
@@ -220,7 +230,10 @@ def create_razorpay_credit_payment_link(
     """Create a Razorpay Payment Link for non-browser channels like WhatsApp."""
     if credits not in ALLOWED_CREDITS:
         raise ValueError("Invalid credits pack")
-    if not credit_service.is_credit_pack_sellable(credits=credits):
+    if credits == FIRST_PURCHASE_STARTER_CREDITS:
+        if not _first_purchase_starter_is_eligible(userid):
+            raise ValueError("This one-time first purchase offer is no longer available")
+    elif not credit_service.is_credit_pack_sellable(credits=credits):
         raise ValueError("This credits pack is currently unavailable")
 
     amount = _price_paise(credits)
@@ -243,6 +256,9 @@ def create_razorpay_credit_payment_link(
             "channel": "whatsapp",
         },
     }
+    if credits == FIRST_PURCHASE_STARTER_CREDITS:
+        payload["notes"]["offer_type"] = "first_purchase_starter"
+        payload["notes"]["starter_price_paise"] = str(amount)
     customer: Dict[str, str] = {}
     if name:
         customer["name"] = str(name)[:100]
@@ -415,7 +431,14 @@ def _process_captured_payment(
     except (TypeError, ValueError):
         return failure("Invalid amount", userid, "invalid_payment_amount")
 
+    # Lock a starter order to the admin price that was active when checkout
+    # began. This lets an already-paid order finish safely if an admin changes
+    # the price while the user is in Razorpay Checkout.
     expected = _expected_paise_for_pack(credits)
+    if credits == FIRST_PURCHASE_STARTER_CREDITS:
+        order_price_raw = str(notes.get("starter_price_paise") or "").strip()
+        if order_price_raw.isdigit() and int(order_price_raw) >= 100:
+            expected = int(order_price_raw)
 
     if amount_paise != expected:
         logger.warning(
@@ -602,6 +625,7 @@ async def razorpay_create_order(body: CreateOrderBody, current_user: User = Depe
     }
     if body.credits == FIRST_PURCHASE_STARTER_CREDITS:
         notes["offer_type"] = "first_purchase_starter"
+        notes["starter_price_paise"] = str(amount)
     gp_tok = (body.google_play_external_transaction_token or "").strip()
     if gp_tok:
         notes["gp_external_tx_token"] = gp_tok[:2048]

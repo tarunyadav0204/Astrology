@@ -950,7 +950,7 @@ export default function ChatScreen({ navigation, route }) {
       bonusCredits: data?.bonus_credits,
       windowMinutes: data?.window_minutes,
     });
-    if (!data?.enabled || !(data?.offer_eligible ?? data?.eligible)) {
+    if (!data?.enabled || !data?.starter_pack?.eligible) {
       setFirstPurchaseBonusOffer(null);
       return;
     }
@@ -1022,7 +1022,7 @@ export default function ChatScreen({ navigation, route }) {
         bonusCredits: data?.bonus_credits,
         windowMinutes: data?.window_minutes,
       });
-      if (data?.offer_eligible ?? data?.eligible) {
+      if (data?.starter_pack?.eligible) {
         showFirstPurchaseBonusOffer(candidate.messageId, data);
       } else {
         setFirstPurchaseBonusOffer(null);
@@ -1141,7 +1141,7 @@ export default function ChatScreen({ navigation, route }) {
           bonusCredits: data?.bonus_credits,
           windowMinutes: data?.window_minutes,
         });
-        if (!(data?.offer_eligible ?? data?.eligible)) {
+        if (!data?.starter_pack?.eligible) {
           setFirstPurchaseBonusOffer(null);
         }
       })
@@ -3936,7 +3936,7 @@ export default function ChatScreen({ navigation, route }) {
                 bonusCredits: bonusOffer?.bonus_credits,
                 windowMinutes: bonusOffer?.window_minutes,
               });
-              if (bonusOffer?.offer_eligible ?? bonusOffer?.eligible) {
+              if (bonusOffer?.starter_pack?.eligible) {
                 showFirstPurchaseBonusOffer(messageId, bonusOffer);
               } else {
                 restoreFirstPurchaseBonusOfferFromMessages([
@@ -5517,10 +5517,14 @@ export default function ChatScreen({ navigation, route }) {
               >
                 <Text style={[styles.creditText, { color: colors.textInverse }]}>
                   {isPremiumAnalysis ? '👑' : (isInstantAnalysis ? '⚡' : '💳')} {credits}
-                  {effectiveChatCost === 0 && (
-                    <Text style={[styles.creditText, { color: colors.primary, fontSize: 10, marginLeft: 4 }]}> · {t('premiumUi.home.free')}</Text>
-                  )}
                 </Text>
+                {effectiveChatCost === 0 && (
+                  <View style={[styles.creditFreeBadge, { backgroundColor: colors.accent }]}>
+                    <Text style={[styles.creditFreeBadgeText, { color: colors.onAccent }]}>
+                      {t('premiumUi.home.free')}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
 
               {showGreeting && (
@@ -6330,7 +6334,7 @@ export default function ChatScreen({ navigation, route }) {
                   ) : credits < effectiveChatCost ? (
                     <Text style={styles.modernSendText}>💳</Text>
                   ) : effectiveChatCost === 0 ? (
-                    <Text style={styles.modernSendText}>{t('premiumUi.home.free')}</Text>
+                    <Ionicons name="arrow-up" size={22} color={colors.onPrimary} />
                   ) : (
                     <Ionicons name="send" size={20} color={COLORS.white} />
                   )}
@@ -6340,12 +6344,38 @@ export default function ChatScreen({ navigation, route }) {
 
 
             {effectiveChatCost === 0 && !isKeyboardVisible && (
-              <View style={styles.firstQuestionFreeBanner}>
-                <Text style={styles.firstQuestionFreeIcon}>🎁</Text>
-                <View style={styles.firstQuestionFreeTextWrap}>
-                  <Text style={styles.firstQuestionFreeTitle}>{t('premiumUi.chatScreen.firstFree')}</Text>
-                  <Text style={styles.firstQuestionFreeSubtext}>{t('premiumUi.chatScreen.askAnythingFree')}</Text>
+              <View
+                style={[
+                  styles.firstQuestionFreeBanner,
+                  {
+                    backgroundColor: colors.selectionSurface,
+                    borderColor: colors.selectionBorder,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.firstQuestionFreeAccent,
+                    { backgroundColor: colors.primary },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.firstQuestionFreeIconWrap,
+                    { backgroundColor: colors.selectionControl },
+                  ]}
+                >
+                  <Ionicons name="gift-outline" size={20} color={colors.selectionText} />
                 </View>
+                <View style={styles.firstQuestionFreeTextWrap}>
+                  <Text style={[styles.firstQuestionFreeTitle, { color: colors.selectionText }]}>
+                    {t('premiumUi.chatScreen.firstFree')}
+                  </Text>
+                  <Text style={[styles.firstQuestionFreeSubtext, { color: colors.selectionTextMuted }]}>
+                    {t('premiumUi.chatScreen.askAnythingFree')}
+                  </Text>
+                </View>
+                <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
               </View>
             )}
 
@@ -8016,9 +8046,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 107, 53, 0.2)',
     borderWidth: 1,
     borderColor: 'rgba(255, 107, 53, 0.4)',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   creditButtonPremium: {
     backgroundColor: 'rgba(255, 215, 0, 0.2)',
@@ -8027,6 +8060,19 @@ const styles = StyleSheet.create({
   creditText: {
     fontSize: 13,
     fontWeight: '700',
+  },
+  creditFreeBadge: {
+    minHeight: 20,
+    paddingHorizontal: 7,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  creditFreeBadgeText: {
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '900',
+    letterSpacing: 0.25,
   },
   menuButton: {
     width: 36,
@@ -8633,31 +8679,42 @@ const styles = StyleSheet.create({
     marginTop: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    backgroundColor: 'rgba(34, 197, 94, 0.2)',
-    borderRadius: 12,
+    paddingVertical: 12,
+    paddingLeft: 16,
+    paddingRight: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(34, 197, 94, 0.4)',
+    overflow: 'hidden',
   },
-  firstQuestionFreeIcon: {
-    fontSize: 24,
-    marginRight: 12,
+  firstQuestionFreeAccent: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: 4,
+  },
+  firstQuestionFreeIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 11,
   },
   firstQuestionFreeTextWrap: {
     flex: 1,
   },
   firstQuestionFreeTitle: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#22c55e',
-    letterSpacing: 0.3,
+    lineHeight: 19,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   firstQuestionFreeSubtext: {
     fontSize: 12,
-    color: 'rgba(34, 197, 94, 0.9)',
+    lineHeight: 17,
     marginTop: 2,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   lowCreditBanner: {
     marginTop: 8,

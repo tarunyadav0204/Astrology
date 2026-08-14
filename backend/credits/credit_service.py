@@ -2754,15 +2754,22 @@ class CreditService:
             current_source=current_source,
             current_reference_id=current_reference_id,
         )
+        starter_enabled = bool(status.get("starter_enabled", True))
+        starter_amount_paise = max(100, int(status.get("starter_amount_paise") or 2400))
+        starter_reason = status.get("reason") if starter_enabled else "starter_offer_disabled"
         starter_pack = {
-            "enabled": bool(status.get("enabled")),
-            "eligible": bool(status.get("eligible")),
-            "reason": status.get("reason"),
+            "enabled": bool(status.get("enabled") and starter_enabled),
+            "eligible": bool(status.get("eligible") and starter_enabled),
+            "reason": starter_reason,
             "credits": 24,
             "product_id": "credits_24",
-            "amount_paise": 2400,
-            "amount_display": "₹24",
-            "price_per_credit_rupees": 1,
+            "amount_paise": starter_amount_paise,
+            "amount_display": (
+                f"₹{starter_amount_paise // 100}"
+                if starter_amount_paise % 100 == 0
+                else f"₹{starter_amount_paise / 100:.2f}"
+            ),
+            "price_per_credit_rupees": round(starter_amount_paise / 2400, 2),
             "window_minutes": int(status.get("window_minutes") or 0),
             "expires_at": status.get("expires_at"),
         }
@@ -2794,10 +2801,16 @@ class CreditService:
             status["purchase_discount"] = {"enabled": False, "eligible": False}
         # UI eligibility includes either configured offer.  Keep `eligible`
         # unchanged because it remains the first-purchase-bonus award gate.
+        # Existing app builds use `offer_eligible` as their display gate.
+        # Keep it tied to the starter switch so Admin can hide the 24-credit
+        # offer remotely even before users install a newer app build.
         status["offer_eligible"] = bool(
-            starter_pack.get("eligible")
-            or status.get("eligible")
-            or status.get("purchase_discount", {}).get("eligible")
+            starter_enabled
+            and (
+                starter_pack.get("eligible")
+                or status.get("eligible")
+                or status.get("purchase_discount", {}).get("eligible")
+            )
         )
         status["enabled"] = bool(
             status.get("enabled") or status.get("purchase_discount", {}).get("enabled")
@@ -4010,10 +4023,32 @@ class CreditService:
                            WHEN ct.source = 'razorpay'
                             AND ABS(ct.amount) = 24
                             AND (
-                                 COALESCE(ct.description, '') ILIKE '%credits_24%'
-                                 OR COALESCE(ct.metadata, '') ILIKE '%credits_24%'
+                                 POSITION('credits_24' IN LOWER(COALESCE(ct.description, ''))) > 0
+                                 OR POSITION('credits_24' IN LOWER(COALESCE(ct.metadata, ''))) > 0
                             )
-                           THEN 24
+                           THEN COALESCE(
+                               (
+                                   substring(
+                                       COALESCE(ct.metadata, '')
+                                       from '"amount_paise"[[:space:]]*:[[:space:]]*([0-9]+)'
+                                   )::numeric / 100
+                               ),
+                               24
+                           )
+                           WHEN ct.source = 'google_play'
+                            AND UPPER(COALESCE(
+                                substring(
+                                    COALESCE(ct.metadata, '')
+                                    from '"price_currency"[[:space:]]*:[[:space:]]*"([^"]+)"'
+                                ),
+                                ''
+                            )) = 'INR'
+                           THEN (
+                               substring(
+                                   COALESCE(ct.metadata, '')
+                                   from '"price_amount_micros"[[:space:]]*:[[:space:]]*([0-9]+)'
+                               )
+                           )::numeric / 1000000
                            WHEN ct.source = 'razorpay_refund'
                             AND EXISTS (
                                SELECT 1
@@ -4024,11 +4059,55 @@ class CreditService:
                                  AND original.transaction_type IN ('earned', 'refund')
                                  AND ABS(original.amount) = 24
                                  AND (
-                                      COALESCE(original.description, '') ILIKE '%credits_24%'
-                                      OR COALESCE(original.metadata, '') ILIKE '%credits_24%'
+                                      POSITION('credits_24' IN LOWER(COALESCE(original.description, ''))) > 0
+                                      OR POSITION('credits_24' IN LOWER(COALESCE(original.metadata, ''))) > 0
                                  )
                             )
-                           THEN ABS(ct.amount)
+                           THEN ABS(ct.amount) * COALESCE(
+                               (
+                                   SELECT substring(
+                                       COALESCE(original.metadata, '')
+                                       from '"amount_paise"[[:space:]]*:[[:space:]]*([0-9]+)'
+                                   )::numeric / 2400
+                                   FROM credit_transactions original
+                                   WHERE original.userid = ct.userid
+                                     AND original.reference_id = ct.reference_id
+                                     AND original.source = 'razorpay'
+                                     AND original.transaction_type IN ('earned', 'refund')
+                                   ORDER BY original.created_at ASC
+                                   LIMIT 1
+                               ),
+                               1
+                           )
+                           WHEN ct.source = 'google_play_refund'
+                           THEN ABS(ct.amount) * COALESCE(
+                               (
+                                   SELECT (
+                                       substring(
+                                           COALESCE(original.metadata, '')
+                                           from '"price_amount_micros"[[:space:]]*:[[:space:]]*([0-9]+)'
+                                       )
+                                   )::numeric / 1000000 / NULLIF(ABS(original.amount), 0)
+                                   FROM credit_transactions original
+                                   WHERE original.userid = ct.userid
+                                     AND original.reference_id = ct.reference_id
+                                     AND original.source = 'google_play'
+                                     AND original.transaction_type IN ('earned', 'refund')
+                                     AND UPPER(COALESCE(
+                                         substring(
+                                             COALESCE(original.metadata, '')
+                                             from '"price_currency"[[:space:]]*:[[:space:]]*"([^"]+)"'
+                                         ),
+                                         ''
+                                     )) = 'INR'
+                                   ORDER BY original.created_at ASC
+                                   LIMIT 1
+                               ),
+                               CASE
+                                   WHEN date(ct.created_at) >= DATE '2026-07-15' THEN 2
+                                   ELSE 1
+                               END
+                           )
                            ELSE NULL
                        END AS amount_inr
                 FROM credit_transactions ct
@@ -4155,10 +4234,32 @@ class CreditService:
                        WHEN ct.source = 'razorpay'
                         AND ABS(ct.amount) = 24
                         AND (
-                             COALESCE(ct.description, '') ILIKE '%credits_24%'
-                             OR COALESCE(ct.metadata, '') ILIKE '%credits_24%'
+                             POSITION('credits_24' IN LOWER(COALESCE(ct.description, ''))) > 0
+                             OR POSITION('credits_24' IN LOWER(COALESCE(ct.metadata, ''))) > 0
                         )
-                       THEN 24
+                       THEN COALESCE(
+                           (
+                               substring(
+                                   COALESCE(ct.metadata, '')
+                                   from '"amount_paise"[[:space:]]*:[[:space:]]*([0-9]+)'
+                               )::numeric / 100
+                           ),
+                           24
+                       )
+                       WHEN ct.source = 'google_play'
+                        AND UPPER(COALESCE(
+                            substring(
+                                COALESCE(ct.metadata, '')
+                                from '"price_currency"[[:space:]]*:[[:space:]]*"([^"]+)"'
+                            ),
+                            ''
+                        )) = 'INR'
+                       THEN (
+                           substring(
+                               COALESCE(ct.metadata, '')
+                               from '"price_amount_micros"[[:space:]]*:[[:space:]]*([0-9]+)'
+                           )
+                       )::numeric / 1000000
                        WHEN ct.source = 'razorpay_refund'
                         AND EXISTS (
                            SELECT 1
@@ -4169,11 +4270,55 @@ class CreditService:
                              AND original.transaction_type IN ('earned', 'refund')
                              AND ABS(original.amount) = 24
                              AND (
-                                  COALESCE(original.description, '') ILIKE '%credits_24%'
-                                  OR COALESCE(original.metadata, '') ILIKE '%credits_24%'
+                                  POSITION('credits_24' IN LOWER(COALESCE(original.description, ''))) > 0
+                                  OR POSITION('credits_24' IN LOWER(COALESCE(original.metadata, ''))) > 0
                              )
                         )
-                       THEN ABS(ct.amount)
+                       THEN ABS(ct.amount) * COALESCE(
+                           (
+                               SELECT substring(
+                                   COALESCE(original.metadata, '')
+                                   from '"amount_paise"[[:space:]]*:[[:space:]]*([0-9]+)'
+                               )::numeric / 2400
+                               FROM credit_transactions original
+                               WHERE original.userid = ct.userid
+                                 AND original.reference_id = ct.reference_id
+                                 AND original.source = 'razorpay'
+                                 AND original.transaction_type IN ('earned', 'refund')
+                               ORDER BY original.created_at ASC
+                               LIMIT 1
+                           ),
+                           1
+                       )
+                       WHEN ct.source = 'google_play_refund'
+                       THEN ABS(ct.amount) * COALESCE(
+                           (
+                               SELECT (
+                                   substring(
+                                       COALESCE(original.metadata, '')
+                                       from '"price_amount_micros"[[:space:]]*:[[:space:]]*([0-9]+)'
+                                   )
+                               )::numeric / 1000000 / NULLIF(ABS(original.amount), 0)
+                               FROM credit_transactions original
+                               WHERE original.userid = ct.userid
+                                 AND original.reference_id = ct.reference_id
+                                 AND original.source = 'google_play'
+                                 AND original.transaction_type IN ('earned', 'refund')
+                                 AND UPPER(COALESCE(
+                                     substring(
+                                         COALESCE(original.metadata, '')
+                                         from '"price_currency"[[:space:]]*:[[:space:]]*"([^"]+)"'
+                                     ),
+                                     ''
+                                 )) = 'INR'
+                               ORDER BY original.created_at ASC
+                               LIMIT 1
+                           ),
+                           CASE
+                               WHEN date(ct.created_at) >= DATE '2026-07-15' THEN 2
+                               ELSE 1
+                           END
+                       )
                        ELSE NULL
                    END AS amount_inr
             {where_sql}
@@ -4226,13 +4371,14 @@ class CreditService:
         zero_filter = " AND ct.amount <> 0" if exclude_zero_amount else ""
         cohort = (cohort_filter or "").strip().lower()
         query_filter = ""
-        params: List[Any] = [from_date, to_date, range_start, to_date]
+        query_params: List[Any] = []
         if query and query.strip():
             like = f"%{query.strip()}%"
             query_filter = " AND (u.name ILIKE ? OR u.phone ILIKE ?)"
-            params.extend([like, like])
+            query_params = [like, like]
 
         cohort_filter_sql = ""
+        cohort_params: List[Any] = []
         if cohort == "new_users_bought_in_range":
             cohort_filter_sql = """
               AND ct.userid IN (
@@ -4255,7 +4401,13 @@ class CreditService:
                     )
                   )
             """
-            params.extend([from_date, to_date, from_date, to_date])
+            cohort_params = [from_date, to_date, from_date, to_date]
+
+        # Placeholder order follows the SELECT fields first, followed by the
+        # WHERE clause (base range, cohort subquery, then optional text query).
+        params: List[Any] = [from_date, to_date, range_start, to_date]
+        params.extend(cohort_params)
+        params.extend(query_params)
 
         sql = f"""
             SELECT
@@ -4277,10 +4429,36 @@ class CreditService:
                         WHEN ct.source = 'razorpay'
                          AND ABS(ct.amount) = 24
                          AND (
-                              COALESCE(ct.description, '') ILIKE '%credits_24%'
-                              OR COALESCE(ct.metadata, '') ILIKE '%credits_24%'
+                              POSITION('credits_24' IN LOWER(COALESCE(ct.description, ''))) > 0
+                              OR POSITION('credits_24' IN LOWER(COALESCE(ct.metadata, ''))) > 0
                          )
-                        THEN 24
+                        THEN COALESCE(
+                            (
+                                substring(
+                                    COALESCE(ct.metadata, '')
+                                    from '"amount_paise"[[:space:]]*:[[:space:]]*([0-9]+)'
+                                )::numeric / 100
+                            ),
+                            24
+                        )
+                        WHEN ct.source = 'google_play'
+                         AND UPPER(COALESCE(
+                             substring(
+                                 COALESCE(ct.metadata, '')
+                                 from '"price_currency"[[:space:]]*:[[:space:]]*"([^"]+)"'
+                             ),
+                             ''
+                         )) = 'INR'
+                         AND substring(
+                             COALESCE(ct.metadata, '')
+                             from '"price_amount_micros"[[:space:]]*:[[:space:]]*([0-9]+)'
+                         ) IS NOT NULL
+                        THEN (
+                            substring(
+                                COALESCE(ct.metadata, '')
+                                from '"price_amount_micros"[[:space:]]*:[[:space:]]*([0-9]+)'
+                            )
+                        )::numeric / 1000000
                         ELSE ABS(ct.amount) * CASE
                             WHEN date(ct.created_at) >= DATE '2026-07-15' THEN 2
                             ELSE 1
@@ -4299,11 +4477,65 @@ class CreditService:
                               AND original.transaction_type IN ('earned', 'refund')
                               AND ABS(original.amount) = 24
                               AND (
-                                   COALESCE(original.description, '') ILIKE '%credits_24%'
-                                   OR COALESCE(original.metadata, '') ILIKE '%credits_24%'
+                                   POSITION('credits_24' IN LOWER(COALESCE(original.description, ''))) > 0
+                                   OR POSITION('credits_24' IN LOWER(COALESCE(original.metadata, ''))) > 0
                               )
                          )
-                        THEN 1
+                        THEN COALESCE(
+                            (
+                                SELECT substring(
+                                    COALESCE(original.metadata, '')
+                                    from '"amount_paise"[[:space:]]*:[[:space:]]*([0-9]+)'
+                                )::numeric / 2400
+                                FROM credit_transactions original
+                                WHERE original.userid = ct.userid
+                                  AND original.reference_id = ct.reference_id
+                                  AND original.source = 'razorpay'
+                                  AND original.transaction_type IN ('earned', 'refund')
+                                ORDER BY original.created_at ASC
+                                LIMIT 1
+                            ),
+                            1
+                        )
+                        WHEN ct.source = 'google_play_refund'
+                        THEN COALESCE(
+                            (
+                                SELECT (
+                                    substring(
+                                        COALESCE(original.metadata, '')
+                                        from '"price_amount_micros"[[:space:]]*:[[:space:]]*([0-9]+)'
+                                    )
+                                )::numeric / 1000000 / NULLIF(ABS(original.amount), 0)
+                                FROM credit_transactions original
+                                WHERE original.userid = ct.userid
+                                  AND original.reference_id = ct.reference_id
+                                  AND original.source = 'google_play'
+                                  AND original.transaction_type IN ('earned', 'refund')
+                                  AND UPPER(COALESCE(
+                                      substring(
+                                          COALESCE(original.metadata, '')
+                                          from '"price_currency"[[:space:]]*:[[:space:]]*"([^"]+)"'
+                                      ),
+                                      ''
+                                  )) = 'INR'
+                                ORDER BY original.created_at ASC
+                                LIMIT 1
+                            ),
+                            CASE
+                                WHEN date(COALESCE(
+                                    (
+                                        SELECT MIN(original.created_at)
+                                        FROM credit_transactions original
+                                        WHERE original.userid = ct.userid
+                                          AND original.reference_id = ct.reference_id
+                                          AND original.source = 'google_play'
+                                          AND original.transaction_type IN ('earned', 'refund')
+                                    ),
+                                    ct.created_at
+                                )) >= DATE '2026-07-15' THEN 2
+                                ELSE 1
+                            END
+                        )
                         -- Use the purchase date for the INR conversion when the
                         -- reversal points back to its original payment/order.
                         WHEN date(COALESCE(
@@ -4363,7 +4595,7 @@ class CreditService:
 
         return {
             "purchased_credits": int(row[0] or 0),
-            "purchased_amount_inr": int(row[1] or 0),
+            "purchased_amount_inr": round(float(row[1] or 0), 2),
             "user_spend_credits": int(row[2] or 0),
             "admin_added_credits": int(row[3] or 0),
             "admin_deducted_credits": int(row[4] or 0),
