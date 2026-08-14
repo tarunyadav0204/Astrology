@@ -4787,7 +4787,13 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     # only (`eligible`). Do not use `offer_eligible` here — that
                     # flag also covers the separate purchase-discount campaign
                     # and inflated "Offer shown" while clients had no tappable UI.
-                    if isinstance(first_purchase_bonus_payload, dict) and first_purchase_bonus_payload.get("eligible"):
+                    if (
+                        isinstance(first_purchase_bonus_payload, dict)
+                        and (
+                            first_purchase_bonus_payload.get("eligible")
+                            or (first_purchase_bonus_payload.get("starter_pack") or {}).get("eligible")
+                        )
+                    ):
                         record_first_purchase_offer_funnel_event(
                             userid=int(user_id),
                             event_name="offer_shown",

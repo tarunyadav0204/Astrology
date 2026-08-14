@@ -20,6 +20,7 @@ import {
   Linking,
   ActivityIndicator,
   FlatList,
+  useWindowDimensions,
 } from 'react-native';
 import {
   ScrollView as GHScrollView,
@@ -462,6 +463,10 @@ function chatPersonStorageKey(birth) {
 
 export default function ChatScreen({ navigation, route }) {
   const { t, i18n } = useTranslation();
+  const { width: viewportWidth, fontScale: viewportFontScale = 1 } = useWindowDimensions();
+  const effectiveHeaderWidth = viewportWidth / Math.max(1, viewportFontScale);
+  const compactHeaderChrome = viewportWidth < 390 || effectiveHeaderWidth < 350;
+  const iconOnlyHeaderBrand = viewportWidth < 340 || effectiveHeaderWidth < 285;
   useAnalytics('ChatScreen');
   const {
     theme,
@@ -3918,7 +3923,15 @@ export default function ChatScreen({ navigation, route }) {
             } else {
               freeUsedThisSendRef.current = false;
             }
-            const wasFreeQuestion = Boolean(freeUsedThisSendRef.current && !gatedNoCharge);
+            // The server is authoritative. The local ref is only an optimistic
+            // hint and can be lost across retries, reconciliation, or a quick
+            // PWA remount while the answer is processing.
+            const serverConfirmedFreeQuestion = Boolean(
+              status.gate_metadata?.free_question_completed
+            );
+            const wasFreeQuestion = Boolean(
+              (freeUsedThisSendRef.current || serverConfirmedFreeQuestion) && !gatedNoCharge
+            );
             if (wasFreeQuestion) {
               suppressModeIntroAfterFreeRef.current = true;
               setShowChatModeIntro(false);
@@ -5414,6 +5427,7 @@ export default function ChatScreen({ navigation, route }) {
             colors={[colors.headerSurface, colors.headerSurface]}
             style={[
               styles.header,
+              compactHeaderChrome && styles.headerCompact,
               {
                 borderColor: colors.cosmicLine,
                 elevation: getCardElevation(3),
@@ -5452,19 +5466,33 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             )}
 
-            <View style={styles.headerCenter}>
+            <View style={[styles.headerCenter, compactHeaderChrome && styles.headerCenterCompact]}>
               {showGreeting ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: -16 }}>
-                  <View style={styles.headerLogoContainer}>
+                <View style={styles.headerBrandRow}>
+                  <View style={[styles.headerLogoContainer, compactHeaderChrome && styles.headerLogoContainerCompact]}>
                     <Image
                       source={require('../../../assets/logo.png')}
-                      style={styles.headerLogo}
+                      style={[styles.headerLogo, compactHeaderChrome && styles.headerLogoCompact]}
                       resizeMode="contain"
                     />
                   </View>
-                  <View>
-                    <Text style={[styles.headerTitle, { color: colors.textInverse, marginBottom: 4 }]}>{t('premiumUi.chatScreen.brand')}</Text>
-                  </View>
+                  {!iconOnlyHeaderBrand ? (
+                    <View style={styles.headerBrandCopy}>
+                      <Text
+                        style={[
+                          styles.headerTitle,
+                          compactHeaderChrome && styles.headerTitleCompact,
+                          { color: colors.textInverse },
+                        ]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.72}
+                        maxFontSizeMultiplier={1.15}
+                      >
+                        {t('premiumUi.chatScreen.brand')}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               ) : isMundane ? (
                 <View style={styles.activeChatTitleWrap}>
@@ -5499,7 +5527,7 @@ export default function ChatScreen({ navigation, route }) {
               )}
             </View>
 
-            <View style={styles.headerRight}>
+            <View style={[styles.headerRight, compactHeaderChrome && styles.headerRightCompact]}>
               {isGuruMember ? (
                 <View style={[styles.guruMemberBadge, { backgroundColor: theme === 'dark' ? 'rgba(255,107,53,0.2)' : 'rgba(255,107,53,0.12)', borderColor: colors.primary }]}>
                   <Text style={[styles.guruMemberBadgeText, { color: colors.primary }]}>
@@ -5510,17 +5538,26 @@ export default function ChatScreen({ navigation, route }) {
               <TouchableOpacity
                 style={[
                   styles.creditButton,
+                  compactHeaderChrome && styles.creditButtonCompact,
                   { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine },
                   isPremiumAnalysis && styles.creditButtonPremium,
                 ]}
                 onPress={() => navigation.navigate('Credits')}
               >
-                <Text style={[styles.creditText, { color: colors.textInverse }]}>
+                <Text
+                  style={[styles.creditText, compactHeaderChrome && styles.creditTextCompact, { color: colors.textInverse }]}
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={1.15}
+                >
                   {isPremiumAnalysis ? '👑' : (isInstantAnalysis ? '⚡' : '💳')} {credits}
                 </Text>
                 {effectiveChatCost === 0 && (
                   <View style={[styles.creditFreeBadge, { backgroundColor: colors.accent }]}>
-                    <Text style={[styles.creditFreeBadgeText, { color: colors.onAccent }]}>
+                    <Text
+                      style={[styles.creditFreeBadgeText, { color: colors.onAccent }]}
+                      numberOfLines={1}
+                      maxFontSizeMultiplier={1.15}
+                    >
                       {t('premiumUi.home.free')}
                     </Text>
                   </View>
@@ -7906,6 +7943,10 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  headerCompact: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
   backButton: {
     width: 36,
     height: 36,
@@ -7917,11 +7958,29 @@ const styles = StyleSheet.create({
   },
   headerCenter: {
     flex: 1,
+    minWidth: 0,
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  headerCenterCompact: {
+    alignItems: 'flex-start',
+  },
+  headerBrandRow: {
+    flex: 1,
+    minWidth: 0,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerBrandCopy: {
+    flex: 1,
+    minWidth: 0,
   },
   activeChatTitleWrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
+    minWidth: 0,
     maxWidth: 176,
   },
   activeChatDot: {
@@ -7948,8 +8007,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif', default: 'serif' }),
     fontSize: 23,
+    lineHeight: 28,
     fontWeight: '600',
-    textAlign: 'center',
+    textAlign: 'left',
+  },
+  headerTitleCompact: {
+    fontSize: 20,
+    lineHeight: 25,
   },
   headerLogoContainer: {
     width: 50,
@@ -7966,10 +8030,21 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+  headerLogoContainerCompact: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    marginRight: 8,
+  },
   headerLogo: {
     width: 48,
     height: 48,
     borderRadius: 14,
+  },
+  headerLogoCompact: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
   },
   nameChip: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
@@ -8029,6 +8104,9 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     overflow: 'visible',
   },
+  headerRightCompact: {
+    gap: 5,
+  },
   guruMemberBadge: {
     borderWidth: 1,
     borderRadius: 12,
@@ -8057,9 +8135,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 215, 0, 0.2)',
     borderColor: 'rgba(255, 215, 0, 0.4)',
   },
+  creditButtonCompact: {
+    paddingHorizontal: 8,
+    gap: 4,
+  },
   creditText: {
     fontSize: 13,
     fontWeight: '700',
+  },
+  creditTextCompact: {
+    fontSize: 12,
   },
   creditFreeBadge: {
     minHeight: 20,

@@ -857,6 +857,25 @@ def first_purchase_bonus_enabled_for_user(user_id: Optional[int]) -> bool:
         return False
 
 
+def first_purchase_starter_enabled_for_user(user_id: Optional[int]) -> bool:
+    """Whether the one-time starter pack is enabled for this user.
+
+    The starter pack has its own Admin switch.  It intentionally shares the
+    optional first-purchase allowlist, but it must not depend on the legacy
+    extra-credit bonus switch; otherwise Admin can show the starter switch as
+    ON while every catalog still hides the pack.
+    """
+    if not get_first_purchase_bonus_config().get("starter_enabled"):
+        return False
+    allowlist = get_first_purchase_bonus_user_allowlist()
+    if not allowlist:
+        return True
+    try:
+        return int(user_id) in allowlist
+    except (TypeError, ValueError):
+        return False
+
+
 def get_first_purchase_bonus_config() -> Dict[str, Any]:
     """Admin-controlled values for the post-free-question first credit purchase bonus."""
     import json

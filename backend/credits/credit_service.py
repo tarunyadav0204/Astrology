@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Optional, Dict, List, Any
 
 # Sentinel: pass this as discount to mean "do not change discount column"
@@ -2654,7 +2654,15 @@ class CreditService:
         created_at = free_row.get("created_at")
         if created_at:
             try:
-                status["expires_at"] = (created_at + timedelta(minutes=int(config["window_minutes"]))).isoformat()
+                # credit_transactions.created_at is TIMESTAMP (without time
+                # zone) and production DB sessions use UTC. Send an explicit
+                # offset so browsers in IST or any other zone do not treat a
+                # fresh offer as several hours old.
+                if created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=timezone.utc)
+                status["expires_at"] = (
+                    created_at + timedelta(minutes=int(config["window_minutes"]))
+                ).isoformat()
             except Exception:
                 pass
         return status
@@ -2673,10 +2681,10 @@ class CreditService:
         after the user started checkout; once charged, it remains redeemable
         provided the user used the free question and has no earlier purchase.
         """
-        from utils.admin_settings import first_purchase_bonus_enabled_for_user
+        from utils.admin_settings import first_purchase_starter_enabled_for_user
 
         return bool(
-            first_purchase_bonus_enabled_for_user(userid)
+            first_purchase_starter_enabled_for_user(userid)
             and self.get_free_chat_question_used(userid)
             and not self._has_prior_credit_purchase(
                 userid,
@@ -2684,6 +2692,68 @@ class CreditService:
                 current_reference_id=current_reference_id,
             )
         )
+
+    def _first_purchase_starter_base_status(
+        self,
+        userid: int,
+        *,
+        current_source: Optional[str] = None,
+        current_reference_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Eligibility for the Admin-controlled starter pack.
+
+        This mirrors the free-question/first-purchase safety gates used by the
+        legacy bonus campaign, while keeping the two feature switches
+        independent.
+        """
+        from utils.admin_settings import (
+            first_purchase_starter_enabled_for_user,
+            get_first_purchase_bonus_config,
+        )
+
+        config = get_first_purchase_bonus_config()
+        enabled = bool(config.get("starter_enabled"))
+        status: Dict[str, Any] = {
+            "enabled": enabled,
+            "eligible": False,
+            "reason": "starter_offer_disabled" if not enabled else "not_eligible",
+            **config,
+        }
+        if not first_purchase_starter_enabled_for_user(userid):
+            status["reason"] = "starter_offer_disabled_or_user_not_allowed"
+            return status
+        if not self.get_free_chat_question_used(userid):
+            status["reason"] = "free_question_not_used"
+            return status
+        if self._has_prior_credit_purchase(
+            userid,
+            current_source=current_source,
+            current_reference_id=current_reference_id,
+        ):
+            status["reason"] = "prior_purchase_exists"
+            return status
+        free_row = self._recent_free_chat_question_row(userid, config["window_minutes"])
+        if not free_row:
+            status["reason"] = "outside_bonus_window"
+            return status
+        if self.has_first_purchase_bonus(userid):
+            status["reason"] = "bonus_already_granted"
+            status["free_question_transaction_id"] = free_row.get("id")
+            return status
+        status["eligible"] = True
+        status["reason"] = "eligible"
+        status["free_question_transaction_id"] = free_row.get("id")
+        created_at = free_row.get("created_at")
+        if created_at:
+            try:
+                if created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=timezone.utc)
+                status["expires_at"] = (
+                    created_at + timedelta(minutes=int(config["window_minutes"]))
+                ).isoformat()
+            except Exception:
+                pass
+        return status
 
     def _purchase_discount_base_status(
         self,
@@ -2754,12 +2824,17 @@ class CreditService:
             current_source=current_source,
             current_reference_id=current_reference_id,
         )
-        starter_enabled = bool(status.get("starter_enabled", True))
-        starter_amount_paise = max(100, int(status.get("starter_amount_paise") or 2400))
-        starter_reason = status.get("reason") if starter_enabled else "starter_offer_disabled"
+        starter_status = self._first_purchase_starter_base_status(
+            userid,
+            current_source=current_source,
+            current_reference_id=current_reference_id,
+        )
+        starter_enabled = bool(starter_status.get("enabled"))
+        starter_amount_paise = max(100, int(starter_status.get("starter_amount_paise") or 2400))
+        starter_reason = starter_status.get("reason") or "starter_offer_disabled"
         starter_pack = {
-            "enabled": bool(status.get("enabled") and starter_enabled),
-            "eligible": bool(status.get("eligible") and starter_enabled),
+            "enabled": starter_enabled,
+            "eligible": bool(starter_status.get("eligible")),
             "reason": starter_reason,
             "credits": 24,
             "product_id": "credits_24",
@@ -2770,8 +2845,8 @@ class CreditService:
                 else f"₹{starter_amount_paise / 100:.2f}"
             ),
             "price_per_credit_rupees": round(starter_amount_paise / 2400, 2),
-            "window_minutes": int(status.get("window_minutes") or 0),
-            "expires_at": status.get("expires_at"),
+            "window_minutes": int(starter_status.get("window_minutes") or 0),
+            "expires_at": starter_status.get("expires_at"),
         }
         status = self._compose_bonus_status(
             status,
@@ -2813,7 +2888,9 @@ class CreditService:
             )
         )
         status["enabled"] = bool(
-            status.get("enabled") or status.get("purchase_discount", {}).get("enabled")
+            status.get("enabled")
+            or starter_pack.get("enabled")
+            or status.get("purchase_discount", {}).get("enabled")
         )
         status["starter_pack"] = starter_pack
 

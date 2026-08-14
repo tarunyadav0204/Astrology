@@ -6187,7 +6187,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               <div className="setting-item">
                 <div className="setting-info">
                   <strong>Enable first purchase bonus</strong>
-                  <p>When off, credit packs and payment verification behave exactly as before.</p>
+                  <p>Controls extra bonus credits on regular packs. The separate 24-credit starter switch below works independently.</p>
                 </div>
                 <label className="toggle-switch">
                   <input
@@ -6202,7 +6202,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 <div className="setting-info">
                   <strong>24-credit starter pack</strong>
                   <p>
-                    Show or hide this one-time pack without releasing a new app version. Turning it off removes it from new
+                    Show or hide this one-time pack without releasing a new app version. It does not require the extra-credit bonus switch above. Turning it off removes it from new
                     web, PWA and Google Play product requests; an already-paid checkout can still finish safely.
                   </p>
                 </div>
