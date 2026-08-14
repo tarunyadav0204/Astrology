@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Animated, Dimensions, AppState, BackHandler, Platform } from 'react-native';
+import { View, StyleSheet, Animated, AppState, BackHandler, Platform, useWindowDimensions } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,8 +24,6 @@ import ChooseLanguageScreen from './screens/ChooseLanguageScreen';
 
 import { useTheme } from '../../context/ThemeContext';
 import FocusedStatusBar from '../Common/FocusedStatusBar';
-
-const { width } = Dimensions.get('window');
 
 /** @returns {string|null} next screen id, or '__root_go_back__' to pop Login off the root stack */
 function resolveAuthHardwareBackTarget(currentScreen, isLogin, formData) {
@@ -86,6 +84,7 @@ const INITIAL_FORM_DATA = {
 
 export default function ModernAuthFlow({ navigation, route }) {
   const { colors } = useTheme();
+  const { width: viewportWidth } = useWindowDimensions();
   const [currentScreen, setCurrentScreen] = useState('phone');
   const [isLogin, setIsLogin] = useState(null);
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
@@ -129,7 +128,22 @@ export default function ModernAuthFlow({ navigation, route }) {
 
   const navigateToScreenRef = useRef(null);
   const navigateToScreen = (screenName, direction = 'forward') => {
-    const slideValue = direction === 'forward' ? -width : width;
+    // RN Web can leave a native-driven translate animation frozen when the
+    // browser/PWA viewport changes or the keyboard opens during registration.
+    // That shifts the whole auth screen off-canvas and exposes the document on
+    // the right. Screen changes are immediate on web; native keeps the gesture.
+    if (Platform.OS === 'web') {
+      slideAnim.stopAnimation();
+      fadeAnim.stopAnimation();
+      if (screenName === 'name') storage.clearPendingRegistration();
+      slideAnim.setValue(0);
+      fadeAnim.setValue(1);
+      setCurrentScreen(screenName);
+      return;
+    }
+
+    const slideWidth = Math.max(1, Number(viewportWidth) || 1);
+    const slideValue = direction === 'forward' ? -slideWidth : slideWidth;
     
     Animated.parallel([
       Animated.timing(slideAnim, {
@@ -145,7 +159,7 @@ export default function ModernAuthFlow({ navigation, route }) {
     ]).start(() => {
       if (screenName === 'name') storage.clearPendingRegistration();
       setCurrentScreen(screenName);
-      slideAnim.setValue(direction === 'forward' ? width : -width);
+      slideAnim.setValue(direction === 'forward' ? slideWidth : -slideWidth);
       
       Animated.parallel([
         Animated.timing(slideAnim, {
@@ -162,6 +176,16 @@ export default function ModernAuthFlow({ navigation, route }) {
     });
   };
   navigateToScreenRef.current = navigateToScreen;
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    // Recover safely if a resize/orientation event interrupted an animation
+    // created by an older mounted bundle before this render completed.
+    slideAnim.stopAnimation();
+    fadeAnim.stopAnimation();
+    slideAnim.setValue(0);
+    fadeAnim.setValue(1);
+  }, [viewportWidth, slideAnim, fadeAnim]);
 
   useFocusEffect(
     useCallback(() => {
@@ -278,18 +302,26 @@ export default function ModernAuthFlow({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
+    alignSelf: 'stretch',
     ...(Platform.OS === 'web' ? { minHeight: 0, height: '100%' } : null),
   },
   gradient: {
     flex: 1,
+    width: '100%',
+    alignSelf: 'stretch',
     ...(Platform.OS === 'web' ? { minHeight: 0 } : null),
   },
   safeArea: {
     flex: 1,
+    width: '100%',
+    alignSelf: 'stretch',
     ...(Platform.OS === 'web' ? { minHeight: 0 } : null),
   },
   screenContainer: {
     flex: 1,
+    width: '100%',
+    alignSelf: 'stretch',
     ...(Platform.OS === 'web' ? { minHeight: 0 } : null),
   },
 });

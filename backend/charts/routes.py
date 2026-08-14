@@ -9,7 +9,7 @@ import time
 from collections import defaultdict, deque
 from pydantic import BaseModel
 from auth import get_current_user, get_optional_user, User
-from calculators.chart_calculator import ChartCalculator
+from calculators.chart_calculator import ChartCalculator, resolve_ayanamsha_mode
 from calculators.vedic_graha_drishti import attach_graha_drishti_to_chart
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 from calculators.jaimini_point_calculator import JaiminiPointCalculator
@@ -297,6 +297,17 @@ def _clone_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     return json.loads(json.dumps(payload))
 
+
+def _parashari_view_profile(request: Dict[str, Any]) -> Tuple[str, str, bool]:
+    """Read the optional chart-view profile without changing global analysis defaults."""
+    profile = request.get("calculation_profile") or {}
+    explicit = bool(profile)
+    ayanamsha, _ = resolve_ayanamsha_mode(profile.get("ayanamsha", "lahiri"))
+    node_type = str(profile.get("node_type", "mean") or "mean").strip().lower()
+    if node_type not in {"mean", "true"}:
+        raise HTTPException(status_code=400, detail="node_type must be 'mean' or 'true'")
+    return ayanamsha, node_type, explicit
+
 def get_divisional_sign(sign, degree_in_sign, division):
     """Calculate divisional sign using proper Vedic formulas with boundary buffer"""
     EPS = 1e-9  # Prevent 10.0 becoming 9.999
@@ -454,9 +465,14 @@ async def calculate_chart_only(
 
         birth_obj = BirthDataSimple(birth_data)
         birth_hash = _birth_hash_from_dict(birth_data)
+        ayanamsha, node_type, explicit_profile = _parashari_view_profile(request)
 
         if birth_hash:
-            cache_key = build_chart_cache_key("calculate-chart-only", birth_hash)
+            cache_key = build_chart_cache_key(
+                "parashari-view-chart-v1" if explicit_profile else "calculate-chart-only",
+                birth_hash,
+                **({"ayanamsha": ayanamsha, "node_type": node_type} if explicit_profile else {}),
+            )
             with get_conn() as conn:
                 cached_payload = fetch_cached_chart_payload(conn, cache_key)
             if cached_payload:
@@ -464,7 +480,9 @@ async def calculate_chart_only(
 
         # Calculate chart
         calculator = ChartCalculator({})
-        chart_data = calculator.calculate_chart(birth_obj)
+        chart_data = calculator.calculate_chart(birth_obj, node_type=node_type, ayanamsha=ayanamsha)
+        if explicit_profile:
+            chart_data["calculation_profile"] = {"ayanamsha": ayanamsha, "node_type": node_type}
 
         if birth_hash:
             with get_conn() as conn:
@@ -747,9 +765,15 @@ async def calculate_divisional_chart(
         birth_data = request.get('birth_data', {})
         # Support both 'division' and 'division_number' for backward compatibility
         division_number = request.get('division', request.get('division_number', 9))
+        ayanamsha, node_type, explicit_profile = _parashari_view_profile(request)
         birth_hash = _birth_hash_from_dict(birth_data)
         cache_key = (
-            build_chart_cache_key("calculate-divisional-chart", birth_hash, division=division_number)
+            build_chart_cache_key(
+                "parashari-view-divisional-v1" if explicit_profile else "calculate-divisional-chart",
+                birth_hash,
+                division=division_number,
+                **({"ayanamsha": ayanamsha, "node_type": node_type} if explicit_profile else {}),
+            )
             if birth_hash
             else None
         )
@@ -777,7 +801,9 @@ async def calculate_divisional_chart(
         
         # Calculate main chart first
         calculator = ChartCalculator({})
-        chart_data = calculator.calculate_chart(birth_obj)
+        chart_data = calculator.calculate_chart(birth_obj, node_type=node_type, ayanamsha=ayanamsha)
+        if explicit_profile:
+            chart_data["calculation_profile"] = {"ayanamsha": ayanamsha, "node_type": node_type}
 
         # Calculate divisional chart
         divisional_data = {

@@ -2659,6 +2659,32 @@ class CreditService:
                 pass
         return status
 
+    def can_redeem_first_purchase_starter(
+        self,
+        userid: int,
+        *,
+        current_source: Optional[str] = None,
+        current_reference_id: Optional[str] = None,
+    ) -> bool:
+        """Final grant guard for the one-time starter SKU.
+
+        Unlike the display gate, this intentionally does not require the
+        short countdown window to still be open. A Play purchase may finish
+        after the user started checkout; once charged, it remains redeemable
+        provided the user used the free question and has no earlier purchase.
+        """
+        from utils.admin_settings import first_purchase_bonus_enabled_for_user
+
+        return bool(
+            first_purchase_bonus_enabled_for_user(userid)
+            and self.get_free_chat_question_used(userid)
+            and not self._has_prior_credit_purchase(
+                userid,
+                current_source=current_source,
+                current_reference_id=current_reference_id,
+            )
+        )
+
     def _purchase_discount_base_status(
         self,
         userid: int,
@@ -2728,6 +2754,18 @@ class CreditService:
             current_source=current_source,
             current_reference_id=current_reference_id,
         )
+        starter_pack = {
+            "enabled": bool(status.get("enabled")),
+            "eligible": bool(status.get("eligible")),
+            "reason": status.get("reason"),
+            "credits": 24,
+            "product_id": "credits_24",
+            "amount_paise": 2400,
+            "amount_display": "₹24",
+            "price_per_credit_rupees": 1,
+            "window_minutes": int(status.get("window_minutes") or 0),
+            "expires_at": status.get("expires_at"),
+        }
         status = self._compose_bonus_status(
             status,
             purchased_credits=purchased_credits,
@@ -2757,11 +2795,14 @@ class CreditService:
         # UI eligibility includes either configured offer.  Keep `eligible`
         # unchanged because it remains the first-purchase-bonus award gate.
         status["offer_eligible"] = bool(
-            status.get("eligible") or status.get("purchase_discount", {}).get("eligible")
+            starter_pack.get("eligible")
+            or status.get("eligible")
+            or status.get("purchase_discount", {}).get("eligible")
         )
         status["enabled"] = bool(
             status.get("enabled") or status.get("purchase_discount", {}).get("enabled")
         )
+        status["starter_pack"] = starter_pack
 
         def _log_status(reason: str, extra: Optional[Dict[str, Any]] = None) -> None:
             try:
@@ -3135,6 +3176,7 @@ class CreditService:
         purchase_reference_id: str,
         product_id: Optional[str] = None,
         exclude_web_topup_bonus: bool = False,
+        exclude_promotional_extras: bool = False,
     ) -> Dict[str, Any]:
         """Apply purchase extras, optionally excluding the web-only top-up bonus.
 
@@ -3142,33 +3184,48 @@ class CreditService:
         web/PWA purchases.  Callers must set ``exclude_web_topup_bonus`` for
         that channel so the Razorpay source alone cannot grant the web offer.
         """
-        pack_result = self.maybe_apply_pack_bonus(
-            userid=userid,
-            purchased_credits=purchased_credits,
-            purchase_source=purchase_source,
-            purchase_reference_id=purchase_reference_id,
-            product_id=product_id,
-        )
-        first_result = self.maybe_apply_first_purchase_bonus(
-            userid=userid,
-            purchased_credits=purchased_credits,
-            purchase_source=purchase_source,
-            purchase_reference_id=purchase_reference_id,
-            product_id=product_id,
-        )
-        discount_result = self.maybe_apply_purchase_discount(
-            userid=userid,
-            purchased_credits=purchased_credits,
-            purchase_source=purchase_source,
-            purchase_reference_id=purchase_reference_id,
-            product_id=product_id,
-        )
-        if exclude_web_topup_bonus:
+        excluded_result = {
+            "applied": False,
+            "eligible": False,
+            "bonus_credits": 0,
+            "reason": "included_in_first_purchase_starter_price",
+        }
+        if exclude_promotional_extras:
+            pack_result = dict(excluded_result)
+            first_result = dict(excluded_result)
+            discount_result = dict(excluded_result)
+        else:
+            pack_result = self.maybe_apply_pack_bonus(
+                userid=userid,
+                purchased_credits=purchased_credits,
+                purchase_source=purchase_source,
+                purchase_reference_id=purchase_reference_id,
+                product_id=product_id,
+            )
+            first_result = self.maybe_apply_first_purchase_bonus(
+                userid=userid,
+                purchased_credits=purchased_credits,
+                purchase_source=purchase_source,
+                purchase_reference_id=purchase_reference_id,
+                product_id=product_id,
+            )
+            discount_result = self.maybe_apply_purchase_discount(
+                userid=userid,
+                purchased_credits=purchased_credits,
+                purchase_source=purchase_source,
+                purchase_reference_id=purchase_reference_id,
+                product_id=product_id,
+            )
+        if exclude_web_topup_bonus or exclude_promotional_extras:
             web_result = {
                 "applied": False,
                 "eligible": False,
                 "bonus_credits": 0,
-                "reason": "excluded_purchase_channel",
+                "reason": (
+                    "included_in_first_purchase_starter_price"
+                    if exclude_promotional_extras
+                    else "excluded_purchase_channel"
+                ),
             }
         else:
             web_result = self.maybe_apply_web_topup_bonus(
@@ -3947,10 +4004,36 @@ class CreditService:
             type_filter = " AND transaction_type = 'spent'"
         with get_conn() as conn:
             cursor = execute(conn, f"""
-                SELECT id, transaction_type, amount, balance_after, source, reference_id, description, created_at
-                FROM credit_transactions
-                WHERE userid = ?{zero_filter}{type_filter}
-                ORDER BY created_at DESC
+                SELECT ct.id, ct.transaction_type, ct.amount, ct.balance_after,
+                       ct.source, ct.reference_id, ct.description, ct.created_at,
+                       CASE
+                           WHEN ct.source = 'razorpay'
+                            AND ABS(ct.amount) = 24
+                            AND (
+                                 COALESCE(ct.description, '') ILIKE '%credits_24%'
+                                 OR COALESCE(ct.metadata, '') ILIKE '%credits_24%'
+                            )
+                           THEN 24
+                           WHEN ct.source = 'razorpay_refund'
+                            AND EXISTS (
+                               SELECT 1
+                               FROM credit_transactions original
+                               WHERE original.userid = ct.userid
+                                 AND original.reference_id = ct.reference_id
+                                 AND original.source = 'razorpay'
+                                 AND original.transaction_type IN ('earned', 'refund')
+                                 AND ABS(original.amount) = 24
+                                 AND (
+                                      COALESCE(original.description, '') ILIKE '%credits_24%'
+                                      OR COALESCE(original.metadata, '') ILIKE '%credits_24%'
+                                 )
+                            )
+                           THEN ABS(ct.amount)
+                           ELSE NULL
+                       END AS amount_inr
+                FROM credit_transactions ct
+                WHERE ct.userid = ?{zero_filter}{type_filter}
+                ORDER BY ct.created_at DESC
                 LIMIT ?
             """, (userid, limit))
             transactions = []
@@ -3964,6 +4047,7 @@ class CreditService:
                     "reference_id": row[5],
                     "description": row[6],
                     "date": row[7],
+                    "amount_inr": row[8],
                 })
             return transactions
 
@@ -4066,7 +4150,32 @@ class CreditService:
         list_sql = f"""
             SELECT ct.id, ct.userid, u.name, u.phone,
                    ct.transaction_type, ct.amount, ct.balance_after,
-                   ct.source, ct.reference_id, ct.description, ct.created_at
+                   ct.source, ct.reference_id, ct.description, ct.created_at,
+                   CASE
+                       WHEN ct.source = 'razorpay'
+                        AND ABS(ct.amount) = 24
+                        AND (
+                             COALESCE(ct.description, '') ILIKE '%credits_24%'
+                             OR COALESCE(ct.metadata, '') ILIKE '%credits_24%'
+                        )
+                       THEN 24
+                       WHEN ct.source = 'razorpay_refund'
+                        AND EXISTS (
+                           SELECT 1
+                           FROM credit_transactions original
+                           WHERE original.userid = ct.userid
+                             AND original.reference_id = ct.reference_id
+                             AND original.source = 'razorpay'
+                             AND original.transaction_type IN ('earned', 'refund')
+                             AND ABS(original.amount) = 24
+                             AND (
+                                  COALESCE(original.description, '') ILIKE '%credits_24%'
+                                  OR COALESCE(original.metadata, '') ILIKE '%credits_24%'
+                             )
+                        )
+                       THEN ABS(ct.amount)
+                       ELSE NULL
+                   END AS amount_inr
             {where_sql}
             ORDER BY ct.created_at DESC
             LIMIT ? OFFSET ?
@@ -4093,6 +4202,7 @@ class CreditService:
                 "reference_id": row[8],
                 "description": row[9],
                 "created_at": row[10],
+                "amount_inr": row[11],
             })
         return {"transactions": transactions, "total": total}
 
@@ -4160,13 +4270,40 @@ class CreditService:
                 COALESCE(SUM(CASE
                     WHEN ct.source IN ('google_play', 'razorpay')
                      AND ct.transaction_type IN ('earned', 'refund')
-                    THEN ABS(ct.amount) * CASE
-                        WHEN date(ct.created_at) >= DATE '2026-07-15' THEN 2
-                        ELSE 1
+                    THEN CASE
+                        -- credits_24 is the one-time post-free-question starter
+                        -- pack: 24 credits are sold for ₹24, not the normal ₹2
+                        -- per-credit rate used after the pricing cutover.
+                        WHEN ct.source = 'razorpay'
+                         AND ABS(ct.amount) = 24
+                         AND (
+                              COALESCE(ct.description, '') ILIKE '%credits_24%'
+                              OR COALESCE(ct.metadata, '') ILIKE '%credits_24%'
+                         )
+                        THEN 24
+                        ELSE ABS(ct.amount) * CASE
+                            WHEN date(ct.created_at) >= DATE '2026-07-15' THEN 2
+                            ELSE 1
+                        END
                     END
                     WHEN ct.source IN ('google_play_refund', 'razorpay_refund')
                      AND ct.transaction_type = 'spent'
                     THEN -ABS(ct.amount) * CASE
+                        WHEN ct.source = 'razorpay_refund'
+                         AND EXISTS (
+                            SELECT 1
+                            FROM credit_transactions original
+                            WHERE original.userid = ct.userid
+                              AND original.reference_id = ct.reference_id
+                              AND original.source = 'razorpay'
+                              AND original.transaction_type IN ('earned', 'refund')
+                              AND ABS(original.amount) = 24
+                              AND (
+                                   COALESCE(original.description, '') ILIKE '%credits_24%'
+                                   OR COALESCE(original.metadata, '') ILIKE '%credits_24%'
+                              )
+                         )
+                        THEN 1
                         -- Use the purchase date for the INR conversion when the
                         -- reversal points back to its original payment/order.
                         WHEN date(COALESCE(

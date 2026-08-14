@@ -172,10 +172,13 @@ export const apiService = {
     return response.data;
   },
   
-  calculateChartOnly: async (birthData, nodeType = 'mean') => {
+  calculateChartOnly: async (birthData, nodeType = 'mean', calculationProfile = null) => {
     // Remove timezone field to let backend calculate it from coordinates
     const { timezone, ...birthDataWithoutTimezone } = birthData;
-    const response = await apiClient.post(`${getEndpoint('/calculate-chart-only')}?node_type=${nodeType}`, birthDataWithoutTimezone);
+    const payload = calculationProfile
+      ? { birth_data: birthDataWithoutTimezone, calculation_profile: calculationProfile }
+      : birthDataWithoutTimezone;
+    const response = await apiClient.post(`${getEndpoint('/calculate-chart-only')}?node_type=${nodeType}`, payload);
     return response.data;
   },
 
@@ -310,12 +313,13 @@ export const apiService = {
     return response.data;
   },
   
-  calculateDivisionalChart: async (birthData, division) => {
+  calculateDivisionalChart: async (birthData, division, calculationProfile = null) => {
     // Remove timezone field to let backend calculate it from coordinates
     const { timezone, ...birthDataWithoutTimezone } = birthData;
     const response = await apiClient.post(getEndpoint('/calculate-divisional-chart'), {
       birth_data: birthDataWithoutTimezone,
-      division: division
+      division: division,
+      ...(calculationProfile ? { calculation_profile: calculationProfile } : {}),
     });
     return response.data;
   },

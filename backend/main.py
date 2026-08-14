@@ -1296,6 +1296,7 @@ class BirthData(BaseModel):
 class TransitRequest(BaseModel):
     birth_data: BirthData
     transit_date: str
+    calculation_profile: Optional[dict] = None
 
 class UserCreate(BaseModel):
     name: str
@@ -3552,6 +3553,13 @@ async def get_public_current_sky():
 
 @app.post("/api/calculate-transits")
 async def calculate_transits(request: TransitRequest):
+    from calculators.chart_calculator import resolve_ayanamsha_mode
+    profile = request.calculation_profile or {}
+    ayanamsha_key, sid_mode = resolve_ayanamsha_mode(profile.get('ayanamsha', 'lahiri'))
+    node_type = str(profile.get('node_type', 'mean') or 'mean').strip().lower()
+    if node_type not in {'mean', 'true'}:
+        raise HTTPException(status_code=400, detail="node_type must be 'mean' or 'true'")
+    swe.set_sid_mode(sid_mode)
     ty, tm, td = parse_calendar_date_y_m_d(request.transit_date)
     jd = swe.julday(ty, tm, td, 12.0)
     
@@ -3563,8 +3571,9 @@ async def calculate_transits(request: TransitRequest):
         if planet <= 6:  # Regular planets
             # CRITICAL: Add FLG_SWIEPH for high-precision Swiss Ephemeris (not Moshier)
             pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH)
-        else:  # Lunar nodes - always use mean for transits
-            pos = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH)
+        else:  # Lunar nodes follow the Parashari viewer profile when explicitly supplied.
+            node_flag = swe.TRUE_NODE if node_type == 'true' else swe.MEAN_NODE
+            pos = swe.calc_ut(jd, node_flag, swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH)
         
         pos_array = pos[0]
         longitude = pos_array[0]
@@ -3614,12 +3623,15 @@ async def calculate_transits(request: TransitRequest):
             'sign': house_sign
         })
     
-    return {
+    response = {
         "planets": planets,
         "houses": houses,
         "ayanamsa": birth_ayanamsa,
-        "ascendant": birth_ascendant_sidereal
+        "ascendant": birth_ascendant_sidereal,
     }
+    if request.calculation_profile:
+        response["calculation_profile"] = {"ayanamsha": ayanamsha_key, "node_type": node_type}
+    return response
 
 
 async def calculate_yogi(birth_data: BirthData):

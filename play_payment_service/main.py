@@ -47,8 +47,10 @@ from credits.razorpay_routes import (  # noqa: E402
     _price_paise,
     _process_captured_payment,
     _product_id,
+    _require_sellable_pack,
     _verify_payment_signature,
     RAZORPAY_API_BASE,
+    FIRST_PURCHASE_STARTER_CREDITS,
     razorpay_webhook,
 )
 from activity.publisher import publish_activity  # noqa: E402
@@ -285,6 +287,7 @@ def create_razorpay_order_direct(
     current_user: User = Depends(get_current_user),
 ):
     _require_payment_service_flag_for_user(current_user.userid)
+    _require_sellable_pack(current_user.userid, body.credits)
     amount = _price_paise(body.credits)
     auth = _auth()
     receipt = f"u{current_user.userid}c{body.credits}{secrets.token_hex(4)}"[:40]
@@ -293,6 +296,8 @@ def create_razorpay_order_direct(
         "credits": str(body.credits),
         "product_id": _product_id(body.credits),
     }
+    if body.credits == FIRST_PURCHASE_STARTER_CREDITS:
+        notes["offer_type"] = "first_purchase_starter"
     gp_tok = (body.google_play_external_transaction_token or "").strip()
     if gp_tok:
         notes["gp_external_tx_token"] = gp_tok[:2048]
@@ -366,7 +371,11 @@ def razorpay_catalog_direct(current_user: User = Depends(get_current_user)):
             status_code=503,
             detail="Razorpay is not configured (set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET).",
         )
-    return {"key_id": key_id, "currency": "INR", "packs": get_razorpay_credit_packs()}
+    return {
+        "key_id": key_id,
+        "currency": "INR",
+        "packs": get_razorpay_credit_packs(current_user.userid),
+    }
 
 
 @app.post("/razorpay/verify")

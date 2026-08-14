@@ -247,6 +247,44 @@
   transform-origin: left center;
 }
 
+.parashari-view-profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-width: 0;
+  padding-right: 0.45rem;
+  border-right: 1px solid var(--pd-line);
+}
+
+.parashari-view-profile > span {
+  color: var(--pd-muted);
+  font-size: 0.58rem;
+  font-weight: 850;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.parashari-view-profile select {
+  min-height: 26px;
+  max-width: 8.5rem;
+  border: 1px solid var(--pd-line);
+  border-radius: var(--radius-sm);
+  padding: 0 1.4rem 0 0.42rem;
+  background: var(--pd-panel);
+  color: var(--pd-ink);
+  font: inherit;
+  font-size: 0.65rem;
+  font-weight: 750;
+}
+
+.parashari-view-profile i {
+  color: var(--pd-accent);
+  font-size: 0.6rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
 .parashari-desk-pills {
   display: flex;
   flex-wrap: nowrap;

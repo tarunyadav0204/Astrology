@@ -5,6 +5,8 @@
  */
 
 export const CREDIT_INR_VALUE = 1.99;
+export const FIRST_PURCHASE_STARTER_CREDITS = 24;
+export const FIRST_PURCHASE_STARTER_PRICE = '₹24';
 
 /** Pack marketing metadata keyed by credit amount (matches Play SKU credits_N). */
 export const CREDIT_PACK_META = {

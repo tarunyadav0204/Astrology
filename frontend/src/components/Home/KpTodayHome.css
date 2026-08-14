@@ -305,6 +305,15 @@
   background: var(--color-accent-soft);
 }
 
+[data-theme='amethystEmber'] .kp-today-inline__card--overview {
+  --kp-inline-card-text: var(--color-on-brand);
+  --kp-inline-card-muted: color-mix(in srgb, var(--color-on-brand) 72%, transparent);
+  --kp-inline-card-subtle: color-mix(in srgb, var(--color-on-brand) 54%, transparent);
+  --kp-inline-card-heading: var(--color-on-brand);
+  --kp-inline-card-border: color-mix(in srgb, var(--color-on-brand) 14%, transparent);
+  background: var(--color-brand-hover);
+}
+
 .kp-today-inline__card ul {
   display: grid;
   gap: 11px;

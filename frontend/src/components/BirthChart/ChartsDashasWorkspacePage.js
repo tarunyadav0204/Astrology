@@ -26,6 +26,23 @@ import { apiService } from '../../services/apiService';
 import './ChartsDashasWorkspacePage.css';
 
 const MOBILE_DESK_MQ = '(max-width: 900px)';
+const PARASHARI_PROFILE_KEY = 'astroroshni_parashari_view_profile_v1';
+const DEFAULT_PARASHARI_PROFILE = { ayanamsha: 'lahiri', node_type: 'mean' };
+
+function loadParashariProfile() {
+  if (typeof window === 'undefined') return DEFAULT_PARASHARI_PROFILE;
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(PARASHARI_PROFILE_KEY) || '{}');
+    return {
+      ayanamsha: ['lahiri', 'raman', 'krishnamurti', 'yukteshwar'].includes(saved.ayanamsha)
+        ? saved.ayanamsha
+        : 'lahiri',
+      node_type: saved.node_type === 'true' ? 'true' : 'mean',
+    };
+  } catch {
+    return DEFAULT_PARASHARI_PROFILE;
+  }
+}
 
 function useMobileDesk() {
   const [isMobile, setIsMobile] = useState(() => (
@@ -110,8 +127,42 @@ const ChartsDashasWorkspacePage = ({
   const [activationsFocus, setActivationsFocus] = useState(false);
   const [activeTool, setActiveTool] = useState(null);
   const [houseSelection, setHouseSelection] = useState(null);
+  const [viewProfile, setViewProfile] = useState(loadParashariProfile);
+  const [viewChartData, setViewChartData] = useState(null);
+  const [viewProfileLoading, setViewProfileLoading] = useState(false);
   const seoData = generatePageSEO('chartsDashasWorkspace', { path: '/charts-dashas' });
   const hasChart = Boolean(birthData && chartData);
+
+  useEffect(() => {
+    window.localStorage.setItem(PARASHARI_PROFILE_KEY, JSON.stringify(viewProfile));
+  }, [viewProfile]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!birthData || !chartData) {
+      setViewChartData(null);
+      return () => { cancelled = true; };
+    }
+    setViewProfileLoading(true);
+    apiService.calculateChartOnly(birthData, viewProfile.node_type, viewProfile)
+      .then((data) => {
+        if (!cancelled) setViewChartData(data);
+      })
+      .catch((error) => {
+        console.error('Failed to load Parashari viewing profile:', error);
+        if (!cancelled) setViewChartData(chartData);
+      })
+      .finally(() => {
+        if (!cancelled) setViewProfileLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [birthData, chartData, viewProfile]);
+
+  const renderedChartData = viewChartData || chartData;
+
+  const updateViewProfile = (field, value) => {
+    setViewProfile((current) => ({ ...current, [field]: value }));
+  };
 
   useEffect(() => {
     if (isMobileDesk) setActivationsFocus(false);
@@ -332,6 +383,10 @@ const ChartsDashasWorkspacePage = ({
         <ParashariDeskMobile
           birthData={birthData}
           chartData={chartData}
+          viewChartData={renderedChartData}
+          calculationProfile={viewProfile}
+          onCalculationProfileChange={updateViewProfile}
+          calculationProfileLoading={viewProfileLoading}
           asOfDate={asOfDate}
           onAsOfChange={setAsOfDate}
           selectedDx={selectedDx}
@@ -361,6 +416,28 @@ const ChartsDashasWorkspacePage = ({
         <div className="parashari-desk-body">
           {/* Shared tools — keeps all four chart cells equal */}
           <div className={`parashari-desk-tools${activationsFocus ? ' is-act-focus' : ''}`}>
+            <div className="parashari-view-profile" aria-label="Chart viewing standard">
+              <span>Chart standard</span>
+              <select
+                value={viewProfile.ayanamsha}
+                onChange={(event) => updateViewProfile('ayanamsha', event.target.value)}
+                aria-label="Ayanamsha"
+              >
+                <option value="lahiri">Lahiri</option>
+                <option value="raman">Raman</option>
+                <option value="krishnamurti">Krishnamurti</option>
+                <option value="yukteshwar">Yukteshwar</option>
+              </select>
+              <select
+                value={viewProfile.node_type}
+                onChange={(event) => updateViewProfile('node_type', event.target.value)}
+                aria-label="Rahu and Ketu calculation"
+              >
+                <option value="mean">Mean nodes</option>
+                <option value="true">True nodes</option>
+              </select>
+              {viewProfileLoading ? <i aria-label="Updating chart">Updating…</i> : null}
+            </div>
             <div className="parashari-desk-tools__clock" aria-label="As-of date for transit and dashas">
               <span className="parashari-desk-tools__label">As-of</span>
               <TransitControls
@@ -431,7 +508,7 @@ const ChartsDashasWorkspacePage = ({
                 <ChartWidget
                   title="D1"
                   chartType="lagna"
-                  chartData={chartData}
+                  chartData={renderedChartData}
                   birthData={birthData}
                   defaultStyle="north"
                   showFooterHint={false}
@@ -440,6 +517,7 @@ const ChartsDashasWorkspacePage = ({
                   onHouseSelect={handleHouseSelect}
                   selectedHouseNumber={houseSelection?.houseNumber}
                   activationHouseStates={visibleActivationHouseStates}
+                  calculationProfile={viewProfile}
                 />
               </div>
             </section>
@@ -456,7 +534,7 @@ const ChartsDashasWorkspacePage = ({
                 <ChartWidget
                   title="D9"
                   chartType="navamsa"
-                  chartData={chartData}
+                  chartData={renderedChartData}
                   birthData={birthData}
                   defaultStyle="north"
                   showFooterHint={false}
@@ -464,6 +542,7 @@ const ChartsDashasWorkspacePage = ({
                   deskMode
                   onHouseSelect={handleHouseSelect}
                   selectedHouseNumber={houseSelection?.houseNumber}
+                  calculationProfile={viewProfile}
                 />
               </div>
             </section>
@@ -481,7 +560,7 @@ const ChartsDashasWorkspacePage = ({
                   <ChartWidget
                     title={selectedDivisionalChart.shortLabel}
                     chartType={dxChartType}
-                    chartData={chartData}
+                    chartData={renderedChartData}
                     birthData={birthData}
                     division={typeof selectedDx === 'number' ? selectedDx : undefined}
                     defaultStyle="north"
@@ -490,6 +569,7 @@ const ChartsDashasWorkspacePage = ({
                     deskMode
                     onHouseSelect={handleHouseSelect}
                     selectedHouseNumber={houseSelection?.houseNumber}
+                    calculationProfile={viewProfile}
                   />
                 </div>
               </section>
@@ -507,7 +587,7 @@ const ChartsDashasWorkspacePage = ({
                 <ChartWidget
                   title="Transit"
                   chartType="transit"
-                  chartData={chartData}
+                  chartData={renderedChartData}
                   birthData={birthData}
                   transitDate={asOfDate}
                   defaultStyle="north"
@@ -517,6 +597,7 @@ const ChartsDashasWorkspacePage = ({
                   onHouseSelect={handleHouseSelect}
                   selectedHouseNumber={houseSelection?.houseNumber}
                   activationHouseStates={visibleActivationHouseStates}
+                  calculationProfile={viewProfile}
                 />
               </div>
             </section>

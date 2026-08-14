@@ -71,6 +71,7 @@ function buildHouseSelection(chartData, houseNumber, chartId = 'lagna') {
 export default function ParashariDeskMobile({
   birthData,
   chartData,
+  viewChartData,
   asOfDate,
   onAsOfChange,
   selectedDx,
@@ -95,6 +96,9 @@ export default function ParashariDeskMobile({
   onOpenTool,
   onChangeNative,
   initialHubTab,
+  calculationProfile,
+  onCalculationProfileChange,
+  calculationProfileLoading,
 }) {
   const navigate = useNavigate();
   const requestedHubTab = HUB_TABS.some((tab) => tab.id === initialHubTab)
@@ -190,7 +194,7 @@ export default function ParashariDeskMobile({
   };
 
   const pickHouse = (houseNumber, { openSheet = false } = {}) => {
-    const sel = buildHouseSelection(chartData, houseNumber, 'lagna');
+    const sel = buildHouseSelection(viewChartData || chartData, houseNumber, 'lagna');
     onHouseSelect?.(sel);
     onAnalysisTabChange?.('house');
     if (openSheet) setSheetOpen(true);
@@ -227,6 +231,29 @@ export default function ParashariDeskMobile({
           </button>
           <button type="button" className="pdm__link" onClick={() => navigate('/charts-dashas/kp')}>KP</button>
           <button type="button" className="pdm__link" onClick={() => navigate('/charts-dashas/nadi')}>Nadi</button>
+        </div>
+
+        <div className="pdm__profile" aria-label="Chart viewing standard">
+          <span>Chart standard</span>
+          <select
+            value={calculationProfile?.ayanamsha || 'lahiri'}
+            onChange={(event) => onCalculationProfileChange?.('ayanamsha', event.target.value)}
+            aria-label="Ayanamsha"
+          >
+            <option value="lahiri">Lahiri</option>
+            <option value="raman">Raman</option>
+            <option value="krishnamurti">Krishnamurti</option>
+            <option value="yukteshwar">Yukteshwar</option>
+          </select>
+          <select
+            value={calculationProfile?.node_type || 'mean'}
+            onChange={(event) => onCalculationProfileChange?.('node_type', event.target.value)}
+            aria-label="Rahu and Ketu calculation"
+          >
+            <option value="mean">Mean nodes</option>
+            <option value="true">True nodes</option>
+          </select>
+          {calculationProfileLoading ? <i>Updating…</i> : null}
         </div>
 
         <nav className="pdm__hub" aria-label="Desk sections">
@@ -270,7 +297,7 @@ export default function ParashariDeskMobile({
               <ChartWidget
                 title={activeChart.title}
                 chartType={activeChart.chartType}
-                chartData={chartData}
+                chartData={viewChartData || chartData}
                 birthData={birthData}
                 transitDate={chartPill === 'transit' ? asOfDate : undefined}
                 division={activeChart.division}
@@ -285,6 +312,7 @@ export default function ParashariDeskMobile({
                     ? activationHouseStates
                     : null
                 }
+                calculationProfile={calculationProfile}
               />
             </div>
 

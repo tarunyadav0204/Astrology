@@ -1,10 +1,30 @@
 import swisseph as swe
 import logging
+import threading
 from .base_calculator import BaseCalculator
 from .vedic_graha_drishti import attach_graha_drishti_to_chart
 from utils.timezone_service import parse_timezone_offset
 
 logger = logging.getLogger(__name__)
+
+# Swiss Ephemeris stores the sidereal mode as process-global state.  Keep a
+# complete chart calculation atomic so two simultaneous Parashari viewer
+# requests cannot borrow each other's ayanamsha.
+_SWISSEPH_CHART_LOCK = threading.RLock()
+
+AYANAMSHA_MODES = {
+    'lahiri': swe.SIDM_LAHIRI,
+    'raman': swe.SIDM_RAMAN,
+    'krishnamurti': swe.SIDM_KRISHNAMURTI,
+    'yukteshwar': swe.SIDM_YUKTESHWAR,
+}
+
+
+def resolve_ayanamsha_mode(value='lahiri'):
+    key = str(value or 'lahiri').strip().lower()
+    if key not in AYANAMSHA_MODES:
+        raise ValueError(f"Unsupported ayanamsha: {value}")
+    return key, AYANAMSHA_MODES[key]
 
 class ChartCalculator(BaseCalculator):
     """Extract chart calculation logic from main.py"""
@@ -16,10 +36,26 @@ class ChartCalculator(BaseCalculator):
     def __init__(self, *args, **kwargs):
         """Initialize with Lahiri Ayanamsa as default"""
         super().__init__(*args, **kwargs)
-        # CRITICAL: Always ensure Lahiri Ayanamsa is set
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
+        # Do not mutate Swiss Ephemeris while another profile calculation is
+        # running; the actual requested mode is set again inside calculate_chart.
+        with _SWISSEPH_CHART_LOCK:
+            swe.set_sid_mode(swe.SIDM_LAHIRI)
     
-    def calculate_chart(self, birth_data, node_type='mean'):
+    def calculate_chart(self, birth_data, node_type='mean', ayanamsha='lahiri'):
+        """Calculate a chart using an explicit, isolated calculation profile."""
+        node_key = str(node_type or 'mean').strip().lower()
+        if node_key not in {'mean', 'true'}:
+            raise ValueError(f"Unsupported lunar node type: {node_type}")
+        ayanamsha_key, sid_mode = resolve_ayanamsha_mode(ayanamsha)
+        with _SWISSEPH_CHART_LOCK:
+            return self._calculate_chart_unlocked(
+                birth_data,
+                node_type=node_key,
+                ayanamsha=ayanamsha_key,
+                sid_mode=sid_mode,
+            )
+
+    def _calculate_chart_unlocked(self, birth_data, node_type='mean', ayanamsha='lahiri', sid_mode=swe.SIDM_LAHIRI):
         """Calculate birth chart with planetary positions and houses"""
         import time
         calc_start = time.time()
@@ -57,8 +93,8 @@ class ChartCalculator(BaseCalculator):
         ephe_end = time.time()
         # print(f"[CALC] Ephemeris setup took {ephe_end - ephe_start:.3f}s")
         
-        # CRITICAL: Use Lahiri Ayanamsa (Mode 1) for DrikPanchang parity
-        swe.set_sid_mode(swe.SIDM_LAHIRI)  # Mode 1 = Lahiri/Chitra
+        # Explicit viewer profile; Lahiri remains the application-wide default.
+        swe.set_sid_mode(sid_mode)
         
         # Calculate Julian Day with high precision for exact AstroSage matching
         jd_start = time.time()
@@ -172,7 +208,7 @@ class ChartCalculator(BaseCalculator):
         
         # Calculate Gulika and Mandi using accurate sunrise/sunset
         upagraha_start = time.time()
-        self._calculate_upagrahas(jd, birth_data.latitude, birth_data.longitude, planets, ayanamsa)
+        self._calculate_upagrahas(jd, birth_data.latitude, birth_data.longitude, planets, ayanamsa, sid_mode)
         upagraha_end = time.time()
         # print(f"[CALC] Upagraha calculation took {upagraha_end - upagraha_start:.3f}s")
         
@@ -200,7 +236,7 @@ class ChartCalculator(BaseCalculator):
         
         # Calculate Bhav Chalit using professional house system
         bhav_start = time.time()
-        bhav_chalit = self._calculate_bhav_chalit_professional(jd, birth_data.latitude, birth_data.longitude, planets, ayanamsa)
+        bhav_chalit = self._calculate_bhav_chalit_professional(jd, birth_data.latitude, birth_data.longitude, planets, ayanamsa, sid_mode)
         bhav_end = time.time()
         # print(f"[CALC] Bhav Chalit calculation took {bhav_end - bhav_start:.3f}s")
         
@@ -217,11 +253,11 @@ class ChartCalculator(BaseCalculator):
         attach_graha_drishti_to_chart(result)
         return result
     
-    def _calculate_bhav_chalit_professional(self, jd, lat, lon, planets, ayanamsa):
+    def _calculate_bhav_chalit_professional(self, jd, lat, lon, planets, ayanamsa, sid_mode=swe.SIDM_LAHIRI):
         """Calculate Bhav Chalit using Placidus house system (professional KP/Sripati method)"""
         # Ensure geocentric mode and Lahiri ayanamsa for house calculations
         swe.set_topo(0, 0, 0)
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
+        swe.set_sid_mode(sid_mode)
         try:
             # Use Placidus house system (P) for accurate unequal houses
             cusps, ascmc = swe.houses_ex(jd, lat, lon, b'P')
@@ -286,11 +322,11 @@ class ChartCalculator(BaseCalculator):
                 'ascendant_sign_name': self.SIGN_NAMES[int(asc_sidereal / 30)]
             }
     
-    def _calculate_upagrahas(self, jd, lat, lon, planets, ayanamsa):
+    def _calculate_upagrahas(self, jd, lat, lon, planets, ayanamsa, sid_mode=swe.SIDM_LAHIRI):
         """Calculate Gulika and Mandi based on actual sunrise/sunset (Dinamaan)"""
         # Ensure geocentric mode and Lahiri ayanamsa for upagraha calculations
         swe.set_topo(0, 0, 0)
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
+        swe.set_sid_mode(sid_mode)
         try:
             # Get sunrise and sunset for the day (single call)
             sun_transit = swe.rise_trans(jd, swe.SUN, '', swe.FLG_SWIEPH, lon, lat, 0)

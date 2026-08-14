@@ -213,6 +213,7 @@ function getCreditPackDisplayPrice(product, iapProducts) {
   if (iapPrice) return iapPrice;
   if (product?.localized_price) return product.localized_price;
   if (product?.formatted_price) return product.formatted_price;
+  if (product?.amount_display) return product.amount_display;
   return null;
 }
 
@@ -1986,8 +1987,13 @@ const CreditScreen = ({ navigation, route }) => {
                         const bonus = getFirstPurchaseBonus(product);
                         const meta = getCreditPackMeta(product.credits);
                         // Prefer app/catalog names (Shuruaat/Guru) over Play Console titles ("999 Credits").
-                        const packName = meta.name || product.name || product.title;
-                        const badge = meta.badge ?? product.badge;
+                        const isStarter = Boolean(product.is_first_purchase_offer);
+                        const packName = isStarter
+                          ? t('chat.firstPurchaseOffer.packName')
+                          : (meta.name || product.name || product.title);
+                        const badge = isStarter
+                          ? t('chat.firstPurchaseOffer.packBadge')
+                          : (meta.badge ?? product.badge);
                         const questions = meta.questions ?? product.questions;
                         const savePercent = Number(meta.savePercent ?? product.save_percent) || 0;
                         const packBonusCredits = Number(meta.bonusCredits ?? product.pack_bonus_credits) || 0;

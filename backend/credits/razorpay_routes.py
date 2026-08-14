@@ -37,11 +37,22 @@ RAZORPAY_SOURCE = "razorpay"
 RAZORPAY_API_BASE = "https://api.razorpay.com/v1"
 
 # Live catalog: Shuruaat (50) / Aashirwad (100) / Sadhak (250) / Guru (999).
-# Retired: 24 and old ₹49 entry; 500 stays inactive.
-ALLOWED_CREDITS: Tuple[int, ...] = (50, 100, 250, 999)
+# credits_24 is deliberately inactive in the general catalog. It is exposed
+# only as the post-free-question, first-purchase starter offer.
+FIRST_PURCHASE_STARTER_CREDITS = 24
+FIRST_PURCHASE_STARTER_PRODUCT_ID = "credits_24"
+ALLOWED_CREDITS: Tuple[int, ...] = (24, 50, 100, 250, 999)
 
 # Display names + marketing copy for recharge UI (Play listing titles may lag).
 CREDIT_PACK_META: Dict[int, Dict[str, Any]] = {
+    24: {
+        "name": "First Light Pack",
+        "badge": "First purchase only",
+        "questions": 1,
+        "save_percent": 50,
+        "value_prop": "24 credits for ₹24",
+        "bonus_credits": 0,
+    },
     50: {
         "name": "Shuruaat Pack",
         "badge": None,
@@ -78,6 +89,7 @@ CREDIT_PACK_META: Dict[int, Dict[str, Any]] = {
 }
 
 _DEFAULT_PRICE_PAISE: Dict[int, int] = {
+    24: 2400,      # one-time starter price: ₹1 per credit
     50: 9900,      # ₹99 Shuruaat Pack
     100: 19900,    # ₹199 Aashirwad Pack
     250: 49900,    # ₹499 Sadhak Pack
@@ -107,6 +119,10 @@ def _auth() -> HTTPBasicAuth:
 
 def _expected_paise_for_pack(credits: int) -> int:
     """Authoritative price in paise (env override per pack)."""
+    # The starter offer is a product rule, not an admin-priced regular pack.
+    # Ignore any stale RAZORPAY_PRICE_PAISE_24 left from the retired SKU.
+    if credits == FIRST_PURCHASE_STARTER_CREDITS:
+        return 2400
     env_key = f"RAZORPAY_PRICE_PAISE_{credits}"
     raw = os.environ.get(env_key)
     if raw is not None and str(raw).strip().isdigit():
@@ -131,7 +147,16 @@ def _format_inr(paise: int) -> str:
     return f"₹{rupees:.2f}"
 
 
-def get_razorpay_credit_packs() -> List[Dict[str, Any]]:
+def _first_purchase_starter_status(userid: int) -> Dict[str, Any]:
+    status = credit_service.get_first_purchase_bonus_status(userid)
+    return dict(status.get("starter_pack") or {})
+
+
+def _first_purchase_starter_is_eligible(userid: int) -> bool:
+    return bool(_first_purchase_starter_status(userid).get("eligible"))
+
+
+def get_razorpay_credit_packs(userid: Optional[int] = None) -> List[Dict[str, Any]]:
     """Active packs only — respects admin credit_product_catalog.is_active."""
     from utils.admin_settings import get_web_topup_bonus_percent, is_web_topup_bonus_enabled
 
@@ -140,12 +165,16 @@ def get_razorpay_credit_packs() -> List[Dict[str, Any]]:
     web_bonus_on = is_web_topup_bonus_enabled()
     web_bonus_percent = int(get_web_topup_bonus_percent() or 0) if web_bonus_on else 0
     for c in ALLOWED_CREDITS:
-        if c not in active_amounts:
+        is_starter = c == FIRST_PURCHASE_STARTER_CREDITS
+        if is_starter:
+            if userid is None or not _first_purchase_starter_is_eligible(userid):
+                continue
+        elif c not in active_amounts:
             continue
         paise = _expected_paise_for_pack(c)
         meta = CREDIT_PACK_META.get(c) or {}
         pack_bonus = int(meta.get("bonus_credits") or 0)
-        web_bonus = credit_service.calculate_web_topup_bonus_credits(c) if web_bonus_on else 0
+        web_bonus = 0 if is_starter else (credit_service.calculate_web_topup_bonus_credits(c) if web_bonus_on else 0)
         packs.append(
             {
                 "credits": c,
@@ -162,9 +191,22 @@ def get_razorpay_credit_packs() -> List[Dict[str, Any]]:
                 "web_topup_bonus_percent": web_bonus_percent,
                 "web_topup_bonus_credits": web_bonus,
                 "total_credits": int(c) + pack_bonus + web_bonus,
+                "is_first_purchase_offer": is_starter,
+                "price_per_credit_rupees": 1 if is_starter else None,
             }
         )
     return packs
+
+
+def _require_sellable_pack(userid: int, credits: int) -> None:
+    if credits not in ALLOWED_CREDITS:
+        raise HTTPException(status_code=400, detail="Invalid credits pack")
+    if credits == FIRST_PURCHASE_STARTER_CREDITS:
+        if not _first_purchase_starter_is_eligible(userid):
+            raise HTTPException(status_code=403, detail="This one-time first purchase offer is no longer available")
+        return
+    if not credit_service.is_credit_pack_sellable(credits=credits):
+        raise HTTPException(status_code=400, detail="This credits pack is currently unavailable")
 
 
 def create_razorpay_credit_payment_link(
@@ -347,6 +389,7 @@ def _process_captured_payment(
     uid_raw = str(notes.get("userid") or "").strip()
     credits_raw = str(notes.get("credits") or "").strip()
     product_id = str(notes.get("product_id") or "").strip()
+    offer_type = str(notes.get("offer_type") or "").strip()
 
     if not uid_raw.isdigit():
         return failure("Invalid order notes (userid)", code="invalid_user_notes")
@@ -361,6 +404,8 @@ def _process_captured_payment(
 
     if product_id != _product_id(credits):
         return failure("product_id mismatch", userid, "product_mismatch")
+    if credits == FIRST_PURCHASE_STARTER_CREDITS and offer_type != "first_purchase_starter":
+        return failure("Invalid first purchase offer order", userid, "starter_offer_marker_missing")
 
     amount_paise = payment.get("amount")
     if amount_paise is None:
@@ -389,6 +434,7 @@ def _process_captured_payment(
             purchase_reference_id=payment_id,
             product_id=product_id,
             exclude_web_topup_bonus=is_play_alternative_billing,
+            exclude_promotional_extras=credits == FIRST_PURCHASE_STARTER_CREDITS,
         )
         return {
             "success": True,
@@ -440,6 +486,7 @@ def _process_captured_payment(
         purchase_reference_id=payment_id,
         product_id=product_id,
         exclude_web_topup_bonus=is_play_alternative_billing,
+        exclude_promotional_extras=credits == FIRST_PURCHASE_STARTER_CREDITS,
     )
     bonus_added = int(extras.get("bonus_credits_added") or 0)
     return {
@@ -531,15 +578,16 @@ async def razorpay_catalog(current_user: User = Depends(get_current_user)):
             status_code=503,
             detail="Razorpay is not configured (set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET).",
         )
-    return {"key_id": key_id, "currency": "INR", "packs": get_razorpay_credit_packs()}
+    return {
+        "key_id": key_id,
+        "currency": "INR",
+        "packs": get_razorpay_credit_packs(current_user.userid),
+    }
 
 
 @router.post("/razorpay/create-order")
 async def razorpay_create_order(body: CreateOrderBody, current_user: User = Depends(get_current_user)):
-    if body.credits not in ALLOWED_CREDITS:
-        raise HTTPException(status_code=400, detail="credits must be one of: 24, 50, 100, 250, 500, 999")
-    if not credit_service.is_credit_pack_sellable(credits=body.credits):
-        raise HTTPException(status_code=400, detail="This credits pack is currently unavailable")
+    _require_sellable_pack(current_user.userid, body.credits)
 
     amount = _price_paise(body.credits)
     auth = _auth()
@@ -552,6 +600,8 @@ async def razorpay_create_order(body: CreateOrderBody, current_user: User = Depe
         "credits": str(body.credits),
         "product_id": _product_id(body.credits),
     }
+    if body.credits == FIRST_PURCHASE_STARTER_CREDITS:
+        notes["offer_type"] = "first_purchase_starter"
     gp_tok = (body.google_play_external_transaction_token or "").strip()
     if gp_tok:
         notes["gp_external_tx_token"] = gp_tok[:2048]

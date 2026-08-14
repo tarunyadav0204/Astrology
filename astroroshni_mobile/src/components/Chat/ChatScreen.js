@@ -59,7 +59,10 @@ import NativeSelectorChip from '../Common/NativeSelectorChip';
 import AppAlertModal from '../Common/AppAlertModal';
 import QuickThemePickerModal from '../Common/QuickThemePickerModal';
 import { useCredits } from '../../credits/CreditContext';
-import { formatCreditsInr, LOWEST_CREDIT_PACK_CREDITS } from '../../credits/creditPackCatalog';
+import {
+  FIRST_PURCHASE_STARTER_CREDITS,
+  FIRST_PURCHASE_STARTER_PRICE,
+} from '../../credits/creditPackCatalog';
 import { useAuthGate } from '../../auth/AuthGateContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
@@ -956,15 +959,16 @@ export default function ChatScreen({ navigation, route }) {
       // `offer_eligible` can come from the general purchase-discount
       // campaign. Keep the post-free-question bonus eligibility separate so
       // its default percentage is not accidentally added to this offer.
-      eligible: Boolean(data.eligible),
+      eligible: Boolean(data.starter_pack?.eligible),
       percent: Number(data.percent || 0),
       fixedCredits: Number(data.fixed_credits || 0),
       maxBonusCredits: Number(data.max_bonus_credits || 0),
-      windowMinutes: Number(data.window_minutes || data.purchase_discount?.window_minutes || 0),
-      expiresAt: data.expires_at || data.purchase_discount?.expires_at || null,
+      windowMinutes: Number(data.starter_pack?.window_minutes || data.window_minutes || 0),
+      expiresAt: data.starter_pack?.expires_at || data.expires_at || null,
       bonusType: String(data.bonus_type || '').toLowerCase(),
       bonusCredits: Number(data.bonus_credits || 0),
       purchaseDiscount: data.purchase_discount || null,
+      starterPack: data.starter_pack || null,
     });
     creditAPI.recordFirstPurchaseOfferFunnelEvent('offer_shown', messageId).catch(() => {});
   }, []);
@@ -1006,8 +1010,8 @@ export default function ChatScreen({ navigation, route }) {
     hydratedBonusOfferMessageIdRef.current = candidate.messageId;
     try {
       const { data } = await creditAPI.getFirstPurchaseBonusStatus(
-        LOWEST_CREDIT_PACK_CREDITS,
-        `credits_${LOWEST_CREDIT_PACK_CREDITS}`,
+        FIRST_PURCHASE_STARTER_CREDITS,
+        `credits_${FIRST_PURCHASE_STARTER_CREDITS}`,
       );
       console.log('[FirstPurchaseBonus] restore status', {
         messageId: candidate.messageId,
@@ -1030,24 +1034,14 @@ export default function ChatScreen({ navigation, route }) {
   }, [showFirstPurchaseBonusOffer]);
 
   const firstPurchaseOfferSummary = useMemo(() => {
-    const purchasedCredits = LOWEST_CREDIT_PACK_CREDITS;
-    // The backend resolves pack overrides and returns the authoritative
-    // amount. Do not recompute from the default percent/fixed fields here.
-    const firstPurchaseBonus = firstPurchaseBonusOffer?.eligible
-      ? Number(firstPurchaseBonusOffer.bonusCredits || 0)
-      : 0;
-    const purchaseDiscount = firstPurchaseBonusOffer?.purchaseDiscount;
-    const purchaseDiscountBonus = purchaseDiscount?.eligible
-      ? Number(purchaseDiscount.bonus_credits || 0)
-      : 0;
-    const bonus = firstPurchaseBonus + purchaseDiscountBonus;
-    const basePrice = Number(formatCreditsInr(purchasedCredits).replace(/[^0-9]/g, '')) || 0;
+    const starterPack = firstPurchaseBonusOffer?.starterPack;
+    const purchasedCredits = Number(starterPack?.credits || FIRST_PURCHASE_STARTER_CREDITS);
     return {
       purchasedCredits,
-      bonus,
-      price: `₹${basePrice}`,
-      total: purchasedCredits + bonus,
-      double: bonus >= purchasedCredits,
+      bonus: 0,
+      price: starterPack?.amount_display || FIRST_PURCHASE_STARTER_PRICE,
+      total: purchasedCredits,
+      double: false,
     };
   }, [firstPurchaseBonusOffer]);
 
@@ -1135,8 +1129,8 @@ export default function ChatScreen({ navigation, route }) {
   const refreshFirstPurchaseBonusOffer = useCallback((sourceMessageId = null) => {
     if (!firstPurchaseBonusOffer) return;
     creditAPI.getFirstPurchaseBonusStatus(
-      LOWEST_CREDIT_PACK_CREDITS,
-      `credits_${LOWEST_CREDIT_PACK_CREDITS}`,
+      FIRST_PURCHASE_STARTER_CREDITS,
+      `credits_${FIRST_PURCHASE_STARTER_CREDITS}`,
     )
       .then(({ data }) => {
         console.log('[FirstPurchaseBonus] refresh status', {
@@ -5582,10 +5576,10 @@ export default function ChatScreen({ navigation, route }) {
             </View>
             <View style={styles.firstPurchaseTopOfferCopy}>
               <Text style={[styles.firstPurchaseTopOfferTitle, { color: colors.text }]} numberOfLines={1}>
-                {t(firstPurchaseOfferSummary.double ? 'chat.firstPurchaseOffer.doubleTitle' : 'chat.firstPurchaseOffer.title')}
+                {t('chat.firstPurchaseOffer.starterTitle')}
               </Text>
               <Text style={[styles.firstPurchaseTopOfferText, { color: colors.textSecondary }]} numberOfLines={1}>
-                {t('chat.firstPurchaseOffer.bonusLine', { bonus: firstPurchaseOfferSummary.bonus })}
+                {t('chat.firstPurchaseOffer.starterChipLine')}
               </Text>
             </View>
             <View style={[
@@ -5625,17 +5619,13 @@ export default function ChatScreen({ navigation, route }) {
                 <Ionicons name="gift-outline" size={28} color={colors.onPrimary || '#fff'} />
               </View>
               <Text style={[styles.firstPurchaseModalEyebrow, { color: colors.primary }]}>
-                {t('chat.firstPurchaseOffer.eyebrow')}
+                {t('chat.firstPurchaseOffer.starterEyebrow')}
               </Text>
               <Text style={[styles.firstPurchaseModalTitle, { color: colors.text }]}>
-                {t(firstPurchaseOfferSummary.double ? 'chat.firstPurchaseOffer.doubleTitle' : 'chat.firstPurchaseOffer.title')}
+                {t('chat.firstPurchaseOffer.starterTitle')}
               </Text>
               <Text style={[styles.firstPurchaseModalBody, { color: colors.textSecondary }]}>
-                {t('chat.firstPurchaseOffer.body', {
-                  credits: firstPurchaseOfferSummary.purchasedCredits,
-                  bonus: firstPurchaseOfferSummary.bonus,
-                  minutes: firstPurchaseBonusOffer?.windowMinutes || 30,
-                })}
+                {t('chat.firstPurchaseOffer.starterBody')}
               </Text>
               <Text style={[styles.firstPurchaseModalPrice, { color: colors.text }]}>
                 {t('chat.firstPurchaseOffer.priceLine', {
@@ -5644,7 +5634,7 @@ export default function ChatScreen({ navigation, route }) {
                 })}
               </Text>
               <Text style={[styles.firstPurchaseModalBonus, { color: colors.primary }]}>
-                {t('chat.firstPurchaseOffer.bonusLine', { bonus: firstPurchaseOfferSummary.bonus })}
+                {t('chat.firstPurchaseOffer.starterChipLine')}
               </Text>
               <View style={[styles.firstPurchaseModalCountdown, { borderColor: firstPurchaseOfferStageColor }]}>
                 <Ionicons name="time-outline" size={18} color={firstPurchaseOfferStageColor} />

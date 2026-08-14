@@ -1287,36 +1287,27 @@ const ChatPage = ({ onLogin }) => {
         const token = localStorage.getItem('token');
         if (!token) return;
         try {
-            const params = new URLSearchParams({ purchased_credits: '50', product_id: 'credits_50' });
+            const params = new URLSearchParams({ purchased_credits: '24', product_id: 'credits_24' });
             const response = await fetch(`/api/credits/first-purchase-bonus/status?${params.toString()}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!response.ok) return;
             const data = await response.json();
             if (!(data?.offer_eligible ?? data?.eligible)) return;
-            const purchaseDiscount = data.purchase_discount || metadata?.purchase_discount || null;
-            const purchasedCredits = Number(data.purchased_credits || metadata?.purchased_credits || 50);
-            const configuredDiscountBonus = purchaseDiscount?.eligible
-                ? Number(
-                    purchaseDiscount.bonus_credits
-                    ?? (Number(purchaseDiscount.fixed_credits || 0) > 0
-                        ? purchaseDiscount.fixed_credits
-                        : Math.min(
-                            Number(purchaseDiscount.max_bonus_credits || 1000),
-                            Math.floor(purchasedCredits * Number(purchaseDiscount.percent || 0) / 100),
-                        ))
-                )
-                : 0;
+            const starterPack = data.starter_pack || metadata?.starter_pack || null;
+            if (!starterPack?.eligible) return;
+            const purchasedCredits = Number(starterPack.credits || 24);
             const offer = {
                 ...data,
                 ...metadata,
                 messageId: String(messageId),
                 purchasedCredits,
-                bonusCredits: Number(data.bonus_credits ?? metadata?.bonus_credits ?? 0) + configuredDiscountBonus,
-                windowMinutes: Number(data.window_minutes || metadata?.window_minutes || purchaseDiscount?.window_minutes || 30),
-                expiresAt: data.expires_at || metadata?.expires_at || purchaseDiscount?.expires_at,
-                purchaseDiscount,
-                price: '₹100',
+                bonusCredits: 0,
+                windowMinutes: Number(starterPack.window_minutes || data.window_minutes || metadata?.window_minutes || 30),
+                expiresAt: starterPack.expires_at || data.expires_at || metadata?.expires_at,
+                starterPack,
+                isStarterOffer: true,
+                price: starterPack.amount_display || '₹24',
             };
             if (!offer.expiresAt) return;
             setFirstPurchaseOffer(offer);

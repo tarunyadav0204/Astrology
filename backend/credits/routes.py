@@ -904,6 +904,7 @@ def _credit_verified_google_play_purchase(
             purchase_source=GOOGLE_PLAY_SOURCE,
             purchase_reference_id=order_id,
             product_id=product_id,
+            exclude_promotional_extras=product_id == "credits_24",
         )
         return {
             "success": True,
@@ -960,6 +961,14 @@ def _credit_verified_google_play_purchase(
             product_id,
         )
         return already_credited(credited_order_id)
+
+    if product_id == "credits_24" and not credit_service.can_redeem_first_purchase_starter(userid):
+        alert(
+            "credit_verify",
+            "starter_offer_ineligible",
+            "The one-time first purchase offer is not eligible for this account",
+        )
+        raise HTTPException(status_code=403, detail="This one-time first purchase offer is no longer available")
 
     try:
         purchase = _verify_google_play_purchase(PACKAGE_NAME, product_id, token)
@@ -1078,6 +1087,7 @@ def _credit_verified_google_play_purchase(
         purchase_source=GOOGLE_PLAY_SOURCE,
         purchase_reference_id=order_id,
         product_id=product_id,
+        exclude_promotional_extras=product_id == "credits_24",
     )
     bonus_added = int(extras.get("bonus_credits_added") or 0)
     return {
@@ -1257,6 +1267,9 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
         products = _list_google_play_products(PACKAGE_NAME)
         # Admin portal can disable packs without removing them from Play Console.
         sellable_ids = credit_service.list_active_credit_product_ids()
+        starter_status = credit_service.get_first_purchase_bonus_status(current_user.userid).get("starter_pack") or {}
+        if starter_status.get("eligible"):
+            sellable_ids.add("credits_24")
         products = [p for p in products if str(p.get("product_id") or "") in sellable_ids]
         first_purchase_base_status = credit_service._first_purchase_bonus_base_status(current_user.userid)
         purchase_discount_base_status = credit_service._purchase_discount_base_status(current_user.userid)
@@ -1276,6 +1289,23 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
                     product["value_prop"] = meta.get("value_prop")
                     product["pack_bonus_credits"] = int(meta.get("bonus_credits") or 0)
                 product_id = str(product.get("product_id") or "").strip() or None
+                is_starter = product_id == "credits_24"
+                product["is_first_purchase_offer"] = is_starter
+                if is_starter:
+                    product["first_purchase_bonus"] = {
+                        "enabled": True,
+                        "eligible": False,
+                        "bonus_credits": 0,
+                        "reason": "included_in_first_purchase_starter_price",
+                    }
+                    product["purchase_discount"] = {
+                        "enabled": False,
+                        "eligible": False,
+                        "bonus_credits": 0,
+                        "reason": "included_in_first_purchase_starter_price",
+                    }
+                    product["total_credits"] = credits
+                    continue
                 status = credit_service._compose_bonus_status(
                     first_purchase_base_status,
                     purchased_credits=credits,

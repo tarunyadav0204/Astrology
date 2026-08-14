@@ -1,0 +1,90 @@
+{
+  "english": {
+    "starterEyebrow": "FIRST PURCHASE OFFER",
+    "starterTitle": "24 CREDITS FOR ₹24",
+    "starterBody": "Your first top-up is just ₹1 per credit. This one-time pack is available after your free question.",
+    "starterChipLine": "₹1 per credit"
+    ,"packName": "First Light Pack"
+    ,"packBadge": "First purchase only"
+  },
+  "hindi": {
+    "starterEyebrow": "पहली खरीद का ऑफ़र",
+    "starterTitle": "₹24 में 24 क्रेडिट",
+    "starterBody": "आपके पहले टॉप-अप में हर क्रेडिट सिर्फ़ ₹1 का है। यह एक बार मिलने वाला पैक आपके मुफ़्त सवाल के बाद उपलब्ध है।",
+    "starterChipLine": "₹1 प्रति क्रेडिट"
+    ,"packName": "फ़र्स्ट लाइट पैक"
+    ,"packBadge": "केवल पहली खरीद"
+  },
+  "es": {
+    "starterEyebrow": "OFERTA DE PRIMERA COMPRA",
+    "starterTitle": "24 CRÉDITOS POR ₹24",
+    "starterBody": "Tu primera recarga cuesta solo ₹1 por crédito. Este paquete único está disponible después de tu pregunta gratuita.",
+    "starterChipLine": "₹1 por crédito"
+    ,"packName": "Pack Primera Luz"
+    ,"packBadge": "Solo primera compra"
+  },
+  "fr": {
+    "starterEyebrow": "OFFRE PREMIER ACHAT",
+    "starterTitle": "24 CRÉDITS POUR ₹24",
+    "starterBody": "Votre première recharge ne coûte que ₹1 par crédit. Ce pack unique est disponible après votre question gratuite.",
+    "starterChipLine": "₹1 par crédit"
+    ,"packName": "Pack Première Lumière"
+    ,"packBadge": "Premier achat uniquement"
+  },
+  "german": {
+    "starterEyebrow": "ANGEBOT FÜR DEN ERSTKAUF",
+    "starterTitle": "24 CREDITS FÜR ₹24",
+    "starterBody": "Deine erste Aufladung kostet nur ₹1 pro Credit. Dieses einmalige Paket ist nach deiner kostenlosen Frage verfügbar.",
+    "starterChipLine": "₹1 pro Credit"
+    ,"packName": "First-Light-Paket"
+    ,"packBadge": "Nur beim Erstkauf"
+  },
+  "russian": {
+    "starterEyebrow": "ПРЕДЛОЖЕНИЕ НА ПЕРВУЮ ПОКУПКУ",
+    "starterTitle": "24 КРЕДИТА ЗА ₹24",
+    "starterBody": "Первое пополнение стоит всего ₹1 за кредит. Этот разовый пакет доступен после бесплатного вопроса.",
+    "starterChipLine": "₹1 за кредит"
+    ,"packName": "Пакет «Первый свет»"
+    ,"packBadge": "Только первая покупка"
+  },
+  "chinese": {
+    "starterEyebrow": "首次购买优惠",
+    "starterTitle": "₹24 购买 24 积分",
+    "starterBody": "首次充值每积分仅需 ₹1。完成免费提问后即可购买此一次性套餐。",
+    "starterChipLine": "每积分 ₹1"
+    ,"packName": "初光套餐"
+    ,"packBadge": "仅限首次购买"
+  },
+  "tamil": {
+    "starterEyebrow": "முதல் வாங்குதல் சலுகை",
+    "starterTitle": "₹24-க்கு 24 கிரெடிட்கள்",
+    "starterBody": "உங்கள் முதல் டாப்-அப்பில் ஒரு கிரெடிட் வெறும் ₹1. இலவசக் கேள்விக்குப் பிறகு இந்த ஒருமுறை பேக் கிடைக்கும்.",
+    "starterChipLine": "ஒரு கிரெடிட் ₹1"
+    ,"packName": "முதல் ஒளி பேக்"
+    ,"packBadge": "முதல் வாங்குதலுக்கு மட்டும்"
+  },
+  "telugu": {
+    "starterEyebrow": "మొదటి కొనుగోలు ఆఫర్",
+    "starterTitle": "₹24కి 24 క్రెడిట్లు",
+    "starterBody": "మీ మొదటి టాప్-అప్‌లో ఒక్కో క్రెడిట్ కేవలం ₹1. ఉచిత ప్రశ్న తర్వాత ఈ ఒక్కసారి ప్యాక్ అందుబాటులో ఉంటుంది.",
+    "starterChipLine": "ఒక్కో క్రెడిట్ ₹1"
+    ,"packName": "ఫస్ట్ లైట్ ప్యాక్"
+    ,"packBadge": "మొదటి కొనుగోలుకు మాత్రమే"
+  },
+  "gujarati": {
+    "starterEyebrow": "પ્રથમ ખરીદીની ઓફર",
+    "starterTitle": "₹24માં 24 ક્રેડિટ",
+    "starterBody": "તમારા પ્રથમ ટોપ-અપમાં દરેક ક્રેડિટ માત્ર ₹1નો છે. મફત પ્રશ્ન પછી આ એક વખતનો પેક ઉપલબ્ધ છે.",
+    "starterChipLine": "₹1 પ્રતિ ક્રેડિટ"
+    ,"packName": "ફર્સ્ટ લાઇટ પેક"
+    ,"packBadge": "માત્ર પ્રથમ ખરીદી"
+  },
+  "marathi": {
+    "starterEyebrow": "पहिल्या खरेदीची ऑफर",
+    "starterTitle": "₹24 मध्ये 24 क्रेडिट्स",
+    "starterBody": "तुमच्या पहिल्या टॉप-अपमध्ये प्रत्येक क्रेडिट फक्त ₹1 चे आहे. मोफत प्रश्नानंतर हा एकदाच मिळणारा पॅक उपलब्ध आहे.",
+    "starterChipLine": "₹1 प्रति क्रेडिट"
+    ,"packName": "फर्स्ट लाइट पॅक"
+    ,"packBadge": "फक्त पहिल्या खरेदीसाठी"
+  }
+}

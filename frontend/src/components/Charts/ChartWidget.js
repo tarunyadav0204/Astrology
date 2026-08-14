@@ -31,6 +31,7 @@ const ChartWidget = ({
   activationHouseStates = null,
   chartStyle: controlledChartStyle,
   onChartStyleChange = null,
+  calculationProfile = null,
 }) => {
   const [internalChartStyle, setInternalChartStyle] = useState(defaultStyle || 'north');
   const chartStyle = controlledChartStyle ?? internalChartStyle;
@@ -85,7 +86,7 @@ const ChartWidget = ({
       const divisionNum = chartType === 'navamsa' ? 9 : (division || 9);
       
       // Always use backend for all divisional charts
-      apiService.calculateDivisionalChart(birthData, divisionNum)
+      apiService.calculateDivisionalChart(birthData, divisionNum, calculationProfile)
         .then(response => {
           setDivisionalData(response.divisional_chart);
         })
@@ -97,7 +98,7 @@ const ChartWidget = ({
           setLoading(false);
         });
     }
-  }, [chartType, birthData, division, chartData]);
+  }, [chartType, birthData, division, chartData, calculationProfile?.ayanamsha, calculationProfile?.node_type]);
 
   // Karkamsa / Swamsa (Jaimini) — need Atmakaraka then recast chart
   useEffect(() => {
@@ -158,6 +159,7 @@ const ChartWidget = ({
       apiService.calculateTransits({
         birth_data: birthData,
         transit_date: transitDay,
+        ...(calculationProfile ? { calculation_profile: calculationProfile } : {}),
       })
         .then((response) => {
           setTransitChartData(response);
@@ -170,7 +172,7 @@ const ChartWidget = ({
           setLoading(false);
         });
     }
-  }, [chartType, birthData, transitDate]);
+  }, [chartType, birthData, transitDate, calculationProfile?.ayanamsha, calculationProfile?.node_type]);
 
   const getChartData = () => {
     switch (chartType) {

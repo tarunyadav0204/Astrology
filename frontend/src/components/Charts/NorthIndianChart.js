@@ -9,6 +9,54 @@ import ChartOverlayActions from './ChartOverlayActions';
 import { resolveChartId } from '../../utils/chartIds';
 import { chartActivationFill } from './chartActivationTheme';
 
+const getTopTriangleRowCounts = (totalPlanets) => {
+  if (totalPlanets <= 3) return [totalPlanets];
+  if (totalPlanets === 4) return [3, 1];
+  if (totalPlanets <= 8) return [Math.ceil(totalPlanets / 2), Math.floor(totalPlanets / 2)];
+
+  // A chart can also include Gulika, Mandi and Indu Lagna. Keep those rare,
+  // very crowded combinations inside the triangle with a tapered third row.
+  const layouts = {
+    9: [4, 3, 2],
+    10: [4, 3, 3],
+    11: [4, 4, 3],
+  };
+  return layouts[totalPlanets] || [5, 4, Math.max(1, totalPlanets - 9)];
+};
+
+export const getTopTrianglePlanetPosition = (houseNumber, planetIndex, totalPlanets) => {
+  if (![2, 12].includes(houseNumber) || totalPlanets < 1) return null;
+
+  const rowCounts = getTopTriangleRowCounts(totalPlanets);
+  const rowY = rowCounts.length === 1
+    ? [34]
+    : rowCounts.length === 2
+      ? [23, 57]
+      : [17, 43, 68];
+
+  let rowIndex = 0;
+  let indexInRow = planetIndex;
+  while (rowIndex < rowCounts.length - 1 && indexInRow >= rowCounts[rowIndex]) {
+    indexInRow -= rowCounts[rowIndex];
+    rowIndex += 1;
+  }
+
+  const countInRow = rowCounts[rowIndex];
+  const y = rowY[rowIndex];
+  const triangleCenterX = houseNumber === 2 ? 100 : 300;
+  // At y, each top triangle extends (100 - y) units either side of its
+  // centre. Preserve a 14-unit text margin so labels never cross a diagonal.
+  const usableHalfWidth = Math.max(0, 100 - y - 14);
+  const spacing = countInRow > 1
+    ? Math.min(38, (usableHalfWidth * 2) / (countInRow - 1))
+    : 0;
+
+  return {
+    x: triangleCenterX + ((indexInRow - ((countInRow - 1) / 2)) * spacing),
+    y,
+  };
+};
+
 /**
  * NORTH INDIAN CHART POSITIONING REFERENCE
  * ========================================
@@ -752,8 +800,12 @@ const NorthIndianChart = ({
               const isDenseHouse = totalPlanets >= 2;
               const isVeryDenseHouse = totalPlanets >= 3;
               let planetX, planetY;
+              const topTrianglePosition = getTopTrianglePlanetPosition(houseNumber, pIndex, totalPlanets);
               
-              if (totalPlanets === 1) {
+              if (topTrianglePosition) {
+                planetX = topTrianglePosition.x;
+                planetY = topTrianglePosition.y;
+              } else if (totalPlanets === 1) {
                 if (houseNumber === 1) {
                   planetX = houseData.center.x;
                   planetY = houseData.center.y - 15;
@@ -772,12 +824,6 @@ const NorthIndianChart = ({
                 } else if (houseNumber === 11) {
                   planetX = houseData.center.x + 15;
                   planetY = houseData.center.y - 5;
-                } else if (houseNumber === 12) {
-                  planetX = houseData.center.x;
-                  planetY = houseData.center.y - 25;
-                } else if (houseNumber === 2) {
-                  planetX = houseData.center.x;
-                  planetY = houseData.center.y - 35;
                 } else {
                   planetX = houseData.center.x;
                   planetY = houseData.center.y - 10;
@@ -818,12 +864,6 @@ const NorthIndianChart = ({
                   } else if (houseNumber === 10) {
                     planetX = houseData.center.x + 15 + (col === 0 ? -spacing : spacing);
                     planetY = houseData.center.y - 25 + (row * rowSpacing);
-                  } else if (houseNumber === 12) {
-                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                    planetY = houseData.center.y - 15 + (row * rowSpacing);
-                  } else if (houseNumber === 2) {
-                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                    planetY = houseData.center.y - 40 + (row * rowSpacing);
                   } else {
                     planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
                     planetY = houseData.center.y - 25 + (row * rowSpacing);
@@ -851,12 +891,6 @@ const NorthIndianChart = ({
                 } else if (houseNumber === 11) {
                   planetX = houseData.center.x + 25;
                   planetY = houseData.center.y - 15 + (pIndex * rowSpacing);
-                } else if (houseNumber === 12) {
-                  planetX = houseData.center.x;
-                  planetY = houseData.center.y - 5 + (pIndex * rowSpacing);
-                } else if (houseNumber === 2) {
-                  planetX = houseData.center.x;
-                  planetY = houseData.center.y - 35 + (pIndex * rowSpacing);
                 } else {
                   planetX = houseData.center.x;
                   planetY = houseData.center.y - 30 + (pIndex * rowSpacing);

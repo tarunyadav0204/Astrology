@@ -28,6 +28,7 @@ import copyAlert from './copy-alert.json';
 import partnershipExit from './partnership-exit.json';
 import themeDiscovery from './theme-discovery.json';
 import planetaryPositions from './planetary-positions.json';
+import firstPurchaseStarter from './first-purchase-starter.json';
 
 // The original premium-ui import accumulated a shifted chatScreen block: the
 // English key contains German, German contains Russian, and the later Indic
@@ -59,6 +60,16 @@ const normalizedPremiumUi = Object.fromEntries(
 
 Object.entries(normalizedPremiumUi).forEach(([language, copy]) => {
   copy.planetaryPositions = planetaryPositions[language] || planetaryPositions.english;
+});
+
+[
+  [en, firstPurchaseStarter.english], [es, firstPurchaseStarter.es], [hi, firstPurchaseStarter.hindi],
+  [tamil, firstPurchaseStarter.tamil], [te, firstPurchaseStarter.telugu], [gu, firstPurchaseStarter.gujarati],
+  [mr, firstPurchaseStarter.marathi], [de, firstPurchaseStarter.german], [fr, firstPurchaseStarter.fr],
+  [ru, firstPurchaseStarter.russian], [zh, firstPurchaseStarter.chinese],
+].forEach(([baseCopy, starterCopy]) => {
+  baseCopy.chat = baseCopy.chat || {};
+  baseCopy.chat.firstPurchaseOffer = { ...(baseCopy.chat.firstPurchaseOffer || {}), ...starterCopy };
 });
 
 [

@@ -157,9 +157,9 @@ export default function PremiumTodayOverview({
         </View>
         <OrbitMotif colors={colors} />
         <View style={styles.heroActions}>
-          <TouchableOpacity onPress={onAsk} activeOpacity={0.86} style={[styles.primaryAction, { backgroundColor: colors.accent }]}>
-            <Ionicons name="sparkles-outline" size={17} color={colors.onAccent} />
-            <Text style={[styles.primaryActionText, { color: colors.onAccent }]}>{t('premiumUi.home.askTara')}</Text>
+          <TouchableOpacity onPress={onAsk} activeOpacity={0.86} style={[styles.primaryAction, { backgroundColor: colors.primary }]}>
+            <Ionicons name="sparkles-outline" size={17} color={colors.onPrimary} />
+            <Text style={[styles.primaryActionText, { color: colors.onPrimary }]}>{t('premiumUi.home.askTara')}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={hasChart ? onOpenCharts : onCreateChart} activeOpacity={0.82} style={[styles.secondaryAction, { borderColor: colors.cosmicLine }]}>
             <Text style={[styles.secondaryActionText, { color: colors.textInverse }]}>{hasChart ? t('premiumUi.home.openChart') : t('premiumUi.home.createChart')}</Text>
