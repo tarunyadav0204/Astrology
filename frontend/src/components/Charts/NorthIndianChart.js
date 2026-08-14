@@ -494,9 +494,23 @@ const NorthIndianChart = ({
     const rashiForThisHouse = getRashiForHouse(houseIndex);
     const houseNumber = houseIndex + 1;
     const planetsInHouse = [];
-    const useHousePlacement = Object.values(chartData.planets).some(
+    // The backend's explicit house placement is authoritative for the natal
+    // view. Once a user temporarily makes another sign the ascendant, however,
+    // those natal house numbers must not pin planets to their old visual
+    // houses. The signs rotate around the fixed North-Indian house frame, so
+    // planets must be placed by sign and move with their rashis as well.
+    const useHousePlacement = customAscendant === null && Object.values(chartData.planets).some(
       (data) => data && typeof data.house === 'number'
     );
+
+    const resolvePlanetSign = (data) => {
+      if (typeof data?.sign === 'number') return data.sign;
+      if (typeof data?.longitude === 'number') {
+        const longitude = ((data.longitude % 360) + 360) % 360;
+        return Math.floor(longitude / 30);
+      }
+      return null;
+    };
     
     // Add regular planets (exclude InduLagna as it's handled separately)
     Object.entries(chartData.planets)
@@ -505,7 +519,7 @@ const NorthIndianChart = ({
         if (useHousePlacement && typeof data.house === 'number') {
           return data.house === houseNumber;
         }
-        return data.sign === rashiForThisHouse;
+        return resolvePlanetSign(data) === rashiForThisHouse;
       })
       .forEach(([name, data]) => {
         const planetNames = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Gulika', 'Mandi'];
@@ -527,7 +541,7 @@ const NorthIndianChart = ({
       const indu = chartData.planets.InduLagna;
       const induHere = useHousePlacement && typeof indu.house === 'number'
         ? indu.house === houseNumber
-        : indu.sign === rashiForThisHouse;
+        : resolvePlanetSign(indu) === rashiForThisHouse;
       if (induHere) {
         planetsInHouse.push({
           symbol: 'IL',
