@@ -1,11 +1,13 @@
 """Database helpers for nudge engine: tables and user resolution."""
 import json
 import logging
+from bisect import bisect_left
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from db import get_conn as _get_app_conn, execute, executemany
+from db import execute, executemany
+from .connections import get_audience_conn, get_notification_conn
 from .default_broadcast_nudges import DEFAULT_BROADCAST_NUDGES, DEFAULT_DAILY_SLOTS
 
 logger = logging.getLogger(__name__)
@@ -22,8 +24,13 @@ except (ValueError, ImportError) as e:
 
 
 def get_conn():
-    """Return a Postgres connection to the main app database (context-managed)."""
-    return _get_app_conn()
+    """Return the writable notification database connection."""
+    return get_notification_conn()
+
+
+def get_read_conn():
+    """Return a read-only connection to the application read replica."""
+    return get_audience_conn()
 
 
 def try_advisory_lock(conn, lock_name: str) -> bool:
@@ -313,6 +320,67 @@ def init_nudge_tables(conn) -> None:
             conn,
             "CREATE INDEX IF NOT EXISTS idx_nudge_campaigns_status_sched "
             "ON nudge_campaigns(status, scheduled_at)",
+        )
+
+        # Durable, fully-rendered campaign work items.  Workers may read these
+        # rows, release the DB connection, call providers, and then persist the
+        # result in a second short transaction.  This is deliberately separate
+        # from nudge_deliveries: a recipient row represents work (including
+        # retries), while delivery rows are the user-visible/audit outcome.
+        execute(
+            conn,
+            """
+            CREATE TABLE IF NOT EXISTS nudge_campaign_recipients (
+                id BIGSERIAL PRIMARY KEY,
+                campaign_id INTEGER NOT NULL,
+                userid INTEGER NOT NULL,
+                delivery_group_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                question TEXT,
+                policy TEXT NOT NULL,
+                channels_json TEXT NOT NULL,
+                endpoints_json TEXT NOT NULL DEFAULT '{}',
+                data_json TEXT NOT NULL DEFAULT '{}',
+                state TEXT NOT NULL DEFAULT 'ready',
+                attempt_count INTEGER NOT NULL DEFAULT 0,
+                available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                claimed_at TIMESTAMPTZ,
+                completed_at TIMESTAMPTZ,
+                last_error TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(campaign_id, userid),
+                UNIQUE(delivery_group_id)
+            )
+            """,
+        )
+        _safe_execute_nudge_ddl(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_nudge_campaign_recipients_ready "
+            "ON nudge_campaign_recipients(campaign_id, state, available_at)",
+        )
+        execute(
+            conn,
+            """
+            CREATE TABLE IF NOT EXISTS nudge_dead_letters (
+                id BIGSERIAL PRIMARY KEY,
+                recipient_id BIGINT,
+                campaign_id INTEGER,
+                userid INTEGER,
+                channel TEXT,
+                payload_json TEXT,
+                error TEXT NOT NULL,
+                attempt_count INTEGER NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                resolved_at TIMESTAMPTZ
+            )
+            """,
+        )
+        _safe_execute_nudge_ddl(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_nudge_dead_letters_open "
+            "ON nudge_dead_letters(created_at DESC) WHERE resolved_at IS NULL",
         )
 
         execute(
@@ -1005,8 +1073,8 @@ def list_deliveries_for_date_admin(
         """
         SELECT d.id,
                d.userid,
-               COALESCE(u.name, '') AS user_name,
-               COALESCE(u.phone, '') AS user_phone,
+               '' AS user_name,
+               '' AS user_phone,
                d.trigger_id,
                d.title,
                d.body,
@@ -1016,7 +1084,6 @@ def list_deliveries_for_date_admin(
                d.read_at,
                d.data_json
         FROM nudge_deliveries d
-        LEFT JOIN users u ON u.userid = d.userid
         WHERE d.sent_at = %s
         ORDER BY d.created_at DESC, d.id DESC
         LIMIT %s
@@ -1451,6 +1518,180 @@ def get_campaign(conn, campaign_id: int) -> Optional[Dict[str, Any]]:
     return _campaign_row_to_dict(row) if row else None
 
 
+_RECIPIENT_COLUMNS = (
+    "id", "campaign_id", "userid", "delivery_group_id", "title", "body",
+    "question", "policy", "channels_json", "endpoints_json", "data_json",
+    "state", "attempt_count", "available_at", "claimed_at", "completed_at",
+    "last_error",
+)
+
+
+def _recipient_row_to_dict(row: Tuple[Any, ...]) -> Dict[str, Any]:
+    out = dict(zip(_RECIPIENT_COLUMNS, row))
+    for key in ("available_at", "claimed_at", "completed_at"):
+        if hasattr(out.get(key), "isoformat"):
+            out[key] = out[key].isoformat()
+    for raw_key, parsed_key, fallback in (
+        ("channels_json", "channels", []),
+        ("endpoints_json", "endpoints", {}),
+        ("data_json", "data", {}),
+    ):
+        try:
+            out[parsed_key] = json.loads(out.get(raw_key) or "")
+        except Exception:
+            out[parsed_key] = fallback
+    return out
+
+
+def upsert_campaign_recipient_snapshots(conn, rows: List[Dict[str, Any]]) -> int:
+    """Persist fully rendered, provider-ready campaign work items."""
+    if not rows:
+        return 0
+    values: List[Tuple[Any, ...]] = []
+    for row in rows:
+        values.append(
+            (
+                int(row["campaign_id"]),
+                int(row["userid"]),
+                str(row["delivery_group_id"]),
+                str(row.get("title") or "")[:100],
+                str(row.get("body") or "")[:200],
+                (str(row.get("question") or "")[:500] or None),
+                str(row.get("policy") or "waterfall")[:32],
+                json.dumps(row.get("channels") or [], ensure_ascii=False),
+                json.dumps(row.get("endpoints") or {}, ensure_ascii=False),
+                json.dumps(row.get("data") or {}, ensure_ascii=False),
+            )
+        )
+    executemany(
+        conn,
+        """
+        INSERT INTO nudge_campaign_recipients
+            (campaign_id, userid, delivery_group_id, title, body, question,
+             policy, channels_json, endpoints_json, data_json)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (campaign_id, userid) DO NOTHING
+        """,
+        values,
+    )
+    return len(values)
+
+
+def claim_campaign_recipients(
+    conn,
+    *,
+    campaign_id: int,
+    userids: List[int],
+    max_attempts: int = 5,
+) -> List[Dict[str, Any]]:
+    """Claim retryable recipients without waiting on another worker."""
+    ids = sorted({int(uid) for uid in userids if str(uid).isdigit() and int(uid) > 0})
+    if not ids:
+        return []
+    cur = execute(
+        conn,
+        f"""
+        WITH claimable AS (
+            SELECT id
+            FROM nudge_campaign_recipients
+            WHERE campaign_id = %s
+              AND userid = ANY(%s)
+              AND attempt_count < %s
+              AND available_at <= CURRENT_TIMESTAMP
+              AND (
+                    state IN ('ready', 'retry')
+                    OR (state = 'sending' AND claimed_at < CURRENT_TIMESTAMP - INTERVAL '15 minutes')
+                  )
+            ORDER BY id
+            FOR UPDATE SKIP LOCKED
+        )
+        UPDATE nudge_campaign_recipients r
+        SET state = 'sending',
+            claimed_at = CURRENT_TIMESTAMP,
+            attempt_count = r.attempt_count + 1,
+            updated_at = CURRENT_TIMESTAMP
+        FROM claimable c
+        WHERE r.id = c.id
+        RETURNING {', '.join('r.' + c for c in _RECIPIENT_COLUMNS)}
+        """,
+        (int(campaign_id), ids, max(1, int(max_attempts))),
+    )
+    return [_recipient_row_to_dict(row) for row in (cur.fetchall() or [])]
+
+
+def complete_campaign_recipient(
+    conn,
+    *,
+    recipient_id: int,
+    state: str,
+    error: Optional[str] = None,
+    retry_delay_seconds: int = 0,
+) -> None:
+    final_state = str(state or "completed").strip().lower()
+    if final_state not in {"completed", "retry", "dead"}:
+        raise ValueError(f"Invalid recipient state: {state}")
+    execute(
+        conn,
+        """
+        UPDATE nudge_campaign_recipients
+        SET state = %s,
+            last_error = %s,
+            available_at = CASE
+                WHEN %s = 'retry' THEN CURRENT_TIMESTAMP + (%s * INTERVAL '1 second')
+                ELSE available_at
+            END,
+            completed_at = CASE WHEN %s IN ('completed', 'dead') THEN CURRENT_TIMESTAMP ELSE NULL END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
+        """,
+        (
+            final_state,
+            (str(error or "")[:2000] or None),
+            final_state,
+            max(0, int(retry_delay_seconds)),
+            final_state,
+            int(recipient_id),
+        ),
+    )
+
+
+def insert_dead_letter(
+    conn,
+    *,
+    recipient: Dict[str, Any],
+    channel: Optional[str],
+    error: str,
+) -> None:
+    execute(
+        conn,
+        """
+        INSERT INTO nudge_dead_letters
+            (recipient_id, campaign_id, userid, channel, payload_json, error, attempt_count)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            int(recipient.get("id") or 0) or None,
+            int(recipient.get("campaign_id") or 0) or None,
+            int(recipient.get("userid") or 0) or None,
+            str(channel or "")[:32] or None,
+            json.dumps(
+                {
+                    "title": recipient.get("title"),
+                    "body": recipient.get("body"),
+                    "question": recipient.get("question"),
+                    "policy": recipient.get("policy"),
+                    "channels": recipient.get("channels") or [],
+                    "endpoints": recipient.get("endpoints") or {},
+                    "data": recipient.get("data") or {},
+                },
+                ensure_ascii=False,
+            )[:16000],
+            str(error or "unknown delivery error")[:4000],
+            int(recipient.get("attempt_count") or 0),
+        ),
+    )
+
+
 def list_campaigns(conn, limit: int = 200) -> List[Dict[str, Any]]:
     lim = max(1, min(int(limit), 500))
     cur = execute(
@@ -1794,12 +2035,15 @@ def count_window_conversions(
         return 0
 
 
-def campaign_stats(conn, campaign_id: int) -> Dict[str, Any]:
+def campaign_stats(conn, campaign_id: int, *, include_window_conversions: bool = True) -> Dict[str, Any]:
     cid = int(campaign_id)
     sends = _delivery_channel_counts(conn, "campaign_id = %s", (cid,))
     conv = _conversion_summary(conn, "campaign_id = %s", (cid,))
     conv_by_channel = _conversions_by_channel(conn, "c.campaign_id = %s", (cid,))
-    window_conversions = count_window_conversions(conn, "d.campaign_id = %s", (cid,))
+    window_conversions = (
+        count_window_conversions(conn, "d.campaign_id = %s", (cid,))
+        if include_window_conversions else 0
+    )
     progress = campaign_delivery_progress(conn, cid)
     targeted = sends.get("targeted") or 0
     conversions = conv.get("conversions") or 0
@@ -1814,6 +2058,70 @@ def campaign_stats(conn, campaign_id: int) -> Dict[str, Any]:
         "median_seconds_to_question": conv.get("median_seconds"),
         "progress": progress,
     }
+
+
+def count_window_conversions_isolated(
+    notification_conn,
+    app_conn,
+    campaign_id: int,
+    window_hours: int = 24,
+) -> int:
+    """Count post-delivery questions without cross-database SQL joins."""
+    cid = int(campaign_id)
+    hours = max(1, min(int(window_hours), 24 * 30))
+    cur = execute(
+        notification_conn,
+        """
+        SELECT d.userid, d.created_at
+        FROM nudge_deliveries d
+        WHERE d.campaign_id = %s
+          AND COALESCE(d.is_primary, TRUE)
+          AND (d.delivery_group_id IS NULL OR NOT EXISTS (
+              SELECT 1 FROM nudge_conversions c
+              WHERE c.delivery_group_id = d.delivery_group_id
+          ))
+        """,
+        (cid,),
+    )
+    deliveries = [(int(row[0]), row[1]) for row in (cur.fetchall() or [])]
+    if not deliveries:
+        return 0
+    user_ids = sorted({row[0] for row in deliveries})
+    earliest = min(row[1] for row in deliveries)
+    latest = max(row[1] for row in deliveries) + timedelta(hours=hours)
+    question_cur = execute(
+        app_conn,
+        """
+        SELECT cs.user_id, cm.timestamp
+        FROM chat_sessions cs
+        JOIN chat_messages cm ON cm.session_id = cs.session_id
+        WHERE cs.user_id = ANY(%s)
+          AND cm.sender = 'user'
+          AND cm.timestamp >= %s AND cm.timestamp <= %s
+        ORDER BY cs.user_id, cm.timestamp
+        """,
+        (user_ids, earliest, latest),
+    )
+    questions: Dict[int, List[Any]] = {}
+    for uid, timestamp in (question_cur.fetchall() or []):
+        questions.setdefault(int(uid), []).append(timestamp)
+    window = timedelta(hours=hours)
+    converted = 0
+    for uid, delivered_at in deliveries:
+        timestamps = questions.get(uid) or []
+        index = bisect_left(timestamps, delivered_at)
+        if index < len(timestamps) and timestamps[index] <= delivered_at + window:
+            converted += 1
+    return converted
+
+
+def campaign_stats_isolated(notification_conn, app_conn, campaign_id: int) -> Dict[str, Any]:
+    """Campaign statistics split across notification storage and app replica."""
+    stats = campaign_stats(notification_conn, campaign_id, include_window_conversions=False)
+    stats["window_conversions"] = count_window_conversions_isolated(
+        notification_conn, app_conn, campaign_id
+    )
+    return stats
 
 
 def campaign_question_funnel(
@@ -1984,6 +2292,159 @@ def campaign_question_funnel(
         "page": page,
         "page_size": page_size,
         "filtered_total": filtered_total,
+    }
+
+
+def campaign_question_funnel_isolated(
+    notification_conn,
+    app_conn,
+    campaign_id: int,
+    *,
+    window_days: int = 7,
+    page: int = 1,
+    page_size: int = 50,
+    asked: Optional[bool] = None,
+) -> Dict[str, Any]:
+    """Cross-store campaign funnel without joining notification and app tables."""
+    cid = int(campaign_id)
+    days = max(1, min(int(window_days), 30))
+    page = max(1, int(page))
+    page_size = max(1, min(int(page_size), 200))
+    cur = execute(
+        notification_conn,
+        """
+        WITH recipients AS (
+            SELECT DISTINCT ON (d.userid)
+                d.userid, d.delivery_group_id, d.created_at,
+                COALESCE(d.channel, 'stored') AS primary_channel,
+                EXISTS (
+                    SELECT 1 FROM nudge_deliveries sent
+                    WHERE sent.campaign_id = d.campaign_id
+                      AND sent.userid = d.userid
+                      AND COALESCE(sent.send_status, '') = 'sent'
+                      AND COALESCE(sent.channel, 'stored') <> 'stored'
+                ) AS channel_delivered,
+                EXISTS (
+                    SELECT 1 FROM nudge_deliveries clicked
+                    WHERE clicked.campaign_id = d.campaign_id
+                      AND clicked.userid = d.userid
+                      AND clicked.clicked_at IS NOT NULL
+                ) AS clicked
+            FROM nudge_deliveries d
+            WHERE d.campaign_id = %s AND COALESCE(d.is_primary, TRUE)
+            ORDER BY d.userid, d.created_at ASC, d.id ASC
+        )
+        SELECT r.*,
+               EXISTS (
+                   SELECT 1 FROM nudge_conversions c
+                   WHERE c.delivery_group_id = r.delivery_group_id
+               ) AS tap_attributed
+        FROM recipients r
+        ORDER BY r.userid
+        """,
+        (cid,),
+    )
+    recipients = list(cur.fetchall() or [])
+    user_ids = sorted({int(row[0]) for row in recipients})
+    profiles: Dict[int, Tuple[str, str]] = {}
+    questions: Dict[int, List[Any]] = {}
+    if user_ids:
+        profile_cur = execute(
+            app_conn,
+            "SELECT userid, COALESCE(name, ''), COALESCE(phone, '') "
+            "FROM users WHERE userid = ANY(%s)",
+            (user_ids,),
+        )
+        profiles = {
+            int(row[0]): (str(row[1] or ""), str(row[2] or ""))
+            for row in (profile_cur.fetchall() or [])
+        }
+        earliest = min(row[2] for row in recipients)
+        latest = max(row[2] for row in recipients) + timedelta(days=days)
+        question_cur = execute(
+            app_conn,
+            """
+            SELECT cs.user_id, cm.timestamp
+            FROM chat_sessions cs
+            JOIN chat_messages cm ON cm.session_id = cs.session_id
+            WHERE cs.user_id = ANY(%s)
+              AND cm.sender = 'user'
+              AND cm.timestamp >= %s AND cm.timestamp < %s
+            ORDER BY cm.timestamp
+            """,
+            (user_ids, earliest, latest),
+        )
+        for uid, timestamp in (question_cur.fetchall() or []):
+            questions.setdefault(int(uid), []).append(timestamp)
+
+    window = timedelta(days=days)
+    items: List[Dict[str, Any]] = []
+    for row in recipients:
+        uid = int(row[0])
+        delivered_at = row[2]
+        matches = [
+            timestamp for timestamp in questions.get(uid, [])
+            if delivered_at <= timestamp < delivered_at + window
+        ]
+        first_question = min(matches) if matches else None
+        name, phone = profiles.get(uid, ("", ""))
+        items.append({
+            "user_id": uid,
+            "name": name,
+            "phone": phone,
+            "delivered_at": delivered_at.isoformat() if hasattr(delivered_at, "isoformat") else str(delivered_at),
+            "channel": row[3] or "stored",
+            "channel_delivered": bool(row[4]),
+            "clicked": bool(row[5]),
+            "first_question_at": first_question.isoformat() if first_question else None,
+            "questions_in_window": len(matches),
+            "hours_to_first_question": (
+                (first_question - delivered_at).total_seconds() / 3600.0
+                if first_question else None
+            ),
+            "tap_attributed": bool(row[6]),
+        })
+
+    targeted = len(items)
+    delivered = sum(1 for item in items if item["channel_delivered"])
+    asked_count = sum(1 for item in items if item["first_question_at"] is not None)
+    delivered_asked = sum(
+        1 for item in items
+        if item["channel_delivered"] and item["first_question_at"] is not None
+    )
+    summary = {
+        "targeted": targeted,
+        "delivered": delivered,
+        "clicked": sum(1 for item in items if item["clicked"]),
+        "asked": asked_count,
+        "tap_attributed": sum(1 for item in items if item["tap_attributed"]),
+        "not_asked": targeted - asked_count,
+        "delivered_and_asked": delivered_asked,
+        "asked_rate": round(asked_count / targeted, 4) if targeted else 0.0,
+        "delivered_asked_rate": round(delivered_asked / delivered, 4) if delivered else 0.0,
+    }
+    if asked is True:
+        filtered = [item for item in items if item["first_question_at"] is not None]
+    elif asked is False:
+        filtered = [item for item in items if item["first_question_at"] is None]
+    else:
+        filtered = items
+    filtered.sort(
+        key=lambda item: (
+            item["first_question_at"] is None,
+            item["first_question_at"] or "",
+            item["user_id"],
+        )
+    )
+    offset = (page - 1) * page_size
+    return {
+        "campaign_id": cid,
+        "window_days": days,
+        "summary": summary,
+        "items": filtered[offset : offset + page_size],
+        "page": page,
+        "page_size": page_size,
+        "filtered_total": len(filtered),
     }
 
 

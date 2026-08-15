@@ -191,6 +191,10 @@ def deliver(
     """
     if not to_send:
         return 0
+    if (os.getenv("NUDGE_SCAN_REQUIRE_TASKS") or "true").strip().lower() in {"1", "true", "yes", "on"}:
+        raise RuntimeError(
+            "Inline scan fan-out is disabled; dispatch through isolated Cloud Tasks workers"
+        )
     count = 0
     with db.get_conn() as conn:
         for userid, ev in to_send:
@@ -244,49 +248,68 @@ def deliver_for_user_batch(
             "delivered": 0,
         }
 
+    # Phase 1: short notification DB read.
     with db.get_conn() as conn:
         existing = db.get_delivery_fingerprints_for_users_on_date(conn, target_date, ids)
-        pending: List[int] = []
-        for uid in ids:
-            key = (uid, event.trigger_id, event.title)
-            if key in existing:
-                continue
-            pending.append(uid)
+        pending = [
+            uid for uid in ids if (uid, event.trigger_id, event.title) not in existing
+        ]
+        token_rows = db.get_device_tokens_for_users(conn, pending) if pending else []
 
-        delivered = 0
-        params_json = json.dumps(event.params) if event.params else ""
-        for uid in pending:
-            try:
-                data_extra: Dict[str, Any] = {}
-                bcid = event.params.get("birth_chart_id") if event.params else None
-                if bcid is not None and str(bcid).strip():
-                    data_extra["native_id"] = str(bcid).strip()
-                deliver_nudge(
-                    conn,
-                    userid=uid,
-                    trigger_id=event.trigger_id,
-                    title=event.title,
-                    body=event.body,
-                    question=event.question,
-                    policy="waterfall",
-                    channels=DEFAULT_WATERFALL_CHANNELS,
-                    sent_at=target_date,
-                    event_params=params_json,
-                    data_extra=data_extra,
-                    cta_deep_link=event.cta_deep_link or "astroroshni://chat",
-                )
-                delivered += 1
-            except Exception as exc:
-                logger.exception(
-                    "Batch delivery failed for user %s, trigger %s: %s",
-                    uid,
-                    event.trigger_id,
-                    exc,
-                )
-        try:
+    params_json = json.dumps(event.params) if event.params else ""
+    bcid = event.params.get("birth_chart_id") if event.params else None
+    groups = {uid: new_delivery_group_id() for uid in pending}
+    base_data: Dict[str, Any] = {
+        "trigger_id": event.trigger_id,
+        "cta": event.cta_deep_link or "astroroshni://chat",
+    }
+    if event.question:
+        base_data["question"] = str(event.question)[:500]
+    if bcid is not None and str(bcid).strip():
+        base_data["native_id"] = str(bcid).strip()
+
+    messages: List[Dict[str, Any]] = []
+    message_users: List[int] = []
+    for uid, token, _platform in token_rows:
+        token_s = str(token or "").strip()
+        if not token_s.startswith("ExponentPushToken["):
+            continue
+        uid_int = int(uid)
+        messages.append({
+            "to": token_s,
+            "title": event.title,
+            "body": event.body,
+            "sound": "default",
+            "data": {**base_data, "nudge_id": groups[uid_int]},
+        })
+        message_users.append(uid_int)
+
+    # Phase 2: Expo I/O without a checked-out DB connection.
+    push_ok: Dict[int, bool] = {}
+    for start in range(0, len(messages), 100):
+        chunk = messages[start : start + 100]
+        users = message_users[start : start + 100]
+        results = push_module.send_expo_push_messages(chunk)
+        for uid, ok in zip(users, results):
+            push_ok[uid] = push_ok.get(uid, False) or bool(ok)
+
+    # Phase 3: durable inbox/delivery write on the notification DB.
+    rows: List[tuple] = []
+    for uid in pending:
+        channel = "push" if push_ok.get(uid) else "stored"
+        gid = groups[uid]
+        payload = {**base_data, "nudge_id": gid}
+        rows.append((
+            uid, event.trigger_id, event.title, event.body, params_json,
+            target_date.isoformat(), channel,
+            json.dumps(payload, ensure_ascii=False)[:8000], gid,
+            "sent" if channel == "push" else "stored",
+        ))
+    if rows:
+        with db.get_conn() as conn:
+            db.insert_deliveries_batch(conn, rows)
             conn.commit()
-        except Exception:
-            pass
+    delivered = len(rows)
 
     return {
         "targeted": len(ids),

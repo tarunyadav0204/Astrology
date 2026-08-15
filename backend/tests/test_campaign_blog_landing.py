@@ -1,4 +1,5 @@
-from unittest.mock import patch
+from contextlib import contextmanager
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -45,19 +46,34 @@ def test_blog_test_push_contains_the_article_link():
         "channels": ["push"],
         "channel_policy": "push_only",
     }
+    @contextmanager
+    def fake_conn():
+        yield MagicMock()
+
     with (
+        patch("nudge_engine.campaigns.db.get_read_conn", side_effect=fake_conn),
+        patch("nudge_engine.campaigns.db.get_conn", side_effect=fake_conn),
         patch("nudge_engine.campaigns.resolve_params_for_users", return_value={42: {}}),
+        patch(
+            "nudge_engine.campaigns._resolve_delivery_endpoints",
+            return_value={42: {"email": "", "whatsapp": {}}},
+        ),
+        patch("nudge_engine.campaigns._resolve_push_endpoints", return_value={42: []}),
         patch(
             "nudge_engine.campaigns.render_campaign_for_user",
             return_value={"title": "Read this", "body": "New article", "question": ""},
         ),
-        patch("nudge_engine.campaigns.deliver_nudge", return_value={"channel": "push"}) as deliver,
+        patch(
+            "nudge_engine.campaigns._deliver_recipient_snapshots",
+            return_value=[{"sent": ["push"], "attempts": [("push", True)]}],
+        ) as deliver,
+        patch("nudge_engine.campaigns.db.insert_delivery"),
     ):
-        send_campaign_test(object(), campaign, 42)
+        send_campaign_test(campaign, 42)
 
-    kwargs = deliver.call_args.kwargs
-    assert kwargs["cta_deep_link"] == "astroroshni://blog"
-    assert kwargs["data_extra"] == {
+    recipient = deliver.call_args.args[0][0]
+    assert recipient["data"]["cta"] == "astroroshni://blog"
+    assert {key: recipient["data"][key] for key in ("landing_screen", "blog_url", "slug")} == {
         "landing_screen": "blog",
         "blog_url": "https://astroroshni.com/blog/saturn-retrograde",
         "slug": "saturn-retrograde",

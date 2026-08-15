@@ -47,7 +47,7 @@ def test_enqueue_scan_batches_releases_db_before_task_enqueue():
         return True
 
     with (
-        patch.object(service.db, "get_conn", side_effect=fake_get_conn),
+        patch.object(service.db, "get_read_conn", side_effect=fake_get_conn),
         patch.object(service.db, "get_user_ids_after", side_effect=fake_get_user_ids_after),
         patch("nudge_engine.task_queue.nudge_tasks_enabled", return_value=True),
         patch("nudge_engine.task_queue.nudge_tasks_are_isolated", return_value=True),

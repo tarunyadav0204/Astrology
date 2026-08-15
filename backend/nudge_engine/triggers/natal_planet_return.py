@@ -123,11 +123,12 @@ class NatalPlanetReturnTrigger(TriggerBase):
                 merged = load_merged_definition(conn, TRIGGER_KEY)
                 if not merged.enabled:
                     return events
-                charts = db.get_self_charts_for_nudge(conn)
                 dedupe_since = target_date - timedelta(days=45)
                 sent_keys = db.get_planet_window_dedupe_keys(
                     conn, TRIGGER_KEY, dedupe_since
                 )
+            with db.get_read_conn() as conn:
+                charts = db.get_self_charts_for_nudge(conn)
         except Exception as e:
             logger.exception("Natal return trigger DB prep failed: %s", e)
             return events

@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Set
 from urllib.parse import unquote, urlparse
@@ -19,6 +20,7 @@ from credits.credit_service import CreditService
 from . import db
 from .delivery import deliver_nudge
 from .param_resolver import CAMPAIGN_PLACEHOLDERS, default_params, resolve_params_for_users
+from .push import send_expo_push_messages
 from .template_render import extract_placeholders, render_template_lenient
 
 logger = logging.getLogger(__name__)
@@ -154,6 +156,7 @@ def resolve_campaign_audience(conn, audience_filter: Dict[str, Any]) -> List[int
             segment_key,
             from_date=from_date,
             to_date=to_date,
+            conn=conn,
         )
     elif ftype == "has_device_token":
         cur = execute(conn, "SELECT DISTINCT userid FROM device_tokens ORDER BY userid")
@@ -407,8 +410,25 @@ def filter_campaign_audience(conn, user_ids: List[int], audience_filter: Dict[st
     return filtered
 
 
-def estimate_campaign_audience(conn, audience_filter: Dict[str, Any]) -> Dict[str, Any]:
-    user_ids = resolve_campaign_audience(conn, audience_filter or {"type": "all"})
+def estimate_campaign_audience(
+    conn, audience_filter: Dict[str, Any], *, notification_conn=None
+) -> Dict[str, Any]:
+    raw_filter = audience_filter or {"type": "all"}
+    replica_filter = json.loads(json.dumps(raw_filter))
+    token_filter = _boolish(replica_filter.pop("has_device_token", None))
+    criteria = dict(replica_filter.get("criteria") or {})
+    if "has_device_token" in criteria:
+        token_filter = _boolish(criteria.pop("has_device_token"))
+        replica_filter["criteria"] = criteria
+    ftype = str(replica_filter.get("type") or "all").strip().lower()
+    if ftype in {"has_device_token", "no_device_token"}:
+        token_filter = ftype == "has_device_token"
+        replica_filter["type"] = "all"
+    user_ids = resolve_campaign_audience(conn, replica_filter)
+    token_conn = notification_conn or conn
+    if token_filter is not None:
+        reachable_ids = set(filter_push_reachable_user_ids(token_conn, user_ids))
+        user_ids = [uid for uid in user_ids if (uid in reachable_ids) == bool(token_filter)]
     if not user_ids:
         return {
             "total_users": 0,
@@ -425,7 +445,7 @@ def estimate_campaign_audience(conn, audience_filter: Dict[str, Any]) -> Dict[st
         "email": "SELECT COUNT(*) FROM users WHERE userid = ANY(%s) AND COALESCE(NULLIF(TRIM(email), ''), '') <> ''",
     }
     for channel, sql in queries.items():
-        cur = execute(conn, sql, (ids,))
+        cur = execute(token_conn if channel == "push" else conn, sql, (ids,))
         row = cur.fetchone()
         reach[channel] = int((row[0] if row else 0) or 0)
     cur = execute(
@@ -510,12 +530,237 @@ def render_campaign_for_user(
     return {"title": title, "body": body, "question": question}
 
 
+def _resolve_delivery_endpoints(conn, user_ids: List[int]) -> Dict[int, Dict[str, Any]]:
+    """Resolve user identity/provider addresses from the application replica."""
+    ids = sorted({int(uid) for uid in user_ids if str(uid).isdigit() and int(uid) > 0})
+    out: Dict[int, Dict[str, Any]] = {uid: {"push": []} for uid in ids}
+    if not ids:
+        return out
+    whatsapp_column = _users_has_column(conn, "whatsapp_wa_id")
+    if whatsapp_column:
+        cur = execute(
+            conn,
+            """
+            SELECT u.userid, COALESCE(u.email, ''), COALESCE(u.phone, ''),
+                   COALESCE(NULLIF(TRIM(u.name), ''), 'there'),
+                   COALESCE(u.whatsapp_wa_id, ''),
+                   COALESCE(ws.last_phone_number_id, '')
+            FROM users u
+            LEFT JOIN LATERAL (
+                SELECT last_phone_number_id
+                FROM whatsapp_sessions
+                WHERE wa_id = u.whatsapp_wa_id
+                ORDER BY updated_at DESC NULLS LAST
+                LIMIT 1
+            ) ws ON TRUE
+            WHERE u.userid = ANY(%s)
+            """,
+            (ids,),
+        )
+    else:
+        cur = execute(
+            conn,
+            """
+            SELECT userid, COALESCE(email, ''), COALESCE(phone, ''),
+                   COALESCE(NULLIF(TRIM(name), ''), 'there'), '' AS wa_id,
+                   '' AS phone_number_id
+            FROM users
+            WHERE userid = ANY(%s)
+            """,
+            (ids,),
+        )
+    for uid, email, phone, name, wa_id, phone_number_id in cur.fetchall() or []:
+        endpoint = out.setdefault(int(uid), {"push": []})
+        endpoint.update(
+            {
+                "email": str(email or "").strip(),
+                "phone": str(phone or "").strip(),
+                "name": str(name or "there").strip() or "there",
+                "whatsapp_wa_id": str(wa_id or "").strip(),
+                "whatsapp_phone_number_id": str(phone_number_id or "").strip(),
+            }
+        )
+    return out
+
+
+def _resolve_push_endpoints(conn, user_ids: List[int]) -> Dict[int, List[Dict[str, str]]]:
+    """Resolve push endpoints from notification-owned token storage."""
+    ids = sorted({int(uid) for uid in user_ids if str(uid).isdigit() and int(uid) > 0})
+    out: Dict[int, List[Dict[str, str]]] = {uid: [] for uid in ids}
+    if not ids:
+        return out
+    cur = execute(
+        conn,
+        "SELECT userid, token, platform FROM device_tokens WHERE userid = ANY(%s)",
+        (ids,),
+    )
+    for uid, token, platform in cur.fetchall() or []:
+        token_s = str(token or "").strip()
+        if token_s:
+            out.setdefault(int(uid), []).append(
+                {"token": token_s, "platform": str(platform or "")[:20]}
+            )
+    return out
+
+
+def _snapshot_campaign_batch(
+    *, campaign: Dict[str, Any], campaign_id: int, user_ids: List[int]
+) -> None:
+    """Read app context from the replica, then store provider-ready work."""
+    with db.get_read_conn() as read_conn:
+        params_by_user = resolve_params_for_users(
+            read_conn, user_ids, needed=needed_placeholders(campaign)
+        )
+        endpoints_by_user = _resolve_delivery_endpoints(read_conn, user_ids)
+    with db.get_conn() as notification_conn:
+        push_by_user = _resolve_push_endpoints(notification_conn, user_ids)
+    for uid in user_ids:
+        endpoints_by_user.setdefault(uid, {})["push"] = push_by_user.get(uid) or []
+
+    channels = [c for c in (campaign.get("channels") or []) if c in ALLOWED_CHANNELS] or list(
+        ALLOWED_CHANNELS
+    )
+    policy = str(campaign.get("channel_policy") or "waterfall")
+    landing = str(campaign.get("landing_screen") or "chat")
+    cta = LANDING_SCREEN_TO_CTA.get(landing, "astroroshni://chat")
+    data_extra: Dict[str, Any] = {
+        "landing_screen": landing,
+        "campaign_id": str(int(campaign_id)),
+        "cta": cta,
+        "trigger_id": campaign_trigger_id(int(campaign_id)),
+    }
+    if landing in {"career", "marriage", "health", "wealth", "progeny", "education"}:
+        data_extra["analysis_type"] = landing
+    if landing == "blog":
+        data_extra.update(_blog_push_data(campaign))
+
+    snapshots: List[Dict[str, Any]] = []
+    for uid in user_ids:
+        copy = render_campaign_for_user(campaign, params_by_user.get(uid) or default_params())
+        if not copy.get("title") or not copy.get("body"):
+            continue
+        group_id = uuid.uuid4().hex
+        data = {**data_extra, "nudge_id": group_id}
+        if copy.get("question"):
+            data["question"] = copy["question"][:500]
+        snapshots.append(
+            {
+                "campaign_id": campaign_id,
+                "userid": uid,
+                "delivery_group_id": group_id,
+                "title": copy["title"],
+                "body": copy["body"],
+                "question": copy.get("question"),
+                "policy": policy,
+                "channels": channels,
+                "endpoints": endpoints_by_user.get(uid) or {"push": []},
+                "data": data,
+            }
+        )
+    with db.get_conn() as notification_conn:
+        db.upsert_campaign_recipient_snapshots(notification_conn, snapshots)
+        notification_conn.commit()
+
+
+def _deliver_recipient_snapshots(recipients: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Call providers without holding any database connection."""
+    results: Dict[int, Dict[str, Any]] = {
+        int(r["id"]): {"recipient": r, "attempts": [], "sent": []} for r in recipients
+    }
+
+    # Push is the high-volume channel: send all tokens in Expo batches of 100.
+    messages: List[Dict[str, Any]] = []
+    message_owners: List[int] = []
+    push_requested: Set[int] = set()
+    for recipient in recipients:
+        rid = int(recipient["id"])
+        channels = recipient.get("channels") or []
+        if "push" not in channels:
+            continue
+        push_requested.add(rid)
+        for token_row in (recipient.get("endpoints") or {}).get("push") or []:
+            token = str((token_row or {}).get("token") or "").strip()
+            if not token.startswith("ExponentPushToken["):
+                continue
+            messages.append(
+                {
+                    "to": token,
+                    "title": recipient.get("title") or "",
+                    "body": recipient.get("body") or "",
+                    "sound": "default",
+                    "data": recipient.get("data") or {},
+                }
+            )
+            message_owners.append(rid)
+    push_success: Set[int] = set()
+    if messages:
+        for rid, ok in zip(message_owners, send_expo_push_messages(messages)):
+            if ok:
+                push_success.add(rid)
+    for rid in push_requested:
+        ok = rid in push_success
+        results[rid]["attempts"].append(("push", ok))
+        if ok:
+            results[rid]["sent"].append("push")
+
+    from .email_channel import send_nudge_email_to_address
+    from .whatsapp_fallback import (
+        send_whatsapp_nudge_to_target,
+        send_whatsapp_template_to_phone,
+    )
+
+    for recipient in recipients:
+        rid = int(recipient["id"])
+        result = results[rid]
+        policy = str(recipient.get("policy") or "waterfall").lower()
+        endpoints = recipient.get("endpoints") or {}
+        requested = [c for c in (recipient.get("channels") or []) if c in ALLOWED_CHANNELS]
+        if policy == "push_only":
+            requested = ["push"]
+        for channel in requested:
+            if channel == "push":
+                continue
+            if result["sent"] and policy != "blast":
+                break
+            ok = False
+            actual = channel
+            if channel == "whatsapp":
+                wa_id = str(endpoints.get("whatsapp_wa_id") or "")
+                phone_number_id = str(endpoints.get("whatsapp_phone_number_id") or "")
+                if wa_id and phone_number_id:
+                    ok = send_whatsapp_nudge_to_target(
+                        wa_id=wa_id,
+                        phone_number_id=phone_number_id,
+                        title=recipient.get("title") or "",
+                        body=recipient.get("body") or "",
+                        question=recipient.get("question"),
+                    )
+                elif endpoints.get("phone"):
+                    actual = "whatsapp_template"
+                    ok = send_whatsapp_template_to_phone(
+                        phone=str(endpoints.get("phone") or ""),
+                        name=str(endpoints.get("name") or "there"),
+                    )
+            elif channel == "email" and endpoints.get("email"):
+                ok = send_nudge_email_to_address(
+                    str(endpoints.get("email")),
+                    title=recipient.get("title") or "",
+                    body=recipient.get("body") or "",
+                    question=recipient.get("question"),
+                    delivery_group_id=str(recipient.get("delivery_group_id") or ""),
+                )
+            result["attempts"].append((actual, bool(ok)))
+            if ok:
+                result["sent"].append(actual)
+    return list(results.values())
+
+
 # ---------------------------------------------------------------------------
 # Batch worker (Cloud Tasks endpoint / inline fallback)
 # ---------------------------------------------------------------------------
 
 def process_campaign_batch(*, campaign_id: int, user_ids: List[int]) -> Dict[str, Any]:
-    """Render + deliver one campaign batch. Idempotent across Cloud Tasks retries."""
+    """Snapshot, claim and deliver a batch without DB connections during I/O."""
     clean_ids: List[int] = []
     seen: Set[int] = set()
     for uid in user_ids or []:
@@ -538,72 +783,135 @@ def process_campaign_batch(*, campaign_id: int, user_ids: List[int]) -> Dict[str
         "failed": 0,
         "channels": {"push": 0, "whatsapp": 0, "email": 0, "stored": 0},
     }
+    # Phase 1: short notification DB read, followed by a read-replica snapshot.
     with db.get_conn() as conn:
         db.init_nudge_tables(conn)
         campaign = db.get_campaign(conn, int(campaign_id))
-        if not campaign:
-            return {"ok": True, "skipped": "missing_campaign", "campaign_id": int(campaign_id)}
-        if campaign.get("status") in ("draft", "cancelled"):
-            return {"ok": True, "skipped": "inactive_campaign", "campaign_id": int(campaign_id)}
+    if not campaign:
+        return {"ok": True, "skipped": "missing_campaign", "campaign_id": int(campaign_id)}
+    if campaign.get("status") in ("draft", "cancelled"):
+        return {"ok": True, "skipped": "inactive_campaign", "campaign_id": int(campaign_id)}
 
-        already = db.get_campaign_delivery_user_ids(
-            conn, campaign_id=int(campaign_id), userids=clean_ids
+    _snapshot_campaign_batch(
+        campaign=campaign,
+        campaign_id=int(campaign_id),
+        user_ids=clean_ids,
+    )
+    max_attempts = max(1, min(int(os.getenv("NUDGE_PROVIDER_MAX_ATTEMPTS", "5") or "5"), 20))
+    with db.get_conn() as conn:
+        recipients = db.claim_campaign_recipients(
+            conn,
+            campaign_id=int(campaign_id),
+            userids=clean_ids,
+            max_attempts=max_attempts,
         )
-        targets = [uid for uid in clean_ids if uid not in already]
-        summary["deduped"] = len(already)
-        if not targets:
-            return summary
+        conn.commit()
+    summary["deduped"] = len(clean_ids) - len(recipients)
+    if not recipients:
+        return summary
 
-        params_by_user = resolve_params_for_users(
-            conn, targets, needed=needed_placeholders(campaign)
-        )
-        channels = [c for c in (campaign.get("channels") or []) if c in ALLOWED_CHANNELS] or list(
-            ALLOWED_CHANNELS
-        )
-        policy = campaign.get("channel_policy") or "waterfall"
-        landing = str(campaign.get("landing_screen") or "chat")
-        cta = LANDING_SCREEN_TO_CTA.get(landing, "astroroshni://chat")
-        event_params = json.dumps({"campaign_id": int(campaign_id)}, ensure_ascii=False)
-        data_extra: Dict[str, Any] = {"landing_screen": landing, "campaign_id": str(int(campaign_id))}
-        if landing in {"career", "marriage", "health", "wealth", "progeny", "education"}:
-            data_extra["analysis_type"] = landing
-        if landing == "blog":
-            data_extra.update(_blog_push_data(campaign))
+    # Phase 2: all provider calls happen with zero database connections held.
+    provider_results = _deliver_recipient_snapshots(recipients)
 
-        for uid in targets:
-            try:
-                copy = render_campaign_for_user(campaign, params_by_user.get(uid) or default_params())
-                if not copy["title"] or not copy["body"]:
-                    summary["failed"] += 1
-                    continue
-                result = deliver_nudge(
-                    conn,
-                    userid=uid,
-                    trigger_id=campaign_trigger_id(int(campaign_id)),
-                    title=copy["title"],
-                    body=copy["body"],
-                    question=copy.get("question") or None,
-                    policy=policy,
-                    channels=channels,
-                    campaign_id=int(campaign_id),
-                    event_params=event_params,
-                    data_extra=data_extra,
-                    cta_deep_link=cta,
+    # Phase 3: persist outcomes in one short notification DB transaction.
+    should_retry = False
+    with db.get_conn() as conn:
+        for result in provider_results:
+            recipient = result["recipient"]
+            attempts = list(result.get("attempts") or [])
+            sent_channels = list(result.get("sent") or [])
+            endpoints = recipient.get("endpoints") or {}
+            policy = str(recipient.get("policy") or "waterfall").lower()
+            requested = [
+                c for c in (recipient.get("channels") or []) if c in ALLOWED_CHANNELS
+            ]
+            if policy == "push_only":
+                requested = ["push"]
+            had_reachable_endpoint = any(
+                (
+                    channel == "push"
+                    and bool(endpoints.get("push") or [])
                 )
-                summary["delivered"] += 1
-                ch = result.get("channel") or "stored"
-                if ch in summary["channels"]:
-                    summary["channels"][ch] += 1
-                for extra in (result.get("channels_sent") or [])[1:]:
-                    if extra in summary["channels"]:
-                        summary["channels"][extra] += 1
-            except Exception as e:
+                or (
+                    channel == "whatsapp"
+                    and bool(
+                        (
+                            endpoints.get("whatsapp_wa_id")
+                            and endpoints.get("whatsapp_phone_number_id")
+                        )
+                        or endpoints.get("phone")
+                    )
+                )
+                or (channel == "email" and bool(endpoints.get("email")))
+                for channel in requested
+            )
+            if (
+                not sent_channels
+                and had_reachable_endpoint
+                and int(recipient.get("attempt_count") or 0) < max_attempts
+            ):
+                error = "All reachable notification providers failed; retry scheduled"
+                db.complete_campaign_recipient(
+                    conn, recipient_id=int(recipient["id"]), state="retry", error=error
+                )
                 summary["failed"] += 1
-                logger.warning(
-                    "campaign %s delivery failed for user %s: %s", campaign_id, uid, e
+                should_retry = True
+                continue
+            primary_assigned = False
+            for channel, ok in attempts:
+                is_primary = bool(ok and not primary_assigned)
+                if is_primary:
+                    primary_assigned = True
+                db.insert_delivery(
+                    conn,
+                    userid=int(recipient["userid"]),
+                    trigger_id=campaign_trigger_id(int(campaign_id)),
+                    title=str(recipient.get("title") or ""),
+                    body=str(recipient.get("body") or ""),
+                    sent_at=datetime.now(IST_TZ).date(),
+                    event_params=json.dumps({"campaign_id": int(campaign_id)}, ensure_ascii=False),
+                    channel=str(channel),
+                    data_payload=recipient.get("data") or {},
+                    campaign_id=int(campaign_id),
+                    delivery_group_id=str(recipient.get("delivery_group_id") or ""),
+                    send_status="sent" if ok else "failed",
+                    is_primary=is_primary,
                 )
+            if not primary_assigned:
+                db.insert_delivery(
+                    conn,
+                    userid=int(recipient["userid"]),
+                    trigger_id=campaign_trigger_id(int(campaign_id)),
+                    title=str(recipient.get("title") or ""),
+                    body=str(recipient.get("body") or ""),
+                    sent_at=datetime.now(IST_TZ).date(),
+                    event_params=json.dumps({"campaign_id": int(campaign_id)}, ensure_ascii=False),
+                    channel="stored",
+                    data_payload=recipient.get("data") or {},
+                    campaign_id=int(campaign_id),
+                    delivery_group_id=str(recipient.get("delivery_group_id") or ""),
+                    send_status="stored",
+                    is_primary=True,
+                )
+            if sent_channels or not had_reachable_endpoint:
+                db.complete_campaign_recipient(conn, recipient_id=int(recipient["id"]), state="completed")
+                summary["delivered"] += 1
+                primary = sent_channels[0] if sent_channels else "stored"
+                if primary in summary["channels"]:
+                    summary["channels"][primary] += 1
+            elif int(recipient.get("attempt_count") or 0) >= max_attempts:
+                error = "All reachable notification providers rejected the delivery"
+                db.complete_campaign_recipient(
+                    conn, recipient_id=int(recipient["id"]), state="dead", error=error
+                )
+                db.insert_dead_letter(conn, recipient=recipient, channel=None, error=error)
+                summary["failed"] += 1
         summary["progress"] = db.refresh_campaign_delivery_status(conn, int(campaign_id))
         conn.commit()
+    if should_retry:
+        # Cloud Tasks applies exponential backoff.  Returning an error is
+        # intentional; recipient claims make each retry idempotent.
+        raise RuntimeError("One or more campaign recipients require provider retry")
     return summary
 
 
@@ -628,9 +936,31 @@ def _dispatch_one_campaign(conn, campaign: Dict[str, Any]) -> Dict[str, Any]:
         if str(audience_filter.get("type") or "").strip().lower() == "user_ids"
         else []
     )
-    audience = resolve_campaign_audience(conn, audience_filter)
-    if str(campaign.get("channel_policy") or "").strip().lower() == "push_only":
-        audience = filter_push_reachable_user_ids(conn, audience)
+    # Audience/history/personalization reads are isolated on the application
+    # replica.  The notification database is used only for campaign state.
+    replica_filter = json.loads(json.dumps(audience_filter))
+    token_filter = _boolish(replica_filter.pop("has_device_token", None))
+    criteria = dict(replica_filter.get("criteria") or {})
+    if "has_device_token" in criteria:
+        token_filter = _boolish(criteria.pop("has_device_token"))
+        replica_filter["criteria"] = criteria
+    audience_type = str(replica_filter.get("type") or "all").strip().lower()
+    if audience_type in {"has_device_token", "no_device_token"}:
+        token_filter = audience_type == "has_device_token"
+        replica_filter["type"] = "all"
+    if selected_user_ids:
+        audience = list(selected_user_ids)
+    else:
+        with db.get_read_conn() as audience_conn:
+            audience = resolve_campaign_audience(audience_conn, replica_filter)
+    if token_filter is not None or str(campaign.get("channel_policy") or "").strip().lower() == "push_only":
+        reachable = set(filter_push_reachable_user_ids(conn, audience))
+        require_push = (
+            True
+            if str(campaign.get("channel_policy") or "").strip().lower() == "push_only"
+            else bool(token_filter)
+        )
+        audience = [uid for uid in audience if (uid in reachable) == require_push]
     db.update_campaign(
         conn,
         campaign_id,
@@ -817,36 +1147,95 @@ def dispatch_campaign_now(campaign_id: int) -> Dict[str, Any]:
         return {"ok": True, **result}
 
 
-def send_campaign_test(conn, campaign: Dict[str, Any], target_userid: int) -> Dict[str, Any]:
-    """Deliver a single rendered copy of the campaign to one user (admin test send)."""
-    params = resolve_params_for_users(
-        conn, [int(target_userid)], needed=needed_placeholders(campaign)
-    ).get(int(target_userid)) or default_params()
+def send_campaign_test(campaign: Dict[str, Any], target_userid: int) -> Dict[str, Any]:
+    """Deliver one test using the same replica/snapshot/provider boundary as a campaign."""
+    uid = int(target_userid)
+    with db.get_read_conn() as read_conn:
+        params = resolve_params_for_users(
+            read_conn, [uid], needed=needed_placeholders(campaign)
+        ).get(uid) or default_params()
+        endpoints = _resolve_delivery_endpoints(read_conn, [uid]).get(uid) or {}
+    with db.get_conn() as notification_conn:
+        endpoints["push"] = _resolve_push_endpoints(notification_conn, [uid]).get(uid) or []
+
     copy = render_campaign_for_user(campaign, params)
     landing = str(campaign.get("landing_screen") or "chat")
+    group_id = uuid.uuid4().hex
     channels = [c for c in (campaign.get("channels") or []) if c in ALLOWED_CHANNELS] or list(
         ALLOWED_CHANNELS
     )
-    result = deliver_nudge(
-        conn,
-        userid=int(target_userid),
-        trigger_id="campaign_test",
-        title=copy["title"],
-        body=copy["body"],
-        question=copy.get("question") or None,
-        policy=campaign.get("channel_policy") or "waterfall",
-        channels=channels,
-        event_params=json.dumps(
-            {"campaign_id": campaign.get("id"), "test": True}, ensure_ascii=False
-        ),
-        data_extra={
-            "landing_screen": landing,
-            **(
-                _blog_push_data(campaign)
-                if landing == "blog"
-                else {}
-            ),
+    data: Dict[str, Any] = {
+        "landing_screen": landing,
+        "cta": LANDING_SCREEN_TO_CTA.get(landing, "astroroshni://chat"),
+        "trigger_id": "campaign_test",
+        "nudge_id": group_id,
+    }
+    if landing == "blog":
+        data.update(_blog_push_data(campaign))
+    if copy.get("question"):
+        data["question"] = copy["question"][:500]
+    recipient = {
+        "id": 0,
+        "userid": uid,
+        "delivery_group_id": group_id,
+        "title": copy["title"],
+        "body": copy["body"],
+        "question": copy.get("question"),
+        "policy": campaign.get("channel_policy") or "waterfall",
+        "channels": channels,
+        "endpoints": endpoints,
+        "data": data,
+    }
+    delivered = _deliver_recipient_snapshots([recipient])[0]
+
+    with db.get_conn() as notification_conn:
+        sent_channels = list(delivered.get("sent") or [])
+        primary_assigned = False
+        for channel, ok in delivered.get("attempts") or []:
+            is_primary = bool(ok and not primary_assigned)
+            primary_assigned = primary_assigned or is_primary
+            db.insert_delivery(
+                notification_conn,
+                userid=uid,
+                trigger_id="campaign_test",
+                title=copy["title"],
+                body=copy["body"],
+                sent_at=datetime.now(IST_TZ).date(),
+                event_params=json.dumps(
+                    {"campaign_id": campaign.get("id"), "test": True}, ensure_ascii=False
+                ),
+                channel=str(channel),
+                data_payload=data,
+                campaign_id=None,
+                delivery_group_id=group_id,
+                send_status="sent" if ok else "failed",
+                is_primary=is_primary,
+            )
+        if not primary_assigned:
+            db.insert_delivery(
+                notification_conn,
+                userid=uid,
+                trigger_id="campaign_test",
+                title=copy["title"],
+                body=copy["body"],
+                sent_at=datetime.now(IST_TZ).date(),
+                event_params=json.dumps(
+                    {"campaign_id": campaign.get("id"), "test": True}, ensure_ascii=False
+                ),
+                channel="stored",
+                data_payload=data,
+                campaign_id=None,
+                delivery_group_id=group_id,
+                send_status="stored",
+                is_primary=True,
+            )
+        notification_conn.commit()
+    return {
+        "copy": copy,
+        "delivery": {
+            "delivery_group_id": group_id,
+            "channel": sent_channels[0] if sent_channels else "stored",
+            "channels_sent": sent_channels,
+            "channels_failed": [c for c, ok in delivered.get("attempts") or [] if not ok],
         },
-        cta_deep_link=LANDING_SCREEN_TO_CTA.get(landing, "astroroshni://chat"),
-    )
-    return {"copy": copy, "delivery": result}
+    }

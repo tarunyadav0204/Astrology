@@ -107,26 +107,50 @@ class AdminEmailNudgeReminderRequest(BaseModel):
     body: Optional[str] = None
 
 
-_ELIGIBLE_OPTIN_FROM_SQL = """
-FROM users u
-LEFT JOIN (
-    SELECT DISTINCT userid FROM device_tokens
-) dt ON dt.userid = u.userid
-"""
-
-
 def _eligible_notification_optin_where(name: Optional[str]) -> tuple[str, List[Any]]:
-    """WHERE clause fragment + params: has email, no device token, optional name/email search."""
-    parts = [
-        "COALESCE(NULLIF(TRIM(u.email), ''), '') <> ''",
-        "dt.userid IS NULL",
-    ]
+    """App-database filter only. Device-token exclusion happens on the notification DB."""
+    parts = ["COALESCE(NULLIF(TRIM(u.email), ''), '') <> ''"]
     params: List[Any] = []
     if name and str(name).strip():
         pat = f"%{str(name).strip()}%"
         parts.append("(u.name ILIKE ? OR COALESCE(u.email, '') ILIKE ?)")
         params.extend([pat, pat])
     return " AND ".join(parts), params
+
+
+def _notification_optin_candidates(
+    *,
+    name: Optional[str],
+    user_ids: Optional[List[int]] = None,
+    limit: int = 50000,
+) -> List[tuple]:
+    """Read user contacts from the replica, then exclude push-enabled IDs on notification DB."""
+    where_sql, params = _eligible_notification_optin_where(name)
+    clean_ids = sorted({int(uid) for uid in (user_ids or []) if str(uid).isdigit() and int(uid) > 0})
+    if clean_ids:
+        placeholders = ",".join(["?"] * len(clean_ids))
+        where_sql += f" AND u.userid IN ({placeholders})"
+        params.extend(clean_ids)
+    with db.get_read_conn() as app_conn:
+        cur = execute(
+            app_conn,
+            f"""
+            SELECT u.userid, COALESCE(TRIM(u.name), ''), TRIM(u.email)
+            FROM users u
+            WHERE {where_sql}
+            ORDER BY u.userid ASC
+            LIMIT ?
+            """,
+            tuple(params + [max(1, min(int(limit), 50000))]),
+        )
+        rows = cur.fetchall() or []
+    candidate_ids = [int(row[0]) for row in rows]
+    if not candidate_ids:
+        return []
+    with db.get_conn() as notification_conn:
+        token_rows = db.get_device_tokens_for_users(notification_conn, candidate_ids)
+    push_enabled_ids = {int(row[0]) for row in token_rows}
+    return [row for row in rows if int(row[0]) not in push_enabled_ids]
 
 
 _LANDING_SCREEN_TO_CTA: Dict[str, str] = {
@@ -427,14 +451,14 @@ def _run_admin_bulk_notification_job(
     *,
     job_id: str,
     admin_userid: int,
-    audience: str,
     user_ids: List[int],
-    name: Optional[str],
-    require_device_token: bool,
     title: str,
     body_text: str,
     landing_screen: str,
     question: Optional[str],
+    trigger_id: str = "admin",
+    data_extra: Optional[Dict[str, Any]] = None,
+    image_url: Optional[str] = None,
 ) -> None:
     sent = 0
     failed = 0
@@ -450,16 +474,7 @@ def _run_admin_bulk_notification_job(
             )
             conn.commit()
 
-        with db.get_conn() as conn:
-            if audience == "all_matching":
-                target_user_ids = db.resolve_notification_recipient_user_ids(
-                    conn,
-                    name=name,
-                    require_device_token=require_device_token,
-                )
-            else:
-                target_user_ids = sorted({int(uid) for uid in user_ids if str(uid).isdigit()})
-            conn.commit()
+        target_user_ids = sorted({int(uid) for uid in user_ids if str(uid).isdigit()})
 
         with db.get_conn() as conn:
             token_rows = db.get_device_tokens_for_users(conn, target_user_ids)
@@ -490,6 +505,8 @@ def _run_admin_bulk_notification_job(
             question=question,
             native_id=None,
         )
+        if data_extra:
+            push_data.update({str(k): v for k, v in data_extra.items() if v is not None})
         group_id_by_user: Dict[int, str] = {
             int(uid): new_delivery_group_id() for uid in target_user_ids
         }
@@ -503,11 +520,16 @@ def _run_admin_bulk_notification_job(
                     "body": body_text,
                     "sound": "default",
                     "data": {**push_data, "nudge_id": group_id_by_user[int(uid)]},
+                    **(
+                        {"richContent": {"image": str(image_url).strip()}}
+                        if image_url and str(image_url).strip().startswith("http")
+                        else {}
+                    ),
                 })
                 token_user_ids.append(int(uid))
 
         sent_by_user: Dict[int, int] = defaultdict(int)
-        for msg_chunk, uid_chunk in zip(_chunked(token_messages, 500), _chunked(token_user_ids, 500)):
+        for msg_chunk, uid_chunk in zip(_chunked(token_messages, 100), _chunked(token_user_ids, 100)):
             results = push_module.send_expo_push_messages(msg_chunk)
             for uid, ok in zip(uid_chunk, results):
                 if ok:
@@ -538,7 +560,7 @@ def _run_admin_bulk_notification_job(
             )[:8000]
             delivery_rows.append((
                 int(uid),
-                "admin",
+                str(trigger_id or "admin")[:80],
                 title,
                 body_text,
                 "{}",
@@ -596,10 +618,9 @@ def _run_admin_bulk_notification_job(
 @router.post("/admin/send-bulk", status_code=202)
 async def admin_send_bulk_notification(
     body: AdminSendBulkNotificationRequest,
-    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
 ):
-    """Create a non-blocking bulk custom notification job."""
+    """Resolve on the replica and enqueue the entire bulk job on the isolated worker."""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     title = (body.title or "").strip()[:100]
@@ -615,6 +636,25 @@ async def admin_send_bulk_notification(
     landing_screen = _normalize_landing_screen(body.landing_screen)
     job_id = uuid.uuid4().hex
     try:
+        if audience == "all_matching":
+            with db.get_read_conn() as read_conn:
+                target_user_ids = db.resolve_notification_recipient_user_ids(
+                    read_conn,
+                    name=body.name,
+                    require_device_token=False,
+                )
+        else:
+            target_user_ids = sorted(set(user_ids))
+        if body.require_device_token:
+            with db.get_conn() as notification_conn:
+                reachable = {
+                    int(row[0])
+                    for row in db.get_device_tokens_for_users(
+                        notification_conn, target_user_ids
+                    )
+                }
+            target_user_ids = [uid for uid in target_user_ids if uid in reachable]
+
         with db.get_conn() as conn:
             db.init_nudge_tables(conn)
             db.create_admin_send_job(
@@ -625,20 +665,40 @@ async def admin_send_bulk_notification(
                 title=title,
                 body=body_text,
             )
+            db.update_admin_send_job(conn, job_id, total_users=len(target_user_ids))
             conn.commit()
-        background_tasks.add_task(
-            _run_admin_bulk_notification_job,
-            job_id=job_id,
-            admin_userid=current_user.userid,
-            audience=audience,
-            user_ids=user_ids,
-            name=body.name,
-            require_device_token=bool(body.require_device_token),
-            title=title,
-            body_text=body_text,
-            landing_screen=landing_screen,
-            question=body.question,
+        from .task_queue import enqueue_nudge_task, nudge_tasks_are_isolated
+
+        if not nudge_tasks_are_isolated():
+            raise RuntimeError("Bulk notifications require an isolated worker target")
+        queued = enqueue_nudge_task(
+            task_kind="admin-bulk-job",
+            task_id=job_id,
+            payload={
+                "job_id": job_id,
+                "admin_userid": int(current_user.userid),
+                "user_ids": target_user_ids,
+                "title": title,
+                "body_text": body_text,
+                "landing_screen": landing_screen,
+                "question": body.question,
+                "trigger_id": "admin",
+                "data_extra": {},
+                "image_url": None,
+            },
+            dispatch_deadline_s=900,
         )
+        if not queued:
+            with db.get_conn() as conn:
+                db.update_admin_send_job(
+                    conn,
+                    job_id,
+                    status="failed",
+                    error="Could not enqueue isolated bulk notification worker",
+                    completed_at=datetime.now(IST_TZ),
+                )
+                conn.commit()
+            raise RuntimeError("Could not enqueue isolated bulk notification worker")
         return {
             "ok": True,
             "job_id": job_id,
@@ -650,6 +710,33 @@ async def admin_send_bulk_notification(
     except Exception as e:
         logger.exception("Admin bulk notification start failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to start bulk notification job") from e
+
+
+def _process_admin_email_batch(
+    *, recipients: List[Dict[str, Any]], subject: str, body_text: str
+) -> Dict[str, Any]:
+    """Provider-only email work. No application or notification DB connection is held."""
+    sent = 0
+    failed = 0
+    for recipient in recipients or []:
+        email = str(recipient.get("email") or "").strip()
+        if not email:
+            failed += 1
+            continue
+        name = str(recipient.get("name") or "").strip()
+        greeting = f"Hi {name}," if name else "Hi,"
+        personalized = (
+            f"{greeting}\n\n{body_text[5:]}"
+            if str(body_text).startswith("Hi,\n\n")
+            else str(body_text)
+        )
+        if send_plain_text_email(email, str(subject), personalized):
+            sent += 1
+        else:
+            failed += 1
+    if failed:
+        logger.warning("admin email batch partial failure sent=%s failed=%s", sent, failed)
+    return {"ok": failed == 0, "sent": sent, "failed": failed}
 
 
 @router.get("/admin/send-bulk/{job_id}")
@@ -688,7 +775,7 @@ async def admin_generate_nudge_from_chat(
     try:
         from .chat_nudge_suggestion import load_last_completed_qa_turns, generate_push_nudge_via_gemini
 
-        with db.get_conn() as conn:
+        with get_conn() as conn:
             turns = load_last_completed_qa_turns(conn, body.user_id, max_turns=2)
         if not turns:
             raise HTTPException(
@@ -750,81 +837,61 @@ async def admin_send_blog_notification(
         notif_body = "Tap to read this new article on AstroRoshni."
 
         with db.get_conn() as conn:
-            # Ensure nudge tables (including device_tokens) exist
             db.init_nudge_tables(conn)
-
-            # Get all distinct user IDs that have at least one device token
             all_tokens: List[tuple] = db.get_all_device_tokens(conn)
-            if not all_tokens:
-                return {
-                    "ok": False,
-                    "sent": 0,
-                    "tokens_found": 0,
-                    "message": "No device tokens registered",
-                }
+        token_user_ids = sorted({int(row[0]) for row in all_tokens})
+        if body.user_ids:
+            explicit = {
+                int(u) for u in body.user_ids if isinstance(u, int) or str(u).isdigit()
+            }
+            token_user_ids = [uid for uid in token_user_ids if uid in explicit]
+        if not token_user_ids:
+            return {"ok": False, "queued": 0, "tokens_found": 0, "message": "No device tokens registered"}
 
-            # Group tokens by user_id
-            tokens_by_user = {}
-            for userid, token, platform in all_tokens:
-                tokens_by_user.setdefault(userid, []).append((token, platform))
+        job_id = f"blog-{int(blog_id)}-{uuid.uuid4().hex}"
+        with db.get_conn() as conn:
+            db.create_admin_send_job(
+                conn,
+                job_id=job_id,
+                admin_userid=current_user.userid,
+                audience="blog",
+                title=notif_title,
+                body=notif_body,
+            )
+            db.update_admin_send_job(conn, job_id, total_users=len(token_user_ids))
+            conn.commit()
+        from .task_queue import enqueue_nudge_task, nudge_tasks_are_isolated
 
-            # If explicit user_ids provided, restrict to those
-            target_user_ids: Optional[List[int]] = None
-            if body.user_ids:
-                target_user_ids = [int(u) for u in body.user_ids if isinstance(u, int) or str(u).isdigit()]
-
-            sent = 0
-            total_tokens = 0
-            for userid, tokens in tokens_by_user.items():
-                if target_user_ids is not None and userid not in target_user_ids:
-                    continue
-
-                # audience == "eligible" is same as "all" here since all have tokens for these users,
-                # but we keep the parameter for future filtering.
-                push_data = {
+        if not nudge_tasks_are_isolated() or not enqueue_nudge_task(
+            task_kind="admin-bulk-job",
+            task_id=job_id,
+            payload={
+                "job_id": job_id,
+                "admin_userid": int(current_user.userid),
+                "user_ids": token_user_ids,
+                "title": notif_title,
+                "body_text": notif_body,
+                "landing_screen": "blog",
+                "question": None,
+                "trigger_id": "blog_admin",
+                "data_extra": {
                     "trigger_id": "blog",
                     "cta": "astroroshni://blog",
                     "blog_id": str(blog_id),
                     "slug": slug or "",
-                }
-                user_sent = 0
-                for token, platform in tokens:
-                    total_tokens += 1
-                    if push_module.send_expo_push(
-                        token,
-                        notif_title,
-                        notif_body,
-                        data=push_data,
-                        image_url=featured_image if featured_image else None,
-                    ):
-                        sent += 1
-                        user_sent += 1
-                channel = "push" if user_sent else "stored"
-                ep = json.dumps({"blog_id": blog_id, "slug": slug or ""}, ensure_ascii=False)
-                db.insert_delivery(
-                    conn,
-                    userid=userid,
-                    trigger_id="blog_admin",
-                    title=notif_title,
-                    body=notif_body,
-                    sent_at=date.today(),
-                    event_params=ep,
-                    channel=channel,
-                    data_payload=push_data,
-                )
-            conn.commit()
+                },
+                "image_url": featured_image,
+            },
+            dispatch_deadline_s=900,
+        ):
+            raise RuntimeError("Could not enqueue isolated blog notification worker")
 
-        logger.info(
-            "Admin send blog notification success: blog_id=%s users=%s tokens_sent=%s",
-            blog_id,
-            len(tokens_by_user),
-            sent,
-        )
         return {
             "ok": True,
-            "sent": sent,
-            "tokens_found": total_tokens,
-            "message": f"Notification sent to {sent} of {total_tokens} device(s)",
+            "queued": len(token_user_ids),
+            "tokens_found": len(all_tokens),
+            "job_id": job_id,
+            "message": f"Queued blog notification for {len(token_user_ids)} users",
         }
     except HTTPException:
         raise
@@ -848,30 +915,10 @@ async def admin_notification_optin_email_eligible_ids(
 
     where_extra, params = _eligible_notification_optin_where(name)
     try:
-        with db.get_conn() as conn:
-            db.init_nudge_tables(conn)
-            cur = execute(
-                conn,
-                f"SELECT COUNT(*) {_ELIGIBLE_OPTIN_FROM_SQL} WHERE {where_extra}",
-                tuple(params),
-            )
-            total = int((cur.fetchone() or (0,))[0] or 0)
-
-            cur = execute(
-                conn,
-                f"""
-                SELECT u.userid
-                {_ELIGIBLE_OPTIN_FROM_SQL}
-                WHERE {where_extra}
-                ORDER BY u.userid ASC
-                LIMIT ?
-                """,
-                tuple(params + [limit]),
-            )
-            rows = cur.fetchall() or []
-            ids = [int(r[0]) for r in rows]
-
-        truncated = total > len(ids)
+        rows = _notification_optin_candidates(name=name, limit=limit)
+        ids = [int(row[0]) for row in rows]
+        total = len(ids)
+        truncated = total >= limit
         return {
             "ok": True,
             "total": total,
@@ -933,30 +980,11 @@ async def admin_send_notification_optin_email(
         )
 
     try:
-        with db.get_conn() as conn:
-            db.init_nudge_tables(conn)
-
-            where_extra, params = _eligible_notification_optin_where(
-                body.name if body.send_all_eligible else None
-            )
-            params = list(params)
-            where_sql = f"WHERE {where_extra}"
-            if not body.send_all_eligible:
-                placeholders = ",".join(["?"] * len(clean_ids))
-                where_sql += f" AND u.userid IN ({placeholders})"
-                params.extend(clean_ids)
-
-            cur = execute(
-                conn,
-                f"""
-                SELECT u.userid, COALESCE(TRIM(u.name), ''), TRIM(u.email)
-                {_ELIGIBLE_OPTIN_FROM_SQL}
-                {where_sql}
-                ORDER BY u.userid ASC
-                """,
-                tuple(params),
-            )
-            rows = cur.fetchall() or []
+        rows = _notification_optin_candidates(
+            name=body.name if body.send_all_eligible else None,
+            user_ids=None if body.send_all_eligible else clean_ids,
+            limit=50000,
+        )
 
         if not rows:
             return {
@@ -966,27 +994,29 @@ async def admin_send_notification_optin_email(
                 "message": "No eligible users without notifications and with email found.",
             }
 
-        emails_sent = 0
-        failures = 0
-        for uid, name, email in rows:
-            greeting = f"Hi {name}," if name else "Hi,"
-            if msg.startswith("Hi,\n\n"):
-                personalized = f"{greeting}\n\n{msg[5:]}"
-            else:
-                personalized = msg
-            ok = send_plain_text_email(email, subject, personalized)
-            if ok:
-                emails_sent += 1
-            else:
-                failures += 1
-                logger.warning("Failed opt-in reminder email to user_id=%s email=%s", uid, email)
+        from .task_queue import enqueue_nudge_task, nudge_tasks_are_isolated
+        if not nudge_tasks_are_isolated():
+            raise RuntimeError("Notification worker target is not isolated from the public API")
+        queued = 0
+        for batch_index, row_chunk in enumerate(_chunked(rows, 100)):
+            recipients = [
+                {"user_id": int(uid), "name": str(name or ""), "email": str(email or "")}
+                for uid, name, email in row_chunk
+            ]
+            if not enqueue_nudge_task(
+                task_kind="admin-email-batch",
+                task_id=f"optin-{current_user.userid}-{uuid.uuid4().hex}-{batch_index}",
+                payload={"recipients": recipients, "subject": subject, "body_text": msg},
+                dispatch_deadline_s=900,
+            ):
+                raise RuntimeError("Could not enqueue isolated email worker batch")
+            queued += len(recipients)
 
         return {
             "ok": True,
             "targeted_users": len(rows),
-            "emails_sent": emails_sent,
-            "failures": failures,
-            "message": f"Sent {emails_sent} reminder email(s) out of {len(rows)} targeted users.",
+            "emails_queued": queued,
+            "message": f"Queued {queued} reminder email(s) on the isolated worker.",
         }
     except HTTPException:
         raise
@@ -1379,20 +1409,26 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
                 conn.commit()
                 return summary
 
-            token_rows = db.get_all_device_tokens(conn)
-            tokens_by_user: Dict[int, List[tuple]] = {}
-            for uid, token, platform in token_rows:
-                tokens_by_user.setdefault(int(uid), []).append((token, platform))
-            all_user_ids = db.get_all_user_ids(conn)
+            with db.get_read_conn() as audience_conn:
+                all_user_ids = db.get_all_user_ids(audience_conn)
             n_users = len(all_user_ids)
 
             try:
-                from .task_queue import enqueue_nudge_task, nudge_tasks_enabled
-                tasks_enabled = nudge_tasks_enabled()
+                from .task_queue import (
+                    enqueue_nudge_task,
+                    nudge_tasks_enabled,
+                    nudge_tasks_are_isolated,
+                )
+                tasks_enabled = nudge_tasks_enabled() and nudge_tasks_are_isolated()
             except Exception as e:
-                logger.warning("nudge task queue unavailable; falling back inline broadcast: %s", e)
+                logger.exception("isolated nudge task queue unavailable: %s", e)
                 enqueue_nudge_task = None
                 tasks_enabled = False
+
+            if not tasks_enabled or not enqueue_nudge_task:
+                raise RuntimeError(
+                    "Broadcast dispatch refused: an isolated notification worker is required"
+                )
 
             if tasks_enabled and enqueue_nudge_task:
                 batch_size = max(1, min(int(os.getenv("NUDGE_BROADCAST_BATCH_SIZE", "500")), 2000))
@@ -1447,127 +1483,6 @@ def _dispatch_due_broadcast(limit: int) -> Dict[str, Any]:
                 conn.commit()
                 logger.info("broadcast dispatch-due queued summary: %s", summary)
                 return summary
-
-            total_push_sent = 0
-            total_delivery_rows = 0
-            marked = 0
-
-            for row in due_rows:
-                schedule_id = int(row[0])
-                title = (row[2] or "").strip()[:100]
-                body_text = (row[3] or "").strip()[:200]
-                category = (row[4] or "general").strip()
-
-                if not title or not body_text:
-                    db.mark_broadcast_schedule_dispatched(conn, schedule_id, 0)
-                    marked += 1
-                    continue
-
-                # Include question so tap → chat pre-fills input (same contract as delivery.py / admin send).
-                payload = {
-                    "trigger_id": "broadcast_schedule",
-                    "cta": "astroroshni://chat",
-                    "schedule_id": str(schedule_id),
-                    "category": category,
-                    "question": body_text[:500],
-                }
-                event_params = json.dumps(
-                    {"schedule_id": schedule_id, "category": category},
-                    ensure_ascii=False,
-                )
-                data_json = ""
-                try:
-                    data_json = json.dumps(payload, ensure_ascii=False)[:8000]
-                except Exception:
-                    data_json = ""
-
-                from .delivery import new_delivery_group_id
-
-                group_id_by_user: Dict[int, str] = {
-                    int(uid): new_delivery_group_id() for uid in all_user_ids
-                }
-
-                # One Expo HTTP request per 100 devices (avoids gateway timeouts on large user bases).
-                expo_messages: List[Dict[str, Any]] = []
-                message_uid: List[int] = []
-                for uid in all_user_ids:
-                    uid_int = int(uid)
-                    for token, _platform in tokens_by_user.get(uid_int, []):
-                        t = (token or "").strip()
-                        if not t.startswith("ExponentPushToken["):
-                            continue
-                        expo_messages.append(
-                            {
-                                "to": t,
-                                "title": title[:100],
-                                "body": body_text[:200],
-                                "sound": "default",
-                                "data": {**payload, "nudge_id": group_id_by_user[uid_int]},
-                            }
-                        )
-                        message_uid.append(uid_int)
-
-                push_ok_by_uid: Dict[int, bool] = defaultdict(bool)
-                if expo_messages:
-                    results = push_module.send_expo_push_messages(expo_messages)
-                    for ok, uid_m in zip(results, message_uid):
-                        if ok:
-                            push_ok_by_uid[uid_m] = True
-                            total_push_sent += 1
-
-                sent_at_iso = now.date().isoformat()
-                batch_rows: List[tuple] = []
-                for uid in all_user_ids:
-                    uid_int = int(uid)
-                    ch = "push" if push_ok_by_uid.get(uid_int) else "stored"
-                    gid = group_id_by_user[uid_int]
-                    user_data_json = json.dumps(
-                        {**payload, "nudge_id": gid}, ensure_ascii=False
-                    )[:8000]
-                    batch_rows.append(
-                        (
-                            uid_int,
-                            "broadcast_schedule",
-                            title,
-                            body_text,
-                            event_params,
-                            sent_at_iso,
-                            ch,
-                            user_data_json,
-                            gid,
-                            "sent" if ch == "push" else "stored",
-                        )
-                    )
-                db.insert_deliveries_batch(conn, batch_rows)
-                total_delivery_rows += len(batch_rows)
-
-                db.mark_broadcast_schedule_dispatched(conn, schedule_id, n_users)
-                marked += 1
-
-            summary = {
-                "ok": True,
-                "due_items": len(due_rows),
-                "schedule_items_marked": marked,
-                "delivery_rows_created": total_delivery_rows,
-                "push_sent": total_push_sent,
-                "users_targeted": n_users,
-            }
-            db.insert_cron_run(
-                conn,
-                job_key="broadcast_dispatch_due",
-                status="success",
-                summary_json=json.dumps(summary, ensure_ascii=False),
-            )
-            conn.commit()
-
-        logger.info(
-            "broadcast dispatch-due: due_rows=%s users=%s deliveries=%s push_tickets_ok=%s",
-            len(due_rows),
-            n_users,
-            total_delivery_rows,
-            total_push_sent,
-        )
-        return summary
     except Exception as e:
         logger.exception("_dispatch_due_broadcast failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to dispatch due nudges") from e
@@ -1592,6 +1507,7 @@ def _process_broadcast_schedule_batch(
     if not clean_user_ids:
         return {"ok": True, "schedule_id": int(schedule_id), "users": 0, "deliveries_created": 0, "push_sent": 0}
 
+    # Phase 1: short notification DB read. Release before provider I/O.
     with db.get_conn() as conn:
         db.init_nudge_tables(conn)
         row = db.get_broadcast_schedule_item(conn, int(schedule_id))
@@ -1622,83 +1538,63 @@ def _process_broadcast_schedule_batch(
                 "push_sent": 0,
             }
 
-        from .delivery import new_delivery_group_id
-
-        payload = {
-            "trigger_id": "broadcast_schedule",
-            "cta": "astroroshni://chat",
-            "schedule_id": str(int(schedule_id)),
-            "category": category,
-            "question": body_text[:500],
-        }
-        event_params = json.dumps(
-            {"schedule_id": int(schedule_id), "category": category},
-            ensure_ascii=False,
-        )
-        group_id_by_user: Dict[int, str] = {
-            int(uid): new_delivery_group_id() for uid in target_user_ids
-        }
-
         token_rows = db.get_device_tokens_for_users(conn, target_user_ids)
-        tokens_by_user: Dict[int, List[str]] = defaultdict(list)
-        for uid, token, _platform in token_rows:
-            token_s = str(token or "").strip()
-            if token_s.startswith("ExponentPushToken["):
-                tokens_by_user[int(uid)].append(token_s)
+    from .delivery import new_delivery_group_id
+    payload = {
+        "trigger_id": "broadcast_schedule",
+        "cta": "astroroshni://chat",
+        "schedule_id": str(int(schedule_id)),
+        "category": category,
+        "question": body_text[:500],
+    }
+    event_params = json.dumps(
+        {"schedule_id": int(schedule_id), "category": category}, ensure_ascii=False
+    )
+    group_id_by_user = {int(uid): new_delivery_group_id() for uid in target_user_ids}
+    tokens_by_user: Dict[int, List[str]] = defaultdict(list)
+    for uid, token, _platform in token_rows:
+        token_s = str(token or "").strip()
+        if token_s.startswith("ExponentPushToken["):
+            tokens_by_user[int(uid)].append(token_s)
+    token_messages: List[Dict[str, Any]] = []
+    token_user_ids: List[int] = []
+    for uid in target_user_ids:
+        for token in tokens_by_user.get(int(uid), []):
+            token_messages.append({
+                "to": token, "title": title, "body": body_text, "sound": "default",
+                "data": {**payload, "nudge_id": group_id_by_user[int(uid)]},
+            })
+            token_user_ids.append(int(uid))
 
-        token_messages: List[Dict[str, Any]] = []
-        token_user_ids: List[int] = []
-        for uid in target_user_ids:
-            for token in tokens_by_user.get(int(uid), []):
-                token_messages.append({
-                    "to": token,
-                    "title": title,
-                    "body": body_text,
-                    "sound": "default",
-                    "data": {**payload, "nudge_id": group_id_by_user[int(uid)]},
-                })
-                token_user_ids.append(int(uid))
+    # Phase 2: provider I/O with no DB checkout.
+    push_sent = 0
+    push_ok_by_uid: Dict[int, bool] = defaultdict(bool)
+    for msg_chunk, uid_chunk in zip(_chunked(token_messages, 100), _chunked(token_user_ids, 100)):
+        results = push_module.send_expo_push_messages(msg_chunk)
+        for uid, ok in zip(uid_chunk, results):
+            if ok:
+                push_ok_by_uid[int(uid)] = True
+                push_sent += 1
 
-        push_sent = 0
-        push_ok_by_uid: Dict[int, bool] = defaultdict(bool)
-        for msg_chunk, uid_chunk in zip(_chunked(token_messages, 500), _chunked(token_user_ids, 500)):
-            results = push_module.send_expo_push_messages(msg_chunk)
-            for uid, ok in zip(uid_chunk, results):
-                if ok:
-                    push_ok_by_uid[int(uid)] = True
-                    push_sent += 1
-
-        sent_at_iso = date.today().isoformat()
-        delivery_rows: List[tuple] = []
-        for uid in target_user_ids:
-            channel = "push" if push_ok_by_uid.get(int(uid)) else "stored"
-            gid = group_id_by_user[int(uid)]
-            user_data_json = json.dumps(
-                {**payload, "nudge_id": gid}, ensure_ascii=False
-            )[:8000]
-            delivery_rows.append((
-                int(uid),
-                "broadcast_schedule",
-                title,
-                body_text,
-                event_params,
-                sent_at_iso,
-                channel,
-                user_data_json,
-                gid,
-                "sent" if channel == "push" else "stored",
-            ))
-
+    # Phase 3: short notification DB write.
+    delivery_rows: List[tuple] = []
+    for uid in target_user_ids:
+        channel = "push" if push_ok_by_uid.get(int(uid)) else "stored"
+        gid = group_id_by_user[int(uid)]
+        user_data_json = json.dumps({**payload, "nudge_id": gid}, ensure_ascii=False)[:8000]
+        delivery_rows.append((
+            int(uid), "broadcast_schedule", title, body_text, event_params,
+            date.today().isoformat(), channel, user_data_json, gid,
+            "sent" if channel == "push" else "stored",
+        ))
+    with db.get_conn() as conn:
         db.insert_deliveries_batch(conn, delivery_rows)
         conn.commit()
-        return {
-            "ok": True,
-            "schedule_id": int(schedule_id),
-            "users": len(target_user_ids),
-            "deduped": len(already_done),
-            "deliveries_created": len(delivery_rows),
-            "push_sent": push_sent,
-        }
+    return {
+        "ok": True, "schedule_id": int(schedule_id), "users": len(target_user_ids),
+        "deduped": len(already_done), "deliveries_created": len(delivery_rows),
+        "push_sent": push_sent,
+    }
 
 
 def _recent_chat_user_candidates(
@@ -1768,7 +1664,6 @@ def _recent_chat_followup_dedupe_keys(conn, *, since_dt: datetime) -> set[tuple[
 
 
 def _process_recent_chat_followup_user(
-    conn,
     *,
     uid: int,
     message_id: int,
@@ -1780,14 +1675,31 @@ def _process_recent_chat_followup_user(
         load_last_completed_qa_turns,
         generate_push_nudge_via_gemini,
     )
-    from .whatsapp_fallback import send_whatsapp_nudge, send_whatsapp_nudge_template
+    from .whatsapp_fallback import (
+        send_whatsapp_nudge_to_target,
+        send_whatsapp_template_to_phone,
+    )
 
     dedupe_since = datetime.utcnow() - timedelta(hours=6)
-    sent_keys = _recent_chat_followup_dedupe_keys(conn, since_dt=dedupe_since)
+    with db.get_conn() as notification_conn:
+        sent_keys = _recent_chat_followup_dedupe_keys(notification_conn, since_dt=dedupe_since)
     if (int(uid), int(message_id)) in sent_keys:
         return {"ok": True, "skipped": "dedupe", "user_id": int(uid), "message_id": int(message_id)}
 
-    turns = load_last_completed_qa_turns(conn, int(uid), max_turns=max_turns)
+    with db.get_read_conn() as app_conn:
+        turns = load_last_completed_qa_turns(app_conn, int(uid), max_turns=max_turns)
+        endpoint_cur = execute(
+            app_conn,
+            """
+            SELECT COALESCE(u.phone, ''), COALESCE(NULLIF(TRIM(u.name), ''), 'there'),
+                   COALESCE(u.whatsapp_wa_id, ''), COALESCE(ws.last_phone_number_id, '')
+            FROM users u
+            LEFT JOIN whatsapp_sessions ws ON ws.wa_id = u.whatsapp_wa_id
+            WHERE u.userid = %s
+            """,
+            (int(uid),),
+        )
+        endpoint_row = endpoint_cur.fetchone()
     if not turns:
         return {"ok": True, "skipped": "no_turns", "user_id": int(uid), "message_id": int(message_id)}
 
@@ -1809,11 +1721,14 @@ def _process_recent_chat_followup_user(
         "nudge_id": group_id,
     }
 
-    tokens = db.get_device_tokens_for_user(conn, int(uid))
-    sent = 0
-    for token, _platform in tokens or []:
-        if push_module.send_expo_push(token, title, body_text, data=push_data):
-            sent += 1
+    with db.get_conn() as notification_conn:
+        tokens = db.get_device_tokens_for_user(notification_conn, int(uid))
+    messages = [
+        {"to": token, "title": title, "body": body_text, "sound": "default", "data": push_data}
+        for token, _platform in (tokens or [])
+        if str(token or "").startswith("ExponentPushToken[")
+    ]
+    sent = sum(1 for ok in push_module.send_expo_push_messages(messages) if ok) if messages else 0
 
     event_params = json.dumps(
         {
@@ -1827,31 +1742,28 @@ def _process_recent_chat_followup_user(
     whatsapp_sent = 0
     whatsapp_template_sent = 0
     if sent <= 0:
-        if send_whatsapp_nudge(
-            conn,
-            userid=int(uid),
+        if endpoint_row and send_whatsapp_nudge_to_target(
+            wa_id=str(endpoint_row[2] or ""),
+            phone_number_id=str(endpoint_row[3] or ""),
             title=title,
             body=body_text,
             question=question,
         ):
             channel = "whatsapp"
             whatsapp_sent = 1
-        elif send_whatsapp_nudge_template(conn, userid=int(uid)):
+        elif endpoint_row and send_whatsapp_template_to_phone(
+            phone=str(endpoint_row[0] or ""), name=str(endpoint_row[1] or "there")
+        ):
             channel = "whatsapp_template"
             whatsapp_template_sent = 1
-    db.insert_delivery(
-        conn,
-        userid=int(uid),
-        trigger_id="chat_hourly_followup",
-        title=title,
-        body=body_text,
-        sent_at=date.today(),
-        event_params=event_params,
-        channel=channel,
-        data_payload=push_data,
-        delivery_group_id=group_id,
-        send_status="sent" if channel in ("push", "whatsapp", "whatsapp_template") else "stored",
-    )
+    with db.get_conn() as notification_conn:
+        db.insert_delivery(
+            notification_conn, userid=int(uid), trigger_id="chat_hourly_followup",
+            title=title, body=body_text, sent_at=date.today(), event_params=event_params,
+            channel=channel, data_payload=push_data, delivery_group_id=group_id,
+            send_status="sent" if channel in ("push", "whatsapp", "whatsapp_template") else "stored",
+        )
+        notification_conn.commit()
     return {
         "ok": True,
         "user_id": int(uid),
@@ -1919,21 +1831,27 @@ def _dispatch_recent_chat_followups(
                 conn.commit()
                 logger.warning("chat_hourly_followup skipped: already running")
                 return summary
-            candidates = _recent_chat_user_candidates(
-                conn,
-                lookback_minutes=lookback_minutes,
-                limit_users=limit_users,
-            )
+            with db.get_read_conn() as audience_conn:
+                candidates = _recent_chat_user_candidates(
+                    audience_conn,
+                    lookback_minutes=lookback_minutes,
+                    limit_users=limit_users,
+                )
             sent_keys = _recent_chat_followup_dedupe_keys(conn, since_dt=dedupe_since)
             today = date.today()
 
             try:
-                from .task_queue import enqueue_nudge_task, nudge_tasks_enabled
-                tasks_enabled = nudge_tasks_enabled()
+                from .task_queue import enqueue_nudge_task, nudge_tasks_enabled, nudge_tasks_are_isolated
+                tasks_enabled = nudge_tasks_enabled() and nudge_tasks_are_isolated()
             except Exception as e:
-                logger.warning("nudge task queue unavailable; falling back inline: %s", e)
+                logger.exception("isolated nudge task queue unavailable: %s", e)
                 enqueue_nudge_task = None
                 tasks_enabled = False
+
+            if not tasks_enabled or not enqueue_nudge_task:
+                raise RuntimeError(
+                    "Recent-chat dispatch refused: an isolated notification worker is required"
+                )
 
             if tasks_enabled and enqueue_nudge_task:
                 enqueued = 0
@@ -1992,7 +1910,6 @@ def _dispatch_recent_chat_followups(
 
                 try:
                     result = _process_recent_chat_followup_user(
-                        conn,
                         uid=uid,
                         message_id=message_id,
                         lookback_minutes=lookback_minutes,
@@ -2164,19 +2081,15 @@ async def internal_chat_followup_user_task(
     lookback_minutes = max(1, min(int(body.get("lookback_minutes") or 60), 24 * 60))
     max_turns = max(1, min(int(body.get("max_turns") or 2), 2))
     try:
-        with db.get_conn() as conn:
-            db.init_nudge_tables(conn)
-            result = _process_recent_chat_followup_user(
-                conn,
-                uid=uid,
-                message_id=message_id,
-                lookback_minutes=lookback_minutes,
-                max_turns=max_turns,
-            )
-            conn.commit()
-            if result.get("ok") is False and result.get("error") != "empty_generated_nudge":
-                raise HTTPException(status_code=500, detail=result.get("error") or "chat follow-up task failed")
-            return result
+        result = _process_recent_chat_followup_user(
+            uid=uid,
+            message_id=message_id,
+            lookback_minutes=lookback_minutes,
+            max_turns=max_turns,
+        )
+        if result.get("ok") is False and result.get("error") != "empty_generated_nudge":
+            raise HTTPException(status_code=500, detail=result.get("error") or "chat follow-up task failed")
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -2270,6 +2183,20 @@ async def admin_list_today_deliveries(
             db.init_nudge_tables(conn)
             rows = db.list_deliveries_for_date_admin(conn, day.isoformat(), limit=int(limit))
             summary = db.summarize_deliveries_for_date_admin(conn, day.isoformat())
+        user_ids = sorted({int(r[1]) for r in rows if r[1] is not None})
+        user_brief: Dict[int, tuple[str, str]] = {}
+        if user_ids:
+            with db.get_read_conn() as read_conn:
+                cur = execute(
+                    read_conn,
+                    "SELECT userid, COALESCE(name, ''), COALESCE(phone, '') "
+                    "FROM users WHERE userid = ANY(%s)",
+                    (user_ids,),
+                )
+                user_brief = {
+                    int(row[0]): (str(row[1] or ""), str(row[2] or ""))
+                    for row in (cur.fetchall() or [])
+                }
         items: List[Dict[str, Any]] = []
         for r in rows:
             channel = (r[8] or "stored").strip()
@@ -2294,8 +2221,8 @@ async def admin_list_today_deliveries(
                 {
                     "id": int(r[0]),
                     "user_id": int(r[1]),
-                    "user_name": r[2] or "",
-                    "user_phone": r[3] or "",
+                    "user_name": user_brief.get(int(r[1]), ("", ""))[0],
+                    "user_phone": user_brief.get(int(r[1]), ("", ""))[1],
                     "trigger_id": r[4] or "",
                     "title": r[5] or "",
                     "body": r[6] or "",
@@ -2665,8 +2592,7 @@ async def admin_preview_campaign(
     }
     try:
         def _work():
-            with db.get_conn() as conn:
-                db.init_nudge_tables(conn)
+            with db.get_read_conn() as conn:
                 params = resolve_params_for_users(
                     conn, [sample_uid], needed=needed_placeholders(pseudo_campaign)
                 ).get(sample_uid) or default_params()
@@ -2701,9 +2627,11 @@ async def admin_campaign_audience_estimate(
         audience_filter = json.loads(fields["audience_filter_json"])
 
         def _work():
-            with db.get_conn() as conn:
-                db.init_nudge_tables(conn)
-                return estimate_campaign_audience(conn, audience_filter)
+            with db.get_read_conn() as conn, db.get_conn() as notification_conn:
+                db.init_nudge_tables(notification_conn)
+                return estimate_campaign_audience(
+                    conn, audience_filter, notification_conn=notification_conn
+                )
 
         result = await run_in_threadpool(_work)
         return {"ok": True, **result}
@@ -2730,11 +2658,10 @@ async def admin_test_send_campaign(
             with db.get_conn() as conn:
                 db.init_nudge_tables(conn)
                 campaign = db.get_campaign(conn, int(campaign_id))
-                if not campaign:
-                    return None
-                result = send_campaign_test(conn, campaign, target_uid)
                 conn.commit()
-                return result
+            if not campaign:
+                return None
+            return send_campaign_test(campaign, target_uid)
 
         result = await run_in_threadpool(_work)
         if result is None:
@@ -2884,12 +2811,15 @@ async def admin_campaign_stats(
     _require_admin(current_user)
     try:
         def _work():
-            with db.get_conn() as conn:
+            with db.get_conn() as conn, db.get_read_conn() as read_conn:
                 db.init_nudge_tables(conn)
                 campaign = db.get_campaign(conn, int(campaign_id))
                 if not campaign:
                     return None
-                return _campaign_dto(None, campaign), db.campaign_stats(conn, int(campaign_id))
+                return (
+                    _campaign_dto(None, campaign),
+                    db.campaign_stats_isolated(conn, read_conn, int(campaign_id)),
+                )
 
         result = await run_in_threadpool(_work)
         if result is None:
@@ -2916,13 +2846,14 @@ async def admin_campaign_question_funnel(
     _require_admin(current_user)
     try:
         def _work():
-            with db.get_conn() as conn:
+            with db.get_conn() as conn, db.get_read_conn() as read_conn:
                 db.init_nudge_tables(conn)
                 campaign = db.get_campaign(conn, int(campaign_id))
                 if not campaign:
                     return None
-                return db.campaign_question_funnel(
+                return db.campaign_question_funnel_isolated(
                     conn,
+                    read_conn,
                     int(campaign_id),
                     window_days=window_days,
                     page=page,

@@ -19,12 +19,8 @@ logger = logging.getLogger(__name__)
 
 def _fetch_user_id_page(*, after_userid: int, limit: int) -> list[int]:
     """Short-lived read so we never hold users locks across Cloud Tasks I/O."""
-    with db.get_conn() as conn:
+    with db.get_read_conn() as conn:
         user_ids = db.get_user_ids_after(conn, after_userid=after_userid, limit=limit)
-        try:
-            conn.commit()
-        except Exception:
-            pass
         return user_ids
 
 

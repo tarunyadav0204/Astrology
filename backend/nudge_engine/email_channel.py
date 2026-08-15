@@ -109,3 +109,36 @@ def send_nudge_email(
     except Exception as e:
         logger.warning("Email nudge send failed user=%s: %s", userid, e)
         return False
+
+
+def send_nudge_email_to_address(
+    to_email: str,
+    *,
+    title: str,
+    body: str,
+    question: Optional[str],
+    delivery_group_id: str,
+) -> bool:
+    """Provider-only email send; performs no database access."""
+    recipient = str(to_email or "").strip()
+    if not recipient:
+        return False
+    cta_url = build_cta_tracking_url(delivery_group_id)
+    subject = (title or "").strip()[:180] or "A message from AstroRoshni"
+    text_parts = [(title or "").strip(), "", (body or "").strip()]
+    q = (question or "").strip()
+    if q:
+        text_parts += ["", "Suggested question to ask in chat:", q]
+    text_parts += ["", f"Continue in chat: {cta_url}"]
+    try:
+        return bool(
+            send_html_email(
+                recipient,
+                subject,
+                _build_html(title, body, question, cta_url),
+                "\n".join(text_parts).strip(),
+            )
+        )
+    except Exception as exc:
+        logger.warning("Email nudge provider send failed recipient=%s: %s", recipient, exc)
+        return False

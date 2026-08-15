@@ -21,8 +21,9 @@ def resolve_and_cap(
     Emit one (userid, event) per user per distinct trigger firing; skip if that
     exact notification was already stored for target_date (same userid, trigger_id, title).
     """
-    with db.get_conn() as conn:
+    with db.get_read_conn() as conn:
         all_user_ids = db.get_all_user_ids(conn)
+    with db.get_conn() as conn:
         existing = db.get_delivery_fingerprints_on_date(conn, target_date)
 
     result: List[Tuple[int, NudgeEvent]] = []

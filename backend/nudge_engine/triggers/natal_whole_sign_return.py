@@ -73,11 +73,12 @@ class NatalWholeSignReturnTrigger(TriggerBase):
                 merged = load_merged_definition(conn, TRIGGER_ID)
                 if not merged.enabled:
                     return events
-                charts = db.get_self_charts_for_nudge(conn)
                 dedupe_since = target_date - timedelta(days=45)
                 sent_keys = db.get_planet_window_dedupe_keys(
                     conn, TRIGGER_ID, dedupe_since
                 )
+            with db.get_read_conn() as conn:
+                charts = db.get_self_charts_for_nudge(conn)
         except Exception as e:
             logger.exception("Natal whole-sign return DB prep failed: %s", e)
             return events

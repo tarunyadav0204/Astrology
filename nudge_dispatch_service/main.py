@@ -37,10 +37,24 @@ from nudge_engine.routes import (  # noqa: E402
     _verify_cron_secret,
 )
 from nudge_engine.service import run_nudge_scan  # noqa: E402
+from nudge_engine import db  # noqa: E402
+from nudge_engine.connections import assert_isolated_database_configuration  # noqa: E402
 
 
 app = FastAPI(title="nudge-dispatch-service")
 logger = logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+def validate_isolation() -> None:
+    """The scheduler front door must never fall back to the application primary."""
+    assert_isolated_database_configuration()
+    with db.get_read_conn() as audience_conn:
+        audience_conn.cursor().execute("SELECT 1")
+    with db.get_conn() as notification_conn:
+        notification_conn.cursor().execute("SELECT 1")
+        db.init_nudge_tables(notification_conn)
+        notification_conn.commit()
 
 
 def _require_dispatch_role() -> None:

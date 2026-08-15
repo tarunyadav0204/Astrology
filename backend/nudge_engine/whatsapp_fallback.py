@@ -88,6 +88,58 @@ def send_whatsapp_nudge(
         return False
 
 
+def send_whatsapp_nudge_to_target(
+    *,
+    wa_id: str,
+    phone_number_id: str,
+    title: str,
+    body: str,
+    question: Optional[str] = None,
+) -> bool:
+    """Provider-only WhatsApp send; performs no database access."""
+    recipient = str(wa_id or "").strip()
+    sender = str(phone_number_id or "").strip()
+    if not recipient or not sender:
+        return False
+    try:
+        from whatsapp.messaging import send_whatsapp_text
+
+        return bool(
+            send_whatsapp_text(
+                to_wa_id=recipient,
+                phone_number_id=sender,
+                body=build_whatsapp_nudge_body(title, body, question),
+            )
+        )
+    except Exception as exc:
+        logger.warning("WhatsApp nudge provider send failed recipient=%s: %s", recipient, exc)
+        return False
+
+
+def send_whatsapp_template_to_phone(*, phone: str, name: str) -> bool:
+    """Provider-only approved-template send; performs no database access."""
+    phone_number_id = _template_phone_number_id()
+    recipient = _digits_only(phone)
+    if not phone_number_id or not recipient:
+        return False
+    try:
+        from whatsapp.messaging import send_whatsapp_template
+
+        return bool(
+            send_whatsapp_template(
+                to=recipient,
+                phone_number_id=phone_number_id,
+                template_name=_template_name(),
+                language_code=_template_language(),
+                body_params=[(str(name or "there").strip() or "there")[:80]],
+                button_payload=WHATSAPP_NUDGE_CONTINUE_BUTTON_ID,
+            )
+        )
+    except Exception as exc:
+        logger.warning("WhatsApp template provider send failed recipient=%s: %s", recipient, exc)
+        return False
+
+
 def _digits_only(value: str) -> str:
     return "".join(ch for ch in str(value or "") if ch.isdigit())
 

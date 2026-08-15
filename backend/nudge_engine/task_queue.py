@@ -36,11 +36,17 @@ def _location() -> str:
 
 def _queue_name(task_kind: Optional[str] = None) -> str:
     task_kind_s = str(task_kind or "").strip().lower()
-    if task_kind_s == "campaign-batch":
+    if task_kind_s in {"campaign-batch", "admin-bulk-job", "broadcast-schedule-batch"}:
         return (
             os.getenv("NUDGE_CAMPAIGN_TASKS_QUEUE")
             or os.getenv("NUDGE_TASKS_QUEUE")
             or "nudge-campaign-queue"
+        ).strip()
+    if task_kind_s == "admin-email-batch":
+        return (
+            os.getenv("NUDGE_EMAIL_TASKS_QUEUE")
+            or os.getenv("NUDGE_TASKS_QUEUE")
+            or "nudge-email-queue"
         ).strip()
     return (os.getenv("NUDGE_TASKS_QUEUE") or "nudge-standard-queue").strip()
 

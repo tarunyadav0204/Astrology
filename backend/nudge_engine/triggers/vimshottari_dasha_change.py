@@ -58,9 +58,10 @@ class VimshottariDashaChangeTrigger(TriggerBase):
                 merged = load_merged_definition(conn, TRIGGER_KEY)
                 if not merged.enabled:
                     return events
-                charts = db.get_self_charts_for_nudge(conn)
                 dedupe_since = target_date - timedelta(days=120)
                 sent_keys = db.get_vimshottari_dasha_dedupe_keys(conn, dedupe_since)
+            with db.get_read_conn() as conn:
+                charts = db.get_self_charts_for_nudge(conn)
         except Exception as e:
             logger.exception("Vimshottari dasha nudge DB prep failed: %s", e)
             return events
