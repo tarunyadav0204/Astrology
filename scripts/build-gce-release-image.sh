@@ -20,6 +20,7 @@ WORK_BUNDLE="$(mktemp "${TMP_ROOT%/}/astroroshni-release-image-bundle-${IMAGE_NA
 GCLOUD_BIN="${GCLOUD_BIN:-gcloud}"
 GCLOUD_CONFIG="${GCLOUD_CONFIG:-${CLOUDSDK_CONFIG:-}}"
 KEEP_BUILDER_VM="${KEEP_BUILDER_VM:-false}"
+BUILDER_CREATED="false"
 
 run_gcloud() {
   if [ -n "${GCLOUD_CONFIG}" ]; then
@@ -51,6 +52,20 @@ retry_gcloud() {
 
 cleanup() {
   rm -f "${WORK_BUNDLE}" 2>/dev/null || true
+  if [ "${BUILDER_CREATED}" = "true" ]; then
+    case "$(printf '%s' "${KEEP_BUILDER_VM}" | tr '[:upper:]' '[:lower:]')" in
+      true|1|yes)
+        echo "ℹ️ Builder VM retained after failure for inspection: ${INSTANCE_NAME}"
+        ;;
+      *)
+        echo "🧹 Cleaning up builder VM after an interrupted or failed image build: ${INSTANCE_NAME}"
+        run_gcloud compute instances delete "${INSTANCE_NAME}" \
+          --project="${PROJECT_ID}" \
+          --zone="${ZONE}" \
+          --quiet >/dev/null 2>&1 || true
+        ;;
+    esac
+  fi
 }
 trap cleanup EXIT
 
@@ -102,6 +117,7 @@ run_gcloud compute instances create "${INSTANCE_NAME}" \
   --service-account="${SERVICE_ACCOUNT}" \
   --scopes="${SCOPES}" \
   --labels=purpose=image-build,owner=codex
+BUILDER_CREATED="true"
 
 echo "⏳ Waiting for SSH readiness on ${INSTANCE_NAME}..."
 wait_for_ssh
@@ -156,6 +172,7 @@ case "$(printf '%s' "${KEEP_BUILDER_VM}" | tr '[:upper:]' '[:lower:]')" in
       --project="${PROJECT_ID}" \
       --zone="${ZONE}" \
       --quiet
+    BUILDER_CREATED="false"
     echo "✅ Builder VM deleted"
     ;;
 esac
