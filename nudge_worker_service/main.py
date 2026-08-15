@@ -50,8 +50,8 @@ def validate_isolation() -> None:
     with db.get_read_conn() as audience_conn:
         audience_conn.cursor().execute("SELECT 1")
     with db.get_conn() as notification_conn:
-        notification_conn.cursor().execute("SELECT 1")
         db.init_nudge_tables(notification_conn)
+        notification_conn.cursor().execute("SELECT 1")
         notification_conn.commit()
 
 

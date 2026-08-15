@@ -205,6 +205,13 @@ def init_nudge_tables(conn) -> None:
     # cannot cause "InFailedSqlTransaction" for the next statement.
     prev_autocommit = getattr(conn, "autocommit", False)
     try:
+        # A harmless validation query (for example the isolated-service
+        # startup probe's ``SELECT 1``) opens a transaction in psycopg2.
+        # PostgreSQL forbids changing autocommit while that transaction is
+        # active, so always return the connection to an idle state before
+        # entering the DDL/autocommit phase.  init_nudge_tables is schema
+        # bootstrap code and must never be called to preserve caller DML.
+        conn.rollback()
         conn.autocommit = True
 
         execute(
