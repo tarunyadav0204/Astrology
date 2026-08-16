@@ -159,9 +159,12 @@ export const CreditProvider = ({ children }) => {
       const response = await creditAPI.getBalance();
       const data = response?.data;
       const balance = Number(data?.credits ?? data?.balance ?? 0) || 0;
+      const canUseFreeQuestion = balance <= 0 && Boolean(data?.free_question_available);
       setCredits(balance);
-      setFreeQuestionAvailable(Boolean(data?.free_question_available));
-      setFreeQuestionRequiresNotifications(Boolean(data?.free_question_requires_notifications));
+      setFreeQuestionAvailable(canUseFreeQuestion);
+      setFreeQuestionRequiresNotifications(
+        canUseFreeQuestion && Boolean(data?.free_question_requires_notifications)
+      );
       setSubscriptionTierName(data?.subscription_tier_name ?? null);
       setSubscriptionDiscountPercent(Number(data?.subscription_discount_percent) || 0);
       setEntitlements(Array.isArray(data?.entitlements) ? data.entitlements : []);

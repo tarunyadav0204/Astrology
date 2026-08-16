@@ -7,9 +7,27 @@ import { buildQueryContext } from '../utils/queryContext';
 import { Alert } from 'react-native';
 import { calculateMudakkuLocal } from '../utils/mudakku';
 import { calculateGandantaLocal } from '../utils/gandanta';
+import { normalizeCalendarDateForApi } from '../utils/birthDateUtils';
 
 // Same JWT as Authorization; some CDNs/proxies strip Authorization on mobile — backend accepts this too.
 const AUTH_FALLBACK_HEADER = 'X-AstroRoshni-Authorization';
+
+const normalizeReportBirthData = (person) => {
+  if (!person || typeof person !== 'object') return person;
+  const rawTime = String(person.time || '').trim();
+  let time = rawTime;
+  if (rawTime.includes('T')) {
+    const parsedTime = new Date(rawTime);
+    if (!Number.isNaN(parsedTime.getTime())) {
+      time = parsedTime.toTimeString().slice(0, 8);
+    }
+  }
+  return {
+    ...person,
+    date: normalizeCalendarDateForApi(person.date),
+    time,
+  };
+};
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -911,6 +929,32 @@ export const creditAPI = {
     api.get(getEndpoint(`/credits/subscription?family=${encodeURIComponent(family)}`)),
   getEntitlements: () => api.get(getEndpoint('/credits/entitlements')),
   getHistory: () => api.get(getEndpoint('/credits/history')),
+  startInstantSession: (chatSessionId, clientInstanceId) =>
+    api.post(
+      getEndpoint('/credits/instant-session/start'),
+      {
+        chat_session_id: chatSessionId,
+        client_instance_id: clientInstanceId,
+      },
+      GLOBAL_ERROR_CONFIG,
+    ),
+  heartbeatInstantSession: (sessionId) =>
+    api.post(
+      getEndpoint(`/credits/instant-session/${encodeURIComponent(sessionId)}/heartbeat`),
+      {},
+      GLOBAL_ERROR_CONFIG,
+    ),
+  getInstantSessionStatus: (sessionId) =>
+    api.get(
+      getEndpoint(`/credits/instant-session/${encodeURIComponent(sessionId)}/status`),
+      GLOBAL_ERROR_CONFIG,
+    ),
+  endInstantSession: (sessionId, reason = 'user_ended') =>
+    api.post(
+      getEndpoint(`/credits/instant-session/${encodeURIComponent(sessionId)}/end`),
+      { reason },
+      GLOBAL_ERROR_CONFIG,
+    ),
   startSpeechSession: () => api.post(getEndpoint('/credits/speech-session/start'), {}, GLOBAL_ERROR_CONFIG),
   endSpeechSession: (sessionId, reason = 'ended') =>
     api.post(getEndpoint(`/credits/speech-session/${encodeURIComponent(sessionId)}/end`), { reason }, GLOBAL_ERROR_CONFIG),
@@ -1208,7 +1252,7 @@ export const reportAPI = {
   startJanamKundliReport: (person, language = 'english', options = {}) =>
     api.post(getEndpoint('/reports/janam_kundli/start'), {
       report_type: 'janam_kundli',
-      birth_data: person,
+      birth_data: normalizeReportBirthData(person),
       language,
       chart_style: options.chartStyle || 'both',
       force_regenerate: Boolean(options.forceRegenerate),
@@ -1218,7 +1262,7 @@ export const reportAPI = {
   lookupExistingJanamKundliReport: (person, language = 'english', options = {}) =>
     api.post(getEndpoint('/reports/janam_kundli/existing'), {
       report_type: 'janam_kundli',
-      birth_data: person,
+      birth_data: normalizeReportBirthData(person),
       language,
       chart_style: options.chartStyle || 'both',
       force_regenerate: false,

@@ -2,53 +2,79 @@
  * Instant chat typing lines — aligned with mobile `en.json` chat.instantLoader.* (English defaults).
  */
 export const INSTANT_LOADER_LINES = [
-    'I am reading the main chart focus first, so the answer stays connected to the right part of life instead of becoming generic.',
-    'Now I am checking the running dasha pattern and seeing which planet is currently carrying more weight in the question.',
-    'I am comparing the present transits with the natal promise to separate a short-term signal from a deeper pattern.',
-    'The relevant houses are being matched with the question, so the answer can stay specific and practical.',
-    'I am checking whether the timing looks active right now, building slowly, or already passing out of focus.',
-    'The main signals are being combined now, especially where two or more factors point in the same direction.',
-    'I am narrowing the dasha timing so past, current, and upcoming influences are not mixed together.',
-    'The transit picture is being checked against the question, especially where it activates the same houses again.',
-    'I am looking for repeated house patterns because repeated signals are more useful than one isolated placement.',
-    'Your exact question and recent chat context are being kept in view so the reply does not drift into a general reading.',
-    'I am separating stronger chart evidence from weaker hints, so the answer can say what is clear and what is uncertain.',
-    'Now I am turning the astrology into practical language, without losing the main chart reasoning.',
-    'I am keeping the response short enough for instant mode while still answering the real question.',
-    'I am turning the chart signals into a short answer you can use, without making it unnecessarily long.',
-    'I am reviewing the final wording so the takeaway is clear before the answer appears.',
-    'Almost ready. I am tightening the response so it gives you the clearest takeaway first.',
+    'Tara is reading your question…',
+    'Checking your chart context…',
+    'Looking at the active timing…',
 ];
 
 export const INSTANT_LOADER_TAKING_LONGER =
     'This is taking a little longer. I am still working on your answer...';
 
-export const INSTANT_LOADER_WORD_MS = 180;
+// These are thinking-state changes, not text being typed. Keep each cue still
+// long enough to read before moving to the next one.
+export const INSTANT_LOADER_WORD_MS = 1700;
 
 export function getInstantLoaderMaxWords() {
-    return INSTANT_LOADER_LINES.reduce((acc, line) => acc + line.split(/\s+/).filter(Boolean).length, 0);
+    // Two extra beats keep the last cue visible before the longer-wait note.
+    return INSTANT_LOADER_LINES.length + 2;
 }
 
 /**
- * Progressive word reveal per line (same algorithm as mobile ChatScreen renderInstantTypingIndicator).
+ * Reveal one short thought at a time. Earlier versions accumulated paragraphs and
+ * looked like a canned loading screen instead of a live conversation.
  */
 export function buildInstantTypingLines(wordCount) {
     const maxWords = getInstantLoaderMaxWords();
-    let remaining = Math.max(0, Math.min(wordCount, maxWords));
-    const typedLines = [];
-    INSTANT_LOADER_LINES.forEach((line, index) => {
-        const words = line.split(/\s+/).filter(Boolean);
-        if (remaining <= 0) return;
-        const visibleWordCount = Math.min(remaining, words.length);
-        remaining -= words.length;
-        typedLines.push({
-            key: `instant-line-${index}`,
-            text: words.slice(0, visibleWordCount).join(' '),
-            isComplete: visibleWordCount >= words.length,
-        });
-    });
+    const step = Math.max(1, Math.min(wordCount, maxWords));
+    const lineIndex = Math.min(step - 1, INSTANT_LOADER_LINES.length - 1);
+    const current = {
+        key: `instant-line-${lineIndex}`,
+        text: INSTANT_LOADER_LINES[lineIndex],
+        isComplete: true,
+    };
     return {
-        lines: typedLines,
+        lines: [current],
         isTakingLonger: wordCount >= maxWords,
     };
+}
+
+/** Split a completed instant answer into readable conversational beats. */
+export function splitInstantReply(content, maxPieceLength = 95) {
+    const normalized = String(content || '').replace(/\r\n/g, '\n').trim();
+    if (!normalized) return [];
+
+    const sentences = normalized
+        .split(/\n{2,}/u)
+        .flatMap((paragraph) => paragraph.match(/[^.!?।！？]+(?:[.!?।！？]+|$)/gu) || [paragraph])
+        .map((part) => part.trim())
+        .filter(Boolean);
+    const pieces = [];
+
+    sentences.forEach((sentence) => {
+        if (sentence.length <= maxPieceLength) {
+            pieces.push(sentence);
+            return;
+        }
+        const clauses = (sentence.match(/[^,;:]+(?:[,;:]|$)/gu) || [sentence])
+            .map((part) => part.trim())
+            .filter(Boolean);
+        let buffer = '';
+        clauses.forEach((clause) => {
+            const candidate = buffer ? `${buffer} ${clause}` : clause;
+            if (buffer && candidate.length > maxPieceLength) {
+                pieces.push(buffer);
+                buffer = clause;
+            } else {
+                buffer = candidate;
+            }
+        });
+        if (buffer) pieces.push(buffer);
+    });
+
+    return pieces.length ? pieces : [normalized];
+}
+
+export function getInstantReplyPieceDelay(piece) {
+    const length = String(piece || '').length;
+    return Math.max(1400, Math.min(2600, 900 + length * 17));
 }

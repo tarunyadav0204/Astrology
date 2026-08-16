@@ -648,8 +648,7 @@ export default function BirthFormScreen({ navigation, route }) {
 
       // 3. Create profile data with REAL ID from database (or guest local id)
       const profileData = {
-        ...formData,
-        time: formData.time.toTimeString().split(' ')[0],
+        ...birthData,
         id: birthChartId,
         isGuestLocal: isGuest || isGuestId(birthChartId),
       };

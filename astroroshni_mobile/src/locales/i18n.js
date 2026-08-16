@@ -29,6 +29,22 @@ import partnershipExit from './partnership-exit.json';
 import themeDiscovery from './theme-discovery.json';
 import planetaryPositions from './planetary-positions.json';
 import firstPurchaseStarter from './first-purchase-starter.json';
+import instantChatPacing from './instant-chat-pacing.json';
+import instantBilling from './instant-billing.json';
+
+const INSTANT_MODE_ACTION_COPY = Object.freeze({
+  english: 'Mode',
+  hindi: 'मोड',
+  es: 'Modo',
+  fr: 'Mode',
+  german: 'Modus',
+  russian: 'Режим',
+  chinese: '模式',
+  tamil: 'பயன்முறை',
+  telugu: 'మోడ్',
+  gujarati: 'મોડ',
+  marathi: 'मोड',
+});
 
 // The original premium-ui import accumulated a shifted chatScreen block: the
 // English key contains German, German contains Russian, and the later Indic
@@ -57,6 +73,28 @@ const normalizedPremiumUi = Object.fromEntries(
     },
   ]),
 );
+
+[
+  [en, instantChatPacing.english], [es, instantChatPacing.es], [hi, instantChatPacing.hindi],
+  [tamil, instantChatPacing.tamil], [te, instantChatPacing.telugu], [gu, instantChatPacing.gujarati],
+  [mr, instantChatPacing.marathi], [de, instantChatPacing.german], [fr, instantChatPacing.fr],
+  [ru, instantChatPacing.russian], [zh, instantChatPacing.chinese],
+].forEach(([baseCopy, pacingCopy]) => {
+  baseCopy.chat = baseCopy.chat || {};
+  baseCopy.chat.instantLoader = { ...(baseCopy.chat.instantLoader || {}), ...pacingCopy };
+});
+
+[
+  [en, instantBilling.english, 'english'], [es, instantBilling.es, 'es'], [hi, instantBilling.hindi, 'hindi'],
+  [tamil, instantBilling.tamil, 'tamil'], [te, instantBilling.telugu, 'telugu'], [gu, instantBilling.gujarati, 'gujarati'],
+  [mr, instantBilling.marathi, 'marathi'], [de, instantBilling.german, 'german'], [fr, instantBilling.fr, 'fr'],
+  [ru, instantBilling.russian, 'russian'], [zh, instantBilling.chinese, 'chinese'],
+].forEach(([baseCopy, billingCopy, language]) => {
+  baseCopy.instantBilling = {
+    ...billingCopy,
+    changeMode: INSTANT_MODE_ACTION_COPY[language],
+  };
+});
 
 Object.entries(normalizedPremiumUi).forEach(([language, copy]) => {
   copy.planetaryPositions = planetaryPositions[language] || planetaryPositions.english;

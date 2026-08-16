@@ -32,6 +32,7 @@ const MessageList = ({
     podcastAutoLaunchKey = 0,
     instantLoaderRevealWords = 1,
     onOpenCreditsModal = null,
+    forceInstantPresentation = false,
 }) => {
     React.useEffect(() => {
         const processingMessages = (messages || []).filter((message) => message?.isProcessing);
@@ -49,7 +50,7 @@ const MessageList = ({
     }, [messages]);
 
     return (
-        <div className="message-list">
+        <div className={`message-list${forceInstantPresentation ? ' message-list--instant-focus' : ''}`}>
             {messages.map((message, index) => (
                 !messageRowShouldRender(message) ? null : (
                 <div
@@ -86,14 +87,17 @@ const MessageList = ({
                                 podcastAutoLaunchKey={podcastAutoLaunchKey}
                                 instantLoaderRevealWords={instantLoaderRevealWords}
                                 onOpenCreditsModal={onOpenCreditsModal}
+                                forceInstantPresentation={forceInstantPresentation}
                             />
                         </div>
-                        <FeedbackComponent 
-                            message={message} 
-                            onFeedbackSubmitted={(messageId, rating) => {
-                                console.log('Feedback submitted:', messageId, rating);
-                            }}
-                        />
+                        {!forceInstantPresentation && String(message?.chatTier || message?.chat_tier || '').trim().toLowerCase() !== 'instant' && (
+                            <FeedbackComponent
+                                message={message}
+                                onFeedbackSubmitted={(messageId, rating) => {
+                                    console.log('Feedback submitted:', messageId, rating);
+                                }}
+                            />
+                        )}
                     </div>
                 </div>
                 )

@@ -111,6 +111,70 @@ def _table_columns(conn, table_name: str) -> set[str]:
     return {str(r[0]) for r in (cur.fetchall() or [])}
 
 
+def _instant_billing_admin_summary(conn, user_id: int) -> Dict[str, Any]:
+    """Return the auditable Instant Chat consultations for an admin user thread."""
+    if not _table_exists(conn, "instant_billing_sessions"):
+        return {"consultation_count": 0, "active_count": 0, "elapsed_seconds": 0,
+                "billed_minutes": 0, "charged_credits": 0, "sessions": []}
+
+    columns = _table_columns(conn, "instant_billing_sessions")
+    first_cost = (
+        "COALESCE(first_minute_cost, per_minute_cost)"
+        if "first_minute_cost" in columns else "per_minute_cost"
+    )
+    cur = execute(
+        conn,
+        """
+        SELECT COUNT(*),
+               COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0),
+               COALESCE(SUM(billable_seconds), 0),
+               COALESCE(SUM(billed_minutes), 0),
+               COALESCE(SUM(charged_credits), 0)
+        FROM instant_billing_sessions
+        WHERE userid = %s
+        """,
+        (user_id,),
+    )
+    totals = cur.fetchone() or (0, 0, 0, 0, 0)
+    cur = execute(
+        conn,
+        f"""
+        SELECT session_id, chat_session_id, status, {first_cost}, per_minute_cost,
+               starting_balance, charged_credits, billed_minutes, billable_seconds,
+               started_at, ended_at, ended_reason
+        FROM instant_billing_sessions
+        WHERE userid = %s
+        ORDER BY started_at DESC
+        LIMIT 100
+        """,
+        (user_id,),
+    )
+    sessions = []
+    for row in cur.fetchall() or []:
+        sessions.append({
+            "session_id": row[0],
+            "chat_session_id": row[1],
+            "status": row[2],
+            "first_minute_cost": int(row[3] or 0),
+            "following_minute_cost": int(row[4] or 0),
+            "starting_balance": int(row[5] or 0),
+            "charged_credits": int(row[6] or 0),
+            "billed_minutes": int(row[7] or 0),
+            "elapsed_seconds": int(row[8] or 0),
+            "started_at": str(row[9]) if row[9] is not None else None,
+            "ended_at": str(row[10]) if row[10] is not None else None,
+            "ended_reason": row[11],
+        })
+    return {
+        "consultation_count": int(totals[0] or 0),
+        "active_count": int(totals[1] or 0),
+        "elapsed_seconds": int(totals[2] or 0),
+        "billed_minutes": int(totals[3] or 0),
+        "charged_credits": int(totals[4] or 0),
+        "sessions": sessions,
+    }
+
+
 # chat_messages shape for admin thread SELECT — avoid information_schema on every request.
 _CHAT_MESSAGES_COLUMNS_CACHE: Optional[set[str]] = None
 
@@ -1183,6 +1247,7 @@ async def get_admin_chat_user_thread(
                 (user_id, limit, offset),
             )
             rows = cur.fetchall() or []
+            instant_billing = _instant_billing_admin_summary(conn, user_id)
 
         if not user_row and total == 0:
             raise HTTPException(status_code=404, detail="User not found")
@@ -1299,6 +1364,7 @@ async def get_admin_chat_user_thread(
             "chat_llm_provider": dominant_provider or None,
             "chat_llm_model": dominant_model or ("multiple" if len(model_counts) > 1 else None),
             "messages": messages,
+            "instant_billing": instant_billing,
             "cost_summary": {
                 "currency": "INR",
                 "usd_to_inr_rate": fx,

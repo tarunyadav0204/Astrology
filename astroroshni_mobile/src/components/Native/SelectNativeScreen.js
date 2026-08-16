@@ -315,6 +315,7 @@ export default function SelectNativeScreen({ navigation, route }) {
           place: chart.place,
           latitude: chart.latitude,
           longitude: chart.longitude,
+          timezone: chart.timezone,
           gender: chart.gender,
           relation: rel || 'other',
           relation_order: chart.relation_order ?? null,

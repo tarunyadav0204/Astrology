@@ -31,6 +31,8 @@ export const CreditProvider = ({ children }) => {
     const [freeQuestionAvailable, setFreeQuestionAvailable] = useState(false);
     const [freeQuestionRequiresNotifications, setFreeQuestionRequiresNotifications] = useState(false);
     const [instantChatCost, setInstantChatCost] = useState(1);
+    const [instantChatFirstMinuteCost, setInstantChatFirstMinuteCost] = useState(1);
+    const [instantChatPerMinuteCost, setInstantChatPerMinuteCost] = useState(1);
     const [speechChatCost, setSpeechChatCost] = useState(1);
     const [instantChatEnabled, setInstantChatEnabled] = useState(true);
     const [speechChatEnabled, setSpeechChatEnabled] = useState(true);
@@ -75,9 +77,13 @@ export const CreditProvider = ({ children }) => {
             if (response.ok) {
                 const data = await response.json();
                 console.log('💳 Credit balance data:', data);
-                setCredits(data.credits || 0);
-                setFreeQuestionAvailable(Boolean(data.free_question_available));
-                setFreeQuestionRequiresNotifications(Boolean(data.free_question_requires_notifications));
+                const balance = Number(data.credits || 0);
+                const canUseFreeQuestion = balance <= 0 && Boolean(data.free_question_available);
+                setCredits(balance);
+                setFreeQuestionAvailable(canUseFreeQuestion);
+                setFreeQuestionRequiresNotifications(
+                    canUseFreeQuestion && Boolean(data.free_question_requires_notifications)
+                );
             } else if (response.status === 403 || response.status === 401) {
                 // User not authenticated or token expired
                 console.log('💳 Authentication failed, setting credits to 0');
@@ -147,6 +153,16 @@ export const CreditProvider = ({ children }) => {
             }
             if (resolvedInstant != null) {
                 setInstantChatCost(resolvedInstant);
+            }
+            if (pricing.instant_chat_first_minute != null) {
+                setInstantChatFirstMinuteCost(Number(pricing.instant_chat_first_minute) || 1);
+            } else if (pricing.instant_chat_per_minute != null) {
+                setInstantChatFirstMinuteCost(Number(pricing.instant_chat_per_minute) || 1);
+            }
+            if (pricing.instant_chat_per_minute != null) {
+                setInstantChatPerMinuteCost(Number(pricing.instant_chat_per_minute) || 1);
+            } else if (resolvedInstant != null) {
+                setInstantChatPerMinuteCost(resolvedInstant);
             }
             if (pricing.speech_chat != null) {
                 setSpeechChatCost(Number(pricing.speech_chat) || resolvedInstant || chatNum || 1);
@@ -248,6 +264,8 @@ export const CreditProvider = ({ children }) => {
             freeQuestionAvailable,
             freeQuestionRequiresNotifications,
             instantChatCost,
+            instantChatFirstMinuteCost,
+            instantChatPerMinuteCost,
             speechChatCost,
             instantChatEnabled,
             speechChatEnabled,

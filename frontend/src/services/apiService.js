@@ -112,6 +112,24 @@ apiClient.interceptors.response.use(
 );
 
 export const apiService = {
+  startInstantChatSession: async ({ chatSessionId, clientInstanceId }) => {
+    const response = await apiClient.post(getEndpoint('/credits/instant-session/start'), {
+      chat_session_id: chatSessionId,
+      client_instance_id: clientInstanceId,
+    });
+    return response.data;
+  },
+
+  heartbeatInstantChatSession: async (sessionId) => {
+    const response = await apiClient.post(getEndpoint(`/credits/instant-session/${encodeURIComponent(sessionId)}/heartbeat`), {});
+    return response.data;
+  },
+
+  endInstantChatSession: async (sessionId, reason = 'user_ended') => {
+    const response = await apiClient.post(getEndpoint(`/credits/instant-session/${encodeURIComponent(sessionId)}/end`), { reason });
+    return response.data;
+  },
+
   // Health check API
   healthCheck: async () => {
     try {

@@ -38,6 +38,7 @@ import { openRazorpayCheckout, openRazorpaySubscriptionCheckout } from '../platf
 import { useAuthGate } from '../auth/AuthGateContext';
 import { useFocusEffect } from '@react-navigation/native';
 import AppAlertModal from '../components/Common/AppAlertModal';
+import FocusedStatusBar from '../components/Common/FocusedStatusBar';
 import { typographyTokens } from '../theme/tokens';
 import {
   getStoredGooglePlayUserId,
@@ -1864,6 +1865,10 @@ const CreditScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
+      <FocusedStatusBar
+        backgroundColor={colors.background}
+        barStyle={colors.statusBarStyle || 'dark-content'}
+      />
       <LinearGradient
         colors={bgGradient}
         style={styles.backgroundGradient}

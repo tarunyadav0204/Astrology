@@ -399,6 +399,33 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
   const formatModalCredits = (row) => formatCreditsCell(row);
   const formatModalInr = (row) => formatInrAmountCell(row);
 
+  const ledgerDisplayRows = useMemo(() => {
+    const seen = new Set();
+    const grouped = [];
+    searchResults.forEach((tx) => {
+      const billingId = tx?.metadata?.billing_session_id;
+      if (!billingId) {
+        grouped.push({ kind: 'transaction', tx });
+        return;
+      }
+      if (seen.has(billingId)) return;
+      seen.add(billingId);
+      grouped.push({
+        kind: 'instant-session',
+        billingId,
+        session: tx.instant_billing_session || null,
+        transactions: searchResults.filter((item) => item?.metadata?.billing_session_id === billingId),
+        user: tx,
+      });
+    });
+    return grouped;
+  }, [searchResults]);
+
+  const formatElapsed = (seconds) => {
+    const total = Math.max(0, Number(seconds) || 0);
+    return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, '0')}s`;
+  };
+
   const menuContextTx = useMemo(() => {
     const anchorId = actionMenu?.anchorTxId;
     if (anchorId == null) return null;
@@ -560,7 +587,46 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {searchResults.map((tx) => (
+                    {ledgerDisplayRows.map((row) => {
+                      if (row.kind === 'instant-session') {
+                        const session = row.session || {};
+                        const charged = session.charged_credits ?? row.transactions.reduce(
+                          (sum, item) => sum + Math.abs(Number(item.amount) || 0), 0
+                        );
+                        return (
+                          <tr key={`instant-${row.billingId}`} className="instant-ledger-row">
+                            <td colSpan="9">
+                              <details className="instant-ledger-group">
+                                <summary>
+                                  <span className="instant-ledger-icon">⚡</span>
+                                  <strong>Instant Chat consultation</strong>
+                                  <span>{row.user.user_name || `User ${row.user.userid}`}</span>
+                                  <span>{formatElapsed(session.elapsed_seconds)}</span>
+                                  <span>{session.billed_minutes ?? row.transactions.length} billed min</span>
+                                  <span>{charged} credits charged</span>
+                                  <em>{session.status || 'recorded'}</em>
+                                </summary>
+                                <div className="instant-ledger-detail">
+                                  <p>
+                                    First minute {session.first_minute_cost ?? '—'} credits · following minutes {session.following_minute_cost ?? '—'} credits each
+                                    {session.ended_reason ? ` · ended: ${session.ended_reason}` : ''}
+                                  </p>
+                                  {row.transactions.map((tx) => (
+                                    <div className="instant-ledger-debit" key={tx.id}>
+                                      <span>{formatDate(tx.created_at)}</span>
+                                      <span>{tx.description}</span>
+                                      <strong>{formatCreditsCell(tx)}</strong>
+                                      <span>balance {tx.balance_after}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            </td>
+                          </tr>
+                        );
+                      }
+                      const tx = row.tx;
+                      return (
                       <tr key={tx.id} className={tx.type}>
                         <td className="ledger-actions-cell">
                           {tx.userid != null && tx.id != null ? (
@@ -594,7 +660,8 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                         <td className={`amount-cell inr-amount-cell ${tx.type}`}>{formatInrAmountCell(tx)}</td>
                         <td className="balance-cell">{tx.balance_after}</td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

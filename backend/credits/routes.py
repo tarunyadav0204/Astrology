@@ -19,6 +19,12 @@ from utils.env_json import parse_json_from_env
 from activity.publisher import publish_activity
 from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
 from .razorpay_routes import refund_razorpay_payment, fetch_razorpay_payment
+from .instant_billing import (
+    InstantBillingError,
+    end_session as end_instant_billing_session,
+    heartbeat_session as heartbeat_instant_billing_session,
+    start_session as start_instant_billing_session,
+)
 from utils.admin_settings import get_chart_guide_video_url, get_nakshatra_guide_videos
 
 router = APIRouter()
@@ -2199,8 +2205,12 @@ async def get_google_play_subscription_plans(current_user: User = Depends(get_cu
         family, entitlement_key = r[6] or "vip", r[7]
         if not product_id:
             continue
-        # Fetch live price from Google Play so app shows same price as Play Store
-        formatted_price = _get_subscription_price_from_play(PACKAGE_NAME, product_id)
+        # Complimentary entitlement rows reuse google_play_product_id as an
+        # internal stable key, but they are not purchasable Play subscriptions.
+        formatted_price = None
+        if family != "pandit":
+            # Fetch live price from Google Play so app shows the Store price.
+            formatted_price = _get_subscription_price_from_play(PACKAGE_NAME, product_id)
         features = None
         benefits = []
         if features_raw is not None:
@@ -2356,6 +2366,67 @@ async def spend_credits(request: dict, current_user: User = Depends(get_current_
         raise HTTPException(status_code=400, detail="Insufficient credits")
     
     return {"success": True, "message": f"Successfully spent {amount} credits"}
+
+
+def _raise_instant_billing_http(error: InstantBillingError) -> None:
+    raise HTTPException(status_code=error.status_code, detail=error.detail)
+
+
+@router.post("/instant-session/start")
+async def start_instant_chat_billing_session(
+    request: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """Begin or reconnect to a server-metered Instant Chat consultation."""
+    try:
+        return start_instant_billing_session(
+            current_user.userid,
+            str((request or {}).get("chat_session_id") or ""),
+            str((request or {}).get("client_instance_id") or "") or None,
+        )
+    except InstantBillingError as error:
+        _raise_instant_billing_http(error)
+
+
+@router.post("/instant-session/{session_id}/heartbeat")
+async def heartbeat_instant_chat_billing_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Advance the authoritative meter and prepay any newly-started minute."""
+    try:
+        return heartbeat_instant_billing_session(current_user.userid, session_id)
+    except InstantBillingError as error:
+        _raise_instant_billing_http(error)
+
+
+@router.get("/instant-session/{session_id}/status")
+async def get_instant_chat_billing_session_status(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    # Status intentionally settles from the server clock too; it cannot be used
+    # as a free, non-billing heartbeat.
+    try:
+        return heartbeat_instant_billing_session(current_user.userid, session_id)
+    except InstantBillingError as error:
+        _raise_instant_billing_http(error)
+
+
+@router.post("/instant-session/{session_id}/end")
+async def end_instant_chat_billing_session(
+    session_id: str,
+    request: dict,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return end_instant_billing_session(
+            current_user.userid,
+            session_id,
+            str((request or {}).get("reason") or "user_ended"),
+        )
+    except InstantBillingError as error:
+        _raise_instant_billing_http(error)
 
 
 @router.post("/speech-session/start")
@@ -3076,6 +3147,8 @@ def _get_pricing_with_originals():
     keys_map = [
         ("chat", "chat_question_cost"),
         ("instant_chat", "instant_chat_cost"),
+        ("instant_chat_first_minute", "instant_chat_first_minute_cost"),
+        ("instant_chat_per_minute", "instant_chat_per_minute_cost"),
         ("speech_chat", "speech_chat_cost"),
         ("speech_chat_per_minute", "speech_chat_per_minute_cost"),
         ("premium_chat", "premium_chat_cost"),
@@ -3159,6 +3232,8 @@ async def get_analysis_pricing():
 _PRICING_KEYS_MAP = [
     ("chat", "chat_question_cost"),
     ("instant_chat", "instant_chat_cost"),
+    ("instant_chat_first_minute", "instant_chat_first_minute_cost"),
+    ("instant_chat_per_minute", "instant_chat_per_minute_cost"),
     ("speech_chat", "speech_chat_cost"),
     ("speech_chat_per_minute", "speech_chat_per_minute_cost"),
     ("premium_chat", "premium_chat_cost"),

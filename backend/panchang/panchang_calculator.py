@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import math
 from utils.timezone_service import parse_timezone_offset
 from utils.timezone_service import get_timezone_from_coordinates
+from utils.calendar_date import parse_calendar_date_y_m_d
 
 
 class PanchangCalculator:
@@ -29,10 +30,12 @@ class PanchangCalculator:
             if reference == "sunrise":
                 reference = "moment"
 
+        year, month, day = parse_calendar_date_y_m_d(date_str)
+        calendar_date = f"{year:04d}-{month:02d}-{day:02d}"
         if not timezone:
-            timezone = get_timezone_from_coordinates(float(latitude), float(longitude), for_date=date_str)
-        self._tz_offset_hours = parse_timezone_offset(timezone, latitude, longitude, for_date=date_str)
-        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+            timezone = get_timezone_from_coordinates(float(latitude), float(longitude), for_date=calendar_date)
+        self._tz_offset_hours = parse_timezone_offset(timezone, latitude, longitude, for_date=calendar_date)
+        date_obj = datetime(year, month, day)
 
         if time_str:
             parts = str(time_str).split(':')
@@ -46,7 +49,11 @@ class PanchangCalculator:
             jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, utc_hour)
         else:
             # Default: evaluate at local sunrise (Hindu day start)
-            jd0 = swe.julday(date_obj.year, date_obj.month, date_obj.day, 0.0)
+            # Swiss Ephemeris expects UT. Start at midnight of the requested
+            # local civil day so eastern longitudes do not jump to tomorrow.
+            jd0 = swe.julday(
+                date_obj.year, date_obj.month, date_obj.day, -self._tz_offset_hours
+            )
             geopos = [float(longitude), float(latitude), 0.0]
             rise = swe.rise_trans(jd0, swe.SUN, swe.CALC_RISE, geopos)
             if rise[0] == 0:
@@ -113,8 +120,9 @@ class PanchangCalculator:
         if not timezone:
             timezone = get_timezone_from_coordinates(float(latitude), float(longitude), for_date=date_str)
         self._tz_offset_hours = parse_timezone_offset(timezone, latitude, longitude, for_date=date_str)
-        year, month, day = map(int, str(date_str).split('T')[0].split('-'))
-        jd = swe.julday(year, month, day, 0.0)
+        year, month, day = parse_calendar_date_y_m_d(date_str)
+        # Search from midnight in the requested location, expressed as UT.
+        jd = swe.julday(year, month, day, -self._tz_offset_hours)
         geopos = [float(longitude), float(latitude), 0.0]
         rise = swe.rise_trans(jd, swe.SUN, swe.CALC_RISE, geopos)
         setting = swe.rise_trans(jd, swe.SUN, swe.CALC_SET, geopos)

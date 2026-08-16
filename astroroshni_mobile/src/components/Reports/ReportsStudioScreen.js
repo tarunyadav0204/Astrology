@@ -271,6 +271,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
   const reportSessionRef = useRef(null);
   const mountedRef = useRef(true);
   const existingLookupKeyRef = useRef('');
+  const selectorOverrideRef = useRef(false);
 
   const reportTypeMap = useMemo(() => {
     const map = new Map();
@@ -416,6 +417,13 @@ export default function ReportsStudioScreen({ navigation, route }) {
 
   useEffect(() => {
     const params = route?.params || {};
+    if (params.selectorTarget && params.birthData) {
+      // A deliberate chart selection must win over restoration of an older
+      // pending report session for a different native.
+      selectorOverrideRef.current = true;
+      clearPollTimer();
+      setLoadingReport(false);
+    }
     if (params.reportType && typeof params.reportType === 'string') {
       setSelectedReportType(params.reportType);
       navigation.setParams({
@@ -767,10 +775,10 @@ export default function ReportsStudioScreen({ navigation, route }) {
   };
 
   const restoreReportSession = useCallback(async ({ forceResume = false } = {}) => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || selectorOverrideRef.current) return;
 
     const session = await loadStoredReportSession();
-    if (!session?.reportId) return;
+    if (!session?.reportId || selectorOverrideRef.current) return;
 
     reportSessionRef.current = session;
     setReportSession(session);
@@ -1029,6 +1037,7 @@ export default function ReportsStudioScreen({ navigation, route }) {
     }
 
     try {
+      selectorOverrideRef.current = false;
       setLoadingReport(true);
       setReportError('');
       setReportDocument(null);

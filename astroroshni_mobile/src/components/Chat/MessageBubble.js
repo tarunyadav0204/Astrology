@@ -106,6 +106,7 @@ function MessageBubble({
   sessionId,
   podcastAutoLaunchMessageId = null,
   podcastAutoLaunchKey = 0,
+  forceInstantPresentation = false,
 }) {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
@@ -139,7 +140,7 @@ function MessageBubble({
   const slideAnim = useRef(new Animated.Value(entryAlreadyPlayed ? 0 : 50)).current;
   const isPartnership = partnership || message.partnership_mode;
   const messageChatTier = String(message?.chatTier || message?.chat_tier || '').trim().toLowerCase();
-  const isInstantChatMessage = messageChatTier === 'instant';
+  const isInstantChatMessage = forceInstantPresentation || messageChatTier === 'instant';
   const hasRemedyCard = Boolean(
     message.next_action?.type === 'remedy'
       && message.next_action?.title
@@ -227,7 +228,8 @@ function MessageBubble({
   const dot3Anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (!message.isTyping) {
+    const shouldAnimateTyping = message.isTyping || message.instantStreaming;
+    if (!shouldAnimateTyping) {
       typingAnimRef.current?.stop?.();
       typingAnimRef.current = null;
       stopAnimatedValue(dot1Anim, 0.3);
@@ -237,7 +239,7 @@ function MessageBubble({
     }
 
     const animateLoader = () => {
-      if (!mountedRef.current || !message.isTyping) return;
+      if (!mountedRef.current || !(message.isTyping || message.instantStreaming)) return;
       const seq = Animated.sequence([
         Animated.timing(dot1Anim, { toValue: 1, duration: 400, useNativeDriver: true }),
         Animated.timing(dot2Anim, { toValue: 1, duration: 400, useNativeDriver: true }),
@@ -248,7 +250,7 @@ function MessageBubble({
       ]);
       typingAnimRef.current = seq;
       seq.start(({ finished }) => {
-        if (finished && mountedRef.current && message.isTyping) {
+        if (finished && mountedRef.current && (message.isTyping || message.instantStreaming)) {
           animateLoader();
         }
       });
@@ -262,7 +264,7 @@ function MessageBubble({
       stopAnimatedValue(dot2Anim, 0.3);
       stopAnimatedValue(dot3Anim, 0.3);
     };
-  }, [message.isTyping, dot1Anim, dot2Anim, dot3Anim]);
+  }, [message.isTyping, message.instantStreaming, dot1Anim, dot2Anim, dot3Anim]);
 
   useEffect(() => {
     const entryId = String(message?.messageId || message?.id || message?.clientRequestId || '');
@@ -1549,6 +1551,64 @@ function MessageBubble({
   const formattedContent = formatContent(displayContent);
   const renderedElements = renderFormattedText(formattedContent);
 
+  // Instant consultation is intentionally a conversation, not a report card.
+  // Keep the payload readable but remove formatting chrome generated for the
+  // Standard/Premium renderer (headings, markdown markers and HTML wrappers).
+  const instantPlainContent = String(displayContent || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/[`*_]+/g, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (isInstantChatMessage) {
+    const instantTime = new Date(message.timestamp || Date.now()).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const isUser = message.role === 'user';
+
+    return (
+      <Animated.View
+        style={[
+          styles.instantMessageRow,
+          isUser ? styles.instantMessageRowUser : styles.instantMessageRowAssistant,
+          { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+        ]}
+      >
+        <View
+          style={[
+            styles.instantMessageBubble,
+            isUser ? styles.instantMessageBubbleUser : styles.instantMessageBubbleAssistant,
+            {
+              backgroundColor: isUser ? colors.selectionSurface : colors.surface,
+              borderColor: isUser ? colors.selectionBorder : colors.cardBorder,
+            },
+          ]}
+        >
+          <Text style={[styles.instantMessageText, { color: colors.text }]}>
+            {instantPlainContent}
+          </Text>
+          {message.instantStreaming ? (
+            <View style={styles.instantInlineTyping}>
+              {[dot1Anim, dot2Anim, dot3Anim].map((opacity, dot) => (
+                <Animated.View
+                  key={dot}
+                  style={[styles.instantInlineTypingDot, { backgroundColor: colors.primary, opacity }]}
+                />
+              ))}
+            </View>
+          ) : null}
+          <Text style={[styles.instantMessageTime, { color: colors.textTertiary }]}>{instantTime}</Text>
+        </View>
+      </Animated.View>
+    );
+  }
+
   const chartName = message.native_name || null;
 
   const BubbleWrapper = ({ children, role, isPartnership, isClarification, timestamp }) => {
@@ -1651,6 +1711,22 @@ function MessageBubble({
 
         <View style={styles.messageContent}>
           {renderedElements}
+          {message.instantStreaming ? (
+            <View
+              style={[
+                styles.instantResponseTyping,
+                { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder },
+              ]}
+              accessibilityLabel={t('chat.instantLoader.lineHouses', 'Tara is typing…')}
+            >
+              {[dot1Anim, dot2Anim, dot3Anim].map((opacity, dot) => (
+                <Animated.View
+                  key={dot}
+                  style={[styles.instantResponseTypingDot, { backgroundColor: colors.primary, opacity }]}
+                />
+              ))}
+            </View>
+          ) : null}
         </View>
 
         {/* Summary Image */}
@@ -1977,7 +2053,7 @@ function MessageBubble({
         )}
 
         {/* Action buttons (podcast, share, copy, etc.) - show for assistant messages with content (incl. chat history) */}
-        {!message.isTyping && message.role === 'assistant' && !message.isWelcome && !isNativeGate && (message.messageId || message.content) && (
+        {!message.isTyping && !message.instantStreaming && message.role === 'assistant' && !message.isWelcome && !isNativeGate && (message.messageId || message.content) && (
           <View style={[styles.actionButtons, { borderTopColor: colors.cardBorder }]}>
             {/* Restart Button for timeout messages */}
             {message.showRestartButton && message.messageId && (
@@ -2364,6 +2440,7 @@ const areMessageBubblePropsEqual = (prevProps, nextProps) => {
   if (prevProps.sessionId !== nextProps.sessionId) return false;
   if (prevProps.podcastAutoLaunchMessageId !== nextProps.podcastAutoLaunchMessageId) return false;
   if (prevProps.podcastAutoLaunchKey !== nextProps.podcastAutoLaunchKey) return false;
+  if (prevProps.forceInstantPresentation !== nextProps.forceInstantPresentation) return false;
   if (prevProps.onStartPartnershipGate !== nextProps.onStartPartnershipGate) return false;
   if (prevProps.onContinueSingleChartGate !== nextProps.onContinueSingleChartGate) return false;
   if (prevProps.onRelationshipContextGate !== nextProps.onRelationshipContextGate) return false;
@@ -2373,6 +2450,54 @@ const areMessageBubblePropsEqual = (prevProps, nextProps) => {
 export default React.memo(MessageBubble, areMessageBubblePropsEqual);
 
   const styles = StyleSheet.create({
+  instantMessageRow: {
+    width: '100%',
+    paddingHorizontal: 12,
+    marginVertical: 3,
+  },
+  instantMessageRowUser: {
+    alignItems: 'flex-end',
+  },
+  instantMessageRowAssistant: {
+    alignItems: 'flex-start',
+  },
+  instantMessageBubble: {
+    maxWidth: '84%',
+    minWidth: 72,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 7,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 18,
+  },
+  instantMessageBubbleUser: {
+    borderBottomRightRadius: 5,
+  },
+  instantMessageBubbleAssistant: {
+    borderBottomLeftRadius: 5,
+  },
+  instantMessageText: {
+    fontSize: 16,
+    lineHeight: 23,
+    fontWeight: '400',
+  },
+  instantMessageTime: {
+    marginTop: 4,
+    alignSelf: 'flex-end',
+    fontSize: 10,
+    lineHeight: 13,
+  },
+  instantInlineTyping: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 7,
+  },
+  instantInlineTypingDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
   container: {
     marginVertical: 4,
   },

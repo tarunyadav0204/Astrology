@@ -46,7 +46,7 @@ _stub_module(
 )
 
 from ai.evidence_planner_schema import normalize_evidence_plan
-from ai.intent_router import apply_transit_timing_guards
+from ai.intent_router import IntentRouter, apply_transit_timing_guards
 from chat.instant_chat_pipeline import (
     _all_house_activation_from_levels,
     _build_answer_mode_contract,
@@ -79,6 +79,139 @@ from chat.instant_chat_pipeline import (
     _rotate_instant_parashari_for_target,
     _target_context_as_birth_summary,
 )
+
+
+def test_instant_dialogue_state_persists_llm_owned_clarification():
+    router = IntentRouter.__new__(IntentRouter)
+    result = router._finalize_instant_dialogue_state(
+        {
+            "status": "CLARIFY",
+            "clarification_question": "Who are you referring to?",
+            "extracted_context": {},
+            "dialogue_state": {
+                "request_summary": "User asks whether an unresolved person will return",
+                "known_facts": {"event": "return"},
+                "unresolved_facts": ["person's relationship to the native"],
+                "corrections": [],
+                "ready_to_calculate": False,
+            },
+        }
+    )
+
+    state = result["extracted_context"]["instant_dialogue"]
+    assert result["status"] == "CLARIFY"
+    assert state["known_facts"] == {"event": "return"}
+    assert state["last_clarification_question"] == "Who are you referring to?"
+    assert state["ready_to_calculate"] is False
+
+
+def test_instant_dialogue_state_accepts_llm_correction_and_next_question():
+    router = IntentRouter.__new__(IntentRouter)
+    prior = {
+        "known_facts": {"event": "return", "person": "boyfriend"},
+        "unresolved_facts": ["person's relationship to the native"],
+        "corrections": [],
+        "ready_to_calculate": False,
+        "last_clarification_question": "Are you asking about a boyfriend?",
+    }
+    result = router._finalize_instant_dialogue_state(
+        {
+            "status": "CLARIFY",
+            "clarification_question": "Is this your first marriage?",
+            "extracted_context": {},
+            "dialogue_state": {
+                "request_summary": "User asks whether her husband will return",
+                "known_facts": {"event": "return", "person": "husband"},
+                "unresolved_facts": ["marriage order"],
+                "corrections": ["The person is husband, not boyfriend"],
+                "ready_to_calculate": False,
+            },
+        },
+        prior_dialogue_state=prior,
+    )
+
+    state = result["dialogue_state"]
+    assert state["known_facts"]["person"] == "husband"
+    assert state["corrections"] == ["The person is husband, not boyfriend"]
+    assert state["unresolved_facts"] == ["marriage order"]
+
+
+def test_instant_dialogue_state_blocks_inconsistent_ready_response():
+    router = IntentRouter.__new__(IntentRouter)
+    prior = {
+        "known_facts": {"event": "return"},
+        "unresolved_facts": ["person identity"],
+        "corrections": [],
+        "ready_to_calculate": False,
+        "last_clarification_question": "Who do you mean by he?",
+    }
+    result = router._finalize_instant_dialogue_state(
+        {
+            "status": "READY",
+            "clarification_question": "",
+            "extracted_context": {},
+            "dialogue_state": {
+                "known_facts": {"event": "return"},
+                "unresolved_facts": ["person identity"],
+                "ready_to_calculate": False,
+            },
+        },
+        prior_dialogue_state=prior,
+    )
+
+    assert result["status"] == "CLARIFY"
+    assert result["clarification_question"] == "Who do you mean by he?"
+
+
+def test_instant_dialogue_state_allows_ready_only_after_llm_resolves_facts():
+    router = IntentRouter.__new__(IntentRouter)
+    result = router._finalize_instant_dialogue_state(
+        {
+            "status": "READY",
+            "clarification_question": "",
+            "extracted_context": {},
+            "dialogue_state": {
+                "request_summary": "First marriage husband return after separation",
+                "known_facts": {
+                    "person": "husband",
+                    "marriage_order": "first",
+                    "current_status": "separated",
+                },
+                "unresolved_facts": [],
+                "corrections": [],
+                "ready_to_calculate": True,
+                "readiness_reason": "Relationship and event are clear",
+            },
+        }
+    )
+
+    assert result["status"] == "READY"
+    assert result["dialogue_state"]["ready_to_calculate"] is True
+    assert "last_clarification_question" not in result["dialogue_state"]
+
+
+def test_instant_router_finalizer_preserves_llm_semantics_without_text_rules():
+    router = IntentRouter.__new__(IntentRouter)
+    result = router._finalize_instant_router_result(
+        {
+            "status": "CLARIFY",
+            "mode": "ANALYZE_TOPIC_POTENTIAL",
+            "category": "relationship",
+            "context_type": "birth",
+            "needs_transits": False,
+            "divisional_charts": ["D1", "D9"],
+            "extracted_context": {"subject": "unresolved"},
+            "evidence_plan": {},
+        },
+        current_year=2026,
+        normalized_query_context=None,
+    )
+
+    assert result["status"] == "CLARIFY"
+    assert result["mode"] == "ANALYZE_TOPIC_POTENTIAL"
+    assert result["category"] == "relationship"
+    assert result["needs_transits"] is False
+    assert result["divisional_charts"] == ["D1", "D9"]
 
 
 def test_evidence_plan_normalizes_dasha_lookup_enums():
@@ -345,6 +478,31 @@ def test_event_prediction_prompt_contains_claim_discipline():
     assert "astrological indicators suggest" in prompt
     assert "not active in a timing window unless" in prompt
     assert "do not say \"career house\"" in prompt.lower()
+
+
+def test_instant_chat_prompt_closes_as_a_conversation_not_an_upsell():
+    prompt = _build_instant_prompt(
+        "What does my current dasha mean for career?",
+        {
+            "intent_summary": {
+                "category": "career",
+                "mode": "ANALYZE_TOPIC_POTENTIAL",
+                "answer_mode": "topic_reading",
+            },
+            "instant_parashari": {},
+            "normalized_evidence": {},
+        },
+        "english",
+    )
+
+    assert "exactly one short, natural question" in prompt
+    assert "Is something at work worrying you right now" in prompt
+    assert "a deeper reading would be better" not in prompt
+    assert "Use everyday language people actually use" in prompt
+    assert "Use daily-use language, not consultant language" in prompt
+    assert "Create a gentle sense that the current situation is worth paying attention to" in prompt
+    assert "Never manufacture FOMO" in prompt
+    assert "answer the user's question fully" in prompt
 
 
 def test_speech_event_answer_polish_replaces_placeholders_and_jargon():

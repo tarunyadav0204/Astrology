@@ -1,0 +1,79 @@
+{
+  "english": {
+    "lineChart": "Tara is reading your question…",
+    "lineDasha": "Checking your chart context…",
+    "lineTransits": "Looking at the active timing…",
+    "lineHouses": "Tara is typing…",
+    "takingLonger": "This is taking a little longer. Tara is still working on your answer…"
+  },
+  "hindi": {
+    "lineChart": "तारा आपका सवाल पढ़ रही है…",
+    "lineDasha": "आपकी कुंडली का संदर्भ देख रही है…",
+    "lineTransits": "वर्तमान समय के संकेत देख रही है…",
+    "lineHouses": "तारा लिख रही है…",
+    "takingLonger": "थोड़ा अधिक समय लग रहा है। तारा अभी भी आपके उत्तर पर काम कर रही है…"
+  },
+  "es": {
+    "lineChart": "Tara está leyendo tu pregunta…",
+    "lineDasha": "Revisando el contexto de tu carta…",
+    "lineTransits": "Observando el momento astrológico activo…",
+    "lineHouses": "Tara está escribiendo…",
+    "takingLonger": "Está tardando un poco más. Tara sigue preparando tu respuesta…"
+  },
+  "fr": {
+    "lineChart": "Tara lit votre question…",
+    "lineDasha": "Vérification du contexte de votre thème…",
+    "lineTransits": "Analyse du timing astrologique actif…",
+    "lineHouses": "Tara écrit…",
+    "takingLonger": "Cela prend un peu plus de temps. Tara prépare toujours votre réponse…"
+  },
+  "german": {
+    "lineChart": "Tara liest deine Frage…",
+    "lineDasha": "Dein Horoskopkontext wird geprüft…",
+    "lineTransits": "Das aktive astrologische Timing wird geprüft…",
+    "lineHouses": "Tara schreibt…",
+    "takingLonger": "Es dauert etwas länger. Tara arbeitet noch an deiner Antwort…"
+  },
+  "russian": {
+    "lineChart": "Тара читает ваш вопрос…",
+    "lineDasha": "Проверяю контекст вашей карты…",
+    "lineTransits": "Смотрю текущее астрологическое время…",
+    "lineHouses": "Тара печатает…",
+    "takingLonger": "Это занимает немного больше времени. Тара всё ещё готовит ваш ответ…"
+  },
+  "chinese": {
+    "lineChart": "Tara 正在阅读你的问题…",
+    "lineDasha": "正在查看你的星盘背景…",
+    "lineTransits": "正在分析当前的时机…",
+    "lineHouses": "Tara 正在输入…",
+    "takingLonger": "这需要多一点时间。Tara 仍在准备你的回答…"
+  },
+  "tamil": {
+    "lineChart": "தாரா உங்கள் கேள்வியைப் படிக்கிறார்…",
+    "lineDasha": "உங்கள் ஜாதகச் சூழலைப் பார்க்கிறார்…",
+    "lineTransits": "தற்போதைய காலச் சுட்டிகளைப் பார்க்கிறார்…",
+    "lineHouses": "தாரா தட்டச்சு செய்கிறார்…",
+    "takingLonger": "சிறிது கூடுதல் நேரம் ஆகிறது. தாரா இன்னும் உங்கள் பதிலைத் தயாரிக்கிறார்…"
+  },
+  "telugu": {
+    "lineChart": "తారా మీ ప్రశ్నను చదువుతోంది…",
+    "lineDasha": "మీ జాతక సందర్భాన్ని పరిశీలిస్తోంది…",
+    "lineTransits": "ప్రస్తుత కాల సూచనలను చూస్తోంది…",
+    "lineHouses": "తారా టైప్ చేస్తోంది…",
+    "takingLonger": "కొంచెం ఎక్కువ సమయం పడుతోంది. తారా ఇంకా మీ సమాధానాన్ని సిద్ధం చేస్తోంది…"
+  },
+  "gujarati": {
+    "lineChart": "તારા તમારો પ્રશ્ન વાંચી રહી છે…",
+    "lineDasha": "તમારી કુંડળીનો સંદર્ભ જોઈ રહી છે…",
+    "lineTransits": "હાલના સમયના સંકેતો જોઈ રહી છે…",
+    "lineHouses": "તારા લખી રહી છે…",
+    "takingLonger": "થોડો વધુ સમય લાગી રહ્યો છે. તારા હજી તમારા જવાબ પર કામ કરી રહી છે…"
+  },
+  "marathi": {
+    "lineChart": "तारा तुमचा प्रश्न वाचत आहे…",
+    "lineDasha": "तुमच्या कुंडलीचा संदर्भ पाहत आहे…",
+    "lineTransits": "सध्याच्या काळाचे संकेत पाहत आहे…",
+    "lineHouses": "तारा लिहित आहे…",
+    "takingLonger": "थोडा अधिक वेळ लागत आहे. तारा अजूनही तुमचे उत्तर तयार करत आहे…"
+  }
+}

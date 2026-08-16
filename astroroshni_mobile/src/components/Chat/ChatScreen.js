@@ -71,6 +71,7 @@ import { getTextToSpeech } from '../../utils/textToSpeechLazy';
 import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
 import { shouldPostChatErrorToAdminLogs } from '../../utils/chatAdminErrorGating';
 import { typographyTokens } from '../../theme/tokens';
+import useInstantBillingSession from '../../hooks/useInstantBillingSession';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -85,44 +86,59 @@ const DEFAULT_PREMIUM_CHAT_COUNTDOWN_SECONDS = 210;
 const FIRST_PURCHASE_MODAL_DURATION_MS = 10 * 1000;
 const FIRST_PURCHASE_MODAL_SEEN_PREFIX = 'first_purchase_bonus_modal_seen_v1:';
 const THEME_DISCOVERY_SEEN_KEY = 'theme_discovery_seen_v1';
+const formatMeterTime = (seconds) => {
+  const safe = Math.max(0, Math.floor(Number(seconds) || 0));
+  return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(safe % 60).padStart(2, '0')}`;
+};
 const INSTANT_LOADER_LINES = [
   'chat.instantLoader.lineChart',
   'chat.instantLoader.lineDasha',
   'chat.instantLoader.lineTransits',
-  'chat.instantLoader.lineHouses',
-  'chat.instantLoader.lineTiming',
-  'chat.instantLoader.lineSynthesis',
-  'chat.instantLoader.lineDashaTiming',
-  'chat.instantLoader.lineTransitTiming',
-  'chat.instantLoader.lineHousePattern',
-  'chat.instantLoader.lineContext',
-  'chat.instantLoader.lineConfidence',
-  'chat.instantLoader.linePractical',
-  'chat.instantLoader.lineTone',
-  'chat.instantLoader.lineAnswer',
-  'chat.instantLoader.lineReview',
-  'chat.instantLoader.lineFinal',
 ];
 const INSTANT_LOADER_FALLBACKS = [
-  'I am reviewing the main chart focus first, so the answer stays connected to the right part of life instead of becoming generic.',
-  'Now I am checking the running dasha pattern and seeing which planet is currently carrying more weight in the question.',
-  'I am comparing the present transits with the natal promise to separate a short-term signal from a deeper pattern.',
-  'The relevant houses are being matched with the question, so the answer can stay specific and practical.',
-  'I am checking whether the timing looks active right now, building slowly, or already passing out of focus.',
-  'The main signals are being combined now, especially where two or more factors point in the same direction.',
-  'I am narrowing the dasha timing so past, current, and upcoming influences are not mixed together.',
-  'The transit picture is being checked against the question, especially where it activates the same houses again.',
-  'I am looking for repeated house patterns because repeated signals are more useful than one isolated placement.',
-  'Your exact question and recent chat context are being kept in view so the reply does not drift into a general study.',
-  'I am separating stronger chart evidence from weaker hints, so the answer can say what is clear and what is uncertain.',
-  'Now I am turning the astrology into practical language, without losing the main chart reasoning.',
-  'I am keeping the response short enough for instant mode while still answering the real question.',
-  'I am turning the chart signals into a short answer you can use, without making it unnecessarily long.',
-  'I am reviewing the final wording so the takeaway is clear before the answer appears.',
-  'Almost ready. I am tightening the response so it gives you the clearest takeaway first.',
+  'Tara is reading your question…',
+  'Checking your chart context…',
+  'Looking at the active timing…',
 ];
-const INSTANT_LOADER_WORD_MS = 180;
-const INSTANT_LOADER_MAX_WORDS = INSTANT_LOADER_FALLBACKS.join(' ').split(/\s+/).filter(Boolean).length;
+const INSTANT_LOADER_WORD_MS = 1700;
+const INSTANT_LOADER_MAX_WORDS = INSTANT_LOADER_LINES.length + 2;
+
+const splitInstantReply = (content, maxPieceLength = 95) => {
+  const normalized = String(content || '').replace(/\r\n/g, '\n').trim();
+  if (!normalized) return [];
+  const sentences = normalized
+    .split(/\n{2,}/u)
+    .flatMap((paragraph) => paragraph.match(/[^.!?।！？]+(?:[.!?।！？]+|$)/gu) || [paragraph])
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const pieces = [];
+  sentences.forEach((sentence) => {
+    if (sentence.length <= maxPieceLength) {
+      pieces.push(sentence);
+      return;
+    }
+    const clauses = (sentence.match(/[^,;:]+(?:[,;:]|$)/gu) || [sentence])
+      .map((part) => part.trim())
+      .filter(Boolean);
+    let buffer = '';
+    clauses.forEach((clause) => {
+      const candidate = buffer ? `${buffer} ${clause}` : clause;
+      if (buffer && candidate.length > maxPieceLength) {
+        pieces.push(buffer);
+        buffer = clause;
+      } else {
+        buffer = candidate;
+      }
+    });
+    if (buffer) pieces.push(buffer);
+  });
+  return pieces.length ? pieces : [normalized];
+};
+
+const getInstantReplyPieceDelay = (piece) => Math.max(
+  1400,
+  Math.min(2600, 900 + String(piece || '').length * 17),
+);
 const parseChatHttpError = (error) => {
   const message = String(error?.message || '');
   const match = message.match(/^HTTP\s+(\d+):\s*([\s\S]*)$/i);
@@ -512,6 +528,8 @@ export default function ChatScreen({ navigation, route }) {
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [chatCost, setChatCost] = useState(1);
   const [instantChatCost, setInstantChatCost] = useState(1);
+  const [instantChatPerMinuteCost, setInstantChatPerMinuteCost] = useState(1);
+  const [instantChatFirstMinuteCost, setInstantChatFirstMinuteCost] = useState(1);
   const [premiumChatCost, setPremiumChatCost] = useState(3);
   const [chatCostOriginal, setChatCostOriginal] = useState(null);
   const [instantChatCostOriginal, setInstantChatCostOriginal] = useState(null);
@@ -524,6 +542,8 @@ export default function ChatScreen({ navigation, route }) {
   const [showChatModeIntro, setShowChatModeIntro] = useState(false);
   const [isInstantAnalysis, setIsInstantAnalysis] = useState(false);
   const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
+  const [showInstantEndConfirm, setShowInstantEndConfirm] = useState(false);
+  const [pendingModeAfterInstantEnd, setPendingModeAfterInstantEnd] = useState(null);
   const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
   const [showPremiumBadge, setShowPremiumBadge] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
@@ -550,6 +570,7 @@ export default function ChatScreen({ navigation, route }) {
   const mountedRef = useRef(true);
   const premiumGlowLoopRef = useRef(null);
   const badgeFadeHandleRef = useRef(null);
+  const instantBilling = useInstantBillingSession({ refreshBalance: fetchBalance });
 
   // The first free question is always answered in Standard mode. Preserve any
   // paid-mode selection in storage, but temporarily reset the UI and hide
@@ -646,6 +667,7 @@ export default function ChatScreen({ navigation, route }) {
   const [isTyping, setIsTyping] = useState(false);
   const [waitSideReplying, setWaitSideReplying] = useState(false);
   const [instantLoaderWordCount, setInstantLoaderWordCount] = useState(1);
+  const instantRevealTimersRef = useRef(new Set());
   const [suggestions, setSuggestions] = useState(DEFAULT_CHAT_SUGGESTIONS);
   /** Keeps suggestion chips off-screen until the user asks for them — saves vertical space for messages. */
   const [showTopicIdeas, setShowTopicIdeas] = useState(false);
@@ -817,8 +839,7 @@ export default function ChatScreen({ navigation, route }) {
     return () => clearInterval(interval);
   }, [hasInstantTypingMessage]);
 
-  // Instant loader grows every ~180ms. Scrolling on every word with animation causes continuous bounce.
-  // Scroll once when typing starts, then occasionally (non-animated) while still stuck to bottom.
+  // Thinking cues change as complete phrases; they are not animated as typed text.
   useEffect(() => {
     if (!hasInstantTypingMessage) return undefined;
     if (!stickMessagesToBottomRef.current) return undefined;
@@ -832,8 +853,7 @@ export default function ChatScreen({ navigation, route }) {
   useEffect(() => {
     if (!hasInstantTypingMessage) return undefined;
     if (!stickMessagesToBottomRef.current) return undefined;
-    // Follow content growth roughly every ~1.5s (≈8 words), never every single word.
-    if (instantLoaderWordCount > 1 && instantLoaderWordCount % 8 !== 0) return undefined;
+    if (instantLoaderWordCount > 1 && instantLoaderWordCount < INSTANT_LOADER_MAX_WORDS) return undefined;
     const now = Date.now();
     if (now - lastAutoScrollAtRef.current < 700) return undefined;
     const timer = setTimeout(() => {
@@ -843,6 +863,11 @@ export default function ChatScreen({ navigation, route }) {
     }, 40);
     return () => clearTimeout(timer);
   }, [hasInstantTypingMessage, instantLoaderWordCount]);
+
+  useEffect(() => () => {
+    instantRevealTimersRef.current.forEach((timer) => clearTimeout(timer));
+    instantRevealTimersRef.current.clear();
+  }, []);
 
   const [showEventPeriods, setShowEventPeriods] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
@@ -913,6 +938,7 @@ export default function ChatScreen({ navigation, route }) {
       : messages;
   const hiddenMessageCount = Math.max(0, messages.length - visibleMessages.length);
   const showWelcomeSuggestionCards =
+    !isInstantAnalysis &&
     !loading &&
     !showGreeting &&
     suggestions.length > 0 &&
@@ -2040,6 +2066,16 @@ export default function ChatScreen({ navigation, route }) {
     const instantOriginal = origMap.instant_chat != null ? Number(origMap.instant_chat) : null;
     setInstantChatCost(Number.isNaN(instantVal) || instantVal <= 0 ? 1 : instantVal);
     setInstantChatCostOriginal(Number.isNaN(instantOriginal) ? null : instantOriginal);
+    const instantMinuteVal = Number(priceMap.instant_chat_per_minute);
+    setInstantChatPerMinuteCost(
+      Number.isFinite(instantMinuteVal) && instantMinuteVal > 0 ? instantMinuteVal : 1
+    );
+    const instantFirstMinuteVal = Number(priceMap.instant_chat_first_minute);
+    setInstantChatFirstMinuteCost(
+      Number.isFinite(instantFirstMinuteVal) && instantFirstMinuteVal > 0
+        ? instantFirstMinuteVal
+        : (Number.isFinite(instantMinuteVal) && instantMinuteVal > 0 ? instantMinuteVal : 1)
+    );
     setInstantChatEnabled(Boolean(features.instant_chat_enabled));
     setSpeechChatEnabled(Boolean(features.speech_chat_enabled));
     const adminSuggestions = Array.isArray(features.chat_static_suggestions)
@@ -2294,6 +2330,32 @@ export default function ChatScreen({ navigation, route }) {
     });
   };
 
+  const revealInstantReply = (messageId, pieces, fullContent) => {
+    if (pieces.length <= 1) return;
+    let elapsed = 0;
+    pieces.slice(1).forEach((piece, index) => {
+      elapsed += getInstantReplyPieceDelay(piece);
+      const timer = setTimeout(() => {
+        instantRevealTimersRef.current.delete(timer);
+        const visibleCount = index + 2;
+        const finished = visibleCount >= pieces.length;
+        setMessagesWithStorage((prev) => prev.map((message) =>
+          String(message.messageId || '') === String(messageId)
+            ? {
+                ...message,
+                content: finished ? fullContent : pieces.slice(0, visibleCount).join('\n\n'),
+                instantStreaming: !finished,
+              }
+            : message
+        ));
+        if (stickMessagesToBottomRef.current) {
+          requestAnimationFrame(() => scrollToBottomReliably(false));
+        }
+      }, elapsed);
+      instantRevealTimersRef.current.add(timer);
+    });
+  };
+
   const exitPartnershipMode = () => {
     const activeChartName = birthData?.name || t('premiumUi.chatScreen.native');
     const transitionMessage = {
@@ -2396,11 +2458,14 @@ export default function ChatScreen({ navigation, route }) {
         isPremiumAnalysis
           ? premiumChatCost
           : (instantChatEnabled && isInstantAnalysis)
-            ? instantChatCost
+            ? 0
             : partnershipMode
               ? partnershipCost
               : chatCost
       );
+  const instantInputLocked =
+    !partnershipMode && !isMundane && !freeQuestionAvailable &&
+    instantChatEnabled && isInstantAnalysis && !instantBilling.active;
   const freeQuestionNotificationGate =
     freeQuestionRequiresNotifications &&
     !partnershipMode &&
@@ -3527,6 +3592,43 @@ export default function ChatScreen({ navigation, route }) {
     return null;
   };
 
+  const startInstantConsultation = async (targetChatSessionId = null) => {
+    try {
+      let target = targetChatSessionId || sessionId;
+      if (!target) target = await createSession();
+      if (!target) return null;
+      const next = await instantBilling.start(target);
+      setShowGreeting(false);
+      return next;
+    } catch (error) {
+      Alert.alert(
+        t('instantBilling.startFailedTitle', 'Could not start Instant Chat'),
+        error?.message || t('instantBilling.startFailedBody', 'Please check your credits and try again.')
+      );
+      return null;
+    }
+  };
+
+  const endInstantConsultation = async (reason = 'user_ended') => {
+    try {
+      const next = await instantBilling.end(reason);
+      setShowInstantEndConfirm(false);
+      return next;
+    } catch (error) {
+      Alert.alert(
+        t('instantBilling.endFailedTitle', 'Could not end consultation'),
+        error?.message || t('instantBilling.endFailedBody', 'Please try again.')
+      );
+      return null;
+    }
+  };
+
+  const replaceInstantConsultation = async (newChatSessionId) => {
+    if (!instantBilling.active) return null;
+    await endInstantConsultation('chat_session_rotated');
+    return startInstantConsultation(newChatSessionId);
+  };
+
   const saveMessageToHistory = async (message, sessionId) => {
     // This is handled by the backend when processing messages
     // No need to save manually in mobile app
@@ -3879,6 +3981,9 @@ export default function ChatScreen({ navigation, route }) {
           const fallbackTier = String(processingMessageForTier?.chatTier || rememberedTier || '').trim().toLowerCase();
           const resolvedChatTier = String(status.chat_tier || status.chatTier || rememberedTier || fallbackTier).trim().toLowerCase();
           const isInstantTierResponse = resolvedChatTier === 'instant';
+          const instantPieces = isInstantTierResponse
+            ? splitInstantReply(status.content || '')
+            : [];
 
           const showFinalMessage = () => {
             const waitConversation = normalizeWaitConversation(status.wait_conversation);
@@ -3890,8 +3995,11 @@ export default function ChatScreen({ navigation, route }) {
                 msg.messageId === messageId
                   ? {
                       ...msg,
-                      content: status.content || 'Response received but content is empty',
+                      content: instantPieces.length > 1
+                        ? instantPieces[0]
+                        : (status.content || 'Response received but content is empty'),
                       isTyping: false,
+                      instantStreaming: instantPieces.length > 1,
                       terms: status.terms || [],
                       glossary: status.glossary || {},
                       message_type: status.message_type || 'answer',
@@ -3985,6 +4093,9 @@ export default function ChatScreen({ navigation, route }) {
               }
               // Instant answers are short; jump to latest message for chat-like feel.
               scrollToBottomReliably(true);
+            }
+            if (isInstantTierResponse && instantPieces.length > 1) {
+              revealInstantReply(messageId, instantPieces, status.content || '');
             }
           };
 
@@ -4280,6 +4391,7 @@ export default function ChatScreen({ navigation, route }) {
   }) => {
     const token = await AsyncStorage.getItem('authToken');
     let activeSessionId = currentSessionId;
+    let activeInstantBillingSessionId = instantBilling.state?.session_id || null;
 
     const attemptSend = async (attempt = 1) => {
       try {
@@ -4345,6 +4457,9 @@ export default function ChatScreen({ navigation, route }) {
           ...(pendingNudgeIdRef.current ? { nudge_id: pendingNudgeIdRef.current } : {}),
           client_request_id: clientRequestId,
           free_question_requested: useFreeQuestion,
+          ...(useInstantChat && instantBilling.active && activeInstantBillingSessionId
+            ? { instant_billing_session_id: activeInstantBillingSessionId }
+            : {}),
         };
 
         console.log(`🚀 [API CALL] Sending request to /chat-v2/ask at: ${new Date().toISOString()} (attempt ${attempt})`);
@@ -4374,6 +4489,11 @@ export default function ChatScreen({ navigation, route }) {
             if (newSessionId) {
               setSessionId(newSessionId);
               activeSessionId = newSessionId;
+              if (useInstantChat && instantBilling.active) {
+                const replacement = await replaceInstantConsultation(newSessionId);
+                if (!replacement) throw new Error('Instant Chat billing session could not be restarted.');
+                activeInstantBillingSessionId = replacement.session_id;
+              }
               return attemptSend(2);
             }
           }
@@ -4389,6 +4509,11 @@ export default function ChatScreen({ navigation, route }) {
             if (newSessionId) {
               setSessionId(newSessionId);
               activeSessionId = newSessionId;
+              if (useInstantChat && instantBilling.active) {
+                const replacement = await replaceInstantConsultation(newSessionId);
+                if (!replacement) throw new Error('Instant Chat billing session could not be restarted.');
+                activeInstantBillingSessionId = replacement.session_id;
+              }
               return attemptSend(2);
             }
           }
@@ -4405,6 +4530,11 @@ export default function ChatScreen({ navigation, route }) {
               pendingChartMismatchSecondAttemptRef.current = true;
               setSessionId(newSessionId);
               activeSessionId = newSessionId;
+              if (useInstantChat && instantBilling.active) {
+                const replacement = await replaceInstantConsultation(newSessionId);
+                if (!replacement) throw new Error('Instant Chat billing session could not be restarted.');
+                activeInstantBillingSessionId = replacement.session_id;
+              }
               return attemptSend(2);
             }
             const createErr = new Error(`HTTP ${response.status}: ${errorText}`);
@@ -4629,7 +4759,7 @@ export default function ChatScreen({ navigation, route }) {
     return `${numericCost} ${unit}`;
   };
 
-  const switchChatMode = (modeKey) => {
+  const applyChatMode = (modeKey) => {
     keepChatOpenAfterAskEntryRef.current = true;
     setShowGreeting(false);
     if (modeKey === 'instant') {
@@ -4650,6 +4780,24 @@ export default function ChatScreen({ navigation, route }) {
     });
   };
 
+  const switchChatMode = (modeKey) => {
+    if (instantBilling.active && modeKey !== 'instant') {
+      setPendingModeAfterInstantEnd(modeKey);
+      setShowChatModeIntro(false);
+      setShowModeSelector(false);
+      setShowInstantEndConfirm(true);
+      return;
+    }
+    applyChatMode(modeKey);
+  };
+
+  useEffect(() => {
+    if (!instantBilling.active) return;
+    setIsInstantAnalysis(true);
+    setIsPremiumAnalysis(false);
+    setShowGreeting(false);
+  }, [instantBilling.active]);
+
   const chatModeOptions = [
     ...(instantChatEnabled ? [{
       key: 'instant',
@@ -4657,8 +4805,8 @@ export default function ChatScreen({ navigation, route }) {
       name: t('chat.modeIntro.instant.name', 'Instant'),
       benefit: t('chat.modeIntro.instant.benefit', 'Fastest replies for quick follow-ups and simple questions.'),
       bestFor: t('chat.modeIntro.instant.bestFor', 'Best when you want a concise answer now.'),
-      cost: instantChatCost,
-      originalCost: instantChatCostOriginal,
+      cost: instantChatFirstMinuteCost,
+      originalCost: null,
     }] : []),
     {
       key: 'standard',
@@ -4684,20 +4832,15 @@ export default function ChatScreen({ navigation, route }) {
 
   const renderInstantTypingIndicator = () => {
     const isDark = theme === 'dark';
-    let remainingWords = instantLoaderWordCount;
-    const typedLines = INSTANT_LOADER_LINES.map((lineKey, index) => {
-      const line = t(lineKey, INSTANT_LOADER_FALLBACKS[index]);
-      const words = line.split(/\s+/).filter(Boolean);
-      if (remainingWords <= 0) return null;
-      const visibleWordCount = Math.min(remainingWords, words.length);
-      remainingWords -= words.length;
-      return {
-        key: lineKey,
-        text: words.slice(0, visibleWordCount).join(' '),
-        isComplete: visibleWordCount >= words.length,
-      };
-    }).filter(Boolean);
-    const latestTypedIndex = typedLines.length - 1;
+    const lineIndex = Math.min(
+      Math.max(instantLoaderWordCount - 1, 0),
+      INSTANT_LOADER_LINES.length - 1,
+    );
+    const typedLines = [{
+      key: INSTANT_LOADER_LINES[lineIndex],
+      text: t(INSTANT_LOADER_LINES[lineIndex], INSTANT_LOADER_FALLBACKS[lineIndex]),
+      isComplete: true,
+    }];
     const isTakingLonger = instantLoaderWordCount >= INSTANT_LOADER_MAX_WORDS;
     return (
       <View
@@ -4710,18 +4853,16 @@ export default function ChatScreen({ navigation, route }) {
         ]}
       >
         {typedLines.map((line, index) => {
-          const isLatest = index === latestTypedIndex;
           return (
             <Text
               key={line.key}
               style={[
                 styles.instantTypingLabel,
                 index > 0 && styles.instantTypingLabelSpaced,
-                { color: isLatest ? colors.text : colors.textSecondary },
+                { color: colors.text },
               ]}
             >
               {line.text}
-              {isLatest && !line.isComplete ? <Text style={styles.instantTypingCursor}>|</Text> : null}
             </Text>
           );
         })}
@@ -4845,6 +4986,12 @@ export default function ChatScreen({ navigation, route }) {
       return;
     }
     if (!messageText.trim() || !birthData) {
+      return;
+    }
+    const wantsMeteredInstant =
+      !partnershipMode && !isMundane && !freeQuestionAvailable && instantChatEnabled && isInstantAnalysis;
+    if (wantsMeteredInstant && !instantBilling.active) {
+      await startInstantConsultation();
       return;
     }
     // Gate rating prompt to the next completed answer only.
@@ -5399,6 +5546,9 @@ export default function ChatScreen({ navigation, route }) {
       ? `${inputScopeNativeTrimmed.slice(0, 7)}...`
       : inputScopeNativeTrimmed;
   const activeMahadasha = dashaData?.maha_dashas?.find((period) => period?.current)?.planet || null;
+  const instantRemainingSeconds = Number(instantBilling.state?.remaining_seconds || 0);
+  const instantBalanceCritical = instantBilling.active && instantRemainingSeconds > 0 && instantRemainingSeconds <= 120;
+  const instantBalanceLow = instantBilling.active && instantRemainingSeconds > 120 && instantRemainingSeconds <= 300;
 
   return (
     <View style={styles.container}>
@@ -5551,7 +5701,7 @@ export default function ChatScreen({ navigation, route }) {
                 >
                   {isPremiumAnalysis ? '👑' : (isInstantAnalysis ? '⚡' : '💳')} {credits}
                 </Text>
-                {effectiveChatCost === 0 && (
+                {freeQuestionAvailable && !partnershipMode && !isMundane && (
                   <View style={[styles.creditFreeBadge, { backgroundColor: colors.accent }]}>
                     <Text
                       style={[styles.creditFreeBadgeText, { color: colors.onAccent }]}
@@ -5599,6 +5749,144 @@ export default function ChatScreen({ navigation, route }) {
             </View>
           </LinearGradient>
         </View>
+
+        {!showGreeting && !partnershipMode && !isMundane && !freeQuestionAvailable && isInstantAnalysis ? (
+          <View
+            style={[
+              styles.instantHeaderSession,
+              {
+                backgroundColor: colors.headerSurface,
+                borderColor: instantBalanceCritical
+                  ? (colors.danger || '#c24141')
+                  : instantBalanceLow
+                    ? (colors.warning || colors.accent)
+                    : colors.cosmicLine,
+              },
+            ]}
+          >
+            <View style={styles.instantHeaderSessionMain}>
+              {instantBilling.active ? (
+                <>
+                  <View style={styles.instantHeaderLiveGroup}>
+                    <View
+                      style={[
+                        styles.instantLiveDot,
+                        { backgroundColor: instantBalanceCritical ? (colors.danger || '#c24141') : (colors.success || '#27805f') },
+                      ]}
+                    />
+                    {viewportWidth >= 460 ? (
+                      <Text style={[styles.instantHeaderLiveLabel, { color: colors.textInverse }]} numberOfLines={1}>
+                        {t('instantBilling.live', 'Instant consultation live')}
+                      </Text>
+                    ) : null}
+                    <Text style={[styles.instantHeaderMetric, { color: colors.textInverse }]}>
+                      {formatMeterTime(instantBilling.state?.elapsed_seconds)}
+                    </Text>
+                    <View style={[styles.instantHeaderDivider, { backgroundColor: colors.cosmicLine }]} />
+                    <Text style={[styles.instantHeaderMetric, { color: colors.textInverse }]} numberOfLines={1}>
+                      {instantBilling.state?.balance ?? credits} {t('instantBilling.creditsLeft', 'Credits left')}
+                    </Text>
+                  </View>
+                  <View style={styles.instantHeaderActions}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setShowModeSelector(false);
+                        setShowChatModeIntro(true);
+                      }}
+                      style={[styles.instantHeaderAction, { borderColor: colors.cosmicLine }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('instantBilling.changeMode', 'Mode')}
+                    >
+                      <Ionicons name="options-outline" size={15} color={colors.textInverse} />
+                      <Text
+                        style={[styles.instantHeaderActionText, { color: colors.textInverse }]}
+                      >
+                        {t('instantBilling.changeMode', 'Mode')}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setShowInstantEndConfirm(true)}
+                      style={[styles.instantHeaderAction, { borderColor: colors.cosmicLine }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('instantBilling.end', 'End')}
+                    >
+                      <Ionicons name="stop-circle-outline" size={16} color={colors.textInverse} />
+                      <Text
+                        style={[styles.instantHeaderActionText, { color: colors.textInverse }]}
+                      >
+                        {t('instantBilling.end', 'End')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View style={styles.instantHeaderLiveGroup}>
+                    <Ionicons name="flash-outline" size={16} color={colors.accent} />
+                    <Text style={[styles.instantHeaderReadyText, { color: colors.textInverse }]} numberOfLines={1}>
+                      {t('instantBilling.splitRate', 'First minute {{first}} credits · then {{following}} credits per started minute', {
+                        first: instantChatFirstMinuteCost,
+                        following: instantChatPerMinuteCost,
+                      })}
+                    </Text>
+                  </View>
+                  <View style={styles.instantHeaderActions}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setShowModeSelector(false);
+                        setShowChatModeIntro(true);
+                      }}
+                      style={[styles.instantHeaderAction, { borderColor: colors.cosmicLine }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('instantBilling.changeMode', 'Mode')}
+                    >
+                      <Ionicons name="options-outline" size={15} color={colors.textInverse} />
+                      <Text
+                        style={[styles.instantHeaderActionText, { color: colors.textInverse }]}
+                      >
+                        {t('instantBilling.changeMode', 'Mode')}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => credits < instantChatFirstMinuteCost ? navigation.navigate('Credits') : startInstantConsultation()}
+                      disabled={instantBilling.busy}
+                      style={[styles.instantHeaderStart, { backgroundColor: colors.accent }]}
+                    >
+                      {instantBilling.busy
+                        ? <ActivityIndicator size="small" color={colors.onAccent || colors.text} />
+                        : <Text
+                            style={[styles.instantHeaderStartText, { color: colors.onAccent || colors.text }]}
+                          >
+                            {credits < instantChatFirstMinuteCost
+                              ? t('instantBilling.addCredits', 'Add credits')
+                              : t('instantBilling.start', 'Start')}
+                          </Text>}
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </View>
+            {(instantBalanceLow || instantBalanceCritical) ? (
+              <TouchableOpacity
+                style={[
+                  styles.instantHeaderWarning,
+                  { backgroundColor: instantBalanceCritical ? (colors.danger || '#c24141') : (colors.warning || colors.accent) },
+                ]}
+                onPress={() => navigation.navigate('Credits')}
+              >
+                <Ionicons name="warning-outline" size={15} color={colors.onAccent || '#fff'} />
+                <Text style={[styles.instantHeaderWarningText, { color: colors.onAccent || '#fff' }]} numberOfLines={1}>
+                  {instantBalanceCritical
+                    ? t('instantBilling.lowBalance', 'Less than 5 minutes left · Add credits')
+                    : t('instantBilling.lowBalance', 'Less than 5 minutes left · Add credits')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            {instantBilling.error ? (
+              <Text style={[styles.instantBillingError, { color: colors.danger || '#c24141' }]}>{instantBilling.error}</Text>
+            ) : null}
+          </View>
+        ) : null}
 
         {!showGreeting && firstPurchaseBonusOffer && firstPurchaseBonusRemainingSeconds > 0 && !firstPurchaseBonusModalVisible && (
           <TouchableOpacity
@@ -5821,7 +6109,7 @@ export default function ChatScreen({ navigation, route }) {
                     </TouchableOpacity>
                   </View>
                 )}
-                {birthData && !isMundane && (
+                {birthData && !isMundane && !isInstantAnalysis && (
                   <PremiumConsultationContext
                     name={birthData.name}
                     sun={loadingChart ? null : (chartData?.planets?.Sun ? getSignName(chartData.planets.Sun.sign) : null)}
@@ -5992,14 +6280,17 @@ export default function ChatScreen({ navigation, route }) {
                       sessionId={sessionId}
                       podcastAutoLaunchMessageId={podcastPromoMessageId}
                       podcastAutoLaunchKey={podcastAutoLaunchKey}
+                      forceInstantPresentation={isInstantAnalysis}
                     />
                   </View>
-                  <FeedbackComponent
-                    message={item}
-                    onFeedbackSubmitted={(messageId, rating) => {
-                      console.log('Feedback submitted:', messageId, rating);
-                    }}
-                  />
+                  {!isInstantAnalysis ? (
+                    <FeedbackComponent
+                      message={item}
+                      onFeedbackSubmitted={(messageId, rating) => {
+                        console.log('Feedback submitted:', messageId, rating);
+                      }}
+                    />
+                  ) : null}
                 </View>
               );
             }}
@@ -6020,7 +6311,7 @@ export default function ChatScreen({ navigation, route }) {
         }}
         >
         {/* Topic idea chips — opt-in so the message list keeps most of the screen */}
-        {!loading && !showGreeting && messages.length > 0 && showTopicIdeas && (
+        {!isInstantAnalysis && !loading && !showGreeting && messages.length > 0 && showTopicIdeas && (
           <View style={styles.suggestionsContainer}>
             <GHScrollView
               horizontal
@@ -6051,7 +6342,7 @@ export default function ChatScreen({ navigation, route }) {
         {/* Unified Input Bar */}
         {!showGreeting && (
           <View style={styles.unifiedInputContainer}>
-            {!partnershipMode && !isMundane && birthData && (
+            {!isInstantAnalysis && !partnershipMode && !isMundane && birthData && (
               <View style={styles.chatInputScopeRow}>
                 <View style={styles.chatInputScopeTextWrap}>
                   <Text
@@ -6140,7 +6431,7 @@ export default function ChatScreen({ navigation, route }) {
                 )}
               </View>
             )}
-            {showChatNotifBanner && !showGreeting ? (
+            {!isInstantAnalysis && showChatNotifBanner && !showGreeting ? (
               <NotificationEnableBanner
                 reason="chat_answer"
                 active={showChatNotifBanner}
@@ -6157,7 +6448,7 @@ export default function ChatScreen({ navigation, route }) {
               ]}
             >
               {/* Expanded row to the left: Standard | Premium with cost/discount (only when not partnership/mundane) */}
-              {!partnershipMode && !isMundane && !freeQuestionAvailable && showModeSelector && (
+              {!isInstantAnalysis && !partnershipMode && !isMundane && !freeQuestionAvailable && showModeSelector && (
                 <View style={styles.modeSelectorExpanded}>
                   {instantChatEnabled && (
                     <TouchableOpacity
@@ -6167,15 +6458,18 @@ export default function ChatScreen({ navigation, route }) {
                         isInstantAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.30)' : 'rgba(249, 115, 22, 0.18)' },
                         !isInstantAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
                       ]}
-                      onPress={() => { setIsInstantAnalysis(true); setIsPremiumAnalysis(false); setShowModeSelector(false); }}
+                      onPress={() => switchChatMode('instant')}
                     >
                       <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>{t('chat.modeInstant', 'Instant')}</Text>
                       <View style={styles.modeSelectorCostCol}>
                         <Text style={[styles.modeSelectorPrice, { color: colors.text }]}>
-                          {formatCreditsInr(instantChatCost)}
+                          {t('instantBilling.splitRateShort', '{{first}} first · {{following}}/min', {
+                            first: instantChatFirstMinuteCost,
+                            following: instantChatPerMinuteCost,
+                          })}
                         </Text>
                         <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}>
-                          {t('premiumUi.chatScreen.creditCount', { count: instantChatCost })}
+                          {t('instantBilling.prepaid', 'prepaid by started minute')}
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -6187,7 +6481,7 @@ export default function ChatScreen({ navigation, route }) {
                       !isPremiumAnalysis && !isInstantAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.35)' : 'rgba(255, 107, 53, 0.25)' },
                       (isPremiumAnalysis || isInstantAnalysis) && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
                     ]}
-                    onPress={() => { setIsInstantAnalysis(false); setIsPremiumAnalysis(false); setShowModeSelector(false); }}
+                    onPress={() => switchChatMode('standard')}
                   >
                     <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>{t('chat.modeStandard', 'Standard')}</Text>
                     <View style={styles.modeSelectorCostCol}>
@@ -6206,7 +6500,7 @@ export default function ChatScreen({ navigation, route }) {
                       isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255, 215, 0, 0.25)' : 'rgba(255, 215, 0, 0.2)' },
                       !isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
                     ]}
-                    onPress={() => { setIsInstantAnalysis(false); setIsPremiumAnalysis(true); setShowModeSelector(false); }}
+                    onPress={() => switchChatMode('premium')}
                   >
                     <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>{t('chat.modePremium', 'Premium')}</Text>
                     <View style={styles.modeSelectorCostCol}>
@@ -6248,6 +6542,7 @@ export default function ChatScreen({ navigation, route }) {
                 placeholder={
                   activeWaitSideMessage ? "Reply while the full answer is prepared..." :
                   loading ? "Analyzing..." :
+                  instantInputLocked ? t('instantBilling.startToAsk', 'Start the consultation to ask a question') :
                   freeQuestionNotificationGate
                     ? "Turn on notifications to unlock your free question"
                   : credits < effectiveChatCost ? "Insufficient credits" :
@@ -6262,7 +6557,7 @@ export default function ChatScreen({ navigation, route }) {
                 maxLength={500}
                 editable={
                   !!activeWaitSideMessage ||
-                  (!loading && (credits >= effectiveChatCost || freeQuestionNotificationGate) && !(partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3)))
+                  (!instantInputLocked && !loading && (credits >= effectiveChatCost || freeQuestionNotificationGate) && !(partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3)))
                 }
                 multiline
                 // RN Web: without rows=1, <textarea> defaults to 2 rows and placeholder sits high.
@@ -6271,7 +6566,7 @@ export default function ChatScreen({ navigation, route }) {
                 blurOnSubmit={false}
               />
 
-              {!partnershipMode && !isMundane && !freeQuestionAvailable && (
+              {!isInstantAnalysis && !partnershipMode && !isMundane && !freeQuestionAvailable && (
                 <TouchableOpacity
                   style={styles.premiumToggleButton}
                   onPress={() => {
@@ -6320,7 +6615,7 @@ export default function ChatScreen({ navigation, route }) {
                 </TouchableOpacity>
               )}
 
-              {!partnershipMode && !isMundane && instantChatEnabled && speechChatEnabled && birthData && (
+              {!isInstantAnalysis && !partnershipMode && !isMundane && instantChatEnabled && speechChatEnabled && birthData && (
                 <TouchableOpacity
                   style={styles.speechMicButton}
                   onPress={() =>
@@ -6345,7 +6640,7 @@ export default function ChatScreen({ navigation, route }) {
               <TouchableOpacity
                 style={[
                   styles.modernSendButton,
-                  ((!activeWaitSideMessage && loading) || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate)) || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))) && styles.modernSendButtonDisabled
+                  ((!activeWaitSideMessage && loading) || instantInputLocked || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate)) || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))) && styles.modernSendButtonDisabled
                 ]}
                 onPress={() => {
                   if (!activeWaitSideMessage && freeQuestionNotificationGate) {
@@ -6354,7 +6649,7 @@ export default function ChatScreen({ navigation, route }) {
                   }
                   sendMessage();
                 }}
-                disabled={(!activeWaitSideMessage && loading) || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate)) || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
+                disabled={(!activeWaitSideMessage && loading) || instantInputLocked || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate)) || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
               >
                 <LinearGradient
                   colors={isPremiumAnalysis ? [colors.accent, colors.primary] : [colors.primaryStrong, colors.primary]}
@@ -6380,7 +6675,7 @@ export default function ChatScreen({ navigation, route }) {
             </LinearGradient>
 
 
-            {effectiveChatCost === 0 && !isKeyboardVisible && (
+            {freeQuestionAvailable && !isInstantAnalysis && !partnershipMode && !isMundane && !isKeyboardVisible && (
               <View
                 style={[
                   styles.firstQuestionFreeBanner,
@@ -6443,7 +6738,7 @@ export default function ChatScreen({ navigation, route }) {
         </KeyboardAvoidingView>
 
         {/* Quick Actions Bar - hide while keyboard is open so input isn't sandwiched above system keyboard */}
-        {!showGreeting && !isKeyboardVisible && (
+        {!isInstantAnalysis && !showGreeting && !isKeyboardVisible && (
           <View style={[styles.quickActionsBar, { paddingBottom: Math.max(8, webBottomInset) }]}>
             <TouchableOpacity
               style={styles.quickActionButton}
@@ -6668,7 +6963,12 @@ export default function ChatScreen({ navigation, route }) {
                           </Text>
                         ) : null}
                         <Text style={[styles.chatModeIntroCost, { color: colors.text }]}>
-                          {formatModeCost(option.cost)}
+                          {option.key === 'instant'
+                            ? t('instantBilling.splitRateShort', '{{first}} first · {{following}}/min', {
+                                first: instantChatFirstMinuteCost,
+                                following: instantChatPerMinuteCost,
+                              })
+                            : formatModeCost(option.cost)}
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -7753,6 +8053,33 @@ export default function ChatScreen({ navigation, route }) {
       />
 
       <AppAlertModal
+        visible={showInstantEndConfirm}
+        variant="warning"
+        icon="stop-circle-outline"
+        title={t('instantBilling.endTitle', 'End Instant consultation?')}
+        message={t(
+          'instantBilling.endMessage',
+          'Instant Chat cannot be paused. Ending stops the timer; starting again opens a new consultation and prepays a new first minute.'
+        )}
+        primaryText={t('instantBilling.endNow', 'End consultation')}
+        secondaryText={t('instantBilling.keepGoing', 'Keep chatting')}
+        onPrimaryPress={async () => {
+          const pendingMode = pendingModeAfterInstantEnd;
+          const ended = await endInstantConsultation('user_ended');
+          if (ended && pendingMode) applyChatMode(pendingMode);
+          setPendingModeAfterInstantEnd(null);
+        }}
+        onSecondaryPress={() => {
+          setPendingModeAfterInstantEnd(null);
+          setShowInstantEndConfirm(false);
+        }}
+        onRequestClose={() => {
+          setPendingModeAfterInstantEnd(null);
+          setShowInstantEndConfirm(false);
+        }}
+      />
+
+      <AppAlertModal
         visible={showInsufficientCreditsAlert}
         variant="warning"
         icon="wallet-outline"
@@ -8320,9 +8647,6 @@ const styles = StyleSheet.create({
   instantTypingLabelSpaced: {
     marginTop: 8,
   },
-  instantTypingCursor: {
-    fontWeight: '800',
-  },
   instantTakingLongerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -8334,6 +8658,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '600',
+  },
+  instantResponseTyping: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: 999,
+    marginTop: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  instantResponseTypingDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 999,
+    opacity: 0.75,
   },
   chatModeIntroOverlay: {
     flex: 1,
@@ -8759,6 +9100,199 @@ const styles = StyleSheet.create({
   modeSelectorCreditLabel: {
     fontSize: 10,
     fontWeight: '500',
+  },
+  instantMeterCard: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 12,
+  },
+  instantHeaderSession: {
+    borderBottomWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  instantHeaderSessionMain: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  instantHeaderLiveGroup: {
+    minWidth: 0,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  instantHeaderLiveLabel: {
+    marginRight: 7,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  instantHeaderMetric: {
+    fontSize: 12,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  instantHeaderDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 16,
+    marginHorizontal: 8,
+  },
+  instantHeaderActions: {
+    flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  instantHeaderAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginLeft: 6,
+  },
+  instantHeaderActionText: {
+    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  instantHeaderReadyText: {
+    minWidth: 0,
+    flexShrink: 1,
+    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  instantHeaderStart: {
+    minWidth: 68,
+    minHeight: 32,
+    marginLeft: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  instantHeaderStartText: {
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  instantHeaderWarning: {
+    marginTop: 5,
+    minHeight: 28,
+    paddingHorizontal: 10,
+    borderRadius: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  instantHeaderWarningText: {
+    minWidth: 0,
+    flexShrink: 1,
+    marginLeft: 6,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  instantMeterTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  instantLiveLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+  },
+  instantLiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 7,
+  },
+  instantLiveText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  instantEndButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginLeft: 8,
+  },
+  instantEndText: {
+    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  instantMeterStats: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  instantMeterStat: {
+    flex: 1,
+    minWidth: 0,
+  },
+  instantMeterDivider: {
+    width: StyleSheet.hairlineWidth,
+    marginHorizontal: 8,
+  },
+  instantMeterEyebrow: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  instantMeterValue: {
+    marginTop: 3,
+    fontSize: 17,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  instantLowBalance: {
+    marginTop: 10,
+    borderRadius: 12,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  instantLowBalanceText: {
+    color: '#fff',
+    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  instantStartRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  instantStartCopy: {
+    flex: 1,
+    marginRight: 10,
+  },
+  instantStartButton: {
+    minWidth: 82,
+    minHeight: 42,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  instantStartButtonText: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  instantBillingError: {
+    marginTop: 8,
+    fontSize: 11,
+    fontWeight: '700',
   },
   firstQuestionFreeBanner: {
     marginTop: 8,

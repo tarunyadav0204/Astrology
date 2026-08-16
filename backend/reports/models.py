@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from utils.calendar_date import parse_calendar_date_y_m_d
 
 
 class BirthInput(BaseModel):
@@ -20,6 +22,14 @@ class BirthInput(BaseModel):
     relation_side: Optional[str] = ""
     relation_label: Optional[str] = ""
     is_family_member: Optional[bool] = None
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def normalize_calendar_date(cls, value: Any) -> str:
+        year, month, day = parse_calendar_date_y_m_d(value)
+        # Validate the calendar date, not only its shape.
+        datetime(year, month, day)
+        return f"{year:04d}-{month:02d}-{day:02d}"
 
 
 class PartnershipReportRequest(BaseModel):

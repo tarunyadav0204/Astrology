@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import { jsPDF } from 'jspdf';
 import { showToast } from '../../utils/toast';
+import textToSpeech from '../../utils/textToSpeech';
 import { useCredits } from '../../context/CreditContext';
 import { splitFreeAnswerContent } from '../../utils/freeAnswerSplit';
 import NorthIndianChart from '../Charts/NorthIndianChart';
@@ -42,6 +43,13 @@ const IconRadioOutline = (p) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={IC.w} height={IC.h} viewBox={IC.vb} {...IC.s(p)}>
         <path d="M12 12h.01" />
         <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14" />
+    </svg>
+);
+const IconVolumeOutline = (p) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={IC.w} height={IC.h} viewBox={IC.vb} {...IC.s(p)}>
+        <path d="M11 5 6 9H2v6h4l5 4Z" />
+        <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+        <path d="M18.5 5.5a9 9 0 0 1 0 13" />
     </svg>
 );
 const IconDocumentOutline = (p) => (
@@ -326,12 +334,15 @@ const MessageBubble = ({
     podcastAutoLaunchKey = 0,
     instantLoaderRevealWords = 1,
     onOpenCreditsModal = null,
+    forceInstantPresentation = false,
 }) => {
     const { podcastCost, refreshBalance, credits, chatCost } = useCredits();
     const standardChatCost = Math.max(1, Number(chatCost) || 1);
     const [detailUnlocked, setDetailUnlocked] = useState(false);
     const blurShownTrackedRef = useRef(false);
     const [showActions, setShowActions] = useState(false);
+    const [isReadingAloud, setIsReadingAloud] = useState(false);
+    const readingAloudRef = useRef(false);
     const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
     const messageRef = useRef(null);
 
@@ -349,6 +360,7 @@ const MessageBubble = ({
         return [];
     }, [message?.content, message?.follow_up_questions]);
     const messageChatTier = String(message?.chatTier || message?.chat_tier || '').trim().toLowerCase();
+    const instantPresentation = forceInstantPresentation || messageChatTier === 'instant';
     const nextAction = message?.next_action || message?.nextAction || null;
     const nextActionType = String(nextAction?.type || '').trim().toLowerCase();
     const hasNextAction = Boolean(nextAction && nextActionType && nextActionType !== 'none');
@@ -527,9 +539,9 @@ const MessageBubble = ({
     }, [canBlurFreeDetail, detailUnlocked, credits, message.messageId, message.id]);
 
     useEffect(() => {
-        if (!showNextActionCard || !isRemedyNextAction) return;
+        if (messageChatTier === 'instant' || !showNextActionCard || !isRemedyNextAction) return;
         recordRemedyScreenImpressionOnce({ sessionId, message }).catch(() => {});
-    }, [showNextActionCard, isRemedyNextAction, sessionId, message]);
+    }, [messageChatTier, showNextActionCard, isRemedyNextAction, sessionId, message]);
 
     const handleRevealDetailedAnswer = useCallback(() => {
         const mid = message.messageId || message.id;
@@ -1117,6 +1129,7 @@ const MessageBubble = ({
     const showMessageToolbar =
         !message.isTyping &&
         !message.isProcessing &&
+        !message.instantStreaming &&
         message.messageId &&
         message.content &&
         message.content.trim().length > 0;
@@ -1131,6 +1144,89 @@ const MessageBubble = ({
             showToast('Copy failed', 'error');
         }
     };
+
+    const handleReadAloud = () => {
+        if (readingAloudRef.current) {
+            textToSpeech.stop();
+            readingAloudRef.current = false;
+            setIsReadingAloud(false);
+            return;
+        }
+
+        const cleanText = cleanTextForCopy(message.content);
+        if (!cleanText) return;
+
+        textToSpeech.stop();
+        const started = textToSpeech.speak(cleanText, {
+            onStart: () => {
+                readingAloudRef.current = true;
+                setIsReadingAloud(true);
+            },
+            onEnd: () => {
+                readingAloudRef.current = false;
+                setIsReadingAloud(false);
+            },
+            onError: () => {
+                readingAloudRef.current = false;
+                setIsReadingAloud(false);
+                showToast('Unable to read this answer aloud', 'error');
+            },
+        });
+
+        if (!started) showToast('Read aloud is not supported in this browser', 'error');
+    };
+
+    useEffect(() => () => {
+        if (readingAloudRef.current) textToSpeech.stop();
+    }, []);
+
+    if (instantPresentation) {
+        const content = String(message.loadingMessage || message.content || '').trim();
+        const paragraphs = content
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/^#{1,6}\s+/gm, '')
+            .replace(/\*\*(.*?)\*\*/g, '$1')
+            .replace(/__(.*?)__/g, '$1')
+            .replace(/[`*_]+/g, '')
+            .split(/\n\s*\n/)
+            .map((part) => part.replace(/\s*\n\s*/g, ' ').trim())
+            .filter(Boolean);
+        const time = message.timestamp
+            ? new Date(message.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+            : '';
+
+        return (
+            <div className={`message-bubble message-bubble--instant ${message.role} ${message.isTyping || message.isProcessing ? 'typing' : ''}`}>
+                <div className="message-content message-content--instant">
+                    <div className="instant-chat-copy">
+                        {(message.isTyping || message.isProcessing) && instantTypingState ? (
+                            <>
+                                <span className="instant-chat-thinking">Tara is thinking</span>
+                                <span className="instant-chat-dots" aria-label="Tara is typing"><i /><i /><i /></span>
+                            </>
+                        ) : (
+                            paragraphs.map((paragraph, index) => <p key={`${index}-${paragraph.slice(0, 18)}`}>{paragraph}</p>)
+                        )}
+                        {message.instantStreaming ? <span className="instant-chat-dots" aria-label="Tara is typing"><i /><i /><i /></span> : null}
+                    </div>
+                    <div className="instant-chat-meta">
+                        {message.role === 'assistant' && !message.isTyping && !message.isProcessing && content ? (
+                            <button
+                                type="button"
+                                className={`instant-chat-listen${isReadingAloud ? ' is-active' : ''}`}
+                                onClick={handleReadAloud}
+                                aria-label={isReadingAloud ? 'Stop reading' : 'Listen to this message'}
+                            >
+                                <IconVolumeOutline />
+                                <span>{isReadingAloud ? 'Stop' : 'Listen'}</span>
+                            </button>
+                        ) : null}
+                        {time ? <time>{time}</time> : null}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     const renderMessageToolbar = (placement) => {
         if (!showMessageToolbar) return null;
@@ -1153,7 +1249,19 @@ const MessageBubble = ({
                         <IconRefreshOutline />
                     </button>
                 )}
-                {isAssistant && (
+                {isAssistant && messageChatTier === 'instant' && (
+                    <button
+                        type="button"
+                        className={`action-btn action-btn--listen ${isReadingAloud ? 'action-btn--listen-active' : ''}`}
+                        onClick={handleReadAloud}
+                        title={isReadingAloud ? 'Stop reading' : 'Listen to this answer'}
+                        aria-pressed={isReadingAloud}
+                    >
+                        <IconVolumeOutline />
+                        <span>{isReadingAloud ? 'Stop' : 'Listen'}</span>
+                    </button>
+                )}
+                {isAssistant && messageChatTier !== 'instant' && (
                     <button
                         type="button"
                         className="action-btn action-btn--podcast"
@@ -1224,12 +1332,12 @@ const MessageBubble = ({
                     </div>
                 )}
                 {/* Beta Notice for Timeline Predictions */}
-                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && message.message_type !== 'clarification' && !isNativeGate && (
+                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && !message.instantStreaming && messageChatTier !== 'instant' && message.message_type !== 'clarification' && !isNativeGate && (
                     <div className="chat-message-notice chat-message-notice--beta">
                         ⚠️ BETA: Timeline predictions are experimental. Use logic and discretion.
                     </div>
                 )}
-                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && message.message_type !== 'clarification' && !isNativeGate && (
+                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && !message.instantStreaming && messageChatTier !== 'instant' && message.message_type !== 'clarification' && !isNativeGate && (
                     <div className="chat-message-notice chat-message-notice--disclaimer">
                         ⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.
                     </div>
@@ -1258,18 +1366,14 @@ const MessageBubble = ({
                     {(message.isTyping || message.isProcessing) ? (
                         isInstantTypingBubble && instantTypingState ? (
                             <div className="instant-typing-bubble" aria-live="polite">
-                                <div className="instant-typing-bubble__label">Instant analysis</div>
+                                <div className="instant-typing-bubble__label">Tara is thinking</div>
                                 {instantTypingState.lines.map((line, index) => {
-                                    const isLatest = index === instantTypingState.lines.length - 1;
                                     return (
                                         <div
                                             key={line.key}
                                             className={`instant-typing-line${index > 0 ? ' instant-typing-line--spaced' : ''}`}
                                         >
                                             <span className="instant-typing-text">{line.text}</span>
-                                            {isLatest && !line.isComplete ? (
-                                                <span className="instant-typing-cursor" aria-hidden="true">|</span>
-                                            ) : null}
                                         </div>
                                     );
                                 })}
@@ -1419,6 +1523,13 @@ const MessageBubble = ({
                                             ),
                                         }}
                                     />
+                                    {message.instantStreaming ? (
+                                        <div className="instant-response-typing" aria-label="Tara is typing" aria-live="polite">
+                                            <span />
+                                            <span />
+                                            <span />
+                                        </div>
+                                    ) : null}
                                 </>
                             ) : (
                                 <div dangerouslySetInnerHTML={{ __html: formatContent(message.content) }} />
@@ -1454,6 +1565,7 @@ const MessageBubble = ({
                 {message.role === 'assistant'
                     && !message.isTyping
                     && !message.isProcessing
+                    && messageChatTier !== 'instant'
                     && followUpQuestions.length > 0 && (
                     <div
                         className="follow-up-questions"
@@ -1509,7 +1621,11 @@ const MessageBubble = ({
                     </div>
                 )}
 
-                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && showNextActionCard && (
+                {message.role === 'assistant'
+                    && !message.isTyping
+                    && !message.isProcessing
+                    && messageChatTier !== 'instant'
+                    && showNextActionCard && (
                     <div
                         className="remedy-next-action-card"
                         style={{

@@ -16,16 +16,26 @@ import PartnerChartModal from './PartnerChartModal';
 import { authService } from '../../services/authService';
 import { locationService } from '../../services/locationService';
 import { apiService } from '../../services/apiService';
+import useInstantBillingSession from '../../hooks/useInstantBillingSession';
 import { normalizeBirthDetailsForChat } from '../../utils/normalizeBirthDetailsForChat';
 import { buildQueryContext } from '../../utils/queryContext';
 import textToSpeech from '../../utils/textToSpeech';
 import {
     INSTANT_LOADER_LINES,
     INSTANT_LOADER_WORD_MS,
+    getInstantReplyPieceDelay,
     getInstantLoaderMaxWords,
+    splitInstantReply,
 } from '../../constants/instantChatLoader';
 import '../Shared/nativeSelectorChip.css';
 import './ChatPage.css';
+
+function formatInstantDuration(value) {
+    const seconds = Math.max(0, Number(value || 0));
+    const minutes = Math.floor(seconds / 60);
+    const remainder = Math.floor(seconds % 60);
+    return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+}
 
 /** Single-chart wizard: empty `{}` is truthy in JS — require real fields before showing a “profile ready” card. */
 function isBirthChartReadyForChat(data) {
@@ -56,6 +66,7 @@ function normalizeLegacyChatHistoryItems(items) {
             out.push({
                 ...item,
                 messageId: item.messageId ?? item.message_id ?? nid(),
+                chatTier: item.chatTier || item.chat_tier || undefined,
                 timestamp: item.timestamp || new Date().toISOString(),
             });
             continue;
@@ -74,6 +85,7 @@ function normalizeLegacyChatHistoryItems(items) {
                 timestamp: ts,
                 messageId: nid(),
                 message_type: item.message_type || 'answer',
+                chatTier: item.chatTier || item.chat_tier || undefined,
             });
         }
     }
@@ -102,6 +114,7 @@ function normalizeChatV2SessionMessages(items) {
                 timestamp: item.timestamp || new Date().toISOString(),
                 messageId: item.message_id ?? item.messageId ?? nid(),
                 message_type: item.message_type || 'answer',
+                chatTier: item.chatTier || item.chat_tier || undefined,
                 terms: Array.isArray(item.terms) ? item.terms : [],
                 glossary: item.glossary && typeof item.glossary === 'object' ? item.glossary : {},
                 images: Array.isArray(item.images) ? item.images : [],
@@ -180,7 +193,8 @@ const ChatPage = ({ onLogin }) => {
         freeQuestionAvailable,
         podcastCost,
         instantChatEnabled,
-        instantChatCost,
+        instantChatFirstMinuteCost,
+        instantChatPerMinuteCost,
         speechChatEnabled,
     } = useCredits();
     const { birthData: initialBirthData } = location.state || {};
@@ -246,10 +260,10 @@ const ChatPage = ({ onLogin }) => {
     const [creditsOfferMessageId, setCreditsOfferMessageId] = useState(null);
     const firstPurchaseOfferShownRef = useRef(null);
     const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
-    const activeSpeechReplyIdRef = useRef(null);
-    const spokenAutoReplyKeysRef = useRef(new Set());
     const [isInstantAnalysis, setIsInstantAnalysis] = useState(false);
+    const [exitInstantAfterEnd, setExitInstantAfterEnd] = useState(false);
     const [instantLoaderWordCount, setInstantLoaderWordCount] = useState(1);
+    const instantRevealTimersRef = useRef(new Set());
 
     const hasInstantTypingMessage = useMemo(
         () => messages.some(
@@ -275,6 +289,35 @@ const ChatPage = ({ onLogin }) => {
         }, INSTANT_LOADER_WORD_MS);
         return () => clearInterval(t);
     }, [hasInstantTypingMessage]);
+
+    useEffect(() => () => {
+        instantRevealTimersRef.current.forEach((timer) => clearTimeout(timer));
+        instantRevealTimersRef.current.clear();
+    }, []);
+
+    const revealInstantReply = (processingClientId, assistantMessageId, pieces, fullContent) => {
+        if (pieces.length <= 1) return;
+        let elapsed = 0;
+        pieces.slice(1).forEach((piece, index) => {
+            elapsed += getInstantReplyPieceDelay(piece);
+            const timer = setTimeout(() => {
+                instantRevealTimersRef.current.delete(timer);
+                const visibleCount = index + 2;
+                const finished = visibleCount >= pieces.length;
+                setMessages((prev) => prev.map((message) =>
+                    message.processingClientId === processingClientId
+                        || String(message.messageId || '') === String(assistantMessageId)
+                        ? {
+                            ...message,
+                            content: finished ? fullContent : pieces.slice(0, visibleCount).join('\n\n'),
+                            instantStreaming: !finished,
+                        }
+                        : message
+                ));
+            }, elapsed);
+            instantRevealTimersRef.current.add(timer);
+        });
+    };
 
     const openBirthModalEmpty = () => {
         setBirthFormGatePrefill(null);
@@ -636,6 +679,8 @@ const ChatPage = ({ onLogin }) => {
 
     // --- chat-v2 async flow (mobile parity) ---
     const [chatV2SessionId, setChatV2SessionId] = useState(null);
+    const instantBilling = useInstantBillingSession({ refreshBalance: fetchBalance });
+    const [showInstantEndConfirm, setShowInstantEndConfirm] = useState(false);
     const singleChartSessionStorageKey = useMemo(() => getSingleChartSessionStorageKey(birthData), [birthData]);
     const [personalChartData, setPersonalChartData] = useState(null);
     const [chatDashaData, setChatDashaData] = useState(null);
@@ -734,6 +779,42 @@ const ChatPage = ({ onLogin }) => {
         }
     };
 
+    const startInstantConsultation = async () => {
+        let sessionId = chatV2SessionId;
+        if (!sessionId) {
+            sessionId = await createChatV2Session();
+            if (!sessionId) return;
+            setChatV2SessionId(sessionId);
+        }
+        try {
+            await instantBilling.start(sessionId);
+        } catch (error) {
+            if (/credit/i.test(error?.message || '')) setShowCreditsModal(true);
+        }
+    };
+
+    const endInstantConsultation = async () => {
+        try {
+            await instantBilling.end('user_ended');
+            setShowInstantEndConfirm(false);
+            if (exitInstantAfterEnd) {
+                setIsInstantAnalysis(false);
+                setExitInstantAfterEnd(false);
+            }
+        } catch (_) {
+            // The themed session panel keeps the server error visible.
+        }
+    };
+
+    const requestExitInstantMode = () => {
+        if (instantBilling.active) {
+            setExitInstantAfterEnd(true);
+            setShowInstantEndConfirm(true);
+            return;
+        }
+        setIsInstantAnalysis(false);
+    };
+
     const parsePythonLikeDictString = (input) => {
         if (typeof input !== 'string') return null;
         const s = input.trim();
@@ -778,55 +859,9 @@ const ChatPage = ({ onLogin }) => {
         textToSpeech.stop();
     }, []);
 
-    useEffect(() => {
-        const autoSpeakMessage = messages.find((m) => (
-            m?.role === 'assistant'
-            && m?.autoSpeakReply
-            && !m?.isProcessing
-            && String(m?.content || '').trim()
-        ));
-
-        if (!autoSpeakMessage) return;
-
-        const speechKey = String(autoSpeakMessage.processingClientId || autoSpeakMessage.messageId || '');
-        if (!speechKey || spokenAutoReplyKeysRef.current.has(speechKey)) return;
-
-        spokenAutoReplyKeysRef.current.add(speechKey);
-        activeSpeechReplyIdRef.current = speechKey;
-
-        const content = String(autoSpeakMessage.content || '').trim();
-        textToSpeech.stop();
-        textToSpeech.speak(content, {
-            onStart: () => {
-                setIsAssistantSpeaking(true);
-            },
-            onEnd: () => {
-                setIsAssistantSpeaking(false);
-                if (activeSpeechReplyIdRef.current === speechKey) {
-                    activeSpeechReplyIdRef.current = null;
-                }
-            },
-            onError: () => {
-                setIsAssistantSpeaking(false);
-                if (activeSpeechReplyIdRef.current === speechKey) {
-                    activeSpeechReplyIdRef.current = null;
-                }
-            },
-        });
-
-        setMessages((prev) =>
-            prev.map((m) =>
-                (String(m.processingClientId || m.messageId || '') === speechKey)
-                    ? { ...m, autoSpeakReply: false }
-                    : m
-            )
-        );
-    }, [messages]);
-
     const interruptAssistantSpeech = () => {
         textToSpeech.stop();
         setIsAssistantSpeaking(false);
-        activeSpeechReplyIdRef.current = null;
     };
 
     const addGreetingMessage = (overrideText = null) => {
@@ -1397,7 +1432,12 @@ const ChatPage = ({ onLogin }) => {
         setShowCreditsModal(true);
     };
 
-    const pollChatV2Status = async (assistantMessageId, processingClientId, wasFreeQuestion = false) => {
+    const pollChatV2Status = async (
+        assistantMessageId,
+        processingClientId,
+        wasFreeQuestion = false,
+        requestedInstantTier = false,
+    ) => {
         const token = localStorage.getItem('token');
         const maxPolls = 120; // 6 minutes (120 * 3s), aligned with Ashtakavarga life-predictions jobs
         let pollCount = 0;
@@ -1431,6 +1471,8 @@ const ChatPage = ({ onLogin }) => {
                         "This answer didn't save any text. Please try your question again, or contact support if it keeps happening.";
                     const mt = status.message_type || 'answer';
                     const gated = mt === 'native_gate' || mt === 'clarification';
+                    const responseIsInstant = requestedInstantTier
+                        || String(status.chat_tier || status.chatTier || '').toLowerCase() === 'instant';
 
                     if (!gated) {
                         setPendingFollowUpQueryContext(null);
@@ -1446,6 +1488,9 @@ const ChatPage = ({ onLogin }) => {
                                 m.processingClientId === processingClientId
                                 && String(m.chatTier || '').toLowerCase() === 'instant'
                         );
+                        const instantPieces = (responseIsInstant || wasInstantTier) && !gated
+                            ? splitInstantReply(content)
+                            : [];
                         if (!gated && !wasInstantTier && String(content).trim().length >= 80) {
                             setPodcastPromoMessageId(assistantMessageId);
                             setPodcastPromoOpen(true);
@@ -1455,9 +1500,10 @@ const ChatPage = ({ onLogin }) => {
                                 ? {
                                     ...m,
                                     messageId: assistantMessageId,
-                                    content,
+                                    content: instantPieces.length > 1 ? instantPieces[0] : content,
                                     isProcessing: false,
                                     isTyping: false,
+                                    instantStreaming: instantPieces.length > 1,
                                     chartInsights: polledChartInsights,
                                     message_type: status.message_type || 'answer',
                                     intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
@@ -1470,11 +1516,19 @@ const ChatPage = ({ onLogin }) => {
                                     next_best_need: status.next_best_need || null,
                                     next_best_need_title: status.next_best_need_title || null,
                                     next_best_need_reason: status.next_best_need_reason || null,
-                                    autoSpeakReply: Boolean(m.autoSpeakReply),
+                                    autoSpeakReply: false,
                                 }
                                 : m
                         );
                     });
+                    if (responseIsInstant && !gated) {
+                        revealInstantReply(
+                            processingClientId,
+                            assistantMessageId,
+                            splitInstantReply(content),
+                            content,
+                        );
+                    }
                     setIsLoading(false);
                     fetchBalance();
                     return;
@@ -1633,7 +1687,8 @@ const ChatPage = ({ onLogin }) => {
                 : '🔮 Analyzing your birth chart...',
             chartData: chartDataForMessage,
             chartInsights: useInstantChat ? [] : [],
-            autoSpeakReply: Boolean(options?.instant_chat),
+            // Instant answers stay silent on web. The reply toolbar provides an explicit Listen control.
+            autoSpeakReply: false,
         };
 
         setMessages(prev => [...prev, processingMessage]);
@@ -1708,6 +1763,7 @@ const ChatPage = ({ onLogin }) => {
         if (useInstantChat) {
             requestData.chat_tier = 'instant';
             requestData.instant_chat = true;
+            requestData.instant_billing_session_id = instantBilling.state?.session_id;
         } else if (options?.chat_tier) {
             requestData.chat_tier = options.chat_tier;
         }
@@ -1770,7 +1826,17 @@ const ChatPage = ({ onLogin }) => {
                     if (newSid) {
                         setChatV2SessionId(newSid);
                         askSessionId = newSid;
-                        const retryBody = { ...requestData, session_id: newSid };
+                        let retryBillingId = requestData.instant_billing_session_id;
+                        if (useInstantChat && instantBilling.active) {
+                            await instantBilling.end('conversation_rotated');
+                            const replacement = await instantBilling.start(newSid);
+                            retryBillingId = replacement?.session_id;
+                        }
+                        const retryBody = {
+                            ...requestData,
+                            session_id: newSid,
+                            ...(retryBillingId ? { instant_billing_session_id: retryBillingId } : {}),
+                        };
                         response = await fetch('/api/chat-v2/ask', {
                             method: 'POST',
                             headers: {
@@ -1827,7 +1893,12 @@ const ChatPage = ({ onLogin }) => {
                 )
             );
 
-            pollChatV2Status(assistantMessageId, processingClientId, useFreeQuestion).catch(() => {
+            pollChatV2Status(
+                assistantMessageId,
+                processingClientId,
+                useFreeQuestion,
+                useInstantChat,
+            ).catch(() => {
                 setIsLoading(false);
             });
         } catch (e) {
@@ -1856,6 +1927,19 @@ const ChatPage = ({ onLogin }) => {
             return;
         }
         if (!birthData) return;
+
+        const requestedInstant = Boolean(
+            options?.instant_chat || String(options?.chat_tier || '').toLowerCase() === 'instant'
+        );
+        const activeForConversation = Boolean(
+            instantBilling.active
+            && instantBilling.state?.chat_session_id
+            && instantBilling.state.chat_session_id === chatV2SessionId
+        );
+        if (requestedInstant && !activeForConversation) {
+            await startInstantConsultation();
+            return;
+        }
 
         return handleSendMessageChatV2(message, options);
 
@@ -2395,7 +2479,7 @@ const ChatPage = ({ onLogin }) => {
                 onClaim={claimFirstPurchaseOffer}
                 onCloseModal={() => setFirstPurchaseOfferModalOpen(false)}
             />
-            <div className={`chat-page${wizardCompleted ? '' : ' chat-page--wizard'}${headerUser ? ' chat-page--with-user-header chat-page--with-user-header-compact' : ''}`}>
+            <div className={`chat-page${wizardCompleted ? '' : ' chat-page--wizard'}${headerUser ? ' chat-page--with-user-header chat-page--with-user-header-compact' : ''}${isInstantAnalysis ? ' chat-page--instant-focus' : ''}`}>
             <div className={`chat-header${wizardCompleted ? '' : ' chat-header--wizard'}`}>
                 {!wizardCompleted ? (
                     <div className="chat-wizard-flow">
@@ -2891,6 +2975,69 @@ const ChatPage = ({ onLogin }) => {
                                 </p>
                             )}
                         </div>
+                        {instantChatEnabled && !isPartnershipMode && !isMundaneMode && (
+                            <section
+                                className={`chat-header-instant ${instantBilling.active ? 'chat-header-instant--live' : 'chat-header-instant--ready'} ${instantBilling.state?.low_balance ? 'chat-header-instant--low' : ''}`}
+                                aria-label="Instant consultation controls"
+                            >
+                                <div className="chat-header-instant__identity">
+                                    <span className="chat-header-instant__icon" aria-hidden="true">⚡</span>
+                                    <span>
+                                        <strong>{instantBilling.active ? 'Instant consultation live' : 'Instant consultation'}</strong>
+                                        <small>
+                                            {instantBilling.active
+                                                ? `First minute ${instantBilling.state?.first_minute_cost ?? instantChatFirstMinuteCost} · then ${instantBilling.state?.following_minute_cost ?? instantChatPerMinuteCost} credits/min`
+                                                : `First minute ${instantChatFirstMinuteCost} · then ${instantChatPerMinuteCost} credits per started minute`}
+                                        </small>
+                                    </span>
+                                </div>
+
+                                {instantBilling.active ? (
+                                    <>
+                                        <div className="chat-header-instant__metrics" aria-live="polite">
+                                            <span><small>Time</small><strong>{formatInstantDuration(instantBilling.state?.elapsed_seconds)}</strong></span>
+                                            <span><small>Credits left</small><strong>{instantBilling.state?.balance ?? credits}</strong></span>
+                                        </div>
+                                        <div className="chat-header-instant__actions">
+                                            {instantBilling.state?.low_balance && (
+                                                <button type="button" className="chat-header-instant__add" onClick={() => setShowCreditsModal(true)}>
+                                                    Add credits
+                                                </button>
+                                            )}
+                                            <button type="button" className="chat-header-instant__end" onClick={() => {
+                                                setExitInstantAfterEnd(false);
+                                                setShowInstantEndConfirm(true);
+                                            }}>
+                                                End
+                                            </button>
+                                            <button type="button" className="chat-header-instant__mode" onClick={requestExitInstantMode}>
+                                                Exit Instant
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="chat-header-instant__actions">
+                                        {isInstantAnalysis && (
+                                            <button type="button" className="chat-header-instant__mode" onClick={requestExitInstantMode}>
+                                                Exit Instant
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            className="chat-header-instant__start"
+                                            disabled={instantBilling.busy}
+                                            onClick={() => {
+                                                setIsInstantAnalysis(true);
+                                                startInstantConsultation();
+                                            }}
+                                        >
+                                            {instantBilling.busy ? 'Starting…' : 'Start now'}
+                                        </button>
+                                    </div>
+                                )}
+                                {instantBilling.error && <p className="chat-header-instant__error">{instantBilling.error}</p>}
+                            </section>
+                        )}
                         <div className="chat-header-toolbar__actions">
                             {!isMundaneMode && !isPartnershipMode && instantChatEnabled && speechChatEnabled && birthData && (
                             <button
@@ -2939,7 +3086,7 @@ const ChatPage = ({ onLogin }) => {
                                     {isPartnershipMode
                                         ? `${partnershipCost}/q`
                                         : instantChatEnabled && isInstantAnalysis && !isPartnershipMode && !isMundaneMode
-                                            ? `${instantChatCost}/q (instant)`
+                                            ? `${instantChatFirstMinuteCost} first · ${instantChatPerMinuteCost}/min`
                                             : `${chatCost}/q`}
                                 </span>
                                 <span className="credits-short">{credits}</span>
@@ -3002,7 +3149,7 @@ const ChatPage = ({ onLogin }) => {
                                 <p>Ask about a decision, relationship, life phase or timing. Tara will connect the relevant chart factors into one clear answer.</p>
                             </section>
                         ) : null}
-                        {!isMundaneMode && isBirthChartReadyForChat(birthData) && (
+                        {!isInstantAnalysis && !isMundaneMode && isBirthChartReadyForChat(birthData) && (
                             <div className="message-bubble assistant chat-chart-essence-wrap">
                                 <div className="message-content chat-chart-essence-wrap__content">
                                     <ChatChartEssence
@@ -3028,6 +3175,7 @@ const ChatPage = ({ onLogin }) => {
                             podcastAutoLaunchKey={podcastAutoLaunchKey}
                             instantLoaderRevealWords={instantLoaderWordCount}
                             onOpenCreditsModal={() => setShowCreditsModal(true)}
+                            forceInstantPresentation={isInstantAnalysis}
                         />
                         <div ref={messagesEndRef} />
                     </div>
@@ -3040,6 +3188,7 @@ const ChatPage = ({ onLogin }) => {
 
             {/* No mode chosen yet — hide composer (premium row + placeholder) so setup stays the only focus */}
             {(wizardCompleted || wizardMode) && (
+                <>
                 <ChatInput
                     onSendMessage={handleSendMessage}
                     isLoading={isLoading}
@@ -3054,8 +3203,41 @@ const ChatPage = ({ onLogin }) => {
                     isAssistantSpeaking={isAssistantSpeaking}
                     onInterruptAssistantSpeech={interruptAssistantSpeech}
                     instantMode={isInstantAnalysis}
-                    onInstantModeChange={setIsInstantAnalysis}
+                    onInstantModeChange={(next) => {
+                        if (!next && instantBilling.active) {
+                            setExitInstantAfterEnd(true);
+                            setShowInstantEndConfirm(true);
+                            return;
+                        }
+                        setIsInstantAnalysis(next);
+                    }}
+                    instantSessionActive={instantBilling.active && instantBilling.state?.chat_session_id === chatV2SessionId}
+                    instantPerMinuteCost={instantChatPerMinuteCost}
+                    instantFirstMinuteCost={instantChatFirstMinuteCost}
+                    instantHeaderControls
                 />
+                </>
+            )}
+
+            {showInstantEndConfirm && (
+                <div className="instant-end-dialog" role="dialog" aria-modal="true" aria-labelledby="instant-end-title">
+                    <div className="instant-end-dialog__card">
+                        <span className="instant-end-dialog__eyebrow">Instant consultation</span>
+                        <h2 id="instant-end-title">{exitInstantAfterEnd ? 'Exit Instant mode?' : 'End this consultation?'}</h2>
+                        <p>{exitInstantAfterEnd
+                            ? 'This ends the live timer and returns you to Standard chat. Your conversation stays here.'
+                            : 'This ends the live timer. Starting again begins and bills a new minute, so you cannot pause between replies.'}</p>
+                        <div>
+                            <button type="button" onClick={() => {
+                                setShowInstantEndConfirm(false);
+                                setExitInstantAfterEnd(false);
+                            }}>Keep chatting</button>
+                            <button type="button" className="instant-end-dialog__confirm" disabled={instantBilling.busy} onClick={endInstantConsultation}>
+                                {exitInstantAfterEnd ? 'End and exit' : 'End chat'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             <PodcastPromoModal

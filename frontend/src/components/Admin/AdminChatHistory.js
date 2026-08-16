@@ -1852,6 +1852,13 @@ const AdminChatHistory = () => {
     Boolean(selectedSession?.cost_summary) ||
     selectedSession?.cost_summary?.input_usd_per_1m != null ||
     selectedSession?.cost_summary?.output_usd_per_1m != null;
+  const instantBillingSummary = selectedSession?.instant_billing || null;
+  const formatInstantDuration = (seconds) => {
+    const total = Math.max(0, Number(seconds) || 0);
+    const minutes = Math.floor(total / 60);
+    const remainder = total % 60;
+    return `${minutes}m ${String(remainder).padStart(2, '0')}s`;
+  };
 
   return (
     <>
@@ -2064,6 +2071,34 @@ const AdminChatHistory = () => {
                 </button>
               </div>
 
+              {instantBillingSummary?.consultation_count > 0 && (
+                <details className="admin-instant-summary">
+                  <summary>
+                    <strong>⚡ Instant Chat</strong>
+                    <span>{instantBillingSummary.consultation_count} consultation{instantBillingSummary.consultation_count === 1 ? '' : 's'}</span>
+                    <span>{formatInstantDuration(instantBillingSummary.elapsed_seconds)}</span>
+                    <span>{instantBillingSummary.billed_minutes} billed min</span>
+                    <span>{instantBillingSummary.charged_credits} credits charged</span>
+                    {instantBillingSummary.active_count > 0 && <em>{instantBillingSummary.active_count} live</em>}
+                  </summary>
+                  <div className="admin-instant-session-list">
+                    {(instantBillingSummary.sessions || []).map((item) => (
+                      <div className="admin-instant-session" key={item.session_id}>
+                        <div>
+                          <strong>{item.status === 'active' ? 'Live consultation' : 'Consultation'}</strong>
+                          <span>{item.started_at ? formatDate(item.started_at) : '—'}</span>
+                        </div>
+                        <span>{formatInstantDuration(item.elapsed_seconds)}</span>
+                        <span>{item.billed_minutes} min</span>
+                        <span>{item.charged_credits} credits</span>
+                        <span>first {item.first_minute_cost} · then {item.following_minute_cost}/min</span>
+                        <span>{item.ended_reason || item.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+
               {renderUserValueSnapshot()}
 
               {selectedUserId != null && sessionPagination && (
@@ -2168,7 +2203,7 @@ const AdminChatHistory = () => {
                   return (
                 <div key={index} className={`message message--${role}`}>
                     <div className="message-label">
-                      {label}
+                      {label}{isInstantUsage ? <span className="admin-instant-message-badge">⚡ Instant</span> : null}
                     </div>
                     <div
                       className="message-content"

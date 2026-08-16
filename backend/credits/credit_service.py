@@ -428,6 +428,8 @@ class CreditService:
             defaults = [
                 ("chat_question_cost", 1, "Credits per chat question"),
                 ("instant_chat_cost", 1, "Credits per instant chat answer"),
+                ("instant_chat_first_minute_cost", 1, "Credits for the first minute of Instant Chat"),
+                ("instant_chat_per_minute_cost", 1, "Credits per following started minute of Instant Chat"),
                 ("speech_chat_cost", 1, "Credits per speech chat turn (Tara / voice-first)"),
                 ("speech_chat_per_minute_cost", 1, "Credits per minute for live speech chat"),
                 ("wealth_analysis_cost", 5, "Credits per wealth analysis"),
@@ -2164,10 +2166,15 @@ class CreditService:
         return True
 
     def is_free_standard_chat_question_available(self, userid: int) -> bool:
-        """Unused one-time free standard chat AND notifications requirement met."""
+        """Unused one-time free standard chat for a user without spendable credits."""
         from utils.admin_settings import is_free_question_enabled
 
         if not is_free_question_enabled():
+            return False
+        # Do not replace a funded user's selected paid mode with the free-question
+        # experience. If their first paid chat is completed, the existing paid-use
+        # guard also prevents this offer from appearing later for the same chart.
+        if self.get_user_credits(userid) > 0:
             return False
         if self.get_free_chat_question_used(userid):
             return False
@@ -2200,6 +2207,8 @@ class CreditService:
         if not is_free_question_enabled():
             return False
         if self.get_free_chat_question_used(userid):
+            return False
+        if self.get_user_credits(userid) > 0:
             return False
         return not self.notification_opt_in_satisfied_for_free_question(userid)
 
@@ -2243,6 +2252,8 @@ class CreditService:
                 row = cur.fetchone()
                 if row and int(row[0] or 0) == 1:
                     return False
+                if row and int(row[1] or 0) > 0:
+                    return False
                 if not row:
                     self._upsert_user_credits(conn, userid, 0, free_used=0)
 
@@ -2251,7 +2262,9 @@ class CreditService:
                     """
                     UPDATE user_credits
                     SET free_chat_question_used = 1, updated_at = CURRENT_TIMESTAMP
-                    WHERE userid = ? AND COALESCE(free_chat_question_used, 0) = 0
+                    WHERE userid = ?
+                      AND COALESCE(free_chat_question_used, 0) = 0
+                      AND COALESCE(credits, 0) <= 0
                     """,
                     (userid,),
                 )
@@ -3956,7 +3969,7 @@ class CreditService:
         """Get all credit settings (value = original cost, discount = discounted cost when set)."""
         from db import get_conn, execute
         keys = (
-            'chat_question_cost', 'instant_chat_cost', 'speech_chat_cost', 'speech_chat_per_minute_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost',
+            'chat_question_cost', 'instant_chat_cost', 'instant_chat_first_minute_cost', 'instant_chat_per_minute_cost', 'speech_chat_cost', 'speech_chat_per_minute_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost',
             'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost',
             'progeny_analysis_cost', 'partnership_report_cost', 'career_report_cost', 'wealth_report_cost',
             'health_report_cost', 'janam_kundli_report_cost', 'progeny_report_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
@@ -4018,6 +4031,42 @@ class CreditService:
                         "key": "speech_chat_per_minute_cost",
                         "value": 1,
                         "description": "Credits per minute for live speech chat",
+                        "discount": None,
+                    })
+                except Exception:
+                    pass
+            if not any(s["key"] == "instant_chat_per_minute_cost" for s in settings):
+                try:
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO credit_settings (setting_key, setting_value, description)
+                        VALUES ('instant_chat_per_minute_cost', 1, 'Credits per following started minute of Instant Chat')
+                        """,
+                    )
+                    conn.commit()
+                    settings.append({
+                        "key": "instant_chat_per_minute_cost",
+                        "value": 1,
+                        "description": "Credits per following started minute of Instant Chat",
+                        "discount": None,
+                    })
+                except Exception:
+                    pass
+            if not any(s["key"] == "instant_chat_first_minute_cost" for s in settings):
+                try:
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO credit_settings (setting_key, setting_value, description)
+                        VALUES ('instant_chat_first_minute_cost', 1, 'Credits for the first minute of Instant Chat')
+                        """,
+                    )
+                    conn.commit()
+                    settings.append({
+                        "key": "instant_chat_first_minute_cost",
+                        "value": 1,
+                        "description": "Credits for the first minute of Instant Chat",
                         "discount": None,
                     })
                 except Exception:
@@ -4397,7 +4446,8 @@ class CreditService:
                            END
                        )
                        ELSE NULL
-                   END AS amount_inr
+                   END AS amount_inr,
+                   ct.metadata
             {where_sql}
             ORDER BY ct.created_at DESC
             LIMIT ? OFFSET ?
@@ -4410,8 +4460,65 @@ class CreditService:
             cur = execute(conn, list_sql, list_params)
             rows = cur.fetchall()
 
+            billing_session_ids = set()
+            parsed_metadata = {}
+            for row in rows:
+                raw_metadata = row[12] if len(row) > 12 else None
+                try:
+                    metadata = raw_metadata if isinstance(raw_metadata, dict) else json.loads(raw_metadata or "{}")
+                except (TypeError, ValueError):
+                    metadata = {}
+                parsed_metadata[row[0]] = metadata
+                billing_session_id = str(metadata.get("billing_session_id") or "").strip()
+                if billing_session_id:
+                    billing_session_ids.add(billing_session_id)
+
+            billing_sessions = {}
+            if billing_session_ids:
+                cur = execute(
+                    conn,
+                    """
+                    SELECT EXISTS (
+                        SELECT 1 FROM information_schema.tables
+                        WHERE table_schema = 'public' AND table_name = 'instant_billing_sessions'
+                    )
+                    """,
+                )
+                exists_row = cur.fetchone()
+                if exists_row and exists_row[0]:
+                    placeholders = ",".join(["?"] * len(billing_session_ids))
+                    cur = execute(
+                        conn,
+                        f"""
+                        SELECT session_id, chat_session_id, status,
+                               COALESCE(first_minute_cost, per_minute_cost), per_minute_cost,
+                               starting_balance, charged_credits, billed_minutes, billable_seconds,
+                               started_at, ended_at, ended_reason
+                        FROM instant_billing_sessions
+                        WHERE session_id IN ({placeholders})
+                        """,
+                        tuple(sorted(billing_session_ids)),
+                    )
+                    for session_row in cur.fetchall() or []:
+                        billing_sessions[str(session_row[0])] = {
+                            "session_id": session_row[0],
+                            "chat_session_id": session_row[1],
+                            "status": session_row[2],
+                            "first_minute_cost": int(session_row[3] or 0),
+                            "following_minute_cost": int(session_row[4] or 0),
+                            "starting_balance": int(session_row[5] or 0),
+                            "charged_credits": int(session_row[6] or 0),
+                            "billed_minutes": int(session_row[7] or 0),
+                            "elapsed_seconds": int(session_row[8] or 0),
+                            "started_at": str(session_row[9]) if session_row[9] is not None else None,
+                            "ended_at": str(session_row[10]) if session_row[10] is not None else None,
+                            "ended_reason": session_row[11],
+                        }
+
         transactions = []
         for row in rows:
+            metadata = parsed_metadata.get(row[0], {})
+            billing_session_id = str(metadata.get("billing_session_id") or "").strip()
             transactions.append({
                 "id": row[0],
                 "userid": row[1],
@@ -4425,6 +4532,8 @@ class CreditService:
                 "description": row[9],
                 "created_at": row[10],
                 "amount_inr": row[11],
+                "metadata": metadata,
+                "instant_billing_session": billing_sessions.get(billing_session_id),
             })
         return {"transactions": transactions, "total": total}
 
@@ -5389,6 +5498,7 @@ class CreditService:
         *,
         from_date: str,
         to_date: str,
+        conn=None,
     ) -> List[int]:
         from db import get_conn, execute
 
@@ -5403,16 +5513,20 @@ class CreditService:
         if not config:
             raise ValueError(f"Unknown campaign segment: {segment}")
 
-        with get_conn() as conn:
+        def _query(active_conn):
             ids_sql = f"""
                 {config['sql']}
                 SELECT userid
                 FROM base
                 ORDER BY {config['order_by']}
             """
-            cur = execute(conn, ids_sql, config["params"])
+            cur = execute(active_conn, ids_sql, config["params"])
             rows = cur.fetchall() or []
-        return [int(r[0]) for r in rows if r and r[0] is not None]
+            return [int(r[0]) for r in rows if r and r[0] is not None]
+        if conn is not None:
+            return _query(conn)
+        with get_conn() as owned_conn:
+            return _query(owned_conn)
 
     def _admin_campaign_segment_definitions(
         self,

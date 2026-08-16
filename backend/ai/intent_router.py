@@ -1314,6 +1314,137 @@ class IntentRouter:
             }
         return result
 
+    def _finalize_instant_dialogue_state(
+        self,
+        result: Dict[str, Any],
+        *,
+        prior_dialogue_state: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        """Validate and persist the LLM-owned clarification state.
+
+        This deliberately does not infer relationships, subjects, events, or user
+        intent in Python.  The model owns natural-language understanding; backend
+        code only normalizes the JSON contract and prevents a previously unresolved
+        dialogue from being treated as ready after an inconsistent model response.
+        """
+        prior = dict(prior_dialogue_state or {})
+        raw_state = result.get("dialogue_state")
+        if not isinstance(raw_state, dict):
+            extracted = result.get("extracted_context")
+            raw_state = (
+                extracted.get("instant_dialogue")
+                if isinstance(extracted, dict)
+                and isinstance(extracted.get("instant_dialogue"), dict)
+                else {}
+            )
+
+        state = dict(raw_state or {})
+        known_facts = state.get("known_facts")
+        if not isinstance(known_facts, dict):
+            known_facts = dict(prior.get("known_facts") or {})
+        state["known_facts"] = known_facts
+
+        unresolved = state.get("unresolved_facts")
+        if not isinstance(unresolved, list):
+            unresolved = list(prior.get("unresolved_facts") or [])
+        state["unresolved_facts"] = [
+            str(item).strip() for item in unresolved if str(item).strip()
+        ][:12]
+
+        corrections = state.get("corrections")
+        if not isinstance(corrections, list):
+            corrections = list(prior.get("corrections") or [])
+        state["corrections"] = [
+            str(item).strip() for item in corrections if str(item).strip()
+        ][-12:]
+
+        status = str(result.get("status") or "READY").strip().upper()
+        clarification_question = str(result.get("clarification_question") or "").strip()
+        prior_question = str(prior.get("last_clarification_question") or "").strip()
+
+        if status == "CLARIFY":
+            if not clarification_question and prior_question:
+                clarification_question = prior_question
+                result["clarification_question"] = prior_question
+            state["ready_to_calculate"] = False
+            if clarification_question:
+                state["last_clarification_question"] = clarification_question
+        else:
+            # READY is accepted only when the LLM's own state says there are no
+            # unresolved facts.  We never decide which facts are required here.
+            model_ready = state.get("ready_to_calculate")
+            if state["unresolved_facts"] or model_ready is False:
+                if clarification_question or prior_question:
+                    result["status"] = "CLARIFY"
+                    result["clarification_question"] = clarification_question or prior_question
+                    state["ready_to_calculate"] = False
+                    state["last_clarification_question"] = result["clarification_question"]
+            else:
+                state["ready_to_calculate"] = True
+                state.pop("last_clarification_question", None)
+
+        extracted_context = result.get("extracted_context")
+        if not isinstance(extracted_context, dict):
+            extracted_context = {}
+            result["extracted_context"] = extracted_context
+        extracted_context["instant_dialogue"] = state
+        result["dialogue_state"] = state
+        return result
+
+    def _finalize_instant_router_result(
+        self,
+        result: Dict[str, Any],
+        *,
+        current_year: int,
+        normalized_query_context: Dict[str, Any] | None,
+    ) -> Dict[str, Any]:
+        """Normalize the Instant router's structured output without re-reading text.
+
+        Instant natural-language understanding belongs exclusively to the LLM.
+        This method may validate schema and prepare deterministic calculation
+        inputs, but it must never inspect words in the user's question to alter
+        intent, subject, category, readiness, or chart selection.
+        """
+        result["status"] = str(result.get("status") or "").strip().upper()
+        if result["status"] not in {"READY", "CLARIFY"}:
+            raise ValueError("Instant intent router returned an invalid status")
+
+        mode = str(result.get("mode") or "").strip().upper()
+        if not mode:
+            raise ValueError("Instant intent router returned no mode")
+        result["mode"] = mode
+        _normalize_lifespan_timing_mode(result)
+
+        result["context_type"] = str(result.get("context_type") or "birth")
+        result["category"] = str(result.get("category") or "general")
+        if not isinstance(result.get("extracted_context"), dict):
+            result["extracted_context"] = {}
+        if not isinstance(result.get("divisional_charts"), list):
+            result["divisional_charts"] = []
+        result["needs_transits"] = bool(result.get("needs_transits"))
+        result["chart_insights"] = []
+
+        if normalized_query_context:
+            result["query_context"] = normalized_query_context
+
+        result["evidence_plan"] = normalize_evidence_plan(
+            result.get("evidence_plan"),
+            question="",
+        )
+        if result["needs_transits"] and not isinstance(result.get("transit_request"), dict):
+            result["transit_request"] = {
+                "startYear": current_year,
+                "endYear": current_year + 2,
+                "yearMonthMap": {
+                    str(year): [
+                        "January", "February", "March", "April", "May", "June",
+                        "July", "August", "September", "October", "November", "December",
+                    ]
+                    for year in range(current_year, current_year + 3)
+                },
+            }
+        return result
+
     def _build_fallback_intent_result(
         self,
         *,
@@ -1392,6 +1523,7 @@ class IntentRouter:
         self,
         *,
         user_question: str,
+        latest_user_reply: str,
         history_text: str,
         app_language: str,
         current_date: str,
@@ -1400,6 +1532,7 @@ class IntentRouter:
         clarification_limit_text: str,
         force_ready_instruction: str,
         force_clarify_instruction: str,
+        dialogue_state_text: str,
     ) -> str:
         return f"""
 You are AstroRoshni's multilingual semantic intent router for instant/speech astrology chat.
@@ -1414,12 +1547,18 @@ Current year: {current_year}; current month: {current_month}
 {force_clarify_instruction}
 {history_text}
 
-Current question: "{user_question}"
+Persisted dialogue state from earlier clarification turns (authoritative unless
+the current user explicitly corrects it):
+{dialogue_state_text}
+
+Full request / clarification chain: "{user_question}"
+LATEST USER MESSAGE (answer this turn): "{latest_user_reply}"
 
 Task:
 1. Semantically understand the user's question in any language/script.
-2. Decide READY vs CLARIFY. Clarify when the core topic/event is genuinely unclear, the user asks multiple unrelated life areas, a reference like "this/that" cannot be resolved from recent history, OR the mode is RECOMMEND_LOCATION and india-vs-abroad scope is unknown. Do not clarify for one clear domain with multiple facets, follow-up challenges, or natural messy phrasing.
-3. Select the astrology mode, answer mode, subject, category, timeframe/date, chart focus, transit need, and compact divisional chart list.
+2. Decide READY vs CLARIFY. Clarify whenever a missing fact would materially change which chart factors, relationship role, event definition, or timing calculation should be used. Resolve ambiguous people and pronouns through conversation; never guess who "he", "she", "they", "that person", or a similar reference means. Clarify when the core topic/event is genuinely unclear, the user asks multiple unrelated life areas, a reference cannot be resolved from recent history/state, OR the mode is RECOMMEND_LOCATION and india-vs-abroad scope is unknown. Do not clarify for one clear domain with multiple facets, follow-up challenges, or natural messy phrasing.
+3. Maintain `dialogue_state` as a complete corrected snapshot, not a delta. When prior dialogue_state contains a last_clarification_question, treat LATEST USER MESSAGE as the user's direct answer to that question—even if it is only one word. Semantically apply that answer to known_facts, remove the fact it resolves from unresolved_facts, and do not repeat the same question. Ask the next necessary question only if a different material fact remains unresolved. Ask exactly one natural question at a time in the user's current language/script. Continue clarifying until you have enough information to choose the correct astrological calculation; only then set READY and ready_to_calculate=true.
+4. Select the astrology mode, answer mode, subject, category, timeframe/date, chart focus, transit need, and compact divisional chart list.
 
 Modes:
 - PREDICT_DAILY: one exact day, today, tomorrow, or a named date.
@@ -1482,11 +1621,24 @@ Calibration:
 - User previously asked where to move; now answers "abroad" / "विदेश" / "both" -> READY, RECOMMEND_LOCATION with matching location_scope.
 - "When will I get married?" -> READY, LIFESPAN_EVENT_TIMING (or event timing), NOT RECOMMEND_LOCATION.
 - Birth details with Place: cities + marriage/love/commitment asks -> marriage/relationship timing or topic reading, NOT RECOMMEND_LOCATION.
+- "Will he come back?" with no resolvable person in history/state -> CLARIFY. Ask who the person is; do not assume boyfriend, husband, or ex.
+- Prior question asks who "he" is and LATEST USER MESSAGE is "spouse" -> identity is resolved as spouse. Remove identity from unresolved_facts and NEVER ask who "he" is again. Either ask the next genuinely missing fact or return READY.
+- User corrects "not my boyfriend, my husband" -> update known_facts and corrections. If marriage order/status materially affects the requested calculation and is still unknown, ask the next single question. Do not answer yet.
+- A short reply such as "yes, first marriage" is an answer to the open clarification, not a new astrology question. Merge it into dialogue_state and either ask the next necessary question or mark READY.
 
 Return exactly this JSON shape:
 {{
   "status": "CLARIFY" or "READY",
   "clarification_question": "same language/script as user, only when CLARIFY",
+  "dialogue_state": {{
+    "request_summary": "concise resolved meaning so far",
+    "known_facts": {{"semantic_field": "LLM-understood value"}},
+    "unresolved_facts": ["only facts that materially affect the calculation"],
+    "corrections": ["user corrections to earlier assumptions"],
+    "ready_to_calculate": true or false,
+    "readiness_reason": "why calculation can or cannot begin",
+    "last_clarification_question": "same as clarification_question while CLARIFY"
+  }},
   "chart_insights": [],
   "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_LOCATION" or "RECOMMEND_REMEDY_FOR_PROBLEM",
   "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
@@ -1532,6 +1684,8 @@ Return exactly this JSON shape:
         force_clarify: bool = False,
         force_location_scope_clarify: bool = False,
         query_context: Dict[str, Any] | None = None,
+        dialogue_state: Dict[str, Any] | None = None,
+        latest_user_reply: str | None = None,
     ) -> Dict[str, Any]:
         import time
 
@@ -1545,6 +1699,14 @@ Return exactly this JSON shape:
         d1_chart = None
 
         history_text = self._build_instant_history_text(chat_history)
+        latest_user_reply_text = str(latest_user_reply or user_question or "").strip()
+        prior_dialogue_state = dict(dialogue_state or {})
+        dialogue_state_text = json.dumps(
+            prior_dialogue_state,
+            ensure_ascii=False,
+            default=str,
+            sort_keys=True,
+        ) if prior_dialogue_state else "{}"
         _lang = str(language or "english").strip() or "english"
         language_policy = resolve_output_language_policy(_lang, user_question)
         app_language = language_policy.get("app_language", _lang)
@@ -1614,7 +1776,12 @@ Current date context:
 {force_clarify_instruction}
 {history_text}
 
-Current question: "{user_question}"
+Persisted dialogue state from earlier clarification turns (authoritative unless
+the current user explicitly corrects it):
+{dialogue_state_text}
+
+Full request / clarification chain: "{user_question}"
+LATEST USER MESSAGE (answer this turn): "{latest_user_reply_text}"
 
 Rules:
 - The AUTHORITATIVE USER-LOCAL CALENDAR above is the sole authority for relative-day phrases in the CURRENT QUESTION.
@@ -1628,6 +1795,10 @@ Rules:
 - For `RECOMMEND_LOCATION`: if the user has NOT clearly said India-only / abroad-overseas / both, return CLARIFY. Your clarification_question MUST ask that geography preference in the SAME language/script as the current question (LLM-authored; never English-by-default). Set extracted_context.location_scope to "india"|"abroad"|"both" when known, else null.
 - Use `RECOMMEND_REMEDY_FOR_PROBLEM` ONLY when query_context already marks a Remedies CTA follow-up. Plain "what should I do" / upay wording → `ANALYZE_ROOT_CAUSE` + `problem_diagnosis` (not a full remedy dump).
 - IMPORTANT: clarification is ALLOWED in instant mode. Do NOT default to READY when the ask is genuinely unclear.
+- All natural-language understanding belongs to you. Resolve ambiguous people, pronouns, relationships, event meanings, and corrections from the current message, recent conversation, and persisted dialogue state. Never guess an unresolved person or relationship.
+- Maintain `dialogue_state` as a complete corrected snapshot on every turn. When prior state contains last_clarification_question, treat LATEST USER MESSAGE as the direct answer to it—even if it is one word. Semantically apply it to known_facts, remove the resolved item from unresolved_facts, and never repeat the same question. Put facts already established by the user in known_facts; put only calculation-relevant missing facts in unresolved_facts; record explicit user corrections; and set ready_to_calculate=true only when the correct chart/evidence calculation can begin.
+- If status is CLARIFY, ask exactly one concise, natural question in the language/script of the CURRENT QUESTION. The next user message may be only a short answer to that question; treat it as continuation, not a new topic.
+- Continue clarification across turns when multiple material facts are missing. Do not start astrological calculation merely because one clarification was answered.
 - Return `CLARIFY` only when the user has not made the core topic specific enough to answer well in one instant reply, or when the message explicitly contains separate unrelated asks.
 - Good reasons to `CLARIFY`:
   - the message explicitly mixes unrelated life areas as separate asks, like "career, marriage, and money" or "first tell career, then marriage"
@@ -1705,6 +1876,15 @@ Return ONLY this JSON shape:
 {{
   "status": "CLARIFY" or "READY",
   "clarification_question": "short question only when status=CLARIFY",
+  "dialogue_state": {{
+    "request_summary": "concise resolved meaning so far",
+    "known_facts": {{"semantic_field": "LLM-understood value"}},
+    "unresolved_facts": ["only facts that materially affect the calculation"],
+    "corrections": ["user corrections to earlier assumptions"],
+    "ready_to_calculate": true or false,
+    "readiness_reason": "why calculation can or cannot begin",
+    "last_clarification_question": "same as clarification_question while CLARIFY"
+  }},
   "chart_insights": [],
   "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_LOCATION" or "RECOMMEND_REMEDY_FOR_PROBLEM",
   "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
@@ -1733,6 +1913,7 @@ Return ONLY this JSON shape:
         if compact_prompt_enabled:
             prompt = self._build_compact_instant_router_prompt(
                 user_question=user_question,
+                latest_user_reply=latest_user_reply_text,
                 history_text=history_text,
                 app_language=app_language,
                 current_date=current_date,
@@ -1741,6 +1922,7 @@ Return ONLY this JSON shape:
                 clarification_limit_text=clarification_limit_text,
                 force_ready_instruction=force_ready_instruction,
                 force_clarify_instruction=force_clarify_instruction,
+                dialogue_state_text=dialogue_state_text,
             )
 
         model = self._get_instant_model()
@@ -1753,6 +1935,7 @@ Return ONLY this JSON shape:
         )
         token_usage: Dict[str, Any] = {}
         response_chars = 0
+        reject_prior_question_fallback = False
 
         try:
             response = None
@@ -1833,18 +2016,95 @@ Return ONLY this JSON shape:
                 token_usage.get("input_tokens"),
                 token_usage.get("output_tokens"),
             )
-            final = self._finalize_router_result(
+            final = self._finalize_instant_router_result(
                 result,
-                user_question=user_question,
                 current_year=current_year,
-                current_month=current_month,
-                resolved_now=resolved_now,
                 normalized_query_context=normalized_query_context,
-                include_chart_insights=False,
-                d1_chart=d1_chart,
-                force_ready=force_ready,
-                language=language,
             )
+            final = self._finalize_instant_dialogue_state(
+                final,
+                prior_dialogue_state=prior_dialogue_state,
+            )
+
+            # A new user reply must never produce the exact same clarification.
+            # This is deliberately a structural guard only: Python does not try
+            # to understand what the reply means.  Instead, ask the LLM to repair
+            # its own semantic state update once, then reject another loop.
+            prior_question = str(
+                prior_dialogue_state.get("last_clarification_question") or ""
+            ).strip()
+            returned_question = str(final.get("clarification_question") or "").strip()
+            repeated_question = (
+                bool(prior_question)
+                and bool(latest_user_reply_text)
+                and final.get("status") == "CLARIFY"
+                and " ".join(returned_question.casefold().split())
+                == " ".join(prior_question.casefold().split())
+            )
+            if repeated_question:
+                reject_prior_question_fallback = True
+                repair_prompt = f"""
+{prompt}
+
+CONTRACT REPAIR (mandatory):
+Your previous JSON repeated the same clarification after the user supplied a new
+answer. That is an invalid dialogue-state update. Re-read the persisted
+last_clarification_question and LATEST USER MESSAGE. Use natural-language
+understanding to apply the user's reply to known_facts, remove every unresolved
+fact it resolves, and return a complete corrected JSON object. Do not repeat the
+previous clarification. If another materially different fact is still needed,
+ask exactly one different question; otherwise return READY. Return JSON only.
+
+Invalid previous JSON:
+{json.dumps(result, ensure_ascii=False, default=str)}
+""".strip()
+                logger.warning(
+                    "instant_intent_router_repeated_clarification repairing model=%s",
+                    model_name,
+                )
+                repair_started = time.time()
+                repair_response = await asyncio.wait_for(
+                    model.generate_content_async(
+                        repair_prompt,
+                        request_options={"timeout": retry_request_timeout},
+                    ),
+                    timeout=retry_wall_timeout,
+                )
+                repair_cleaned = (
+                    repair_response.text.replace("```json", "")
+                    .replace("```", "")
+                    .strip()
+                )
+                repair_result = json.loads(repair_cleaned)
+                final = self._finalize_instant_router_result(
+                    repair_result,
+                    current_year=current_year,
+                    normalized_query_context=normalized_query_context,
+                )
+                final = self._finalize_instant_dialogue_state(
+                    final,
+                    prior_dialogue_state=prior_dialogue_state,
+                )
+                repaired_question = str(
+                    final.get("clarification_question") or ""
+                ).strip()
+                if (
+                    final.get("status") == "CLARIFY"
+                    and " ".join(repaired_question.casefold().split())
+                    == " ".join(prior_question.casefold().split())
+                ):
+                    raise ValueError(
+                        "Instant intent router repeated a resolved clarification after repair"
+                    )
+                logger.info(
+                    "instant_intent_router_repair_done status=%s elapsed_ms=%.1f",
+                    final.get("status"),
+                    (time.time() - repair_started) * 1000.0,
+                )
+            if final.get("status") == "CLARIFY" and not str(
+                final.get("clarification_question") or ""
+            ).strip():
+                raise ValueError("Instant intent router returned CLARIFY without an LLM question")
             final["_llm_usage_stage"] = _build_usage_stage(
                 stage="instant_intent_router",
                 llm_model=model_name,
@@ -1862,23 +2122,42 @@ Return ONLY this JSON shape:
                 total_time,
                 e,
             )
-            fallback = self._build_fallback_intent_result(
-                user_question=user_question,
-                current_year=current_year,
-                current_month=current_month,
-                resolved_now=resolved_now,
-                normalized_query_context=normalized_query_context,
-            )
-            fallback["_llm_usage_stage"] = _build_usage_stage(
-                stage="instant_intent_router",
-                llm_model=model_name,
-                prompt_chars=len(prompt),
-                response_chars=response_chars,
-                token_usage=token_usage,
-                success=False,
-                elapsed_ms=(time.time() - intent_start) * 1000.0,
-            )
-            return fallback
+            if (
+                not reject_prior_question_fallback
+                and prior_dialogue_state.get("unresolved_facts")
+            ):
+                prior_question = str(
+                    prior_dialogue_state.get("last_clarification_question") or ""
+                ).strip()
+                if prior_question:
+                    fallback = {
+                        "status": "CLARIFY",
+                        "clarification_question": prior_question,
+                        "mode": str(prior_dialogue_state.get("mode") or "ANALYZE_TOPIC_POTENTIAL"),
+                        "category": str(prior_dialogue_state.get("category") or "general"),
+                        "context_type": "birth",
+                        "needs_transits": False,
+                        "divisional_charts": [],
+                        "chart_insights": [],
+                        "extracted_context": {"instant_dialogue": prior_dialogue_state},
+                    }
+                    fallback["status"] = "CLARIFY"
+                    fallback["clarification_question"] = prior_question
+                    fallback["dialogue_state"] = prior_dialogue_state
+                    fallback["_llm_usage_stage"] = _build_usage_stage(
+                        stage="instant_intent_router",
+                        llm_model=model_name,
+                        prompt_chars=len(prompt),
+                        response_chars=response_chars,
+                        token_usage=token_usage,
+                        success=False,
+                        elapsed_ms=(time.time() - intent_start) * 1000.0,
+                    )
+                    return fallback
+            # With no prior LLM-authored clarification there is no safe semantic
+            # fallback.  Let the worker expose a retryable error instead of
+            # guessing an intent from language-specific keywords.
+            raise
         
     async def classify_intent(self, user_question: str, chat_history: list = None, user_facts: dict = None, clarification_count: int = 0, language: str = 'english', force_ready: bool = False, d1_chart: dict = None, force_clarify: bool = False, force_location_scope_clarify: bool = False, query_context: Dict[str, Any] | None = None) -> Dict[str, str]:
         """

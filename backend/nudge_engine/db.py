@@ -1795,15 +1795,25 @@ def refresh_campaign_delivery_status(conn, campaign_id: int) -> Dict[str, int]:
     Mark a sending campaign sent only after every eligible recipient has a
     persisted delivery outcome. Returns recipient-level progress.
     """
-    progress = campaign_delivery_progress(conn, int(campaign_id))
+    # Campaign batches run concurrently.  Serialize the very small completion
+    # check so the worker that acquires this row after the final batch commit
+    # observes every persisted outcome.  Counting before taking the lock lets
+    # all final workers see an incomplete MVCC snapshot and can leave a fully
+    # delivered campaign stuck in ``sending`` forever.
     cur = execute(
         conn,
-        "SELECT total_targeted, status FROM nudge_campaigns WHERE id = %s",
+        "SELECT total_targeted, status FROM nudge_campaigns WHERE id = %s FOR UPDATE",
         (int(campaign_id),),
     )
     row = cur.fetchone()
     if not row:
-        return progress
+        return {
+            "processed": 0,
+            "delivered": 0,
+            "undelivered": 0,
+            "failed_attempts": 0,
+        }
+    progress = campaign_delivery_progress(conn, int(campaign_id))
     total_targeted = int(row[0] or 0)
     status = str(row[1] or "")
     if status == "sending" and progress["processed"] >= total_targeted:

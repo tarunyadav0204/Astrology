@@ -1449,7 +1449,7 @@ def build_janam_kundli_report_context(request: Any) -> Dict[str, Any]:
             birth_payload.get("date"),
             float(birth_payload.get("latitude") or 0),
             float(birth_payload.get("longitude") or 0),
-            birth_payload.get("timezone") or "UTC+0",
+            birth_payload.get("timezone"),
         )
         if isinstance(timings, dict):
             panchang = dict(panchang)

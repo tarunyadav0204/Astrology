@@ -49,21 +49,44 @@ class _FakeResponse:
 
 
 class _FakeModel:
-    def __init__(self, payload):
-        self.payload = payload
+    def __init__(self, payloads):
+        self.payloads = list(payloads)
+        self.prompts = []
         self._model_name = "fake-intent-model"
 
     async def generate_content_async(self, prompt, request_options=None):
-        return _FakeResponse(self.payload)
+        self.prompts.append(prompt)
+        if not self.payloads:
+            raise AssertionError("No fake intent response remains")
+        return _FakeResponse(self.payloads.pop(0))
 
 
 class _TestRouter(IntentRouter):
     def __init__(self, payload):
-        super().__init__()
-        self._payload = payload
+        payloads = payload if isinstance(payload, list) else [payload]
+        self._fake_model = _FakeModel(payloads)
 
-    def _get_model(self):
-        return _FakeModel(self._payload)
+    def _get_instant_model(self):
+        return self._fake_model
+
+
+def _with_dialogue_state(payload):
+    payload = dict(payload)
+    status = str(payload.get("status") or "READY").upper()
+    question = str(payload.get("clarification_question") or "").strip()
+    payload.setdefault(
+        "dialogue_state",
+        {
+            "request_summary": "test request",
+            "known_facts": {},
+            "unresolved_facts": ["topic"] if status == "CLARIFY" else [],
+            "corrections": [],
+            "ready_to_calculate": status == "READY",
+            "readiness_reason": "test fixture",
+            "last_clarification_question": question if status == "CLARIFY" else "",
+        },
+    )
+    return payload
 
 
 def test_instant_router_allows_clarify_for_broad_question():
@@ -77,7 +100,7 @@ def test_instant_router_allows_clarify_for_broad_question():
         "needs_transits": False,
         "divisional_charts": ["D1", "D9"],
     }
-    router = _TestRouter(payload)
+    router = _TestRouter(_with_dialogue_state(payload))
     result = asyncio.run(
         router.classify_instant_intent(
             "Tell me about my life",
@@ -103,7 +126,7 @@ def test_instant_router_not_limited_to_single_clarification():
         "needs_transits": True,
         "divisional_charts": ["D1", "D9"],
     }
-    router = _TestRouter(payload)
+    router = _TestRouter(_with_dialogue_state(payload))
     result = asyncio.run(
         router.classify_instant_intent(
             "When will it happen?",
@@ -133,7 +156,7 @@ def test_instant_router_keeps_ready_for_straightforward_daily():
             "yearMonthMap": {"2026": ["May"]},
         },
     }
-    router = _TestRouter(payload)
+    router = _TestRouter(_with_dialogue_state(payload))
     result = asyncio.run(
         router.classify_instant_intent(
             "How is tomorrow for me?",
@@ -153,7 +176,7 @@ def test_instant_router_keeps_ready_for_straightforward_daily():
     assert result["extracted_context"]["specific_date"] == "2026-05-02"
 
 
-def test_instant_router_refines_marriage_from_weak_timing_category():
+def test_instant_router_does_not_reinterpret_marriage_in_python():
     payload = {
         "status": "READY",
         "mode": "LIFESPAN_EVENT_TIMING",
@@ -163,7 +186,7 @@ def test_instant_router_refines_marriage_from_weak_timing_category():
         "needs_transits": True,
         "divisional_charts": ["D1", "D9"],
     }
-    router = _TestRouter(payload)
+    router = _TestRouter(_with_dialogue_state(payload))
     result = asyncio.run(
         router.classify_instant_intent(
             "When will I get married?",
@@ -173,11 +196,11 @@ def test_instant_router_refines_marriage_from_weak_timing_category():
             language="english",
         )
     )
-    assert result["category"] == "marriage"
+    assert result["category"] == "timing"
     assert result["mode"] == "LIFESPAN_EVENT_TIMING"
 
 
-def test_instant_router_normalizes_predict_event_timing_and_refines_job():
+def test_instant_router_normalizes_mode_but_does_not_reinterpret_job_in_python():
     payload = {
         "status": "READY",
         "mode": "PREDICT_EVENT_TIMING",
@@ -187,7 +210,7 @@ def test_instant_router_normalizes_predict_event_timing_and_refines_job():
         "needs_transits": True,
         "divisional_charts": ["D1", "D9"],
     }
-    router = _TestRouter(payload)
+    router = _TestRouter(_with_dialogue_state(payload))
     result = asyncio.run(
         router.classify_instant_intent(
             "When will I get a job?",
@@ -198,13 +221,69 @@ def test_instant_router_normalizes_predict_event_timing_and_refines_job():
         )
     )
     assert result["mode"] == "LIFESPAN_EVENT_TIMING"
-    assert result["category"] == "job"
+    assert result["category"] == "general"
+
+
+def test_instant_router_repairs_repeated_clarification_with_llm():
+    repeated = _with_dialogue_state(
+        {
+            "status": "CLARIFY",
+            "clarification_question": "Who does he refer to?",
+            "mode": "LIFESPAN_EVENT_TIMING",
+            "extracted_context": {},
+            "context_type": "birth",
+            "category": "relationship",
+            "needs_transits": True,
+            "divisional_charts": ["D1", "D9"],
+        }
+    )
+    repeated["dialogue_state"]["unresolved_facts"] = ["identity_of_subject"]
+    repaired = _with_dialogue_state(
+        {
+            "status": "READY",
+            "clarification_question": "",
+            "mode": "LIFESPAN_EVENT_TIMING",
+            "target_subject_key": "spouse",
+            "extracted_context": {},
+            "context_type": "birth",
+            "category": "relationship",
+            "needs_transits": True,
+            "divisional_charts": ["D1", "D9"],
+        }
+    )
+    repaired["dialogue_state"]["known_facts"] = {"identity_of_subject": "spouse"}
+
+    router = _TestRouter([repeated, repaired])
+    result = asyncio.run(
+        router.classify_instant_intent(
+            "Will he come back?\nspouse",
+            [],
+            clarification_count=1,
+            language="english",
+            dialogue_state={
+                "request_summary": "Whether he will return",
+                "known_facts": {},
+                "unresolved_facts": ["identity_of_subject"],
+                "corrections": [],
+                "ready_to_calculate": False,
+                "last_clarification_question": "Who does he refer to?",
+            },
+            latest_user_reply="spouse",
+        )
+    )
+
+    assert result["status"] == "READY"
+    assert result["target_subject_key"] == "spouse"
+    assert result["dialogue_state"]["unresolved_facts"] == []
+    assert len(router._fake_model.prompts) == 2
+    assert "CONTRACT REPAIR" in router._fake_model.prompts[1]
 
 
 if __name__ == "__main__":
     test_instant_router_allows_clarify_for_broad_question()
     test_instant_router_not_limited_to_single_clarification()
     test_instant_router_keeps_ready_for_straightforward_daily()
-    test_instant_router_refines_marriage_from_weak_timing_category()
-    test_instant_router_normalizes_predict_event_timing_and_refines_job()
+    test_instant_router_does_not_reinterpret_marriage_in_python()
+    test_instant_router_normalizes_mode_but_does_not_reinterpret_job_in_python()
+    test_instant_router_repairs_repeated_clarification_with_llm()
     print("instant intent router tests passed")

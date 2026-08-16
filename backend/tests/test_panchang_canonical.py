@@ -1,4 +1,5 @@
 import sys
+from datetime import datetime
 
 sys.path.insert(0, 'backend')
 
@@ -33,3 +34,32 @@ def test_birth_reference_is_preserved_through_compatibility_facade():
     assert canonical['tithi']['name'] == legacy['tithi']['name']
     assert canonical['nakshatra']['name'] == legacy['nakshatra']['name']
     assert canonical['karana']['name'] == legacy['karana']['name']
+
+
+def test_iso_datetime_date_is_normalized_for_daily_and_birth_panchang():
+    iso_date = '2006-04-15T04:26:51.191Z'
+    calculator = PanchangCalculator()
+
+    daily = calculator.calculate_panchang(iso_date, *LOCATION)
+    birth = calculator.calculate_birth_panchang({
+        'date': iso_date,
+        'time': '16:30:00',
+        'latitude': -36.8509,
+        'longitude': 174.7645,
+        'timezone': 'Pacific/Auckland',
+    })
+
+    assert set(daily) >= {'tithi', 'vara', 'nakshatra', 'yoga', 'karana'}
+    assert set(birth) >= {'tithi', 'vara', 'nakshatra', 'yoga', 'karana'}
+
+
+def test_auckland_sunrise_stays_on_requested_local_calendar_day():
+    timings = PanchangCalculator().get_local_sunrise_sunset(
+        '2006-04-15T04:26:51.191Z',
+        -36.8509,
+        174.7645,
+        'Pacific/Auckland',
+    )
+
+    assert datetime.fromisoformat(timings['sunrise']).date().isoformat() == '2006-04-15'
+    assert datetime.fromisoformat(timings['sunset']).date().isoformat() == '2006-04-15'

@@ -14,6 +14,7 @@ import time
 from auth import get_current_user
 from db import get_conn, execute
 from charts.house_insight_service import build_chart_preview_insights
+from credits.instant_billing import InstantBillingError, require_active_session
 
 logger = logging.getLogger(__name__)
 _CHAT_SCHEMA_FLAGS: set[str] = set()
@@ -696,7 +697,11 @@ def _create_native_gate_response(
 router = APIRouter(prefix="/chat-v2", tags=["chat_history"])
 
 STANDARD_MAX_CLARIFICATIONS = 1
-INSTANT_MAX_CLARIFICATIONS = 3
+# Instant Chat is an LLM-owned dialogue.  It may ask as many concise follow-up
+# questions as are materially necessary; the session turn limit remains the
+# independent abuse/size guard.  A numeric cap here used to force calculation
+# with unresolved facts after three questions.
+INSTANT_MAX_CLARIFICATIONS = None
 
 # Cap user turns per session so threads do not grow without bound in DB/UI. Clients must POST /session
 # and retry when they receive SESSION_TURN_LIMIT_PREFIX (HTTP 409). Model context already uses ~last 3 Q&A.
@@ -2082,6 +2087,23 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         is_plain_text_channel=bool(is_plain_text_channel),
     )
 
+    # New clients keep Instant Chat inside a server-metered consultation. Older
+    # clients omit this id and retain the legacy per-answer price during rollout.
+    instant_billing_session_id = str(request.get("instant_billing_session_id") or "").strip()
+    instant_metered_billing = bool(
+        instant_chat_active and instant_billing_session_id and not speech_chat_requested
+    )
+    instant_billing_state = None
+    if instant_metered_billing:
+        try:
+            instant_billing_state = require_active_session(
+                current_user.userid,
+                instant_billing_session_id,
+                session_id,
+            )
+        except InstantBillingError as error:
+            raise HTTPException(status_code=error.status_code, detail=error.detail)
+
     # Check credit cost and user balance (first question free for standard chat)
     credit_service = CreditService()
     if partnership_mode:
@@ -2093,6 +2115,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             credit_service.get_credit_setting('speech_chat_cost')
             if speech_chat_billing
             else 0 if speech_chat_requested
+            else 0 if instant_metered_billing
             else credit_service.get_credit_setting('instant_chat_cost')
         )
     else:
@@ -2125,12 +2148,13 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             else (
                 'speech_chat_cost' if instant_chat_active and speech_chat_billing
                 else 'speech_chat_per_minute_cost' if instant_chat_active and speech_chat_requested
+                else 'instant_chat_per_minute_cost' if instant_metered_billing
                 else 'instant_chat_cost' if instant_chat_active
                 else 'chat_question_cost'
             )
         )
     )
-    effective_cost = 0 if free_eligible else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
+    effective_cost = 0 if (free_eligible or instant_metered_billing) else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
     log_ask_phase(
         "credits",
         chat_key=chat_key,
@@ -2501,6 +2525,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         "chat_tier": effective_chat_tier,
         "speech_chat_requested": speech_chat_requested,
         "speech_chat_billing": speech_chat_billing,
+        "instant_metered_billing": instant_metered_billing,
         "claim_id": str(uuid.uuid4()),
     }
     queued = False
@@ -2558,7 +2583,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         else:
             background_tasks.add_task(
                 process_gemini_response,
-                assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, worker_intent_metadata, user_message_id, using_free_question, effective_cost, effective_chat_tier, speech_chat_billing, speech_chat_requested
+                assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, worker_intent_metadata, user_message_id, using_free_question, effective_cost, effective_chat_tier, speech_chat_billing, speech_chat_requested, instant_metered_billing
             )
     log_ask_phase(
         "enqueue_or_background_dispatch",
@@ -2585,6 +2610,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         "chat_tier": effective_chat_tier,
         "expectedWaitSeconds": get_chat_countdown_seconds(effective_chat_tier),
         "chart_insights": chart_insights,
+        "instant_billing": instant_billing_state,
     }
 
 
@@ -2672,6 +2698,7 @@ async def process_chat_task(request: dict, x_chat_task_secret: Optional[str] = H
             chat_tier=request.get("chat_tier", "standard"),
             speech_chat_billing=bool(request.get("speech_chat_billing")),
             speech_chat_requested=bool(request.get("speech_chat_requested") or request.get("speech_chat_billing")),
+            instant_metered_billing=bool(request.get("instant_metered_billing")),
         )
         return {"ok": True, "state": "processed", "message_id": message_id}
     finally:
@@ -3338,7 +3365,7 @@ async def _close_wait_side_conversation(message_id: int):
         logger.info("wait side conversation close skipped for message_id=%s: %s", message_id, str(exc)[:200])
 
 
-async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None, cached_intent: dict = None, user_message_id: int = None, using_free_question: bool = False, effective_cost: int = None, chat_tier: str = "standard", speech_chat_billing: bool = False, speech_chat_requested: bool = False):
+async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None, cached_intent: dict = None, user_message_id: int = None, using_free_question: bool = False, effective_cost: int = None, chat_tier: str = "standard", speech_chat_billing: bool = False, speech_chat_requested: bool = False, instant_metered_billing: bool = False):
     """Background task to process Gemini response. user_message_id: ID of the user message to update with category/canonical_question."""
     import sys
     import os
@@ -3622,6 +3649,12 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
 
                 intent = build_fomo_chat_intent(trusted_fomo_context)
             elif is_instant_chat:
+                instant_dialogue_state = (
+                    extracted_context.get("instant_dialogue")
+                    if isinstance(extracted_context, dict)
+                    and isinstance(extracted_context.get("instant_dialogue"), dict)
+                    else None
+                )
                 intent = await intent_router.classify_instant_intent(
                     combined_question,
                     history,
@@ -3630,6 +3663,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     language=language,
                     force_ready=force_ready,
                     query_context=query_context,
+                    dialogue_state=instant_dialogue_state,
+                    latest_user_reply=question,
                 )
             else:
                 intent = await intent_router.classify_intent(
@@ -3646,6 +3681,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             # location-scope clarify reply). Never force cartography from keywords alone.
             mode_u_early = str(intent.get("mode") or "").upper() if isinstance(intent, dict) else ""
             if (
+                not is_instant_chat
+                and
                 text_scope_raw
                 and isinstance(intent, dict)
                 and (awaiting_location_scope or mode_u_early == "RECOMMEND_LOCATION")
@@ -3663,7 +3700,11 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             # awaiting_location_scope clarification). Do NOT reuse a prior session's
             # location_scope for a fresh "where should I live" ask — that silently
             # skipped India/abroad clarification after an earlier India default.
-            if isinstance(extracted_context, dict) and isinstance(intent, dict):
+            if (
+                not is_instant_chat
+                and isinstance(extracted_context, dict)
+                and isinstance(intent, dict)
+            ):
                 intent.setdefault("extracted_context", {})
                 if isinstance(intent.get("extracted_context"), dict):
                     text_scope = _infer_location_scope_from_text(combined_question)
@@ -3717,6 +3758,13 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         force_ready=False,
                         force_location_scope_clarify=True,
                         query_context=query_context,
+                        dialogue_state=(
+                            extracted_context.get("instant_dialogue")
+                            if isinstance(extracted_context, dict)
+                            and isinstance(extracted_context.get("instant_dialogue"), dict)
+                            else None
+                        ),
+                        latest_user_reply=question,
                     )
                 else:
                     intent = await intent_router.classify_intent(
@@ -3730,7 +3778,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         clarification_count=clarification_count,
                     )
                 # Re-apply ONLY user-stated scope from this reply after retry.
-                if isinstance(intent, dict):
+                if isinstance(intent, dict) and not is_instant_chat:
                     from ai.intent_router import _infer_location_scope_from_text
 
                     text_scope = _infer_location_scope_from_text(combined_question)
@@ -3751,7 +3799,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     and intent["extracted_context"].get("location_scope")
                 )
             )
-            if location_scope_clarify_pending:
+            if location_scope_clarify_pending and not is_instant_chat:
                 from ai.intent_router import _location_scope_clarification_fallback
 
                 has_q = bool(str(intent.get("clarification_question") or "").strip())
@@ -3790,6 +3838,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             # FAIL-SAFE: Force LIFESPAN_EVENT_TIMING for "When/Year" questions to avoid clarification trap.
             timing_keywords = ['when', 'year', 'which year', 'what year', 'kab', 'saal', 'samay']
             if (
+                not is_instant_chat
+                and
                 any(kw in question.lower() for kw in timing_keywords)
                 and intent.get('status') == 'CLARIFY'
             ):
@@ -3845,7 +3895,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             can_return_clarification = bool(
                 intent.get("status") == "CLARIFY"
                 and (
-                    clarification_count < MAX_CLARIFICATIONS
+                    MAX_CLARIFICATIONS is None
+                    or clarification_count < MAX_CLARIFICATIONS
                     or location_scope_clarify
                 )
             )
@@ -4388,6 +4439,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 skip_instant_charge = bool(
                     (is_instant_chat and result.get("skip_instant_credit_charge"))
                     or (is_speech_chat and not speech_chat_billing)
+                    or (is_instant_chat and instant_metered_billing)
                 )
                 if skip_instant_charge:
                     success = True
