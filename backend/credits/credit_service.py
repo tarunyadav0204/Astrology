@@ -3781,8 +3781,18 @@ class CreditService:
         return (effective, value, discount)
     
     def update_credit_setting(self, setting_key: str, value: int, discount: Any = _DISCOUNT_OMIT) -> bool:
-        """Update credit cost setting. discount=_DISCOUNT_OMIT: leave discount column unchanged; None: set to NULL; int: set value."""
+        """Update or create a credit cost setting.
+
+        Admin clients can safely expose newly introduced settings before a
+        database migration has seeded their rows. discount=_DISCOUNT_OMIT
+        preserves an existing discount; None clears it; int replaces it.
+        """
         from db import get_conn, execute
+        descriptions = {
+            "instant_chat_first_minute_cost": "Credits for the first minute of Instant Chat",
+            "instant_chat_per_minute_cost": "Credits per following started minute of Instant Chat",
+        }
+        description = descriptions.get(setting_key, setting_key.replace("_", " ").strip().capitalize())
         with get_conn() as conn:
             if discount is _DISCOUNT_OMIT:
                 cursor = execute(
@@ -3794,6 +3804,15 @@ class CreditService:
                     """,
                     (value, setting_key),
                 )
+                if (cursor.rowcount or 0) == 0:
+                    cursor = execute(
+                        conn,
+                        """
+                        INSERT INTO credit_settings (setting_key, setting_value, description, updated_at)
+                        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                        """,
+                        (setting_key, value, description),
+                    )
             else:
                 d = None if discount is None or discount < 0 else int(discount)
                 cursor = execute(
@@ -3805,6 +3824,16 @@ class CreditService:
                     """,
                     (value, d, setting_key),
                 )
+                if (cursor.rowcount or 0) == 0:
+                    cursor = execute(
+                        conn,
+                        """
+                        INSERT INTO credit_settings (
+                            setting_key, setting_value, description, discount, updated_at
+                        ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        """,
+                        (setting_key, value, description, d),
+                    )
             success = (cursor.rowcount or 0) > 0
             conn.commit()
             return success

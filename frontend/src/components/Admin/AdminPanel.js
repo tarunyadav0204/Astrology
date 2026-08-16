@@ -42,6 +42,31 @@ import AdminGooglePlayTestimonials from './AdminGooglePlayTestimonials';
 import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import './AdminPanel.css';
 
+const INSTANT_CHAT_CREDIT_SETTINGS = [
+  {
+    key: 'instant_chat_first_minute_cost',
+    value: 1,
+    description: 'Credits for the first minute of Instant Chat',
+    discount: null,
+  },
+  {
+    key: 'instant_chat_per_minute_cost',
+    value: 1,
+    description: 'Credits per following started minute of Instant Chat',
+    discount: null,
+  },
+];
+
+function withRequiredInstantChatSettings(settings) {
+  const normalized = Array.isArray(settings) ? [...settings] : [];
+  INSTANT_CHAT_CREDIT_SETTINGS.forEach((fallback) => {
+    if (!normalized.some((setting) => setting.key === fallback.key)) {
+      normalized.push({ ...fallback });
+    }
+  });
+  return normalized;
+}
+
 function todayInIST() {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Kolkata',
@@ -312,7 +337,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [promoCodes, setPromoCodes] = useState([]);
   const [creditStats, setCreditStats] = useState({});
   const [newPromoCode, setNewPromoCode] = useState({ code: '', credits: 100, max_uses: 1, max_uses_per_user: 1 });
-  const [creditSettings, setCreditSettings] = useState([]);
+  const [creditSettings, setCreditSettings] = useState(() =>
+    withRequiredInstantChatSettings([])
+  );
   const [editingPromoCode, setEditingPromoCode] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [campaignDraftPrefill, setCampaignDraftPrefill] = useState(null);
@@ -2503,7 +2530,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         headers: getAdminAuthHeaders()
       });
       const data = await response.json();
-      setCreditSettings(data.settings || []);
+      setCreditSettings(withRequiredInstantChatSettings(data.settings));
     } catch (error) {
       console.error('Error fetching credit settings:', error);
     }
@@ -2530,11 +2557,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   };
 
   const handleSettingChange = (key, value) => {
-    setCreditSettings(prev =>
-      prev.map(setting =>
-        setting.key === key ? { ...setting, value: parseInt(value) || 0 } : setting
-      )
-    );
+    setCreditSettings((prev) => {
+      const parsedValue = parseInt(value, 10) || 0;
+      if (prev.some((setting) => setting.key === key)) {
+        return prev.map((setting) =>
+          setting.key === key ? { ...setting, value: parsedValue } : setting
+        );
+      }
+      const fallback = INSTANT_CHAT_CREDIT_SETTINGS.find((setting) => setting.key === key);
+      return fallback ? [...prev, { ...fallback, value: parsedValue }] : prev;
+    });
   };
 
   const vipTiers = ['Silver', 'Gold', 'Platinum'].map(name => {
@@ -4271,6 +4303,39 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         {activeTab === 'credits' && activeSubTab === 'management' && (
           <div className="credits-management">
             <h2>Credit Management</h2>
+
+            <div className="credit-settings instant-chat-billing-settings">
+              <h3>Instant Chat billing</h3>
+              <p className="credit-settings-hint">
+                Server-authoritative rates charged by started minute. The first-minute rate is charged when a consultation starts; the continuing rate is charged for each following started minute.
+              </p>
+              <div className="settings-form">
+                {INSTANT_CHAT_CREDIT_SETTINGS.map((definition) => {
+                  const setting = creditSettings.find((item) => item.key === definition.key) || definition;
+                  const isFirstMinute = definition.key === 'instant_chat_first_minute_cost';
+                  return (
+                    <div className="setting-item" key={definition.key}>
+                      <div className="setting-info">
+                        <strong>{isFirstMinute ? 'First minute' : 'Following started minutes'}</strong>
+                        <p>{definition.description}</p>
+                      </div>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={setting.value}
+                        onChange={(event) => handleSettingChange(definition.key, event.target.value)}
+                        aria-label={definition.description}
+                        className="feature-costs-input"
+                      />
+                    </div>
+                  );
+                })}
+                <button onClick={handleUpdateSettings} className="update-settings-btn">
+                  Save Instant Chat rates
+                </button>
+              </div>
+            </div>
             
             <div className="credit-settings">
               <h3>Feature Costs</h3>
