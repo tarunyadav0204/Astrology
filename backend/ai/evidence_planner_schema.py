@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import re
 from typing import Any, Dict, List
 
 
@@ -145,6 +146,22 @@ def _normalize_timeframe(value: Any) -> Dict[str, Any]:
     raw = value if isinstance(value, dict) else {"kind": "none"}
     out = dict(raw)
     out["kind"] = _enum_ci(out.get("kind"), TIMEFRAME_KINDS, "none")
+    # Flash-Lite occasionally supplies a useful structured duration while
+    # leaving ``kind`` at ``none``. Preserve the semantic information instead
+    # of treating a clearly bounded request as a current-only reading.
+    if out["kind"] == "none" and out.get("duration") not in (None, ""):
+        out["kind"] = "bounded_future"
+    if out.get("duration_months") in (None, ""):
+        # This parses the router's structured canonical duration, never the
+        # user's natural-language question. It is a compatibility bridge while
+        # older router responses roll out.
+        duration = str(out.get("duration") or "").strip().lower()
+        match = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(day|days|week|weeks|month|months|year|years)", duration)
+        if match:
+            amount = float(match.group(1))
+            unit = match.group(2)
+            months = amount / 30.4375 if unit.startswith("day") else amount * 7 / 30.4375 if unit.startswith("week") else amount * 12 if unit.startswith("year") else amount
+            out["duration_months"] = max(1, int(round(months)))
     if "granularity" in out:
         out["granularity"] = _enum_ci(out.get("granularity"), GRANULARITIES, "multi_year_window")
     return out

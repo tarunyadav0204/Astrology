@@ -48,7 +48,6 @@ const END_YEAR = 2100;
 const ITEM_WIDTH = 80;
 const ITEM_GAP = 12;
 const TOTAL_ITEM_SIZE = ITEM_WIDTH + ITEM_GAP;
-const SIDE_PADDING = (width - ITEM_WIDTH) / 2;
 
 const extractBirthYear = (data) => {
   if (!data || typeof data !== 'object') return null;
@@ -119,7 +118,9 @@ export default function EventScreen({ route }) {
   const deviceDay = deviceNow.getDate();
   const recommendedMonth = deviceDay <= 15 ? deviceMonth : Math.min(deviceMonth + 1, 12);
   const deviceMonths = React.useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), []);
-  const [readingMode, setReadingMode] = useState('yearly'); // 'yearly' | 'monthly'
+  const [readingMode, setReadingMode] = useState(
+    route?.params?.readingMode === 'monthly' ? 'monthly' : 'yearly'
+  ); // 'yearly' | 'monthly'
   const [selectedMonth, setSelectedMonth] = useState(recommendedMonth);
   const [monthlyData, setMonthlyData] = useState(null);
   
@@ -187,8 +188,17 @@ export default function EventScreen({ route }) {
   const TIMELINE_POLL_MS = 3000;
   const TIMELINE_MAX_WAIT_MS = 15 * 60 * 1000;
   const [showEventCreditsModal, setShowEventCreditsModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState(null); // 'generate' | 'regenerate' | null
+  const [pendingAction, setPendingAction] = useState(null); // 'generate' | 'regenerate' | 'monthly' | null
   const [continueChecking, setContinueChecking] = useState(false);
+  const [selectorWidth, setSelectorWidth] = useState(Math.max(ITEM_WIDTH, width - 32));
+  const selectorSidePadding = Math.max(0, (selectorWidth - ITEM_WIDTH) / 2);
+
+  useEffect(() => {
+    const requestedMode = route?.params?.readingMode;
+    if (!analysisStarted && (requestedMode === 'yearly' || requestedMode === 'monthly')) {
+      setReadingMode(requestedMode);
+    }
+  }, [analysisStarted, route?.params?.readingMode]);
 
   const loadingMessages = [
     { icon: '🌟', text: 'Analyzing planetary positions...' },
@@ -1111,26 +1121,32 @@ export default function EventScreen({ route }) {
   const scrollYearStripToIndex = useCallback((index, animated) => {
     const ref = yearSliderRef.current;
     if (!ref) return;
-    const padding = SIDE_PADDING;
+    const padding = selectorSidePadding;
     const itemOffset = padding + index * TOTAL_ITEM_SIZE;
-    const desired = itemOffset - (width - ITEM_WIDTH) / 2;
+    const desired = itemOffset - (selectorWidth - ITEM_WIDTH) / 2;
     const contentW = padding * 2 + years.length * TOTAL_ITEM_SIZE;
-    const maxScroll = Math.max(0, contentW - width);
+    const maxScroll = Math.max(0, contentW - selectorWidth);
     const x = Math.max(0, Math.min(maxScroll, desired));
     ref.scrollTo({ x, animated });
-  }, [years.length]);
+  }, [selectorSidePadding, selectorWidth, years.length]);
 
   const scrollMonthStripToIndex = useCallback((index, animated) => {
     const ref = monthSliderRef.current;
     if (!ref) return;
-    const padding = SIDE_PADDING;
+    const padding = selectorSidePadding;
     const itemOffset = padding + index * TOTAL_ITEM_SIZE;
-    const desired = itemOffset - (width - ITEM_WIDTH) / 2;
+    const desired = itemOffset - (selectorWidth - ITEM_WIDTH) / 2;
     const contentW = padding * 2 + deviceMonths.length * TOTAL_ITEM_SIZE;
-    const maxScroll = Math.max(0, contentW - width);
+    const maxScroll = Math.max(0, contentW - selectorWidth);
     const x = Math.max(0, Math.min(maxScroll, desired));
     ref.scrollTo({ x, animated });
-  }, [deviceMonths.length]);
+  }, [deviceMonths.length, selectorSidePadding, selectorWidth]);
+
+  const handleSelectorLayout = useCallback((event) => {
+    const nextWidth = Number(event?.nativeEvent?.layout?.width);
+    if (!Number.isFinite(nextWidth) || nextWidth < ITEM_WIDTH) return;
+    setSelectorWidth((current) => Math.abs(current - nextWidth) < 1 ? current : nextWidth);
+  }, []);
 
   useEffect(() => {
     if (analysisStarted) return;
@@ -1159,13 +1175,59 @@ export default function EventScreen({ route }) {
     scrollMonthStripToIndex(index, true);
   };
 
-  const handleMonthlyContinue = () => {
-    trackEvent('monthly_timeline_requested', {
-      year: Number(selectedYear),
-      month: Number(selectedMonth),
-      source: 'event_screen',
+  const handleMonthlyContinue = async () => {
+    if (continueChecking) return;
+    const authOk = await requireAuthForPaid({
+      feature: 'monthly deep timeline',
+      message: 'Sign in to generate a monthly deep reading.',
+      resume: { resumeRoute: 'EventScreen', resumeParams: {} },
     });
-    navigation.navigate('MonthlyDeepScreen', { year: selectedYear, month: selectedMonth });
+    if (!authOk) return;
+
+    setContinueChecking(true);
+    try {
+      const activeBirthData = await getBirthDetails();
+      const birthChartId = resolveBirthChartId(activeBirthData);
+      if (!activeBirthData || !birthChartId) {
+        Alert.alert('Error', 'Birth chart not found. Please select a birth chart.');
+        return;
+      }
+
+      const [cacheResponse, refreshedCredits] = await Promise.all([
+        chatAPI.getCachedMonthlyEvents({
+          ...activeBirthData,
+          selectedYear,
+          selectedMonth,
+          birth_chart_id: birthChartId,
+        }),
+        fetchBalance(),
+      ]);
+
+      if (cacheResponse.data?.cached && cacheResponse.data?.data) {
+        navigation.navigate('MonthlyDeepScreen', {
+          year: selectedYear,
+          month: selectedMonth,
+        });
+        return;
+      }
+
+      const actualCredits = refreshedCredits ?? credits;
+      if (actualCredits < creditCost) {
+        Alert.alert('Insufficient Credits', `You need ${creditCost} credits for this analysis. You have ${actualCredits} credits.`, [
+          { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
+          { text: 'Cancel', style: 'cancel' },
+        ]);
+        return;
+      }
+
+      setPendingAction('monthly');
+      setShowEventCreditsModal(true);
+    } catch (error) {
+      console.error('[EventScreen] monthly preflight failed', error?.message || error);
+      Alert.alert('Error', 'Failed to prepare the monthly study. Please try again.');
+    } finally {
+      setContinueChecking(false);
+    }
   };
 
   const navigateToChat = (context, type) => {
@@ -1371,6 +1433,12 @@ export default function EventScreen({ route }) {
     } else if (pendingAction === 'regenerate') {
       setMonthlyData(null);
       fetchMonthlyGuide(selectedYear);
+    } else if (pendingAction === 'monthly') {
+      navigation.navigate('MonthlyDeepScreen', {
+        year: selectedYear,
+        month: selectedMonth,
+        autoGenerate: true,
+      });
     }
     setPendingAction(null);
   };
@@ -1516,14 +1584,14 @@ export default function EventScreen({ route }) {
           {readingMode === 'yearly' ? (
             <>
               {/* Year Picker - Horizontal Chips */}
-              <View style={styles.yearChipsContainer}>
+              <View style={styles.yearChipsContainer} onLayout={handleSelectorLayout}>
                 <GHScrollView
                   ref={yearSliderRef}
                   horizontal
                   nestedScrollEnabled
                   showsHorizontalScrollIndicator={false}
                   decelerationRate="fast"
-                  contentContainerStyle={styles.yearChipsContent}
+                  contentContainerStyle={[styles.yearChipsContent, { paddingHorizontal: selectorSidePadding }]}
                 >
                   {years.map((item) => (
                     <View key={item} style={{ width: TOTAL_ITEM_SIZE }}>
@@ -1562,14 +1630,14 @@ export default function EventScreen({ route }) {
               <Text style={[styles.sectionSubtitle, { color: colors.textSecondary, marginTop: 8, marginBottom: 12 }]}>
                 {t('eventScreen.pickMonth', `Pick a month in ${selectedYear}`)}
               </Text>
-              <View style={styles.yearChipsContainer}>
+              <View style={styles.yearChipsContainer} onLayout={handleSelectorLayout}>
                 <GHScrollView
                   ref={yearSliderRef}
                   horizontal
                   nestedScrollEnabled
                   showsHorizontalScrollIndicator={false}
                   decelerationRate="fast"
-                  contentContainerStyle={styles.yearChipsContent}
+                  contentContainerStyle={[styles.yearChipsContent, { paddingHorizontal: selectorSidePadding }]}
                 >
                   {years.map((item) => (
                     <View key={item} style={{ width: TOTAL_ITEM_SIZE }}>
@@ -1586,14 +1654,14 @@ export default function EventScreen({ route }) {
                 </GHScrollView>
               </View>
               {renderCachedYearsLegend()}
-              <View style={styles.monthChipsContainer}>
+              <View style={styles.monthChipsContainer} onLayout={handleSelectorLayout}>
                 <GHScrollView
                   ref={monthSliderRef}
                   horizontal
                   nestedScrollEnabled
                   showsHorizontalScrollIndicator={false}
                   decelerationRate="fast"
-                  contentContainerStyle={styles.monthChipsContent}
+                  contentContainerStyle={[styles.monthChipsContent, { paddingHorizontal: selectorSidePadding }]}
                 >
                   {deviceMonths.map((item) => (
                     <View key={item} style={{ width: ITEM_WIDTH + ITEM_GAP }}>
@@ -1659,7 +1727,7 @@ export default function EventScreen({ route }) {
                 colors={continueGradient}
                 style={styles.unlockGradient}
               >
-                {continueChecking && readingMode === 'yearly' ? (
+                {continueChecking ? (
                   <>
                     <ActivityIndicator size="small" color={onPrimaryText} />
                     <Text style={[styles.unlockButtonText, { color: onPrimaryText }]}>
@@ -1935,7 +2003,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   monthChipsContent: {
-    paddingHorizontal: (width - ITEM_WIDTH) / 2,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -1957,7 +2024,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   yearChipsContent: {
-    paddingHorizontal: (width - 80) / 2,
     flexDirection: 'row',
     alignItems: 'center',
   },

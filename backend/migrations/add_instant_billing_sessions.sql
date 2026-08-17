@@ -30,6 +30,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_instant_billing_one_active_user
     ON instant_billing_sessions(userid)
     WHERE status = 'active';
 
+-- Do not use ON CONFLICT (setting_key) here.  Older production databases were
+-- created before credit_settings.setting_key had a UNIQUE constraint, and
+-- PostgreSQL rejects that conflict target even when the row does not exist.
+-- The guarded insert keeps this migration idempotent on both legacy and current
+-- schemas without changing or deduplicating existing pricing configuration.
 INSERT INTO credit_settings (setting_key, setting_value, description)
-VALUES ('instant_chat_per_minute_cost', 1, 'Credits per minute for Instant Chat')
-ON CONFLICT (setting_key) DO NOTHING;
+SELECT 'instant_chat_per_minute_cost', 1, 'Credits per minute for Instant Chat'
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM credit_settings
+    WHERE setting_key = 'instant_chat_per_minute_cost'
+);

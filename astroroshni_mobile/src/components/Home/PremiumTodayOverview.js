@@ -312,6 +312,9 @@ export function PremiumExploreIntro({
   onOpenReports,
   onOpenPanchang,
   onOpenMuhurat,
+  onOpenYearly,
+  onOpenMonthly,
+  eventsCost = 100,
   paths = [],
   analyses = [],
   onSelectPath,
@@ -325,6 +328,9 @@ export function PremiumExploreIntro({
     ['sunny-outline', t('premiumUi.home.panchang'), t('premiumUi.home.dayRhythm'), onOpenPanchang],
     ['time-outline', t('premiumUi.home.muhurat'), t('premiumUi.home.supportiveTiming'), onOpenMuhurat],
   ];
+  const personalAnalyses = analyses.filter((item) => !['yearly', 'muhurat', 'trading', 'financial', 'childbirth'].includes(item.id));
+  const timingAnalyses = analyses.filter((item) => ['muhurat', 'trading', 'financial', 'childbirth'].includes(item.id));
+  const guidedPaths = paths.filter((item) => item.action !== 'events');
   return (
     <View style={styles.exploreIntroWrap}>
       <View style={[styles.exploreHero, { backgroundColor: colors.surfaceInverse, borderColor: colors.cosmicLine }]}>
@@ -343,10 +349,81 @@ export function PremiumExploreIntro({
         <Text style={[typography.title, styles.exploreHeroTitle, { color: colors.onSurfaceInverse }]}>{t('premiumUi.home.exploreWith')}{`\n`}{t('premiumUi.home.purpose')}</Text>
         <Text style={[styles.exploreHeroBody, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.home.studioBody')}</Text>
       </View>
-      <View style={[styles.studioDirectory, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}> 
+      <View style={[styles.timingSpotlight, { backgroundColor: colors.surfaceInverse, borderColor: colors.cosmicLine }]}>
+        <View pointerEvents="none" style={styles.timingSpotlightGlow} />
+        <View style={styles.timingSpotlightHeader}>
+          <View style={styles.timingSpotlightHeading}>
+            <Text style={[typography.eyebrow, { color: colors.accent }]}>
+              {t('premiumUi.home.signatureTiming', 'SIGNATURE TIMING')}
+            </Text>
+            <Text style={[typography.sectionTitle, styles.timingSpotlightTitle, { color: colors.onSurfaceInverse }]}>
+              {t('premiumUi.home.yourTimeAhead', 'Your time ahead')}
+            </Text>
+          </View>
+          <View style={[styles.timingCostPill, { borderColor: colors.cosmicLine, backgroundColor: colors.cosmicGlow }]}>
+            <Ionicons name="diamond-outline" size={12} color={colors.accent} />
+            <Text style={[styles.timingCostText, { color: colors.onSurfaceInverse }]}>
+              {t('premiumUi.home.creditsShort', { count: eventsCost })}
+            </Text>
+          </View>
+        </View>
+        <Text style={[styles.timingSpotlightBody, { color: colors.onSurfaceInverseMuted }]}>
+          {t(
+            'premiumUi.home.timingSpotlightBody',
+            'Personal timing from dashas, transits, Parashari, Nadi, Jaimini and KP.'
+          )}
+        </Text>
+        <View style={styles.timingChoices}>
+          <TouchableOpacity
+            onPress={onOpenYearly}
+            activeOpacity={0.82}
+            style={[styles.timingChoice, { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine }]}
+          >
+            <View style={[styles.timingChoiceIcon, { backgroundColor: colors.accentSoft }]}>
+              <Ionicons name="calendar-outline" size={20} color={colors.onAccent} />
+            </View>
+            <Text style={[styles.timingChoiceTitle, { color: colors.onSurfaceInverse }]}>
+              {t('premiumUi.home.yearlyTimeline', 'Yearly timeline')}
+            </Text>
+            <Text style={[styles.timingChoiceBody, { color: colors.onSurfaceInverseMuted }]} numberOfLines={2}>
+              {t('premiumUi.home.yearlyTimelineBody', '12 monthly chapters and major turning points')}
+            </Text>
+            <View style={styles.timingChoiceCta}>
+              <Text style={[styles.timingChoiceCtaText, { color: colors.accent }]}>
+                {t('premiumUi.home.exploreYear', 'Explore my year')}
+              </Text>
+              <Ionicons name="arrow-forward" size={14} color={colors.accent} />
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onOpenMonthly}
+            activeOpacity={0.82}
+            style={[styles.timingChoice, { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine }]}
+          >
+            <View style={[styles.timingChoiceIcon, { backgroundColor: colors.accentSoft }]}>
+              <Ionicons name="moon-outline" size={20} color={colors.onAccent} />
+            </View>
+            <Text style={[styles.timingChoiceTitle, { color: colors.onSurfaceInverse }]}>
+              {t('premiumUi.home.monthlyDeepDive', 'Monthly deep dive')}
+            </Text>
+            <Text style={[styles.timingChoiceBody, { color: colors.onSurfaceInverseMuted }]} numberOfLines={2}>
+              {t('premiumUi.home.monthlyDeepDiveBody', 'Detailed triggers and scenarios for one month')}
+            </Text>
+            <View style={styles.timingChoiceCta}>
+              <Text style={[styles.timingChoiceCtaText, { color: colors.accent }]}>
+                {t('premiumUi.home.chooseMonth', 'Choose a month')}
+              </Text>
+              <Ionicons name="arrow-forward" size={14} color={colors.accent} />
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+      <CatalogueGroup eyebrow={t('premiumUi.home.waysBegin')} title={t('premiumUi.home.guidedExperiences')} items={guidedPaths} onSelect={onSelectPath} colors={colors} typography={typography} t={t} />
+      <CatalogueGroup eyebrow={t('premiumUi.home.completeChart')} title={t('premiumUi.home.personalReadings')} items={personalAnalyses} onSelect={onSelectAnalysis} colors={colors} typography={typography} t={t} />
+      <View style={[styles.studioDirectory, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
         {shortcuts.map(([icon, title, body, onPress]) => (
-          <TouchableOpacity key={title} onPress={onPress} activeOpacity={0.82} style={[styles.shortcut, { borderBottomColor: colors.cardBorder }]}> 
-            <View style={[styles.shortcutIcon, { backgroundColor: colors.accentSoft }]}> 
+          <TouchableOpacity key={title} onPress={onPress} activeOpacity={0.82} style={[styles.shortcut, { borderBottomColor: colors.cardBorder }]}>
+            <View style={[styles.shortcutIcon, { backgroundColor: colors.accentSoft }]}>
               <Ionicons name={icon} size={17} color={colors.onAccent} />
             </View>
             <View style={styles.shortcutCopy}>
@@ -357,9 +434,7 @@ export function PremiumExploreIntro({
           </TouchableOpacity>
         ))}
       </View>
-      <CatalogueGroup eyebrow={t('premiumUi.home.waysBegin')} title={t('premiumUi.home.guidedExperiences')} items={paths} onSelect={onSelectPath} colors={colors} typography={typography} t={t} />
-      <CatalogueGroup eyebrow={t('premiumUi.home.completeChart')} title={t('premiumUi.home.personalReadings')} items={analyses.slice(0, 8)} onSelect={onSelectAnalysis} colors={colors} typography={typography} t={t} />
-      <CatalogueGroup eyebrow={t('premiumUi.home.planNext')} title={t('premiumUi.home.timingDecisions')} items={analyses.slice(8)} onSelect={onSelectAnalysis} colors={colors} typography={typography} t={t} />
+      <CatalogueGroup eyebrow={t('premiumUi.home.planNext')} title={t('premiumUi.home.timingDecisions')} items={timingAnalyses} onSelect={onSelectAnalysis} colors={colors} typography={typography} t={t} />
     </View>
   );
 }
@@ -423,6 +498,21 @@ const styles = StyleSheet.create({
   exploreHeroEyebrowRule: { width: 24, height: StyleSheet.hairlineWidth },
   exploreHeroTitle: { fontSize: 38, lineHeight: 41, marginBottom: 14 },
   exploreHeroBody: { fontSize: 13, lineHeight: 20, maxWidth: 330, fontWeight: '500' },
+  timingSpotlight: { borderWidth: 1, borderRadius: 26, padding: 18, overflow: 'hidden' },
+  timingSpotlightGlow: { position: 'absolute', width: 180, height: 180, borderRadius: 90, right: -75, top: -105, backgroundColor: 'rgba(245, 158, 11, 0.12)' },
+  timingSpotlightHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+  timingSpotlightHeading: { flex: 1, minWidth: 0 },
+  timingSpotlightTitle: { fontSize: 28, lineHeight: 32, marginTop: 5 },
+  timingCostPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 6 },
+  timingCostText: { fontSize: 10, fontWeight: '900' },
+  timingSpotlightBody: { fontSize: 12, lineHeight: 18, marginTop: 8, marginBottom: 16, maxWidth: 320 },
+  timingChoices: { flexDirection: 'row', gap: 10 },
+  timingChoice: { flex: 1, minWidth: 0, minHeight: 176, borderWidth: 1, borderRadius: 18, padding: 13 },
+  timingChoiceIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  timingChoiceTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 18, lineHeight: 21, marginBottom: 6 },
+  timingChoiceBody: { fontSize: 10, lineHeight: 15, fontWeight: '500', flexGrow: 1 },
+  timingChoiceCta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 12 },
+  timingChoiceCtaText: { fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.4 },
   studioDirectory: { borderWidth: 1, borderRadius: 22, overflow: 'hidden' },
   shortcut: { minHeight: 72, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
   shortcutIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', marginRight: 12 },

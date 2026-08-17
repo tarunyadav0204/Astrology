@@ -35,10 +35,21 @@ function getMonthName(monthId) {
   return MONTH_NAMES[monthId - 1] || `Month ${monthId}`;
 }
 
+const resolveBirthChartId = (data) => {
+  const raw = data?.id
+    ?? data?._id
+    ?? data?.birth_chart_id
+    ?? data?.birthChartId
+    ?? data?.chart_id
+    ?? null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
 export default function MonthlyDeepScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const { year, month } = route.params || {};
+  const { year, month, autoGenerate = false } = route.params || {};
   const { credits, fetchBalance } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
   const { t } = useTranslation();
@@ -188,12 +199,13 @@ export default function MonthlyDeepScreen() {
   const tryLoadCachedDeepMonth = useCallback(async () => {
     try {
       const bd = await getBirthDetails();
-      if (!bd?.id || year == null || month == null) return false;
+      const birthChartId = resolveBirthChartId(bd);
+      if (!birthChartId || year == null || month == null) return false;
       const res = await chatAPI.getCachedMonthlyEvents({
         ...bd,
         selectedYear: year,
         selectedMonth: month,
-        birth_chart_id: bd.id,
+        birth_chart_id: birthChartId,
       });
       if (res.data?.cached && res.data?.data) {
         if (isMountedRef.current) {
@@ -393,11 +405,12 @@ export default function MonthlyDeepScreen() {
 
   const resumePendingDeepMonthJob = useCallback(async (pending, birthDataOverride = null) => {
     const activeBirthData = birthDataOverride || birthData;
+    const activeBirthChartId = resolveBirthChartId(activeBirthData);
     if (
       !pending ||
       !pending.jobId ||
-      !activeBirthData?.id ||
-      Number(pending.birthChartId) !== Number(activeBirthData.id) ||
+      !activeBirthChartId ||
+      Number(pending.birthChartId) !== activeBirthChartId ||
       Number(pending.year) !== Number(year) ||
       Number(pending.month) !== Number(month)
     ) {
@@ -425,11 +438,27 @@ export default function MonthlyDeepScreen() {
     const authOk = await requireAuthForPaid({
       feature: 'monthly deep timeline',
       message: 'Sign in to generate a monthly deep reading.',
-      resume: { resumeRoute: 'MonthlyDeep', resumeParams: {} },
+      resume: { resumeRoute: 'MonthlyDeepScreen', resumeParams: { year, month } },
     });
     if (!authOk) return false;
     creditsModalInFlightRef.current = true;
     try {
+      const activeBirthData = await getBirthDetails();
+      if (!resolveBirthChartId(activeBirthData)) {
+        Alert.alert(
+          'Birth chart not found',
+          'Please re-select your birth chart, then generate the monthly study again.',
+          [
+            { text: 'Select chart', onPress: () => navigation.navigate('SelectNative') },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+        if (isMountedRef.current) {
+          setShowMonthlyCreditsModal(false);
+          setShowGenerateButton(true);
+        }
+        return false;
+      }
       const refreshedCredits = await fetchBalance();
       const actualCredits = refreshedCredits ?? credits;
 
@@ -459,7 +488,7 @@ export default function MonthlyDeepScreen() {
     } finally {
       creditsModalInFlightRef.current = false;
     }
-  }, [credits, fetchBalance, creditCost, navigation, showMonthlyCreditsModal, requireAuthForPaid]);
+  }, [credits, fetchBalance, creditCost, getBirthDetails, month, navigation, requireAuthForPaid, showMonthlyCreditsModal, year]);
 
   useEffect(() => {
     pricingAPI.getPricing().then((res) => {
@@ -468,8 +497,21 @@ export default function MonthlyDeepScreen() {
     }).catch(() => {});
   }, []);
 
-  const fetchDeepMonth = useCallback(async () => {
-    if (!birthData?.id || year == null || month == null) return;
+  const fetchDeepMonth = useCallback(async (birthDataOverride = null) => {
+    const activeBirthData = birthDataOverride || birthData;
+    const birthChartId = resolveBirthChartId(activeBirthData);
+    if (!birthChartId || year == null || month == null) {
+      revealEmptyStateActions();
+      Alert.alert(
+        'Birth chart not found',
+        'Please re-select your birth chart, then generate the monthly study again.',
+        [
+          { text: 'Select chart', onPress: () => navigation.navigate('SelectNative') },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+      return;
+    }
     trackEvent('monthly_timeline_requested', {
       year: Number(year),
       month: Number(month),
@@ -480,10 +522,10 @@ export default function MonthlyDeepScreen() {
     startMonthlyLoadingUi(startedAt);
     try {
       const startResponse = await chatAPI.getMonthlyEvents({
-        ...birthData,
+        ...activeBirthData,
         selectedYear: year,
         selectedMonth: month,
-        birth_chart_id: birthData.id,
+        birth_chart_id: birthChartId,
       });
       if (startResponse.data?.data && !startResponse.data?.job_id) {
         setMonthlyData(startResponse.data.data);
@@ -502,7 +544,7 @@ export default function MonthlyDeepScreen() {
       if (!jobId) throw new Error('No job_id received.');
       await savePendingDeepMonthJob({
         jobId,
-        birthChartId: Number(birthData.id),
+        birthChartId,
         year: Number(year),
         month: Number(month),
         startedAt,
@@ -527,7 +569,7 @@ export default function MonthlyDeepScreen() {
     year,
     month,
     attachDeepMonthPolling,
-    openCreditsModal,
+    navigation,
     revealEmptyStateActions,
     savePendingDeepMonthJob,
     startMonthlyLoadingUi,
@@ -543,17 +585,21 @@ export default function MonthlyDeepScreen() {
         navigation.replace('BirthProfileIntro', { returnTo: 'MonthlyDeepScreen', returnParams: route.params });
         return;
       }
-      setBirthData(bd);
       if (year == null || month == null) {
+        setBirthData(bd);
         setLoading(false);
         return;
       }
-      const initKey = `${bd.id || 'nochart'}:${year}:${month}`;
+      const initKey = `${resolveBirthChartId(bd) || 'nochart'}:${year}:${month}`;
       if (initLoadKeyRef.current === initKey) {
         setLoading(false);
         return;
       }
       initLoadKeyRef.current = initKey;
+      // Set this only after claiming the initialization key. `birthData`
+      // participates in the pending-job callback dependency, so setting a new
+      // parsed object before this guard causes the effect to rerun forever.
+      setBirthData(bd);
       try {
         const pending = await loadPendingDeepMonthJob();
         const resumedPending = await resumePendingDeepMonthJob(
@@ -564,6 +610,17 @@ export default function MonthlyDeepScreen() {
         );
         if (resumedPending) {
           setLoading(false);
+          return;
+        }
+
+        // EventScreen already completed the same cache/credit preflight used by
+        // the yearly flow. Start immediately instead of repeating that network
+        // chain during the navigation transition.
+        if (autoGenerate) {
+          setLoading(false);
+          setMonthlyData(null);
+          setShowGenerateButton(false);
+          await fetchDeepMonth(bd);
           return;
         }
 
@@ -586,7 +643,10 @@ export default function MonthlyDeepScreen() {
       setLoading(false);
     })();
     return () => { mounted = false; };
-  }, [year, month, getBirthDetails, loadPendingDeepMonthJob, navigation, resumePendingDeepMonthJob, route.params, tryLoadCachedDeepMonth]);
+  // `fetchDeepMonth` deliberately is not a dependency here. This initializer
+  // passes the freshly loaded `bd` explicitly; depending on the callback would
+  // create a loop because the callback changes after `setBirthData(bd)`.
+  }, [autoGenerate, year, month, getBirthDetails, loadPendingDeepMonthJob, navigation, resumePendingDeepMonthJob, route.params, tryLoadCachedDeepMonth]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {

@@ -2320,6 +2320,9 @@ const loadHomeData = async (nativeData = null) => {
           }}
           onOpenPanchang={() => onOptionSelect?.({ action: 'panchang' })}
           onOpenMuhurat={() => navigation.navigate('MuhuratHub')}
+          onOpenYearly={() => onOptionSelect({ action: 'events', readingMode: 'yearly' })}
+          onOpenMonthly={() => onOptionSelect({ action: 'events', readingMode: 'monthly' })}
+          eventsCost={pricing.events ?? 100}
           paths={options}
           analyses={analysisOptions}
           onSelectPath={(item) => onOptionSelect(item)}

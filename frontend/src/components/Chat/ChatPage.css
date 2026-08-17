@@ -501,6 +501,69 @@ button.chat-header-credits.credits-display:active {
     line-height: 1;
 }
 
+.instant-evidence-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.22rem 0.5rem;
+    color: var(--color-brand);
+    background: color-mix(in srgb, var(--color-brand) 8%, var(--color-surface));
+    border: 1px solid color-mix(in srgb, var(--color-brand) 30%, var(--color-border));
+    border-radius: 999px;
+    font: inherit;
+    font-size: 0.68rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.instant-evidence-toggle.is-open {
+    color: var(--color-on-brand);
+    background: var(--color-brand);
+}
+
+.instant-evidence-inspector {
+    width: min(42rem, calc(100vw - 3rem));
+    margin-top: 0.65rem;
+    padding: 0.75rem;
+    color: var(--color-text);
+    background: var(--color-surface-raised, var(--color-surface));
+    border: 1px solid var(--color-border);
+    border-radius: 0.85rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.instant-evidence-inspector > header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.instant-evidence-inspector header div { display: grid; gap: 0.16rem; }
+.instant-evidence-inspector header small { color: var(--color-text-muted); font-size: 0.61rem; font-weight: 900; letter-spacing: 0.14em; }
+.instant-evidence-inspector header strong { font-size: 0.86rem; text-transform: capitalize; }
+.instant-evidence-inspector header > span { padding: 0.2rem 0.42rem; border-radius: 999px; font-size: 0.64rem; font-weight: 800; white-space: nowrap; }
+.instant-evidence-inspector .is-pass { color: var(--color-success, #237a57); background: color-mix(in srgb, var(--color-success, #237a57) 14%, transparent); }
+.instant-evidence-inspector .is-review { color: var(--color-warning, #a36a13); background: color-mix(in srgb, var(--color-warning, #a36a13) 14%, transparent); }
+.instant-evidence-inspector details { padding: 0.5rem 0; border-bottom: 1px solid var(--color-border); }
+.instant-evidence-inspector details:last-child { border-bottom: 0; padding-bottom: 0; }
+.instant-evidence-inspector summary { color: var(--color-text); font-size: 0.76rem; font-weight: 850; cursor: pointer; }
+.instant-evidence-inspector details > p { margin: 0.45rem 0; font-size: 0.78rem; }
+.instant-evidence-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.instant-evidence-tags span { padding: 0.2rem 0.38rem; color: var(--color-text-muted); background: var(--color-surface-muted); border-radius: 0.35rem; font-size: 0.65rem; }
+.instant-evidence-inspector ul, .instant-evidence-inspector ol { display: grid; gap: 0.4rem; margin: 0.5rem 0 0; padding: 0; list-style: none; }
+.instant-evidence-inspector li { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.4rem; background: var(--color-surface-muted); border-radius: 0.45rem; font-size: 0.7rem; }
+.instant-evidence-inspector li em { padding: 0.16rem 0.3rem; border-radius: 999px; color: var(--color-text-muted); font-size: 0.59rem; font-style: normal; }
+.instant-evidence-inspector li em.is-available { color: var(--color-success, #237a57); }
+.instant-evidence-inspector li em.is-not_exposed { color: var(--color-warning, #a36a13); }
+.instant-evidence-inspector ol li { align-items: flex-start; justify-content: flex-start; flex-wrap: wrap; }
+.instant-evidence-inspector ol code { color: var(--color-brand); font-size: 0.62rem; }
+.instant-evidence-inspector ol li > div { display: grid; min-width: 9rem; }
+.instant-evidence-inspector ol small { color: var(--color-text-muted); }
+.instant-evidence-inspector pre { flex: 1 0 100%; max-height: 10rem; margin: 0; padding: 0.45rem; overflow: auto; color: var(--color-text); background: var(--color-surface); border-radius: 0.35rem; font-size: 0.59rem; white-space: pre-wrap; }
+
 .instant-chat-listen {
     display: inline-flex;
     align-items: center;

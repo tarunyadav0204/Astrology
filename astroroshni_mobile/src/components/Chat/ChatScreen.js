@@ -3126,7 +3126,12 @@ export default function ChatScreen({ navigation, route }) {
       const ok = await requireAuthForPaid({
         feature: featureLabel,
         message,
-        resume: { resumeRoute, resumeParams: {} },
+        resume: {
+          resumeRoute,
+          resumeParams: option.action === 'events'
+            ? { readingMode: option.readingMode || 'yearly' }
+            : {},
+        },
       });
       if (!ok) return;
     }
@@ -3142,7 +3147,7 @@ export default function ChatScreen({ navigation, route }) {
     } else if (option.action === 'periods') {
       setShowEventPeriods(true);
     } else if (option.action === 'events') {
-      navigation.navigate('EventScreen');
+      navigation.navigate('EventScreen', { readingMode: option.readingMode || 'yearly' });
     } else if (option.action === 'ashtakvarga') {
       navigation.navigate('AshtakvargaOracle');
     } else if (option.action === 'muhurat') {

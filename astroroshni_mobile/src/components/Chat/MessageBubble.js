@@ -130,6 +130,7 @@ function MessageBubble({
   const [detailUnlocked, setDetailUnlocked] = useState(false);
   const [showRevealCreditsModal, setShowRevealCreditsModal] = useState(false);
   const [copyAlert, setCopyAlert] = useState({ visible: false, error: false });
+  const [showInstantEvidence, setShowInstantEvidence] = useState(false);
   const blurShownTrackedRef = useRef(false);
   // Init from the played-ids set so FlatList remounts do not flash translateY:50 for one frame
   // (that looked like the long answer bouncing between sections while reading).
@@ -141,6 +142,9 @@ function MessageBubble({
   const isPartnership = partnership || message.partnership_mode;
   const messageChatTier = String(message?.chatTier || message?.chat_tier || '').trim().toLowerCase();
   const isInstantChatMessage = forceInstantPresentation || messageChatTier === 'instant';
+  const instantEvidence = message?.instant_evidence_debug
+    || message?.gate_metadata?.instant_evidence_debug
+    || null;
   const hasRemedyCard = Boolean(
     message.next_action?.type === 'remedy'
       && message.next_action?.title
@@ -1583,6 +1587,7 @@ function MessageBubble({
         <View
           style={[
             styles.instantMessageBubble,
+            showInstantEvidence && instantEvidence ? styles.instantMessageBubbleEvidence : null,
             isUser ? styles.instantMessageBubbleUser : styles.instantMessageBubbleAssistant,
             {
               backgroundColor: isUser ? colors.selectionSurface : colors.surface,
@@ -1604,6 +1609,66 @@ function MessageBubble({
             </View>
           ) : null}
           <Text style={[styles.instantMessageTime, { color: colors.textTertiary }]}>{instantTime}</Text>
+          {!isUser && instantEvidence ? (
+            <>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityState={{ expanded: showInstantEvidence }}
+                style={[styles.instantEvidenceToggle, {
+                  backgroundColor: colors.accentSoft,
+                  borderColor: colors.selectionBorder,
+                }]}
+                onPress={() => setShowInstantEvidence((open) => !open)}
+              >
+                <Ionicons name="diamond-outline" size={14} color={colors.accent} />
+                <Text style={[styles.instantEvidenceToggleText, { color: colors.text }]}>Evidence · {instantEvidence?.evidence_ledger?.record_count || 0}</Text>
+                <Ionicons name={showInstantEvidence ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textSecondary} />
+              </TouchableOpacity>
+              {showInstantEvidence ? (
+                <View style={[styles.instantEvidencePanel, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+                  <View style={styles.instantEvidenceHeader}>
+                    <View style={styles.instantEvidenceHeaderCopy}>
+                      <Text style={[styles.instantEvidenceEyebrow, { color: colors.accent }]}>TEST EVIDENCE</Text>
+                      <Text style={[styles.instantEvidenceTitle, { color: colors.text }]}>
+                        {instantEvidence?.query_plan?.category || 'general'} · {instantEvidence?.query_plan?.answer_mode || 'reading'}
+                      </Text>
+                    </View>
+                    <View style={[styles.instantEvidenceStatus, { backgroundColor: colors.accentSoft }]}>
+                      <Text style={[styles.instantEvidenceStatusText, { color: colors.text }]}>
+                        {instantEvidence?.verification?.passed ? 'Evidence linked' : 'Review'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={[styles.instantEvidenceVerdict, { borderColor: colors.cardBorder }]}>
+                    <Text style={[styles.instantEvidenceLabel, { color: colors.textSecondary }]}>VERDICT</Text>
+                    <Text style={[styles.instantEvidenceValue, { color: colors.text }]}>{String(instantEvidence?.verdict?.direction || 'No verdict')}</Text>
+                    <Text style={[styles.instantEvidenceMeta, { color: colors.textSecondary }]}>Confidence {Math.round(Number(instantEvidence?.verdict?.confidence || 0) * 100)}% · {instantEvidence?.evidence_plan?.methodology_version || '—'}</Text>
+                  </View>
+                  <Text style={[styles.instantEvidenceLabel, { color: colors.textSecondary }]}>CALCULATION PLAN</Text>
+                  {(instantEvidence?.evidence_ledger?.capabilities || []).map((item) => (
+                    <View key={item.request_id} style={[styles.instantEvidenceRow, { borderColor: colors.cardBorder }]}>
+                      <Text style={[styles.instantEvidenceRowName, { color: colors.text }]} numberOfLines={2}>
+                        {item.capability}{item.evidence_ids?.length ? ` · ${item.evidence_ids.join(', ')}` : ''}
+                      </Text>
+                      <Text style={[styles.instantEvidenceRowStatus, { color: item.status === 'available' ? colors.success : colors.accent }]}>{item.status}</Text>
+                    </View>
+                  ))}
+                  <Text style={[styles.instantEvidenceLabel, styles.instantEvidenceSectionLabel, { color: colors.textSecondary }]}>EVIDENCE LEDGER</Text>
+                  {(instantEvidence?.evidence_ledger?.records || []).map((item) => (
+                    <View key={item.evidence_id} style={[styles.instantEvidenceRecord, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+                      <View style={styles.instantEvidenceRecordTop}>
+                        <Text style={[styles.instantEvidenceId, { color: colors.accent }]}>{item.evidence_id}</Text>
+                        <Text style={[styles.instantEvidenceConfidence, { color: colors.textSecondary }]}>{Math.round(Number(item.confidence || 0) * 100)}%</Text>
+                      </View>
+                      <Text style={[styles.instantEvidenceRecordKind, { color: colors.text }]}>{item.kind}</Text>
+                      <Text style={[styles.instantEvidenceRecordSource, { color: colors.textSecondary }]}>{item.source}</Text>
+                      <Text style={[styles.instantEvidenceJson, { color: colors.textSecondary }]} numberOfLines={8}>{JSON.stringify(item.value, null, 2)}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </>
+          ) : null}
         </View>
       </Animated.View>
     );
@@ -2470,6 +2535,9 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 18,
   },
+  instantMessageBubbleEvidence: {
+    maxWidth: '96%',
+  },
   instantMessageBubbleUser: {
     borderBottomRightRadius: 5,
   },
@@ -2498,6 +2566,54 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     height: 5,
     borderRadius: 3,
   },
+  instantEvidenceToggle: {
+    marginTop: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+  },
+  instantEvidenceToggleText: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '800',
+  },
+  instantEvidencePanel: {
+    marginTop: 8,
+    padding: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+  },
+  instantEvidenceHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  instantEvidenceHeaderCopy: { flex: 1, gap: 2 },
+  instantEvidenceEyebrow: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 1.2 },
+  instantEvidenceTitle: { fontSize: 13, lineHeight: 17, fontWeight: '800', textTransform: 'capitalize' },
+  instantEvidenceStatus: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 999 },
+  instantEvidenceStatusText: { fontSize: 9, lineHeight: 11, fontWeight: '800' },
+  instantEvidenceVerdict: { marginTop: 9, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
+  instantEvidenceLabel: { marginTop: 8, marginBottom: 4, fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 1 },
+  instantEvidenceValue: { fontSize: 13, lineHeight: 17, fontWeight: '800' },
+  instantEvidenceMeta: { marginTop: 2, fontSize: 10, lineHeight: 14 },
+  instantEvidenceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
+  instantEvidenceRowName: { flex: 1, fontSize: 10, lineHeight: 14, fontWeight: '600' },
+  instantEvidenceRowStatus: { fontSize: 9, lineHeight: 12, fontWeight: '800' },
+  instantEvidenceSectionLabel: { marginTop: 12 },
+  instantEvidenceRecord: { marginTop: 6, padding: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 9 },
+  instantEvidenceRecordTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 6 },
+  instantEvidenceId: { fontSize: 9, lineHeight: 12, fontWeight: '900' },
+  instantEvidenceConfidence: { fontSize: 9, lineHeight: 12, fontWeight: '700' },
+  instantEvidenceRecordKind: { marginTop: 3, fontSize: 11, lineHeight: 14, fontWeight: '800' },
+  instantEvidenceRecordSource: { fontSize: 9, lineHeight: 12 },
+  instantEvidenceJson: { marginTop: 5, fontSize: 8, lineHeight: 11, fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }) },
   container: {
     marginVertical: 4,
   },

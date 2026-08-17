@@ -4538,6 +4538,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         except Exception:
                             logger.exception("locational_map_attach_on_save_failed message_id=%s", message_id)
 
+                    if is_instant_chat and isinstance(result.get("instant_evidence_debug"), dict):
+                        answer_gate_metadata = dict(answer_gate_metadata or {})
+                        answer_gate_metadata["instant_evidence_debug"] = result.get("instant_evidence_debug")
+
                     # Normalize follow-up questions to a simple list of plain strings.
                     # The model may sometimes return objects like {"icon": "💡", "question": "Ask about ..."}.
                     # We strip any icon metadata here so the mobile client always receives clean text.

@@ -28,3 +28,21 @@ def test_payment_failure_alert_migration_is_idempotent_and_deduplicated():
     assert "dedupe_key TEXT NOT NULL UNIQUE" in sql
     assert "userid INTEGER" in sql
     assert "CREATE INDEX IF NOT EXISTS" in sql
+
+
+def test_instant_billing_settings_seeds_support_legacy_credit_settings_schema():
+    """Runtime migrations must not assume setting_key has a unique index.
+
+    The canonical PostgreSQL dump and older production databases allow more
+    than one credit_settings row per key, so PostgreSQL cannot accept
+    ``ON CONFLICT (setting_key)`` as a conflict target.
+    """
+    for filename, setting_key in (
+        ("add_instant_billing_sessions.sql", "instant_chat_per_minute_cost"),
+        ("add_instant_billing_split_rates.sql", "instant_chat_first_minute_cost"),
+    ):
+        sql = (MIGRATIONS / filename).read_text(encoding="utf-8")
+
+        assert "\nON CONFLICT (setting_key)" not in sql
+        assert "WHERE NOT EXISTS" in sql
+        assert f"WHERE setting_key = '{setting_key}'" in sql

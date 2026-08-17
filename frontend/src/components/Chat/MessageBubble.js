@@ -341,6 +341,7 @@ const MessageBubble = ({
     const [detailUnlocked, setDetailUnlocked] = useState(false);
     const blurShownTrackedRef = useRef(false);
     const [showActions, setShowActions] = useState(false);
+    const [showInstantEvidence, setShowInstantEvidence] = useState(false);
     const [isReadingAloud, setIsReadingAloud] = useState(false);
     const readingAloudRef = useRef(false);
     const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
@@ -361,6 +362,9 @@ const MessageBubble = ({
     }, [message?.content, message?.follow_up_questions]);
     const messageChatTier = String(message?.chatTier || message?.chat_tier || '').trim().toLowerCase();
     const instantPresentation = forceInstantPresentation || messageChatTier === 'instant';
+    const instantEvidence = message?.instant_evidence_debug
+        || message?.gate_metadata?.instant_evidence_debug
+        || null;
     const nextAction = message?.next_action || message?.nextAction || null;
     const nextActionType = String(nextAction?.type || '').trim().toLowerCase();
     const hasNextAction = Boolean(nextAction && nextActionType && nextActionType !== 'none');
@@ -1181,7 +1185,16 @@ const MessageBubble = ({
     }, []);
 
     if (instantPresentation) {
-        const content = String(message.loadingMessage || message.content || '').trim();
+        // `loadingMessage` is deliberately retained on some locally-created rows so a
+        // remount can restore the processing copy. Once the server answer completes,
+        // however, it must never shadow `message.content` (read-aloud already reads
+        // `message.content`, which previously made the answer audible but invisible).
+        const isInstantPending = Boolean(message.isTyping || message.isProcessing);
+        const content = String(
+            isInstantPending
+                ? (message.loadingMessage || message.content || '')
+                : (message.content || ''),
+        ).trim();
         const paragraphs = content
             .replace(/<[^>]+>/g, ' ')
             .replace(/^#{1,6}\s+/gm, '')
@@ -1210,6 +1223,17 @@ const MessageBubble = ({
                         {message.instantStreaming ? <span className="instant-chat-dots" aria-label="Tara is typing"><i /><i /><i /></span> : null}
                     </div>
                     <div className="instant-chat-meta">
+                        {message.role === 'assistant' && instantEvidence && !message.isTyping && !message.isProcessing ? (
+                            <button
+                                type="button"
+                                className={`instant-evidence-toggle${showInstantEvidence ? ' is-open' : ''}`}
+                                onClick={() => setShowInstantEvidence((open) => !open)}
+                                aria-expanded={showInstantEvidence}
+                            >
+                                <span aria-hidden="true">◇</span>
+                                Evidence · {instantEvidence?.evidence_ledger?.record_count || 0}
+                            </button>
+                        ) : null}
                         {message.role === 'assistant' && !message.isTyping && !message.isProcessing && content ? (
                             <button
                                 type="button"
@@ -1223,6 +1247,61 @@ const MessageBubble = ({
                         ) : null}
                         {time ? <time>{time}</time> : null}
                     </div>
+                    {showInstantEvidence && instantEvidence ? (
+                        <section className="instant-evidence-inspector" aria-label="Instant answer evidence">
+                            <header>
+                                <div>
+                                    <small>TEST EVIDENCE</small>
+                                    <strong>{instantEvidence?.query_plan?.category || 'general'} · {instantEvidence?.query_plan?.answer_mode || 'reading'}</strong>
+                                </div>
+                                <span className={instantEvidence?.verification?.passed ? 'is-pass' : 'is-review'}>
+                                    {instantEvidence?.verification?.passed ? 'Evidence linked' : 'Review needed'}
+                                </span>
+                            </header>
+                            <details open>
+                                <summary>Verdict</summary>
+                                <p>{String(instantEvidence?.verdict?.direction || 'No verdict')}</p>
+                                <div className="instant-evidence-tags">
+                                    <span>Confidence {Math.round(Number(instantEvidence?.verdict?.confidence || 0) * 100)}%</span>
+                                    <span>Method {instantEvidence?.evidence_plan?.methodology_version || '—'}</span>
+                                </div>
+                            </details>
+                            <details>
+                                <summary>Calculation plan</summary>
+                                <ul>
+                                    {(instantEvidence?.evidence_ledger?.capabilities || []).map((item) => (
+                                        <li key={item.request_id}>
+                                            <span>{item.capability}{item.evidence_ids?.length ? ` · ${item.evidence_ids.join(', ')}` : ''}</span>
+                                            <em className={`is-${item.status}`}>{item.status}</em>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </details>
+                            <details>
+                                <summary>Evidence ledger</summary>
+                                <ol>
+                                    {(instantEvidence?.evidence_ledger?.records || []).map((item) => (
+                                        <li key={item.evidence_id}>
+                                            <code>{item.evidence_id}</code>
+                                            <div><strong>{item.kind}</strong><small>{item.source} · {Math.round(Number(item.confidence || 0) * 100)}%</small></div>
+                                            <pre>{JSON.stringify(item.value, null, 2)}</pre>
+                                        </li>
+                                    ))}
+                                </ol>
+                            </details>
+                            <details>
+                                <summary>Claim bindings</summary>
+                                <ul>
+                                    {(instantEvidence?.verification?.checks || []).map((item) => (
+                                        <li key={item.claim_id}>
+                                            <span>{item.claim_id}</span>
+                                            <em className={item.passed ? 'is-available' : 'is-not_exposed'}>{item.passed ? 'linked' : 'missing'}</em>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </details>
+                        </section>
+                    ) : null}
                 </div>
             </div>
         );

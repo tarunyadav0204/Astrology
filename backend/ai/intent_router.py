@@ -1606,10 +1606,12 @@ Evidence planner:
 - Build an `evidence_plan` that describes what data agents must collect; do not write astrology rule combinations as text.
 - Use enum values only.
 - Split compound questions into multiple `question_parts`.
+- A comparison is multi-part: emit one `question_part` per option and give each option its own event_profile (for example promotion and job_change). Add a `decision_option_context` evidence need covering those parts. Never collapse both options into `general_event`.
 - Add one `evidence_needs` item per data need, not per sentence.
 - For "When will I get married?", use event_timing + future_dasha_event_windows + transit_event_windows + natal_topic_foundation with event_profile marriage.
 - For "When will my Mercury dasha start and how will my career be?", use two parts: factual_chart_lookup for dasha_timeline_lookup and topic_outlook for career evidence.
 - Always include safety.blocked_content_checks for death_prediction and fetal_sex_determination.
+- For every bounded rolling horizon, timeframe MUST include numeric `duration_months` (for example next six months -> {{"kind":"bounded_future","duration_months":6}}). Use `duration_years` only in addition, never instead.
 
 Calibration:
 - "How is my relationship with my wife?" -> READY, ANALYZE_TOPIC_POTENTIAL, category relationship or marriage, answer_mode topic_reading, target_subject_key wife, needs_transits false.
@@ -1858,10 +1860,12 @@ EVIDENCE PLAN:
 - Return `evidence_plan` as the data-collection plan for backend agents.
 - Use enum values only.
 - Split compound questions into multiple `question_parts`.
+- A comparison is multi-part: emit one `question_part` per option and give each option its own event_profile (for example promotion and job_change). Add a `decision_option_context` evidence need covering those parts. Never collapse both options into `general_event`.
 - Planner chooses evidence needs; agents own detailed astrology rule combinations.
 - Always include blocked content checks for `death_prediction` and `fetal_sex_determination`.
 - For direct dasha/date questions, add evidence need kind `dasha_timeline_lookup` with params like {{"planet":"Mercury","level":"mahadasha","operation":"find_start_end"}}.
 - For event timing like marriage, add `natal_topic_foundation`, `future_dasha_event_windows`, and `transit_event_windows` with `event_profile":"marriage"`.
+- For every bounded rolling horizon, timeframe MUST include numeric `duration_months` (for example next six months -> {{"kind":"bounded_future","duration_months":6}}). Use `duration_years` only in addition, never instead.
 
 TARGET SUBJECT:
 - Use `self` for the native unless the user clearly asks about spouse, child, sibling, parent, etc.

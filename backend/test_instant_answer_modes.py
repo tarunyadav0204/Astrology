@@ -505,6 +505,47 @@ def test_instant_chat_prompt_closes_as_a_conversation_not_an_upsell():
     assert "answer the user's question fully" in prompt
 
 
+def test_instant_year_career_answer_contract_is_user_facing_not_a_house_dump():
+    contract = _build_answer_mode_contract(
+        "timing_window",
+        "career",
+        {"kind": "year", "span_days": 365},
+        "current",
+    )
+    skeleton = contract["answer_skeleton"]
+    assert skeleton.startswith("Plain-language year verdict")
+    assert "Concrete likely outcomes" in skeleton
+    assert "At most one compact astrological reason" in skeleton
+    assert "MD/AD/PD" not in skeleton
+
+    prompt = _build_instant_prompt(
+        "How is my career this year?",
+        {
+            "intent_summary": {
+                "category": "career",
+                "mode": "ANALYZE_TOPIC_POTENTIAL",
+                "answer_mode": "timing_window",
+                "period_window": {"kind": "year", "span_days": 365},
+            },
+            "instant_parashari": {},
+            "normalized_evidence": {
+                "answer_mode_contract": contract,
+                "active_areas": [
+                    {"house": 2, "theme": "income and financial security"},
+                    {"house": 6, "theme": "workload and professional tasks"},
+                    {"house": 11, "theme": "gains, recognition, and networks"},
+                ],
+            },
+        },
+        "english",
+    )
+
+    assert "The astrology context is evidence, not the answer" in prompt
+    assert "Never respond mainly with dasha date ranges" in prompt
+    assert "Translate house themes into ordinary outcomes" in prompt
+    assert "no more than one sentence of astrological proof" in prompt
+
+
 def test_speech_event_answer_polish_replaces_placeholders_and_jargon():
     polished = _polish_speech_event_answer(
         "While your current period is active, it is not the primary window for this event. "

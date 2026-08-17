@@ -1501,6 +1501,7 @@ const ChatPage = ({ onLogin }) => {
                                     ...m,
                                     messageId: assistantMessageId,
                                     content: instantPieces.length > 1 ? instantPieces[0] : content,
+                                    loadingMessage: null,
                                     isProcessing: false,
                                     isTyping: false,
                                     instantStreaming: instantPieces.length > 1,
