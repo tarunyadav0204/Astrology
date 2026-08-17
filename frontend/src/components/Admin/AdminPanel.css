@@ -2519,6 +2519,114 @@ input:checked + .toggle-slider:before {
   gap: 20px;
 }
 
+.nudge-composer-switch {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 10px;
+  border: 1px solid #ead7cf;
+  border-radius: 14px;
+  background: #fffaf7;
+}
+
+.nudge-composer-switch button {
+  padding: 10px 14px;
+  border: 1px solid #dbc6bb;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--admin-text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nudge-composer-switch button.active {
+  border-color: var(--admin-accent-text);
+  background: var(--admin-accent-text);
+  color: #fff;
+}
+
+.nudge-composer-switch span {
+  margin-left: auto;
+  color: var(--admin-text-muted);
+  font-size: 13px;
+}
+
+.nudge-locked-field {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 9px 12px;
+  border: 1px solid #d9eadb;
+  border-radius: 8px;
+  background: #f6fcf7;
+  color: #234b2f;
+  font-weight: 700;
+}
+
+.nudge-daily-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.nudge-bulk-paste {
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px dashed #d8c8bb;
+  border-radius: 14px;
+  background: #fffcfa;
+}
+
+.nudge-bulk-paste .notif-search-btn {
+  margin-top: 10px;
+}
+
+.nudge-daily-card {
+  padding: 16px;
+  border: 1px solid #eadfd6;
+  border-radius: 14px;
+  background: var(--admin-surface-muted);
+}
+
+.nudge-daily-card__time {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.nudge-daily-card__time strong {
+  font-size: 18px;
+  color: var(--admin-text);
+}
+
+.nudge-daily-card__time span,
+.nudge-bulk-times span {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #f3e2d8;
+  color: #7c4a2d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.nudge-bulk-launch {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.5fr) 1fr;
+  gap: 16px;
+  align-items: end;
+}
+
+.nudge-bulk-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 10px;
+}
+
 .nudge-builder-section {
   padding: 20px;
   border: 1px solid #eadfd6;
@@ -2872,8 +2980,15 @@ input:checked + .toggle-slider:before {
   .nudge-lifecycle-grid,
   .nudge-estimate-metrics,
   .nudge-campaign-card__facts,
-  .nudge-split-inputs {
+  .nudge-split-inputs,
+  .nudge-daily-grid,
+  .nudge-bulk-launch {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nudge-composer-switch span {
+    width: 100%;
+    margin-left: 0;
   }
 
   .nudge-builder-section,

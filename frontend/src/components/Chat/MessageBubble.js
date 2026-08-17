@@ -1253,6 +1253,7 @@ const MessageBubble = ({
                                 <div>
                                     <small>TEST EVIDENCE</small>
                                     <strong>{instantEvidence?.query_plan?.category || 'general'} · {instantEvidence?.query_plan?.answer_mode || 'reading'}</strong>
+                                    {instantEvidence?.query_plan?.user_goal ? <p>{instantEvidence.query_plan.user_goal}</p> : null}
                                 </div>
                                 <span className={instantEvidence?.verification?.passed ? 'is-pass' : 'is-review'}>
                                     {instantEvidence?.verification?.passed ? 'Evidence linked' : 'Review needed'}
@@ -1264,6 +1265,13 @@ const MessageBubble = ({
                                 <div className="instant-evidence-tags">
                                     <span>Confidence {Math.round(Number(instantEvidence?.verdict?.confidence || 0) * 100)}%</span>
                                     <span>Method {instantEvidence?.evidence_plan?.methodology_version || '—'}</span>
+                                    {instantEvidence?.query_plan?.target_subject?.label || instantEvidence?.query_plan?.target_subject?.key ? (
+                                        <span>{instantEvidence?.query_plan?.target_subject?.label || instantEvidence?.query_plan?.target_subject?.key}</span>
+                                    ) : null}
+                                    {instantEvidence?.query_plan?.time_scope?.requested ? <span>{instantEvidence.query_plan.time_scope.requested}</span> : null}
+                                    {instantEvidence?.composer_metrics ? (
+                                        <span>{instantEvidence.composer_metrics.prompt_chars || 0} chars · {instantEvidence.composer_metrics.generation_calls || 1} call</span>
+                                    ) : null}
                                 </div>
                             </details>
                             <details>

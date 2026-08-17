@@ -37,8 +37,46 @@ def fuse_evidence(query_plan: Dict[str, Any], ledger: Dict[str, Any]) -> Dict[st
         name for name, row in capability_rows.items()
         if row.get("required") and row.get("status") != "available"
     ]
+    timing_mode = query_plan.get("answer_mode") in {
+        "event_timing", "lifetime_event_timing", "month_timing", "event_prediction", "timing_window"
+    }
+    calculator_required_mode = query_plan.get("answer_mode") in {
+        "factual_chart_lookup", "location_recommendation", "dedicated_muhurat_flow"
+    }
+    available_capabilities = {
+        str(name) for name, row in capability_rows.items() if row.get("status") == "available"
+    }
+    high_confidence_capabilities = {
+        str(name) for name, row in capability_rows.items() if row.get("confidence_role") == "high_confidence"
+    }
+    high_support_capabilities = {
+        str(name) for name, row in capability_rows.items() if row.get("confidence_role") == "high_support"
+    }
     option_comparison = (by_kind.get("option_comparison") or {}).get("value")
-    if query_plan.get("answer_mode") == "comparison_choice" and isinstance(option_comparison, dict) and option_comparison:
+    time_scope = query_plan.get("time_scope") if isinstance(query_plan.get("time_scope"), dict) else {}
+    exact_day = bool(time_scope.get("is_exact_day"))
+    daily_synthesis = (by_kind.get("daily_school_synthesis") or {}).get("value")
+    daily_synthesis = daily_synthesis if isinstance(daily_synthesis, dict) else {}
+    daily_judgment = daily_synthesis.get("daily_judgment") if isinstance(daily_synthesis.get("daily_judgment"), dict) else {}
+    if exact_day:
+        tara = daily_judgment.get("moon_tara_quality") if isinstance(daily_judgment.get("moon_tara_quality"), dict) else {}
+        direction = (
+            "insufficient_evidence" if missing_required else
+            "supportive_day" if tara.get("quality") == "supportive" and daily_judgment.get("support_houses") else
+            "caution_day" if tara.get("quality") == "caution" and daily_judgment.get("caution_houses") else
+            "mixed_day"
+        )
+        windows = []
+        rationale = {
+            "target_date": time_scope.get("target_date") or time_scope.get("as_of"),
+            "top_activated_houses": daily_judgment.get("top_activated_houses") or [],
+            "top_event_domains": daily_judgment.get("top_event_domains") or [],
+            "moon_tara_quality": tara,
+            "massive_result_factors": daily_judgment.get("massive_result_factors") or [],
+            "decision_rule": daily_judgment.get("prediction_rule"),
+        }
+        confidence = 0.9 if not missing_required else 0.38
+    elif query_plan.get("answer_mode") == "comparison_choice" and isinstance(option_comparison, dict) and option_comparison:
         comparison = option_comparison.get("comparison") if isinstance(option_comparison.get("comparison"), dict) else {}
         direction = comparison.get("direction") or "insufficient_option_evidence"
         windows = [
@@ -94,6 +132,23 @@ def fuse_evidence(query_plan: Dict[str, Any], ledger: Dict[str, Any]) -> Dict[st
         windows = []
         rationale = primary[:4] if isinstance(primary, list) else primary
         confidence = 0.72 if primary else 0.35
+    if (timing_mode or calculator_required_mode or exact_day) and missing_required:
+        direction = "insufficient_evidence"
+        confidence = min(confidence, 0.39)
+        windows = []
+    confidence_tier = "directional"
+    if timing_mode or exact_day:
+        high_confidence_complete = bool(high_confidence_capabilities) and high_confidence_capabilities.issubset(available_capabilities)
+        high_support_complete = bool(high_support_capabilities) and high_support_capabilities.issubset(available_capabilities)
+        if high_confidence_complete and high_support_complete and not missing_required:
+            confidence_tier = "high_support"
+        elif high_confidence_complete and not missing_required:
+            confidence_tier = "high_confidence"
+        elif not missing_required:
+            confidence_tier = "limited_timing_support"
+    else:
+        high_confidence_complete = False
+        high_support_complete = False
     conflicts = []
     if primary and modifiers:
         conflicts.append("Primary drivers and secondary modifiers must both be represented; modifiers cannot overturn primary evidence without an explicit rule.")
@@ -103,6 +158,13 @@ def fuse_evidence(query_plan: Dict[str, Any], ledger: Dict[str, Any]) -> Dict[st
         "answer_mode": query_plan.get("answer_mode"),
         "direction": direction,
         "confidence": round(max(0.0, min(1.0, confidence)), 2),
+        "confidence_tier": confidence_tier,
+        "confidence_evidence": {
+            "mandatory_complete": not missing_required,
+            "high_confidence_complete": high_confidence_complete,
+            "high_support_complete": high_support_complete,
+            "available": sorted(available_capabilities),
+        },
         "ranked_windows": windows[:5] if isinstance(windows, list) else windows,
         "rationale": rationale,
         "modifiers": modifiers[:5] if isinstance(modifiers, list) else modifiers,

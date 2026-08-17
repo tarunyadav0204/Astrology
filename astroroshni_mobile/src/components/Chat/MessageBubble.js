@@ -1634,6 +1634,11 @@ function MessageBubble({
                       <Text style={[styles.instantEvidenceTitle, { color: colors.text }]}>
                         {instantEvidence?.query_plan?.category || t('premiumUi.chat.general')} · {instantEvidence?.query_plan?.answer_mode || t('premiumUi.chat.reading')}
                       </Text>
+                      {instantEvidence?.query_plan?.user_goal ? (
+                        <Text style={[styles.instantEvidenceMeta, { color: colors.textSecondary }]} numberOfLines={3}>
+                          {instantEvidence.query_plan.user_goal}
+                        </Text>
+                      ) : null}
                     </View>
                     <View style={[styles.instantEvidenceStatus, { backgroundColor: colors.accentSoft }]}>
                       <Text style={[styles.instantEvidenceStatusText, { color: colors.text }]}>
@@ -1646,7 +1651,14 @@ function MessageBubble({
                   <View style={[styles.instantEvidenceVerdict, { borderColor: colors.cardBorder }]}>
                     <Text style={[styles.instantEvidenceLabel, { color: colors.textSecondary }]}>{t('premiumUi.chat.verdict')}</Text>
                     <Text style={[styles.instantEvidenceValue, { color: colors.text }]}>{String(instantEvidence?.verdict?.direction || t('premiumUi.chat.noVerdict'))}</Text>
-                    <Text style={[styles.instantEvidenceMeta, { color: colors.textSecondary }]}>{t('premiumUi.chat.confidence')} {Math.round(Number(instantEvidence?.verdict?.confidence || 0) * 100)}% · {instantEvidence?.evidence_plan?.methodology_version || '—'}</Text>
+                    <Text style={[styles.instantEvidenceMeta, { color: colors.textSecondary }]}>
+                      {t('premiumUi.chat.confidence')} {Math.round(Number(instantEvidence?.verdict?.confidence || 0) * 100)}% · {instantEvidence?.evidence_plan?.methodology_version || '—'}
+                      {instantEvidence?.query_plan?.target_subject?.label || instantEvidence?.query_plan?.target_subject?.key
+                        ? ` · ${instantEvidence?.query_plan?.target_subject?.label || instantEvidence?.query_plan?.target_subject?.key}`
+                        : ''}
+                      {instantEvidence?.query_plan?.time_scope?.requested ? ` · ${instantEvidence.query_plan.time_scope.requested}` : ''}
+                      {instantEvidence?.composer_metrics ? ` · ${instantEvidence.composer_metrics.prompt_chars || 0} chars · ${instantEvidence.composer_metrics.generation_calls || 1} call` : ''}
+                    </Text>
                   </View>
                   <Text style={[styles.instantEvidenceLabel, { color: colors.textSecondary }]}>{t('premiumUi.chat.calculationPlan')}</Text>
                   {(instantEvidence?.evidence_ledger?.capabilities || []).map((item) => (

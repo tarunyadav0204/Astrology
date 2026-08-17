@@ -37,6 +37,38 @@ function formatInstantDuration(value) {
     return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
 }
 
+function formatResponseDuration(value) {
+    const milliseconds = Math.max(0, Number(value || 0));
+    return `${(milliseconds / 1000).toFixed(1)}s`;
+}
+
+function buildInstantTimingBreakdown(timing, endToEndMs) {
+    if (!timing || timing.kind !== 'instant_chat_usage' || !Array.isArray(timing.stages)) {
+        return null;
+    }
+    const buckets = { intent: 0, calculate: 0, compose: 0 };
+    timing.stages.forEach((stage) => {
+        const name = String(stage?.stage || '').toLowerCase();
+        const elapsed = Math.max(0, Number(stage?.elapsed_ms || 0));
+        if (name.includes('intent') || name === 'answer_mode') buckets.intent += elapsed;
+        else if (name === 'calculations_and_evidence' || name === 'prompt_build') buckets.calculate += elapsed;
+        else if (name === 'instant_answer') buckets.compose += elapsed;
+    });
+    const measured = buckets.intent + buckets.calculate + buckets.compose;
+    const delivery = Math.max(0, Number(endToEndMs || 0) - measured);
+    const parts = [
+        ['Intent', buckets.intent],
+        ['Calc', buckets.calculate],
+        ['AI', buckets.compose],
+        ['UI', delivery],
+    ].filter(([, value]) => value >= 50);
+    if (!parts.length) return null;
+    return {
+        label: parts.map(([label, value]) => `${label} ${formatResponseDuration(value)}`).join(' · '),
+        title: parts.map(([label, value]) => `${label}: ${formatResponseDuration(value)}`).join('\n'),
+    };
+}
+
 /** Single-chart wizard: empty `{}` is truthy in JS — require real fields before showing a “profile ready” card. */
 function isBirthChartReadyForChat(data) {
     const norm = normalizeBirthDetailsForChat(data);
@@ -200,6 +232,9 @@ const ChatPage = ({ onLogin }) => {
     const { birthData: initialBirthData } = location.state || {};
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [responseElapsedMs, setResponseElapsedMs] = useState(null);
+    const [responseStageTimings, setResponseStageTimings] = useState(null);
+    const responseStartedAtRef = useRef(null);
     const [showCreditsModal, setShowCreditsModal] = useState(false);
     const [showContextModal, setShowContextModal] = useState(false);
     const [contextData, setContextData] = useState(null);
@@ -212,6 +247,25 @@ const ChatPage = ({ onLogin }) => {
             return null;
         }
     });
+
+    useEffect(() => {
+        if (isLoading) {
+            const startedAt = Date.now();
+            responseStartedAtRef.current = startedAt;
+            setResponseElapsedMs(0);
+            setResponseStageTimings(null);
+            const timer = window.setInterval(() => {
+                setResponseElapsedMs(Date.now() - startedAt);
+            }, 100);
+            return () => window.clearInterval(timer);
+        }
+
+        if (responseStartedAtRef.current !== null) {
+            setResponseElapsedMs(Date.now() - responseStartedAtRef.current);
+            responseStartedAtRef.current = null;
+        }
+        return undefined;
+    }, [isLoading]);
 
     useEffect(() => {
         const params = new URLSearchParams(location.search || '');
@@ -1439,7 +1493,13 @@ const ChatPage = ({ onLogin }) => {
         requestedInstantTier = false,
     ) => {
         const token = localStorage.getItem('token');
-        const maxPolls = 120; // 6 minutes (120 * 3s), aligned with Ashtakavarga life-predictions jobs
+        // Instant replies are checkpointed several times per second while Gemini
+        // is writing.  A slow 3-second fallback collapsed those checkpoints into
+        // one final render whenever a browser/proxy dropped the WebSocket.  Keep
+        // the durable HTTP fallback frequent for Instant only; Standard remains
+        // deliberately low-frequency.
+        const pollIntervalMs = requestedInstantTier ? 140 : 3000;
+        const maxPolls = Math.ceil((6 * 60 * 1000) / pollIntervalMs);
         let pollCount = 0;
 
         const poll = async () => {
@@ -1488,9 +1548,6 @@ const ChatPage = ({ onLogin }) => {
                                 m.processingClientId === processingClientId
                                 && String(m.chatTier || '').toLowerCase() === 'instant'
                         );
-                        const instantPieces = (responseIsInstant || wasInstantTier) && !gated
-                            ? splitInstantReply(content)
-                            : [];
                         if (!gated && !wasInstantTier && String(content).trim().length >= 80) {
                             setPodcastPromoMessageId(assistantMessageId);
                             setPodcastPromoOpen(true);
@@ -1500,11 +1557,11 @@ const ChatPage = ({ onLogin }) => {
                                 ? {
                                     ...m,
                                     messageId: assistantMessageId,
-                                    content: instantPieces.length > 1 ? instantPieces[0] : content,
+                                    content,
                                     loadingMessage: null,
                                     isProcessing: false,
                                     isTyping: false,
-                                    instantStreaming: instantPieces.length > 1,
+                                    instantStreaming: false,
                                     chartInsights: polledChartInsights,
                                     message_type: status.message_type || 'answer',
                                     intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
@@ -1522,14 +1579,12 @@ const ChatPage = ({ onLogin }) => {
                                 : m
                         );
                     });
-                    if (responseIsInstant && !gated) {
-                        revealInstantReply(
-                            processingClientId,
-                            assistantMessageId,
-                            splitInstantReply(content),
-                            content,
-                        );
-                    }
+                    const completedElapsedMs = responseStartedAtRef.current !== null
+                        ? Date.now() - responseStartedAtRef.current
+                        : responseElapsedMs;
+                    setResponseStageTimings(
+                        buildInstantTimingBreakdown(status.timing, completedElapsedMs)
+                    );
                     setIsLoading(false);
                     fetchBalance();
                     return;
@@ -1560,7 +1615,17 @@ const ChatPage = ({ onLogin }) => {
                         prev.map((m) => {
                             if (m.processingClientId !== processingClientId) return m;
                             if (String(m.chatTier || '').toLowerCase() === 'instant') {
-                                return { ...m, isProcessing: true, isTyping: true };
+                                const partial = String(status.partial_content || '');
+                                return partial
+                                    ? {
+                                        ...m,
+                                        content: partial,
+                                        loadingMessage: null,
+                                        isProcessing: false,
+                                        isTyping: false,
+                                        instantStreaming: true,
+                                    }
+                                    : { ...m, isProcessing: true, isTyping: true };
                             }
                             if (Array.isArray(loadingList) && loadingList.length > 0) {
                                 const next = loadingList[Math.floor(Math.random() * loadingList.length)];
@@ -1583,7 +1648,7 @@ const ChatPage = ({ onLogin }) => {
 
                     pollCount++;
                     if (pollCount < maxPolls) {
-                        setTimeout(() => poll().catch(() => {}), 3000);
+                        setTimeout(() => poll().catch(() => {}), pollIntervalMs);
                     } else {
                         setMessages(prev =>
                             prev.map(m =>
@@ -1604,7 +1669,7 @@ const ChatPage = ({ onLogin }) => {
                     // Unknown intermediate status - keep polling.
                     pollCount++;
                     if (pollCount < maxPolls) {
-                        setTimeout(() => poll().catch(() => {}), 3000);
+                        setTimeout(() => poll().catch(() => {}), pollIntervalMs);
                     } else {
                         setIsLoading(false);
                     }
@@ -1630,6 +1695,93 @@ const ChatPage = ({ onLogin }) => {
 
         return poll();
     };
+
+    const streamChatV2Status = (
+        assistantMessageId,
+        processingClientId,
+        wasFreeQuestion = false,
+        requestedInstantTier = false,
+    ) => new Promise((resolve, reject) => {
+        const token = localStorage.getItem('token') || '';
+        if (!token || typeof WebSocket === 'undefined') {
+            reject(new Error('WebSocket unavailable'));
+            return;
+        }
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const url = `${protocol}//${window.location.host}/api/chat-v2/stream/${assistantMessageId}?token=${encodeURIComponent(token)}`;
+        let completed = false;
+        let opened = false;
+        let socket;
+        try {
+            socket = new WebSocket(url);
+        } catch (error) {
+            reject(error);
+            return;
+        }
+
+        const connectionTimer = window.setTimeout(() => {
+            if (!opened && !completed) {
+                try { socket.close(); } catch (_) {}
+                reject(new Error('WebSocket connection timed out'));
+            }
+        }, 5000);
+
+        socket.onopen = () => {
+            opened = true;
+            window.clearTimeout(connectionTimer);
+        };
+        socket.onmessage = (event) => {
+            let payload;
+            try {
+                payload = JSON.parse(event.data);
+            } catch (_) {
+                return;
+            }
+            if (payload.type === 'content_delta') {
+                const streamedContent = String(payload.content || '');
+                if (!streamedContent) return;
+                setMessages((prev) => prev.map((message) =>
+                    message.processingClientId === processingClientId
+                        ? {
+                            ...message,
+                            messageId: assistantMessageId,
+                            content: streamedContent,
+                            loadingMessage: null,
+                            isProcessing: false,
+                            isTyping: false,
+                            instantStreaming: true,
+                        }
+                        : message
+                ));
+                return;
+            }
+            if (payload.type === 'completed') {
+                completed = true;
+                try { socket.close(); } catch (_) {}
+                // Reuse the authoritative completion path for parsed metadata,
+                // evidence, first-purchase offers, timing, and balance refresh.
+                pollChatV2Status(
+                    assistantMessageId,
+                    processingClientId,
+                    wasFreeQuestion,
+                    requestedInstantTier,
+                ).then(resolve).catch(reject);
+                return;
+            }
+            if (payload.type === 'failed' || payload.type === 'error') {
+                completed = true;
+                try { socket.close(); } catch (_) {}
+                reject(new Error(payload.error_message || payload.error || 'Instant stream failed'));
+            }
+        };
+        socket.onerror = () => {
+            if (!completed) reject(new Error('Instant WebSocket connection failed'));
+        };
+        socket.onclose = () => {
+            window.clearTimeout(connectionTimer);
+            if (!completed) reject(new Error('Instant WebSocket closed before completion'));
+        };
+    });
 
     const handleSendMessageChatV2 = async (message, options = {}) => {
         if (!birthData) return;
@@ -1894,12 +2046,28 @@ const ChatPage = ({ onLogin }) => {
                 )
             );
 
-            pollChatV2Status(
-                assistantMessageId,
-                processingClientId,
-                useFreeQuestion,
-                useInstantChat,
-            ).catch(() => {
+            const observeStatus = serverTier === 'instant'
+                ? streamChatV2Status(
+                    assistantMessageId,
+                    processingClientId,
+                    useFreeQuestion,
+                    true,
+                ).catch((streamError) => {
+                    console.warn('[ChatPage] Instant WebSocket unavailable; using polling fallback', streamError);
+                    return pollChatV2Status(
+                        assistantMessageId,
+                        processingClientId,
+                        useFreeQuestion,
+                        true,
+                    );
+                })
+                : pollChatV2Status(
+                    assistantMessageId,
+                    processingClientId,
+                    useFreeQuestion,
+                    false,
+                );
+            observeStatus.catch(() => {
                 setIsLoading(false);
             });
         } catch (e) {
@@ -3040,6 +3208,27 @@ const ChatPage = ({ onLogin }) => {
                             </section>
                         )}
                         <div className="chat-header-toolbar__actions">
+                            {responseElapsedMs !== null && (
+                                <>
+                                    <div
+                                        className={`chat-response-timer ${isLoading ? 'chat-response-timer--running' : 'chat-response-timer--complete'}`}
+                                        aria-label={`Response time ${formatResponseDuration(responseElapsedMs)}`}
+                                        title={isLoading ? 'Response timer running' : 'Response completed'}
+                                    >
+                                        <span className="chat-response-timer__dot" aria-hidden="true" />
+                                        <span aria-hidden="true">{formatResponseDuration(responseElapsedMs)}</span>
+                                    </div>
+                                    {!isLoading && responseStageTimings && (
+                                        <div
+                                            className="chat-response-stages"
+                                            title={responseStageTimings.title}
+                                            aria-label={`Response stages: ${responseStageTimings.label}`}
+                                        >
+                                            {responseStageTimings.label}
+                                        </div>
+                                    )}
+                                </>
+                            )}
                             {!isMundaneMode && !isPartnershipMode && instantChatEnabled && speechChatEnabled && birthData && (
                             <button
                                 type="button"

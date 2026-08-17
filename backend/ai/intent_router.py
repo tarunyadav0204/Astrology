@@ -7,6 +7,7 @@ import re
 import asyncio
 import random
 import logging
+from types import SimpleNamespace
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
@@ -14,6 +15,7 @@ from ai.evidence_planner_schema import normalize_evidence_plan
 from ai.output_schema import resolve_output_language_policy
 from daily.daily_micro_intents import classify_daily_micro_intent
 from utils.query_context import normalize_query_context, resolve_query_now
+from ai.gemini_chat_analyzer import generate_content_rest_v1beta_result
 
 logger = logging.getLogger(__name__)
 
@@ -1132,6 +1134,50 @@ class IntentRouter:
             self._model_cache[fallback_fast] = genai.GenerativeModel(fallback_fast, generation_config=self._gen_config)
             return self._model_cache[fallback_fast]
 
+    def _get_instant_model_name(self) -> str:
+        """Resolve Instant's model name without constructing a legacy SDK model."""
+        from utils.admin_settings import get_setting
+
+        name = (
+            get_setting("gemini_instant_intent_model")
+            or get_setting("gemini_intent_model")
+            or "models/gemini-3.1-flash-lite"
+        ).strip()
+        if "pro" in name.lower() or "2.0-flash-lite" in name.lower():
+            return "models/gemini-3.1-flash-lite"
+        return name
+
+    async def _generate_instant_content(self, prompt: str, model_name: str, timeout_s: float):
+        api_key = os.getenv("GEMINI_API_KEY") or ""
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY environment variable not set")
+        model_id = str(model_name or "").lower()
+        thinking_level = None
+        if "gemini-3" in model_id:
+            configured = str(os.getenv("INSTANT_CHAT_THINKING_LEVEL") or "").strip().lower()
+            if configured in {"minimal", "low", "medium", "high"}:
+                thinking_level = configured
+            else:
+                thinking_level = "minimal" if "flash-lite" in model_id else "low"
+        result = await asyncio.wait_for(
+            asyncio.to_thread(
+                generate_content_rest_v1beta_result,
+                model_name,
+                prompt,
+                api_key,
+                thinking_level,
+            ),
+            timeout=max(3.0, timeout_s),
+        )
+        usage = result.get("usage") or {}
+        usage_metadata = SimpleNamespace(
+            prompt_token_count=int(usage.get("input_tokens") or 0),
+            candidates_token_count=int(usage.get("output_tokens") or 0),
+            cached_content_token_count=int(usage.get("cached_tokens") or 0),
+            total_token_count=int(usage.get("total_tokens") or 0),
+        )
+        return SimpleNamespace(text=str(result.get("text") or ""), usage_metadata=usage_metadata)
+
     def _chart_insight_message_is_valid(self, message: Any) -> bool:
         if not isinstance(message, str):
             return False
@@ -1557,6 +1603,8 @@ LATEST USER MESSAGE (answer this turn): "{latest_user_reply}"
 Task:
 1. Semantically understand the user's question in any language/script.
 2. Decide READY vs CLARIFY. Clarify whenever a missing fact would materially change which chart factors, relationship role, event definition, or timing calculation should be used. Resolve ambiguous people and pronouns through conversation; never guess who "he", "she", "they", "that person", or a similar reference means. Clarify when the core topic/event is genuinely unclear, the user asks multiple unrelated life areas, a reference cannot be resolved from recent history/state, OR the mode is RECOMMEND_LOCATION and india-vs-abroad scope is unknown. Do not clarify for one clear domain with multiple facets, follow-up challenges, or natural messy phrasing.
+   If the message contains two or more independently answerable questions, set CLARIFY, answer_mode=compound_plan, route_action=clarify, and ask the user in their own language/script to choose just one question first. Do not create calculator work for either part yet.
+   If the user asks for compatibility between two charts, set answer_mode=dedicated_partnership_flow and route_action=handoff. Instant Chat does not calculate compatibility.
 3. Maintain `dialogue_state` as a complete corrected snapshot, not a delta. When prior dialogue_state contains a last_clarification_question, treat LATEST USER MESSAGE as the user's direct answer to that question—even if it is only one word. Semantically apply that answer to known_facts, remove the fact it resolves from unresolved_facts, and do not repeat the same question. Ask the next necessary question only if a different material fact remains unresolved. Ask exactly one natural question at a time in the user's current language/script. Continue clarifying until you have enough information to choose the correct astrological calculation; only then set READY and ready_to_calculate=true.
 4. Select the astrology mode, answer mode, subject, category, timeframe/date, chart focus, transit need, and compact divisional chart list.
 
@@ -1579,12 +1627,16 @@ Answer modes:
 - potential_capacity: suitability, promise, aptitude, capacity.
 - comparison_choice: choosing between options.
 - location_recommendation: where to move / which city or direction for a life goal.
+- factual_chart_lookup: an exact fact from D1 or any supported divisional chart, dasha, placement, dignity, aspect, yoga, karaka, lagna, or transit chart.
+- dedicated_muhurat_flow: choosing an auspicious time/date for a specified activity; collect the event, location and usable date range before READY. The location must be either the saved birth location (`muhurat_use_birth_location=true`) or the user's own place text in `muhurat_location_query`; never invent coordinates.
+- dedicated_partnership_flow: compatibility/synastry between two charts; hand off to Partnership mode.
+- compound_plan: two or more independently answerable questions; clarify and ask for one question only.
 - problem_diagnosis: why something is blocked, delayed, unstable, difficult.
 - remedy_action: ONLY when query_context already marks a Remedies CTA follow-up (remedy_followup / open_remedy / follow_up_type=remedy_action). Never choose from wording alone.
 - topic_reading: focused reading when no other answer mode fits.
 
 Categories:
-career, job, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, learning, travel, visa, foreign, gain, wish, general, son, daughter, mother, father, spouse, siblings, children, family, soul, spirituality, purpose, dharma, vehicles, timing.
+career, job, promotion, employment, authority, job_change, project, business, love, relationship, marriage, partner, separation, wealth, money, finance, income, debt, investment, inheritance, health, disease, mental_wellbeing, surgery, accident, recovery, property, home, child, pregnancy, childbirth, adoption, education, learning, exams, travel, visa, foreign, immigration, location, legal, competition, reputation, government, friends, creativity, sports, research, karma, retirement, gain, wish, general, self, life_purpose, son, daughter, mother, father, spouse, siblings, children, family, soul, spirituality, purpose, dharma, vehicles, muhurat, timing.
 For "when will I..." choose the life area category, not generic timing, when identifiable.
 
 Target subjects:
@@ -1605,11 +1657,11 @@ Always keep small. D1/D9 default. Add D10 career/job/business, D7 relationship/c
 Evidence planner:
 - Build an `evidence_plan` that describes what data agents must collect; do not write astrology rule combinations as text.
 - Use enum values only.
-- Split compound questions into multiple `question_parts`.
+- Detect compound questions semantically, but do not split or calculate them in Instant Chat. Return CLARIFY with answer_mode=compound_plan and one LLM-authored request to ask one question at a time.
 - A comparison is multi-part: emit one `question_part` per option and give each option its own event_profile (for example promotion and job_change). Add a `decision_option_context` evidence need covering those parts. Never collapse both options into `general_event`.
 - Add one `evidence_needs` item per data need, not per sentence.
 - For "When will I get married?", use event_timing + future_dasha_event_windows + transit_event_windows + natal_topic_foundation with event_profile marriage.
-- For "When will my Mercury dasha start and how will my career be?", use two parts: factual_chart_lookup for dasha_timeline_lookup and topic_outlook for career evidence.
+- For "When will my Mercury dasha start and how will my career be?", return CLARIFY/compound_plan and ask which one they want answered first. Do not emit evidence needs yet.
 - Always include safety.blocked_content_checks for death_prediction and fetal_sex_determination.
 - For every bounded rolling horizon, timeframe MUST include numeric `duration_months` (for example next six months -> {{"kind":"bounded_future","duration_months":6}}). Use `duration_years` only in addition, never instead.
 
@@ -1632,6 +1684,8 @@ Return exactly this JSON shape:
 {{
   "status": "CLARIFY" or "READY",
   "clarification_question": "same language/script as user, only when CLARIFY",
+  "route_action": "answer" or "clarify" or "handoff",
+  "user_message": "LLM-authored same-language clarification or handoff message, otherwise empty",
   "dialogue_state": {{
     "request_summary": "concise resolved meaning so far",
     "known_facts": {{"semantic_field": "LLM-understood value"}},
@@ -1644,11 +1698,25 @@ Return exactly this JSON shape:
   "chart_insights": [],
   "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_LOCATION" or "RECOMMEND_REMEDY_FOR_PROBLEM",
   "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
-  "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "location_recommendation" or "problem_diagnosis" or "remedy_action" or "topic_reading",
+  "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "location_recommendation" or "factual_chart_lookup" or "dedicated_muhurat_flow" or "dedicated_partnership_flow" or "compound_plan" or "problem_diagnosis" or "remedy_action" or "topic_reading",
   "target_subject_key": "one allowed target subject",
   "needs_year_clarification": false,
   "daily_intent_confirmed": true or false,
-  "extracted_context": {{"timeframe":"", "aspect":"", "specific_date": null, "specific_date_basis":"not_date_bound", "location_scope":"india or abroad or both or null", "awaiting_location_scope": false}},
+  "extracted_context": {{
+    "timeframe":"", "aspect":"", "specific_date": null,
+    "specific_date_basis":"not_date_bound",
+    "requested_chart":"D1/D2/.../D60/Karkamsa/Swamsa or null",
+    "requested_fact":"LLM-normalized fact requested or null",
+    "location_scope":"india or abroad or both or null",
+    "location_goal":"career/wealth/relationship/education/health/general or null",
+    "hub_regions":["known normalized region ids only"],
+    "awaiting_location_scope": false,
+    "muhurat_event_type":"childbirth/vehicle/griha_pravesh/gold/business_opening/marriage/property or null",
+    "muhurat_start_date":"YYYY-MM-DD or null",
+    "muhurat_end_date":"YYYY-MM-DD or null",
+    "muhurat_use_birth_location": true or false or null,
+    "muhurat_location_query":"user-stated place name or null; never coordinates"
+  }},
   "context_type": "birth" or "annual",
   "category": "general",
   "year": "year only when annual is clearly asked",
@@ -1852,6 +1920,11 @@ UNIVERSAL ANSWER MODE:
 - `event_prediction`: when/if one specific life event will happen
 - `potential_capacity`: suitability, promise, capacity, aptitude
 - `comparison_choice`: choice between two or more options
+- `location_recommendation`: where to relocate/live/settle for a stated goal
+- `factual_chart_lookup`: exact fact from D1 or any supported divisional, dasha, placement, aspect, yoga, karaka, lagna, or transit chart
+- `dedicated_muhurat_flow`: choose an auspicious date/time for a specified activity; required event, location, and date range must be known. Preserve a user-stated place in `muhurat_location_query` or explicitly select the saved birth location; never invent latitude/longitude.
+- `dedicated_partnership_flow`: compatibility between two charts; return a handoff because Instant Chat does not calculate compatibility
+- `compound_plan`: two or more independently answerable questions; ask the user to choose one question first
 - `problem_diagnosis`: why something is blocked, unstable, delayed, difficult, or leaking
 - `remedy_action`: ONLY when query_context already marks a Remedies CTA follow-up. Wording like remedy/upay/fix/action alone is NOT enough — use `problem_diagnosis` or `topic_reading`.
 - `topic_reading`: focused reading when no other answer mode fits
@@ -1859,7 +1932,7 @@ UNIVERSAL ANSWER MODE:
 EVIDENCE PLAN:
 - Return `evidence_plan` as the data-collection plan for backend agents.
 - Use enum values only.
-- Split compound questions into multiple `question_parts`.
+- For multiple independently answerable questions, return CLARIFY with answer_mode=compound_plan and route_action=clarify. Ask one natural same-language question telling the user to choose one question first. Do not emit calculator evidence needs yet.
 - A comparison is multi-part: emit one `question_part` per option and give each option its own event_profile (for example promotion and job_change). Add a `decision_option_context` evidence need covering those parts. Never collapse both options into `general_event`.
 - Planner chooses evidence needs; agents own detailed astrology rule combinations.
 - Always include blocked content checks for `death_prediction` and `fetal_sex_determination`.
@@ -1880,6 +1953,8 @@ Return ONLY this JSON shape:
 {{
   "status": "CLARIFY" or "READY",
   "clarification_question": "short question only when status=CLARIFY",
+  "route_action": "answer" or "clarify" or "handoff",
+  "user_message": "same-language clarification or handoff message, otherwise empty",
   "dialogue_state": {{
     "request_summary": "concise resolved meaning so far",
     "known_facts": {{"semantic_field": "LLM-understood value"}},
@@ -1892,11 +1967,26 @@ Return ONLY this JSON shape:
   "chart_insights": [],
   "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_LOCATION" or "RECOMMEND_REMEDY_FOR_PROBLEM",
   "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
-  "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "location_recommendation" or "problem_diagnosis" or "remedy_action" or "topic_reading",
+  "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "location_recommendation" or "factual_chart_lookup" or "dedicated_muhurat_flow" or "dedicated_partnership_flow" or "compound_plan" or "problem_diagnosis" or "remedy_action" or "topic_reading",
   "target_subject_key": "self" or "spouse" or "wife" or "husband" or "partner" or "child" or "first_child" or "second_child" or "third_child" or "mother" or "father" or "sibling" or "brother" or "sister" or "younger_brother" or "younger_sister" or "younger_sibling" or "elder_brother" or "elder_sister" or "elder_sibling" or "maternal_uncle" or "uncle",
   "needs_year_clarification": false,
   "daily_intent_confirmed": true or false,
-  "extracted_context": {{"timeframe":"...", "aspect":"...", "specific_date":"YYYY-MM-DD only when daily_intent_confirmed=true", "specific_date_basis":"explicit_user_day or relative_user_day or not_date_bound", "location_scope":"india or abroad or both or null", "awaiting_location_scope": true or false}},
+  "extracted_context": {{
+    "timeframe":"...", "aspect":"...",
+    "specific_date":"YYYY-MM-DD only when daily_intent_confirmed=true",
+    "specific_date_basis":"explicit_user_day or relative_user_day or not_date_bound",
+    "requested_chart":"D1/D2/.../D60/Karkamsa/Swamsa or null",
+    "requested_fact":"LLM-normalized fact requested or null",
+    "location_scope":"india or abroad or both or null",
+    "location_goal":"career/wealth/relationship/education/health/general or null",
+    "hub_regions":["known normalized region ids only"],
+    "awaiting_location_scope": true or false,
+    "muhurat_event_type":"childbirth/vehicle/griha_pravesh/gold/business_opening/marriage/property or null",
+    "muhurat_start_date":"YYYY-MM-DD or null",
+    "muhurat_end_date":"YYYY-MM-DD or null",
+    "muhurat_use_birth_location": true or false or null,
+    "muhurat_location_query":"user-stated place name or null; never coordinates"
+  }},
   "context_type": "birth" or "annual",
   "category": "career" or "job" or "promotion" or "business" or "love" or "relationship" or "marriage" or "partner" or "wealth" or "money" or "finance" or "health" or "disease" or "property" or "home" or "child" or "pregnancy" or "education" or "learning" or "travel" or "visa" or "foreign" or "gain" or "wish" or "general" or "son" or "daughter" or "mother" or "father" or "spouse" or "siblings" or "children" or "family" or "soul" or "spirituality" or "purpose" or "dharma" or "vehicles" or "timing",
   "year": "year only when annual is clearly asked",
@@ -1929,8 +2019,7 @@ Return ONLY this JSON shape:
                 dialogue_state_text=dialogue_state_text,
             )
 
-        model = self._get_instant_model()
-        model_name = model._model_name if hasattr(model, '_model_name') else 'Unknown'
+        model_name = self._get_instant_model_name()
         logger.info(
             "SPEECH_PERF instant_intent_router_request model=%s prompt_chars=%s compact_prompt=%s",
             model_name,
@@ -1962,10 +2051,7 @@ Return ONLY this JSON shape:
                         wall_timeout,
                     )
                     response = await asyncio.wait_for(
-                        model.generate_content_async(
-                            prompt,
-                            request_options={"timeout": per_request_timeout},
-                        ),
+                        self._generate_instant_content(prompt, model_name, per_request_timeout),
                         timeout=wall_timeout,
                     )
                     logger.info(
@@ -2068,10 +2154,7 @@ Invalid previous JSON:
                 )
                 repair_started = time.time()
                 repair_response = await asyncio.wait_for(
-                    model.generate_content_async(
-                        repair_prompt,
-                        request_options={"timeout": retry_request_timeout},
-                    ),
+                    self._generate_instant_content(repair_prompt, model_name, retry_request_timeout),
                     timeout=retry_wall_timeout,
                 )
                 repair_cleaned = (

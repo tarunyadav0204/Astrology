@@ -37,6 +37,45 @@ const LIFECYCLE_STEPS = [
     text: 'Save as draft, schedule it, or send it now. To stop a draft or scheduled campaign, delete it below.',
   },
 ];
+const DAILY_PUSH_SLOTS = [
+  { time: '07:00', label: '7:00 AM' },
+  { time: '12:00', label: '12:00 PM' },
+  { time: '16:00', label: '4:00 PM' },
+  { time: '22:00', label: '10:00 PM' },
+];
+
+const getIstDate = (daysFromToday = 1) => {
+  const date = new Date(Date.now() + daysFromToday * 24 * 60 * 60 * 1000);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+};
+
+const addDaysToDate = (dateString, days) => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return date.toISOString().slice(0, 10);
+};
+
+const getCampaignSchedule = (startDate, index) => {
+  const slot = DAILY_PUSH_SLOTS[index % DAILY_PUSH_SLOTS.length];
+  return {
+    ...slot,
+    date: addDaysToDate(startDate, Math.floor(index / DAILY_PUSH_SLOTS.length)),
+  };
+};
+
+const emptyDailyCampaigns = () => DAILY_PUSH_SLOTS.map((slot) => ({
+  ...slot,
+  title_template: '',
+  body_template: '',
+  question_template: '',
+}));
 
 const emptyForm = {
   name: '',
@@ -111,10 +150,61 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [busyCampaignId, setBusyCampaignId] = useState(null);
+  const [composerMode, setComposerMode] = useState('bulk');
+  const [dailyDate, setDailyDate] = useState(() => getIstDate(1));
+  const [dailyCampaigns, setDailyCampaigns] = useState(emptyDailyCampaigns);
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkPaste, setBulkPaste] = useState('');
+  const [bulkPasteResult, setBulkPasteResult] = useState(null);
 
   const setField = (key, value) => {
     setSaveResult(null);
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+  const setDailyCampaignField = (index, key, value) => {
+    setSaveResult(null);
+    setDailyCampaigns((prev) => prev.map((campaign, campaignIndex) => (
+      campaignIndex === index ? { ...campaign, [key]: value } : campaign
+    )));
+  };
+  const parseBulkCampaignCopy = () => {
+    const marker = /(?:^|\n)\s*\*{0,2}(Title|Body|Chat Question):\*{0,2}\s*/gim;
+    const matches = [...bulkPaste.matchAll(marker)];
+    const parsed = [];
+    let current = null;
+
+    matches.forEach((match, index) => {
+      const field = match[1].toLowerCase();
+      const valueStart = (match.index || 0) + match[0].length;
+      const valueEnd = index + 1 < matches.length ? matches[index + 1].index : bulkPaste.length;
+      let value = bulkPaste.slice(valueStart, valueEnd).trim();
+      if (field === 'chat question') {
+        value = value.replace(/\n\s*[^\n]{0,12}Option\s+\d+:[\s\S]*$/i, '').trim();
+      }
+      if (field === 'title') {
+        current = { title_template: value, body_template: '', question_template: '' };
+        parsed.push(current);
+      } else if (current && field === 'body') {
+        current.body_template = value;
+      } else if (current && field === 'chat question') {
+        current.question_template = value;
+      }
+    });
+
+    const campaigns = parsed.slice(0, 500);
+    if (!campaigns.length) {
+      setBulkPasteResult({ ok: false, message: 'Could not find campaign blocks. Use Title:, Body:, and Chat Question: labels.' });
+      return;
+    }
+    setDailyCampaigns(campaigns.map((campaign, index) => ({
+      ...DAILY_PUSH_SLOTS[index % DAILY_PUSH_SLOTS.length],
+      ...campaign,
+    })));
+    const dayCount = Math.ceil(campaigns.length / DAILY_PUSH_SLOTS.length);
+    setBulkPasteResult({
+      ok: true,
+      message: `${campaigns.length} campaign${campaigns.length === 1 ? '' : 's'} loaded and distributed across ${dayCount} day${dayCount === 1 ? '' : 's'}.`,
+    });
   };
   const showResult = (ok, msg) => {
     setResultOk(ok);
@@ -155,6 +245,7 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
 
   useEffect(() => {
     if (!prefillDraft) return;
+    setComposerMode('single');
     setEditingId(null);
     setPreview(null);
     setAudienceEstimate(null);
@@ -357,7 +448,6 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
         return;
       }
     }
-
     setSaving(true);
     setSaveResult(null);
     showResult(true, '');
@@ -381,6 +471,84 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
       reportSaveResult(false, e.message || 'Save failed');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleBulkSchedule = async () => {
+    const reportSaveResult = (ok, message) => {
+      setSaveResult({ ok, message });
+      showResult(ok, message);
+    };
+
+    if (!form.name.trim()) {
+      reportSaveResult(false, 'Enter a batch name.');
+      return;
+    }
+    if (!dailyDate) {
+      reportSaveResult(false, 'Choose the IST schedule date.');
+      return;
+    }
+    const incompleteIndex = dailyCampaigns.findIndex(
+      (campaign) => !campaign.title_template.trim() || !campaign.body_template.trim()
+    );
+    if (incompleteIndex >= 0) {
+      const schedule = getCampaignSchedule(dailyDate, incompleteIndex);
+      reportSaveResult(false, `Add a title and body for campaign ${incompleteIndex + 1} (${schedule.date}, ${schedule.label} IST).`);
+      return;
+    }
+    if (form.landing_screen === 'blog') {
+      let parsedBlogUrl;
+      try {
+        parsedBlogUrl = new URL(form.landing_url.trim());
+      } catch (_) {
+        parsedBlogUrl = null;
+      }
+      if (!parsedBlogUrl || parsedBlogUrl.protocol !== 'https:') {
+        reportSaveResult(false, 'Enter a valid HTTPS blog link.');
+        return;
+      }
+    }
+    const scheduledDates = dailyCampaigns.map((campaign, index) => {
+      const schedule = getCampaignSchedule(dailyDate, index);
+      return new Date(`${schedule.date}T${schedule.time}:00+05:30`);
+    });
+    if (scheduledDates.some((scheduledDate) => scheduledDate.getTime() <= Date.now())) {
+      reportSaveResult(false, 'One or more IST slots have already passed. Choose a later date.');
+      return;
+    }
+
+    setBulkSaving(true);
+    setSaveResult(null);
+    showResult(true, '');
+    try {
+      const shared = buildPayload();
+      const campaignsToCreate = dailyCampaigns.map((campaign, index) => {
+        const schedule = getCampaignSchedule(dailyDate, index);
+        return {
+          ...shared,
+          name: `${form.name.trim()} - ${schedule.date} ${schedule.label} IST`,
+          title_template: campaign.title_template.trim(),
+          body_template: campaign.body_template.trim(),
+          question_template: campaign.question_template.trim(),
+          channel_policy: 'push_only',
+          channels: ['push'],
+          ai_personalize: false,
+          ai_base_prompt: '',
+          scheduled_at: new Date(`${schedule.date}T${schedule.time}:00+05:30`).toISOString(),
+          status: 'scheduled',
+        };
+      });
+      const response = await apiFetch('/api/nudge/admin/campaigns/bulk', {
+        method: 'POST',
+        body: JSON.stringify({ campaigns: campaignsToCreate }),
+      });
+      reportSaveResult(true, `${response.count || dailyCampaigns.length} push campaigns scheduled from ${dailyDate} (IST).`);
+      setDailyCampaigns(emptyDailyCampaigns());
+      await load();
+    } catch (e) {
+      reportSaveResult(false, e.message || 'Batch scheduling failed');
+    } finally {
+      setBulkSaving(false);
     }
   };
 
@@ -416,6 +584,7 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
     const audience = campaign.audience_filter || { type: 'all' };
     const criteria = audience.criteria || {};
     setEditingId(campaign.id);
+    setComposerMode('single');
     setPreview(null);
     setAudienceEstimate(null);
     setForm({
@@ -608,12 +777,34 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
         ))}
       </div>
 
+      <div className="nudge-composer-switch" role="group" aria-label="Campaign creation mode">
+        <button
+          type="button"
+          className={composerMode === 'bulk' ? 'active' : ''}
+          onClick={() => {
+            setComposerMode('bulk');
+            setEditingId(null);
+            setSaveResult(null);
+          }}
+        >
+          Schedule bulk PNs
+        </button>
+        <button
+          type="button"
+          className={composerMode === 'single' ? 'active' : ''}
+          onClick={() => setComposerMode('single')}
+        >
+          Create one campaign
+        </button>
+        <span>Automatically distributes 4 per day at 7 AM, 12 PM, 4 PM and 10 PM IST</span>
+      </div>
+
       <div className="notifications-form notifications-form--wide nudge-campaign-builder">
         <section className="nudge-builder-section">
           <div className="nudge-section-header">
             <div>
               <div className="nudge-section-eyebrow">
-                {editingId ? `Editing campaign #${editingId}` : 'New campaign'}
+                {editingId ? `Editing campaign #${editingId}` : composerMode === 'bulk' ? 'New daily PN batch' : 'New campaign'}
               </div>
               <h4 className="nudge-builder-section__title">Campaign basics</h4>
             </div>
@@ -624,23 +815,30 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
 
           <div className="nudge-scheduler-row nudge-scheduler-row--3">
             <div className="form-field">
-              <label>Campaign name</label>
+              <label>{composerMode === 'bulk' ? 'Batch name' : 'Campaign name'}</label>
               <input
                 type="text"
                 maxLength={200}
-                placeholder="e.g. Saturn transit re-engagement"
+                placeholder={composerMode === 'bulk' ? 'e.g. Hidden blessings - August' : 'e.g. Saturn transit re-engagement'}
                 value={form.name}
                 onChange={(e) => setField('name', e.target.value)}
               />
             </div>
-            <div className="form-field">
-              <label>Channel policy</label>
-              <select value={form.channel_policy} onChange={(e) => setField('channel_policy', e.target.value)}>
-                <option value="waterfall">Waterfall - stop at first successful channel</option>
-                <option value="blast">Blast - send on every selected channel</option>
-                <option value="push_only">PN only - send push notification only</option>
-              </select>
-            </div>
+            {composerMode === 'bulk' ? (
+              <div className="form-field">
+                <label>Channel policy</label>
+                <div className="nudge-locked-field">PN only · push notification</div>
+              </div>
+            ) : (
+              <div className="form-field">
+                <label>Channel policy</label>
+                <select value={form.channel_policy} onChange={(e) => setField('channel_policy', e.target.value)}>
+                  <option value="waterfall">Waterfall - stop at first successful channel</option>
+                  <option value="blast">Blast - send on every selected channel</option>
+                  <option value="push_only">PN only - send push notification only</option>
+                </select>
+              </div>
+            )}
             <div className="form-field">
               <label>Landing screen</label>
               <select value={form.landing_screen} onChange={(e) => setField('landing_screen', e.target.value)}>
@@ -669,7 +867,7 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
             </div>
           ) : null}
 
-          <div className="form-field">
+          {composerMode === 'single' && <div className="form-field">
             <label>Channel order</label>
             {form.channel_policy === 'push_only' ? (
               <div className="nudge-channel-stack">
@@ -707,7 +905,7 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
                 </div>
               </div>
             )}
-          </div>
+          </div>}
         </section>
 
         <section className="nudge-builder-section">
@@ -940,11 +1138,13 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
               <h4 className="nudge-builder-section__title">What will users see?</h4>
             </div>
             <p className="nudge-section-tip">
-              Keep the copy specific and useful. Use placeholders or AI framing when you want stronger personalization.
+              {composerMode === 'bulk'
+                ? 'Paste options in the format shown in your campaign notes, or edit each time slot directly.'
+                : 'Keep the copy specific and useful. Use placeholders or AI framing when you want stronger personalization.'}
             </p>
           </div>
 
-          <div className="form-field">
+          {composerMode === 'single' ? <><div className="form-field">
             <label>Title template (max 200)</label>
             <input
               type="text"
@@ -976,9 +1176,77 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
                 </button>
               ))}
             </div>
-          </div>
+          </div></> : (
+            <>
+              <div className="nudge-bulk-paste">
+                <div className="form-field">
+                  <label>Paste up to 500 formatted campaign options</label>
+                  <textarea
+                    rows={5}
+                    value={bulkPaste}
+                    onChange={(e) => {
+                      setBulkPaste(e.target.value);
+                      setBulkPasteResult(null);
+                    }}
+                    placeholder={'Title: ...\n\nBody: ...\n\nChat Question: ...'}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="notif-search-btn"
+                  onClick={parseBulkCampaignCopy}
+                  disabled={!bulkPaste.trim()}
+                >
+                  Parse and distribute campaigns
+                </button>
+                {bulkPasteResult ? (
+                  <div className={`notif-result ${bulkPasteResult.ok ? 'success' : 'error'}`}>
+                    {bulkPasteResult.message}
+                  </div>
+                ) : null}
+              </div>
+              <div className="nudge-daily-grid">
+                {dailyCampaigns.map((campaign, index) => {
+                  const schedule = getCampaignSchedule(dailyDate, index);
+                  return <div className="nudge-daily-card" key={`${index}-${schedule.date}-${schedule.time}`}>
+                  <div className="nudge-daily-card__time">
+                    <strong>#{index + 1} · {schedule.label}</strong>
+                    <span>{schedule.date} · IST</span>
+                  </div>
+                  <div className="form-field">
+                    <label>Title (max 200)</label>
+                    <input
+                      type="text"
+                      maxLength={200}
+                      value={campaign.title_template}
+                      onChange={(e) => setDailyCampaignField(index, 'title_template', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>Body (max 600)</label>
+                    <textarea
+                      rows={4}
+                      maxLength={600}
+                      value={campaign.body_template}
+                      onChange={(e) => setDailyCampaignField(index, 'body_template', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>Chat question (optional, max 900)</label>
+                    <textarea
+                      rows={3}
+                      maxLength={900}
+                      value={campaign.question_template}
+                      onChange={(e) => setDailyCampaignField(index, 'question_template', e.target.value)}
+                    />
+                  </div>
+                  </div>;
+                })}
+              </div>
+            </>
+          )}
 
-          <div className="form-field">
+          {composerMode === 'single' && <div className="form-field">
             <label>Suggested chat question template (optional, max 900)</label>
             <textarea
               rows={2}
@@ -987,9 +1255,9 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
               value={form.question_template}
               onChange={(e) => setField('question_template', e.target.value)}
             />
-          </div>
+          </div>}
 
-          <div className="form-field">
+          {composerMode === 'single' && <div className="form-field">
             <label className="notif-inline-checkbox">
               <input
                 type="checkbox"
@@ -1007,9 +1275,9 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
                 onChange={(e) => setField('ai_base_prompt', e.target.value)}
               />
             )}
-          </div>
+          </div>}
 
-          <div className="nudge-scheduler-row">
+          {composerMode === 'single' && <div className="nudge-scheduler-row">
             <div className="form-field">
               <label>Preview as user ID (optional)</label>
               <input
@@ -1025,9 +1293,9 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
                 {previewing ? 'Rendering...' : 'Preview campaign'}
               </button>
             </div>
-          </div>
+          </div>}
 
-          {preview && (
+          {composerMode === 'single' && preview && (
             <div className="nudge-preview-card">
               <div><strong>Preview for user #{preview.user_id}</strong></div>
               <div><strong>Title:</strong> {preview.rendered?.title}</div>
@@ -1047,14 +1315,18 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
           <div className="nudge-section-header">
             <div>
               <div className="nudge-section-eyebrow">Launch</div>
-              <h4 className="nudge-builder-section__title">Save, schedule, or send later</h4>
+              <h4 className="nudge-builder-section__title">
+                {composerMode === 'bulk' ? 'Schedule the full IST day' : 'Save, schedule, or send later'}
+              </h4>
             </div>
             <p className="nudge-section-tip">
-              Leaving the time empty keeps this as a draft. Scheduled or draft campaigns can be stopped by deleting them from the list below.
+              {composerMode === 'bulk'
+                ? 'The full push campaign queue is created together. If any campaign is invalid, none are created.'
+                : 'Leaving the time empty keeps this as a draft. Scheduled or draft campaigns can be stopped by deleting them from the list below.'}
             </p>
           </div>
 
-          <div className="nudge-scheduler-row">
+          {composerMode === 'single' ? <div className="nudge-scheduler-row">
             <div className="form-field">
               <label>Schedule time (optional)</label>
               <input
@@ -1063,11 +1335,35 @@ export default function AdminNudgeCampaigns({ prefillDraft = null, onPrefillCons
                 onChange={(e) => setField('scheduled_at', e.target.value)}
               />
             </div>
-          </div>
+          </div> : (
+            <div className="nudge-bulk-launch">
+              <div className="form-field">
+                <label>Start date (IST)</label>
+                <input
+                  type="date"
+                  min={getIstDate(0)}
+                  value={dailyDate}
+                  onChange={(e) => setDailyDate(e.target.value)}
+                />
+              </div>
+              <div className="nudge-bulk-times" aria-label="Daily notification times">
+                {DAILY_PUSH_SLOTS.map((slot) => <span key={slot.time}>{slot.label}</span>)}
+              </div>
+            </div>
+          )}
 
           <div className="form-buttons nudge-builder-toolbar">
-            <button type="button" className="create-btn" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : editingId ? 'Update campaign' : form.scheduled_at ? 'Save and schedule' : 'Save draft'}
+            <button
+              type="button"
+              className="create-btn"
+              onClick={composerMode === 'bulk' ? handleBulkSchedule : handleSave}
+              disabled={composerMode === 'bulk' ? bulkSaving : saving}
+            >
+              {composerMode === 'bulk'
+                ? (bulkSaving
+                  ? `Scheduling ${dailyCampaigns.length} campaigns...`
+                  : `Schedule all ${dailyCampaigns.length} PNs`)
+                : (saving ? 'Saving...' : editingId ? 'Update campaign' : form.scheduled_at ? 'Save and schedule' : 'Save draft')}
             </button>
             {editingId && (
               <button type="button" className="notif-search-btn" onClick={resetEditor}>

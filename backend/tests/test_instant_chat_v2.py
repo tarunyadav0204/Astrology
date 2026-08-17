@@ -1,10 +1,46 @@
+from datetime import datetime
+
 from instant_chat_v2.orchestrator import build_instant_v2_packet, finalize_instant_v2_packet
 from instant_chat_v2.planner import build_query_plan
 from instant_chat_v2.answer_spec import build_answer_spec
 from chat.instant_chat_pipeline import (
+    _build_instant_composer_context,
+    _build_instant_composer_prompt_v3,
     _build_event_timing_verdict,
+    _instant_real_chart_facts,
+    _should_force_event_current_window,
+    _repair_common_utf8_mojibake,
+    _resolve_period_window,
     _target_focus_calculation_frame,
 )
+
+
+def test_event_prediction_keeps_exact_day_window():
+    assert _should_force_event_current_window(
+        "event_prediction",
+        {"kind": "day", "start": "2026-08-17", "end": "2026-08-17"},
+    ) is False
+    assert _should_force_event_current_window(
+        "event_prediction",
+        {"kind": "year", "start": "2026-01-01", "end": "2026-12-31"},
+    ) is True
+
+
+def test_daily_router_mode_resolves_to_exact_day_before_legacy_event_logic():
+    window = _resolve_period_window(
+        {"mode": "PREDICT_DAILY", "extracted_context": {"period": "today"}},
+        datetime(2026, 8, 17, 10, 0, 0),
+        "How is my day today?",
+    )
+    assert window == {
+        "kind": "day",
+        "start": "2026-08-17",
+        "end": "2026-08-17",
+        "span_days": 1,
+        "label": "17 August 2026",
+        "use_pd": True,
+        "use_sk_pr": True,
+    }
 
 
 def _intent(category="marriage"):
@@ -46,9 +82,140 @@ def _context():
                 "windows": [{"start": "2027-02", "end": "2027-06"}],
                 "why": ["Dasha and transit agree"],
             },
+            "forward_event_dasha_scan": [{
+                "start": "2027-02-01", "end": "2027-06-30",
+                "chain": "Saturn - Venus - Jupiter",
+            }],
+            "transit_activation_timeline": {
+                "peak_windows": [{"start": "2027-02-01", "end": "2027-06-30"}],
+            },
             "claim_gates": {"allow_timing": True},
         },
     }
+
+
+def _daily_context():
+    context = _context()
+    context["intent_summary"] = {
+        "category": "general",
+        "mode": "PREDICT_DAILY",
+        "answer_mode": "event_prediction",
+        "period_window": {"kind": "day", "start": "2026-08-17", "end": "2026-08-17"},
+        "time_relation": "current",
+        "target_subject": {"key": "self", "label": "self"},
+    }
+    context["daily_prediction_spine"] = {
+        "target_date": "2026-08-17",
+        "panchanga": {"vara": "Monday", "tithi": "Chaturthi"},
+        "moon": {
+            "transit": {"nakshatra": "Hasta", "house": 3},
+            "tara_bala": {"tara": "Sadhana", "quality": "supportive"},
+        },
+        "dasha_stack": [
+            {"level": "Mahadasha", "planet": "Saturn", "natal": {"house": 2, "lordships": [7, 8]}, "transit": {"house": 9}, "trigger": {"score": 2}},
+            {"level": "Antardasha", "planet": "Rahu", "natal": {"house": 2}, "transit": {"house": 8}, "trigger": {"score": 3}},
+            {"level": "Pratyantardasha", "planet": "Saturn", "natal": {"house": 2}, "transit": {"house": 9}, "trigger": {"score": 4}},
+            {"level": "Sookshma", "planet": "Mercury", "natal": {"house": 11, "lordships": [3, 12]}, "transit": {"house": 1}, "trigger": {"score": 8, "flags": ["same_nakshatra_return"]}},
+            {"level": "Prana", "planet": "Moon", "natal": {"house": 4}, "transit": {"house": 3}, "trigger": {"score": 9}},
+        ],
+        "daily_judgment": {
+            "top_activated_houses": [{"house": 3, "score": 72}, {"house": 11, "score": 61}],
+            "top_event_domains": [{"domain": "communication", "score": 72}, {"domain": "gains", "score": 61}],
+            "support_houses": [3, 11],
+            "caution_houses": [],
+            "moon_tara_quality": {"tara": "Sadhana", "quality": "supportive"},
+            "massive_result_factors": [{"level": "Sookshma", "planet": "Mercury", "flags": ["same_nakshatra_return"]}],
+            "prediction_rule": "Prioritize Prana, Sookshma and PD; MD/AD are background.",
+        },
+        "school_judgments": {
+            "kp": {"available": True, "event_houses": [3, 11], "verdict": "supportive_for_intent"},
+            "parashari": {"verdict": "supportive_for_intent"},
+            "merge_rule": "KP confirms materialisation; Moon and micro dashas time the day.",
+        },
+        "interpretation_rules": [
+            "Prana and Sookshma are the sharpest event triggers.",
+            "MD and AD are background permission only.",
+        ],
+    }
+    context["normalized_evidence"]["daily_prediction_spine"] = context["daily_prediction_spine"]
+    return context
+
+
+def test_exact_day_uses_daily_evidence_contract_not_generic_timing():
+    context = _daily_context()
+    intent = _intent("general")
+    intent.update(context["intent_summary"])
+    packet = build_instant_v2_packet(
+        question="How is my day today?",
+        intent=intent,
+        answer_mode="event_prediction",
+        target_subject={"key": "self", "label": "self"},
+        language="english",
+        instant_context=context,
+    )
+
+    assert packet["query_plan"]["time_scope"]["is_exact_day"] is True
+    assert packet["evidence_plan"]["forecast_shape"] == "daily_forecast"
+    capabilities = {row["capability"]: row for row in packet["evidence_ledger"]["capabilities"]}
+    assert set(capabilities) == {
+        "daily.five_level_dasha",
+        "daily.moon_tara_bala",
+        "daily.kp_fructification",
+        "daily.school_synthesis",
+    }
+    assert all(row["status"] == "available" for row in capabilities.values())
+    assert packet["verdict"]["direction"] == "supportive_day"
+    assert packet["answer_spec"]["daily_rules"]["decision_hierarchy"][0].startswith("KP")
+    assert "MD/AD/PD alone" in packet["answer_spec"]["daily_rules"]["instruction"]
+    assert "claim-timing-window" not in {
+        row["claim_id"] for row in packet["answer_spec"]["claims"]
+    }
+
+
+def test_daily_composer_receives_micro_timing_and_mandatory_shape():
+    context = _daily_context()
+    packet = build_instant_v2_packet(
+        question="How is today?",
+        intent=context["intent_summary"],
+        answer_mode="event_prediction",
+        target_subject={"key": "self"},
+        language="english",
+        instant_context=context,
+    )
+    brief = _build_instant_composer_context(context, packet)
+    prompt = _build_instant_composer_prompt_v3("How is today?", brief, "english")
+
+    assert brief["query_plan"]["forecast_shape"] == "daily_forecast"
+    levels = [row["level"] for row in brief["evidence"]["daily_prediction"]["five_level_dasha"]]
+    assert levels[-2:] == ["Sookshma", "Prana"]
+    assert brief["evidence"]["daily_prediction"]["kp"]["event_houses"] == [3, 11]
+    assert set(brief["evidence"]).issubset({"natal_promise", "daily_prediction"})
+    assert "daily_prediction" in brief["evidence"]
+    assert "Never decide or describe today mainly from MD/AD/PD" in prompt
+    assert "Sentence 1 must give a plain overall outlook" in prompt
+
+
+def test_exact_day_missing_daily_calculators_is_not_replaced_by_period_evidence():
+    context = _context()
+    context["intent_summary"] = {
+        "category": "general",
+        "mode": "PREDICT_DAILY",
+        "period_window": {"kind": "day", "start": "2026-08-17"},
+    }
+    packet = build_instant_v2_packet(
+        question="How is today?",
+        intent=context["intent_summary"],
+        answer_mode="event_prediction",
+        target_subject={"key": "self"},
+        language="english",
+        instant_context=context,
+    )
+    assert packet["verdict"]["direction"] == "insufficient_evidence"
+    assert "daily.five_level_dasha" in packet["verdict"]["missing_required_capabilities"]
+
+
+def test_common_utf8_mojibake_is_repaired_without_touching_other_scripts():
+    assert _repair_common_utf8_mojibake("things arenâ\x80\x99t moving — ठीक") == "things aren’t moving — ठीक"
 
 
 def test_planner_does_not_keyword_route_raw_question():
@@ -63,6 +230,20 @@ def test_planner_does_not_keyword_route_raw_question():
 
     assert first["category"] == second["category"] == "marriage"
     assert first["requested_evidence"] == second["requested_evidence"]
+
+
+def test_planner_preserves_llm_resolved_user_goal():
+    intent = _intent("career")
+    intent["query_context"]["user_goal"] = "understand whether career improves this year"
+    plan = build_query_plan(
+        question="How is my career this year?",
+        intent=intent,
+        answer_mode="timing_window",
+        target_subject={"key": "self"},
+        language="english",
+    )
+
+    assert plan["user_goal"] == "understand whether career improves this year"
 
 
 def test_marriage_packet_exposes_plan_evidence_and_claim_bindings():
@@ -177,7 +358,7 @@ def test_answer_contract_limits_instant_reply_and_protects_derived_framing():
         instant_context=_context(),
     )
 
-    assert packet["answer_spec"]["max_words"] == 120
+    assert packet["answer_spec"]["max_words"] == 320
     assert "derived indication" in packet["answer_spec"]["target_framing"]
 
 
@@ -424,3 +605,137 @@ def test_answer_spec_preserves_window_facts_without_inviting_fact_fusion():
 
     assert spec["event_rules"]["allowed_timing_windows"][0]["why"] == why
     assert "Never fuse two facts" in spec["event_rules"]["instruction"]
+
+
+def test_timing_confidence_requires_named_calculator_families():
+    limited = build_instant_v2_packet(
+        question="When will I marry?", intent=_intent(), answer_mode="event_timing",
+        target_subject={"key": "self"}, language="english", instant_context=_context(),
+    )
+    assert limited["verdict"]["confidence_tier"] == "limited_timing_support"
+
+    high_context = _context()
+    high_context["normalized_evidence"]["karaka_evidence"] = {
+        "chara_karakas": {"Darakaraka": {"planet": "Venus"}}
+    }
+    high = build_instant_v2_packet(
+        question="When will I marry?", intent=_intent(), answer_mode="event_timing",
+        target_subject={"key": "self"}, language="english", instant_context=high_context,
+    )
+    assert high["verdict"]["confidence_tier"] == "high_confidence"
+
+    support_context = _context()
+    support_context["normalized_evidence"].update({
+        "karaka_evidence": {"chara_karakas": {"Darakaraka": {"planet": "Venus"}}},
+        "double_transit": {"windows": [{"house": 7, "start": "2027-02-01"}]},
+    })
+    supported = build_instant_v2_packet(
+        question="When will I marry?", intent=_intent(), answer_mode="event_timing",
+        target_subject={"key": "self"}, language="english", instant_context=support_context,
+    )
+    assert supported["verdict"]["confidence_tier"] == "high_support"
+
+
+def test_fused_verdict_and_current_transits_do_not_replace_dasha_or_trigger_windows():
+    context = _context()
+    context["normalized_evidence"].pop("forward_event_dasha_scan")
+    context["normalized_evidence"].pop("transit_activation_timeline")
+    packet = build_instant_v2_packet(
+        question="When will I marry?", intent=_intent(), answer_mode="event_timing",
+        target_subject={"key": "self"}, language="english", instant_context=context,
+    )
+    capability_rows = {
+        item["capability"]: item for item in packet["evidence_ledger"]["capabilities"]
+    }
+    assert capability_rows["parashari.dasha_windows"]["status"] == "not_exposed"
+    assert capability_rows["transit.trigger_windows"]["status"] == "not_exposed"
+    assert packet["verdict"]["direction"] == "insufficient_evidence"
+
+
+def test_routing_only_flows_request_no_astrology_calculators():
+    for mode in ("compound_plan", "dedicated_partnership_flow"):
+        packet = build_instant_v2_packet(
+            question="One routed request", intent=_intent("general"), answer_mode=mode,
+            target_subject={"key": "self"}, language="english", instant_context=_context(),
+        )
+        assert packet["evidence_plan"]["capability_requests"] == []
+
+
+def test_dedicated_calculator_flows_cannot_answer_from_generic_chart_evidence():
+    cases = (
+        ("factual_chart_lookup", "general", "chart.all_supported_facts"),
+        ("location_recommendation", "location", "location.goal_based_recommendation"),
+        ("dedicated_muhurat_flow", "muhurat", "muhurat.ranked_slots"),
+    )
+    for mode, category, required_capability in cases:
+        packet = build_instant_v2_packet(
+            question="A dedicated calculator request", intent=_intent(category), answer_mode=mode,
+            target_subject={"key": "self"}, language="english", instant_context=_context(),
+        )
+        capability_rows = {
+            row["capability"]: row for row in packet["evidence_ledger"]["capabilities"]
+        }
+        assert capability_rows[required_capability]["status"] == "not_exposed"
+        assert packet["verdict"]["direction"] == "insufficient_evidence"
+
+
+def test_muhurat_location_query_survives_llm_plan_without_invented_coordinates():
+    intent = _intent("muhurat")
+    intent["extracted_context"] = {
+        "muhurat_event_type": "business_opening",
+        "muhurat_start_date": "2026-10-01",
+        "muhurat_end_date": "2026-10-15",
+        "muhurat_location_query": "Pune, Maharashtra",
+    }
+    plan = build_query_plan(
+        question="Find a business opening muhurat in Pune", intent=intent,
+        answer_mode="dedicated_muhurat_flow", target_subject={"key": "self"},
+        language="english",
+    )
+    assert plan["special_flow"]["muhurat_location_query"] == "Pune, Maharashtra"
+
+
+def test_requested_divisional_and_jaimini_chart_facts_are_really_calculated():
+    longitudes = {
+        "Sun": 12.0, "Moon": 48.0, "Mars": 79.0, "Mercury": 103.0,
+        "Jupiter": 137.0, "Venus": 166.0, "Saturn": 201.0,
+        "Rahu": 250.0, "Ketu": 70.0,
+    }
+    chart = {
+        "ascendant": 95.0,
+        "ayanamsa": 24.1,
+        "planets": {
+            name: {
+                "longitude": longitude,
+                "sign": int(longitude / 30),
+                "house": ((int(longitude / 30) - 3) % 12) + 1,
+            }
+            for name, longitude in longitudes.items()
+        },
+    }
+    karakas = {
+        "chara_karakas": {
+            "Atmakaraka": {"planet": "Mars"},
+        }
+    }
+    facts = _instant_real_chart_facts(
+        chart_data=chart,
+        requested_charts=["D12", "Swamsa", "Karakamsha"],
+        requested_fact="planet placements",
+        karaka_evidence=karakas,
+        d1_snapshot={},
+    )
+    assert facts["calculation_complete"] is True
+    assert set(facts["charts"]) == {"D12", "SWAMSA", "KARAKAMSHA"}
+    assert facts["charts"]["D12"]["planets"]["Ketu"]["house"] >= 1
+    assert facts["charts"]["SWAMSA"]["atmakaraka"] == "Mars"
+
+
+def test_unsupported_chart_fact_is_unavailable_instead_of_guessed():
+    facts = _instant_real_chart_facts(
+        chart_data={"ascendant": 0.0, "planets": {}},
+        requested_charts=["D13"], requested_fact="placements",
+        karaka_evidence={}, d1_snapshot={},
+    )
+    assert facts["calculation_complete"] is False
+    assert facts["missing_requested_charts"] == ["D13"]

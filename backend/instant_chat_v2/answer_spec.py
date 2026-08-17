@@ -22,6 +22,19 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
             "required": True,
         },
     ]
+    time_scope = query_plan.get("time_scope") if isinstance(query_plan.get("time_scope"), dict) else {}
+    exact_day = bool(time_scope.get("is_exact_day"))
+    daily_ids = [
+        item.get("evidence_id") for item in ledger.get("records", [])
+        if item.get("kind") in {"daily_dasha_stack", "daily_moon_tara", "daily_kp", "daily_school_synthesis"}
+    ]
+    if exact_day:
+        claims.append({
+            "claim_id": "claim-daily-outlook",
+            "purpose": "Give the exact day's ranked likely manifestations, best use, main caution and one practical action",
+            "evidence_ids": daily_ids,
+            "required": True,
+        })
     if query_plan.get("answer_mode") == "comparison_choice":
         comparison_ids = [
             item.get("evidence_id") for item in ledger.get("records", [])
@@ -34,7 +47,7 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                 "evidence_ids": comparison_ids,
                 "required": True,
             })
-    if query_plan.get("answer_mode") in {"event_timing", "lifetime_event_timing", "month_timing", "event_prediction", "timing_window"}:
+    if not exact_day and query_plan.get("answer_mode") in {"event_timing", "lifetime_event_timing", "month_timing", "event_prediction", "timing_window"}:
         timing_ids = [item.get("evidence_id") for item in ledger.get("records", []) if item.get("kind") == "event_timing_verdict"]
         if timing_ids:
             claims.append({
@@ -50,7 +63,7 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
     activation_value = (activation_record or {}).get("value")
     activation_value = activation_value if isinstance(activation_value, dict) else {}
     activation_timeline = activation_value.get("timeline") if isinstance(activation_value.get("timeline"), dict) else {}
-    if activation_record and activation_timeline:
+    if not exact_day and activation_record and activation_timeline:
         claims.append({
             "claim_id": "claim-dated-transit-activation",
             "purpose": "Identify only dated peaks that pass natal promise, dasha permission, and transit-trigger gates",
@@ -59,7 +72,8 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
         })
     timing_sequence = None
     current_cause_rules = None
-    if query_plan.get("answer_mode") == "event_prediction":
+    timing_value: Dict[str, Any] = {}
+    if not exact_day and query_plan.get("answer_mode") == "event_prediction":
         timing_record = next(
             (item for item in ledger.get("records", []) if item.get("kind") == "event_timing_verdict"),
             None,
@@ -129,14 +143,50 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                 "evidence. Never infer a current sub-period from a future timing window."
             ),
         }
+    answer_mode = str(query_plan.get("answer_mode") or "topic_reading")
+    if answer_mode == "factual_chart_lookup":
+        max_words, word_target = 140, "Usually 30-100 words; add only the context needed to identify the chart/system."
+    elif answer_mode in {"event_prediction", "timing_window", "location_recommendation", "dedicated_muhurat_flow"}:
+        max_words, word_target = 320, "Usually 140-260 words; preserve every material phase or ranked window."
+    elif answer_mode in {"explanation_mechanism", "problem_diagnosis", "comparison_choice"}:
+        max_words, word_target = 280, "Usually 110-220 words; be complete without repeating evidence."
+    else:
+        max_words, word_target = 240, "Usually 90-180 words; expand when the answer genuinely needs more explanation."
+    daily_rules = None
+    if exact_day:
+        daily_rules = {
+            "target_date": time_scope.get("target_date") or time_scope.get("as_of"),
+            "answer_order": [
+                "direct overall outlook for this day",
+                "one or two most likely real-life manifestations",
+                "best use or opportunity",
+                "main caution",
+                "one practical action",
+                "one compact astrological reason",
+                "one natural follow-up question",
+            ],
+            "decision_hierarchy": [
+                "KP daily fructification and event-house materialisation",
+                "transiting Moon, current nakshatra and Tara Bala",
+                "Prana and Sookshma dasha triggers",
+                "Pratyantardasha as the day frame",
+                "Antardasha and Mahadasha only as background permission",
+            ],
+            "instruction": (
+                "This is an exact-day forecast, never a shortened yearly or period reading. "
+                "Do not decide the day from MD/AD/PD alone. Lead with what the user is likely to "
+                "experience or should do today. Use PR/SK, Moon/Tara Bala and KP to rank the day; "
+                "MD/AD may explain the background in at most one compact clause."
+            ),
+        }
     return {
         "schema_version": "instant-answer-spec/v1",
         "tone": "natural, concise, daily-use language",
-        "max_words": 120,
-        "composer_word_target": "80-110 words; never exceed 120 words",
-        "answer_order": ["direct_answer", "one_chart_reason", "one_caution_if_material", "natural_follow_up_question"],
+        "max_words": max_words,
+        "composer_word_target": word_target,
+        "answer_order": daily_rules.get("answer_order") if daily_rules else ["direct_answer", "one_chart_reason", "one_caution_if_material", "natural_follow_up_question"],
         "presentation_contract": {
-            "astrology_is_hidden_evidence": True,
+            "astrology_is_hidden_evidence": False,
             "opening": "Answer the user's real-life question directly in ordinary language.",
             "broad_period_answer": [
                 "overall verdict",
@@ -144,7 +194,11 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                 "stronger or more demanding phase differences",
                 "one practical takeaway",
             ],
-            "technical_detail_limit": "At most one compact astrological proof sentence unless the user asks how it was derived.",
+            "technical_detail_limit": (
+                "Include at least one understandable astrological reason in every completed answer. "
+                "Prefer plain labels such as the active dasha, relevant house/lord, transit trigger, "
+                "divisional confirmation or karaka; do not dump raw calculations."
+            ),
             "invalid_shape": "A list of dashas, date ranges, planets, or house numbers that leaves the user to interpret the result.",
         },
         "activation_prediction_rules": {
@@ -201,6 +255,7 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
         ),
         "evidence_limitations": verdict.get("missing_required_capabilities") or [],
         "health_rules": health_rules,
+        "daily_rules": daily_rules,
         "timing_sequence": timing_sequence,
         "current_cause_rules": current_cause_rules,
         "comparison_rules": (
@@ -276,9 +331,9 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                     "offer or joining date unless the contract explicitly supplies that layer."
                 ),
             }
-            if query_plan.get("answer_mode") == "event_prediction"
-            else None
-        ),
+                if not exact_day and query_plan.get("answer_mode") == "event_prediction"
+                else None
+            ),
         "limitation_instruction": (
             "The evidence does not distinguish the named options. Do not favor, predict, or imply a winner. "
             "State that both remain open, name only the shared supported pressure/direction, and ask which "

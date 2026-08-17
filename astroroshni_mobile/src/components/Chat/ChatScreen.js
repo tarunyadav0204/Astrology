@@ -668,6 +668,8 @@ export default function ChatScreen({ navigation, route }) {
   const [waitSideReplying, setWaitSideReplying] = useState(false);
   const [instantLoaderWordCount, setInstantLoaderWordCount] = useState(1);
   const instantRevealTimersRef = useRef(new Set());
+  /** Instant assistant message_id → live WebSocket. Polling remains the recovery/final-authority path. */
+  const instantStreamSocketsRef = useRef(new Map());
   const [suggestions, setSuggestions] = useState(DEFAULT_CHAT_SUGGESTIONS);
   /** Keeps suggestion chips off-screen until the user asks for them — saves vertical space for messages. */
   const [showTopicIdeas, setShowTopicIdeas] = useState(false);
@@ -867,6 +869,17 @@ export default function ChatScreen({ navigation, route }) {
   useEffect(() => () => {
     instantRevealTimersRef.current.forEach((timer) => clearTimeout(timer));
     instantRevealTimersRef.current.clear();
+  }, []);
+
+  useEffect(() => () => {
+    instantStreamSocketsRef.current.forEach((socket) => {
+      try {
+        socket.close();
+      } catch (_) {
+        // Socket cleanup must never block screen teardown.
+      }
+    });
+    instantStreamSocketsRef.current.clear();
   }, []);
 
   const [showEventPeriods, setShowEventPeriods] = useState(false);
@@ -3866,6 +3879,87 @@ export default function ChatScreen({ navigation, route }) {
     );
   };
 
+  const streamInstantResponse = async (messageId, processingMessageId) => {
+    if (!messageId || typeof WebSocket === 'undefined') return false;
+
+    const token = await AsyncStorage.getItem('authToken');
+    if (!token) return false;
+
+    const mid = String(messageId);
+    const previousSocket = instantStreamSocketsRef.current.get(mid);
+    if (previousSocket) {
+      try {
+        previousSocket.close();
+      } catch (_) {
+        // A stale socket should not prevent a new stream attempt.
+      }
+    }
+
+    const wsBase = String(API_BASE_URL || '')
+      .replace(/\/+$/, '')
+      .replace(/^http:/i, 'ws:')
+      .replace(/^https:/i, 'wss:');
+    const streamUrl = `${wsBase}${getEndpoint(`/chat-v2/stream/${messageId}`)}?token=${encodeURIComponent(token)}`;
+
+    let socket;
+    try {
+      socket = new WebSocket(streamUrl);
+    } catch (error) {
+      console.warn('[InstantStream] WebSocket unavailable; polling will continue', error?.message || error);
+      return false;
+    }
+
+    instantStreamSocketsRef.current.set(mid, socket);
+    socket.onmessage = (event) => {
+      let payload;
+      try {
+        payload = JSON.parse(event.data);
+      } catch (_) {
+        return;
+      }
+
+      if (payload?.type === 'content_delta') {
+        const content = String(payload.content || '');
+        if (!content) return;
+        setMessagesWithStorage((prev) => prev.map((msg) =>
+          String(msg.messageId || '') === mid || msg.id === processingMessageId
+            ? {
+                ...msg,
+                messageId,
+                content,
+                isTyping: false,
+                instantStreaming: true,
+                chartInsights: [],
+                waitConversation: null,
+                engagementUpdates: [],
+              }
+            : msg
+        ));
+        setIsTyping(false);
+        if (stickMessagesToBottomRef.current) {
+          setTimeout(() => scrollToBottomReliably(false), 40);
+        }
+      }
+
+      if (['completed', 'failed', 'error'].includes(payload?.type)) {
+        try {
+          socket.close();
+        } catch (_) {
+          // Polling will fetch the authoritative terminal state.
+        }
+      }
+    };
+    socket.onerror = () => {
+      // The existing status poll is deliberately always active as fallback.
+    };
+    socket.onclose = () => {
+      if (instantStreamSocketsRef.current.get(mid) === socket) {
+        instantStreamSocketsRef.current.delete(mid);
+      }
+    };
+    return true;
+  };
+
   const pollForResponse = async (messageId, processingMessageId, currentSessionId, userQuestion = '', isResume = false) => {
     if (!messageId) {
       return;
@@ -3986,9 +4080,6 @@ export default function ChatScreen({ navigation, route }) {
           const fallbackTier = String(processingMessageForTier?.chatTier || rememberedTier || '').trim().toLowerCase();
           const resolvedChatTier = String(status.chat_tier || status.chatTier || rememberedTier || fallbackTier).trim().toLowerCase();
           const isInstantTierResponse = resolvedChatTier === 'instant';
-          const instantPieces = isInstantTierResponse
-            ? splitInstantReply(status.content || '')
-            : [];
 
           const showFinalMessage = () => {
             const waitConversation = normalizeWaitConversation(status.wait_conversation);
@@ -4000,11 +4091,9 @@ export default function ChatScreen({ navigation, route }) {
                 msg.messageId === messageId
                   ? {
                       ...msg,
-                      content: instantPieces.length > 1
-                        ? instantPieces[0]
-                        : (status.content || 'Response received but content is empty'),
+                      content: status.content || 'Response received but content is empty',
                       isTyping: false,
-                      instantStreaming: instantPieces.length > 1,
+                      instantStreaming: false,
                       terms: status.terms || [],
                       glossary: status.glossary || {},
                       message_type: status.message_type || 'answer',
@@ -4099,9 +4188,6 @@ export default function ChatScreen({ navigation, route }) {
               // Instant answers are short; jump to latest message for chat-like feel.
               scrollToBottomReliably(true);
             }
-            if (isInstantTierResponse && instantPieces.length > 1) {
-              revealInstantReply(messageId, instantPieces, status.content || '');
-            }
           };
 
           showFinalMessage();
@@ -4128,6 +4214,7 @@ export default function ChatScreen({ navigation, route }) {
           updateEffectiveStartedAt(status.started_at);
           const polledChartInsights = Array.isArray(status.chart_insights) ? status.chart_insights : [];
           const waitConversation = normalizeWaitConversation(status.wait_conversation);
+          const partialContent = String(status.partial_content || '');
           const hasEngagementIncoming =
             Array.isArray(status.engagement_updates) && status.engagement_updates.length > 0;
           // Standard/premium wait path: do not rewrite + scrollToEnd on every 1.5s poll.
@@ -4137,6 +4224,31 @@ export default function ChatScreen({ navigation, route }) {
             let changed = false;
             const next = prev.map((msg) => {
               if (msg.messageId !== messageId && msg.id !== processingMessageId) return msg;
+
+              const messageTier = String(
+                status.chat_tier ||
+                status.chatTier ||
+                msg.chatTier ||
+                messageTierByIdRef.current[messageId] ||
+                ''
+              ).trim().toLowerCase();
+              if (messageTier === 'instant' && partialContent) {
+                if (msg.content === partialContent && msg.isTyping === false && msg.instantStreaming === true) {
+                  return msg;
+                }
+                changed = true;
+                shouldScrollForContentGrowth = true;
+                return {
+                  ...msg,
+                  messageId: msg.messageId || messageId,
+                  content: partialContent,
+                  isTyping: false,
+                  instantStreaming: true,
+                  chartInsights: [],
+                  waitConversation: null,
+                  engagementUpdates: [],
+                };
+              }
 
               const nextMessageId = msg.messageId || messageId;
               const nextStartedAt = mergeProcessingStartedAt(
@@ -4626,9 +4738,6 @@ export default function ChatScreen({ navigation, route }) {
 
         console.log(`🚀 [POLLING START] Starting polling for messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
 
-        // Start polling IMMEDIATELY before state updates to avoid delay
-        pollForResponse(assistantMessageId, processingMessageId, activeSessionId, messageText);
-
         // Update user message with real DB ID (async, non-blocking)
         if (user_message_id) {
           setMessagesWithStorage(prev => {
@@ -4664,6 +4773,15 @@ export default function ChatScreen({ navigation, route }) {
           });
           return updated;
         });
+
+        // Instant mode renders Gemini's live tokens over WebSocket. The status
+        // poll always runs too, providing reconnect recovery and final metadata.
+        if (serverTier === 'instant') {
+          streamInstantResponse(assistantMessageId, processingMessageId).catch(() => {
+            // Polling is already active and remains the durable fallback.
+          });
+        }
+        pollForResponse(assistantMessageId, processingMessageId, activeSessionId, messageText);
       } catch (error) {
         // Only auto-retry for network-level errors
         if ((error.message?.includes('Network') || error.message?.includes('fetch')) && attempt < 3) {

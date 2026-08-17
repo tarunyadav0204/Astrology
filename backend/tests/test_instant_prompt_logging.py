@@ -4,9 +4,45 @@ import logging
 from chat.instant_chat_pipeline import (
     _build_instant_composer_context,
     _build_instant_prompt,
+    _build_period_topic_forecast,
     _log_instant_llm_request,
     _log_instant_llm_response,
 )
+
+
+def test_period_forecast_is_clamped_to_requested_horizon():
+    normalized = {
+        "current_timing": {"period_window": {"start": "2026-08-17", "end": "2027-04-14"}},
+        "window_dasha_segments": {
+            "segments": [
+                {
+                    "start": "2026-09-19",
+                    "end": "2027-02-12",
+                    "mahadasha": "Saturn",
+                    "antardasha": "Rahu",
+                    "pratyantardasha": "Mercury",
+                    "activated_focus_houses": [6],
+                },
+                {
+                    "start": "2027-02-13",
+                    "end": "2027-04-14",
+                    "mahadasha": "Saturn",
+                    "antardasha": "Rahu",
+                    "pratyantardasha": "Ketu",
+                    "activated_focus_houses": [8],
+                },
+            ]
+        },
+    }
+
+    forecast = _build_period_topic_forecast(
+        normalized,
+        "health",
+        {"as_of": "2026-08-17", "horizon_end": "2027-02-17"},
+    )
+
+    assert forecast["period"]["end"] == "2027-02-17"
+    assert forecast["chronological_phases"][-1]["end"] == "2027-02-17"
 
 
 def _payloads(caplog, prefix):
@@ -185,6 +221,44 @@ def test_v3_composer_receives_fused_brief_not_calculation_workspace():
     assert "role, status, recognition" in forecast["chronological_phases"][2]["manifestation_candidates"][0]
     assert "income, compensation" in forecast["chronological_phases"][2]["manifestation_candidates"][-1]
     assert forecast["strongest_phase"]["peak_windows"][0]["start"] == "2026-12-12"
+    assert brief["answer_blueprint"]["slots"][0]["slot"] == "direct real-life verdict"
+    assert brief["answer_blueprint"]["slots"][-1]["slot"] == "one natural follow-up question"
     assert "do not collapse multiple phases" in prompt
     assert "never turn a career forecast into a wealth forecast" in prompt
+    assert "Fill `answer_blueprint` in order" in prompt
     assert len(prompt) < 12000
+
+
+def test_future_comparison_does_not_send_current_chain_to_composer():
+    instant_context = {
+        "intent_summary": {"category": "career", "answer_mode": "comparison"},
+        "normalized_evidence": {
+            "current_timing": {
+                "authoritative_current_dasha_display": "Saturn-Rahu-Saturn",
+            },
+        },
+    }
+    packet = {
+        "query_plan": {
+            "category": "career",
+            "answer_mode": "comparison",
+            "time_scope": {"as_of": "2026-08-17", "horizon_end": "2027-08-17"},
+        },
+        "verdict": {
+            "direction": "promotion",
+            "ranked_windows": [
+                {
+                    "start": "2027-04-15",
+                    "end": "2027-08-17",
+                    "dasha_chain": "Saturn-Rahu-Venus",
+                }
+            ],
+        },
+        "answer_spec": {},
+    }
+
+    brief = _build_instant_composer_context(instant_context, packet)
+
+    assert "current_timing" not in (brief.get("evidence") or {})
+    assert "Saturn-Rahu-Saturn" not in json.dumps(brief)
+    assert brief["verdict"]["ranked_windows"][0]["start"] == "2027-04-15"

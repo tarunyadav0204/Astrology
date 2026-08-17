@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List
 
 
@@ -34,12 +35,18 @@ def _compact(value: Any, *, depth: int = 0) -> Any:
 
 
 def _add(records: List[Dict[str, Any]], *, source: str, kind: str, value: Any,
-         strength: str = "supporting", confidence: float = 0.75) -> None:
+         strength: str = "supporting", confidence: float = 0.75,
+         calculator: str | None = None) -> None:
     if value in (None, "", [], {}):
         return
     records.append({
         "evidence_id": f"ev-{len(records) + 1:03d}",
         "source": source,
+        "provenance": {
+            "calculator": calculator or source,
+            "execution": "existing_instant_calculator_pipeline",
+            "precomputed": True,
+        },
         "kind": kind,
         "strength": strength,
         "confidence": round(max(0.0, min(1.0, float(confidence))), 2),
@@ -49,13 +56,23 @@ def _add(records: List[Dict[str, Any]], *, source: str, kind: str, value: Any,
 
 def _capability_evidence_kinds(capability: str) -> List[str]:
     name = str(capability or "").lower()
+    if name == "daily.five_level_dasha":
+        return ["daily_dasha_stack"]
+    if name == "daily.moon_tara_bala":
+        return ["daily_moon_tara"]
+    if name == "daily.kp_fructification":
+        return ["daily_kp"]
+    if name == "daily.school_synthesis":
+        return ["daily_school_synthesis"]
     if name == "parashari.current_dasha":
         return ["current_dasha"]
     if "dasha_windows" in name:
-        return ["event_timing_verdict", "future_dasha_windows", "transit_activation_timeline", "option_comparison"]
+        # Timing permission requires an actual calculated dasha scan. A fused
+        # verdict or a transit timeline cannot stand in for dasha evidence.
+        return ["future_dasha_windows"]
     if name == "parashari.activations":
         return ["active_houses"]
-    if any(token in name for token in ("d7", "d9", "d10", "divisional")):
+    if re.search(r"(?:^|\.)d\d+(?:_|\.|$)", name) or "divisional" in name:
         return ["divisional_confirmation"]
     if name.startswith("parashari.") and any(
         token in name for token in ("promise", "foundation", "topic_foundation", "house_lords")
@@ -63,12 +80,25 @@ def _capability_evidence_kinds(capability: str) -> List[str]:
         return ["primary_drivers"]
     if name.startswith("kp."):
         return ["kp_signals"]
+    if name in {"transit.double_transit", "parashari.double_transit"}:
+        return ["double_transit_support"]
     if name.startswith("transit."):
-        return ["transit_activation_timeline", "event_timing_verdict", "current_transits"]
+        # A current planet snapshot is not an event trigger window.
+        return ["transit_activation_timeline"]
     if name == "comparison.option_specific_evidence":
         return ["option_comparison"]
     if name == "parashari.health_body_area":
         return ["health_body_area"]
+    if name.startswith("chart."):
+        return ["chart_facts"]
+    if name.startswith("jaimini.karaka") or name == "parashari.karaka_support":
+        return ["karaka_support"]
+    if name.startswith("nadi."):
+        return ["nadi_synthesis"]
+    if name.startswith("location."):
+        return ["location_recommendation"]
+    if name.startswith("muhurat."):
+        return ["muhurat_slots"]
     # Jaimini and future capability families must expose their own record kind;
     # divisional evidence alone is not proof that a Jaimini calculation ran.
     return []
@@ -80,6 +110,39 @@ def build_evidence_ledger(instant_context: Dict[str, Any], evidence_plan: Dict[s
     dashas = instant_context.get("current_dashas") if isinstance(instant_context.get("current_dashas"), dict) else {}
     parashari = instant_context.get("instant_parashari") if isinstance(instant_context.get("instant_parashari"), dict) else {}
     transits = instant_context.get("current_transits") if isinstance(instant_context.get("current_transits"), dict) else {}
+    daily = instant_context.get("daily_prediction_spine") if isinstance(instant_context.get("daily_prediction_spine"), dict) else {}
+
+    if daily:
+        schools = daily.get("school_judgments") if isinstance(daily.get("school_judgments"), dict) else {}
+        _add(
+            records, source="daily_prediction_spine", kind="daily_dasha_stack",
+            value={
+                "target_date": daily.get("target_date"),
+                "dasha_stack": daily.get("dasha_stack"),
+                "ranked_triggers": daily.get("ranked_triggers"),
+                "interpretation_rules": daily.get("interpretation_rules"),
+            }, strength="primary", confidence=0.96, calculator="daily_prediction_spine",
+        )
+        _add(
+            records, source="daily_prediction_spine", kind="daily_moon_tara",
+            value={
+                "target_date": daily.get("target_date"),
+                "moon": daily.get("moon"),
+                "panchanga": daily.get("panchanga"),
+            }, strength="primary", confidence=0.94, calculator="daily_prediction_spine",
+        )
+        _add(
+            records, source="daily_prediction_spine.kp", kind="daily_kp",
+            value=schools.get("kp"), strength="primary", confidence=0.94,
+            calculator="kp_daily_fructification",
+        )
+        _add(
+            records, source="daily_prediction_spine.synthesis", kind="daily_school_synthesis",
+            value={
+                "daily_judgment": daily.get("daily_judgment"),
+                "school_judgments": schools,
+            }, strength="supporting", confidence=0.9, calculator="daily_school_judgments",
+        )
 
     _add(records, source="parashari.dasha", kind="current_dasha", value={
         "as_of": dashas.get("as_of"), "levels": dashas.get("levels") or []
@@ -101,12 +164,15 @@ def build_evidence_ledger(instant_context: Dict[str, Any], evidence_plan: Dict[s
          value={"as_of": transits.get("as_of"), "planets": transits.get("planets")}, confidence=0.78)
     _add(records, source="timing.fusion", kind="event_timing_verdict",
          value=normalized.get("event_timing_verdict"), strength="primary", confidence=0.9)
-    _add(records, source="parashari.transit_activation", kind="transit_activation_timeline",
-         value={
-             "natal_promise": normalized.get("natal_promise"),
-             "timeline": normalized.get("transit_activation_timeline"),
-             "window_segments": normalized.get("window_dasha_segments"),
-         }, strength="primary", confidence=0.92)
+    activation_timeline = normalized.get("transit_activation_timeline")
+    activation_segments = normalized.get("window_dasha_segments")
+    if activation_timeline or activation_segments:
+        _add(records, source="parashari.transit_activation", kind="transit_activation_timeline",
+             value={
+                 "natal_promise": normalized.get("natal_promise"),
+                 "timeline": activation_timeline,
+                 "window_segments": activation_segments,
+             }, strength="primary", confidence=0.92)
     _add(records, source="parashari.dasha_scan", kind="future_dasha_windows",
          value=normalized.get("forward_event_dasha_scan") or normalized.get("horizon_dasha_segments"),
          strength="primary", confidence=0.88)
@@ -115,6 +181,28 @@ def build_evidence_ledger(instant_context: Dict[str, Any], evidence_plan: Dict[s
     _add(records, source="parashari.health", kind="health_body_area",
          value=normalized.get("health_body_area") or normalized.get("body_area_evidence"),
          strength="primary", confidence=0.8)
+    chart_facts = normalized.get("chart_facts") if isinstance(normalized.get("chart_facts"), dict) else {}
+    _add(
+        records, source="chart.calculation", kind="chart_facts",
+        value=chart_facts if chart_facts.get("calculation_complete") else {},
+        strength="primary", confidence=0.98, calculator="chart_and_divisional_calculators",
+    )
+    _add(records, source="jaimini.karaka", kind="karaka_support",
+         value=normalized.get("karaka_evidence") or normalized.get("jaimini_evidence") or parashari.get("karaka_evidence"),
+         strength="supporting", confidence=0.84, calculator="jaimini_karaka_calculator")
+    timing_payload = normalized.get("event_timing_verdict") if isinstance(normalized.get("event_timing_verdict"), dict) else {}
+    _add(records, source="transit.double_transit", kind="double_transit_support",
+         value=(normalized.get("double_transit") or timing_payload.get("double_transit")),
+         strength="supporting", confidence=0.9, calculator="double_transit_service")
+    _add(records, source="nadi.domain_synthesis", kind="nadi_synthesis",
+         value=normalized.get("nadi_evidence"), strength="supporting", confidence=0.82,
+         calculator="nadi_domain_synthesis_calculator")
+    _add(records, source="location.recommendation", kind="location_recommendation",
+         value=normalized.get("location_recommendation") or instant_context.get("location_recommendation"),
+         strength="primary", confidence=0.85, calculator="location_recommendation_calculator")
+    _add(records, source="muhurat.election", kind="muhurat_slots",
+         value=normalized.get("muhurat_slots") or instant_context.get("muhurat_slots"),
+         strength="primary", confidence=0.9, calculator="muhurat_calculator")
     _add(records, source="claim.gates", kind="claim_gates",
          value=normalized.get("claim_gates"), strength="constraint", confidence=1.0)
 
@@ -137,10 +225,12 @@ def build_evidence_ledger(instant_context: Dict[str, Any], evidence_plan: Dict[s
             **request,
             "status": status,
             "evidence_ids": evidence_ids,
+            "unavailable_reason": None if evidence_ids else "No result from the named calculator was exposed for this request.",
         })
     return {
         "schema_version": "instant-evidence-ledger/v1",
         "records": records,
         "capabilities": capabilities,
         "record_count": len(records),
+        "calculator_contract": "A capability is available only when its own calculator-family record is present; unrelated chart evidence never satisfies it.",
     }

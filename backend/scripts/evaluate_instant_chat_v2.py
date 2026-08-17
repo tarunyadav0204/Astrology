@@ -77,7 +77,9 @@ def _compact_result(question: str, intent: Dict[str, Any], result: Dict[str, Any
             "model": result.get("chat_llm_model"),
             "prompt_chars": result.get("llm_prompt_chars"),
             "response_chars": len(result.get("response") or ""),
+            "composer_metrics": packet.get("composer_metrics"),
         },
+        "composer_brief": packet.get("composer_brief"),
         "query_plan": {
             key: plan.get(key)
             for key in ("category", "answer_mode", "time_scope", "target_subject", "required_capabilities")
@@ -163,7 +165,7 @@ ANSWER: {row.get('answer')}
         premium_analysis=False,
         force_gemini=True,
         llm_log_tag=None,
-        request_timeout_s=180.0,
+        request_timeout_s=45.0,
     )
     parsed = _parse_json_object(judged.get("response") or "")
     parsed["model"] = judged.get("chat_llm_model")

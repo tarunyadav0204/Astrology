@@ -9,8 +9,9 @@ from calendar import monthrange
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 import asyncio
+import time
 
 from ai.parallel_chat.parallel_agent_payloads import build_parashari_agent_payload
 from ai.response_parser import ResponseParser
@@ -18,6 +19,7 @@ from calculators import RemedyEngine
 from calculators.chart_calculator import ChartCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
 from chat.chat_context_builder import ChatContextBuilder
+from daily_prediction_spine import build_daily_prediction_spine
 from instant_chat_v2 import build_instant_v2_packet, finalize_instant_v2_packet
 from context_agents.base import AgentContext
 from prediction_engine.nakshatra_transit import nakshatra_transit_relation
@@ -37,6 +39,24 @@ def _env_flag(name: str, default: bool = False) -> bool:
     if raw is None:
         return default
     return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _instant_timeout_seconds(name: str, default: float, *, maximum: float) -> float:
+    try:
+        return max(3.0, min(maximum, float(os.getenv(name, str(default)) or default)))
+    except (TypeError, ValueError):
+        return default
+
+
+def _instant_thinking_level(model_name: str) -> Optional[str]:
+    """Fast but non-zero reasoning for Gemini 3; Gemini 2.x omits the setting."""
+    model_id = str(model_name or "").lower()
+    if "gemini-3" not in model_id:
+        return None
+    configured = str(os.getenv("INSTANT_CHAT_THINKING_LEVEL") or "").strip().lower()
+    if configured in {"minimal", "low", "medium", "high"}:
+        return configured
+    return "minimal" if "flash-lite" in model_id else "low"
 
 
 def _build_instant_usage_stage(stage: str, model_name: str, prompt_chars: int, response_chars: int, token_usage: Dict[str, Any] | None, success: bool, elapsed_s: float | None = None) -> Dict[str, Any]:
@@ -1108,6 +1128,7 @@ def _slim_event_prediction_payload(
     house_lordships: Dict[str, List[int]],
     named_dasha_lookup: Optional[Dict[str, Any]] = None,
     evidence_plan: Optional[Dict[str, Any]] = None,
+    daily_prediction_spine: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     focus_houses = list((instant_parashari or {}).get("focus_houses") or [])
     is_target_relative = str((target_chart_context or {}).get("key") or "self") != "self"
@@ -1320,6 +1341,18 @@ def _slim_event_prediction_payload(
             ],
         ],
     }
+    # Preserve compact calculator provenance required by the v2 confidence
+    # contract. These are already bounded by the evidence ledger compactor.
+    for evidence_key in (
+        "karaka_evidence",
+        "double_transit",
+        "nadi_evidence",
+        "chart_facts",
+        "location_recommendation",
+        "muhurat_slots",
+    ):
+        if (normalized_evidence or {}).get(evidence_key) not in (None, "", [], {}):
+            slim_normalized[evidence_key] = (normalized_evidence or {}).get(evidence_key)
     if named_dasha_lookup:
         slim_normalized["named_dasha_lookup"] = named_dasha_lookup
         slim_normalized["primary_drivers"] = [
@@ -1396,6 +1429,10 @@ def _slim_event_prediction_payload(
         "current_transits_formatted": major_transits,
         "instant_parashari": slim_parashari,
         "normalized_evidence": slim_normalized,
+        # Exact-day questions can still be routed through the compact event
+        # payload. Keep the authoritative five-level/KP/Moon calculation at
+        # the top level so the Instant v2 evidence gateway can see it.
+        "daily_prediction_spine": daily_prediction_spine or {},
         "recent_history": [],
         "complexity_hint": {"mode": "slim_event_prediction", "question_length": len(question or "")},
         "named_dasha_lookup": named_dasha_lookup or {},
@@ -1515,6 +1552,7 @@ _MONTH_NAME_TO_NUM = {
 }
 
 ANSWER_MODES = [
+    "factual_chart_lookup",
     "explanation_mechanism",
     "trait_nature",
     "relationship_person",
@@ -1525,6 +1563,10 @@ ANSWER_MODES = [
     "problem_diagnosis",
     "remedy_action",
     "topic_reading",
+    "location_recommendation",
+    "dedicated_muhurat_flow",
+    "dedicated_partnership_flow",
+    "compound_plan",
 ]
 
 TARGET_SUBJECTS = {
@@ -1737,6 +1779,48 @@ def _conversational_ack_response(language: str, *, speech_mode: bool) -> Dict[st
         },
         "skip_instant_credit_charge": True,
     }
+
+
+def _instant_route_response(
+    *,
+    body: str,
+    answer_mode: str,
+    route_action: str,
+    language: str,
+    speech_mode: bool,
+) -> Dict[str, Any]:
+    """Return a router-owned clarification/handoff without running calculators.
+
+    The multilingual LLM router writes ``body``.  This helper only packages it
+    into the normal chat response contract and therefore performs no natural-
+    language interpretation or generation itself.
+    """
+    message = str(body or "").strip()
+    if not message:
+        # This is an exceptional degraded-router fallback, not semantic routing.
+        message = (
+            "Please ask one clear question at a time so I can calculate it accurately."
+            if route_action == "clarify"
+            else "Please open the dedicated Partnership experience for this two-chart reading."
+        )
+    response = _conversational_ack_response(language, speech_mode=speech_mode)
+    response.update({
+        "response": message,
+        "raw_response": message,
+        "llm_response_chars": len(message),
+        "chat_llm_model": "__instant_semantic_router__",
+        "follow_up_questions": [],
+        "skip_instant_credit_charge": True,
+    })
+    response["timing"].update({
+        "route_action": route_action,
+        "calculator_execution_skipped": True,
+    })
+    response["instant_context_summary"].update({
+        "answer_mode": answer_mode,
+        "mode": route_action,
+    })
+    return response
 
 
 def _instant_lifetime_event_year_clarification_response(language: str, *, speech_mode: bool) -> Dict[str, Any]:
@@ -2001,9 +2085,37 @@ def _resolve_period_window(intent: Optional[Dict[str, Any]], now_local: datetime
     extracted = ir.get("extracted_context") if isinstance(ir.get("extracted_context"), dict) else {}
     tr = ir.get("transit_request") if isinstance(ir.get("transit_request"), dict) else {}
     year_month_map = tr.get("yearMonthMap") if isinstance(tr.get("yearMonthMap"), dict) else {}
+    resolved_period = ir.get("period_window") if isinstance(ir.get("period_window"), dict) else {}
     timeframe_text = str(extracted.get("timeframe") or "").strip().lower()
     if not timeframe_text:
         timeframe_text = str(question or "").strip().lower()
+
+    # The LLM intent router owns natural-language interpretation. Once it has
+    # classified a request as daily (or supplied an exact-day period), preserve
+    # that result here instead of degrading it to the legacy "current" window.
+    is_daily_request = bool(
+        str(ir.get("mode") or "").strip().upper() == "PREDICT_DAILY"
+        or str(resolved_period.get("kind") or "").strip().lower() == "day"
+    )
+    if is_daily_request:
+        target_raw = str(
+            resolved_period.get("start")
+            or resolved_period.get("date")
+            or resolved_period.get("target_date")
+            or extracted.get("specific_date")
+            or ir.get("dasha_as_of")
+            or now_local.strftime("%Y-%m-%d")
+        ).strip()
+        target = _parse_ymd(target_raw) or now_local.replace(tzinfo=None)
+        return {
+            "kind": "day",
+            "start": target.strftime("%Y-%m-%d"),
+            "end": target.strftime("%Y-%m-%d"),
+            "span_days": 1,
+            "label": target.strftime("%d %B %Y"),
+            "use_pd": True,
+            "use_sk_pr": True,
+        }
     
     # Handle "this year" or generic year requests
     if "year" in timeframe_text or str(now_local.year) in timeframe_text:
@@ -4227,6 +4339,7 @@ CRITICAL:
 - Do not be biased by the user's wording. For example, a 'will X happen' question should still map to the mode that best fits the chart-reading task, not what the user seems to want to hear.
 
 Answer mode meanings:
+- factual_chart_lookup: exact calculated fact from any supported chart, dasha, transit, yoga, karaka or strength table
 - explanation_mechanism: user asks how/why a prior chart claim was made
 - trait_nature: user asks about behavior, nature, speech, temperament, personality
 - relationship_person: user asks about the nature/characteristics of spouse/partner/person
@@ -4237,6 +4350,18 @@ Answer mode meanings:
 - problem_diagnosis: user asks why something is blocked, unstable, delayed, leaking, or difficult
 - remedy_action: ONLY when the client already marked this turn as a Remedies CTA follow-up (query_context.remedy_followup / open_remedy / follow_up_type=remedy_action). Never choose remedy_action from wording alone (e.g. "what should I do", "upay", "solution") — those stay problem_diagnosis or topic_reading; the UI will offer a Remedies card when appropriate.
 - topic_reading: default focused reading when none of the above fit best
+- location_recommendation: where/place/direction recommendation for a stated life goal; this is distinct from event timing
+- dedicated_muhurat_flow: best date/time for an action; requires the event, location/timezone and usable date range
+- dedicated_partnership_flow: two-chart compatibility; Instant must hand this to Partnership mode and must not calculate it
+- compound_plan: two or more materially different questions; ask the user to send only one question first and do not calculate
+
+Routing action:
+- `answer`: the question is single, sufficiently clear and can enter its calculator flow.
+- `clarify`: a material fact is missing, or answer_mode is compound_plan. Write one short natural clarification in the user's language.
+- `handoff`: answer_mode is dedicated_partnership_flow. Write one short natural message in the user's language directing them to Partnership mode.
+- For dedicated_muhurat_flow, clarify if event, location/timezone, or date range is missing; otherwise answer through that dedicated flow.
+- For location_recommendation, clarify only when the goal or requested scope is materially missing.
+- Do not classify a question as compound merely because it needs several astrology calculations. It must contain materially different user asks.
 
 Also infer the target_subject_key from the allowed_target_subjects list.
 Examples:
@@ -4251,7 +4376,7 @@ Instant chat now handles open-ended event timing by scanning a bounded forward h
 - Set `needs_year_clarification=false` when a specific year/window is already given, or when the question is not event timing.
 
 Return JSON only:
-{{"answer_mode":"one_of_the_allowed_modes","confidence":"high|medium|low","reason":"very short reason","target_subject_key":"allowed_target_or_self","needs_year_clarification":true_or_false}}
+{{"answer_mode":"one_of_the_allowed_modes","route_action":"answer|clarify|handoff","confidence":"high|medium|low","reason":"very short reason","target_subject_key":"allowed_target_or_self","needs_year_clarification":true_or_false,"user_message":"required for clarify or handoff; same language as user"}}
 
 INPUT:
 {context_json}
@@ -4267,7 +4392,6 @@ async def _infer_answer_mode_with_llm(
 ) -> Dict[str, Any]:
     prompt = _build_answer_mode_router_prompt(question, intent, history)
     model_name = get_gemini_instant_model()
-    selected_model = analyzer.get_named_gemini_model(model_name, premium_analysis=False)
 
     def _pack(mode: str, target_subject: Optional[Dict[str, Any]] = None, **extra: Any) -> Dict[str, Any]:
         return {
@@ -4280,18 +4404,24 @@ async def _infer_answer_mode_with_llm(
         llm_result = await analyzer.generate_text_from_prompt(
             prompt,
             premium_analysis=False,
-            model_override=selected_model,
+            model_override=None,
             model_name_override=model_name,
             llm_log_tag="instant_answer_mode",
-            request_timeout_s=20.0,
+            request_timeout_s=_instant_timeout_seconds(
+                "INSTANT_CHAT_ROUTER_TIMEOUT_SECONDS",
+                10.0,
+                maximum=20.0,
+            ),
             force_gemini=True,
+            use_gemini_rest=True,
+            gemini_thinking_level=_instant_thinking_level(model_name),
         )
     except Exception as exc:
         logger.warning("instant answer mode llm classification failed: %s", exc)
-        return _pack(_infer_answer_mode(question, intent, history))
+        return _pack("topic_reading", route_action="answer", router_degraded=True)
     if not llm_result.get("success"):
         logger.warning("instant answer mode llm classification unsuccessful: %s", llm_result.get("error"))
-        return _pack(_infer_answer_mode(question, intent, history))
+        return _pack("topic_reading", route_action="answer", router_degraded=True)
     raw = str(llm_result.get("response") or "").strip()
     target_subject: Optional[Dict[str, Any]] = None
     try:
@@ -4311,7 +4441,20 @@ async def _infer_answer_mode_with_llm(
         if mode in ANSWER_MODES:
             if target_subject is None:
                 target_subject = _fallback_target_subject(question)
-            return _pack(mode, target_subject, needs_year_clarification=needs_year_clarification)
+            route_action = str(data.get("route_action") or "answer").strip().lower()
+            if route_action not in {"answer", "clarify", "handoff"}:
+                route_action = "answer"
+            if mode == "compound_plan":
+                route_action = "clarify"
+            elif mode == "dedicated_partnership_flow":
+                route_action = "handoff"
+            return _pack(
+                mode,
+                target_subject,
+                needs_year_clarification=needs_year_clarification,
+                route_action=route_action,
+                user_message=str(data.get("user_message") or "").strip(),
+            )
     except Exception:
         pass
     m = re.search(r'"answer_mode"\s*:\s*"([^"]+)"', raw)
@@ -4333,9 +4476,9 @@ async def _infer_answer_mode_with_llm(
             if target_subject is None:
                 target_subject = _fallback_target_subject(question)
             needs_year_clarification = False
-            return _pack(mode, target_subject, needs_year_clarification=needs_year_clarification)
+            return _pack(mode, target_subject, needs_year_clarification=needs_year_clarification, route_action="answer")
     logger.warning("instant answer mode llm output invalid, falling back: %s", _truncate(raw, 240))
-    return _pack(_infer_answer_mode(question, intent, history), needs_year_clarification=False)
+    return _pack("topic_reading", needs_year_clarification=False, route_action="answer", router_degraded=True)
 
 
 def _mode_selection_from_intent(intent: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -4387,6 +4530,8 @@ def _mode_selection_from_intent(intent: Optional[Dict[str, Any]]) -> Optional[Di
         "answer_mode": mode,
         "target_subject": target_subject,
         "needs_year_clarification": bool(intent.get("needs_year_clarification")),
+        "route_action": str(intent.get("route_action") or "answer").strip().lower(),
+        "user_message": str(intent.get("clarification_question") or intent.get("route_message") or "").strip(),
     }
 
 
@@ -5726,6 +5871,412 @@ def _build_named_dasha_lookup_from_evidence_plan(
     }
 
 
+def _instant_real_karaka_evidence(chart_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Run the existing Jaimini calculator and expose only its real result."""
+    try:
+        from calculators.chara_karaka_calculator import CharaKarakaCalculator
+
+        result = CharaKarakaCalculator(chart_data).calculate_chara_karakas()
+        return result if isinstance(result, dict) else {}
+    except Exception:
+        logger.exception("Instant Jaimini karaka calculation failed")
+        return {}
+
+
+def _instant_real_kp_evidence(birth_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Calculate the compact KP payload required by the exact-day spine."""
+    try:
+        from app.kp.services.chart_service import KPChartService
+
+        result = KPChartService.calculate_kp_chart(
+            birth_data.get("date"),
+            birth_data.get("time"),
+            birth_data.get("latitude"),
+            birth_data.get("longitude"),
+            birth_data.get("timezone"),
+        )
+        if not isinstance(result, dict) or result.get("error"):
+            return {}
+        return {
+            "planet_lords": result.get("planet_lords") or {},
+            "cusp_lords": result.get("cusp_lords") or {},
+            "significators": result.get("significators") or {},
+            "planet_significators": result.get("planet_significators") or {},
+            "four_step_theory": result.get("four_step_theory") or {},
+        }
+    except Exception:
+        logger.exception("Instant exact-day KP calculation failed")
+        return {}
+
+
+def _should_force_event_current_window(
+    answer_mode: str,
+    period_window: Optional[Dict[str, Any]],
+) -> bool:
+    """Keep a resolved exact day intact while retaining legacy event behavior."""
+    return (
+        str(answer_mode or "").strip() == "event_prediction"
+        and str((period_window or {}).get("kind") or "").strip().lower() != "day"
+    )
+
+
+_INSTANT_SUPPORTED_VARGAS = {1, 2, 3, 4, 7, 9, 10, 12, 16, 20, 24, 27, 30, 40, 45, 60}
+
+
+def _instant_compact_calculated_chart(chart: Dict[str, Any]) -> Dict[str, Any]:
+    """Keep exact placements while avoiding a second full chart context."""
+    if not isinstance(chart, dict):
+        return {}
+    payload = chart.get("divisional_chart") if isinstance(chart.get("divisional_chart"), dict) else chart
+    planets = payload.get("planets") if isinstance(payload.get("planets"), dict) else {}
+    compact_planets: Dict[str, Any] = {}
+    for name, row in planets.items():
+        if not isinstance(row, dict):
+            continue
+        compact_planets[str(name)] = {
+            key: row.get(key)
+            for key in (
+                "sign", "sign_name", "house", "longitude", "degree",
+                "degree_in_sign", "nakshatra", "pada", "retrograde",
+                "combust", "exalted", "debilitated",
+            )
+            if row.get(key) is not None
+        }
+    ascendant = payload.get("ascendant")
+    return {
+        "chart_name": chart.get("chart_name") or payload.get("chart_type"),
+        "division_number": chart.get("division_number"),
+        "ascendant": ascendant,
+        "ascendant_sign": (
+            payload.get("ascendant_sign")
+            if payload.get("ascendant_sign") is not None
+            else int(float(ascendant) / 30) if isinstance(ascendant, (int, float)) else None
+        ),
+        "ayanamsa": payload.get("ayanamsa"),
+        "planets": compact_planets,
+    }
+
+
+def _instant_real_chart_facts(
+    *, chart_data: Dict[str, Any], requested_charts: List[str], requested_fact: Any,
+    karaka_evidence: Dict[str, Any], d1_snapshot: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Calculate every explicitly requested supported chart.
+
+    A chart name appearing in a prose summary is not proof that the chart was
+    calculated.  This adapter is the sole source for the chart-fact capability.
+    """
+    requested = []
+    for raw in requested_charts or ["D1"]:
+        label = str(raw or "").strip()
+        normalized = re.sub(r"[\s_-]+", "", label).upper()
+        if normalized in {"KARAKAMSHA", "KARKAMSA"}:
+            normalized = "KARAKAMSHA"
+        elif normalized == "SWAMSA":
+            normalized = "SWAMSA"
+        elif normalized and normalized[0].isdigit():
+            normalized = f"D{normalized}"
+        if normalized and normalized not in requested:
+            requested.append(normalized)
+    if not requested:
+        requested = ["D1"]
+
+    calculated: Dict[str, Any] = {}
+    missing: List[str] = []
+    failures: Dict[str, str] = {}
+    divisional_calc = None
+    jaimini_calc = None
+
+    for chart_name in requested:
+        try:
+            if chart_name == "D1":
+                calculated[chart_name] = _instant_compact_calculated_chart(chart_data) or d1_snapshot
+                continue
+            match = re.fullmatch(r"D(\d{1,2})", chart_name)
+            if match:
+                division = int(match.group(1))
+                if division not in _INSTANT_SUPPORTED_VARGAS:
+                    missing.append(chart_name)
+                    failures[chart_name] = "This divisional chart is not supported by the verified calculator set."
+                    continue
+                if divisional_calc is None:
+                    from calculators.divisional_chart_calculator import DivisionalChartCalculator
+                    divisional_calc = DivisionalChartCalculator(chart_data)
+                result = divisional_calc.calculate_divisional_chart(division)
+                compact = _instant_compact_calculated_chart(result)
+                if not compact.get("planets"):
+                    raise ValueError("calculator returned no planetary placements")
+                calculated[chart_name] = compact
+                continue
+            if chart_name in {"KARAKAMSHA", "SWAMSA"}:
+                karakas = karaka_evidence.get("chara_karakas") if isinstance(karaka_evidence, dict) else {}
+                atmakaraka = (karakas.get("Atmakaraka") or {}).get("planet") if isinstance(karakas, dict) else None
+                if not atmakaraka:
+                    raise ValueError("Atmakaraka is unavailable")
+                if jaimini_calc is None:
+                    from calculators.jaimini_chart_calculator import JaiminiChartCalculator
+                    # Older saved calculation payloads may contain longitude
+                    # but omit the redundant degree-within-sign field expected
+                    # by this legacy Jaimini adapter.
+                    jaimini_chart_data = dict(chart_data)
+                    jaimini_chart_data["planets"] = {
+                        name: {
+                            **row,
+                            "sign": row.get("sign", int(float(row.get("longitude") or 0) / 30)),
+                            "degree": row.get("degree", float(row.get("longitude") or 0) % 30),
+                        }
+                        for name, row in (chart_data.get("planets") or {}).items()
+                        if isinstance(row, dict)
+                    }
+                    jaimini_calc = JaiminiChartCalculator(jaimini_chart_data, atmakaraka)
+                result = (
+                    jaimini_calc.calculate_karkamsa_chart()
+                    if chart_name == "KARAKAMSHA"
+                    else jaimini_calc.calculate_swamsa_chart()
+                )
+                chart_key = "karkamsa_chart" if chart_name == "KARAKAMSHA" else "swamsa_chart"
+                compact = _instant_compact_calculated_chart(result.get(chart_key) or {})
+                if not compact.get("planets"):
+                    raise ValueError("calculator returned no planetary placements")
+                calculated[chart_name] = {
+                    **compact,
+                    "atmakaraka": result.get("atmakaraka"),
+                    "atmakaraka_degree_in_d9": result.get("atmakaraka_degree_in_d9"),
+                    "significance": result.get("significance"),
+                }
+                continue
+            missing.append(chart_name)
+            failures[chart_name] = "Unknown chart identifier."
+        except Exception as exc:
+            logger.exception("Instant chart fact calculation failed for %s", chart_name)
+            missing.append(chart_name)
+            failures[chart_name] = str(exc)[:180]
+
+    return {
+        "requested_charts": requested,
+        "requested_fact": requested_fact,
+        "charts": calculated,
+        "calculation_complete": bool(calculated) and not missing,
+        "missing_requested_charts": missing,
+        "calculation_failures": failures,
+        "supported_divisional_charts": [f"D{number}" for number in sorted(_INSTANT_SUPPORTED_VARGAS)],
+        "source": "DivisionalChartCalculator and JaiminiChartCalculator",
+    }
+
+
+def _instant_real_nadi_evidence(chart_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Run the existing Bhrigu Nandi Nadi linkage calculator.
+
+    A methodology declaration is not evidence.  Instant may cite Nadi only
+    when this adapter has produced a real linkage network for the chart.
+    """
+    try:
+        from calculators.nadi_linkage_calculator import NadiLinkageCalculator
+
+        links = NadiLinkageCalculator(chart_data).get_nadi_links()
+        return {
+            "method": "Bhrigu Nandi Nadi planetary linkage network",
+            "links": links,
+        } if isinstance(links, dict) and links else {}
+    except Exception:
+        logger.exception("Instant Nadi linkage calculation failed")
+        return {}
+
+
+def _instant_real_double_transit_evidence(
+    *, chart_data: Dict[str, Any], start: datetime, end: datetime,
+    focus_houses: List[int], answer_mode: str,
+) -> Dict[str, Any]:
+    """Calculate exact Jupiter-Saturn double-transit windows for timing flows."""
+    if answer_mode not in {
+        "event_timing", "lifetime_event_timing", "month_timing",
+        "event_prediction", "timing_window",
+    }:
+        return {}
+    try:
+        from charts.double_transit_service import calculate_double_transits
+
+        result = calculate_double_transits(chart_data, start, end)
+        if not isinstance(result, dict):
+            return {}
+        wanted = {int(house) for house in (focus_houses or []) if str(house).isdigit()}
+        windows = [
+            row for row in (result.get("windows") or [])
+            if isinstance(row, dict) and (not wanted or int(row.get("house") or 0) in wanted)
+        ]
+        return {
+            "schema": result.get("schema"),
+            "method": result.get("method"),
+            "range": result.get("range"),
+            "focus_houses": sorted(wanted),
+            "window_count": len(windows),
+            "windows": windows[:16],
+        }
+    except Exception:
+        logger.exception("Instant double-transit calculation failed")
+        return {}
+
+
+def _instant_resolve_muhurat_location(
+    *, birth_data: Dict[str, Any], extracted: Dict[str, Any], language: str,
+    start_date: str,
+) -> Dict[str, Any]:
+    """Resolve a user-supplied place name through Places; never trust LLM coordinates."""
+    if extracted.get("muhurat_use_birth_location") is True:
+        lat = birth_data.get("latitude")
+        lon = birth_data.get("longitude")
+        if lat is None or lon is None:
+            return {}
+        return {
+            "latitude": float(lat),
+            "longitude": float(lon),
+            "timezone": birth_data.get("timezone"),
+            "label": birth_data.get("place") or birth_data.get("birth_place") or "birth location",
+            "source": "saved_birth_location",
+        }
+    query = str(extracted.get("muhurat_location_query") or "").strip()
+    if not query:
+        return {}
+    try:
+        from utils.google_places_client import place_details, places_autocomplete_suggestions
+        from utils.timezone_service import get_iana_timezone
+
+        suggestions = places_autocomplete_suggestions(query, language=language or "en", limit=1)
+        if not suggestions:
+            return {}
+        detail = place_details(suggestions[0]["place_id"], language=language or "en")
+        lat = float(detail["latitude"])
+        lon = float(detail["longitude"])
+        return {
+            "latitude": lat,
+            "longitude": lon,
+            "timezone": get_iana_timezone(lat, lon),
+            "label": detail.get("formattedAddress") or detail.get("name") or query,
+            "place_id": detail.get("place_id"),
+            "source": "google_places_verified",
+        }
+    except Exception:
+        logger.exception("Instant Muhurat location resolution failed query=%s", query)
+        return {}
+
+
+def _instant_real_location_evidence(
+    *, birth_data: Dict[str, Any], intent: Dict[str, Any], chart_data: Dict[str, Any],
+    current_dashas: Dict[str, Any], answer_mode: str,
+) -> Dict[str, Any]:
+    if answer_mode != "location_recommendation":
+        return {}
+    try:
+        from chat.locational_context_builder import build_locational_recommendation_pack
+
+        location_intent = dict(intent or {})
+        location_intent["mode"] = "RECOMMEND_LOCATION"
+        result = build_locational_recommendation_pack(
+            birth_data,
+            intent_result=location_intent,
+            natal_chart=chart_data,
+            current_dashas=current_dashas,
+            # Geography is accepted only from LLM-normalized extracted_context;
+            # no English keyword parsing is allowed in Instant Chat.
+            user_question="",
+        )
+        return result if isinstance(result, dict) else {}
+    except Exception:
+        logger.exception("Instant location recommendation calculation failed")
+        return {}
+
+
+def _instant_real_muhurat_evidence(
+    *, birth_data: Dict[str, Any], intent: Dict[str, Any], chart_data: Dict[str, Any],
+    answer_mode: str,
+) -> Dict[str, Any]:
+    """Run a supported election calculator using LLM-normalized parameters."""
+    if answer_mode != "dedicated_muhurat_flow":
+        return {}
+    extracted = (intent or {}).get("extracted_context")
+    extracted = extracted if isinstance(extracted, dict) else {}
+    event_type = str(extracted.get("muhurat_event_type") or "").strip().lower()
+    start_date = str(extracted.get("muhurat_start_date") or "").strip()
+    end_date = str(extracted.get("muhurat_end_date") or "").strip()
+    language = str((intent or {}).get("language") or "en").strip().lower()
+    resolved_location = _instant_resolve_muhurat_location(
+        birth_data=birth_data,
+        extracted=extracted,
+        language=language,
+        start_date=start_date,
+    )
+    lat = resolved_location.get("latitude")
+    lon = resolved_location.get("longitude")
+    timezone_name = resolved_location.get("timezone")
+    if not event_type or not start_date or not end_date or lat is None or lon is None:
+        return {}
+    moon = ((chart_data.get("planets") or {}).get("Moon") or {})
+    try:
+        user_nakshatra = int((float(moon.get("longitude")) % 360.0) / (360.0 / 27.0)) + 1
+    except (TypeError, ValueError):
+        return {}
+    try:
+        from calculators.muhurat_calculator import MuhuratCalculator
+
+        calculator = MuhuratCalculator()
+        common = (start_date, end_date, float(lat), float(lon), user_nakshatra)
+        if event_type == "childbirth":
+            result = calculator.calculate_childbirth_muhurat(*common, tz=timezone_name)
+        elif event_type == "vehicle":
+            result = calculator.calculate_vehicle_muhurat(
+                *common, tz=timezone_name, birth_data=birth_data,
+            )
+        elif event_type == "griha_pravesh":
+            result = calculator.calculate_griha_pravesh_muhurat(*common, tz=timezone_name)
+        elif event_type == "gold":
+            result = calculator.calculate_gold_muhurat(*common, tz=timezone_name)
+        elif event_type == "business_opening":
+            result = calculator.calculate_business_muhurat(*common, tz=timezone_name)
+        elif event_type in {"marriage", "property"}:
+            from panchang.muhurat_calculator import MuhuratCalculator as PanchangMuhuratCalculator
+
+            day_calculator = PanchangMuhuratCalculator()
+            start_day = datetime.strptime(start_date[:10], "%Y-%m-%d").date()
+            end_day = datetime.strptime(end_date[:10], "%Y-%m-%d").date()
+            if end_day < start_day or (end_day - start_day).days > 62:
+                return {}
+            recommendations = []
+            cursor = start_day
+            method = (
+                day_calculator.calculate_vivah_muhurat
+                if event_type == "marriage"
+                else day_calculator.calculate_property_muhurat
+            )
+            while cursor <= end_day:
+                day_result = method(
+                    cursor.isoformat(), float(lat), float(lon), timezone_name,
+                )
+                if isinstance(day_result, dict) and day_result.get("muhurtas"):
+                    recommendations.append(day_result)
+                cursor += timedelta(days=1)
+            result = {
+                "category": "Marriage" if event_type == "marriage" else "Property Purchase",
+                "period": f"{start_date[:10]} to {end_date[:10]}",
+                "dates_found": len(recommendations),
+                "recommendations": recommendations,
+                "rejected_dates": [],
+                "mode": "panchang_election",
+            }
+        else:
+            return {}
+        if not isinstance(result, dict) or result.get("error"):
+            return {}
+        compact = dict(result)
+        compact["recommendations"] = list(result.get("recommendations") or [])[:5]
+        compact["rejected_dates"] = list(result.get("rejected_dates") or [])[:8]
+        compact["calculator_event_type"] = event_type
+        compact["calculation_location"] = resolved_location
+        return compact
+    except Exception:
+        logger.exception("Instant Muhurat calculation failed event_type=%s", event_type)
+        return {}
+
+
 def _build_instant_context(
     birth_data: Dict[str, Any],
     question: str,
@@ -5755,7 +6306,7 @@ def _build_instant_context(
     # Event-window scans always start from the actual query date. The legacy
     # period resolver treats phrases containing "year" as a calendar-year
     # outlook and can otherwise anchor "next three years" to 1 January.
-    if resolved_answer_mode == "event_prediction":
+    if _should_force_event_current_window(resolved_answer_mode, period_window):
         period_window = {
             "kind": "current",
             "start": now_local.strftime("%Y-%m-%d"),
@@ -6153,6 +6704,89 @@ def _build_instant_context(
         relationship_target=target_subject,
         target_chart_context=target_chart_context,
     )
+    # Dedicated calculator adapters. These records are intentionally created
+    # only from calculator output; their mere presence in a prompt or method
+    # registry never marks a capability as available.
+    karaka_evidence = _instant_real_karaka_evidence(chart_data)
+    if karaka_evidence:
+        normalized_evidence["karaka_evidence"] = karaka_evidence
+
+    nadi_evidence = _instant_real_nadi_evidence(chart_data)
+    if nadi_evidence:
+        normalized_evidence["nadi_evidence"] = nadi_evidence
+
+    double_transit_evidence = _instant_real_double_transit_evidence(
+        chart_data=chart_data,
+        start=now_local,
+        end=now_local + timedelta(days=_INSTANT_EVENT_HORIZON_DAYS),
+        focus_houses=list(focus.get("houses") or []),
+        answer_mode=answer_mode,
+    )
+    if double_transit_evidence:
+        normalized_evidence["double_transit"] = double_transit_evidence
+
+    requested_chart = extracted_context.get("requested_chart")
+    chart_focus = (intent or {}).get("chart_focus") if isinstance((intent or {}).get("chart_focus"), dict) else {}
+    requested_charts = list(chart_focus.get("requested") or [])
+    if requested_chart and requested_chart not in requested_charts:
+        requested_charts.append(requested_chart)
+    normalized_evidence["chart_facts"] = _instant_real_chart_facts(
+        chart_data=chart_data,
+        requested_charts=requested_charts or ["D1"],
+        requested_fact=extracted_context.get("requested_fact"),
+        karaka_evidence=karaka_evidence,
+        d1_snapshot=evidence_natal_snapshot,
+    )
+
+    location_evidence = _instant_real_location_evidence(
+        birth_data=birth_data,
+        intent=intent or {},
+        chart_data=chart_data,
+        current_dashas=current_dashas,
+        answer_mode=answer_mode,
+    )
+    if location_evidence:
+        normalized_evidence["location_recommendation"] = location_evidence
+
+    muhurat_evidence = _instant_real_muhurat_evidence(
+        birth_data=birth_data,
+        intent=intent or {},
+        chart_data=chart_data,
+        answer_mode=answer_mode,
+    )
+    if muhurat_evidence:
+        normalized_evidence["muhurat_slots"] = muhurat_evidence
+
+    daily_prediction_spine: Dict[str, Any] = {}
+    if str((period_window or {}).get("kind") or "").lower() == "day":
+        try:
+            daily_static_context: Dict[str, Any] = {
+                "d1_chart": chart_data,
+                "planetary_analysis": chart_data.get("planetary_analysis") or {},
+            }
+            kp_evidence = _instant_real_kp_evidence(birth_data)
+            if kp_evidence:
+                daily_static_context["kp_analysis"] = kp_evidence
+            if karaka_evidence:
+                daily_static_context["chara_karakas"] = karaka_evidence
+            daily_prediction_spine = build_daily_prediction_spine(
+                birth_data=birth_data,
+                static_context=daily_static_context,
+                intent_result={
+                    **(intent or {}),
+                    "mode": "PREDICT_DAILY",
+                    "dasha_as_of": (
+                        period_window.get("start")
+                        or period_window.get("date")
+                        or dasha_anchor.strftime("%Y-%m-%d")
+                    ),
+                    "query_context": query_context,
+                },
+            ) or {}
+            if daily_prediction_spine:
+                normalized_evidence["daily_prediction_spine"] = daily_prediction_spine
+        except Exception:
+            logger.exception("Instant exact-day prediction spine calculation failed")
     if answer_mode == "comparison_choice" and not dasha_calc_fallback:
         comparison_raw_periods: Optional[List[Dict[str, Any]]] = None
         try:
@@ -6256,6 +6890,7 @@ def _build_instant_context(
             house_lordships=house_lordships,
             named_dasha_lookup=named_dasha_lookup,
             evidence_plan=evidence_plan,
+            daily_prediction_spine=daily_prediction_spine,
         )
 
     is_general_month_window = (
@@ -6449,6 +7084,7 @@ def _build_instant_context(
         "current_transits_formatted": prompt_transits_context,
         "instant_parashari": prompt_instant_parashari,
         "normalized_evidence": prompt_normalized_evidence,
+        "daily_prediction_spine": daily_prediction_spine,
         "recent_history": recent_history,
         "complexity_hint": complexity_hint,
         "named_dasha_lookup": named_dasha_lookup,
@@ -6457,6 +7093,27 @@ def _build_instant_context(
 
 _FOLLOW_UPS_START = "###FOLLOW_UPS_START###"
 _FOLLOW_UPS_END = "###FOLLOW_UPS_END###"
+
+
+def _repair_common_utf8_mojibake(value: Any) -> str:
+    """Repair punctuation corrupted by a UTF-8/Windows-1252 boundary.
+
+    Keep this deliberately narrow so translated scripts and user names are
+    never re-encoded or otherwise normalized.
+    """
+    text = str(value or "")
+    replacements = {
+        "â\x80\x99": "’",
+        "â\x80\x98": "‘",
+        "â\x80\x9c": "“",
+        "â\x80\x9d": "”",
+        "â\x80\x93": "–",
+        "â\x80\x94": "—",
+        "â\x80¦": "…",
+    }
+    for broken, repaired in replacements.items():
+        text = text.replace(broken, repaired)
+    return text
 
 
 def _parse_speech_followups_from_answer(raw: str) -> tuple[str, List[str]]:
@@ -6698,8 +7355,8 @@ _PERIOD_TOPIC_HOUSE_MANIFESTATIONS: Dict[str, Dict[int, str]] = {
     "health": {
         1: "vitality and physical resilience",
         6: "health routines, treatment, and manageable strain",
-        8: "recovery complexity and sudden changes requiring care",
-        12: "rest, isolation, hospitalization, or energy drain",
+        8: "changes in stamina that merit closer observation",
+        12: "rest, sleep, and energy conservation",
     },
 }
 
@@ -6740,7 +7397,11 @@ def _period_topic_manifestations(category: str, houses: List[Any], areas: Any) -
     return out[:4]
 
 
-def _build_period_topic_forecast(normalized: Dict[str, Any], category: str) -> Dict[str, Any]:
+def _build_period_topic_forecast(
+    normalized: Dict[str, Any],
+    category: str,
+    time_scope: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Create the compact, chronological forecast the composer must narrate.
 
     Window calculations are ranked for evidence selection.  A period forecast,
@@ -6757,12 +7418,29 @@ def _build_period_topic_forecast(normalized: Dict[str, Any], category: str) -> D
     raw_segments = [row for row in (source.get("segments") or []) if isinstance(row, dict)]
     if not raw_segments:
         return {}
+    period = ((normalized.get("current_timing") or {}).get("period_window") or {})
+    period = period if isinstance(period, dict) else {}
+    time_scope = time_scope if isinstance(time_scope, dict) else {}
+    window_start = str(time_scope.get("as_of") or period.get("start") or "")
+    window_end = str(time_scope.get("horizon_end") or period.get("end") or "")
+    if window_start:
+        period["start"] = window_start
+    if window_end:
+        period["end"] = window_end
 
     phases: List[Dict[str, Any]] = []
     seen: set[tuple[Any, ...]] = set()
     for row in sorted(raw_segments, key=lambda item: (str(item.get("start") or ""), str(item.get("end") or ""))):
+        row_start = str(row.get("start") or "")
+        row_end = str(row.get("end") or "")
+        if window_start and row_end and row_end < window_start:
+            continue
+        if window_end and row_start and row_start > window_end:
+            continue
+        phase_start = max(row_start, window_start) if row_start and window_start else row_start or window_start
+        phase_end = min(row_end, window_end) if row_end and window_end else row_end or window_end
         key = (
-            row.get("start"), row.get("end"), row.get("mahadasha"),
+            phase_start, phase_end, row.get("mahadasha"),
             row.get("antardasha"), row.get("pratyantardasha"),
         )
         if key in seen:
@@ -6770,6 +7448,21 @@ def _build_period_topic_forecast(normalized: Dict[str, Any], category: str) -> D
         seen.add(key)
         houses = list(row.get("activated_focus_houses") or [])
         peaks = _compact_composer_windows(list(row.get("peak_activation_windows") or []), limit=3)
+        bounded_peaks: List[Dict[str, Any]] = []
+        for peak in peaks:
+            peak_start = str(peak.get("start") or "")
+            peak_end = str(peak.get("end") or "")
+            if window_start and peak_end and peak_end < window_start:
+                continue
+            if window_end and peak_start and peak_start > window_end:
+                continue
+            bounded = dict(peak)
+            if window_start and peak_start:
+                bounded["start"] = max(peak_start, window_start)
+            if window_end and peak_end:
+                bounded["end"] = min(peak_end, window_end)
+            bounded_peaks.append(bounded)
+        peaks = bounded_peaks
         permission = str(row.get("natal_promise_status") or "")
         phase_state = (
             "transit_reinforced_peak"
@@ -6780,8 +7473,8 @@ def _build_period_topic_forecast(normalized: Dict[str, Any], category: str) -> D
         )
         phases.append(
             {
-                "start": row.get("start"),
-                "end": row.get("end"),
+                "start": phase_start,
+                "end": phase_end,
                 "dasha_chain": " - ".join(
                     str(row.get(key_name) or "").strip()
                     for key_name in ("mahadasha", "antardasha", "pratyantardasha")
@@ -6805,7 +7498,7 @@ def _build_period_topic_forecast(normalized: Dict[str, Any], category: str) -> D
     return {
         "forecast_shape": "period_topic_forecast",
         "category": _normalize_event_category(category),
-        "period": ((normalized.get("current_timing") or {}).get("period_window") or {}),
+        "period": period,
         "year_like": bool(rules.get("year_like")),
         "phase_count": len(phases),
         "chronological_phases": phases,
@@ -6894,6 +7587,9 @@ def _compact_composer_windows(rows: Any, *, limit: int = 5) -> List[Dict[str, An
         "end",
         "label",
         "chain",
+        "mahadasha",
+        "antardasha",
+        "pratyantardasha",
         "planet",
         "dasha_levels",
         "strength",
@@ -6908,10 +7604,138 @@ def _compact_composer_windows(rows: Any, *, limit: int = 5) -> List[Dict[str, An
         "why",
     }
     return [
-        {key: value for key, value in row.items() if key in allowed and value not in (None, "", [], {})}
+        {
+            key: _limit_composer_value(value)
+            for key, value in row.items()
+            if key in allowed and value not in (None, "", [], {})
+        }
         for row in rows[:limit]
         if isinstance(row, dict)
     ]
+
+
+def _limit_composer_value(
+    value: Any,
+    *,
+    depth: int = 0,
+    max_depth: int = 5,
+    list_limit: int = 7,
+    string_limit: int = 280,
+) -> Any:
+    """Bound model-facing evidence without changing the audit ledger.
+
+    Calculators return rich nested diagnostics for reproducibility.  After the
+    adjudicator has fused those diagnostics, the composer only needs the
+    answer-bearing values.  This limiter is intentionally language agnostic:
+    it never interprets the user's words or writes an answer.
+    """
+    if value in (None, "", [], {}):
+        return None
+    if isinstance(value, str):
+        clean = value.strip()
+        if len(clean) <= string_limit:
+            return clean
+        return f"{clean[: max(0, string_limit - 1)].rstrip()}…"
+    if isinstance(value, (int, float, bool)):
+        return value
+    if isinstance(value, (list, tuple)):
+        if depth >= max_depth:
+            scalars = [item for item in value if isinstance(item, (str, int, float, bool))]
+            return [
+                _limit_composer_value(
+                    item,
+                    depth=depth + 1,
+                    max_depth=max_depth,
+                    list_limit=list_limit,
+                    string_limit=string_limit,
+                )
+                for item in scalars[:list_limit]
+            ]
+        return [
+            compact
+            for item in list(value)[:list_limit]
+            if (
+                compact := _limit_composer_value(
+                    item,
+                    depth=depth + 1,
+                    max_depth=max_depth,
+                    list_limit=list_limit,
+                    string_limit=string_limit,
+                )
+            )
+            not in (None, "", [], {})
+        ]
+    if isinstance(value, dict):
+        compact_dict: Dict[str, Any] = {}
+        for key, item in value.items():
+            if depth >= max_depth and isinstance(item, (dict, list, tuple)):
+                continue
+            compact = _limit_composer_value(
+                item,
+                depth=depth + 1,
+                max_depth=max_depth,
+                list_limit=list_limit,
+                string_limit=string_limit,
+            )
+            if compact not in (None, "", [], {}):
+                compact_dict[str(key)] = compact
+        return compact_dict
+    return _limit_composer_value(
+        str(value),
+        depth=depth,
+        max_depth=max_depth,
+        list_limit=list_limit,
+        string_limit=string_limit,
+    )
+
+
+def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) -> Dict[str, Any]:
+    """Fit the composer JSON to a latency-safe envelope in two semantic passes."""
+    compact = _limit_composer_value(context)
+    compact = compact if isinstance(compact, dict) else {}
+    if _json_size(compact) <= target_chars:
+        return compact
+
+    tighter = _limit_composer_value(
+        context,
+        max_depth=4,
+        list_limit=6,
+        string_limit=180,
+    )
+    tighter = tighter if isinstance(tighter, dict) else {}
+    if _json_size(tighter) <= target_chars:
+        return tighter
+
+    # These are explanatory duplicates of facts already represented by the
+    # verdict, promise, timing, and ranked windows. Keep them in the audit
+    # packet, but remove them from an exceptionally large writing brief.
+    evidence = tighter.get("evidence") if isinstance(tighter.get("evidence"), dict) else {}
+    for key in ("divisional_specifics", "active_areas", "topic_confirmation"):
+        evidence.pop(key, None)
+        if _json_size(tighter) <= target_chars:
+            break
+    if _json_size(tighter) > target_chars:
+        contract = (
+            tighter.get("answer_contract")
+            if isinstance(tighter.get("answer_contract"), dict)
+            else {}
+        )
+        for key in ("current_cause_rules", "evidence_limitations"):
+            contract.pop(key, None)
+            if _json_size(tighter) <= target_chars:
+                break
+        query_plan = tighter.get("query_plan") if isinstance(tighter.get("query_plan"), dict) else {}
+        if (
+            _json_size(tighter) > target_chars
+            and query_plan.get("forecast_shape") == "period_topic_forecast"
+        ):
+            # The chronological forecast and fused verdict already contain the
+            # allowed windows. The event rule object is an adjudicator-facing
+            # duplicate for this answer shape.
+            contract.pop("event_rules", None)
+        if _json_size(tighter) > target_chars:
+            contract.pop("activation_prediction_rules", None)
+    return tighter
 
 
 def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
@@ -6933,25 +7757,141 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
     }
     compact = {
         "max_words": answer_spec.get("max_words"),
-        "answer_order": answer_spec.get("answer_order"),
-        "presentation_contract": answer_spec.get("presentation_contract"),
+        "composer_word_target": answer_spec.get("composer_word_target"),
         "activation_prediction_rules": {
-            "required_reasoning_order": activation.get("required_reasoning_order"),
             "natal_promise": activation.get("natal_promise"),
             "allowed_peak_windows": _compact_composer_windows(activation.get("allowed_peak_windows")),
-            "high_activity_claim_gate": activation.get("high_activity_claim_gate"),
         },
-        "forbidden": answer_spec.get("forbidden"),
         "target_framing": answer_spec.get("target_framing"),
         "required_derived_opening": answer_spec.get("required_derived_opening"),
         "evidence_limitations": answer_spec.get("evidence_limitations"),
         "health_rules": answer_spec.get("health_rules"),
-        "timing_sequence": answer_spec.get("timing_sequence"),
         "current_cause_rules": answer_spec.get("current_cause_rules"),
         "comparison_rules": answer_spec.get("comparison_rules"),
+        "daily_rules": answer_spec.get("daily_rules"),
         "event_rules": compact_event_rules,
     }
     return {key: value for key, value in compact.items() if value not in (None, "", [], {})}
+
+
+def _compact_daily_prediction_for_composer(value: Any) -> Dict[str, Any]:
+    """Keep the decisive daily evidence while excluding the full chart workspace."""
+    if not isinstance(value, dict) or not value:
+        return {}
+    moon = value.get("moon") if isinstance(value.get("moon"), dict) else {}
+    schools = value.get("school_judgments") if isinstance(value.get("school_judgments"), dict) else {}
+    judgment = value.get("daily_judgment") if isinstance(value.get("daily_judgment"), dict) else {}
+    compact_dashas = []
+    for row in list(value.get("dasha_stack") or [])[:5]:
+        if not isinstance(row, dict):
+            continue
+        trigger = row.get("trigger") if isinstance(row.get("trigger"), dict) else {}
+        compact_dashas.append({
+            "level": row.get("level"),
+            "planet": row.get("planet"),
+            "start": row.get("start"),
+            "end": row.get("end"),
+            "natal_house": (row.get("natal") or {}).get("house") if isinstance(row.get("natal"), dict) else None,
+            "natal_lordships": (row.get("natal") or {}).get("lordships") if isinstance(row.get("natal"), dict) else None,
+            "transit_house": (row.get("transit") or {}).get("house") if isinstance(row.get("transit"), dict) else None,
+            "trigger_strength": trigger.get("strength"),
+            "trigger_score": trigger.get("weighted_score") or trigger.get("score"),
+            "trigger_flags": list(trigger.get("flags") or [])[:5],
+        })
+    kp = schools.get("kp") if isinstance(schools.get("kp"), dict) else {}
+    return {
+        "target_date": value.get("target_date"),
+        "panchanga": value.get("panchanga"),
+        "moon": {
+            "transit": moon.get("transit"),
+            "tara_bala": moon.get("tara_bala"),
+        },
+        "five_level_dasha": compact_dashas,
+        "daily_judgment": judgment,
+        "kp": kp,
+        "school_verdicts": {
+            name: row.get("verdict")
+            for name, row in schools.items()
+            if isinstance(row, dict) and row.get("verdict")
+        },
+        "merge_rule": schools.get("merge_rule"),
+        "interpretation_rules": list(value.get("interpretation_rules") or [])[:6],
+    }
+
+
+def _build_instant_answer_blueprint(
+    *,
+    query_plan: Dict[str, Any],
+    verdict: Dict[str, Any],
+    evidence: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Expose semantic answer slots without writing the answer in code.
+
+    This is deliberately not a template or a language generator. The LLM still
+    owns natural-language understanding and expression in every supported
+    language. The blueprint only prevents the single composer call from losing
+    the adjudicated verdict, progression, peak, or material caution inside a
+    compact evidence object.
+    """
+    if query_plan.get("forecast_shape") == "daily_forecast":
+        return {
+            "purpose": "semantic slots for one exact-day forecast; not prewritten prose",
+            "slots": [
+                {"slot": "direct overall outlook for the target day", "source": "verdict"},
+                {"slot": "one or two likely real-life manifestations", "source": "evidence.daily_prediction.daily_judgment and evidence.daily_prediction.kp"},
+                {"slot": "best use or opportunity", "source": "supportive daily factors"},
+                {"slot": "main caution", "source": "caution daily factors"},
+                {"slot": "one practical action", "source": "the ranked daily evidence"},
+                {"slot": "one compact astrological reason", "source": "KP plus Moon/Tara plus Sookshma/Prana"},
+                {"slot": "one natural follow-up question", "source": "the user's real concern"},
+            ],
+            "user_goal": query_plan.get("user_goal"),
+        }
+    slots = [{"slot": "direct real-life verdict", "source": "verdict"}]
+    if evidence.get("period_topic_forecast"):
+        slots.append(
+            {
+                "slot": "material chronological phases",
+                "source": "evidence.period_topic_forecast.chronological_phases",
+            }
+        )
+    timeline = evidence.get("transit_activation_timeline")
+    has_peak = bool(
+        (isinstance(timeline, dict) and timeline.get("peak_windows"))
+        or verdict.get("ranked_windows")
+    )
+    if has_peak:
+        slots.append(
+            {
+                "slot": "strongest supported window",
+                "source": "verdict.ranked_windows or evidence.transit_activation_timeline.peak_windows",
+            }
+        )
+    if evidence.get("active_areas") or evidence.get("topic_confirmation"):
+        slots.append(
+            {
+                "slot": "main opportunity",
+                "source": "evidence.active_areas and evidence.topic_confirmation",
+            }
+        )
+    if evidence.get("risk_specifics") or verdict.get("modifiers"):
+        slots.append(
+            {"slot": "main pressure", "source": "evidence.risk_specifics and verdict.modifiers"}
+        )
+    slots.extend(
+        [
+            {"slot": "one practical implication", "source": "the fused facts above"},
+            {
+                "slot": "one natural follow-up question",
+                "source": "user_goal and the user's real-life concern",
+            },
+        ]
+    )
+    return {
+        "purpose": "semantic slots for one direct user-facing answer; not prewritten prose",
+        "slots": slots,
+        "user_goal": query_plan.get("user_goal"),
+    }
 
 
 def _build_instant_composer_context(
@@ -7005,24 +7945,29 @@ def _build_instant_composer_context(
     answer_mode = str(intent.get("answer_mode") or query_plan.get("answer_mode") or "")
     category = str(intent.get("category") or query_plan.get("category") or "general")
     period_topic_forecast = (
-        _build_period_topic_forecast(normalized, category)
+        _build_period_topic_forecast(normalized, category, query_plan.get("time_scope"))
         if answer_mode == "timing_window" and _normalize_event_category(category) not in {"general", "timing"}
         else {}
     )
     if period_topic_forecast:
         compact_query_plan["forecast_shape"] = "period_topic_forecast"
+    time_scope = query_plan.get("time_scope") if isinstance(query_plan.get("time_scope"), dict) else {}
+    exact_day = bool(time_scope.get("is_exact_day"))
+    if exact_day:
+        compact_query_plan["forecast_shape"] = "daily_forecast"
 
     compact_answer_contract = _compact_answer_spec_for_composer(answer_spec)
-    if period_topic_forecast:
-        # A three-phase annual forecast cannot reliably fit the generic Instant
-        # ceiling without dropping a phase or reverting to vague compression.
-        compact_answer_contract["max_words"] = max(
-            160, int(compact_answer_contract.get("max_words") or 0)
-        )
 
     evidence = {
         "natal_promise": normalized.get("natal_promise"),
-        "current_timing": normalized.get("current_timing"),
+        # A future option-comparison already carries its window-specific dasha
+        # evidence in the verdict. Supplying the present chain as well invited
+        # the composer to explain a 2027 result with a 2026 chain.
+        "current_timing": (
+            None
+            if period_topic_forecast or (answer_mode.startswith("comparison") and compact_verdict.get("ranked_windows"))
+            else normalized.get("current_timing")
+        ),
         "period_topic_forecast": period_topic_forecast,
         "active_areas": list(normalized.get("active_areas") or [])[:4],
         "topic_confirmation": normalized.get("topic_confirmation"),
@@ -7042,10 +7987,31 @@ def _build_instant_composer_context(
         "risk_specifics": list(normalized.get("risk_specifics") or [])[:3],
         "health_body_area": normalized.get("health_body_area"),
         "option_comparison": normalized.get("option_comparison"),
+        "daily_prediction": _compact_daily_prediction_for_composer(
+            instant_context.get("daily_prediction_spine") or normalized.get("daily_prediction_spine")
+        ) if exact_day else None,
     }
+    if exact_day:
+        # Exact-day forecasts have their own authoritative calculation spine.
+        # Do not let broad-period timing, generic active-area summaries, or slow
+        # transit timelines compete with KP/Moon/Tara and five-level dashas in
+        # the composer prompt.
+        evidence = {
+            "natal_promise": evidence.get("natal_promise"),
+            "daily_prediction": evidence.get("daily_prediction"),
+        }
     evidence = {key: value for key, value in evidence.items() if value not in (None, "", [], {})}
 
-    return {
+    answer_blueprint = _build_instant_answer_blueprint(
+        query_plan=compact_query_plan,
+        verdict=compact_verdict,
+        evidence=evidence,
+    )
+    answer_blueprint = {
+        key: value for key, value in answer_blueprint.items() if value not in (None, "", [], {})
+    }
+
+    context = {
         "context_profile": "instant_composer_v3",
         "native": {
             key: birth.get(key)
@@ -7062,9 +8028,11 @@ def _build_instant_composer_context(
         "query_plan": compact_query_plan,
         "verdict": compact_verdict,
         "evidence": evidence,
+        "answer_blueprint": answer_blueprint,
         "answer_contract": compact_answer_contract,
         "recent_history": list(instant_context.get("recent_history") or [])[-1:],
     }
+    return _fit_composer_brief(context)
 
 
 def _build_instant_composer_prompt_v3(
@@ -7078,6 +8046,7 @@ def _build_instant_composer_prompt_v3(
     language_label = (language or "english").strip().lower()
     context_json = json.dumps(composer_context, ensure_ascii=False, separators=(",", ":"))
     is_period_topic_forecast = str((composer_context.get("query_plan") or {}).get("forecast_shape") or "") == "period_topic_forecast"
+    is_daily_forecast = str((composer_context.get("query_plan") or {}).get("forecast_shape") or "") == "daily_forecast"
     period_forecast_rules = ""
     if is_period_topic_forecast:
         period_forecast_rules = """
@@ -7091,6 +8060,16 @@ def _build_instant_composer_prompt_v3(
 - Do not use empty phrases such as "steady development", "mixed period", "building resources", or "potential gains" unless the same sentence says the concrete supported manifestation and its phase.
 - Do not finish with a generic house-number proof such as "the second house is emphasized." For this forecast shape, omit astrological terminology unless one compact mechanism genuinely clarifies why two phases differ.
 """
+    if is_daily_forecast:
+        period_forecast_rules = """
+- This is an exact-day forecast, not a shortened annual, monthly, or general dasha reading.
+- Decide the day in this order: KP daily materialisation; transiting Moon, current nakshatra and Tara Bala; Prana and Sookshma triggers; Pratyantardasha as the day frame. Mahadasha and Antardasha are background permission only.
+- Never decide or describe today mainly from MD/AD/PD. Do not say the day is slow, heavy, favorable, difficult, career-active, or relationship-active merely because those three levels or slow transits suggest it.
+- Sentence 1 must give a plain overall outlook for the target day. Then give one or two ranked concrete manifestations, the best use/opportunity, the main caution, and one practical action.
+- Use KP to say which event areas are most likely to materialize. Use Moon/nakshatra/Tara Bala to describe the day's flow or ease. Use Sookshma and Prana to explain the immediate trigger. Mention MD/AD only in one short background clause if genuinely useful.
+- Do not dump all five dasha levels, houses, scores, school verdicts, or Panchanga fields. Give one compact understandable astrology reason after the practical answer.
+- If any mandatory daily evidence is missing, ask one precise clarification or state that a responsible exact-day judgment is not available; never substitute a generic period forecast.
+"""
     speech_rules = ""
     if speech_mode:
         speech_rules = f"""
@@ -7103,9 +8082,10 @@ def _build_instant_composer_prompt_v3(
 - Use zero to three short follow-ups and valid JSON inside the markers.
 """
     else:
-        word_range = "110-160" if is_period_topic_forecast else "70-120"
+        answer_contract = composer_context.get("answer_contract") if isinstance(composer_context.get("answer_contract"), dict) else {}
+        word_guidance = str(answer_contract.get("composer_word_target") or "Usually 90-180 words; expand when necessary.")
         speech_rules = f"""
-- Write {word_range} words, normally as two or three short message-sized paragraphs.
+- Length guidance: {word_guidance} Do not omit a material phase, evidence limitation, or direct answer merely to stay short.
 - End the visible answer with exactly one natural, topic-specific question about the user's real concern or goal.
 - Do not recommend a deeper reading and do not add remedies, feedback requests, mode suggestions, or sales copy.
 - Append exactly one final metadata line after the visible answer:
@@ -7118,13 +8098,14 @@ Hard rules:
 - Reply in {language_label}, matching the user's script and everyday level of formality.
 - Answer the real-life question in the first sentence. Never open with planets, dashas, dates, evidence IDs, or house numbers.
 - Treat `verdict` and `answer_contract` as authoritative. Use `evidence` only to explain them; never invent a stronger conclusion.
+- Fill `answer_blueprint` in order. It contains semantic answer slots, not prose to repeat. The first slot must become a concrete answer to what the user asked.
 - Follow this reasoning order internally: natal promise -> active dasha delivery -> dated transit repetition -> real-life outcome. Show the user the outcome, not this workflow.
 - Translate supported areas into concrete life language. Never leave the user to decode house numbers or a list of dasha phases.
 - When `query_plan.forecast_shape` is `period_topic_forecast`, the answer format is mandatory: (1) a direct overall verdict, (2) the chronological progression across the full requested period, (3) the strongest opportunity and main pressure/caution, and (4) one practical takeaway. Use `evidence.period_topic_forecast.chronological_phases`; do not collapse multiple phases into one generic year summary.
 - For a broad period, give two or three supported real-life manifestations. Describe what is likely to happen or require attention, not merely which astrological sectors are active.
 - A dated peak is only the most concentrated part of its containing phase. Never present the final or strongest peak as though nothing meaningful happens during the rest of the requested period.
 - A period is "highly active" only when it appears in an allowed/peak window. Copy supplied dates exactly. If no peak exists, call it background activity, not a peak.
-- Give at most one short astrological proof sentence unless the user explicitly asks how it was derived.
+- Include at least one short, understandable astrological reason in every completed answer so it is visibly chart-based. Add more only when needed to explain materially different phases or evidence.
 - If evidence is missing, state the limited conclusion plainly. Never fill gaps with generic planet folklore.
 - Preserve all cautions and limitations. For health, describe only allowed susceptibilities, never diagnosis or certainty.
 - For a derived person, keep ownership explicit: these are the native chart's indications for that person, not that person's own chart or dasha.
@@ -7362,7 +8343,7 @@ Your job:
     length_rule = (
         "- Keep it concise for listening: 60 to 100 words, then the follow-up block."
         if speech_mode
-        else "- Keep the visible answer between 70 and 120 words: usually 2 short message-sized paragraphs, ending with one question."
+        else "- Keep it conversational and proportionate to the question. Do not enforce a fixed 120-word ceiling; end with one natural question."
     )
     followup_tail = ""
     if speech_mode:
@@ -7474,9 +8455,11 @@ Style rules:
 - For event predictions, mention every distinct `event_rules.required_material_windows` entry in chronological order when supplied. Apply `event_rules.dasha_level_terms` exactly: MD is major period, AD is sub-period, and PD is sub-sub-period. Never call a PD planet the sub-period lord.
 - Obey `instant_v2_answer_contract.answer_spec.comparison_rules` literally and keep its required conclusion logically consistent in every sentence.
 - If `query_plan.time_scope.horizon_end` is present, never mention or imply a date after it, even if a legacy evidence block contains a later date. The v2 filtered ranked windows win.
+- When explaining a dated future window, use only the dasha chain attached to that exact window. Never use `current_timing` or the present MD/AD/PD chain as the astrological reason for a later window.
 - Obey `instant_v2_answer_contract.answer_spec.target_framing`. For a spouse, child, parent, or other derived subject without that person's own birth data, say "your chart's indications for your wife/child/etc." Never call the native's dasha "her dasha" or "his dasha".
 - If `instant_v2_answer_contract.verdict.missing_required_capabilities` is non-empty, state the supported directional evidence but do not invent the missing specificity. For a comparison without option-specific evidence, do not pick a winner; say what the chart supports and ask the one real-life distinction needed next.
 - For time-bound questions, use only windows in `instant_v2_answer_contract.verdict` or `normalized_evidence.event_timing_verdict`. Never restart a window before the context's as-of date, and never replace the user's requested horizon with the current calendar year.
+- For health answers, translate difficult 8th/12th-house or hidden-pressure evidence into restrained self-care language such as rest, routine, observation, and checking persistent symptoms with a qualified professional. Do not claim recovery complications, isolation, acute danger, or a medical outcome unless that exact conclusion is explicit in the adjudicated health evidence.
 - For event-prediction answers, obey `normalized_evidence.event_timing_verdict.claim_contract` as a hard evidence gate. A focus house is only a possible topic house; it is not active in a timing window unless that same window lists it in `activated_focus_houses` or names it in `why`.
 - For event-prediction answers, never translate a raw line like "Jupiter rules focus house(s) [9]" into "Jupiter rules the progeny house" or another named domain house unless that exact domain house number is explicitly active in the same window. Safer wording is "Jupiter activates an event-relevant support house" or the exact house theme from `allowed_house_themes`.
 - For event-prediction answers, do not say "career house", "marriage house", "progeny house", "health house", or similar named-house claims unless the corresponding house number is active in that window. Use the listed `allowed_house_themes` instead.
@@ -7506,11 +8489,35 @@ async def generate_instant_chat_response(
     history: List[Dict[str, Any]],
     language: str = "english",
     speech_mode: bool = False,
+    stream_callback: Optional[Callable[[str, str], None]] = None,
 ) -> Dict[str, Any]:
     if _is_conversational_non_question(question):
         return _conversational_ack_response(language, speech_mode=speech_mode)
 
+    pipeline_started = time.perf_counter()
+    instant_stages: List[Dict[str, Any]] = []
+    stage_timings_ms: Dict[str, float] = {}
+
+    def _finish_local_stage(stage: str, started: float) -> None:
+        elapsed_s = max(0.0, time.perf_counter() - started)
+        stage_timings_ms[stage] = round(elapsed_s * 1000.0, 1)
+        instant_stages.append(
+            _build_instant_usage_stage(stage, "local", 0, 0, {}, True, elapsed_s)
+        )
+
+    mode_started = time.perf_counter()
     mode_selection = _mode_selection_from_intent(intent)
+    structured_parts = (
+        ((intent or {}).get("evidence_plan") or {}).get("question_parts")
+        if isinstance((intent or {}).get("evidence_plan"), dict)
+        else []
+    )
+    if isinstance(structured_parts, list) and len(structured_parts) > 1:
+        # The multilingual intent LLM has already established that this is a
+        # compound request. Ask the compact semantic router to write the one-
+        # question clarification in the user's language; calculators must not
+        # run for either part yet.
+        mode_selection = None
     if mode_selection:
         logger.info(
             "instant_answer_mode_from_intent answer_mode=%s target=%s",
@@ -7524,6 +8531,16 @@ async def generate_instant_chat_response(
             intent=intent,
             history=history,
         )
+    _finish_local_stage("answer_mode", mode_started)
+    route_action = str((mode_selection or {}).get("route_action") or "answer").strip().lower()
+    if route_action in {"clarify", "handoff"}:
+        return _instant_route_response(
+            body=str((mode_selection or {}).get("user_message") or ""),
+            answer_mode=str((mode_selection or {}).get("answer_mode") or "topic_reading"),
+            route_action=route_action,
+            language=language,
+            speech_mode=speech_mode,
+        )
     if bool((mode_selection or {}).get("needs_year_clarification")):
         return _instant_lifetime_event_year_clarification_response(language, speech_mode=speech_mode)
     answer_mode = _clamp_remedy_answer_mode(
@@ -7532,6 +8549,7 @@ async def generate_instant_chat_response(
         question,
     )
     target_subject = (mode_selection or {}).get("target_subject") if isinstance(mode_selection, dict) else None
+    calculations_started = time.perf_counter()
     instant_context = _build_instant_context(
         birth_data=birth_data,
         question=question,
@@ -7562,6 +8580,7 @@ async def generate_instant_chat_response(
         except Exception as exc:
             instant_v2_packet_error = f"{type(exc).__name__}: {exc}"
             logger.exception("instant_v2_packet_build_failed")
+    _finish_local_stage("calculations_and_evidence", calculations_started)
     prompt_context = instant_context
     if instant_v2_packet:
         prompt_context = _build_instant_composer_context(instant_context, instant_v2_packet)
@@ -7605,9 +8624,38 @@ async def generate_instant_chat_response(
             )
         except Exception as exc:
             logger.warning("SPEECH_DEBUG instant_llm_context_full_log_failed error=%s", str(exc)[:200])
+    prompt_started = time.perf_counter()
     prompt = _build_instant_prompt(question, prompt_context, language, speech_mode=speech_mode)
+    try:
+        prompt_budget = max(8000, int(os.getenv("INSTANT_CHAT_PROMPT_CHAR_BUDGET", "15000") or 15000))
+    except (TypeError, ValueError):
+        prompt_budget = 15000
+    if len(prompt) > prompt_budget:
+        # Do not silently cut authoritative evidence or add a second rewrite
+        # call. Surface budget drift so the compact packet can be corrected at
+        # its source without weakening the current answer.
+        logger.warning(
+            "INSTANT_PERF prompt_budget_exceeded prompt_chars=%s budget_chars=%s profile=%s",
+            len(prompt),
+            prompt_budget,
+            (prompt_context or {}).get("context_profile"),
+        )
+    _finish_local_stage("prompt_build", prompt_started)
     model_name = get_gemini_instant_model()
-    selected_model = analyzer.get_named_gemini_model(model_name, premium_analysis=False)
+    if instant_v2_packet:
+        instant_v2_packet["composer_brief"] = prompt_context
+        instant_v2_packet["composer_metrics"] = {
+            "context_chars": _json_size(prompt_context),
+            "section_chars": {
+                str(key): _json_size(value)
+                for key, value in (prompt_context or {}).items()
+            },
+            "prompt_chars": len(prompt),
+            "prompt_budget_chars": prompt_budget,
+            "within_prompt_budget": len(prompt) <= prompt_budget,
+            "generation_calls": 1,
+            "response_model": model_name,
+        }
     answer_request_id = _log_instant_llm_request(
         stage="instant_answer",
         model_name=model_name,
@@ -7618,17 +8666,35 @@ async def generate_instant_chat_response(
         compacted=bool(prompt_context is not instant_context),
     )
 
+    answer_timeout_s = _instant_timeout_seconds(
+        "INSTANT_CHAT_ANSWER_TIMEOUT_SECONDS",
+        30.0,
+        maximum=45.0,
+    )
+    thinking_level = _instant_thinking_level(model_name)
+    logger.info(
+        "INSTANT_PERF latency_policy model=%s thinking_level=%s timeout_s=%.1f transport=genai_rest",
+        model_name,
+        thinking_level or "model_default",
+        answer_timeout_s,
+    )
     started_at = datetime.utcnow()
     llm_result = await analyzer.generate_text_from_prompt(
         prompt,
         premium_analysis=False,
-        model_override=selected_model,
+        model_override=None,
         model_name_override=model_name,
         llm_log_tag="instant_chat",
-        request_timeout_s=90.0,
+        request_timeout_s=answer_timeout_s,
         force_gemini=True,
+        use_gemini_rest=True,
+        gemini_thinking_level=thinking_level,
+        stream_callback=stream_callback,
     )
     elapsed_s = max(0.0, (datetime.utcnow() - started_at).total_seconds())
+    pipeline_elapsed_s = max(0.0, time.perf_counter() - pipeline_started)
+    stage_timings_ms["answer_model"] = round(elapsed_s * 1000.0, 1)
+    stage_timings_ms["pipeline_total"] = round(pipeline_elapsed_s * 1000.0, 1)
     _log_instant_llm_response(
         request_id=answer_request_id,
         stage="instant_answer",
@@ -7640,6 +8706,15 @@ async def generate_instant_chat_response(
 
     if not llm_result.get("success"):
         error_text = llm_result.get("error") or "Instant chat failed"
+        answer_usage_stage = _build_instant_usage_stage(
+            "instant_answer",
+            llm_result.get("chat_llm_model") or model_name,
+            len(prompt),
+            0,
+            llm_result.get("token_usage") or {},
+            False,
+            elapsed_s,
+        )
         return {
             "success": False,
             "response": "I’m having trouble giving the instant reading right now. Please try again in a moment.",
@@ -7649,26 +8724,23 @@ async def generate_instant_chat_response(
                 "chat_llm_provider": "gemini",
                 "chat_llm_model": llm_result.get("chat_llm_model") or model_name,
                 "instant_chat": True,
-                "total_request_time": elapsed_s,
+                "total_request_time": pipeline_elapsed_s,
+                "answer_model_time": elapsed_s,
+                "instant_stage_timings_ms": stage_timings_ms,
+                "instant_transport": "genai_rest_stream" if stream_callback else "genai_rest",
+                "instant_thinking_level": thinking_level,
             },
             "token_usage": llm_result.get("token_usage") or {},
             "llm_prompt_chars": len(prompt),
             "llm_response_chars": 0,
-            "instant_llm_usage_stage": _build_instant_usage_stage(
-                "instant_answer",
-                llm_result.get("chat_llm_model") or model_name,
-                len(prompt),
-                0,
-                llm_result.get("token_usage") or {},
-                False,
-                elapsed_s,
-            ),
+            "instant_llm_usage_stage": answer_usage_stage,
+            "instant_llm_usage_stages": [*instant_stages, answer_usage_stage],
             "terms": [],
             "glossary": {},
             "follow_up_questions": [],
         }
 
-    raw_response = (llm_result.get("response") or "").strip()
+    raw_response = _repair_common_utf8_mojibake(llm_result.get("response")).strip()
     if speech_mode:
         response_text, speech_followups = _parse_speech_followups_from_answer(raw_response)
         response_text = _strip_speech_answer_greeting(response_text)
@@ -7682,83 +8754,15 @@ async def generate_instant_chat_response(
         response_content = _strip_speech_answer_greeting(response_content)
         response_content = _polish_speech_event_answer(response_content, prompt_context)
         response_content = _truncate_speech_answer(response_content)
-    contract_enforcement = None
-    if instant_v2_packet:
-        query_plan = instant_v2_packet.get("query_plan") or {}
-        verdict = instant_v2_packet.get("verdict") or {}
-        answer_spec = instant_v2_packet.get("answer_spec") or {}
-        requires_enforcement = (
-            query_plan.get("answer_mode") == "comparison_choice"
-            or query_plan.get("answer_mode") == "event_prediction"
-            or query_plan.get("answer_mode") in {"event_timing", "lifetime_event_timing", "month_timing", "timing_window"}
-            or query_plan.get("category") == "health"
-            or query_plan.get("interpretation_frame") == "native_chart_derived_house"
-        )
-        if requires_enforcement:
-            enforcement_brief = _build_instant_composer_context(instant_context, instant_v2_packet)
-            enforcement_context = {
-                "query_plan": enforcement_brief.get("query_plan"),
-                "verdict": enforcement_brief.get("verdict"),
-                "evidence": enforcement_brief.get("evidence"),
-                "answer_contract": enforcement_brief.get("answer_contract"),
-                "draft": response_content,
-            }
-            enforcement_prompt = f"""
-You are the final compliance editor for a fast astrology chat answer.
-
-Return ONLY the final user-facing answer, in the same language as the draft. Keep it under 120 words and end with one natural follow-up question. Preserve supported dates and facts. Do not add astrology facts.
-
-Strict contract:
-{json.dumps(enforcement_context, ensure_ascii=False, default=str, separators=(",", ":"))}
-
-Mandatory checks:
-- Open with the real-life answer, not astrology mechanics.
-- For a broad period preserve the verdict, supported manifestations, meaningful phase differences, and practical takeaway.
-- Treat houses, dasha chains, transit triggers, and evidence IDs as hidden proof; use at most one short proof sentence.
-- Preserve allowed dates, score qualifiers, required chronological windows, hard horizon, close-call conclusions, health limitations, and derived-chart ownership exactly.
-- Never add a transit, placement, lordship, manifestation, offer, promotion, success claim, or causal link absent from the compact contract.
-- MD/AD/PD are separate levels; call the three-planet sequence a dasha chain.
-- If evidence is limited, say so in ordinary language instead of filling the gap with technical detail.
-- If the draft already complies, reproduce it without changing its meaning.
-""".strip()
-            enforcement_request_id = _log_instant_llm_request(
-                stage="instant_contract_enforcement",
-                model_name=model_name,
-                prompt=enforcement_prompt,
-                context=enforcement_context,
-                answer_mode=str(query_plan.get("answer_mode") or answer_mode),
-                speech_mode=speech_mode,
-                compacted=True,
-            )
-            enforcement_started = datetime.utcnow()
-            enforcement_result = await analyzer.generate_text_from_prompt(
-                enforcement_prompt,
-                premium_analysis=False,
-                model_override=selected_model,
-                model_name_override=model_name,
-                llm_log_tag="instant_contract_enforcement",
-                request_timeout_s=45.0,
-                force_gemini=True,
-            )
-            enforcement_elapsed = max(
-                0.0, (datetime.utcnow() - enforcement_started).total_seconds()
-            )
-            _log_instant_llm_response(
-                request_id=enforcement_request_id,
-                stage="instant_contract_enforcement",
-                model_name=model_name,
-                prompt=enforcement_prompt,
-                result=enforcement_result,
-                elapsed_s=enforcement_elapsed,
-            )
-            if enforcement_result.get("success") and str(enforcement_result.get("response") or "").strip():
-                response_content = str(enforcement_result.get("response") or "").strip()
-            contract_enforcement = {
-                "applied": bool(enforcement_result.get("success")),
-                "elapsed_s": enforcement_elapsed,
-                "model": enforcement_result.get("chat_llm_model") or model_name,
-                "error": enforcement_result.get("error"),
-            }
+    # Instant is intentionally a single-generation product. Contract compliance
+    # belongs in the authoritative first prompt; a second LLM editor adds
+    # latency, can distort multilingual wording, and makes the experience no
+    # longer instant.
+    contract_enforcement = {
+        "applied": False,
+        "reason": "single_call_contract_in_primary_prompt",
+        "generation_calls": 1,
+    } if instant_v2_packet else None
     if instant_v2_packet:
         instant_v2_packet = finalize_instant_v2_packet(
             instant_v2_packet,
@@ -7796,6 +8800,17 @@ Mandatory checks:
         len(combined_followups),
         bool(speech_mode),
     )
+    pipeline_elapsed_s = max(0.0, time.perf_counter() - pipeline_started)
+    stage_timings_ms["pipeline_total"] = round(pipeline_elapsed_s * 1000.0, 1)
+    answer_usage_stage = _build_instant_usage_stage(
+        "instant_answer",
+        llm_result.get("chat_llm_model") or model_name,
+        len(prompt),
+        len(response_text),
+        llm_result.get("token_usage") or {},
+        True,
+        elapsed_s,
+    )
     event_timing_verdict = None
     try:
         ne = (prompt_context or {}).get("normalized_evidence") or {}
@@ -7814,20 +8829,17 @@ Mandatory checks:
             "chat_llm_provider": "gemini",
             "chat_llm_model": llm_result.get("chat_llm_model") or model_name,
             "instant_chat": True,
-            "total_request_time": elapsed_s,
+            "total_request_time": pipeline_elapsed_s,
+            "answer_model_time": elapsed_s,
+            "instant_stage_timings_ms": stage_timings_ms,
+            "instant_transport": "genai_rest_stream" if stream_callback else "genai_rest",
+            "instant_thinking_level": thinking_level,
         },
         "token_usage": llm_result.get("token_usage") or {},
         "llm_prompt_chars": len(prompt),
         "llm_response_chars": len(response_content),
-        "instant_llm_usage_stage": _build_instant_usage_stage(
-            "instant_answer",
-            llm_result.get("chat_llm_model") or model_name,
-            len(prompt),
-            len(response_text),
-            llm_result.get("token_usage") or {},
-            True,
-            elapsed_s,
-        ),
+        "instant_llm_usage_stage": answer_usage_stage,
+        "instant_llm_usage_stages": [*instant_stages, answer_usage_stage],
         "terms": [],
         "glossary": {},
         "follow_up_questions": combined_followups,

@@ -223,6 +223,12 @@ class CampaignUpsertRequest(BaseModel):
     status: str = "draft"  # "draft", "scheduled", or "paused"
 
 
+class CampaignBulkCreateRequest(BaseModel):
+    """Create several campaigns in one transaction."""
+
+    campaigns: List[CampaignUpsertRequest] = Field(min_length=1, max_length=500)
+
+
 class CampaignPreviewRequest(BaseModel):
     title_template: str
     body_template: str
@@ -2448,6 +2454,34 @@ async def admin_create_campaign(
     except Exception as e:
         logger.exception("admin_create_campaign failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to create campaign") from e
+
+
+@router.post("/admin/campaigns/bulk")
+async def admin_create_campaigns_bulk(
+    body: CampaignBulkCreateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Validate and create a campaign batch atomically."""
+    _require_admin(current_user)
+    validated = [_validate_campaign_payload(campaign) for campaign in body.campaigns]
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            campaign_ids = [
+                db.create_campaign(conn, created_by=current_user.userid, **fields)
+                for fields in validated
+            ]
+            conn.commit()
+        return {
+            "ok": True,
+            "count": len(campaign_ids),
+            "campaign_ids": campaign_ids,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_create_campaigns_bulk failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to create campaign batch") from e
 
 
 @router.get("/admin/campaigns/{campaign_id}")

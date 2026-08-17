@@ -57,6 +57,9 @@ def build_query_plan(
         None,
     )
     category = str(intent.get("category") or query_context.get("event_profile") or "general").strip().lower()
+    route_action = str(intent.get("route_action") or "answer").strip().lower()
+    if route_action not in {"answer", "clarify", "handoff"}:
+        route_action = "answer"
     requested = _strings(query_context.get("required_evidence"))
     if not requested:
         requested = _strings(intent.get("required_evidence"))
@@ -85,6 +88,18 @@ def build_query_plan(
         except (TypeError, ValueError):
             duration_months = None
     as_of_day = _date_text(as_of)
+    resolved_period = intent.get("period_window") if isinstance(intent.get("period_window"), dict) else {}
+    resolved_period_kind = str(resolved_period.get("kind") or "").strip().lower()
+    exact_day = bool(
+        resolved_period_kind == "day"
+        or str(intent.get("mode") or "").strip().upper() == "PREDICT_DAILY"
+    )
+    target_day = _date_text(
+        resolved_period.get("start")
+        or resolved_period.get("date")
+        or resolved_period.get("target_date")
+        or as_of_day
+    ) if exact_day else None
     horizon_end = _add_months(as_of_day, duration_months)
     if str(answer_mode or "") == "event_prediction" and (
         semantic_value not in (None, "") or semantic_duration not in (None, "")
@@ -101,6 +116,12 @@ def build_query_plan(
         "language": str(language or "english").strip().lower(),
         "category": category,
         "answer_mode": str(answer_mode or "topic_reading"),
+        "route_action": route_action,
+        "user_goal": (
+            query_context.get("user_goal")
+            or intent.get("user_goal")
+            or extracted.get("user_goal")
+        ),
         "target_subject": target_subject or intent.get("target_subject") or {"key": "self", "label": "self"},
         "time_scope": {
             "requested": extracted.get("timeframe") or query_context.get("time_scope"),
@@ -108,8 +129,23 @@ def build_query_plan(
             "relation": relation,
             "as_of": as_of_day,
             "horizon_end": horizon_end,
+            "granularity": "day" if exact_day else semantic_kind,
+            "is_exact_day": exact_day,
+            "target_date": target_day,
         },
         "event_profile": query_context.get("event_profile") or category,
+        "special_flow": {
+            "requested_chart": extracted.get("requested_chart"),
+            "requested_fact": extracted.get("requested_fact"),
+            "location_scope": extracted.get("location_scope"),
+            "location_goal": extracted.get("location_goal") or category,
+            "hub_regions": extracted.get("hub_regions") or [],
+            "muhurat_event_type": extracted.get("muhurat_event_type"),
+            "muhurat_start_date": extracted.get("muhurat_start_date"),
+            "muhurat_end_date": extracted.get("muhurat_end_date"),
+            "muhurat_use_birth_location": extracted.get("muhurat_use_birth_location"),
+            "muhurat_location_query": extracted.get("muhurat_location_query"),
+        },
         "requested_evidence": requested,
         "requested_precision": query_context.get("requested_precision") or "best_supported",
         "comparison_options": [
@@ -123,8 +159,9 @@ def build_query_plan(
         ] if str(answer_mode or "") == "comparison_choice" else [],
         "certainty_policy": certainty,
         "clarification": {
-            "needed": bool(intent.get("needs_clarification")),
+            "needed": bool(intent.get("needs_clarification")) or route_action == "clarify",
             "reason": intent.get("clarification_reason"),
+            "user_message": intent.get("user_message") or intent.get("clarification_question"),
         },
         "interpretation_frame": (
             "native_chart"

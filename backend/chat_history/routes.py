@@ -3,7 +3,8 @@ Chat History API Routes
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query, Header
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query, Header, WebSocket, WebSocketDisconnect
+from fastapi.encoders import jsonable_encoder
 from datetime import datetime, timedelta
 from typing import Optional
 import uuid
@@ -11,7 +12,9 @@ import json
 import logging
 import os
 import time
-from auth import get_current_user
+import asyncio
+import jwt
+from auth import ALGORITHM, SECRET_KEY, User, get_current_user
 from db import get_conn, execute
 from charts.house_insight_service import build_chart_preview_insights
 from credits.instant_billing import InstantBillingError, require_active_session
@@ -55,6 +58,36 @@ def sanitize_text(text):
     text = text.encode('utf-8', 'surrogatepass').decode('utf-8', 'ignore')
     text = text.replace('\0', '')
     return text.strip()
+
+
+def _instant_stream_reveal_prefixes(previous: str, current: str, chunk_size: int = 44) -> list[str]:
+    """Turn a provider burst into readable, append-only streaming checkpoints.
+
+    Gemini can deliver several SSE events within the same millisecond. Persisting
+    those events verbatim makes the browser observe only the final value. These
+    prefixes preserve true first-token latency while giving the WebSocket relay
+    enough time to publish subsequent text as it becomes readable.
+    """
+    old = str(previous or "")
+    new = str(current or "")
+    if not new or new == old:
+        return []
+    if old and not new.startswith(old):
+        return [new]
+    size = max(24, min(96, int(chunk_size or 44)))
+    prefixes: list[str] = []
+    cursor = len(old)
+    while cursor < len(new):
+        end = min(len(new), cursor + size)
+        if end < len(new):
+            # Prefer finishing a nearby word, without allowing one long token to
+            # turn the entire provider burst back into a single checkpoint.
+            nearby_space = new.find(" ", end, min(len(new), end + 14))
+            if nearby_space >= 0:
+                end = nearby_space + 1
+        prefixes.append(new[:end])
+        cursor = end
+    return prefixes
 
 
 def coerce_chat_birth_details(bd):
@@ -695,6 +728,142 @@ def _create_native_gate_response(
 
 
 router = APIRouter(prefix="/chat-v2", tags=["chat_history"])
+
+
+def _chat_stream_token(websocket: WebSocket) -> str:
+    token = websocket.query_params.get("token") or websocket.query_params.get("access_token")
+    if token:
+        return str(token).strip()
+    auth_header = websocket.headers.get("authorization") or websocket.headers.get("x-astroroshni-authorization")
+    if auth_header and str(auth_header).lower().startswith("bearer "):
+        return str(auth_header)[7:].strip()
+    return ""
+
+
+def _chat_stream_user(token: str) -> User:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        phone = payload.get("sub")
+        if not phone:
+            raise ValueError("missing subject")
+    except Exception as exc:
+        raise ValueError("invalid token") from exc
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "SELECT userid, name, phone, role, signup_client FROM users WHERE phone = ?",
+            (phone,),
+        )
+        row = cur.fetchone()
+    if row is None:
+        raise ValueError("user not found")
+    signup_client = row[4] if len(row) > 4 else None
+    if signup_client is not None and not str(signup_client).strip():
+        signup_client = None
+    return User(
+        userid=row[0],
+        name=row[1],
+        phone=row[2],
+        role=row[3],
+        signup_client=signup_client,
+    )
+
+
+@router.websocket("/stream/{message_id}")
+async def stream_message_status(websocket: WebSocket, message_id: int):
+    """Relay durable Instant Chat Gemini deltas across workers and VM instances."""
+    await websocket.accept()
+    try:
+        current_user = _chat_stream_user(_chat_stream_token(websocket))
+    except ValueError:
+        await websocket.send_json({"type": "error", "error": "Not authenticated"})
+        await websocket.close(code=4401)
+        return
+
+    last_content = ""
+    last_heartbeat = time.monotonic()
+    started = time.monotonic()
+    try:
+        await websocket.send_json({"type": "ready", "message_id": message_id})
+        while time.monotonic() - started < 420:
+            with get_conn() as conn:
+                cur = execute(
+                    conn,
+                    """
+                        SELECT cm.status, cm.content, cm.error_message, cs.user_id
+                        FROM chat_messages cm
+                        JOIN chat_sessions cs ON cs.session_id = cm.session_id
+                        WHERE cm.message_id = %s
+                    """,
+                    (message_id,),
+                )
+                row = cur.fetchone()
+            if row is None:
+                await websocket.send_json({"type": "error", "error": "Message not found"})
+                await websocket.close(code=4404)
+                return
+            status, content, error_message, owner_user_id = row
+            if int(owner_user_id) != int(current_user.userid):
+                await websocket.send_json({"type": "error", "error": "Access denied"})
+                await websocket.close(code=4403)
+                return
+
+            current_content = str(content or "")
+            if current_content != last_content:
+                is_append = current_content.startswith(last_content)
+                delta = current_content[len(last_content):] if is_append else current_content
+                await websocket.send_json(
+                    {
+                        "type": "content_delta",
+                        "message_id": message_id,
+                        "delta": delta,
+                        "content": current_content,
+                        "replace": not is_append,
+                    }
+                )
+                last_content = current_content
+
+            if status == "completed":
+                final_payload = await check_message_status(message_id, current_user=current_user)
+                await websocket.send_json(
+                    {
+                        "type": "completed",
+                        "message_id": message_id,
+                        "payload": jsonable_encoder(final_payload),
+                    }
+                )
+                await websocket.close(code=1000)
+                return
+            if status == "failed":
+                await websocket.send_json(
+                    {
+                        "type": "failed",
+                        "message_id": message_id,
+                        "error_message": error_message or "Analysis failed. Please try again.",
+                    }
+                )
+                await websocket.close(code=1011)
+                return
+
+            if time.monotonic() - last_heartbeat >= 20:
+                await websocket.send_json({"type": "heartbeat", "message_id": message_id})
+                last_heartbeat = time.monotonic()
+            # Keep the relay comfortably below the paced reveal interval so the
+            # browser sees individual checkpoints instead of a completed burst.
+            await asyncio.sleep(0.06)
+        await websocket.send_json({"type": "error", "error": "Stream timed out"})
+        await websocket.close(code=1013)
+    except WebSocketDisconnect:
+        return
+    except RuntimeError as exc:
+        if "websocket" not in str(exc).lower():
+            logger.warning("chat stream runtime error message_id=%s: %s", message_id, exc, exc_info=True)
+    except Exception:
+        logger.warning("chat stream failed message_id=%s", message_id, exc_info=True)
+        try:
+            await websocket.close(code=1011)
+        except Exception:
+            pass
 
 STANDARD_MAX_CLARIFICATIONS = 1
 # Instant Chat is an LLM-owned dialogue.  It may ask as many concise follow-up
@@ -2811,6 +2980,9 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         elif status == "failed":
             response["error_message"] = error_message or "An error occurred while processing your request"
         elif status == "processing":
+            # Lets reconnecting/WebSocket-fallback clients continue from the
+            # latest durable Gemini stream checkpoint.
+            response["partial_content"] = content or ""
             if chart_insights_json:
                 try:
                     response["chart_insights"] = json.loads(chart_insights_json)
@@ -2864,6 +3036,28 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
                 except Exception:
                     response["engagement_updates"] = []
         
+        if parallel_llm_usage:
+            try:
+                parsed_usage = (
+                    json.loads(parallel_llm_usage)
+                    if isinstance(parallel_llm_usage, str)
+                    else parallel_llm_usage
+                )
+                if isinstance(parsed_usage, dict) and parsed_usage.get("kind") == "instant_chat_usage":
+                    # Durations and counts only: prompt and chart context are not
+                    # exposed through the polling response.
+                    response["timing"] = {
+                        "kind": "instant_chat_usage",
+                        "stages": parsed_usage.get("stages") or [],
+                        "totals": parsed_usage.get("totals") or {},
+                    }
+            except Exception:
+                logger.debug(
+                    "Unable to decode instant timing payload message_id=%s",
+                    message_id,
+                    exc_info=True,
+                )
+
         total_time = time.time() - start_time
         # print(f"✅ [STATUS COMPLETE] messageId: {message_id}, status: {status}, total_time: {total_time:.3f}s")
         
@@ -4313,6 +4507,64 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
 
         if is_instant_chat:
             llm_start = time.time()
+            instant_stream_state = {"last_flush": 0.0, "last_text": ""}
+            try:
+                stream_reveal_interval = max(
+                    0.05,
+                    min(0.25, float(os.getenv("INSTANT_CHAT_STREAM_REVEAL_INTERVAL_SECONDS", "0.11"))),
+                )
+            except (TypeError, ValueError):
+                stream_reveal_interval = 0.11
+            try:
+                stream_reveal_chars = max(
+                    24,
+                    min(96, int(os.getenv("INSTANT_CHAT_STREAM_REVEAL_CHARS", "44"))),
+                )
+            except (TypeError, ValueError):
+                stream_reveal_chars = 44
+
+            def _persist_instant_stream_delta(_delta: str, full_text: str) -> None:
+                """Checkpoint visible Gemini text without finalizing or billing the turn."""
+                visible_text = sanitize_text(full_text)
+                if not visible_text:
+                    return
+                reveal_prefixes = _instant_stream_reveal_prefixes(
+                    str(instant_stream_state["last_text"] or ""),
+                    visible_text,
+                    stream_reveal_chars,
+                )
+                for reveal_text in reveal_prefixes:
+                    if instant_stream_state["last_text"]:
+                        wait_for = stream_reveal_interval - (
+                            time.monotonic() - float(instant_stream_state["last_flush"])
+                        )
+                        if wait_for > 0:
+                            # This callback runs in the Gemini transport thread,
+                            # never on FastAPI's event loop.
+                            time.sleep(wait_for)
+                    try:
+                        with get_conn() as stream_conn:
+                            execute(
+                                stream_conn,
+                                """
+                                    UPDATE chat_messages
+                                    SET content = %s
+                                    WHERE message_id = %s AND status = %s
+                                """,
+                                (reveal_text, message_id, "processing"),
+                            )
+                            stream_conn.commit()
+                        instant_stream_state["last_flush"] = time.monotonic()
+                        instant_stream_state["last_text"] = reveal_text
+                    except Exception:
+                        # The final authoritative save remains the recovery path.
+                        logger.warning(
+                            "instant stream checkpoint failed message_id=%s",
+                            message_id,
+                            exc_info=True,
+                        )
+                        return
+
             result = await generate_instant_chat_response(
                 analyzer,
                 question=combined_question,
@@ -4321,6 +4573,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 history=history,
                 language=language,
                 speech_mode=bool(is_speech_chat),
+                stream_callback=_persist_instant_stream_delta,
             )
             logger.info(
                 "SPEECH_DEBUG instant_result message_id=%s success=%s response_chars=%s response_preview=%r followups=%r",
@@ -4573,7 +4826,16 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             second_stage = dict(intent.get("_llm_usage_stage") or {})
                             second_stage["stage"] = "instant_intent_background"
                             instant_stages.append(second_stage)
-                        if isinstance(result.get("instant_llm_usage_stage"), dict):
+                        result_stages = result.get("instant_llm_usage_stages")
+                        if isinstance(result_stages, list):
+                            instant_stages.extend(
+                                dict(stage)
+                                for stage in result_stages
+                                if isinstance(stage, dict)
+                            )
+                        elif isinstance(result.get("instant_llm_usage_stage"), dict):
+                            # Backward compatibility for responses created before
+                            # Instant exposed calculation and prompt-build timings.
                             instant_stages.append(dict(result.get("instant_llm_usage_stage") or {}))
                         if instant_stages:
                             parallel_usage_blob = {

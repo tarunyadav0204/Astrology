@@ -5,7 +5,7 @@ import html
 import asyncio
 import re
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from datetime import datetime
 from dotenv import load_dotenv
 from ai.response_parser import ResponseParser
@@ -96,6 +96,165 @@ def _generate_content_rest_v1beta(
     if not text:
         raise RuntimeError("Empty candidates/parts in Gemini REST response")
     return text
+
+
+def generate_content_rest_v1beta_result(
+    model_name: str,
+    prompt: str,
+    api_key: str,
+    thinking_level: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Modern Gemini generateContent transport used by latency-sensitive calls.
+
+    The backend's pinned FastAPI/AnyIO versions are not compatible with current
+    ``google-genai`` releases.  Calling the same GenAI endpoint directly keeps
+    Instant Chat on the supported API surface without upgrading the entire API
+    runtime.  Standard and Premium chat remain on their existing SDK path.
+    """
+    import requests
+
+    mid = _normalize_model_id_for_rest(model_name)
+    generation_config: Dict[str, Any] = {
+        "temperature": 0,
+        "topP": 0.95,
+        "topK": 40,
+    }
+    normalized_level = str(thinking_level or "").strip().lower()
+    if normalized_level and _model_supports_gemini3_thinking_level(mid):
+        generation_config["thinkingConfig"] = {"thinkingLevel": normalized_level}
+    body = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": generation_config,
+    }
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{mid}:generateContent"
+    response = requests.post(url, params={"key": api_key}, json=body, timeout=120)
+    if not response.ok:
+        try:
+            detail = response.json()
+        except Exception:
+            detail = response.text
+        raise RuntimeError(f"Gemini REST {response.status_code}: {detail}")
+    data = response.json()
+    if data.get("promptFeedback", {}).get("blockReason"):
+        raise RuntimeError(f"Prompt blocked: {data.get('promptFeedback')}")
+    text = _extract_text_from_generate_content_json(data)
+    if not text:
+        raise RuntimeError("Empty candidates/parts in Gemini REST response")
+    usage_meta = data.get("usageMetadata") or {}
+    usage = {
+        "input_tokens": int(usage_meta.get("promptTokenCount") or 0),
+        "output_tokens": int(usage_meta.get("candidatesTokenCount") or 0),
+        "cached_tokens": int(usage_meta.get("cachedContentTokenCount") or 0),
+        "total_tokens": int(usage_meta.get("totalTokenCount") or 0),
+    }
+    usage["non_cached_input_tokens"] = max(
+        0,
+        usage["input_tokens"] - usage["cached_tokens"],
+    )
+    return {"text": text, "usage": usage, "transport": "genai_rest"}
+
+
+def generate_content_rest_v1beta_stream_result(
+    model_name: str,
+    prompt: str,
+    api_key: str,
+    thinking_level: Optional[str] = None,
+    on_text_delta: Optional[Callable[[str, str], None]] = None,
+) -> Dict[str, Any]:
+    """Stream visible Gemini text over the REST SSE endpoint.
+
+    Gemini thinking parts are deliberately ignored. ``on_text_delta`` receives
+    both the new text and the complete visible text accumulated so far. Keeping
+    this helper synchronous lets callers run it in ``asyncio.to_thread`` while
+    the worker checkpoints progress for WebSocket clients.
+    """
+    import requests
+
+    mid = _normalize_model_id_for_rest(model_name)
+    generation_config: Dict[str, Any] = {
+        "temperature": 0,
+        "topP": 0.95,
+        "topK": 40,
+    }
+    normalized_level = str(thinking_level or "").strip().lower()
+    if normalized_level and _model_supports_gemini3_thinking_level(mid):
+        generation_config["thinkingConfig"] = {"thinkingLevel": normalized_level}
+    body = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": generation_config,
+    }
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{mid}:streamGenerateContent"
+    response = requests.post(
+        url,
+        params={"alt": "sse", "key": api_key},
+        json=body,
+        stream=True,
+        timeout=(15, 120),
+    )
+    if not response.ok:
+        try:
+            detail = response.json()
+        except Exception:
+            detail = response.text
+        raise RuntimeError(f"Gemini REST stream {response.status_code}: {detail}")
+    response.encoding = response.encoding or "utf-8"
+
+    chunks: List[str] = []
+    usage_meta: Dict[str, Any] = {}
+    prompt_feedback: Dict[str, Any] = {}
+    # ``requests`` defaults to 512-byte reads here. Gemini SSE events are often
+    # smaller than that, so the default can hold several model chunks until the
+    # buffer fills and make a genuinely streamed response appear all at once.
+    for raw_line in response.iter_lines(chunk_size=1, decode_unicode=True):
+        if isinstance(raw_line, bytes):
+            raw_line = raw_line.decode("utf-8", errors="replace")
+        line = str(raw_line or "").strip()
+        if not line or not line.startswith("data:"):
+            continue
+        payload = line[5:].strip()
+        if not payload or payload == "[DONE]":
+            continue
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError:
+            logger.warning("Ignoring malformed Gemini SSE event: %r", payload[:240])
+            continue
+        prompt_feedback = data.get("promptFeedback") or prompt_feedback
+        usage_meta = data.get("usageMetadata") or usage_meta
+        visible_parts: List[str] = []
+        for candidate in data.get("candidates") or []:
+            for part in ((candidate.get("content") or {}).get("parts") or []):
+                if part.get("thought"):
+                    continue
+                if part.get("text") is not None:
+                    visible_parts.append(str(part.get("text")))
+        delta = "".join(visible_parts)
+        if not delta:
+            continue
+        chunks.append(delta)
+        full_text = "".join(chunks)
+        if on_text_delta is not None:
+            try:
+                on_text_delta(delta, full_text)
+            except Exception:
+                logger.warning("Gemini stream progress callback failed", exc_info=True)
+
+    if prompt_feedback.get("blockReason"):
+        raise RuntimeError(f"Prompt blocked: {prompt_feedback}")
+    text = "".join(chunks).strip()
+    if not text:
+        raise RuntimeError("Empty candidates/parts in Gemini REST stream response")
+    usage = {
+        "input_tokens": int(usage_meta.get("promptTokenCount") or 0),
+        "output_tokens": int(usage_meta.get("candidatesTokenCount") or 0),
+        "cached_tokens": int(usage_meta.get("cachedContentTokenCount") or 0),
+        "total_tokens": int(usage_meta.get("totalTokenCount") or 0),
+    }
+    usage["non_cached_input_tokens"] = max(
+        0,
+        usage["input_tokens"] - usage["cached_tokens"],
+    )
+    return {"text": text, "usage": usage, "transport": "genai_rest_stream"}
 
 
 class _SimpleTextResponse:
@@ -346,6 +505,9 @@ class GeminiChatAnalyzer:
         llm_log_tag: Optional[str] = None,
         request_timeout_s: Optional[float] = None,
         force_gemini: bool = False,
+        use_gemini_rest: bool = False,
+        gemini_thinking_level: Optional[str] = None,
+        stream_callback: Optional[Callable[[str, str], None]] = None,
     ) -> Dict[str, Any]:
         """
         Single LLM completion for an arbitrary prompt (parallel chat branches + merge).
@@ -463,42 +625,60 @@ class GeminiChatAnalyzer:
                     (str(model_name_override).strip() if model_name_override else "")
                     or (get_gemini_premium_model() if premium_analysis else get_gemini_chat_model())
                 )
-                # Honor model_name_override even when no cached GenerativeModel is supplied.
-                # Previously override was only logged while _get_model(premium) actually ran.
-                if model_override is not None:
-                    selected_model = model_override
-                elif model_name_override:
-                    selected_model = self.get_named_gemini_model(
-                        model_name, premium_analysis=premium_analysis
+                if use_gemini_rest:
+                    api_key = os.getenv("GEMINI_API_KEY") or ""
+                    if not api_key:
+                        raise ValueError("GEMINI_API_KEY environment variable not set")
+                    rest_fn = (
+                        generate_content_rest_v1beta_stream_result
+                        if stream_callback is not None
+                        else generate_content_rest_v1beta_result
                     )
+                    rest_args = [model_name, prompt, api_key, gemini_thinking_level]
+                    if stream_callback is not None:
+                        rest_args.append(stream_callback)
+                    rest_result = await asyncio.wait_for(
+                        asyncio.to_thread(rest_fn, *rest_args),
+                        timeout=timeout_s,
+                    )
+                    response_text = str(rest_result.get("text") or "").strip()
+                    token_usage = dict(rest_result.get("usage") or token_usage)
                 else:
-                    selected_model = self._get_model(premium_analysis)
-                req_to = int(timeout_s) if timeout_s >= 1 else 1
-                response = await asyncio.wait_for(
-                    selected_model.generate_content_async(
-                        prompt,
-                        request_options={"timeout": req_to},
-                    ),
-                    timeout=timeout_s,
-                )
-                if response and hasattr(response, "text") and response.text:
-                    response_text = response.text.strip()
-                try:
-                    usage_meta = getattr(response, "usage_metadata", None)
-                    if usage_meta is not None:
-                        token_usage = {
-                            "input_tokens": int(getattr(usage_meta, "prompt_token_count", 0) or 0),
-                            "output_tokens": int(getattr(usage_meta, "candidates_token_count", 0) or 0),
-                            "cached_tokens": int(getattr(usage_meta, "cached_content_token_count", 0) or 0),
-                            "total_tokens": int(getattr(usage_meta, "total_token_count", 0) or 0),
-                        }
-                        token_usage["non_cached_input_tokens"] = max(
-                            0,
-                            int(token_usage.get("input_tokens") or 0)
-                            - int(token_usage.get("cached_tokens") or 0),
+                    # Honor model_name_override even when no cached GenerativeModel is supplied.
+                    if model_override is not None:
+                        selected_model = model_override
+                    elif model_name_override:
+                        selected_model = self.get_named_gemini_model(
+                            model_name, premium_analysis=premium_analysis
                         )
-                except Exception:
-                    pass
+                    else:
+                        selected_model = self._get_model(premium_analysis)
+                    req_to = int(timeout_s) if timeout_s >= 1 else 1
+                    response = await asyncio.wait_for(
+                        selected_model.generate_content_async(
+                            prompt,
+                            request_options={"timeout": req_to},
+                        ),
+                        timeout=timeout_s,
+                    )
+                    if response and hasattr(response, "text") and response.text:
+                        response_text = response.text.strip()
+                    try:
+                        usage_meta = getattr(response, "usage_metadata", None)
+                        if usage_meta is not None:
+                            token_usage = {
+                                "input_tokens": int(getattr(usage_meta, "prompt_token_count", 0) or 0),
+                                "output_tokens": int(getattr(usage_meta, "candidates_token_count", 0) or 0),
+                                "cached_tokens": int(getattr(usage_meta, "cached_content_token_count", 0) or 0),
+                                "total_tokens": int(getattr(usage_meta, "total_token_count", 0) or 0),
+                            }
+                            token_usage["non_cached_input_tokens"] = max(
+                                0,
+                                int(token_usage.get("input_tokens") or 0)
+                                - int(token_usage.get("cached_tokens") or 0),
+                            )
+                    except Exception:
+                        pass
 
             if not response_text:
                 if "non_cached_input_tokens" not in token_usage:
