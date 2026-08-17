@@ -1621,30 +1621,34 @@ function MessageBubble({
                 onPress={() => setShowInstantEvidence((open) => !open)}
               >
                 <Ionicons name="diamond-outline" size={14} color={colors.accent} />
-                <Text style={[styles.instantEvidenceToggleText, { color: colors.text }]}>Evidence · {instantEvidence?.evidence_ledger?.record_count || 0}</Text>
+                <Text style={[styles.instantEvidenceToggleText, { color: colors.text }]}>
+                  {t('premiumUi.chat.evidence')} · {instantEvidence?.evidence_ledger?.record_count || 0}
+                </Text>
                 <Ionicons name={showInstantEvidence ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textSecondary} />
               </TouchableOpacity>
               {showInstantEvidence ? (
                 <View style={[styles.instantEvidencePanel, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
                   <View style={styles.instantEvidenceHeader}>
                     <View style={styles.instantEvidenceHeaderCopy}>
-                      <Text style={[styles.instantEvidenceEyebrow, { color: colors.accent }]}>TEST EVIDENCE</Text>
+                      <Text style={[styles.instantEvidenceEyebrow, { color: colors.accent }]}>{t('premiumUi.chat.testEvidence')}</Text>
                       <Text style={[styles.instantEvidenceTitle, { color: colors.text }]}>
-                        {instantEvidence?.query_plan?.category || 'general'} · {instantEvidence?.query_plan?.answer_mode || 'reading'}
+                        {instantEvidence?.query_plan?.category || t('premiumUi.chat.general')} · {instantEvidence?.query_plan?.answer_mode || t('premiumUi.chat.reading')}
                       </Text>
                     </View>
                     <View style={[styles.instantEvidenceStatus, { backgroundColor: colors.accentSoft }]}>
                       <Text style={[styles.instantEvidenceStatusText, { color: colors.text }]}>
-                        {instantEvidence?.verification?.passed ? 'Evidence linked' : 'Review'}
+                        {instantEvidence?.verification?.passed
+                          ? t('premiumUi.chat.evidenceLinked')
+                          : t('premiumUi.chat.reviewEvidence')}
                       </Text>
                     </View>
                   </View>
                   <View style={[styles.instantEvidenceVerdict, { borderColor: colors.cardBorder }]}>
-                    <Text style={[styles.instantEvidenceLabel, { color: colors.textSecondary }]}>VERDICT</Text>
-                    <Text style={[styles.instantEvidenceValue, { color: colors.text }]}>{String(instantEvidence?.verdict?.direction || 'No verdict')}</Text>
-                    <Text style={[styles.instantEvidenceMeta, { color: colors.textSecondary }]}>Confidence {Math.round(Number(instantEvidence?.verdict?.confidence || 0) * 100)}% · {instantEvidence?.evidence_plan?.methodology_version || '—'}</Text>
+                    <Text style={[styles.instantEvidenceLabel, { color: colors.textSecondary }]}>{t('premiumUi.chat.verdict')}</Text>
+                    <Text style={[styles.instantEvidenceValue, { color: colors.text }]}>{String(instantEvidence?.verdict?.direction || t('premiumUi.chat.noVerdict'))}</Text>
+                    <Text style={[styles.instantEvidenceMeta, { color: colors.textSecondary }]}>{t('premiumUi.chat.confidence')} {Math.round(Number(instantEvidence?.verdict?.confidence || 0) * 100)}% · {instantEvidence?.evidence_plan?.methodology_version || '—'}</Text>
                   </View>
-                  <Text style={[styles.instantEvidenceLabel, { color: colors.textSecondary }]}>CALCULATION PLAN</Text>
+                  <Text style={[styles.instantEvidenceLabel, { color: colors.textSecondary }]}>{t('premiumUi.chat.calculationPlan')}</Text>
                   {(instantEvidence?.evidence_ledger?.capabilities || []).map((item) => (
                     <View key={item.request_id} style={[styles.instantEvidenceRow, { borderColor: colors.cardBorder }]}>
                       <Text style={[styles.instantEvidenceRowName, { color: colors.text }]} numberOfLines={2}>
@@ -1653,7 +1657,7 @@ function MessageBubble({
                       <Text style={[styles.instantEvidenceRowStatus, { color: item.status === 'available' ? colors.success : colors.accent }]}>{item.status}</Text>
                     </View>
                   ))}
-                  <Text style={[styles.instantEvidenceLabel, styles.instantEvidenceSectionLabel, { color: colors.textSecondary }]}>EVIDENCE LEDGER</Text>
+                  <Text style={[styles.instantEvidenceLabel, styles.instantEvidenceSectionLabel, { color: colors.textSecondary }]}>{t('premiumUi.chat.evidenceLedger')}</Text>
                   {(instantEvidence?.evidence_ledger?.records || []).map((item) => (
                     <View key={item.evidence_id} style={[styles.instantEvidenceRecord, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
                       <View style={styles.instantEvidenceRecordTop}>
