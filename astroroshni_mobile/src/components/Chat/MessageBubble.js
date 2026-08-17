@@ -2534,7 +2534,7 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   instantMessageRow: {
     width: '100%',
     paddingHorizontal: 12,
-    marginVertical: 3,
+    marginVertical: 7,
   },
   instantMessageRowUser: {
     alignItems: 'flex-end',

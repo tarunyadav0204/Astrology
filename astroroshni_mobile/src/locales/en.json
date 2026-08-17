@@ -802,6 +802,7 @@
   "chat": {
     "chartEssence": "{{name}}'s Chart Essence",
     "welcomeMessage": "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nTap a question below, or ask me anything in your own words.",
+    "instantWelcomeMessage": "🌟 Hi {{name}}, I'm Tara.\n\nTell me what's on your mind in your own words. I may ask one short follow-up so I can read your chart accurately.",
     "nativeGateTapInstruction": "Please choose one of the options below instead of typing a reply.",
     "welcomeSuggestionsTitle": "Try asking",
     "insufficientCreditsTitle": "Not enough credits",

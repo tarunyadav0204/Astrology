@@ -2308,12 +2308,7 @@ export default function ChatScreen({ navigation, route }) {
           }
           return {
             ...msg,
-            content: t('chat.welcomeMessage',
-              Platform.OS === 'ios'
-                ? "🌟 Welcome {{name}}! I can help you study your chart and answer practical questions.\n\nTap a suggestion below, or type your own question."
-                : "🌟 Welcome {{name}}! I can help you study your chart and answer practical questions.\n\nTap a suggestion below, or type your own question.",
-              { name: birthData?.name || 'there' }
-            ),
+            content: getWelcomeMessageContent(birthData?.name || 'there'),
           };
         });
         return sortMessagesForDisplay(refreshed);
@@ -2342,6 +2337,24 @@ export default function ChatScreen({ navigation, route }) {
       return newMessages;
     });
   };
+
+  // A welcome row can already exist when the persisted mode is hydrated or the
+  // user changes modes. Keep that row aligned with the active experience: Instant
+  // has no suggestion chips, so it must never inherit Standard's "tap below" copy.
+  useEffect(() => {
+    if (isMundane || partnershipMode) return;
+    const welcomeContent = getWelcomeMessageContent(birthData?.name || 'there');
+    setMessagesWithStorage((previousMessages) => {
+      let changed = false;
+      const nextMessages = previousMessages.map((message) => {
+        if (!message?.isWelcome || String(message.content || '').startsWith('🌍')) return message;
+        if (message.content === welcomeContent) return message;
+        changed = true;
+        return { ...message, content: welcomeContent };
+      });
+      return changed ? nextMessages : previousMessages;
+    });
+  }, [isInstantAnalysis, birthData?.name, i18n.language, isMundane, partnershipMode]);
 
   const revealInstantReply = (messageId, pieces, fullContent) => {
     if (pieces.length <= 1) return;
@@ -2465,7 +2478,7 @@ export default function ChatScreen({ navigation, route }) {
   }, [currentPersonId, loading, isTyping, showGreeting, pendingMessages, sessionId, forceGreeting, route.params?.resetToGreeting, partnershipMode]);
 
   // First question free: standard chat only (not partnership, not mundane)
-  const effectiveChatCost = (!partnershipMode && !isMundane && freeQuestionAvailable)
+  const effectiveChatCost = (!partnershipMode && !isMundane && !isInstantAnalysis && freeQuestionAvailable)
     ? 0
     : (
         isPremiumAnalysis
@@ -2476,9 +2489,6 @@ export default function ChatScreen({ navigation, route }) {
               ? partnershipCost
               : chatCost
       );
-  const instantInputLocked =
-    !partnershipMode && !isMundane && !freeQuestionAvailable &&
-    instantChatEnabled && isInstantAnalysis && !instantBilling.active;
   const freeQuestionNotificationGate =
     freeQuestionRequiresNotifications &&
     !partnershipMode &&
@@ -3269,12 +3279,7 @@ export default function ChatScreen({ navigation, route }) {
         } else {
           welcomeMessage = {
             id: Date.now().toString(),
-            content: t('chat.welcomeMessage',
-              Platform.OS === 'ios'
-                ? "🌟 Welcome {{name}}! I can help you study your chart and answer practical questions.\n\nTap a suggestion below, or type your own question."
-                : "🌟 Welcome {{name}}! I can help you study your chart and answer practical questions.\n\nTap a suggestion below, or type your own question.",
-              { name: nativeName }
-            ),
+            content: getWelcomeMessageContent(nativeName),
             role: 'assistant',
             isWelcome: true,
             timestamp: new Date().toISOString(),
@@ -3342,6 +3347,14 @@ export default function ChatScreen({ navigation, route }) {
     }
   };
 
+  function getWelcomeMessageContent(nativeName, instantOverride = isInstantAnalysis) {
+    const key = instantOverride ? 'chat.instantWelcomeMessage' : 'chat.welcomeMessage';
+    const fallback = instantOverride
+      ? "🌟 Hi {{name}}, I'm Tara.\n\nTell me what's on your mind in your own words. I may ask one short follow-up so I can read your chart accurately."
+      : "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nTap a question below, or ask me anything in your own words.";
+    return t(key, fallback, { name: nativeName || 'there' });
+  }
+
   const buildFreshWelcomeMessage = (nativeNameOverride = null) => {
     const nativeName = nativeNameOverride || birthData?.name || 'there';
     if (isMundaneRef.current) {
@@ -3355,12 +3368,7 @@ export default function ChatScreen({ navigation, route }) {
     }
     return {
       id: Date.now().toString(),
-      content: t('chat.welcomeMessage',
-        Platform.OS === 'ios'
-          ? "🌟 Welcome {{name}}! I can help you study your chart and answer practical questions.\n\nTap a suggestion below, or type your own question."
-          : "🌟 Welcome {{name}}! I can help you study your chart and answer practical questions.\n\nTap a suggestion below, or type your own question.",
-        { name: nativeName }
-      ),
+      content: getWelcomeMessageContent(nativeName),
       role: 'assistant',
       isWelcome: true,
       timestamp: new Date().toISOString(),
@@ -4505,15 +4513,18 @@ export default function ChatScreen({ navigation, route }) {
     clientRequestId,
     subjectGateOverride = null,
     queryContextOverride = null,
+    instantBillingSessionIdOverride = null,
   }) => {
     const token = await AsyncStorage.getItem('authToken');
     let activeSessionId = currentSessionId;
-    let activeInstantBillingSessionId = instantBilling.state?.session_id || null;
+    let activeInstantBillingSessionId =
+      instantBillingSessionIdOverride || instantBilling.state?.session_id || null;
 
     const attemptSend = async (attempt = 1) => {
       try {
         // When using first question free, send as standard so backend applies free-question logic
-        const useFreeQuestion = !partnershipMode && !isMundane && freeQuestionAvailable;
+        const useFreeQuestion =
+          !partnershipMode && !isMundane && !isInstantAnalysis && freeQuestionAvailable;
         const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && isInstantAnalysis;
         const requestedTier = useFreeQuestion
           ? 'standard'
@@ -4574,7 +4585,7 @@ export default function ChatScreen({ navigation, route }) {
           ...(pendingNudgeIdRef.current ? { nudge_id: pendingNudgeIdRef.current } : {}),
           client_request_id: clientRequestId,
           free_question_requested: useFreeQuestion,
-          ...(useInstantChat && instantBilling.active && activeInstantBillingSessionId
+          ...(useInstantChat && activeInstantBillingSessionId
             ? { instant_billing_session_id: activeInstantBillingSessionId }
             : {}),
         };
@@ -5112,10 +5123,19 @@ export default function ChatScreen({ navigation, route }) {
       return;
     }
     const wantsMeteredInstant =
-      !partnershipMode && !isMundane && !freeQuestionAvailable && instantChatEnabled && isInstantAnalysis;
+      !partnershipMode && !isMundane && instantChatEnabled && isInstantAnalysis;
+    let startedInstantBillingSessionId = null;
+    let startedInstantChatSessionId = null;
     if (wantsMeteredInstant && !instantBilling.active) {
-      await startInstantConsultation();
-      return;
+      if (credits < instantChatFirstMinuteCost) {
+        navigation.navigate('Credits');
+        return;
+      }
+      startedInstantChatSessionId = sessionId || await createSession();
+      if (!startedInstantChatSessionId) return;
+      const startedSession = await startInstantConsultation(startedInstantChatSessionId);
+      if (!startedSession?.session_id) return;
+      startedInstantBillingSessionId = startedSession.session_id;
     }
     // Gate rating prompt to the next completed answer only.
     setRatingEligibleMessageId(null);
@@ -5149,7 +5169,8 @@ export default function ChatScreen({ navigation, route }) {
     // Add user message immediately (include chart name for badge)
     const userMessageId = Date.now().toString();
     const chartName = partnershipMode ? nativeChart?.name : birthData?.name;
-    const useFreeQuestion = !partnershipMode && !isMundane && freeQuestionAvailable;
+    const useFreeQuestion =
+      !partnershipMode && !isMundane && !isInstantAnalysis && freeQuestionAvailable;
     const isProModelFlow = !useFreeQuestion && isPremiumAnalysis;
     const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && isInstantAnalysis;
     const outgoingTier = useFreeQuestion
@@ -5223,7 +5244,7 @@ export default function ChatScreen({ navigation, route }) {
     }, 100);
 
     // Create session if needed
-    let currentSessionId = sessionId;
+    let currentSessionId = startedInstantChatSessionId || sessionId;
     if (!currentSessionId) {
       currentSessionId = await createSession();
       if (!currentSessionId) {
@@ -5310,7 +5331,7 @@ export default function ChatScreen({ navigation, route }) {
       }
 
       // Track if this send uses the free standard question (for post-success toast)
-      if (!partnershipMode && freeQuestionAvailable) {
+      if (!partnershipMode && !isInstantAnalysis && freeQuestionAvailable) {
         freeUsedThisSendRef.current = true;
       }
 
@@ -5322,6 +5343,7 @@ export default function ChatScreen({ navigation, route }) {
         clientRequestId,
         subjectGateOverride,
         queryContextOverride,
+        instantBillingSessionIdOverride: startedInstantBillingSessionId,
       });
       if (queryContextOverride?.fomo_snapshot_id && queryContextOverride?.fomo_presentation_id) {
         pendingFomoQueryContextRef.current = null;
@@ -5526,9 +5548,7 @@ export default function ChatScreen({ navigation, route }) {
     } else {
       welcomeMessage = {
         id: Date.now().toString(),
-        content: t('chat.welcomeMessage', Platform.OS === 'ios'
-          ? "🌟 Welcome {{name}}! I can help you study your chart and answer practical questions.\n\nTap a suggestion below, or type your own question."
-          : "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nTap a question below, or ask me anything in your own words.", { name: nativeName }),
+        content: getWelcomeMessageContent(nativeName),
         role: 'assistant',
         isWelcome: true,
         timestamp: new Date().toISOString(),
@@ -5873,7 +5893,7 @@ export default function ChatScreen({ navigation, route }) {
           </LinearGradient>
         </View>
 
-        {!showGreeting && !partnershipMode && !isMundane && !freeQuestionAvailable && isInstantAnalysis ? (
+        {!showGreeting && !partnershipMode && !isMundane && isInstantAnalysis ? (
           <View
             style={[
               styles.instantHeaderSession,
@@ -5969,21 +5989,6 @@ export default function ChatScreen({ navigation, route }) {
                       >
                         {t('instantBilling.changeMode', 'Mode')}
                       </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => credits < instantChatFirstMinuteCost ? navigation.navigate('Credits') : startInstantConsultation()}
-                      disabled={instantBilling.busy}
-                      style={[styles.instantHeaderStart, { backgroundColor: colors.accent }]}
-                    >
-                      {instantBilling.busy
-                        ? <ActivityIndicator size="small" color={colors.onAccent || colors.text} />
-                        : <Text
-                            style={[styles.instantHeaderStartText, { color: colors.onAccent || colors.text }]}
-                          >
-                            {credits < instantChatFirstMinuteCost
-                              ? t('instantBilling.addCredits', 'Add credits')
-                              : t('instantBilling.start', 'Start')}
-                          </Text>}
                     </TouchableOpacity>
                   </View>
                 </>
@@ -6665,7 +6670,6 @@ export default function ChatScreen({ navigation, route }) {
                 placeholder={
                   activeWaitSideMessage ? "Reply while the full answer is prepared..." :
                   loading ? "Analyzing..." :
-                  instantInputLocked ? t('instantBilling.startToAsk', 'Start the consultation to ask a question') :
                   freeQuestionNotificationGate
                     ? "Turn on notifications to unlock your free question"
                   : credits < effectiveChatCost ? "Insufficient credits" :
@@ -6680,7 +6684,7 @@ export default function ChatScreen({ navigation, route }) {
                 maxLength={500}
                 editable={
                   !!activeWaitSideMessage ||
-                  (!instantInputLocked && !loading && (credits >= effectiveChatCost || freeQuestionNotificationGate) && !(partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3)))
+                  (!loading && !instantBilling.busy && (credits >= effectiveChatCost || freeQuestionNotificationGate) && !(partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3)))
                 }
                 multiline
                 // RN Web: without rows=1, <textarea> defaults to 2 rows and placeholder sits high.
@@ -6763,7 +6767,7 @@ export default function ChatScreen({ navigation, route }) {
               <TouchableOpacity
                 style={[
                   styles.modernSendButton,
-                  ((!activeWaitSideMessage && loading) || instantInputLocked || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate)) || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))) && styles.modernSendButtonDisabled
+                  ((!activeWaitSideMessage && loading) || instantBilling.busy || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate)) || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))) && styles.modernSendButtonDisabled
                 ]}
                 onPress={() => {
                   if (!activeWaitSideMessage && freeQuestionNotificationGate) {
@@ -6772,7 +6776,7 @@ export default function ChatScreen({ navigation, route }) {
                   }
                   sendMessage();
                 }}
-                disabled={(!activeWaitSideMessage && loading) || instantInputLocked || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate)) || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
+                disabled={(!activeWaitSideMessage && loading) || instantBilling.busy || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate)) || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
               >
                 <LinearGradient
                   colors={isPremiumAnalysis ? [colors.accent, colors.primary] : [colors.primaryStrong, colors.primary]}

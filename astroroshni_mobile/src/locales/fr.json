@@ -349,6 +349,7 @@
   "chat": {
     "chartEssence": "Essence du thème de {{name}}",
     "welcomeMessage": "🌟 Bienvenue {{name}} ! Je suis là pour vous aider à comprendre votre thème natal.\n\nTouchez une question ci-dessous, ou posez-moi votre propre question.",
+    "instantWelcomeMessage": "🌟 Bonjour {{name}}, je suis Tara.\n\nDites-moi avec vos propres mots ce qui vous préoccupe. Je pourrai vous poser une courte question complémentaire afin de lire votre thème avec précision.",
     "nativeGateTapInstruction": "Veuillez choisir l'une des options ci-dessous au lieu de taper une réponse.",
     "welcomeSuggestionsTitle": "Essayez de demander",
     "insufficientCreditsTitle": "Crédits insuffisants",

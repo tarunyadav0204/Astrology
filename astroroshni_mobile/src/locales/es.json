@@ -349,6 +349,7 @@
   "chat": {
     "chartEssence": "Esencia de la Carta de {{name}}",
     "welcomeMessage": "🌟 ¡Bienvenido {{name}}! Estoy aquí para ayudarte a entender tu carta natal.\n\nToca una pregunta abajo, o pregúntame lo que quieras.",
+    "instantWelcomeMessage": "🌟 Hola {{name}}, soy Tara.\n\nCuéntame con tus propias palabras qué tienes en mente. Puede que te haga una breve pregunta de seguimiento para leer tu carta con precisión.",
     "nativeGateTapInstruction": "Por favor, elige una de las opciones de abajo en lugar de escribir una respuesta.",
     "welcomeSuggestionsTitle": "Prueba a preguntar",
     "insufficientCreditsTitle": "Créditos insuficientes",
