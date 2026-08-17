@@ -8,6 +8,38 @@ const AREA_RULES = [
   { id: 'innerGrowth', analysisType: 'karma', required: [8, 9, 12], weights: { 8: 4, 9: 2, 12: 3, 1: 1 } },
 ];
 
+const KP_TODAY_CACHE_PREFIX = 'kp_today_home_v3:';
+
+const localDateKey = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const birthIdentity = (birthDetails = {}) => (
+  birthDetails.id
+  || birthDetails.birth_chart_id
+  || birthDetails.name
+  || 'anon'
+);
+
+/**
+ * Exact, day-scoped key shared by Today and Instant Chat. Birth inputs are part
+ * of the key so an edited chart cannot reuse activations calculated earlier in
+ * the day for its old time or coordinates.
+ */
+export function getKpTodayCacheKey(birthDetails, date = new Date()) {
+  const identity = birthIdentity(birthDetails);
+  const fingerprint = [
+    birthDetails?.date || '',
+    birthDetails?.time || '',
+    birthDetails?.latitude ?? '',
+    birthDetails?.longitude ?? '',
+  ].map((value) => encodeURIComponent(String(value))).join('|');
+  return `${KP_TODAY_CACHE_PREFIX}${identity}:${fingerprint}:${localDateKey(date)}`;
+}
+
 const normalizeHouse = (value) => {
   const house = Number(value);
   return Number.isInteger(house) && house >= 1 && house <= 12 ? house : null;

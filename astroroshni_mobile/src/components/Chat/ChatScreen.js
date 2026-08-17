@@ -72,6 +72,7 @@ import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
 import { shouldPostChatErrorToAdminLogs } from '../../utils/chatAdminErrorGating';
 import { typographyTokens } from '../../theme/tokens';
 import useInstantBillingSession from '../../hooks/useInstantBillingSession';
+import { getKpTodayCacheKey, rankKpHomeAreas } from '../../utils/kpHomeRecommendations';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -686,6 +687,7 @@ export default function ChatScreen({ navigation, route }) {
   }, [messages.length]);
 
   const [language, setLanguage] = useState('english');
+  const [instantWelcomeAreaIds, setInstantWelcomeAreaIds] = useState([]);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showQuickThemePicker, setShowQuickThemePicker] = useState(false);
   const [themePickerDiscovery, setThemePickerDiscovery] = useState(false);
@@ -2338,6 +2340,45 @@ export default function ChatScreen({ navigation, route }) {
     });
   };
 
+  // Today already calculates and caches the selected chart's KP activations.
+  // Instant reuses that exact day/chart cache so its greeting is personal with
+  // no extra request and no LLM latency. Missing data deliberately falls back
+  // to the generic Instant greeting rather than presenting stale areas.
+  useEffect(() => {
+    let active = true;
+    const loadInstantWelcomeAreas = async () => {
+      if (!isInstantAnalysis || !birthData?.date) {
+        if (active) setInstantWelcomeAreaIds([]);
+        return;
+      }
+      setInstantWelcomeAreaIds([]);
+      try {
+        const cachedRaw = await AsyncStorage.getItem(getKpTodayCacheKey(birthData));
+        if (!active) return;
+        const cached = cachedRaw ? JSON.parse(cachedRaw) : null;
+        const nextAreas = cached?.today
+          ? rankKpHomeAreas(cached).slice(0, 3).map((area) => area.id)
+          : [];
+        setInstantWelcomeAreaIds(nextAreas);
+      } catch (_) {
+        if (active) setInstantWelcomeAreaIds([]);
+      }
+    };
+    loadInstantWelcomeAreas();
+    return () => {
+      active = false;
+    };
+  }, [
+    isInstantAnalysis,
+    birthData?.id,
+    birthData?.birth_chart_id,
+    birthData?.name,
+    birthData?.date,
+    birthData?.time,
+    birthData?.latitude,
+    birthData?.longitude,
+  ]);
+
   // A welcome row can already exist when the persisted mode is hydrated or the
   // user changes modes. Keep that row aligned with the active experience: Instant
   // has no suggestion chips, so it must never inherit Standard's "tap below" copy.
@@ -2354,7 +2395,14 @@ export default function ChatScreen({ navigation, route }) {
       });
       return changed ? nextMessages : previousMessages;
     });
-  }, [isInstantAnalysis, birthData?.name, i18n.language, isMundane, partnershipMode]);
+  }, [
+    isInstantAnalysis,
+    instantWelcomeAreaIds,
+    birthData?.name,
+    i18n.language,
+    isMundane,
+    partnershipMode,
+  ]);
 
   const revealInstantReply = (messageId, pieces, fullContent) => {
     if (pieces.length <= 1) return;
@@ -3348,11 +3396,25 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   function getWelcomeMessageContent(nativeName, instantOverride = isInstantAnalysis) {
+    const name = nativeName || 'there';
+    if (instantOverride && instantWelcomeAreaIds.length) {
+      const areas = instantWelcomeAreaIds.slice(0, 3).map((areaId) => (
+        t(`premiumUi.homeRecommendations.areas.${areaId}.short`)
+      ));
+      const templateKey = `premiumUi.homeRecommendations.instantWelcome.${areas.length}`;
+      return t(templateKey, {
+        name,
+        area1: areas[0],
+        area2: areas[1],
+        area3: areas[2],
+      });
+    }
+
     const key = instantOverride ? 'chat.instantWelcomeMessage' : 'chat.welcomeMessage';
     const fallback = instantOverride
       ? "🌟 Hi {{name}}, I'm Tara.\n\nTell me what's on your mind in your own words. I may ask one short follow-up so I can read your chart accurately."
       : "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nTap a question below, or ask me anything in your own words.";
-    return t(key, fallback, { name: nativeName || 'there' });
+    return t(key, fallback, { name });
   }
 
   const buildFreshWelcomeMessage = (nativeNameOverride = null) => {

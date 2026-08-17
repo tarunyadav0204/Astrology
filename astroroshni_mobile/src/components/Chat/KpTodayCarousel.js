@@ -19,8 +19,8 @@ import { kpAPI } from '../../services/api';
 import { trackEvent } from '../../utils/analytics';
 import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 import { useTranslation } from 'react-i18next';
+import { getKpTodayCacheKey } from '../../utils/kpHomeRecommendations';
 
-const CACHE_PREFIX = 'kp_today_home_v2:';
 const MAX_PAGES = 5;
 const BULLETS_PER_PAGE = 4;
 
@@ -62,14 +62,6 @@ function formatShortDate(d, locale = 'en-IN') {
   } catch (_) {
     return formatLocalDate(d);
   }
-}
-
-function birthId(birthDetails) {
-  return birthDetails?.id || birthDetails?.birth_chart_id || birthDetails?.name || 'anon';
-}
-
-function cacheKey(birthDetails) {
-  return `${CACHE_PREFIX}${birthId(birthDetails)}:${formatLocalDate(new Date())}`;
 }
 
 function isTechnicalLabel(label) {
@@ -368,13 +360,7 @@ export default function KpTodayCarousel({ birthDetails, onOpenKp, onData, embedd
 
   const birthKey = useMemo(() => {
     if (!birthDetails) return '';
-    return [
-      birthId(birthDetails),
-      String(birthDetails.date || ''),
-      String(birthDetails.time || ''),
-      String(birthDetails.latitude ?? ''),
-      String(birthDetails.longitude ?? ''),
-    ].join('|');
+    return getKpTodayCacheKey(birthDetails);
   }, [
     birthDetails?.id,
     birthDetails?.birth_chart_id,
@@ -394,7 +380,7 @@ export default function KpTodayCarousel({ birthDetails, onOpenKp, onData, embedd
     }
 
     const requestId = ++requestIdRef.current;
-    const key = cacheKey(details);
+    const key = getKpTodayCacheKey(details);
 
     try {
       const cachedRaw = await AsyncStorage.getItem(key);
