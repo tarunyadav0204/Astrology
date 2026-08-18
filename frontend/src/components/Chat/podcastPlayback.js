@@ -40,3 +40,25 @@ export function podcastLangFromUiLanguage(language) {
     const l = (language || 'english').toLowerCase();
     return l.startsWith('hi') ? 'hi' : 'en';
 }
+
+export const PODCAST_LISTEN_LANG_STORAGE_KEY = 'podcast_listen_lang';
+
+export function readStoredPodcastListenLang(fallbackLanguage) {
+    try {
+        const stored = localStorage.getItem(PODCAST_LISTEN_LANG_STORAGE_KEY);
+        if (stored === 'hi' || stored === 'en') return stored;
+    } catch (_) {
+        /* ignore */
+    }
+    return podcastLangFromUiLanguage(fallbackLanguage);
+}
+
+export function storePodcastListenLang(lang) {
+    const code = podcastLangFromUiLanguage(lang);
+    try {
+        localStorage.setItem(PODCAST_LISTEN_LANG_STORAGE_KEY, code);
+    } catch (_) {
+        /* ignore */
+    }
+    return code;
+}

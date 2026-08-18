@@ -811,6 +811,7 @@ CREATE TABLE "chat_messages" (
     "intent_router_ms" DOUBLE PRECISION,
     "client_request_id" TEXT,
     "gate_metadata" TEXT,
+    "chat_tier" TEXT NOT NULL DEFAULT 'standard',
     PRIMARY KEY ("message_id"),
     FOREIGN KEY ("session_id") REFERENCES "chat_sessions" ("session_id")
 );

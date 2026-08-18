@@ -12,9 +12,14 @@ import {
     stopAndRevokePodcastPlayback,
     registerPodcastPlayback,
     base64ToAudioBlob,
-    podcastLangFromUiLanguage,
+    readStoredPodcastListenLang,
+    storePodcastListenLang,
 } from './podcastPlayback';
+import PodcastLanguageModal from './PodcastLanguageModal';
 import { buildInstantTypingLines, INSTANT_LOADER_TAKING_LONGER } from '../../constants/instantChatLoader';
+
+const premiumPodcastReadyKeys = new Set();
+const PODCAST_READY_TOAST = 'Podcast ready — tap to listen';
 
 /** Lucide-style 24×24 outline icons to match mobile Ionicons outline look */
 const IC = {
@@ -42,6 +47,12 @@ const IconShareSocialOutline = (p) => (
 const IconRadioOutline = (p) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={IC.w} height={IC.h} viewBox={IC.vb} {...IC.s(p)}>
         <path d="M12 12h.01" />
+        <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14" />
+    </svg>
+);
+const IconRadioFilled = (p) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={IC.w} height={IC.h} viewBox={IC.vb} {...IC.s({ ...p, strokeWidth: 2.25 })}>
+        <circle cx="12" cy="12" r="2.25" fill="currentColor" stroke="none" />
         <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14" />
     </svg>
 );
@@ -131,6 +142,32 @@ const extractFollowUpQuestionsFromContent = (content) => {
 
 const stripFollowUpQuestionsBlocks = (content) =>
     String(content || '').replace(new RegExp(FOLLOW_UP_BLOCK_RE.source, 'gi'), '').trim();
+
+/** Hide model/internal markers that otherwise leak as [POS_START] / {json} in bubbles. */
+const sanitizeVisibleChatContent = (content, { asHtmlSpans = false } = {}) => {
+    let out = String(content || '');
+    out = out.replace(
+        /\n?\s*(?:NEXT_ACTION_META|FAQ_META|PREDICTION_ANCHOR_META)\s*:\s*\{[\s\S]*?\}\s*/gi,
+        '\n',
+    );
+    const held = [];
+    const hold = (kind, inner) => {
+        const token = `\u0000SENT${held.length}\u0000`;
+        held.push({ kind, inner: String(inner).replace(/\n+/g, ' ').trim() });
+        return token;
+    };
+    out = out.replace(/(?:【|\[)POS_START(?:】|\])([\s\S]*?)(?:【|\[)POS_END(?:】|\])/gi, (_, inner) => hold('pos', inner));
+    out = out.replace(/(?:【|\[)NEG_START(?:】|\])([\s\S]*?)(?:【|\[)NEG_END(?:】|\])/gi, (_, inner) => hold('neg', inner));
+    out = out.replace(/(?:【|\[)(?:POS|NEG)_(?:START|END)(?:】|\])/gi, '');
+    held.forEach((item, i) => {
+        const token = `\u0000SENT${i}\u0000`;
+        const replacement = asHtmlSpans
+            ? `<span class="chat-sentiment-${item.kind === 'pos' ? 'positive' : 'negative'}">${item.inner}</span>`
+            : `${item.kind === 'pos' ? '【POS_START】' : '【NEG_START】'}${item.inner}${item.kind === 'pos' ? '【POS_END】' : '【NEG_END】'}`;
+        out = out.split(token).join(replacement);
+    });
+    return out;
+};
 
 const followUpChipLayoutStyle = {
     display: 'block',
@@ -361,6 +398,7 @@ const MessageBubble = ({
         return [];
     }, [message?.content, message?.follow_up_questions]);
     const messageChatTier = String(message?.chatTier || message?.chat_tier || '').trim().toLowerCase();
+    const isPremiumChatMessage = messageChatTier === 'premium' || message?.premium_analysis === true;
     const instantPresentation = forceInstantPresentation || messageChatTier === 'instant';
     const instantEvidence = message?.instant_evidence_debug
         || message?.gate_metadata?.instant_evidence_debug
@@ -441,6 +479,15 @@ const MessageBubble = ({
     const [podcastModalOpen, setPodcastModalOpen] = useState(false);
     const [podcastModalMode, setPodcastModalMode] = useState('loading');
     const [podcastLoading, setPodcastLoading] = useState(false);
+    const [podcastReady, setPodcastReady] = useState(() => {
+        const mid = message?.messageId != null ? String(message.messageId) : '';
+        if (!mid) return false;
+        return premiumPodcastReadyKeys.has(`${mid}:en`) || premiumPodcastReadyKeys.has(`${mid}:hi`);
+    });
+    const [showPodcastLanguageModal, setShowPodcastLanguageModal] = useState(false);
+    const [podcastListenLang, setPodcastListenLang] = useState(() => readStoredPodcastListenLang(language));
+    const podcastListenLangRef = useRef(podcastListenLang);
+    const skipPodcastCreditsRef = useRef(false);
     const [pdfGenerating, setPdfGenerating] = useState(false);
     const [podcastCurrentTime, setPodcastCurrentTime] = useState(0);
     const [podcastDuration, setPodcastDuration] = useState(0);
@@ -606,6 +653,65 @@ const MessageBubble = ({
             .trim();
     }, [message?.content]);
 
+    const markPremiumPodcastReady = useCallback((key) => {
+        if (!key) return;
+        premiumPodcastReadyKeys.add(key);
+        setPodcastReady(true);
+    }, []);
+
+    useEffect(() => {
+        if (!isPremiumChatMessage || instantPresentation) return;
+        if (message.role !== 'assistant' || message.isTyping || message.isProcessing) return;
+        if (message.message_type === 'clarification' || isNativeGate) return;
+        const mid = message.messageId != null ? String(message.messageId) : '';
+        if (!mid) return;
+        if (premiumPodcastReadyKeys.has(`${mid}:en`) || premiumPodcastReadyKeys.has(`${mid}:hi`)) {
+            setPodcastReady(true);
+            return;
+        }
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        let active = true;
+        void (async () => {
+            try {
+                const [enResponse, hiResponse] = await Promise.all([
+                    fetch(
+                        `/api/tts/podcast/check-cache?message_id=${encodeURIComponent(mid)}&lang=en`,
+                        { headers: { Authorization: `Bearer ${token}` } },
+                    ),
+                    fetch(
+                        `/api/tts/podcast/check-cache?message_id=${encodeURIComponent(mid)}&lang=hi`,
+                        { headers: { Authorization: `Bearer ${token}` } },
+                    ),
+                ]);
+                const enData = enResponse.ok ? await enResponse.json() : null;
+                const hiData = hiResponse.ok ? await hiResponse.json() : null;
+                if (!active) return;
+                if (enData?.cached === true) {
+                    markPremiumPodcastReady(`${mid}:en`);
+                }
+                if (hiData?.cached === true) {
+                    markPremiumPodcastReady(`${mid}:hi`);
+                }
+            } catch (_) {
+                /* ignore hydrate errors */
+            }
+        })();
+        return () => {
+            active = false;
+        };
+    }, [
+        instantPresentation,
+        isNativeGate,
+        isPremiumChatMessage,
+        markPremiumPodcastReady,
+        message.isProcessing,
+        message.isTyping,
+        message.messageId,
+        message.message_type,
+        message.role,
+    ]);
+
     useEffect(() => {
         return () => {
             podcastFetchAbortRef.current?.abort();
@@ -649,7 +755,14 @@ const MessageBubble = ({
         setPodcastDuration(0);
     }, []);
 
-    const fetchAndPlayPodcast = useCallback(async () => {
+    const persistPodcastListenLang = useCallback((listenLang) => {
+        const lang = storePodcastListenLang(listenLang);
+        podcastListenLangRef.current = lang;
+        setPodcastListenLang(lang);
+        return lang;
+    }, []);
+
+    const fetchAndPlayPodcast = useCallback(async (listenLang) => {
         const token = localStorage.getItem('token');
         if (!token) {
             showToast('Please log in to listen to podcasts.', 'error');
@@ -658,7 +771,7 @@ const MessageBubble = ({
         const cleanText = getCleanMessageText();
         if (!cleanText) return;
 
-        const langCode = podcastLangFromUiLanguage(language);
+        const langCode = persistPodcastListenLang(listenLang || podcastListenLangRef.current || language);
         const mid = message.messageId != null ? String(message.messageId) : null;
 
         podcastFetchAbortRef.current?.abort();
@@ -707,6 +820,9 @@ const MessageBubble = ({
             if (!b64 || typeof b64 !== 'string') {
                 throw new Error('No audio in response');
             }
+            if (mid) {
+                markPremiumPodcastReady(`${mid}:${langCode}`);
+            }
 
             const blob = base64ToAudioBlob(b64);
             const url = URL.createObjectURL(blob);
@@ -747,23 +863,25 @@ const MessageBubble = ({
         message.native_name,
         podcastCost,
         podcastPlaybackRate,
+        persistPodcastListenLang,
         refreshBalance,
         sessionId,
+        markPremiumPodcastReady,
     ]);
 
-    const handlePodcastButtonClick = useCallback(async () => {
+    const continuePodcastAfterLanguage = useCallback(async (listenLang) => {
         const token = localStorage.getItem('token');
         if (!token) {
             showToast('Please log in to listen to podcasts.', 'error');
             return;
         }
-        const cleanText = getCleanMessageText();
-        if (!cleanText) return;
+        const langCode = persistPodcastListenLang(listenLang);
+        const skipCredits = skipPodcastCreditsRef.current;
+        skipPodcastCreditsRef.current = false;
+        setShowPodcastLanguageModal(false);
 
-        const langCode = podcastLangFromUiLanguage(language);
         const mid = message.messageId != null ? String(message.messageId) : null;
         const sourceKey = `${mid || 'noid'}_${langCode}`;
-
         if (podcastSourceKeyRef.current === sourceKey && podcastAudioRef.current?.src && !podcastLoading) {
             setPodcastModalOpen(true);
             setPodcastModalMode('playing');
@@ -771,6 +889,11 @@ const MessageBubble = ({
             if (a.paused) {
                 await a.play().catch(() => {});
             }
+            return;
+        }
+
+        if (isPremiumChatMessage || skipCredits) {
+            await fetchAndPlayPodcast(langCode);
             return;
         }
 
@@ -798,8 +921,29 @@ const MessageBubble = ({
             if (!ok) return;
         }
 
-        await fetchAndPlayPodcast();
-    }, [fetchAndPlayPodcast, getCleanMessageText, language, message.messageId, podcastCost, podcastLoading]);
+        await fetchAndPlayPodcast(langCode);
+    }, [
+        fetchAndPlayPodcast,
+        isPremiumChatMessage,
+        message.messageId,
+        persistPodcastListenLang,
+        podcastCost,
+        podcastLoading,
+    ]);
+
+    const handlePodcastButtonClick = useCallback(async () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            showToast('Please log in to listen to podcasts.', 'error');
+            return;
+        }
+        const cleanText = getCleanMessageText();
+        if (!cleanText) return;
+        if (podcastLoading) return;
+
+        skipPodcastCreditsRef.current = false;
+        setShowPodcastLanguageModal(true);
+    }, [getCleanMessageText, podcastLoading]);
 
     const lastPodcastPromoKeyRef = useRef(0);
     useEffect(() => {
@@ -812,7 +956,8 @@ const MessageBubble = ({
         if (lastPodcastPromoKeyRef.current === podcastAutoLaunchKey) return;
         lastPodcastPromoKeyRef.current = podcastAutoLaunchKey;
         const timer = setTimeout(() => {
-            fetchAndPlayPodcast();
+            skipPodcastCreditsRef.current = true;
+            setShowPodcastLanguageModal(true);
         }, 350);
         return () => clearTimeout(timer);
     }, [
@@ -824,7 +969,6 @@ const MessageBubble = ({
         message.isProcessing,
         message.message_type,
         isNativeGate,
-        fetchAndPlayPodcast,
     ]);
 
     const handlePodcastTogglePause = () => {
@@ -1039,6 +1183,7 @@ const MessageBubble = ({
         
         // 4. Strip Follow-up Questions from HTML — rendered as React chips (PWA-safe wrapping).
         formatted = stripFollowUpQuestionsBlocks(formatted);
+        formatted = sanitizeVisibleChatContent(formatted, { asHtmlSpans: true });
         
         // 5. Handle Final Thoughts
         formatted = formatted.replace(/(### Final Thoughts[\s\S]*?)(?=###|$)/g, (match, finalThoughts) => {
@@ -1201,6 +1346,8 @@ const MessageBubble = ({
             .replace(/\*\*(.*?)\*\*/g, '$1')
             .replace(/__(.*?)__/g, '$1')
             .replace(/[`*_]+/g, '')
+            .replace(/(?:【|\[)(?:POS|NEG)_(?:START|END)(?:】|\])/gi, '')
+            .replace(/\n?\s*(?:NEXT_ACTION_META|FAQ_META|PREDICTION_ANCHOR_META)\s*:\s*\{[\s\S]*?\}\s*/gi, '\n')
             .split(/\n\s*\n/)
             .map((part) => part.replace(/\s*\n\s*/g, ' ').trim())
             .filter(Boolean);
@@ -1351,12 +1498,22 @@ const MessageBubble = ({
                 {isAssistant && messageChatTier !== 'instant' && (
                     <button
                         type="button"
-                        className="action-btn action-btn--podcast"
+                        className={`action-btn action-btn--podcast${podcastReady ? ' action-btn--podcast-ready' : ''}`}
                         disabled={podcastLoading}
                         onClick={handlePodcastButtonClick}
-                        title="Listen as podcast"
+                        title={podcastReady ? PODCAST_READY_TOAST : 'Listen as podcast'}
+                        aria-label={podcastReady ? PODCAST_READY_TOAST : 'Listen as podcast'}
                     >
-                        <IconRadioOutline />
+                        {podcastLoading ? (
+                            <span className="podcast-prep-spinner" aria-hidden="true" />
+                        ) : podcastReady ? (
+                            <>
+                                <IconRadioFilled />
+                                <span className="podcast-ready-label">Ready</span>
+                            </>
+                        ) : (
+                            <IconRadioOutline />
+                        )}
                     </button>
                 )}
                 <button type="button" className="action-btn action-btn--toolbar" onClick={handleCopyClick} title="Copy message">
@@ -2014,6 +2171,17 @@ const MessageBubble = ({
                 </div>
             </div>
             
+            <PodcastLanguageModal
+                open={showPodcastLanguageModal}
+                selectedLang={podcastListenLang}
+                uiLanguage={language}
+                onSelect={continuePodcastAfterLanguage}
+                onClose={() => {
+                    skipPodcastCreditsRef.current = false;
+                    setShowPodcastLanguageModal(false);
+                }}
+            />
+
             {podcastModalOpen &&
                 createPortal(
                     <div

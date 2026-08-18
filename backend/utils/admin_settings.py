@@ -1340,6 +1340,10 @@ SPEECH_TTS_PROVIDER_LOCAL = "local"
 SPEECH_TTS_PROVIDER_GOOGLE = "google"
 DEFAULT_SPEECH_TTS_VOICE_EN = "en-IN-Neural2-A"
 DEFAULT_SPEECH_TTS_VOICE_HI = "hi-IN-Neural2-A"
+DEFAULT_PODCAST_VOICE_EN_FEMALE = "en-GB-Chirp3-HD-Gacrux"
+DEFAULT_PODCAST_VOICE_EN_MALE = "en-GB-Chirp3-HD-Algenib"
+DEFAULT_PODCAST_VOICE_HI_FEMALE = "en-GB-Chirp3-HD-Gacrux"
+DEFAULT_PODCAST_VOICE_HI_MALE = "en-GB-Chirp3-HD-Puck"
 
 
 def get_podcast_provider() -> str:
@@ -1373,3 +1377,19 @@ def get_speech_tts_voice(lang: str = "en") -> str:
         return value or DEFAULT_SPEECH_TTS_VOICE_HI
     value = (get_setting("speech_tts_voice_en") or "").strip()
     return value or DEFAULT_SPEECH_TTS_VOICE_EN
+
+
+def get_podcast_tts_voices(lang: str = "en") -> tuple[str, str]:
+    """
+    Female/male Google TTS voices for podcast hosts.
+    English uses `podcast_tts_voice_en_female` / `podcast_tts_voice_en_male`.
+    Hindi uses `podcast_tts_voice_hi_female` / `podcast_tts_voice_hi_male`.
+    """
+    normalized_lang = (lang or "en").strip().lower()
+    if normalized_lang.startswith("hi"):
+        female = (get_setting("podcast_tts_voice_hi_female") or "").strip() or DEFAULT_PODCAST_VOICE_HI_FEMALE
+        male = (get_setting("podcast_tts_voice_hi_male") or "").strip() or DEFAULT_PODCAST_VOICE_HI_MALE
+        return female, male
+    female = (get_setting("podcast_tts_voice_en_female") or "").strip() or DEFAULT_PODCAST_VOICE_EN_FEMALE
+    male = (get_setting("podcast_tts_voice_en_male") or "").strip() or DEFAULT_PODCAST_VOICE_EN_MALE
+    return female, male

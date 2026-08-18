@@ -1,6 +1,7 @@
 import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Speech from 'expo-speech';
+import { Platform } from 'react-native';
 import { chatAPI } from '../services/api';
 
 let currentSound = null;
@@ -23,6 +24,18 @@ const markHandledError = (error) => {
   return error;
 };
 
+const isWebPlatform = () => Platform.OS === 'web';
+
+const clearPodcastTempUri = () => {
+  if (!podcastTempUri) return;
+  if (String(podcastTempUri).startsWith('blob:')) {
+    try { URL.revokeObjectURL(podcastTempUri); } catch (_) {}
+  } else if (!isWebPlatform()) {
+    FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});
+  }
+  podcastTempUri = null;
+};
+
 const stopLoadedAudio = async () => {
   if (currentSound) {
     try {
@@ -39,10 +52,7 @@ const stopLoadedAudio = async () => {
     FileSystem.deleteAsync(speechTempUri, { idempotent: true }).catch(() => {});
     speechTempUri = null;
   }
-  if (podcastTempUri) {
-    FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});
-    podcastTempUri = null;
-  }
+  clearPodcastTempUri();
 };
 
 const stopLoadedAudioImmediately = () => {
@@ -54,11 +64,10 @@ const stopLoadedAudioImmediately = () => {
     FileSystem.deleteAsync(speechTempUri, { idempotent: true }).catch(() => {});
     speechTempUri = null;
   }
-  if (podcastTempUri) {
-    FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});
-    podcastTempUri = null;
+  if (!sound) {
+    clearPodcastTempUri();
+    return;
   }
-  if (!sound) return;
   try {
     sound.setOnPlaybackStatusUpdate?.(null);
   } catch {
@@ -68,7 +77,137 @@ const stopLoadedAudioImmediately = () => {
     .catch(() => {})
     .finally(() => {
       sound.unloadAsync?.().catch(() => {});
+      clearPodcastTempUri();
     });
+};
+
+const SILENT_WAV =
+  'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+
+let webAudioEl = null;
+
+const getWebAudioElement = () => {
+  if (typeof document === 'undefined') return null;
+  if (!webAudioEl) {
+    webAudioEl = document.createElement('audio');
+    webAudioEl.setAttribute('playsinline', 'true');
+    webAudioEl.playsInline = true;
+    webAudioEl.preload = 'auto';
+  }
+  return webAudioEl;
+};
+
+const unlockWebPodcastAudio = () => {
+  if (!isWebPlatform()) return;
+  const el = getWebAudioElement();
+  if (!el) return;
+  try {
+    el.muted = false;
+    el.volume = 0;
+    if (!el.src) el.src = SILENT_WAV;
+    const playPromise = el.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(() => {});
+    }
+  } catch {
+    // ignore unlock failures; play() later will surface errors
+  }
+};
+
+const base64ToBlobUrl = (b64, mime = 'audio/mpeg') => {
+  const binary = atob(String(b64 || ''));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: mime }));
+};
+
+const createWebHtmlSound = (url) => {
+  const audio = getWebAudioElement() || document.createElement('audio');
+  audio.setAttribute('playsinline', 'true');
+  audio.playsInline = true;
+  audio.preload = 'auto';
+  try { audio.pause(); } catch (_) {}
+  audio.muted = false;
+  audio.src = url;
+  try { audio.load(); } catch (_) {}
+  let statusCb = null;
+  const emit = (extra = {}) => {
+    if (!statusCb) return;
+    statusCb({
+      isLoaded: true,
+      shouldPlay: !audio.paused,
+      isPlaying: !audio.paused,
+      positionMillis: Math.floor((audio.currentTime || 0) * 1000),
+      durationMillis: Number.isFinite(audio.duration) ? Math.floor(audio.duration * 1000) : 0,
+      didJustFinish: false,
+      ...extra,
+    });
+  };
+  audio.ontimeupdate = () => emit();
+  audio.onloadedmetadata = () => emit();
+  audio.onended = () => emit({ didJustFinish: true, positionMillis: 0 });
+  audio.onerror = () => {
+    if (statusCb) {
+      statusCb({ isLoaded: false, error: 'web_audio_error' });
+    }
+  };
+  return {
+    playAsync: () => audio.play(),
+    pauseAsync: () => {
+      audio.pause();
+      return Promise.resolve();
+    },
+    stopAsync: () => {
+      audio.pause();
+      audio.currentTime = 0;
+      return Promise.resolve();
+    },
+    unloadAsync: () => {
+      audio.pause();
+      audio.removeAttribute('src');
+      try { audio.load(); } catch (_) {}
+      return Promise.resolve();
+    },
+    setVolumeAsync: (v) => {
+      audio.volume = Math.max(0, Math.min(1, Number(v) || 1));
+      return Promise.resolve();
+    },
+    setRateAsync: (r) => {
+      audio.playbackRate = Math.min(2, Math.max(0.5, Number(r) || 1));
+      return Promise.resolve();
+    },
+    setPositionAsync: (ms) => {
+      audio.currentTime = Math.max(0, Number(ms) || 0) / 1000;
+      return Promise.resolve();
+    },
+    getStatusAsync: () => Promise.resolve({
+      isLoaded: true,
+      shouldPlay: !audio.paused,
+      isPlaying: !audio.paused,
+      positionMillis: Math.floor((audio.currentTime || 0) * 1000),
+      durationMillis: Number.isFinite(audio.duration) ? Math.floor(audio.duration * 1000) : 0,
+    }),
+    setOnPlaybackStatusUpdate: (cb) => {
+      statusCb = cb;
+    },
+  };
+};
+
+const attachPodcastStatus = (sound, { onDone, onProgress }) => {
+  sound.setOnPlaybackStatusUpdate((status) => {
+    if (status.isLoaded && podcastCallbacks?.onProgress && status.positionMillis != null) {
+      podcastCallbacks.onProgress(status.positionMillis, status.durationMillis ?? 0);
+    } else if (status.isLoaded && onProgress && status.positionMillis != null) {
+      onProgress(status.positionMillis, status.durationMillis ?? 0);
+    }
+    if (status.didJustFinish) {
+      podcastCallbacks = null;
+      if (onDone) onDone();
+      sound.unloadAsync?.().catch(() => {});
+      currentSound = null;
+      clearPodcastTempUri();
+    }
+  });
 };
 
 const normalizeVoice = (voice) => ({
@@ -311,6 +450,8 @@ const speakLocally = async (text, { language = 'english', voiceName, onDone, onE
 };
 
 export const textToSpeech = {
+  unlockWebAudio: unlockWebPodcastAudio,
+
   setSpeechProvider(provider) {
     speechProvider = normalizeSpeechProvider(provider);
     console.log('[TTS] setSpeechProvider', { provider: speechProvider });
@@ -745,10 +886,7 @@ export const textToSpeech = {
         currentSound = null;
         speechCallbacks = null;
         podcastCallbacks = null;
-        if (podcastTempUri) {
-          FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});
-          podcastTempUri = null;
-        }
+        clearPodcastTempUri();
       }
 
       const lang = language?.toLowerCase().startsWith('hi') ? 'hi' : 'en';
@@ -757,6 +895,20 @@ export const textToSpeech = {
       const base64Audio = response?.data?.audio;
       if (!base64Audio || typeof base64Audio !== 'string') {
         if (onError) onError(new Error('Podcast: missing audio from server'));
+        return;
+      }
+
+      podcastCallbacks = { onPause, onResume, onStop, onProgress };
+
+      if (isWebPlatform()) {
+        const url = base64ToBlobUrl(base64Audio);
+        podcastTempUri = url;
+        const sound = createWebHtmlSound(url);
+        currentSound = sound;
+        attachPodcastStatus(sound, { onDone, onProgress });
+        await sound.setVolumeAsync(1.0);
+        await sound.playAsync();
+        if (onStart) onStart();
         return;
       }
 
@@ -784,23 +936,7 @@ export const textToSpeech = {
       );
       currentSound = sound;
       await sound.setVolumeAsync(1.0);
-      podcastCallbacks = { onPause, onResume, onStop, onProgress };
-
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && podcastCallbacks?.onProgress && status.positionMillis != null) {
-          podcastCallbacks.onProgress(status.positionMillis, status.durationMillis ?? 0);
-        }
-        if (status.didJustFinish) {
-          podcastCallbacks = null;
-          if (onDone) onDone();
-          sound.unloadAsync();
-          currentSound = null;
-          if (podcastTempUri) {
-            FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});
-            podcastTempUri = null;
-          }
-        }
-      });
+      attachPodcastStatus(sound, { onDone, onProgress });
 
       await sound.playAsync();
       if (onStart) onStart();
@@ -813,10 +949,7 @@ export const textToSpeech = {
         console.error('[TTS] playPodcast error', e);
       }
       podcastCallbacks = null;
-      if (podcastTempUri) {
-        FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});
-        podcastTempUri = null;
-      }
+      clearPodcastTempUri();
       if (onError) onError(e);
     }
   },
@@ -856,10 +989,7 @@ export const textToSpeech = {
       currentSound = null;
       if (podcastCallbacks && podcastCallbacks.onStop) podcastCallbacks.onStop();
       podcastCallbacks = null;
-      if (podcastTempUri) {
-        FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});
-        podcastTempUri = null;
-      }
+      clearPodcastTempUri();
     }
   },
 
@@ -920,10 +1050,7 @@ export const textToSpeech = {
         currentSound = null;
         speechCallbacks = null;
         podcastCallbacks = null;
-        if (podcastTempUri) {
-          FileSystem.deleteAsync(podcastTempUri, { idempotent: true }).catch(() => {});
-          podcastTempUri = null;
-        }
+        clearPodcastTempUri();
       }
       podcastTempUri = null;
 

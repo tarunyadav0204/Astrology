@@ -1872,6 +1872,42 @@ button.chat-header-credits.credits-display:active {
     color: #ea580c;
 }
 
+.message-action-buttons .action-btn--podcast-ready {
+    width: auto;
+    min-width: 36px;
+    padding: 0 10px;
+    gap: 5px;
+    background: rgba(22, 163, 74, 0.12);
+    border-color: rgba(22, 163, 74, 0.38);
+    color: #15803d;
+}
+
+.message-action-buttons .action-btn--podcast-ready:hover:not(:disabled) {
+    background: rgba(22, 163, 74, 0.18);
+    border-color: rgba(22, 163, 74, 0.5);
+    color: #166534;
+}
+
+.message-action-buttons .podcast-ready-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1;
+}
+
+.message-action-buttons .podcast-prep-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: podcast-prep-spin 0.7s linear infinite;
+}
+
+@keyframes podcast-prep-spin {
+    to { transform: rotate(360deg); }
+}
+
 .message-action-buttons .action-btn--restart {
     background: rgba(255, 107, 53, 0.08);
     border-color: rgba(255, 107, 53, 0.22);

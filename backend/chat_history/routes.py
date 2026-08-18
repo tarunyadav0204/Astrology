@@ -534,6 +534,16 @@ def _ensure_conversation_state_pending_gate_cols(conn):
     _mark_schema_ready("conversation_state_pending_gate_cols")
 
 
+def _ensure_chat_messages_chat_tier(conn):
+    if _schema_already_ready("chat_messages_chat_tier"):
+        return
+    execute(
+        conn,
+        "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS chat_tier TEXT NOT NULL DEFAULT 'standard'",
+    )
+    _mark_schema_ready("chat_messages_chat_tier")
+
+
 def _conversation_state_pending_gate_cols_exist(conn) -> bool:
     cur = execute(
         conn,
@@ -675,6 +685,7 @@ def _create_native_gate_response(
     chat_tier: str = "standard",
 ):
     _ensure_chat_messages_gate_metadata(conn)
+    _ensure_chat_messages_chat_tier(conn)
     _ensure_conversation_state_pending_gate_cols(conn)
     cur = execute(
         conn,
@@ -696,8 +707,8 @@ def _create_native_gate_response(
         conn,
         """
             INSERT INTO chat_messages
-                (session_id, sender, content, status, message_type, gate_metadata, completed_at, client_request_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                (session_id, sender, content, status, message_type, gate_metadata, completed_at, client_request_id, chat_tier)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING message_id
         """,
         (
@@ -709,6 +720,7 @@ def _create_native_gate_response(
             json.dumps(gate_metadata, ensure_ascii=False),
             datetime.now(),
             client_request_id,
+            chat_tier,
         ),
     )
     assistant_message_id = cur.fetchone()[0]
@@ -1646,13 +1658,15 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
         sess_llm_model = session_row[3] if len(session_row) > 3 else None
 
         _ensure_chat_messages_gate_metadata(conn)
+        _ensure_chat_messages_chat_tier(conn)
         conn.commit()
 
         cur = execute(
             conn,
             """
                 SELECT message_id, sender, content, timestamp, completed_at, terms, glossary, images,
-                       message_type, gate_metadata, parallel_llm_usage, next_action, status, started_at, follow_up_questions
+                       message_type, gate_metadata, parallel_llm_usage, next_action, status, started_at,
+                       follow_up_questions, chat_tier
                 FROM chat_messages
                 WHERE session_id = %s
                 ORDER BY timestamp ASC
@@ -1731,7 +1745,9 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
         status = msg[12] if len(msg) > 12 else None
         started_at = msg[13] if len(msg) > 13 else None
         follow_up_questions = msg[14] if len(msg) > 14 else None
+        chat_tier = msg[15] if len(msg) > 15 else "standard"
         message_data["message_type"] = mt
+        message_data["chat_tier"] = str(chat_tier or "standard").strip().lower()
         message_data["status"] = status
         message_data["started_at"] = started_at
         if gm:
@@ -1918,7 +1934,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         raise HTTPException(status_code=403, detail="Speech chat is not enabled for your account.")
     speech_billing_requested = request.get("speech_billing", request.get("speechBilling", True))
     speech_chat_billing = bool(speech_chat_requested and instant_chat_active and speech_billing_requested is not False)
-    effective_chat_tier = "instant" if instant_chat_active else "standard"
+    effective_chat_tier = "instant" if instant_chat_active else ("premium" if premium_analysis else "standard")
     chat_worker_mode_active = chat_worker_mode_enabled_for_user(current_user.userid)
     # A free question is always a Standard single-chart answer. Do not open
     # the subject gate at all: free users must not be routed into Partnership
@@ -2441,6 +2457,8 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 ),
             )
 
+        _ensure_chat_messages_chat_tier(conn)
+
         # Save user question (sanitized)
         cur = execute(
             conn,
@@ -2463,11 +2481,11 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         cur = execute(
             conn,
             """
-                INSERT INTO chat_messages (session_id, sender, content, status, started_at, client_request_id)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO chat_messages (session_id, sender, content, status, started_at, client_request_id, chat_tier)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING message_id
             """,
-            (session_id, "assistant", "", "processing", datetime.now(), client_request_id),
+            (session_id, "assistant", "", "processing", datetime.now(), client_request_id, effective_chat_tier),
         )
         assistant_message_id = cur.fetchone()[0]
         conn.commit()

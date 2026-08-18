@@ -662,6 +662,7 @@ export default function ChatScreen({ navigation, route }) {
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
+  const [isComposerFocused, setIsComposerFocused] = useState(false);
   /** Expo Web: RN multiline TextInput defaults to 2 textarea rows → placeholder sits high. */
   const [webComposerHeight, setWebComposerHeight] = useState(44);
   const [loading, setLoading] = useState(false);
@@ -4240,7 +4241,8 @@ export default function ChatScreen({ navigation, route }) {
             }
             const mt = status.message_type || 'answer';
             const body = (status.content || '').trim();
-            if (!wasFreeQuestion && !gatedNoCharge && !isInstantTierResponse && mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
+            const isPremiumTierResponse = resolvedChatTier === 'premium';
+            if (!wasFreeQuestion && !gatedNoCharge && !isInstantTierResponse && !isPremiumTierResponse && mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
               setRatingEligibleMessageId(messageId);
               setPodcastPromoMessageId(messageId);
               setPodcastPromoVisible(true);
@@ -4946,6 +4948,12 @@ export default function ChatScreen({ navigation, route }) {
     return t('chat.modeIntro.standard.name', 'Standard');
   };
 
+  const getChatModeCompactName = (modeKey = getChatModeKey()) => {
+    if (modeKey === 'premium') return 'P';
+    if (modeKey === 'instant') return 'I';
+    return 'S';
+  };
+
   const formatModeCost = (cost) => {
     const numericCost = Number(cost) || 0;
     if (numericCost <= 0) return t('chat.modeIntro.free', 'Free');
@@ -5001,6 +5009,11 @@ export default function ChatScreen({ navigation, route }) {
       name: t('chat.modeIntro.instant.name', 'Instant'),
       benefit: t('chat.modeIntro.instant.benefit', 'Fastest replies for quick follow-ups and simple questions.'),
       bestFor: t('chat.modeIntro.instant.bestFor', 'Best when you want a concise answer now.'),
+      features: [
+        t('chat.modeIntro.instant.feature1', 'Quick replies for a natural back-and-forth'),
+        t('chat.modeIntro.instant.feature2', 'Clarifying questions when more context is needed'),
+        t('chat.modeIntro.instant.feature3', 'Charged by conversation time'),
+      ],
       cost: instantChatFirstMinuteCost,
       originalCost: null,
     }] : []),
@@ -5010,6 +5023,11 @@ export default function ChatScreen({ navigation, route }) {
       name: t('chat.modeIntro.standard.name', 'Standard'),
       benefit: t('chat.modeIntro.standard.benefit', 'Balanced depth and speed for most astrology questions.'),
       bestFor: t('chat.modeIntro.standard.bestFor', 'Best default when you want useful detail.'),
+      features: [
+        t('chat.modeIntro.standard.feature1', 'Parashari, Nadi, Jaimini and KP synthesis'),
+        t('chat.modeIntro.standard.feature2', 'Complete answer in AstroRoshni’s structured format'),
+        t('chat.modeIntro.standard.feature3', 'Balanced depth and response time'),
+      ],
       cost: chatCost,
       originalCost: chatCostOriginal,
     },
@@ -5021,6 +5039,11 @@ export default function ChatScreen({ navigation, route }) {
         ? 'Detailed chart study for important decisions and complex topics.'
         : 'Detailed chart study for important decisions and complex topics.'),
       bestFor: t('chat.modeIntro.premium.bestFor', 'Best when accuracy and detail matter more than speed.'),
+      features: [
+        t('chat.modeIntro.premium.feature1', 'Parashari, Nadi, Jaimini and KP synthesis'),
+        t('chat.modeIntro.premium.feature2', 'Our highest-care analysis for complex questions'),
+        t('chat.modeIntro.premium.feature3', 'Podcast version included at no extra cost'),
+      ],
       cost: premiumChatCost,
       originalCost: premiumChatCostOriginal,
     },
@@ -6716,6 +6739,8 @@ export default function ChatScreen({ navigation, route }) {
                     : null,
                 ]}
                 value={inputText}
+                onFocus={() => setIsComposerFocused(true)}
+                onBlur={() => setIsComposerFocused(false)}
                 onChangeText={(text) => {
                   setInputText(text);
                   if (Platform.OS === 'web' && !text) {
@@ -6755,9 +6780,16 @@ export default function ChatScreen({ navigation, route }) {
                 blurOnSubmit={false}
               />
 
-              {!isInstantAnalysis && !partnershipMode && !isMundane && !freeQuestionAvailable && (
+              {!partnershipMode && !isMundane && !freeQuestionAvailable && (
                 <TouchableOpacity
-                  style={styles.premiumToggleButton}
+                  style={[
+                    styles.chatModeIdentityButton,
+                    (isComposerFocused || inputText.trim().length > 0) && styles.chatModeIdentityButtonCompact,
+                    {
+                      backgroundColor: colors.surfaceRaised,
+                      borderColor: colors.border,
+                    },
+                  ]}
                   onPress={() => {
                     if (Date.now() < modeIntroSuppressOpenUntilRef.current) {
                       return;
@@ -6766,41 +6798,24 @@ export default function ChatScreen({ navigation, route }) {
                     setShowChatModeIntro(true);
                   }}
                   delayPressIn={50}
-                  onLongPress={() => setShowPremiumModal(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('chat.modeIntro.openSelector', 'Change chat mode')}
                 >
-                  <Animated.View
-                    style={[
-                      styles.premiumToggleIcon,
-                      isPremiumAnalysis && {
-                        transform: [{
-                          scale: glowAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 1.15],
-                          }),
-                        }],
-                      },
-                    ]}
-                  >
-                    {isPremiumAnalysis ? (
-                      <LinearGradient
-                        colors={['#ffd700', '#ff6b35']}
-                        style={styles.premiumIconGradient}
-                      >
-                        <Text style={styles.premiumIconText}>P</Text>
-                      </LinearGradient>
-                    ) : isInstantAnalysis ? (
-                      <LinearGradient
-                        colors={['#ff8c5a', '#ff6b35']}
-                        style={styles.premiumIconGradient}
-                      >
-                        <Text style={styles.premiumIconText}>I</Text>
-                      </LinearGradient>
-                    ) : (
-                      <View style={styles.premiumIconInactive}>
-                        <Text style={styles.premiumIconTextInactive}>S</Text>
-                      </View>
-                    )}
-                  </Animated.View>
+                  {!(isComposerFocused || inputText.trim().length > 0) && (
+                    <Ionicons
+                      name={isInstantAnalysis ? 'flash' : isPremiumAnalysis ? 'sparkles' : 'chatbubble-ellipses'}
+                      size={14}
+                      color={colors.primary}
+                    />
+                  )}
+                  <Text numberOfLines={1} style={[styles.chatModeIdentityText, { color: colors.text }]}>
+                    {isComposerFocused || inputText.trim().length > 0
+                      ? getChatModeCompactName()
+                      : getChatModeName()}
+                  </Text>
+                  {!(isComposerFocused || inputText.trim().length > 0) && (
+                    <Ionicons name="chevron-down" size={13} color={colors.textSecondary} />
+                  )}
                 </TouchableOpacity>
               )}
 
@@ -7087,8 +7102,8 @@ export default function ChatScreen({ navigation, route }) {
               style={[
                 styles.chatModeIntroSheet,
                 {
-                  backgroundColor: theme === 'dark' ? '#24113f' : '#fffaf5',
-                  borderColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.28)' : 'rgba(234, 88, 12, 0.18)',
+                  backgroundColor: colors.surfaceRaised || colors.surface,
+                  borderColor: colors.cardBorder || colors.border,
                 },
               ]}
             >
@@ -7105,11 +7120,16 @@ export default function ChatScreen({ navigation, route }) {
               <Text style={[styles.chatModeIntroBody, { color: colors.textSecondary }]}>
                 {t(
                   'chat.modeIntro.body',
-                  'Choose how fast and deep you want this answer. You can change modes anytime from the S/I/P button near the message box.'
+                  'Compare the experience and price before you ask. You can change modes anytime.'
                 )}
               </Text>
 
-              <View style={styles.chatModeIntroRows}>
+              <ScrollView
+                style={styles.chatModeIntroRowsScroll}
+                contentContainerStyle={styles.chatModeIntroRows}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
+              >
                 {chatModeOptions.map((option) => {
                   const isCurrent = option.key === getChatModeKey();
                   const hasDiscount = option.originalCost != null && Number(option.originalCost) > Number(option.cost || 0);
@@ -7121,19 +7141,17 @@ export default function ChatScreen({ navigation, route }) {
                       style={[
                         styles.chatModeIntroRow,
                         {
-                          backgroundColor: isCurrent
-                            ? (theme === 'dark' ? 'rgba(249, 115, 22, 0.18)' : 'rgba(249, 115, 22, 0.10)')
-                            : (theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.035)'),
+                          backgroundColor: isCurrent ? colors.selectionSurface : colors.surfaceMuted,
                           borderColor: isCurrent
-                            ? 'rgba(249, 115, 22, 0.45)'
-                            : (theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+                            ? (colors.selectionBorder || colors.primary)
+                            : (colors.cardBorder || colors.border),
                         },
                       ]}
                     >
-                      <View style={[styles.chatModeIntroIcon, { backgroundColor: isCurrent ? colors.primary : 'rgba(249, 115, 22, 0.16)' }]}>
-                        <Ionicons name={option.icon} size={17} color={isCurrent ? '#fff' : colors.primary} />
+                      <View style={[styles.chatModeIntroIcon, { backgroundColor: isCurrent ? colors.primary : colors.selectionSurface }]}>
+                        <Ionicons name={option.icon} size={17} color={isCurrent ? colors.onPrimary : colors.primary} />
                       </View>
-                      <View style={styles.chatModeIntroRowText}>
+                      <View style={styles.chatModeIntroContent}>
                         <View style={styles.chatModeIntroRowHeader}>
                           <Text style={[styles.chatModeIntroModeName, { color: colors.text }]}>{option.name}</Text>
                           {isCurrent ? (
@@ -7141,29 +7159,39 @@ export default function ChatScreen({ navigation, route }) {
                               {t('chat.modeIntro.current', 'Current')}
                             </Text>
                           ) : null}
+                          <View style={styles.chatModeIntroCostWrap}>
+                            {hasDiscount ? (
+                              <Text style={[styles.chatModeIntroOriginalCost, { color: colors.textTertiary || colors.textSecondary }]}>
+                                {formatModeCost(option.originalCost)}
+                              </Text>
+                            ) : null}
+                            <Text style={[styles.chatModeIntroCost, { color: colors.text }]}>
+                              {option.key === 'instant'
+                                ? t('instantBilling.splitRateShort', '{{first}} first · {{following}}/min', {
+                                    first: instantChatFirstMinuteCost,
+                                    following: instantChatPerMinuteCost,
+                                  })
+                                : t('chat.modeIntro.perQuestion', '{{cost}} per question', {
+                                    cost: formatModeCost(option.cost),
+                                  })}
+                            </Text>
+                          </View>
                         </View>
                         <Text style={[styles.chatModeIntroBenefit, { color: colors.textSecondary }]}>{option.benefit}</Text>
+                        <View style={styles.chatModeIntroFeatureList}>
+                          {option.features.map((feature) => (
+                            <View key={feature} style={styles.chatModeIntroFeatureRow}>
+                              <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
+                              <Text style={[styles.chatModeIntroFeatureText, { color: colors.text }]}>{feature}</Text>
+                            </View>
+                          ))}
+                        </View>
                         <Text style={[styles.chatModeIntroBestFor, { color: colors.textTertiary || colors.textSecondary }]}>{option.bestFor}</Text>
-                      </View>
-                      <View style={styles.chatModeIntroCostWrap}>
-                        {hasDiscount ? (
-                          <Text style={[styles.chatModeIntroOriginalCost, { color: colors.textTertiary || colors.textSecondary }]}>
-                            {formatModeCost(option.originalCost)}
-                          </Text>
-                        ) : null}
-                        <Text style={[styles.chatModeIntroCost, { color: colors.text }]}>
-                          {option.key === 'instant'
-                            ? t('instantBilling.splitRateShort', '{{first}} first · {{following}}/min', {
-                                first: instantChatFirstMinuteCost,
-                                following: instantChatPerMinuteCost,
-                              })
-                            : formatModeCost(option.cost)}
-                        </Text>
                       </View>
                     </TouchableOpacity>
                   );
                 })}
-              </View>
+              </ScrollView>
 
               <TouchableOpacity
                 activeOpacity={0.9}
@@ -8913,10 +8941,14 @@ const styles = StyleSheet.create({
   },
   chatModeIntroRows: {
     gap: 10,
+    paddingBottom: 2,
+  },
+  chatModeIntroRowsScroll: {
+    flexShrink: 1,
   },
   chatModeIntroRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     borderWidth: 1,
     borderRadius: 18,
     paddingHorizontal: 12,
@@ -8929,6 +8961,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
+    marginTop: 1,
+  },
+  chatModeIntroContent: {
+    flex: 1,
+    minWidth: 0,
   },
   chatModeIntroRowText: {
     flex: 1,
@@ -8963,7 +9000,9 @@ const styles = StyleSheet.create({
   },
   chatModeIntroCostWrap: {
     alignItems: 'flex-end',
-    minWidth: 58,
+    marginLeft: 'auto',
+    paddingLeft: 8,
+    maxWidth: '48%',
   },
   chatModeIntroOriginalCost: {
     fontSize: 11,
@@ -8975,6 +9014,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     textAlign: 'right',
+  },
+  chatModeIntroFeatureList: {
+    gap: 4,
+    marginTop: 8,
+  },
+  chatModeIntroFeatureRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  chatModeIntroFeatureText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
   },
   chatModeIntroContinue: {
     borderRadius: 16,
@@ -9159,6 +9213,30 @@ const styles = StyleSheet.create({
   },
   premiumToggleButton: {
     marginHorizontal: 4,
+  },
+  chatModeIdentityButton: {
+    minHeight: 40,
+    maxWidth: 104,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    marginHorizontal: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  chatModeIdentityButtonCompact: {
+    minWidth: 40,
+    maxWidth: 40,
+    paddingHorizontal: 0,
+    marginHorizontal: 2,
+    gap: 0,
+  },
+  chatModeIdentityText: {
+    flexShrink: 1,
+    fontSize: 11,
+    fontWeight: '800',
   },
   premiumToggleIcon: {
     width: 44,

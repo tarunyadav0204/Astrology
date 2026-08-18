@@ -16,8 +16,12 @@ logger = logging.getLogger(__name__)
 # Env: bucket name for podcast cache. If unset, use in-memory cache only.
 PODCAST_CACHE_BUCKET_ENV = "PODCAST_CACHE_BUCKET"
 
-# In-memory cache when GCS is not configured. Key: (message_id_str, lang_str) -> bytes. Max entries.
-_MEMORY_CACHE: dict[tuple[str, str], bytes] = {}
+# Bump when synthesis/prosody changes so stale MP3s are not replayed.
+PODCAST_AUDIO_VERSION = "v4"
+
+
+# In-memory cache when GCS is not configured. Key: (message_id_str, lang_str, version) -> bytes. Max entries.
+_MEMORY_CACHE: dict[tuple[str, str, str], bytes] = {}
 _MEMORY_CACHE_MAX = 500
 
 
@@ -29,8 +33,14 @@ def _safe_key_part(s: str, max_len: int = 200) -> str:
     return safe[:max_len] if len(safe) > max_len else safe
 
 
-def _cache_key(message_id: str, lang: str) -> tuple[str, str]:
-    return (str(message_id).strip() or "unknown", (lang or "en").strip()[:10])
+def _cache_key(message_id: str, lang: str) -> tuple[str, str, str]:
+    return (str(message_id).strip() or "unknown", (lang or "en").strip()[:10], PODCAST_AUDIO_VERSION)
+
+
+def _object_name(message_id: str, lang: str) -> str:
+    message_id_safe = _safe_key_part(str(message_id))
+    lang_safe = _safe_key_part(str(lang), 10)
+    return f"podcast/{message_id_safe}_{lang_safe}_{PODCAST_AUDIO_VERSION}.mp3"
 
 
 def get_cached_audio(message_id: str, lang: str) -> Optional[bytes]:
@@ -43,9 +53,7 @@ def get_cached_audio(message_id: str, lang: str) -> Optional[bytes]:
     bucket_name = os.getenv(PODCAST_CACHE_BUCKET_ENV)
     if not bucket_name or not bucket_name.strip():
         return None
-    message_id_safe = _safe_key_part(str(message_id))
-    lang_safe = _safe_key_part(str(lang), 10)
-    object_name = f"podcast/{message_id_safe}_{lang_safe}.mp3"
+    object_name = _object_name(message_id, lang)
     try:
         from google.cloud import storage
         from utils.env_json import parse_json_from_env
@@ -90,9 +98,7 @@ def put_cached_audio(message_id: str, lang: str, audio_bytes: bytes) -> None:
     bucket_name = os.getenv(PODCAST_CACHE_BUCKET_ENV)
     if not bucket_name or not bucket_name.strip():
         return
-    message_id_safe = _safe_key_part(str(message_id))
-    lang_safe = _safe_key_part(str(lang), 10)
-    object_name = f"podcast/{message_id_safe}_{lang_safe}.mp3"
+    object_name = _object_name(message_id, lang)
     try:
         from google.cloud import storage
         from utils.env_json import parse_json_from_env

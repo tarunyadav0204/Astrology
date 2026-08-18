@@ -78,6 +78,50 @@ function todayInIST() {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
+function withSelectedVoiceOption(options, selectedName) {
+  const list = Array.isArray(options) ? [...options] : [];
+  if (selectedName && !list.some((voice) => voice?.name === selectedName)) {
+    list.unshift({ name: selectedName, language_codes: [], ssml_gender: '' });
+  }
+  return list;
+}
+
+function AdminVoicePicker({
+  label,
+  help,
+  value,
+  onChange,
+  options,
+  formatLabel,
+  playBusy,
+  onPlay,
+}) {
+  return (
+    <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+      <div className="setting-info">
+        <strong>{label}</strong>
+        <p>{help}</p>
+      </div>
+      <div className="voice-preview-controls">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          style={{ minWidth: '320px', maxWidth: '100%' }}
+        >
+          {options.map((voice) => (
+            <option key={`${label}-${voice.name}`} value={voice.name}>
+              {formatLabel(voice)}
+            </option>
+          ))}
+        </select>
+        <button type="button" className="create-btn" onClick={onPlay} disabled={playBusy || !value}>
+          {playBusy ? 'Playing…' : 'Play sample'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** API may return boolean, 0/1, or legacy strings for promo_codes.is_active */
 function promoCodeIsActive(value) {
   if (value === true || value === 1) return true;
@@ -454,6 +498,24 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [chatStaticSuggestionsSaving, setChatStaticSuggestionsSaving] = useState(false);
   const [podcastProvider, setPodcastProvider] = useState('tts');
   const [podcastProviderSaving, setPodcastProviderSaving] = useState(false);
+  const [podcastTtsVoiceEnFemale, setPodcastTtsVoiceEnFemale] = useState('en-GB-Chirp3-HD-Gacrux');
+  const [podcastTtsVoiceEnMale, setPodcastTtsVoiceEnMale] = useState('en-GB-Chirp3-HD-Algenib');
+  const [podcastTtsVoiceHiFemale, setPodcastTtsVoiceHiFemale] = useState('en-GB-Chirp3-HD-Gacrux');
+  const [podcastTtsVoiceHiMale, setPodcastTtsVoiceHiMale] = useState('en-GB-Chirp3-HD-Puck');
+  const [podcastPreviewTextEn, setPodcastPreviewTextEn] = useState(
+    'Hey, this is your cosmic reading. Mars is strong in the tenth house.'
+  );
+  const [podcastPreviewTextHi, setPodcastPreviewTextHi] = useState(
+    'नमस्ते, यह आपका कॉस्मिक रीडिंग है। मंगल दसवें भाव में मजबूत है।'
+  );
+  const [speechPreviewTextEn, setSpeechPreviewTextEn] = useState(
+    'Hi, I am Tara. This is how English speech chat will sound.'
+  );
+  const [speechPreviewTextHi, setSpeechPreviewTextHi] = useState(
+    'नमस्ते, मैं तारा हूँ। हिंदी स्पीच चैट ऐसी सुनाई देगी।'
+  );
+  const [ttsPreviewBusyKey, setTtsPreviewBusyKey] = useState('');
+  const ttsPreviewAudioRef = useRef(null);
   const [allowedDevices, setAllowedDevices] = useState([]);
   const [allowedDevicesLoading, setAllowedDevicesLoading] = useState(false);
   const [newAllowedDeviceId, setNewAllowedDeviceId] = useState('');
@@ -685,6 +747,18 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   }, [activeTab, activeSubTab, notifSubTab]);
 
+  useEffect(() => () => {
+    const audio = ttsPreviewAudioRef.current;
+    if (!audio) return;
+    try {
+      audio.pause();
+      audio.src = '';
+    } catch (_) {
+      /* ignore */
+    }
+    ttsPreviewAudioRef.current = null;
+  }, []);
+
   useEffect(() => {
     if (activeTab !== 'notifications' || notifSubTab !== 'sent_today') return undefined;
     const timer = window.setInterval(() => {
@@ -900,6 +974,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setDeepseekReportModel(data.deepseek_report_model || data.deepseek_analysis_model || '');
       setDeepseekTimelineModel(data.deepseek_timeline_model || '');
       setPodcastProvider(data.podcast_provider || 'tts');
+      setPodcastTtsVoiceEnFemale(data.podcast_tts_voice_en_female || 'en-GB-Chirp3-HD-Gacrux');
+      setPodcastTtsVoiceEnMale(data.podcast_tts_voice_en_male || 'en-GB-Chirp3-HD-Algenib');
+      setPodcastTtsVoiceHiFemale(data.podcast_tts_voice_hi_female || 'en-GB-Chirp3-HD-Gacrux');
+      setPodcastTtsVoiceHiMale(data.podcast_tts_voice_hi_male || 'en-GB-Chirp3-HD-Puck');
     } catch (error) {
       console.error('Error fetching admin settings:', error);
     }
@@ -924,10 +1002,76 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const hindiSpeechVoiceOptions = speechVoiceOptions.filter((voice) =>
     Array.isArray(voice?.language_codes) && voice.language_codes.some((code) => String(code || '').toLowerCase().startsWith('hi'))
   );
+  const englishPodcastVoiceOptions = speechVoiceOptions.filter((voice) =>
+    Array.isArray(voice?.language_codes) && voice.language_codes.some((code) => String(code || '').toLowerCase().startsWith('en'))
+  );
+  const hindiPodcastVoiceOptions = speechVoiceOptions.filter((voice) => {
+    const codes = Array.isArray(voice?.language_codes) ? voice.language_codes : [];
+    const isHindi = codes.some((code) => String(code || '').toLowerCase().startsWith('hi'));
+    const isChirp = String(voice?.name || '').toLowerCase().includes('chirp');
+    return isHindi || isChirp;
+  });
   const speechVoiceLabel = (voice) => {
     const langs = Array.isArray(voice?.language_codes) ? voice.language_codes.join(', ') : '';
     const gender = voice?.ssml_gender ? ` · ${voice.ssml_gender}` : '';
     return `${voice?.name || 'Unknown'}${langs ? ` · ${langs}` : ''}${gender}`;
+  };
+
+  const stopAdminVoicePreview = () => {
+    const audio = ttsPreviewAudioRef.current;
+    if (audio) {
+      try {
+        audio.pause();
+        audio.src = '';
+      } catch (_) {
+        /* ignore */
+      }
+      ttsPreviewAudioRef.current = null;
+    }
+  };
+
+  const playAdminVoicePreview = async ({ key, voiceName, text, lang, mode, role }) => {
+    const sample = String(text || '').trim();
+    if (!sample) {
+      alert('Type a line to preview first.');
+      return;
+    }
+    if (!voiceName) {
+      alert('Select a voice first.');
+      return;
+    }
+    stopAdminVoicePreview();
+    setTtsPreviewBusyKey(key);
+    try {
+      const res = await fetch('/api/tts/voice-preview', {
+        method: 'POST',
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: sample.slice(0, 400),
+          voice_name: voiceName,
+          lang,
+          mode,
+          role,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const detail = typeof data.detail === 'string' ? data.detail : (data.detail?.[0]?.msg || res.status);
+        alert('Preview failed: ' + detail);
+        return;
+      }
+      const audio = new Audio(`data:audio/mpeg;base64,${data.audio}`);
+      ttsPreviewAudioRef.current = audio;
+      audio.onended = () => {
+        if (ttsPreviewAudioRef.current === audio) ttsPreviewAudioRef.current = null;
+      };
+      await audio.play();
+    } catch (error) {
+      console.error('Voice preview failed:', error);
+      alert('Preview failed. Check Google TTS credentials and try again.');
+    } finally {
+      setTtsPreviewBusyKey('');
+    }
   };
 
   const fetchBlogPosts = async () => {
@@ -6977,40 +7121,64 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   <option value="google">Google TTS</option>
                 </select>
               </div>
-              <div className="setting-item">
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 <div className="setting-info">
-                  <strong>English Google voice</strong>
-                  <p>Default voice for English speech chat when Google TTS is selected.</p>
+                  <strong>English preview line</strong>
+                  <p>Type a sentence, then play it with the selected English voice.</p>
                 </div>
-                <select
-                  value={speechTtsVoiceEn}
-                  onChange={(e) => setSpeechTtsVoiceEn(e.target.value)}
-                  style={{ minWidth: '320px', maxWidth: '100%' }}
-                >
-                  {englishSpeechVoiceOptions.map((voice) => (
-                    <option key={`speech-en-${voice.name}`} value={voice.name}>
-                      {speechVoiceLabel(voice)}
-                    </option>
-                  ))}
-                </select>
+                <textarea
+                  value={speechPreviewTextEn}
+                  onChange={(e) => setSpeechPreviewTextEn(e.target.value)}
+                  rows={2}
+                  style={{ width: '100%', maxWidth: '420px', minHeight: '64px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                />
               </div>
-              <div className="setting-item">
+              <AdminVoicePicker
+                label="English Google voice"
+                help="Default voice for English speech chat when Google TTS is selected."
+                value={speechTtsVoiceEn}
+                onChange={setSpeechTtsVoiceEn}
+                options={withSelectedVoiceOption(englishSpeechVoiceOptions, speechTtsVoiceEn)}
+                formatLabel={speechVoiceLabel}
+                playBusy={ttsPreviewBusyKey === 'speech-en'}
+                onPlay={() => playAdminVoicePreview({
+                  key: 'speech-en',
+                  voiceName: speechTtsVoiceEn,
+                  text: speechPreviewTextEn,
+                  lang: 'en',
+                  mode: 'speech',
+                  role: 'female',
+                })}
+              />
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 <div className="setting-info">
-                  <strong>Hindi Google voice</strong>
-                  <p>Default voice for Hindi speech chat when Google TTS is selected.</p>
+                  <strong>Hindi preview line</strong>
+                  <p>Type a sentence, then play it with the selected Hindi voice.</p>
                 </div>
-                <select
-                  value={speechTtsVoiceHi}
-                  onChange={(e) => setSpeechTtsVoiceHi(e.target.value)}
-                  style={{ minWidth: '320px', maxWidth: '100%' }}
-                >
-                  {hindiSpeechVoiceOptions.map((voice) => (
-                    <option key={`speech-hi-${voice.name}`} value={voice.name}>
-                      {speechVoiceLabel(voice)}
-                    </option>
-                  ))}
-                </select>
+                <textarea
+                  value={speechPreviewTextHi}
+                  onChange={(e) => setSpeechPreviewTextHi(e.target.value)}
+                  rows={2}
+                  style={{ width: '100%', maxWidth: '420px', minHeight: '64px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                />
               </div>
+              <AdminVoicePicker
+                label="Hindi Google voice"
+                help="Default voice for Hindi speech chat when Google TTS is selected."
+                value={speechTtsVoiceHi}
+                onChange={setSpeechTtsVoiceHi}
+                options={withSelectedVoiceOption(hindiSpeechVoiceOptions, speechTtsVoiceHi)}
+                formatLabel={speechVoiceLabel}
+                playBusy={ttsPreviewBusyKey === 'speech-hi'}
+                onPlay={() => playAdminVoicePreview({
+                  key: 'speech-hi',
+                  voiceName: speechTtsVoiceHi,
+                  text: speechPreviewTextHi,
+                  lang: 'hi',
+                  mode: 'speech',
+                  role: 'female',
+                })}
+              />
               <div className="form-buttons" style={{ marginTop: '12px' }}>
                 <button
                   type="button"
@@ -7243,10 +7411,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             </div>
             
             <div className="settings-section">
-              <h3>Podcast provider</h3>
+              <h3>Podcast</h3>
               <p className="settings-hint">
                 When a user requests a podcast and it is not cached, the app uses this method to generate it.
-                TTS: Gemini script + Google Text-to-Speech. Notebook LM: Discovery Engine Podcast API (full message as context, no script step).
+                TTS: Gemini script + Google Text-to-Speech with the female/male hosts below.
+                Notebook LM: Discovery Engine Podcast API (full message as context, no script step).
               </p>
               <div className="setting-item">
                 <div className="setting-info">
@@ -7262,33 +7431,152 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   <option value="notebook_lm">Notebook LM (Discovery Engine API)</option>
                 </select>
               </div>
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>English preview line</strong>
+                  <p>Type a line, then play it with the English female or male host.</p>
+                </div>
+                <textarea
+                  value={podcastPreviewTextEn}
+                  onChange={(e) => setPodcastPreviewTextEn(e.target.value)}
+                  rows={2}
+                  style={{ width: '100%', maxWidth: '420px', minHeight: '64px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                />
+              </div>
+              <AdminVoicePicker
+                label="English female host"
+                help="Used for FEMALE: lines in English podcasts."
+                value={podcastTtsVoiceEnFemale}
+                onChange={setPodcastTtsVoiceEnFemale}
+                options={withSelectedVoiceOption(englishPodcastVoiceOptions, podcastTtsVoiceEnFemale)}
+                formatLabel={speechVoiceLabel}
+                playBusy={ttsPreviewBusyKey === 'podcast-en-female'}
+                onPlay={() => playAdminVoicePreview({
+                  key: 'podcast-en-female',
+                  voiceName: podcastTtsVoiceEnFemale,
+                  text: podcastPreviewTextEn,
+                  lang: 'en',
+                  mode: 'podcast',
+                  role: 'female',
+                })}
+              />
+              <AdminVoicePicker
+                label="English male host"
+                help="Used for MALE: lines in English podcasts."
+                value={podcastTtsVoiceEnMale}
+                onChange={setPodcastTtsVoiceEnMale}
+                options={withSelectedVoiceOption(englishPodcastVoiceOptions, podcastTtsVoiceEnMale)}
+                formatLabel={speechVoiceLabel}
+                playBusy={ttsPreviewBusyKey === 'podcast-en-male'}
+                onPlay={() => playAdminVoicePreview({
+                  key: 'podcast-en-male',
+                  voiceName: podcastTtsVoiceEnMale,
+                  text: podcastPreviewTextEn,
+                  lang: 'en',
+                  mode: 'podcast',
+                  role: 'male',
+                })}
+              />
+              <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div className="setting-info">
+                  <strong>Hindi preview line</strong>
+                  <p>Type a line, then play it with the Hindi female or male host. Chirp3 English voices are included because they can speak Hindi script.</p>
+                </div>
+                <textarea
+                  value={podcastPreviewTextHi}
+                  onChange={(e) => setPodcastPreviewTextHi(e.target.value)}
+                  rows={2}
+                  style={{ width: '100%', maxWidth: '420px', minHeight: '64px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                />
+              </div>
+              <AdminVoicePicker
+                label="Hindi female host"
+                help="Used for FEMALE: lines in Hindi podcasts."
+                value={podcastTtsVoiceHiFemale}
+                onChange={setPodcastTtsVoiceHiFemale}
+                options={withSelectedVoiceOption(hindiPodcastVoiceOptions, podcastTtsVoiceHiFemale)}
+                formatLabel={speechVoiceLabel}
+                playBusy={ttsPreviewBusyKey === 'podcast-hi-female'}
+                onPlay={() => playAdminVoicePreview({
+                  key: 'podcast-hi-female',
+                  voiceName: podcastTtsVoiceHiFemale,
+                  text: podcastPreviewTextHi,
+                  lang: 'hi',
+                  mode: 'podcast',
+                  role: 'female',
+                })}
+              />
+              <AdminVoicePicker
+                label="Hindi male host"
+                help="Used for MALE: lines in Hindi podcasts."
+                value={podcastTtsVoiceHiMale}
+                onChange={setPodcastTtsVoiceHiMale}
+                options={withSelectedVoiceOption(hindiPodcastVoiceOptions, podcastTtsVoiceHiMale)}
+                formatLabel={speechVoiceLabel}
+                playBusy={ttsPreviewBusyKey === 'podcast-hi-male'}
+                onPlay={() => playAdminVoicePreview({
+                  key: 'podcast-hi-male',
+                  voiceName: podcastTtsVoiceHiMale,
+                  text: podcastPreviewTextHi,
+                  lang: 'hi',
+                  mode: 'podcast',
+                  role: 'male',
+                })}
+              />
               <div className="form-buttons" style={{ marginTop: '12px' }}>
                 <button type="button" className="create-btn" onClick={async () => {
                   setPodcastProviderSaving(true);
                   try {
-                    const res = await fetch('/api/admin/settings/podcast_provider', {
-                      method: 'PUT',
-                      headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
+                    const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+                    const payloads = [
+                      {
                         key: 'podcast_provider',
                         value: podcastProvider,
                         description: 'Podcast generation: tts or notebook_lm',
-                      }),
-                    });
-                    if (!res.ok) {
-                      const err = await res.json().catch(() => ({}));
-                      alert('Failed to save: ' + (err.detail || res.status));
-                      return;
+                      },
+                      {
+                        key: 'podcast_tts_voice_en_female',
+                        value: podcastTtsVoiceEnFemale,
+                        description: 'Google TTS voice for the English female podcast host.',
+                      },
+                      {
+                        key: 'podcast_tts_voice_en_male',
+                        value: podcastTtsVoiceEnMale,
+                        description: 'Google TTS voice for the English male podcast host.',
+                      },
+                      {
+                        key: 'podcast_tts_voice_hi_female',
+                        value: podcastTtsVoiceHiFemale,
+                        description: 'Google TTS voice for the Hindi female podcast host.',
+                      },
+                      {
+                        key: 'podcast_tts_voice_hi_male',
+                        value: podcastTtsVoiceHiMale,
+                        description: 'Google TTS voice for the Hindi male podcast host.',
+                      },
+                    ];
+                    for (const payload of payloads) {
+                      const res = await fetch(`/api/admin/settings/${payload.key}`, {
+                        method: 'PUT',
+                        headers,
+                        body: JSON.stringify(payload),
+                      });
+                      if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        alert('Failed to save: ' + (err.detail || res.status));
+                        return;
+                      }
                     }
-                    alert('Podcast provider saved. New podcast requests will use the selected method.');
+                    alert('Podcast settings saved. New podcasts will use the selected voices.');
+                    fetchAdminSettings();
                   } catch (e) {
                     console.error(e);
-                    alert('Failed to save podcast provider.');
+                    alert('Failed to save podcast settings.');
                   } finally {
                     setPodcastProviderSaving(false);
                   }
                 }} disabled={podcastProviderSaving}>
-                  {podcastProviderSaving ? 'Saving…' : 'Save podcast provider'}
+                  {podcastProviderSaving ? 'Saving…' : 'Save podcast settings'}
                 </button>
               </div>
             </div>

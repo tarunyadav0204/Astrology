@@ -23,8 +23,9 @@ const noopTts = {
   resumePodcast: noopAsync,
   stopPodcast: noopAsync,
   seekPodcast: noopAsync,
-  setPodcastRate: noopAsync,
-  getAvailableVoices: () => Promise.resolve([]),
+    setPodcastRate: noopAsync,
+    unlockWebAudio: noop,
+    getAvailableVoices: () => Promise.resolve([]),
 };
 
 export function getTextToSpeech() {

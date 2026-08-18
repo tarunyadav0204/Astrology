@@ -826,6 +826,16 @@
     },
     "betaNotice": "⚠️ BETA: Timeline studies are experimental. Use logic and discretion.",
     "disclaimerNotice": "⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.",
+    "podcastReadyLabel": "Ready",
+    "podcastReadyToast": "Podcast ready — tap to listen",
+    "podcastPreparing": "Preparing your podcast…",
+    "podcastLanguage": {
+      "title": "Choose podcast language",
+      "body": "We'll generate the audio in the language you pick. English and Hindi only.",
+      "english": "English",
+      "hindi": "हिन्दी",
+      "cancel": "Cancel"
+    },
     "verified": "AstroRoshni Verified",
     "inquiry": "AstroRoshni Inquiry",
     "you": "You",

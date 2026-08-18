@@ -27,6 +27,7 @@ from activity.publisher import publish_activity
 from utils.env_json import parse_json_from_env
 from utils.admin_settings import (
   get_podcast_provider,
+  get_podcast_tts_voices,
   get_speech_tts_voice,
   PODCAST_PROVIDER_NOTEBOOK_LM,
 )
@@ -71,6 +72,36 @@ def _add_podcast_history(userid: int, message_id: str, session_id: Optional[str]
         )
         conn.commit()
 
+
+def _premium_podcast_included(userid: int, message_id: Optional[str]) -> bool:
+    """Trust the stored answer tier, never a client-supplied Premium flag."""
+    if not message_id:
+        return False
+    try:
+        mid = int(str(message_id).strip())
+    except (TypeError, ValueError):
+        return False
+    try:
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                SELECT COALESCE(cm.chat_tier, 'standard')
+                FROM chat_messages cm
+                INNER JOIN chat_sessions cs ON cs.session_id = cm.session_id
+                WHERE cm.message_id = %s
+                  AND cm.sender = 'assistant'
+                  AND cs.user_id = %s
+                LIMIT 1
+                """,
+                (mid, userid),
+            )
+            row = cur.fetchone()
+        return bool(row and str(row[0] or '').strip().lower() == 'premium')
+    except Exception:
+        logger.exception("Podcast: failed to verify Premium inclusion message_id=%s user_id=%s", message_id, userid)
+        return False
+
 # TTS credential order: (1) GOOGLE_TTS_SERVICE_ACCOUNT_JSON if set, else (2) GOOGLE_SERVICE_ACCOUNT_KEY
 # (inline JSON from tradebest where billing is enabled), else (3) Play credentials. This way the same
 # key you use as GOOGLE_SERVICE_ACCOUNT_KEY (tradebest) can drive TTS without a separate env var.
@@ -112,10 +143,12 @@ def _build_voice_and_config(lang: str, voice_name: Optional[str] = None):
     parts = resolved_voice_name.split("-")
     language_code = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 else ("hi-IN" if lang.startswith("hi") else "en-IN")
     voice = texttospeech.VoiceSelectionParams(language_code=language_code, name=resolved_voice_name)
-  audio_config = texttospeech.AudioConfig(
-    audio_encoding=texttospeech.AudioEncoding.MP3,
-    speaking_rate=0.95,
-  )
+  audio_kwargs = {
+    "audio_encoding": texttospeech.AudioEncoding.MP3,
+  }
+  if _voice_family(resolved_voice_name) != "journey":
+    audio_kwargs["speaking_rate"] = 0.95
+  audio_config = texttospeech.AudioConfig(**audio_kwargs)
   return voice, audio_config
 
 
@@ -143,17 +176,82 @@ def _voice_supports_word_mark_timepoints(voice_name: Optional[str]) -> bool:
   return True
 
 
+def _voice_family(voice_name: Optional[str]) -> str:
+  name = str(voice_name or "").lower()
+  if "journey" in name:
+    return "journey"
+  if "studio" in name:
+    return "studio"
+  if "chirp" in name:
+    return "chirp"
+  if "neural2" in name:
+    return "neural2"
+  if "wavenet" in name:
+    return "wavenet"
+  return "standard"
+
+
+def _is_indic_voice(voice_name: Optional[str]) -> bool:
+  parts = str(voice_name or "").split("-")
+  return len(parts) >= 2 and parts[1].upper() == "IN"
+
+
+def _ssml_mode_for_voice(voice_name: Optional[str]) -> str:
+  """
+  Journey/Studio reject SSML. Indic Neural2/Chirp3-IN reject <prosody pitch="..st">
+  and similar tags that US/GB Chirp3 ignore.
+  """
+  family = _voice_family(voice_name)
+  if family in ("journey", "studio"):
+    return "plain"
+  if family == "chirp" or _is_indic_voice(voice_name):
+    return "breaks"
+  return "full"
+
+
+def _is_invalid_tts_argument(exc: Exception) -> bool:
+  if type(exc).__name__ == "InvalidArgument":
+    return True
+  msg = str(exc).lower()
+  return "invalid argument" in msg or "400" in msg
+
+
+def _language_code_from_voice_name(voice_name: Optional[str], fallback: str = "en-GB") -> str:
+  parts = str(voice_name or "").split("-")
+  if len(parts) >= 2 and len(parts[0]) == 2 and parts[1]:
+    return f"{parts[0]}-{parts[1]}"
+  return fallback
+
+
 def _podcast_voices(lang: str) -> tuple[str, str, str]:
   """
   Return (female_voice_name, male_voice_name, language_code) for podcast.
-  - en: UK English Chirp3-HD (Gacrux, Algenib).
-  - hi: Chirp3-HD Gacrux (F) + Puck (M) for a grounded + upbeat duo.
+  Voices come from admin settings, with Chirp3 HD defaults.
   """
-  if lang and str(lang).lower().startswith("hi"):
-    # Use Chirp3 HD voices even for Hindi script so personas match English podcasts:
-    # Gacrux = mature/steady expert, Puck = upbeat and engaging.
-    return ("en-GB-Chirp3-HD-Gacrux", "en-GB-Chirp3-HD-Puck", "en-GB")
-  return ("en-GB-Chirp3-HD-Gacrux", "en-GB-Chirp3-HD-Algenib", "en-GB")
+  female, male = get_podcast_tts_voices(lang)
+  fallback = "hi-IN" if str(lang or "").lower().startswith("hi") else "en-GB"
+  return female, male, _language_code_from_voice_name(female, fallback)
+
+
+def _podcast_audio_config(role: str, voice_name: Optional[str] = None, *, minimal: bool = False):
+  """
+  Chirp3 HD honors AudioConfig speaking_rate more reliably than nested SSML <prosody>.
+  Journey and some Indic voices 400 if speaking_rate or volume_gain_db is set.
+  """
+  encoding = texttospeech.AudioEncoding.MP3
+  if minimal:
+    return texttospeech.AudioConfig(audio_encoding=encoding)
+  family = _voice_family(voice_name)
+  speaking_rate = 1.22 if role == "male" else 1.0
+  if family == "journey":
+    return texttospeech.AudioConfig(audio_encoding=encoding)
+  if _is_indic_voice(voice_name):
+    return texttospeech.AudioConfig(audio_encoding=encoding, speaking_rate=speaking_rate)
+  return texttospeech.AudioConfig(
+    audio_encoding=encoding,
+    speaking_rate=speaking_rate,
+    volume_gain_db=10.0,
+  )
 
 
 # Sanskrit/Vedic terms that Google TTS often mispronounces. alias = spelling TTS will speak.
@@ -185,18 +283,68 @@ _PRONUNCIATION_ALIASES: list[tuple[str, str]] = [
 
 def _strip_literal_punctuation_words(text: str) -> str:
   """
-  Gemini sometimes outputs literal words like 'question mark' or 'dot'.
-  These are almost never desirable in spoken audio, so strip them.
+  Gemini and Chirp3 sometimes introduce spoken punctuation ('comma', 'dot').
+  Strip those words. Do not strip 'period' — it is used in 'time period'.
   """
-  # Lowercase match but preserve original case by replacing basic variants.
-  patterns = [
-    r"\s*[Qq]uestion mark",
-    r"\s*[Qq]uestion\-mark",
-    r"\s*[Ff]ull stop",
-  ]
-  for pat in patterns:
-    text = re.sub(pat, "", text)
+  if not text:
+    return text
+  text = re.sub(
+    r"\b(?:question[\s-]*mark|exclamation[\s-]*(?:mark|point)|full[\s-]*stop)s?\b",
+    "",
+    text,
+    flags=re.IGNORECASE,
+  )
+  text = re.sub(
+    r"\b(?:commas?|dots?|semicolons?|colons?)\b",
+    "",
+    text,
+    flags=re.IGNORECASE,
+  )
+  text = re.sub(r"\s+([,.;:?!।])", r"\1", text)
+  text = re.sub(r"\s{2,}", " ", text)
   return text
+
+
+def _collapse_adjacent_breaks(text: str) -> str:
+  def _pick(match: re.Match) -> str:
+    times = [int(x) for x in re.findall(r'time="(\d+)ms"', match.group(0))]
+    return f'<break time="{max(times) if times else 200}ms"/>'
+
+  return re.sub(r'(?:<break time="\d+ms"/>\s*){2,}', _pick, text)
+
+
+def _replace_spoken_punctuation_with_breaks(text: str) -> str:
+  """
+  Chirp3 HD often verbalizes ',', '.', '?', and dashes as 'comma' / 'dot'.
+  Turn leftover punctuation into SSML breaks, leaving existing tags alone.
+  """
+  if not text:
+    return text
+  parts = re.split(r"(<[^>]+>)", text)
+  out: list[str] = []
+  for part in parts:
+    if part.startswith("<") and part.endswith(">"):
+      out.append(part)
+      continue
+    chunk = part
+    chunk = re.sub(r"\.{3,}", '<break time="280ms"/>', chunk)
+    chunk = chunk.replace("…", '<break time="280ms"/>')
+    chunk = re.sub(r"[.?!।]+", '<break time="380ms"/>', chunk)
+    chunk = re.sub(r"[,;:]+", '<break time="160ms"/>', chunk)
+    chunk = re.sub(r"\s*[—–]\s*", '<break time="160ms"/>', chunk)
+    chunk = re.sub(r"\s+-\s+", '<break time="160ms"/>', chunk)
+    out.append(chunk)
+  return _collapse_adjacent_breaks("".join(out))
+
+
+def _escape_ssml_text(text: str) -> str:
+  """
+  Chirp3 speaks numeric entities like &#x27; as "hash x 27".
+  Decode entities first, then escape only XML-significant characters.
+  Apostrophes and quotes stay as real characters inside SSML text nodes.
+  """
+  decoded = html.unescape(str(text or ""))
+  return html.escape(decoded, quote=False)
 
 
 def _apply_pronunciation_ssml(text: str) -> str:
@@ -204,7 +352,7 @@ def _apply_pronunciation_ssml(text: str) -> str:
   text = _strip_literal_punctuation_words(text)
   for term, alias in _PRONUNCIATION_ALIASES:
     if term in text:
-      safe_alias = html.escape(alias, quote=True)
+      safe_alias = html.escape(alias, quote=False)
       # Pronounce using alias, but wrap in moderate emphasis so Vedic terms carry a bit more weight
       # and blend better into the surrounding prosody.
       text = text.replace(
@@ -360,7 +508,16 @@ Original answer:
     return base_text
 
 
-def _segment_text_to_ssml(segment_text: str, role: str = "female") -> str:
+def _segment_text_to_plain(segment_text: str) -> str:
+  text = html.unescape(str(segment_text or ""))
+  text = _strip_literal_punctuation_words(text)
+  text = _apply_pronunciation_plain(text)
+  text = re.sub(r"\[PAUSE:(?:short|medium|long)\]", ". ", text, flags=re.IGNORECASE)
+  text = re.sub(r"\[(?:EMPHASIS|RISE|FALL|SLOW):([^\]]+)\]", r"\1", text, flags=re.IGNORECASE)
+  return _strip_spoken_control_cues_for_plain_tts(text)
+
+
+def _segment_text_to_ssml(segment_text: str, role: str = "female", ssml_mode: str = "full") -> str:
   """
   Convert segment text with cues to SSML for Google TTS.
   Cues: [PAUSE:*], [EMPHASIS:...], [RISE:...], [FALL:...], [SLOW:...].
@@ -373,17 +530,26 @@ def _segment_text_to_ssml(segment_text: str, role: str = "female") -> str:
   base_hash = sum(ord(ch) for ch in segment_text)
 
   # Escape XML in the text so we can safely insert SSML tags
-  text = html.escape(segment_text.strip(), quote=True)
-  # Treat \"...\" as a small hesitation / breath for the more expressive female host.
-  # For the male host we skip this to avoid extra micro-pauses.
-  if role != "male":
-    text = re.sub(r"\.\.\.", '<break time="260ms"/>', text)
-  # Improve pronunciation of Sanskrit/astrology terms via SSML <sub alias="...">
-  text = _apply_pronunciation_ssml(text)
+  text = _escape_ssml_text(_strip_literal_punctuation_words(segment_text.strip()))
+  if ssml_mode == "breaks":
+    text = _apply_pronunciation_plain(text)
+  else:
+    # Improve pronunciation of Sanskrit/astrology terms via SSML <sub alias="...">
+    text = _apply_pronunciation_ssml(text)
   # Pauses — defaults; we will further tighten them for the male host below so he sounds less choppy.
   text = re.sub(r"\[PAUSE:short\]", '<break time="420ms"/>', text, flags=re.IGNORECASE)
   text = re.sub(r"\[PAUSE:medium\]", '<break time="900ms"/>', text, flags=re.IGNORECASE)
   text = re.sub(r"\[PAUSE:long\]", '<break time="1300ms"/>', text, flags=re.IGNORECASE)
+  if ssml_mode == "breaks":
+    text = re.sub(r"\[(?:EMPHASIS|RISE|FALL|SLOW):([^\]]+)\]", r"\1", text, flags=re.IGNORECASE)
+    text = _replace_spoken_punctuation_with_breaks(text)
+    if role == "male":
+      text = text.replace('<break time="900ms"/>', '<break time="650ms"/>')
+      text = text.replace('<break time="1300ms"/>', '<break time="950ms"/>')
+      text = text.replace('<break time="380ms"/>', '<break time="240ms"/>')
+      text = text.replace('<break time="160ms"/>', '<break time="90ms"/>')
+    return f"<speak>{text}</speak>"
+
   # Emphasis — strong so it stands out from neutral tone
   text = re.sub(
     r"\[EMPHASIS:([^\]]+)\]",
@@ -408,7 +574,14 @@ def _segment_text_to_ssml(segment_text: str, role: str = "female") -> str:
   def _fall_repl(match: re.Match) -> str:
     phrase = match.group(1)
     local = (base_hash + sum(ord(c) for c in phrase) * 3) % 3
-    if local == 0:
+    if role == "male":
+      if local == 0:
+        pitch, rate = "-0.4st", "102%"
+      elif local == 1:
+        pitch, rate = "-0.7st", "100%"
+      else:
+        pitch, rate = "-1.0st", "98%"
+    elif local == 0:
       pitch, rate = "-0.6st", "97%"
     elif local == 1:
       pitch, rate = "-1.0st", "94%"
@@ -422,11 +595,11 @@ def _segment_text_to_ssml(segment_text: str, role: str = "female") -> str:
     # Female host can slow down more; male host stays closer to normal so he doesn't feel dragged.
     if role == "male":
       if local == 0:
-        rate = "96%"
+        rate = "104%"
       elif local == 1:
-        rate = "94%"
+        rate = "102%"
       else:
-        rate = "98%"
+        rate = "106%"
     else:
       if local == 0:
         rate = "92%"
@@ -440,11 +613,6 @@ def _segment_text_to_ssml(segment_text: str, role: str = "female") -> str:
   text = re.sub(r"\[FALL:([^\]]+)\]", _fall_repl, text, flags=re.IGNORECASE)
   text = re.sub(r"\[SLOW:([^\]]+)\]", _slow_repl, text, flags=re.IGNORECASE)
 
-  # For the male host, further tighten medium/long pauses so his delivery feels more continuous.
-  if role == "male":
-    text = text.replace('<break time="900ms"/>', '<break time="650ms"/>')
-    text = text.replace('<break time="1300ms"/>', '<break time="950ms"/>')
-
   # Interjections — wrap short exclamations so Google TTS treats them as expressive
   def _interjection_repl(match: re.Match) -> str:
     word = match.group(1)
@@ -452,11 +620,20 @@ def _segment_text_to_ssml(segment_text: str, role: str = "female") -> str:
     return f'<say-as interpret-as="interjection">{word}</say-as>{punct}'
 
   text = re.sub(r"(?<![\w>])(Wow|Oh|Great|Nice|Exactly|Right)([!?,\.])", _interjection_repl, text)
+  # Chirp3 HD reads leftover punctuation aloud; convert to pauses after cues are applied.
+  text = _replace_spoken_punctuation_with_breaks(text)
+
+  # For the male host, further tighten pauses so his delivery feels more continuous.
+  if role == "male":
+    text = text.replace('<break time="900ms"/>', '<break time="650ms"/>')
+    text = text.replace('<break time="1300ms"/>', '<break time="950ms"/>')
+    text = text.replace('<break time="380ms"/>', '<break time="240ms"/>')
+    text = text.replace('<break time="160ms"/>', '<break time="90ms"/>')
 
   # Base prosody per host — keep consistent so clearly 2 people (Gacrux vs Algenib).
-  # Make the male host slightly faster overall so his delivery feels snappier.
+  # Chirp3 often ignores nested SSML rate; AudioConfig speaking_rate is the reliable knob.
   if role == "male":
-    prosody = '<prosody rate="105%" pitch="-0.2st">'
+    prosody = '<prosody rate="118%" pitch="-0.2st">'
   else:
     prosody = '<prosody rate="100%" pitch="+0.2st">'
   return f"<speak>{prosody}{text}</prosody></speak>"
@@ -698,16 +875,41 @@ async def _synthesize_ssml(client, voice, audio_config, ssml: str) -> bytes:
     return await _chunk_and_synthesize(client, voice, audio_config, plain)
   synthesis_input = texttospeech.SynthesisInput(ssml=ssml)
   loop = asyncio.get_running_loop()
-  response = await loop.run_in_executor(
-    None,
-    partial(
-      client.synthesize_speech,
-      input=synthesis_input,
-      voice=voice,
-      audio_config=audio_config,
-    ),
-  )
+  try:
+    response = await loop.run_in_executor(
+      None,
+      partial(
+        client.synthesize_speech,
+        input=synthesis_input,
+        voice=voice,
+        audio_config=audio_config,
+      ),
+    )
+  except Exception as e:
+    if not _is_invalid_tts_argument(e):
+      raise
+    logger.warning("TTS: SSML rejected (%s); retrying as plain text", e)
+    plain = re.sub(r"<[^>]+>", " ", ssml)
+    plain = re.sub(r"\s+", " ", plain).strip()
+    return await _chunk_and_synthesize(client, voice, audio_config, plain)
   return response.audio_content
+
+
+async def _synthesize_podcast_segment(client, voice_name: str, role: str, segment_text: str, language_code: str) -> bytes:
+  voice = texttospeech.VoiceSelectionParams(language_code=language_code, name=voice_name)
+  audio_config = _podcast_audio_config(role, voice_name)
+  mode = _ssml_mode_for_voice(voice_name)
+  try:
+    if mode == "plain":
+      return await _chunk_and_synthesize(client, voice, audio_config, _segment_text_to_plain(segment_text))
+    ssml = _segment_text_to_ssml(segment_text, role, ssml_mode=mode)
+    return await _synthesize_ssml(client, voice, audio_config, ssml)
+  except Exception as e:
+    if not _is_invalid_tts_argument(e):
+      raise
+    logger.warning("TTS: voice %s rejected podcast audio (%s); retrying minimal plain text", voice_name, e)
+    minimal = _podcast_audio_config(role, voice_name, minimal=True)
+    return await _chunk_and_synthesize(client, voice, minimal, _segment_text_to_plain(segment_text))
 
 
 async def _synthesize_ssml_with_timepoints(client, voice, audio_config, ssml: str) -> tuple[bytes, list]:
@@ -846,6 +1048,86 @@ async def list_voices():
   return {"voices": voices}
 
 
+class VoicePreviewRequest(BaseModel):
+  text: str
+  voice_name: str
+  lang: str = "en"
+  mode: str = "podcast"  # podcast | speech
+  role: str = "female"  # female | male (podcast hosts)
+
+
+def _require_tts_preview_admin(current_user: User = Depends(get_current_user)) -> User:
+  if getattr(current_user, "role", None) != "admin":
+    raise HTTPException(status_code=403, detail="Admin access required")
+  return current_user
+
+
+@router.post("/voice-preview")
+async def voice_preview(
+  request: VoicePreviewRequest,
+  current_user: User = Depends(_require_tts_preview_admin),
+):
+  """
+  Admin-only audition of a Google TTS voice using the exact typed sample.
+  Podcast mode uses the same SSML + rate path as generated episodes.
+  """
+  sample = str(request.text or "").strip()
+  voice_name = str(request.voice_name or "").strip()
+  if not sample:
+    raise HTTPException(status_code=400, detail="Text is required")
+  if not voice_name:
+    raise HTTPException(status_code=400, detail="voice_name is required")
+  if len(sample) > 400:
+    sample = sample[:400]
+
+  lang = "hi" if str(request.lang or "en").lower().startswith("hi") else "en"
+  role = "male" if str(request.role or "").lower().startswith("m") else "female"
+  mode = str(request.mode or "podcast").strip().lower()
+  language_code = _language_code_from_voice_name(
+    voice_name,
+    "hi-IN" if lang == "hi" else "en-GB",
+  )
+
+  try:
+    creds = _get_google_credentials()
+    client = texttospeech.TextToSpeechClient(credentials=creds)
+  except HTTPException:
+    raise
+  except Exception as e:
+    logger.exception("TTS: voice-preview client init failed")
+    raise HTTPException(status_code=503, detail=f"TTS client initialization failed: {e}")
+
+  try:
+    if mode == "speech":
+      voice, audio_config = _build_voice_and_config(lang, voice_name)
+      spoken = _strip_spoken_control_cues_for_plain_tts(sample)
+      try:
+        audio_bytes = await _chunk_and_synthesize(client, voice, audio_config, spoken)
+      except Exception as e:
+        if not _is_invalid_tts_argument(e):
+          raise
+        logger.warning("TTS: speech preview rejected for %s (%s); retrying minimal config", voice_name, e)
+        minimal = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+        audio_bytes = await _chunk_and_synthesize(client, voice, minimal, spoken)
+    else:
+      audio_bytes = await _synthesize_podcast_segment(
+        client,
+        voice_name,
+        role,
+        sample,
+        language_code,
+      )
+  except HTTPException:
+    raise
+  except Exception as e:
+    logger.exception("TTS: voice-preview failed voice=%s mode=%s", voice_name, mode)
+    raise HTTPException(status_code=500, detail=f"Voice preview failed: {e}")
+
+  if not audio_bytes:
+    raise HTTPException(status_code=500, detail="Voice preview produced no audio")
+  return JSONResponse({"audio": base64.b64encode(audio_bytes).decode("ascii"), "voice_name": voice_name})
+
+
 @router.post("/synthesize")
 async def synthesize(
   text: str,
@@ -975,6 +1257,7 @@ class PodcastRequest(BaseModel):
   session_id: Optional[str] = None  # optional: for podcast history and opening conversation
   preview: Optional[str] = None  # optional: first ~150 chars for history list
   native_name: Optional[str] = None  # optional: birth chart / native name for personalized intro
+  prepare_only: bool = False  # generate/cache a Premium podcast without returning or autoplaying audio
 
 
 def _podcast_cache_lang(lang: str) -> str:
@@ -1057,6 +1340,14 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
     raw_id = request.message_id
     message_id = str(raw_id).strip() if raw_id is not None else None
     cache_lang = _podcast_cache_lang(lang)
+    premium_included = _premium_podcast_included(current_user.userid, message_id)
+
+    # Auto-prepare was removed: podcasts generate only from the Listen CTA.
+    if request.prepare_only:
+      raise HTTPException(
+        status_code=403,
+        detail="Automatic podcast preparation is disabled. Generate from the Listen CTA.",
+      )
 
     if message_id:
       loop = asyncio.get_running_loop()
@@ -1072,17 +1363,19 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
           cache_lang,
           request.preview,
         )
+        if request.prepare_only:
+          return JSONResponse({"ready": True, "cached": True, "included_with_premium": premium_included})
         audio_b64 = base64.b64encode(cached).decode("ascii")
-        return JSONResponse({"audio": audio_b64, "cached": True})
+        return JSONResponse({"audio": audio_b64, "cached": True, "included_with_premium": premium_included})
 
     # Cache miss: will generate and deduct. Check balance first.
     base_cost = credit_service.get_credit_setting("podcast_cost")
-    effective_cost = credit_service.get_effective_cost(
+    effective_cost = 0 if premium_included else credit_service.get_effective_cost(
       current_user.userid, base_cost or 2, "podcast_cost"
     )
-    effective_cost = max(1, int(effective_cost)) if effective_cost else 2
+    effective_cost = 0 if premium_included else (max(1, int(effective_cost)) if effective_cost else 2)
     balance = credit_service.get_user_credits(current_user.userid)
-    if balance < effective_cost:
+    if effective_cost > 0 and balance < effective_cost:
       raise HTTPException(
         status_code=402,
         detail=f"Insufficient credits. Need {effective_cost}, have {balance}.",
@@ -1161,20 +1454,19 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
         raise HTTPException(status_code=503, detail=f"TTS client initialization failed: {e}")
 
       female_name, male_name, language_code = _podcast_voices(lang)
-      audio_config = texttospeech.AudioConfig(
-        audio_encoding=texttospeech.AudioEncoding.MP3,
-        speaking_rate=0.95,
-        volume_gain_db=10.0,  # +10 dB max recommended; makes podcast clearly audible
-      )
       audio_parts: list[bytes] = []
       try:
         for role, segment_text in segments:
           if not segment_text or not segment_text.strip():
             continue
           voice_name = female_name if role == "female" else male_name
-          voice = texttospeech.VoiceSelectionParams(language_code=language_code, name=voice_name)
-          ssml = _segment_text_to_ssml(segment_text, role)
-          segment_bytes = await _synthesize_ssml(client, voice, audio_config, ssml)
+          segment_bytes = await _synthesize_podcast_segment(
+            client,
+            voice_name,
+            role,
+            segment_text,
+            _language_code_from_voice_name(voice_name, language_code),
+          )
           audio_parts.append(segment_bytes)
       except Exception as e:
         logger.exception("TTS: podcast synthesis failed")
@@ -1189,14 +1481,15 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
       await loop.run_in_executor(None, partial(put_cached_audio, message_id, cache_lang, audio_bytes))
 
     # Deduct (we already checked balance above)
-    success = credit_service.spend_credits(
-      current_user.userid,
-      effective_cost,
-      "podcast",
-      f"Podcast for message {message_id or 'chat'}",
-    )
-    if not success:
-      logger.warning("Podcast: credit deduction failed (insufficient balance?) for user %s", current_user.userid)
+    if effective_cost > 0:
+      success = credit_service.spend_credits(
+        current_user.userid,
+        effective_cost,
+        "podcast",
+        f"Podcast for message {message_id or 'chat'}",
+      )
+      if not success:
+        logger.warning("Podcast: credit deduction failed (insufficient balance?) for user %s", current_user.userid)
 
     publish_activity(
       "podcast_generated",
@@ -1205,7 +1498,7 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
       user_name=current_user.name,
       resource_type="message",
       resource_id=message_id,
-      metadata={"cached": False},
+      metadata={"cached": False, "included_with_premium": premium_included, "credits_charged": effective_cost},
     )
     if message_id:
       _add_podcast_history(
@@ -1215,8 +1508,10 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
         cache_lang,
         request.preview,
       )
+    if request.prepare_only:
+      return JSONResponse({"ready": True, "cached": False, "included_with_premium": premium_included})
     audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
-    return JSONResponse({"audio": audio_b64, "cached": False})
+    return JSONResponse({"audio": audio_b64, "cached": False, "included_with_premium": premium_included})
 
   except HTTPException:
     raise

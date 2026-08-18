@@ -36,6 +36,7 @@ import { useAuthGate } from '../../auth/AuthGateContext';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import AppAlertModal from '../Common/AppAlertModal';
 import PodcastPlayerModal from '../PodcastPlayerModal';
+import PodcastLanguageModal from './PodcastLanguageModal';
 import { creditAPI } from '../../services/api';
 import {
   freeDetailRevealClickedStorageKey,
@@ -54,6 +55,50 @@ const formatGlossaryTitle = (value) => String(value || '')
 /** Avoid replaying slide-in when a tall bubble remounts (Android clipping / recycle). */
 const messageBubbleEntryPlayedIds = new Set();
 const remedyScreenImpressionClaims = new Set();
+const premiumPodcastReadyKeys = new Set();
+
+const PODCAST_LISTEN_LANG_KEY = 'podcast_listen_lang';
+
+const podcastLangFromUiLanguage = (language) =>
+  String(language || '').toLowerCase().startsWith('hi') ? 'hi' : 'en';
+
+const podcastReadyKey = (messageId, language) => {
+  const mid = messageId != null ? String(messageId) : '';
+  return mid ? `${mid}:${podcastLangFromUiLanguage(language)}` : '';
+};
+
+const messageHasReadyPodcast = (messageId) => {
+  if (messageId == null || messageId === '') return false;
+  return (
+    premiumPodcastReadyKeys.has(podcastReadyKey(messageId, 'en'))
+    || premiumPodcastReadyKeys.has(podcastReadyKey(messageId, 'hi'))
+  );
+};
+
+const sanitizeVisibleChatContent = (content, { asHtmlSpans = false } = {}) => {
+  let out = String(content || '');
+  out = out.replace(
+    /\n?\s*(?:NEXT_ACTION_META|FAQ_META|PREDICTION_ANCHOR_META)\s*:\s*\{[\s\S]*?\}\s*/gi,
+    '\n',
+  );
+  const held = [];
+  const hold = (kind, inner) => {
+    const token = `\u0000SENT${held.length}\u0000`;
+    held.push({ kind, inner: String(inner).replace(/\n+/g, ' ').trim() });
+    return token;
+  };
+  out = out.replace(/(?:【|\[)POS_START(?:】|\])([\s\S]*?)(?:【|\[)POS_END(?:】|\])/gi, (_, inner) => hold('pos', inner));
+  out = out.replace(/(?:【|\[)NEG_START(?:】|\])([\s\S]*?)(?:【|\[)NEG_END(?:】|\])/gi, (_, inner) => hold('neg', inner));
+  out = out.replace(/(?:【|\[)(?:POS|NEG)_(?:START|END)(?:】|\])/gi, '');
+  held.forEach((item, i) => {
+    const token = `\u0000SENT${i}\u0000`;
+    const replacement = asHtmlSpans
+      ? `<span class="chat-sentiment-${item.kind === 'pos' ? 'positive' : 'negative'}">${item.inner}</span>`
+      : `${item.kind === 'pos' ? '【POS_START】' : '【NEG_START】'}${item.inner}${item.kind === 'pos' ? '【POS_END】' : '【NEG_END】'}`;
+    out = out.split(token).join(replacement);
+  });
+  return out;
+};
 
 const localCalendarDay = () => {
   const now = new Date();
@@ -142,6 +187,7 @@ function MessageBubble({
   const isPartnership = partnership || message.partnership_mode;
   const messageChatTier = String(message?.chatTier || message?.chat_tier || '').trim().toLowerCase();
   const isInstantChatMessage = forceInstantPresentation || messageChatTier === 'instant';
+  const isPremiumChatMessage = messageChatTier === 'premium' || message?.premium_analysis === true;
   const instantEvidence = message?.instant_evidence_debug
     || message?.gate_metadata?.instant_evidence_debug
     || null;
@@ -154,11 +200,20 @@ function MessageBubble({
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
   const [isLoadingPodcast, setIsLoadingPodcast] = useState(false);
+  const [podcastReady, setPodcastReady] = useState(() =>
+    messageHasReadyPodcast(message?.messageId)
+  );
   const [isPlayingPodcast, setIsPlayingPodcast] = useState(false);
   const [isPausedPodcast, setIsPausedPodcast] = useState(false);
   const [isSharingPodcast, setIsSharingPodcast] = useState(false);
   const [showPodcastCreditsModal, setShowPodcastCreditsModal] = useState(false);
+  const [showPodcastLanguageModal, setShowPodcastLanguageModal] = useState(false);
+  const [podcastListenLang, setPodcastListenLang] = useState(() => podcastLangFromUiLanguage(language));
+  const podcastListenLangRef = useRef(podcastListenLang);
+  const skipPodcastCreditsRef = useRef(false);
+  const lastPodcastPromoKeyRef = useRef(0);
   const [showPodcastPlayerModal, setShowPodcastPlayerModal] = useState(false);
+  const showPodcastPlayerModalRef = useRef(false);
   const [podcastPlayerMode, setPodcastPlayerMode] = useState('generating');
   const [podcastPositionMillis, setPodcastPositionMillis] = useState(0);
   const [podcastDurationMillis, setPodcastDurationMillis] = useState(0);
@@ -171,14 +226,35 @@ function MessageBubble({
   const entryAnimRef = useRef(null);
   const typingAnimRef = useRef(null);
   const mountedRef = useRef(true);
+
+  useEffect(() => {
+    showPodcastPlayerModalRef.current = showPodcastPlayerModal;
+  }, [showPodcastPlayerModal]);
   /** After seek, ignore progress updates briefly so we don't overwrite with stale position. */
   const lastSeekedAtRef = useRef(0);
   /** Set when user closes the modal while "Generating..." so we don't reopen or auto-play when the request completes. */
   const userDismissedGeneratingRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    AsyncStorage.getItem(PODCAST_LISTEN_LANG_KEY)
+      .then((stored) => {
+        if (cancelled) return;
+        if (stored !== 'hi' && stored !== 'en') return;
+        podcastListenLangRef.current = stored;
+        setPodcastListenLang(stored);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   useFocusEffect(
     React.useCallback(() => {
       mountedRef.current = true;
       return () => {
+        // PWA: opening the podcast modal (or route blur) must not abort playback.
+        if (Platform.OS === 'web') return;
         mountedRef.current = false;
         userDismissedGeneratingRef.current = true;
         getTextToSpeech().stopPodcast();
@@ -317,7 +393,21 @@ function MessageBubble({
       .trim();
   };
 
-  const playPodcast = async () => {
+  const markPremiumPodcastReady = useCallback((key) => {
+    if (!key) return;
+    premiumPodcastReadyKeys.add(key);
+    setPodcastReady(true);
+  }, []);
+
+  const persistPodcastListenLang = (listenLang) => {
+    const lang = podcastLangFromUiLanguage(listenLang);
+    podcastListenLangRef.current = lang;
+    setPodcastListenLang(lang);
+    AsyncStorage.setItem(PODCAST_LISTEN_LANG_KEY, lang).catch(() => {});
+    return lang;
+  };
+
+  const playPodcast = async (listenLang) => {
     if (isPlayingPodcast) {
       getTextToSpeech().stop();
       setIsPlayingPodcast(false);
@@ -327,13 +417,14 @@ function MessageBubble({
 
     const cleanText = getCleanMessageText();
     if (!cleanText) return;
+    const lang = podcastLangFromUiLanguage(listenLang || podcastListenLangRef.current || language);
 
     try {
       userDismissedGeneratingRef.current = false;
       setIsLoadingPodcast(true);
       setIsPlayingPodcast(false);
       await getTextToSpeech().playPodcast(cleanText, {
-        language,
+        language: lang,
         messageId: message.messageId || null,
         sessionId: sessionId || null,
         preview: (cleanText || message.content || '').slice(0, 150),
@@ -356,6 +447,8 @@ function MessageBubble({
           setIsPausedPodcast(false);
           setPodcastPlayerMode('playing');
           setShowPodcastPlayerModal(true);
+          const readyKey = podcastReadyKey(message.messageId, lang);
+          if (readyKey) markPremiumPodcastReady(readyKey);
         },
         onDone: () => {
           if (userDismissedGeneratingRef.current) return;
@@ -395,7 +488,12 @@ function MessageBubble({
                 { text: t('credits.buyCredits', 'Buy Credits'), onPress: () => navigation.navigate('Credits') },
               ]
             );
+            return;
           }
+          Alert.alert(
+            t('common.error', 'Error'),
+            t('podcast.playFailed', 'Could not play podcast. Please try again.')
+          );
         },
       });
     } catch (error) {
@@ -420,7 +518,44 @@ function MessageBubble({
     }
   };
 
+  const startPodcastPlayback = (listenLang) => {
+    const lang = persistPodcastListenLang(listenLang || podcastListenLangRef.current);
+    setPodcastPlayerMode('generating');
+    setShowPodcastPlayerModal(true);
+    setPodcastPositionMillis(0);
+    setPodcastDurationMillis(0);
+    playPodcast(lang);
+  };
+
+  const continuePodcastAfterLanguage = async (listenLang) => {
+    const lang = persistPodcastListenLang(listenLang);
+    const skipCredits = skipPodcastCreditsRef.current;
+    skipPodcastCreditsRef.current = false;
+    setShowPodcastLanguageModal(false);
+
+    if (isPremiumChatMessage || skipCredits) {
+      startPodcastPlayback(lang);
+      return;
+    }
+
+    const messageId = message.messageId || null;
+    if (messageId) {
+      try {
+        const res = await chatAPI.checkPodcastCache(messageId, lang);
+        if (res?.data?.cached === true) {
+          startPodcastPlayback(lang);
+          return;
+        }
+      } catch (_) {
+        // On error (e.g. network), show modal so user confirms before we attempt creation
+      }
+    }
+
+    setShowPodcastCreditsModal(true);
+  };
+
   const onPodcastButtonPress = async () => {
+    getTextToSpeech().unlockWebAudio?.();
     if (isPausedPodcast) {
       getTextToSpeech().resumePodcast();
       return;
@@ -436,22 +571,8 @@ function MessageBubble({
     const cleanText = getCleanMessageText();
     if (!cleanText) return;
 
-    // Ask backend if podcast exists for this message. If cached, fetch and play (no charge). If not, show credit modal then generate.
-    const messageId = message.messageId || null;
-    if (messageId) {
-      try {
-        const res = await chatAPI.checkPodcastCache(messageId, language);
-        if (res?.data?.cached === true) {
-          playPodcast();
-          return;
-        }
-      } catch (_) {
-        // On error (e.g. network), show modal so user confirms before we attempt creation
-      }
-    }
-
-    // No cached podcast: show credit confirmation modal; on confirm we call playPodcast() which generates and charges
-    setShowPodcastCreditsModal(true);
+    skipPodcastCreditsRef.current = false;
+    setShowPodcastLanguageModal(true);
   };
 
   const confirmPodcastCredits = async () => {
@@ -462,11 +583,8 @@ function MessageBubble({
     });
     if (!authOk) return;
     setShowPodcastCreditsModal(false);
-    setPodcastPlayerMode('generating');
-    setShowPodcastPlayerModal(true);
-    setPodcastPositionMillis(0);
-    setPodcastDurationMillis(0);
-    playPodcast();
+    getTextToSpeech().unlockWebAudio?.();
+    startPodcastPlayback(podcastListenLangRef.current);
   };
 
   const handlePausePodcast = () => {
@@ -501,7 +619,7 @@ function MessageBubble({
     if (!cleanText) return;
     try {
       setIsSharingPodcast(true);
-      const lang = language?.toLowerCase().startsWith('hi') ? 'hi' : 'en';
+      const lang = podcastLangFromUiLanguage(podcastListenLangRef.current || language);
       const response = await chatAPI.getPodcastAudio(cleanText, lang, message.messageId || null, null, null, message.native_name || null);
       const base64Audio = response?.data?.audio;
       if (!base64Audio || typeof base64Audio !== 'string') {
@@ -644,6 +762,7 @@ function MessageBubble({
     formatted = formatted.replace(/#### Glossary[\s\S]*?(?=####|$)/gi, '');
     formatted = formatted.replace(/### Glossary[\s\S]*?(?=###|$)/gi, '');
     formatted = formatted.replace(/## Glossary[\s\S]*?(?=##|$)/gi, '');
+    formatted = sanitizeVisibleChatContent(formatted, { asHtmlSpans: true });
 
     // Remove standalone # at end of lines (trailing markdown artifacts)
     formatted = formatted
@@ -1220,6 +1339,7 @@ function MessageBubble({
     out = out.replace(/<\/div>/gi, '\n');
     out = out.replace(/<div[^>]*>/gi, '\n');
     out = out.replace(/<(?!\/?tooltip\b)[^>]+>/gi, '');
+    out = sanitizeVisibleChatContent(out, { asHtmlSpans: false });
     return out;
   };
 
@@ -1414,6 +1534,49 @@ function MessageBubble({
         ? String(message.content)
         : '';
 
+  useEffect(() => {
+    if (!isPremiumChatMessage || isInstantChatMessage) return;
+    if (message.role !== 'assistant' || message.isTyping || message.isProcessing) return;
+    if (isClarification || isNativeGate) return;
+    const messageId = message.messageId || null;
+    if (!messageId) return;
+    if (messageHasReadyPodcast(messageId)) {
+      setPodcastReady(true);
+      return;
+    }
+    let active = true;
+    void (async () => {
+      try {
+        const [enCached, hiCached] = await Promise.all([
+          chatAPI.checkPodcastCache(messageId, 'en'),
+          chatAPI.checkPodcastCache(messageId, 'hi'),
+        ]);
+        if (!active) return;
+        if (enCached?.data?.cached === true) {
+          markPremiumPodcastReady(podcastReadyKey(messageId, 'en'));
+        }
+        if (hiCached?.data?.cached === true) {
+          markPremiumPodcastReady(podcastReadyKey(messageId, 'hi'));
+        }
+      } catch (_) {
+        /* ignore hydrate errors */
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [
+    isClarification,
+    isInstantChatMessage,
+    isNativeGate,
+    isPremiumChatMessage,
+    markPremiumPodcastReady,
+    message.isProcessing,
+    message.isTyping,
+    message.messageId,
+    message.role,
+  ]);
+
   // Promo CTA on ChatScreen: skip the credits modal; user already consented in PodcastPromoModal.
   useEffect(() => {
     if (isInstantChatMessage) return;
@@ -1422,38 +1585,16 @@ function MessageBubble({
     if (!mid || String(mid) !== String(podcastAutoLaunchMessageId)) return;
     if (message.role !== 'assistant' || message.isTyping) return;
     if (isClarification || isNativeGate) return;
+    if (lastPodcastPromoKeyRef.current === podcastAutoLaunchKey) return;
     const body = getCleanMessageText();
     if (!body || body.length < 80) return;
+    lastPodcastPromoKeyRef.current = podcastAutoLaunchKey;
 
     const timer = setTimeout(() => {
-      void (async () => {
-        try {
-          userDismissedGeneratingRef.current = false;
-          const msgId = message.messageId || null;
-          if (msgId) {
-            try {
-              const res = await chatAPI.checkPodcastCache(msgId, language);
-              if (res?.data?.cached === true) {
-                await playPodcast();
-                return;
-              }
-            } catch (_) {
-              // Network failure: still attempt generation (server enforces credits).
-            }
-          }
-          setShowPodcastCreditsModal(false);
-          setPodcastPlayerMode('generating');
-          setShowPodcastPlayerModal(true);
-          setPodcastPositionMillis(0);
-          setPodcastDurationMillis(0);
-          playPodcast();
-        } catch (e) {
-          console.error('[Podcast] auto-launch', e);
-        }
-      })();
+      skipPodcastCreditsRef.current = true;
+      setShowPodcastLanguageModal(true);
     }, 400);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- playPodcast closes over latest message/session; avoid re-firing loops
   }, [
     isInstantChatMessage,
     podcastAutoLaunchKey,
@@ -1462,7 +1603,6 @@ function MessageBubble({
     message.role,
     message.isTyping,
     message.content,
-    language,
     isClarification,
     isNativeGate,
   ]);
@@ -2158,14 +2298,32 @@ function MessageBubble({
               <>
                 {!isInstantChatMessage && !(isPlayingPodcast || isPausedPodcast) && (
                   <TouchableOpacity
-                    style={[styles.actionButton, styles.listenPodcastButton, highlightedActionStyle]}
+                    style={[
+                      styles.actionButton,
+                      styles.listenPodcastButton,
+                      highlightedActionStyle,
+                      podcastReady && styles.listenPodcastButtonReady,
+                    ]}
                     onPress={onPodcastButtonPress}
                     disabled={isLoadingPodcast}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      podcastReady
+                        ? t('chat.podcastReadyToast', 'Podcast ready — tap to listen')
+                        : t('chat.listenPodcast', 'Listen as podcast')
+                    }
                   >
                     {isLoadingPodcast ? (
                       <ActivityIndicator size="small" color={colors.primary} />
                     ) : (
-                      <Ionicons name="radio-outline" size={17} color={colors.primary} />
+                      <View style={styles.podcastReadyIconWrap}>
+                        <Ionicons
+                          name={podcastReady ? 'radio' : 'radio-outline'}
+                          size={17}
+                          color={podcastReady ? '#15803d' : colors.primary}
+                        />
+                        {podcastReady ? <View style={styles.podcastReadyDot} /> : null}
+                      </View>
                     )}
                   </TouchableOpacity>
                 )}
@@ -2478,6 +2636,17 @@ function MessageBubble({
         cost={podcastCost ?? 2}
         credits={credits ?? 0}
         confirmLabel={t('common.continue', 'Continue')}
+      />
+
+      <PodcastLanguageModal
+        visible={showPodcastLanguageModal}
+        selectedLang={podcastListenLang}
+        colors={colors}
+        onSelect={continuePodcastAfterLanguage}
+        onClose={() => {
+          skipPodcastCreditsRef.current = false;
+          setShowPodcastLanguageModal(false);
+        }}
       />
 
       <AppAlertModal
@@ -3085,6 +3254,27 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
           borderColor: 'rgba(255, 107, 53, 0.35)',
         }
       : {}),
+  },
+  listenPodcastButtonReady: {
+    backgroundColor: 'rgba(22, 163, 74, 0.12)',
+    borderColor: 'rgba(22, 163, 74, 0.38)',
+  },
+  podcastReadyIconWrap: {
+    width: 17,
+    height: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  podcastReadyDot: {
+    position: 'absolute',
+    top: -2,
+    right: -3,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#16a34a',
+    borderWidth: 1,
+    borderColor: '#fff',
   },
   pdfButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',

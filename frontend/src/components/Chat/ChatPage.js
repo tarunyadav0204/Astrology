@@ -1230,7 +1230,8 @@ const ChatPage = ({ onLogin }) => {
             if (status.status === 'completed') {
                 const body = String(status.content || '').trim();
                 const mt = status.message_type || 'answer';
-                if (mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
+                const isPremiumTierResponse = String(status.chat_tier || status.chatTier || '').toLowerCase() === 'premium';
+                if (!isPremiumTierResponse && mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
                     setPodcastPromoMessageId(assistantMessageIdToUpdate);
                     setPodcastPromoOpen(true);
                 }
@@ -1548,7 +1549,12 @@ const ChatPage = ({ onLogin }) => {
                                 m.processingClientId === processingClientId
                                 && String(m.chatTier || '').toLowerCase() === 'instant'
                         );
-                        if (!gated && !wasInstantTier && String(content).trim().length >= 80) {
+                        const wasPremiumTier = prev.some(
+                            (m) =>
+                                m.processingClientId === processingClientId
+                                && String(m.chatTier || m.chat_tier || '').toLowerCase() === 'premium'
+                        ) || String(status.chat_tier || status.chatTier || '').toLowerCase() === 'premium';
+                        if (!gated && !wasInstantTier && !wasPremiumTier && String(content).trim().length >= 80) {
                             setPodcastPromoMessageId(assistantMessageId);
                             setPodcastPromoOpen(true);
                         }

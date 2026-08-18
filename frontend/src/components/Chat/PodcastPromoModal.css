@@ -59,3 +59,33 @@
   background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
   color: #fff;
 }
+
+.podcast-lang-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.podcast-lang-option {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1.5px solid #e5e7eb;
+  background: #f9fafb;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #111827;
+}
+
+.podcast-lang-option:hover {
+  border-color: #f9a8d4;
+  background: #fff1f2;
+}
+
+.podcast-lang-option.is-selected {
+  border-color: #e91e63;
+  background: rgba(233, 30, 99, 0.08);
+  color: #c2185b;
+}

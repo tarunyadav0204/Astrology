@@ -1627,6 +1627,19 @@ select {
   color: var(--admin-text);
 }
 
+.voice-preview-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  max-width: 100%;
+}
+
+.voice-preview-controls select {
+  flex: 1 1 280px;
+}
+
 .setting-info p {
   margin: 0;
   color: var(--admin-text-muted);

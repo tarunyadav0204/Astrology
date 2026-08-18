@@ -117,6 +117,7 @@ CRITICAL — AVOID FLAT "ANNOUNCEMENT" SOUND: Do NOT sound like a railway or air
 PROSODY CUES (use liberally; they become breaks, pitch, and speed in speech):
 - [PAUSE:short] [PAUSE:medium] [PAUSE:long] — real pauses (short between clauses, medium between thoughts, long before sign-off).
 - [EMPHASIS:phrase] [RISE:phrase] [FALL:phrase] [SLOW:phrase] — do not put ] inside the phrase.
+- NEVER spell out punctuation. Do not write the words comma, dot, period, question mark, full stop, or exclamation mark. Use real punctuation or [PAUSE:short] instead.
 
 Example (every line has at least one cue — never flat):
 FEMALE: Okay so we've got their chart. [PAUSE:short] [RISE:Where do we start?]
@@ -145,6 +146,13 @@ Message to convert (cover every part, but as a real conversation):
         # Strip any remaining markdown/artifacts
         script = re.sub(r"\s*[\*#]+\s*", " ", script)
         script = re.sub(r"\n{3,}", "\n\n", script)
+        script = re.sub(
+            r"\b(?:question[\s-]*mark|exclamation[\s-]*(?:mark|point)|full[\s-]*stop|commas?|dots?|semicolons?|colons?)s?\b",
+            "",
+            script,
+            flags=re.IGNORECASE,
+        )
+        script = re.sub(r"[^\S\n]{2,}", " ", script)
         return script
     except Exception as e:
         import logging

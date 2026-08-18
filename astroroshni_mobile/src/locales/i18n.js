@@ -23,6 +23,7 @@ import authDeep from './auth-deep.json';
 import homeRecommendations from './home-recommendations.json';
 import appUpdate from './app-update.json';
 import chatModes from './chat-modes.json';
+import chatModeSelector from './chat-mode-selector.json';
 import creditConfirmation from './credit-confirmation.json';
 import copyAlert from './copy-alert.json';
 import partnershipExit from './partnership-exit.json';
@@ -135,11 +136,16 @@ Object.entries(normalizedPremiumUi).forEach(([language, copy]) => {
 });
 
 [
-  [en, chatModes.english], [es, chatModes.es], [hi, chatModes.hindi], [tamil, chatModes.tamil],
-  [te, chatModes.telugu], [gu, chatModes.gujarati], [mr, chatModes.marathi], [de, chatModes.german],
-  [fr, chatModes.fr], [ru, chatModes.russian], [zh, chatModes.chinese],
-].forEach(([baseCopy, modeCopy]) => {
+  [en, chatModes.english, 'english'], [es, chatModes.es, 'es'], [hi, chatModes.hindi, 'hindi'], [tamil, chatModes.tamil, 'tamil'],
+  [te, chatModes.telugu, 'telugu'], [gu, chatModes.gujarati, 'gujarati'], [mr, chatModes.marathi, 'marathi'], [de, chatModes.german, 'german'],
+  [fr, chatModes.fr, 'fr'], [ru, chatModes.russian, 'russian'], [zh, chatModes.chinese, 'chinese'],
+].forEach(([baseCopy, modeCopy, language]) => {
   baseCopy.chatModes = modeCopy;
+  baseCopy.chat = baseCopy.chat || {};
+  baseCopy.chat.modeIntro = {
+    ...(baseCopy.chat.modeIntro || {}),
+    ...(chatModeSelector[language] || chatModeSelector.english),
+  };
 });
 
 [
