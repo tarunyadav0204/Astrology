@@ -1054,6 +1054,19 @@ export const textToSpeech = {
       }
       podcastTempUri = null;
 
+      // Android ExoPlayer often drops Authorization on remote URIs, which then 401/404s.
+      // Download with the same headers the rest of the app uses, then play a local file.
+      const authHeaders = {
+        Authorization: `Bearer ${authToken}`,
+        'X-AstroRoshni-Authorization': `Bearer ${authToken}`,
+      };
+      const response = await fetch(streamUrl, { headers: authHeaders });
+      if (!response.ok) {
+        const err = new Error(`Podcast stream failed (${response.status})`);
+        err.status = response.status;
+        throw err;
+      }
+
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,
@@ -1064,8 +1077,29 @@ export const textToSpeech = {
         interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
       });
 
+      let playUri = streamUrl;
+      if (isWebPlatform()) {
+        const blob = await response.blob();
+        playUri = URL.createObjectURL(blob);
+        podcastTempUri = playUri;
+      } else {
+        const filename = `podcast_history_${Date.now()}.mp3`;
+        playUri = `${FileSystem.cacheDirectory}${filename}`;
+        podcastTempUri = playUri;
+        const buffer = await response.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        const chunk = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunk) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+        }
+        await FileSystem.writeAsStringAsync(playUri, globalThis.btoa(binary), {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      }
+
       const { sound } = await Audio.Sound.createAsync(
-        { uri: streamUrl, headers: { Authorization: `Bearer ${authToken}` } },
+        { uri: playUri },
         { progressUpdateIntervalMillis: 250 }
       );
       currentSound = sound;
@@ -1081,6 +1115,7 @@ export const textToSpeech = {
           if (onDone) onDone();
           sound.unloadAsync();
           currentSound = null;
+          clearPodcastTempUri();
         }
       });
 

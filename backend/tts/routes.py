@@ -1287,6 +1287,168 @@ def _podcast_cache_lang(lang: str) -> str:
   return "hi" if l.startswith("hi") else "en"
 
 
+def _podcast_lang_aliases(lang: str) -> tuple[str, ...]:
+  return ("hi", "hindi") if _podcast_cache_lang(lang) == "hi" else ("en", "english")
+
+
+def _message_id_aliases(message_id: str) -> list[str]:
+  raw = str(message_id or "").strip()
+  ids = [raw] if raw else []
+  try:
+    as_int = str(int(raw))
+    if as_int not in ids:
+      ids.append(as_int)
+  except (TypeError, ValueError):
+    pass
+  return ids
+
+
+def _find_podcast_history(userid: int, message_id: str, cache_lang: str):
+  ids = _message_id_aliases(message_id)
+  if not ids:
+    return None
+  langs = _podcast_lang_aliases(cache_lang)
+  id_ph = ",".join("?" for _ in ids)
+  lang_ph = ",".join("?" for _ in langs)
+  with get_conn() as conn:
+    cursor = execute(
+      conn,
+      f"""
+      SELECT message_id, session_id, lang, preview
+      FROM podcast_history
+      WHERE userid = ?
+        AND message_id IN ({id_ph})
+        AND LOWER(TRIM(lang)) IN ({lang_ph})
+      ORDER BY created_at DESC
+      LIMIT 1
+      """,
+      (userid, *ids, *langs),
+    )
+    row = cursor.fetchone()
+    if row:
+      return row
+    cursor = execute(
+      conn,
+      f"""
+      SELECT message_id, session_id, lang, preview
+      FROM podcast_history
+      WHERE userid = ?
+        AND message_id IN ({id_ph})
+      ORDER BY created_at DESC
+      LIMIT 1
+      """,
+      (userid, *ids),
+    )
+    return cursor.fetchone()
+
+
+def _cached_podcast_bytes(message_id: str, cache_lang: str):
+  for mid in _message_id_aliases(message_id):
+    for alias in _podcast_lang_aliases(cache_lang):
+      cached = get_cached_audio(mid, alias)
+      if cached:
+        return cached
+  return None
+
+
+def _load_assistant_message_content(userid: int, message_id: str, session_id: Optional[str] = None):
+  mid_int = None
+  try:
+    mid_int = int(str(message_id).strip())
+  except (TypeError, ValueError):
+    mid_int = None
+  with get_conn() as conn:
+    if mid_int is not None:
+      cursor = execute(
+        conn,
+        """
+        SELECT cm.content, cm.session_id
+        FROM chat_messages cm
+        INNER JOIN chat_sessions cs ON cs.session_id = cm.session_id
+        WHERE cm.message_id = ?
+          AND cs.user_id = ?
+          AND cm.sender = 'assistant'
+        LIMIT 1
+        """,
+        (mid_int, userid),
+      )
+      row = cursor.fetchone()
+      if row and str(row[0] or "").strip():
+        return str(row[0]).strip(), row[1]
+    if session_id:
+      cursor = execute(
+        conn,
+        """
+        SELECT cm.content, cm.session_id
+        FROM chat_messages cm
+        INNER JOIN chat_sessions cs ON cs.session_id = cm.session_id
+        WHERE cm.session_id = ?
+          AND cs.user_id = ?
+          AND cm.sender = 'assistant'
+          AND CAST(cm.message_id AS TEXT) = ?
+        LIMIT 1
+        """,
+        (session_id, userid, str(message_id).strip()),
+      )
+      row = cursor.fetchone()
+      if row and str(row[0] or "").strip():
+        return str(row[0]).strip(), row[1]
+  return None, None
+
+
+async def _synthesize_podcast_mp3(text: str, lang: str, native_name: str = "") -> bytes:
+  loop = asyncio.get_running_loop()
+  script = await loop.run_in_executor(None, partial(generate_podcast_script, text, lang))
+  if not script or not script.strip():
+    raise HTTPException(status_code=500, detail="Podcast script generation produced empty output")
+  intro = _podcast_intro_line(native_name or "", lang)
+  outro = _podcast_outro_lines(lang)
+  script = (
+    intro
+    + constrain_podcast_script(script, PODCAST_BODY_MAX_SPOKEN_WORDS)
+    + "\n"
+    + outro
+  )
+  script = _normalize_hindi_ordinals(script, lang)
+  script = constrain_podcast_script(script)
+  segments = _parse_podcast_script(script)
+  if not segments:
+    raise HTTPException(status_code=500, detail="Podcast script had no parseable FEMALE:/MALE: lines")
+  try:
+    creds = _get_google_credentials()
+    client = texttospeech.TextToSpeechClient(credentials=creds)
+  except HTTPException:
+    raise
+  except Exception as e:
+    logger.exception("TTS: Error initializing TextToSpeechClient for podcast")
+    raise HTTPException(status_code=503, detail=f"TTS client initialization failed: {e}")
+  female_name, male_name, language_code = _podcast_voices(lang)
+  audio_parts: list[bytes] = []
+  try:
+    for role, segment_text in segments:
+      if not segment_text or not segment_text.strip():
+        continue
+      voice_name = female_name if role == "female" else male_name
+      audio_parts.append(
+        await _synthesize_podcast_segment(
+          client,
+          voice_name,
+          role,
+          segment_text,
+          _language_code_from_voice_name(voice_name, language_code),
+        )
+      )
+  except HTTPException:
+    raise
+  except Exception as e:
+    logger.exception("TTS: podcast synthesis failed")
+    raise HTTPException(status_code=500, detail=f"Podcast TTS failed: {e}")
+  audio_bytes = b"".join(audio_parts)
+  if not audio_bytes:
+    raise HTTPException(status_code=500, detail="Podcast produced no audio")
+  return audio_bytes
+
+
 def _podcast_intro_line(native_name: str, lang: str) -> str:
   """Return the consistent two-host AstroRoshni programme opening."""
   name = (native_name or "").strip()
@@ -1600,7 +1762,7 @@ async def podcast_history(current_user: User = Depends(get_current_user)):
       {
         "message_id": r[0],
         "session_id": r[1],
-        "lang": r[2] or "en",
+        "lang": _podcast_cache_lang(r[2] or "en"),
         "preview": r[3],
         "created_at": (r[4].isoformat() if hasattr(r[4], "isoformat") else (str(r[4]) if r[4] is not None else None)),
       }
@@ -1617,24 +1779,51 @@ async def podcast_stream(
 ):
   """
   Stream cached podcast audio. Only allowed if this user has the podcast in their history.
-  Returns 404 if not in history or cache miss.
+  If the MP3 is missing from cache (common on local/emulator after a backend restart),
+  rebuild it from the original chat message without charging again.
   """
   raw_id = str(message_id).strip() if message_id else None
   if not raw_id:
     raise HTTPException(status_code=400, detail="message_id required")
   cache_lang = _podcast_cache_lang(lang)
   _ensure_podcast_history_table()
-  with get_conn() as conn:
-    cursor = execute(
-      conn,
-      "SELECT 1 FROM podcast_history WHERE userid = ? AND message_id = ? AND lang = ? LIMIT 1",
-      (current_user.userid, raw_id, cache_lang),
+  history = _find_podcast_history(current_user.userid, raw_id, cache_lang)
+  if not history:
+    logger.warning(
+      "Podcast stream: no history row user=%s message_id=%s lang=%s",
+      current_user.userid,
+      raw_id,
+      cache_lang,
     )
-    if not cursor.fetchone():
-      raise HTTPException(status_code=404, detail="Podcast not found or access denied")
-  audio_bytes = get_cached_audio(raw_id, cache_lang)
-  if not audio_bytes and cache_lang == "en":
-    audio_bytes = get_cached_audio(raw_id, "english")
-  if not audio_bytes:
+    raise HTTPException(status_code=404, detail="Podcast not found or access denied")
+  history_id = str(history[0] or raw_id).strip()
+  history_session = history[1]
+  history_lang = _podcast_cache_lang(history[2] or cache_lang)
+  audio_bytes = _cached_podcast_bytes(history_id, history_lang) or _cached_podcast_bytes(raw_id, cache_lang)
+  if audio_bytes:
+    return Response(content=audio_bytes, media_type="audio/mpeg")
+
+  logger.warning(
+    "Podcast stream cache miss; rebuilding user=%s message_id=%s lang=%s",
+    current_user.userid,
+    history_id,
+    history_lang,
+  )
+  content, session_id = _load_assistant_message_content(
+    current_user.userid,
+    history_id,
+    history_session,
+  )
+  if not content:
     raise HTTPException(status_code=404, detail="Podcast audio not in cache")
+  audio_bytes = await _synthesize_podcast_mp3(content, history_lang)
+  loop = asyncio.get_running_loop()
+  await loop.run_in_executor(None, partial(put_cached_audio, history_id, history_lang, audio_bytes))
+  _add_podcast_history(
+    current_user.userid,
+    history_id,
+    session_id or history_session,
+    history_lang,
+    history[3],
+  )
   return Response(content=audio_bytes, media_type="audio/mpeg")
