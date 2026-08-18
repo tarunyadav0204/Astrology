@@ -198,14 +198,18 @@ def _is_indic_voice(voice_name: Optional[str]) -> bool:
 
 def _ssml_mode_for_voice(voice_name: Optional[str]) -> str:
   """
-  Journey/Studio reject SSML. Indic Neural2/Chirp3-IN reject <prosody pitch="..st">
-  and similar tags that US/GB Chirp3 ignore.
+  Journey/Studio reject SSML. Chirp3 verbalizes punctuation, so those voices need
+  break-only SSML. Neural2/Wavenet (including en-IN) already pause at commas and
+  periods — converting punctuation into extra <break> tags stacks silence,
+  which is especially obvious on the faster male host.
   """
   family = _voice_family(voice_name)
   if family in ("journey", "studio"):
     return "plain"
-  if family == "chirp" or _is_indic_voice(voice_name):
+  if family == "chirp":
     return "breaks"
+  if family in ("neural2", "wavenet") or _is_indic_voice(voice_name):
+    return "cues"
   return "full"
 
 
@@ -362,11 +366,26 @@ def _apply_pronunciation_ssml(text: str) -> str:
   return text
 
 
-def _apply_pronunciation_plain(text: str) -> str:
+def _apply_pronunciation_plain(text: str, *, compact_hyphens: bool = False) -> str:
   """Replace terms with phonetic spelling for plain-text TTS (no SSML). Used by /tts/synthesize."""
   text = _strip_literal_punctuation_words(text)
   for term, alias in _PRONUNCIATION_ALIASES:
-    text = text.replace(term, alias)
+    spoken = alias.replace("-", "") if compact_hyphens else alias
+    text = text.replace(term, spoken)
+  return text
+
+
+def _tighten_male_breaks(text: str, *, extra_short: bool = False) -> str:
+  """SSML <break> is wall-clock silence and does not scale with speaking_rate."""
+  replacements = [
+    ('<break time="1300ms"/>', '<break time="700ms"/>' if extra_short else '<break time="950ms"/>'),
+    ('<break time="900ms"/>', '<break time="320ms"/>' if extra_short else '<break time="650ms"/>'),
+    ('<break time="420ms"/>', '<break time="160ms"/>' if extra_short else '<break time="220ms"/>'),
+    ('<break time="380ms"/>', '<break time="160ms"/>' if extra_short else '<break time="240ms"/>'),
+    ('<break time="160ms"/>', '<break time="70ms"/>' if extra_short else '<break time="90ms"/>'),
+  ]
+  for old, new in replacements:
+    text = text.replace(old, new)
   return text
 
 
@@ -531,8 +550,9 @@ def _segment_text_to_ssml(segment_text: str, role: str = "female", ssml_mode: st
 
   # Escape XML in the text so we can safely insert SSML tags
   text = _escape_ssml_text(_strip_literal_punctuation_words(segment_text.strip()))
-  if ssml_mode == "breaks":
-    text = _apply_pronunciation_plain(text)
+  if ssml_mode in ("breaks", "cues"):
+    # Neural2 treats "Daa-sha" hyphens as extra pauses; compact those aliases.
+    text = _apply_pronunciation_plain(text, compact_hyphens=(ssml_mode == "cues"))
   else:
     # Improve pronunciation of Sanskrit/astrology terms via SSML <sub alias="...">
     text = _apply_pronunciation_ssml(text)
@@ -540,14 +560,12 @@ def _segment_text_to_ssml(segment_text: str, role: str = "female", ssml_mode: st
   text = re.sub(r"\[PAUSE:short\]", '<break time="420ms"/>', text, flags=re.IGNORECASE)
   text = re.sub(r"\[PAUSE:medium\]", '<break time="900ms"/>', text, flags=re.IGNORECASE)
   text = re.sub(r"\[PAUSE:long\]", '<break time="1300ms"/>', text, flags=re.IGNORECASE)
-  if ssml_mode == "breaks":
+  if ssml_mode in ("breaks", "cues"):
     text = re.sub(r"\[(?:EMPHASIS|RISE|FALL|SLOW):([^\]]+)\]", r"\1", text, flags=re.IGNORECASE)
-    text = _replace_spoken_punctuation_with_breaks(text)
+    if ssml_mode == "breaks":
+      text = _replace_spoken_punctuation_with_breaks(text)
     if role == "male":
-      text = text.replace('<break time="900ms"/>', '<break time="650ms"/>')
-      text = text.replace('<break time="1300ms"/>', '<break time="950ms"/>')
-      text = text.replace('<break time="380ms"/>', '<break time="240ms"/>')
-      text = text.replace('<break time="160ms"/>', '<break time="90ms"/>')
+      text = _tighten_male_breaks(text, extra_short=(ssml_mode == "cues"))
     return f"<speak>{text}</speak>"
 
   # Emphasis — strong so it stands out from neutral tone
@@ -625,10 +643,7 @@ def _segment_text_to_ssml(segment_text: str, role: str = "female", ssml_mode: st
 
   # For the male host, further tighten pauses so his delivery feels more continuous.
   if role == "male":
-    text = text.replace('<break time="900ms"/>', '<break time="650ms"/>')
-    text = text.replace('<break time="1300ms"/>', '<break time="950ms"/>')
-    text = text.replace('<break time="380ms"/>', '<break time="240ms"/>')
-    text = text.replace('<break time="160ms"/>', '<break time="90ms"/>')
+    text = _tighten_male_breaks(text)
 
   # Base prosody per host — keep consistent so clearly 2 people (Gacrux vs Algenib).
   # Chirp3 often ignores nested SSML rate; AudioConfig speaking_rate is the reliable knob.

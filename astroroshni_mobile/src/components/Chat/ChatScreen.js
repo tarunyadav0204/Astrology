@@ -1413,6 +1413,7 @@ export default function ChatScreen({ navigation, route }) {
   const [podcastPromoVisible, setPodcastPromoVisible] = useState(false);
   const [podcastPromoMessageId, setPodcastPromoMessageId] = useState(null);
   const [podcastAutoLaunchKey, setPodcastAutoLaunchKey] = useState(0);
+  const [podcastAutoLaunchLang, setPodcastAutoLaunchLang] = useState('en');
   const [ratingPromptVisible, setRatingPromptVisible] = useState(false);
   const [ratingPromptPending, setRatingPromptPending] = useState(false);
   const [ratingPromptMessageId, setRatingPromptMessageId] = useState(null);
@@ -6493,6 +6494,7 @@ export default function ChatScreen({ navigation, route }) {
                       sessionId={sessionId}
                       podcastAutoLaunchMessageId={podcastPromoMessageId}
                       podcastAutoLaunchKey={podcastAutoLaunchKey}
+                      podcastAutoLaunchLang={podcastAutoLaunchLang}
                       forceInstantPresentation={isInstantAnalysis}
                     />
                   </View>
@@ -8341,8 +8343,9 @@ export default function ChatScreen({ navigation, route }) {
             triggerRatingPrompt(ratingPromptMessageId, 'after_podcast_close');
           }
         }}
-        onGenerate={() => {
+        onGenerate={(lang) => {
           setPodcastPromoVisible(false);
+          setPodcastAutoLaunchLang(String(lang || '').toLowerCase().startsWith('hi') ? 'hi' : 'en');
           setPodcastAutoLaunchKey((k) => k + 1);
           if (ratingPromptPending && ratingPromptMessageId) {
             setRatingPromptPending(false);

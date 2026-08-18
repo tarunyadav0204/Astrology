@@ -369,6 +369,7 @@ const MessageBubble = ({
     onStartPartnershipGate,
     podcastAutoLaunchMessageId = null,
     podcastAutoLaunchKey = 0,
+    podcastAutoLaunchLang = 'en',
     instantLoaderRevealWords = 1,
     onOpenCreditsModal = null,
     forceInstantPresentation = false,
@@ -954,15 +955,18 @@ const MessageBubble = ({
         if (message.isTyping || message.isProcessing) return;
         if (message.message_type === 'clarification' || isNativeGate) return;
         if (lastPodcastPromoKeyRef.current === podcastAutoLaunchKey) return;
-        lastPodcastPromoKeyRef.current = podcastAutoLaunchKey;
         const timer = setTimeout(() => {
+            lastPodcastPromoKeyRef.current = podcastAutoLaunchKey;
             skipPodcastCreditsRef.current = true;
-            setShowPodcastLanguageModal(true);
+            const lang = String(podcastAutoLaunchLang || '').toLowerCase().startsWith('hi') ? 'hi' : 'en';
+            continuePodcastAfterLanguage(lang);
         }, 350);
         return () => clearTimeout(timer);
     }, [
         podcastAutoLaunchKey,
         podcastAutoLaunchMessageId,
+        podcastAutoLaunchLang,
+        continuePodcastAfterLanguage,
         message.role,
         message.messageId,
         message.isTyping,

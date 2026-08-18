@@ -836,6 +836,11 @@
       "hindi": "हिन्दी",
       "cancel": "Cancel"
     },
+    "podcastPromo": {
+      "title": "Turn this answer into a podcast",
+      "body": "Listen to this consultation on the go. Choose English or Hindi — first-time generation uses {{cost}} credits; replaying the same saved audio is free.",
+      "later": "Maybe later"
+    },
     "verified": "AstroRoshni Verified",
     "inquiry": "AstroRoshni Inquiry",
     "you": "You",

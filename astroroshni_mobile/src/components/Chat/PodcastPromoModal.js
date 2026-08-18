@@ -13,7 +13,7 @@ export default function PodcastPromoModal({ visible, onClose, onGenerate, podcas
   // THEMES.dark.cardBackground is translucent glass — use opaque surfaces so the dialog reads as a solid sheet.
   const cardBg = colors?.backgroundSecondary ?? colors?.background ?? '#fff';
   const border = colors?.cardBorder ?? colors?.strokeMuted ?? '#eee';
-  const primaryBtn = colors?.primary ?? '#e91e63';
+  const primary = colors?.primary ?? '#e91e63';
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -25,32 +25,43 @@ export default function PodcastPromoModal({ visible, onClose, onGenerate, podcas
           <Text style={[styles.body, { color: sub }]}>
             {t(
               'chat.podcastPromo.body',
-              'Listen to this consultation on the go. First-time generation uses {{cost}} credits; replaying the same saved audio is free.',
+              'Listen to this consultation on the go. Choose English or Hindi — first-time generation uses {{cost}} credits; replaying the same saved audio is free.',
               { cost }
             )}
           </Text>
-          <View style={styles.row}>
+          <View style={styles.options}>
             <TouchableOpacity
-              style={[
-                styles.btn,
-                styles.btnGhost,
-                {
-                  backgroundColor: colors?.backgroundTertiary ?? colors?.surface ?? 'rgba(0,0,0,0.06)',
-                  borderColor: border,
-                },
-              ]}
-              onPress={onClose}
+              style={[styles.option, { borderColor: primary, backgroundColor: `${primary}14` }]}
+              onPress={() => onGenerate?.('en')}
             >
-              <Text style={[styles.btnGhostText, { color: sub }]}>
-                {t('chat.podcastPromo.later', 'Maybe later')}
+              <Text style={[styles.optionLabel, { color: primary }]}>
+                {t('chat.podcastLanguage.english', 'English')}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.btnPrimary, { backgroundColor: primaryBtn }]} onPress={onGenerate}>
-              <Text style={styles.btnPrimaryText}>
-                {t('chat.podcastPromo.cta', 'Generate podcast')}
+            <TouchableOpacity
+              style={[styles.option, { borderColor: border }]}
+              onPress={() => onGenerate?.('hi')}
+            >
+              <Text style={[styles.optionLabel, { color: text }]}>
+                {t('chat.podcastLanguage.hindi', 'हिन्दी')}
               </Text>
             </TouchableOpacity>
           </View>
+          <TouchableOpacity
+            style={[
+              styles.btn,
+              styles.btnGhost,
+              {
+                backgroundColor: colors?.backgroundTertiary ?? colors?.surface ?? 'rgba(0,0,0,0.06)',
+                borderColor: border,
+              },
+            ]}
+            onPress={onClose}
+          >
+            <Text style={[styles.btnGhostText, { color: sub }]}>
+              {t('chat.podcastPromo.later', 'Maybe later')}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -84,6 +95,21 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     flexWrap: 'wrap',
     gap: 10,
+  },
+  options: {
+    gap: 10,
+    marginBottom: 14,
+  },
+  option: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  optionLabel: {
+    fontSize: 17,
+    fontWeight: '700',
   },
   btn: {
     paddingVertical: 12,

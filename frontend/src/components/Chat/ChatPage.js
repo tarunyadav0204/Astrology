@@ -308,6 +308,7 @@ const ChatPage = ({ onLogin }) => {
     const [podcastPromoOpen, setPodcastPromoOpen] = useState(false);
     const [podcastPromoMessageId, setPodcastPromoMessageId] = useState(null);
     const [podcastAutoLaunchKey, setPodcastAutoLaunchKey] = useState(0);
+    const [podcastAutoLaunchLang, setPodcastAutoLaunchLang] = useState('en');
     const [firstPurchaseOffer, setFirstPurchaseOffer] = useState(null);
     const [firstPurchaseOfferModalOpen, setFirstPurchaseOfferModalOpen] = useState(false);
     const [firstPurchaseOfferRemainingSeconds, setFirstPurchaseOfferRemainingSeconds] = useState(0);
@@ -3369,6 +3370,7 @@ const ChatPage = ({ onLogin }) => {
                             onStartPartnershipGate={handleStartPartnershipGate}
                             podcastAutoLaunchMessageId={podcastPromoMessageId}
                             podcastAutoLaunchKey={podcastAutoLaunchKey}
+                            podcastAutoLaunchLang={podcastAutoLaunchLang}
                             instantLoaderRevealWords={instantLoaderWordCount}
                             onOpenCreditsModal={() => setShowCreditsModal(true)}
                             forceInstantPresentation={isInstantAnalysis}
@@ -3443,8 +3445,9 @@ const ChatPage = ({ onLogin }) => {
                     setPodcastPromoOpen(false);
                     setPodcastPromoMessageId(null);
                 }}
-                onGenerate={() => {
+                onGenerate={(lang) => {
                     setPodcastPromoOpen(false);
+                    setPodcastAutoLaunchLang(String(lang || '').toLowerCase().startsWith('hi') ? 'hi' : 'en');
                     setPodcastAutoLaunchKey((k) => k + 1);
                 }}
             />

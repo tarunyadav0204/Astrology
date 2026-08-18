@@ -151,6 +151,7 @@ function MessageBubble({
   sessionId,
   podcastAutoLaunchMessageId = null,
   podcastAutoLaunchKey = 0,
+  podcastAutoLaunchLang = 'en',
   forceInstantPresentation = false,
 }) {
   const { t } = useTranslation();
@@ -1588,17 +1589,20 @@ function MessageBubble({
     if (lastPodcastPromoKeyRef.current === podcastAutoLaunchKey) return;
     const body = getCleanMessageText();
     if (!body || body.length < 80) return;
-    lastPodcastPromoKeyRef.current = podcastAutoLaunchKey;
 
     const timer = setTimeout(() => {
+      lastPodcastPromoKeyRef.current = podcastAutoLaunchKey;
       skipPodcastCreditsRef.current = true;
-      setShowPodcastLanguageModal(true);
+      continuePodcastAfterLanguage(
+        String(podcastAutoLaunchLang || '').toLowerCase().startsWith('hi') ? 'hi' : 'en',
+      );
     }, 400);
     return () => clearTimeout(timer);
   }, [
     isInstantChatMessage,
     podcastAutoLaunchKey,
     podcastAutoLaunchMessageId,
+    podcastAutoLaunchLang,
     message.messageId,
     message.role,
     message.isTyping,
@@ -2690,6 +2694,7 @@ const areMessageBubblePropsEqual = (prevProps, nextProps) => {
   if (prevProps.sessionId !== nextProps.sessionId) return false;
   if (prevProps.podcastAutoLaunchMessageId !== nextProps.podcastAutoLaunchMessageId) return false;
   if (prevProps.podcastAutoLaunchKey !== nextProps.podcastAutoLaunchKey) return false;
+  if (prevProps.podcastAutoLaunchLang !== nextProps.podcastAutoLaunchLang) return false;
   if (prevProps.forceInstantPresentation !== nextProps.forceInstantPresentation) return false;
   if (prevProps.onStartPartnershipGate !== nextProps.onStartPartnershipGate) return false;
   if (prevProps.onContinueSingleChartGate !== nextProps.onContinueSingleChartGate) return false;

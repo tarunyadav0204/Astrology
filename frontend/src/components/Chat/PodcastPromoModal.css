@@ -1,7 +1,7 @@
 .podcast-promo-overlay {
   position: fixed;
   inset: 0;
-  z-index: 12000;
+  z-index: 2147483000;
   background: rgba(15, 15, 20, 0.45);
   display: flex;
   align-items: center;

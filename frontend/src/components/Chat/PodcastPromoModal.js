@@ -16,15 +16,20 @@ export default function PodcastPromoModal({ open, onClose, onGenerate, podcastCo
           Turn this answer into a podcast
         </h2>
         <p className="podcast-promo-body">
-          Listen to this consultation on the go. We will generate natural audio from this reply. First-time
-          generation uses {cost} credits; replaying the same saved audio is free.
+          Listen to this consultation on the go. Choose English or Hindi — we will generate the audio in that
+          language. First-time generation uses {cost} credits; replaying the same saved audio is free.
         </p>
+        <div className="podcast-lang-options">
+          <button type="button" className="podcast-lang-option" onClick={() => onGenerate?.('en')}>
+            English
+          </button>
+          <button type="button" className="podcast-lang-option" onClick={() => onGenerate?.('hi')}>
+            हिन्दी
+          </button>
+        </div>
         <div className="podcast-promo-actions">
           <button type="button" className="podcast-promo-btn podcast-promo-btn--secondary" onClick={onClose}>
             Maybe later
-          </button>
-          <button type="button" className="podcast-promo-btn podcast-promo-btn--primary" onClick={onGenerate}>
-            Generate podcast
           </button>
         </div>
       </div>

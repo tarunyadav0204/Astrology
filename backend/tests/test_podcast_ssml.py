@@ -50,7 +50,8 @@ def test_indic_voices_use_break_only_ssml():
     assert _is_indic_voice("en-IN-Neural2-A")
     assert _is_indic_voice("hi-IN-Wavenet-A")
     assert not _is_indic_voice("en-GB-Chirp3-HD-Algenib")
-    assert _ssml_mode_for_voice("en-IN-Neural2-A") == "breaks"
+    assert _ssml_mode_for_voice("en-IN-Neural2-A") == "cues"
+    assert _ssml_mode_for_voice("en-IN-Neural2-B") == "cues"
     assert _ssml_mode_for_voice("en-IN-Journey-F") == "plain"
     assert _ssml_mode_for_voice("en-GB-Chirp3-HD-Algenib") == "breaks"
 
@@ -66,6 +67,20 @@ def test_indic_voices_use_break_only_ssml():
     assert _language_code_from_voice_name("en-GB-Chirp3-HD-Algenib") == "en-GB"
     assert _language_code_from_voice_name("hi-IN-Neural2-A") == "hi-IN"
     assert _language_code_from_voice_name("", "en-GB") == "en-GB"
+
+
+def test_neural2_keeps_punctuation_instead_of_stacking_breaks():
+    male = _segment_text_to_ssml(
+        "Moon in Cancer, that's the big one. [PAUSE:medium] Mars is strong.",
+        "male",
+        ssml_mode="cues",
+    )
+    assert "<prosody" not in male
+    assert "Moon in Cancer, that's the big one." in male
+    assert male.count("<break") == 1
+    assert 'time="320ms"' in male
+    assert "Daa-sha" not in _segment_text_to_ssml("This Dasha is strong", "male", ssml_mode="cues")
+    assert "Daasha" in _segment_text_to_ssml("This Dasha is strong", "male", ssml_mode="cues")
 
 
 def test_ssml_does_not_emit_apostrophe_entity():

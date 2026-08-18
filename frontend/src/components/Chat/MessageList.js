@@ -30,6 +30,7 @@ const MessageList = ({
     onStartPartnershipGate,
     podcastAutoLaunchMessageId = null,
     podcastAutoLaunchKey = 0,
+    podcastAutoLaunchLang = 'en',
     instantLoaderRevealWords = 1,
     onOpenCreditsModal = null,
     forceInstantPresentation = false,
@@ -85,6 +86,7 @@ const MessageList = ({
                                 onStartPartnershipGate={onStartPartnershipGate}
                                 podcastAutoLaunchMessageId={podcastAutoLaunchMessageId}
                                 podcastAutoLaunchKey={podcastAutoLaunchKey}
+                                podcastAutoLaunchLang={podcastAutoLaunchLang}
                                 instantLoaderRevealWords={instantLoaderRevealWords}
                                 onOpenCreditsModal={onOpenCreditsModal}
                                 forceInstantPresentation={forceInstantPresentation}

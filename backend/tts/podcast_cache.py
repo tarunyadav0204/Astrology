@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 PODCAST_CACHE_BUCKET_ENV = "PODCAST_CACHE_BUCKET"
 
 # Bump when synthesis/prosody changes so stale MP3s are not replayed.
-PODCAST_AUDIO_VERSION = "v4"
+PODCAST_AUDIO_VERSION = "v5"
 
 
 # In-memory cache when GCS is not configured. Key: (message_id_str, lang_str, version) -> bytes. Max entries.
