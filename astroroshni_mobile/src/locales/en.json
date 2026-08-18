@@ -829,9 +829,12 @@
     "podcastReadyLabel": "Ready",
     "podcastReadyToast": "Podcast ready — tap to listen",
     "podcastPreparing": "Preparing your podcast…",
+    "podcastFreeBadge": "Free",
+    "podcastIncludedA11y": "Free podcast included — tap to listen",
     "podcastLanguage": {
       "title": "Choose podcast language",
       "body": "We'll generate the audio in the language you pick. English and Hindi only.",
+      "premiumBody": "This Premium answer includes a free podcast. Choose English or Hindi.",
       "english": "English",
       "hindi": "हिन्दी",
       "cancel": "Cancel"
@@ -839,6 +842,8 @@
     "podcastPromo": {
       "title": "Turn this answer into a podcast",
       "body": "Listen to this consultation on the go. Choose English or Hindi — first-time generation uses {{cost}} credits; replaying the same saved audio is free.",
+      "premiumTitle": "You earned a free podcast",
+      "premiumBody": "This Premium question includes a podcast at no extra cost. Choose English or Hindi to listen.",
       "later": "Maybe later"
     },
     "verified": "AstroRoshni Verified",

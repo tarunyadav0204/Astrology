@@ -103,6 +103,15 @@ const INSTANT_LOADER_FALLBACKS = [
 ];
 const INSTANT_LOADER_WORD_MS = 1700;
 const INSTANT_LOADER_MAX_WORDS = INSTANT_LOADER_LINES.length + 2;
+const INSTANT_REPLY_FIRST_PIECE_MS = 1100;
+
+const shouldPaceInstantAnswer = ({ chatTier, messageType, content } = {}) => {
+  const tier = String(chatTier || '').toLowerCase();
+  const mt = String(messageType || 'answer').toLowerCase();
+  if (tier !== 'instant') return false;
+  if (mt === 'clarification' || mt === 'native_gate') return false;
+  return String(content || '').trim().length > 0;
+};
 
 const splitInstantReply = (content, maxPieceLength = 95) => {
   const normalized = String(content || '').replace(/\r\n/g, '\n').trim();
@@ -137,8 +146,8 @@ const splitInstantReply = (content, maxPieceLength = 95) => {
 };
 
 const getInstantReplyPieceDelay = (piece) => Math.max(
-  1400,
-  Math.min(2600, 900 + String(piece || '').length * 17),
+  1800,
+  Math.min(3400, 1100 + String(piece || '').length * 22),
 );
 const parseChatHttpError = (error) => {
   const message = String(error?.message || '');
@@ -670,6 +679,7 @@ export default function ChatScreen({ navigation, route }) {
   const [waitSideReplying, setWaitSideReplying] = useState(false);
   const [instantLoaderWordCount, setInstantLoaderWordCount] = useState(1);
   const instantRevealTimersRef = useRef(new Set());
+  const instantRevealActiveRef = useRef(new Set());
   /** Instant assistant message_id → live WebSocket. Polling remains the recovery/final-authority path. */
   const instantStreamSocketsRef = useRef(new Map());
   const [suggestions, setSuggestions] = useState(DEFAULT_CHAT_SUGGESTIONS);
@@ -704,6 +714,9 @@ export default function ChatScreen({ navigation, route }) {
   /** When false, skip auto scroll-to-end so we don't fight the user's scroll position. */
   const stickMessagesToBottomRef = useRef(true);
   const lastAutoScrollAtRef = useRef(0);
+  const pendingScrollToLastAnswerRef = useRef(false);
+  const showGreetingRef = useRef(true);
+  const prevShowGreetingRef = useRef(true);
 
   useEffect(() => {
     showMenuRef.current = showMenu;
@@ -872,6 +885,7 @@ export default function ChatScreen({ navigation, route }) {
   useEffect(() => () => {
     instantRevealTimersRef.current.forEach((timer) => clearTimeout(timer));
     instantRevealTimersRef.current.clear();
+    instantRevealActiveRef.current.clear();
   }, []);
 
   useEffect(() => () => {
@@ -902,11 +916,18 @@ export default function ChatScreen({ navigation, route }) {
   // after the answer arrives. Reset this only when the user returns to the
   // chat entry screen, so the chooser remains available for the next question.
   useEffect(() => {
+    showGreetingRef.current = showGreeting;
+    const enteredChat = prevShowGreetingRef.current && !showGreeting;
+    prevShowGreetingRef.current = showGreeting;
     if (showGreeting) {
       suppressModeIntroAfterFreeRef.current = false;
       chatModeIntroShownKeyRef.current = null;
+      pendingScrollToLastAnswerRef.current = false;
     } else {
       chatEntryStartedAtRef.current = Date.now();
+      if (enteredChat) {
+        requestScrollToLastAnswerTop();
+      }
     }
   }, [showGreeting]);
   /** Keyboard frame height for bottom inset (iOS + Android; edge-to-edge often breaks adjustResize for RN root). */
@@ -918,6 +939,8 @@ export default function ChatScreen({ navigation, route }) {
   const [currentPersonId, setCurrentPersonId] = useState(null);
   const [pendingMessages, setPendingMessages] = useState(new Set());
   const scrollViewRef = useRef(null);
+  const lastMessageRef = useRef(null);
+  const lastAnswerIndexRef = useRef(-1);
   /** FlatList uses scrollToOffset; ScrollView uses scrollTo — keep measureLayout-based scrolls working. */
   const scrollMessageListToY = (y, animated = false) => {
     const node = scrollViewRef.current;
@@ -927,6 +950,28 @@ export default function ChatScreen({ navigation, route }) {
       node.scrollToOffset({ offset, animated });
     } else if (typeof node.scrollTo === 'function') {
       node.scrollTo({ y: offset, animated });
+    }
+  };
+
+  const requestScrollToLastAnswerTop = () => {
+    pendingScrollToLastAnswerRef.current = true;
+    stickMessagesToBottomRef.current = false;
+  };
+
+  const scrollToLastAnswerTop = () => {
+    if (!pendingScrollToLastAnswerRef.current || showGreetingRef.current) return;
+    const list = scrollViewRef.current;
+    const index = lastAnswerIndexRef.current;
+    if (!list || typeof list.scrollToIndex !== 'function' || index < 0) return;
+    stickMessagesToBottomRef.current = false;
+    try {
+      list.scrollToIndex({
+        index,
+        viewPosition: 0,
+        animated: false,
+      });
+    } catch (_) {
+      // Item may not be measured yet; onScrollToIndexFailed retries.
     }
   };
   const instantScrollRetryRef = useRef([]);
@@ -947,11 +992,24 @@ export default function ChatScreen({ navigation, route }) {
   const [loadingChart, setLoadingChart] = useState(false);
   const [dashaData, setDashaData] = useState(null);
   const [loadingDashas, setLoadingDashas] = useState(false);
-  const lastMessageRef = useRef(null);
   const visibleMessages =
     messages.length > renderedMessageCount
       ? messages.slice(-renderedMessageCount)
       : messages;
+  let lastAnswerIndex = visibleMessages.length - 1;
+  const lastVisible = visibleMessages[lastAnswerIndex];
+  if (!lastVisible?.isTyping) {
+    lastAnswerIndex = -1;
+    for (let i = visibleMessages.length - 1; i >= 0; i -= 1) {
+      const msg = visibleMessages[i];
+      if (msg?.role === 'assistant' && !msg?.isTyping) {
+        lastAnswerIndex = i;
+        break;
+      }
+    }
+    if (lastAnswerIndex < 0) lastAnswerIndex = visibleMessages.length - 1;
+  }
+  lastAnswerIndexRef.current = lastAnswerIndex;
   const hiddenMessageCount = Math.max(0, messages.length - visibleMessages.length);
   const showWelcomeSuggestionCards =
     !isInstantAnalysis &&
@@ -1254,6 +1312,33 @@ export default function ChatScreen({ navigation, route }) {
     scrollViewRef.current?.scrollToEnd({ animated });
   };
 
+  useEffect(() => {
+    if (showGreeting) return;
+    if (!pendingScrollToLastAnswerRef.current) return;
+    if (hasInstantTypingMessage) {
+      pendingScrollToLastAnswerRef.current = false;
+      return undefined;
+    }
+    if (visibleMessages.length === 0 || lastAnswerIndex < 0) return undefined;
+
+    let cancelled = false;
+    const run = () => {
+      if (cancelled || !pendingScrollToLastAnswerRef.current) return;
+      scrollToLastAnswerTop();
+    };
+    const handle = InteractionManager.runAfterInteractions(run);
+    const timers = [0, 80, 180, 360, 700].map((ms) => setTimeout(run, ms));
+    const finish = setTimeout(() => {
+      pendingScrollToLastAnswerRef.current = false;
+    }, 900);
+    return () => {
+      cancelled = true;
+      handle.cancel?.();
+      timers.forEach(clearTimeout);
+      clearTimeout(finish);
+    };
+  }, [showGreeting, visibleMessages.length, lastAnswerIndex, hasInstantTypingMessage]);
+
   const rememberMessageTier = (messageId, tier) => {
     if (!messageId) return;
     const normalized = String(tier || '').trim().toLowerCase();
@@ -1412,8 +1497,12 @@ export default function ChatScreen({ navigation, route }) {
 
   const [podcastPromoVisible, setPodcastPromoVisible] = useState(false);
   const [podcastPromoMessageId, setPodcastPromoMessageId] = useState(null);
+  const [podcastPromoIncluded, setPodcastPromoIncluded] = useState(false);
   const [podcastAutoLaunchKey, setPodcastAutoLaunchKey] = useState(0);
   const [podcastAutoLaunchLang, setPodcastAutoLaunchLang] = useState('en');
+  const consumePodcastAutoLaunch = useCallback(() => {
+    setPodcastAutoLaunchKey(0);
+  }, []);
   const [ratingPromptVisible, setRatingPromptVisible] = useState(false);
   const [ratingPromptPending, setRatingPromptPending] = useState(false);
   const [ratingPromptMessageId, setRatingPromptMessageId] = useState(null);
@@ -1560,12 +1649,21 @@ export default function ChatScreen({ navigation, route }) {
   }, [isKeyboardVisible, keyboardBottomInset]);
 
   useEffect(() => {
-    if (showGreeting && podcastPromoVisible) {
-      setPodcastPromoVisible(false);
-      setPodcastPromoMessageId(null);
-      setPodcastAutoLaunchKey(0);
+    if (!showGreeting) return;
+    setPodcastPromoVisible(false);
+    setPodcastPromoMessageId(null);
+    setPodcastPromoIncluded(false);
+    setPodcastAutoLaunchKey(0);
+    try {
+      getTextToSpeech().stopPodcast();
+    } catch (_) {
+      try {
+        getTextToSpeech().stop();
+      } catch (e) {
+        // ignore
+      }
     }
-  }, [showGreeting, podcastPromoVisible]);
+  }, [showGreeting]);
 
   // Stop any ongoing TTS playback when leaving the chat screen
   useFocusEffect(
@@ -2217,12 +2315,11 @@ export default function ChatScreen({ navigation, route }) {
             setMessages(storedMessages);
             // Keep Home as the default view; history is restored only after the user opens chat.
 
-            // Set flag to auto-scroll when content renders
-            setTimeout(() => {
-              if (messages.length > 0) {
-                scrollToBottomReliably(false);
-              }
-            }, 50);
+            // Align to the last answer once chat is visible; don't jump to the thread bottom.
+            if (storedMessages.length > 0) {
+              requestScrollToLastAnswerTop();
+              setTimeout(scrollToLastAnswerTop, 50);
+            }
 
             // Check for processing messages and resume polling.
             // This prevents a stuck "Analyzing..." state after app/background refresh.
@@ -2406,30 +2503,52 @@ export default function ChatScreen({ navigation, route }) {
     partnershipMode,
   ]);
 
-  const revealInstantReply = (messageId, pieces, fullContent) => {
-    if (pieces.length <= 1) return;
-    let elapsed = 0;
-    pieces.slice(1).forEach((piece, index) => {
-      elapsed += getInstantReplyPieceDelay(piece);
-      const timer = setTimeout(() => {
-        instantRevealTimersRef.current.delete(timer);
-        const visibleCount = index + 2;
-        const finished = visibleCount >= pieces.length;
-        setMessagesWithStorage((prev) => prev.map((message) =>
-          String(message.messageId || '') === String(messageId)
-            ? {
-                ...message,
-                content: finished ? fullContent : pieces.slice(0, visibleCount).join('\n\n'),
-                instantStreaming: !finished,
-              }
-            : message
-        ));
-        if (stickMessagesToBottomRef.current) {
-          requestAnimationFrame(() => scrollToBottomReliably(false));
-        }
-      }, elapsed);
-      instantRevealTimersRef.current.add(timer);
-    });
+  const revealInstantReply = (messageId, pieces, fullContent, onFinished) => {
+    const revealKey = String(messageId || '');
+    const finish = () => {
+      if (revealKey) instantRevealActiveRef.current.delete(revealKey);
+      onFinished?.();
+    };
+    if (!pieces.length) {
+      finish();
+      return;
+    }
+    if (revealKey) instantRevealActiveRef.current.add(revealKey);
+
+    const showCount = (count) => {
+      const finished = count >= pieces.length;
+      setMessagesWithStorage((prev) => prev.map((message) =>
+        String(message.messageId || '') === String(messageId)
+          ? {
+              ...message,
+              content: finished ? fullContent : pieces.slice(0, count).join('\n\n'),
+              isTyping: false,
+              instantStreaming: !finished,
+            }
+          : message
+      ));
+      setIsTyping(false);
+      if (stickMessagesToBottomRef.current) {
+        requestAnimationFrame(() => scrollToBottomReliably(false));
+      }
+      if (finished) finish();
+    };
+
+    const firstTimer = setTimeout(() => {
+      instantRevealTimersRef.current.delete(firstTimer);
+      showCount(1);
+      if (pieces.length <= 1) return;
+      let elapsed = 0;
+      pieces.slice(1).forEach((piece, index) => {
+        elapsed += getInstantReplyPieceDelay(piece);
+        const timer = setTimeout(() => {
+          instantRevealTimersRef.current.delete(timer);
+          showCount(index + 2);
+        }, elapsed);
+        instantRevealTimersRef.current.add(timer);
+      });
+    }, INSTANT_REPLY_FIRST_PIECE_MS);
+    instantRevealTimersRef.current.add(firstTimer);
   };
 
   const exitPartnershipMode = () => {
@@ -2492,13 +2611,9 @@ export default function ChatScreen({ navigation, route }) {
             setMessages(prev => prev.length === 0 ? storedMessages : prev);
             // Keep Home as the default view; history is restored only after the user opens chat.
 
-            // Set flag to scroll if we loaded new messages and not showing greeting
             if (prevLength === 0 && storedMessages.length > 0 && !showGreeting) {
-              setTimeout(() => {
-                if (storedMessages.length > 0) {
-                  scrollToBottomReliably(false);
-                }
-              }, 50);
+              requestScrollToLastAnswerTop();
+              setTimeout(scrollToLastAnswerTop, 50);
             }
 
             const hasPendingProcessing = storedMessages.some(
@@ -3301,12 +3416,9 @@ export default function ChatScreen({ navigation, route }) {
         }
       }
 
-      // Set flag to scroll when content renders
-      setTimeout(() => {
-        if (messages.length > 0) {
-          scrollToBottomReliably(false);
-        }
-      }, 50);
+      // Align to the last answer once the thread is on screen.
+      requestScrollToLastAnswerTop();
+      setTimeout(scrollToLastAnswerTop, 50);
 
       // Check if we need to show welcome message
       setTimeout(async () => {
@@ -3991,26 +4103,9 @@ export default function ChatScreen({ navigation, route }) {
       }
 
       if (payload?.type === 'content_delta') {
-        const content = String(payload.content || '');
-        if (!content) return;
-        setMessagesWithStorage((prev) => prev.map((msg) =>
-          String(msg.messageId || '') === mid || msg.id === processingMessageId
-            ? {
-                ...msg,
-                messageId,
-                content,
-                isTyping: false,
-                instantStreaming: true,
-                chartInsights: [],
-                waitConversation: null,
-                engagementUpdates: [],
-              }
-            : msg
-        ));
-        setIsTyping(false);
-        if (stickMessagesToBottomRef.current) {
-          setTimeout(() => scrollToBottomReliably(false), 40);
-        }
+        // Hold the fast socket payload. Instant UI reveals the completed
+        // answer in typing-sized pieces from the status-complete path.
+        return;
       }
 
       if (['completed', 'failed', 'error'].includes(payload?.type)) {
@@ -4153,8 +4248,9 @@ export default function ChatScreen({ navigation, route }) {
           const resolvedChatTier = String(status.chat_tier || status.chatTier || rememberedTier || fallbackTier).trim().toLowerCase();
           const isInstantTierResponse = resolvedChatTier === 'instant';
 
-          const showFinalMessage = () => {
+          const showFinalMessage = ({ paceContent = false } = {}) => {
             const waitConversation = normalizeWaitConversation(status.wait_conversation);
+            const finalContent = status.content || 'Response received but content is empty';
             setMessagesWithStorage(prev => {
               const processingMsg = prev.find(m => m.messageId === messageId);
               const userMsg = processingMsg?.userMessageId ? prev.find(m => m.id === processingMsg.userMessageId) : null;
@@ -4163,8 +4259,8 @@ export default function ChatScreen({ navigation, route }) {
                 msg.messageId === messageId
                   ? {
                       ...msg,
-                      content: status.content || 'Response received but content is empty',
-                      isTyping: false,
+                      content: paceContent ? (msg.content || '') : finalContent,
+                      isTyping: paceContent,
                       instantStreaming: false,
                       terms: status.terms || [],
                       glossary: status.glossary || {},
@@ -4172,8 +4268,8 @@ export default function ChatScreen({ navigation, route }) {
                       chatTier: resolvedChatTier || msg.chatTier,
                       threadMode: resolvedChatTier || msg.threadMode || msg.chatTier,
                       summary_image: status.summary_image || null,
-                      follow_up_questions: status.follow_up_questions || [],
-                      next_action: status.next_action || null,
+                      follow_up_questions: paceContent ? [] : (status.follow_up_questions || []),
+                      next_action: paceContent ? null : (status.next_action || null),
                       native_name: chartName,
                       intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
                       gate_metadata: status.gate_metadata || null,
@@ -4183,8 +4279,10 @@ export default function ChatScreen({ navigation, route }) {
               );
               return updated;
             });
-            setLoading(false);
-            setIsTyping(false);
+            if (!paceContent) {
+              setLoading(false);
+              setIsTyping(false);
+            }
             removePendingMessage(messageId);
             // Stop auto-follow so post-answer UI (feedback, banners) does not yank scroll while reading.
             if (!isInstantTierResponse) {
@@ -4212,6 +4310,7 @@ export default function ChatScreen({ navigation, route }) {
               setShowModeSelector(false);
               setPodcastPromoVisible(false);
               setPodcastPromoMessageId(null);
+              setPodcastPromoIncluded(false);
               freeUsedThisSendRef.current = false;
               const bonusOffer = status.first_purchase_bonus || status.gate_metadata?.first_purchase_bonus || null;
               console.log('[FirstPurchaseBonus] free answer completed', {
@@ -4243,9 +4342,10 @@ export default function ChatScreen({ navigation, route }) {
             const mt = status.message_type || 'answer';
             const body = (status.content || '').trim();
             const isPremiumTierResponse = resolvedChatTier === 'premium';
-            if (!wasFreeQuestion && !gatedNoCharge && !isInstantTierResponse && !isPremiumTierResponse && mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
+            if (!wasFreeQuestion && !gatedNoCharge && !isInstantTierResponse && mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
               setRatingEligibleMessageId(messageId);
               setPodcastPromoMessageId(messageId);
+              setPodcastPromoIncluded(isPremiumTierResponse);
               setPodcastPromoVisible(true);
             } else if (isInstantTierResponse) {
               // Instant mode should not trigger post-answer podcast/review prompts.
@@ -4254,6 +4354,7 @@ export default function ChatScreen({ navigation, route }) {
               setRatingPromptMessageId(null);
               setPodcastPromoVisible(false);
               setPodcastPromoMessageId(null);
+              setPodcastPromoIncluded(false);
               setPodcastAutoLaunchKey(0);
               if (ratingPromptVisible) {
                 setRatingPromptVisible(false);
@@ -4263,6 +4364,42 @@ export default function ChatScreen({ navigation, route }) {
             }
           };
 
+          const paceReply = shouldPaceInstantAnswer({
+            chatTier: resolvedChatTier,
+            messageType: status.message_type,
+            content: status.content,
+          });
+          const revealKey = String(messageId || '');
+          if (paceReply && !instantRevealActiveRef.current.has(revealKey)) {
+            showFinalMessage({ paceContent: true });
+            revealInstantReply(
+              messageId,
+              splitInstantReply(status.content || ''),
+              status.content || '',
+              () => {
+                setMessagesWithStorage((prev) => prev.map((msg) =>
+                  msg.messageId === messageId
+                    ? {
+                        ...msg,
+                        content: status.content || msg.content,
+                        isTyping: false,
+                        instantStreaming: false,
+                        follow_up_questions: status.follow_up_questions || [],
+                        next_action: status.next_action || null,
+                      }
+                    : msg
+                ));
+                setLoading(false);
+                setIsTyping(false);
+              },
+            );
+            finishPoll();
+            return;
+          }
+          if (instantRevealActiveRef.current.has(revealKey)) {
+            finishPoll();
+            return;
+          }
           showFinalMessage();
           finishPoll();
           return;
@@ -4287,7 +4424,6 @@ export default function ChatScreen({ navigation, route }) {
           updateEffectiveStartedAt(status.started_at);
           const polledChartInsights = Array.isArray(status.chart_insights) ? status.chart_insights : [];
           const waitConversation = normalizeWaitConversation(status.wait_conversation);
-          const partialContent = String(status.partial_content || '');
           const hasEngagementIncoming =
             Array.isArray(status.engagement_updates) && status.engagement_updates.length > 0;
           // Standard/premium wait path: do not rewrite + scrollToEnd on every 1.5s poll.
@@ -4305,22 +4441,8 @@ export default function ChatScreen({ navigation, route }) {
                 messageTierByIdRef.current[messageId] ||
                 ''
               ).trim().toLowerCase();
-              if (messageTier === 'instant' && partialContent) {
-                if (msg.content === partialContent && msg.isTyping === false && msg.instantStreaming === true) {
-                  return msg;
-                }
-                changed = true;
-                shouldScrollForContentGrowth = true;
-                return {
-                  ...msg,
-                  messageId: msg.messageId || messageId,
-                  content: partialContent,
-                  isTyping: false,
-                  instantStreaming: true,
-                  chartInsights: [],
-                  waitConversation: null,
-                  engagementUpdates: [],
-                };
+              if (messageTier === 'instant') {
+                return msg;
               }
 
               const nextMessageId = msg.messageId || messageId;
@@ -5229,6 +5351,7 @@ export default function ChatScreen({ navigation, route }) {
     setRatingPromptMessageId(null);
     setPodcastPromoVisible(false);
     setPodcastPromoMessageId(null);
+    setPodcastPromoIncluded(false);
 
     // Partnership Step 2: Relationship description
     if (partnershipMode && partnershipStep === 2) {
@@ -5763,6 +5886,7 @@ export default function ChatScreen({ navigation, route }) {
 
   const handleMessagesScrollBeginDrag = () => {
     stickMessagesToBottomRef.current = false;
+    pendingScrollToLastAnswerRef.current = false;
   };
 
   const showOlderMessages = () => {
@@ -6290,6 +6414,24 @@ export default function ChatScreen({ navigation, route }) {
             showsVerticalScrollIndicator={false}
             onScroll={handleMessagesScroll}
             onScrollBeginDrag={handleMessagesScrollBeginDrag}
+            onContentSizeChange={() => {
+              if (pendingScrollToLastAnswerRef.current) scrollToLastAnswerTop();
+            }}
+            onScrollToIndexFailed={(info) => {
+              if (!pendingScrollToLastAnswerRef.current) return;
+              const offset = Math.max(0, Number(info?.averageItemLength || 0) * Number(info?.index || 0));
+              scrollMessageListToY(offset, false);
+              setTimeout(() => {
+                if (!pendingScrollToLastAnswerRef.current) return;
+                try {
+                  scrollViewRef.current?.scrollToIndex({
+                    index: info.index,
+                    viewPosition: 0,
+                    animated: false,
+                  });
+                } catch (_) {}
+              }, 80);
+            }}
             scrollEventThrottle={16}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="none"
@@ -6389,25 +6531,34 @@ export default function ChatScreen({ navigation, route }) {
               ) : null
             }
             renderItem={({ item, index }) => {
-              const isLastMessage = index === visibleMessages.length - 1;
+              const isLastAnswer = index === lastAnswerIndex;
+              const lastAnswerProps = isLastAnswer
+                ? {
+                    ref: lastMessageRef,
+                    collapsable: false,
+                    onLayout: () => {
+                      if (pendingScrollToLastAnswerRef.current) scrollToLastAnswerTop();
+                    },
+                  }
+                : null;
 
               if (item.isTyping) {
                 if (item.waitConversation?.enabled && Array.isArray(item.waitConversation.messages) && item.waitConversation.messages.length > 0) {
                   return (
-                    <View ref={isLastMessage ? lastMessageRef : null}>
+                    <View {...lastAnswerProps}>
                       {renderWaitConversation(item.waitConversation)}
                     </View>
                   );
                 }
                 if (item.chatTier === 'instant') {
                   return (
-                    <View ref={isLastMessage ? lastMessageRef : null}>
+                    <View {...lastAnswerProps}>
                       {renderInstantTypingIndicator()}
                     </View>
                   );
                 }
                 return (
-                  <View ref={isLastMessage ? lastMessageRef : null}>
+                  <View {...lastAnswerProps}>
                     <LoadingBubble
                       key={`loading-${item.clientRequestId || item.id}`}
                       chartInsights={item.chartInsights}
@@ -6477,7 +6628,7 @@ export default function ChatScreen({ navigation, route }) {
 
               return (
                 <View>
-                  <View ref={isLastMessage ? lastMessageRef : null}>
+                  <View {...lastAnswerProps}>
                       <MessageBubble
                       message={item}
                       language={language}
@@ -6495,6 +6646,7 @@ export default function ChatScreen({ navigation, route }) {
                       podcastAutoLaunchMessageId={podcastPromoMessageId}
                       podcastAutoLaunchKey={podcastAutoLaunchKey}
                       podcastAutoLaunchLang={podcastAutoLaunchLang}
+                      onPodcastAutoLaunchConsumed={consumePodcastAutoLaunch}
                       forceInstantPresentation={isInstantAnalysis}
                     />
                   </View>
@@ -8335,10 +8487,12 @@ export default function ChatScreen({ navigation, route }) {
       <PodcastPromoModal
         visible={!showGreeting && podcastPromoVisible}
         podcastCost={podcastCost}
+        included={podcastPromoIncluded}
         colors={colors}
         onClose={() => {
           setPodcastPromoVisible(false);
           setPodcastPromoMessageId(null);
+          setPodcastPromoIncluded(false);
           if (ratingPromptPending && ratingPromptMessageId) {
             setRatingPromptPending(false);
             triggerRatingPrompt(ratingPromptMessageId, 'after_podcast_close');
@@ -8346,6 +8500,7 @@ export default function ChatScreen({ navigation, route }) {
         }}
         onGenerate={(lang) => {
           setPodcastPromoVisible(false);
+          setPodcastPromoIncluded(false);
           setPodcastAutoLaunchLang(String(lang || '').toLowerCase().startsWith('hi') ? 'hi' : 'en');
           setPodcastAutoLaunchKey((k) => k + 1);
           if (ratingPromptPending && ratingPromptMessageId) {

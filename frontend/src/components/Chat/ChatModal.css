@@ -2886,6 +2886,20 @@
     line-height: 1;
 }
 
+.message-action-buttons .action-btn--podcast-included {
+    width: auto;
+    min-width: 36px;
+    padding: 0 10px;
+    gap: 5px;
+}
+
+.message-action-buttons .podcast-included-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1;
+}
+
 .message-action-buttons .podcast-prep-spinner {
     width: 14px;
     height: 14px;

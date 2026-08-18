@@ -31,6 +31,7 @@ const MessageList = ({
     podcastAutoLaunchMessageId = null,
     podcastAutoLaunchKey = 0,
     podcastAutoLaunchLang = 'en',
+    onPodcastAutoLaunchConsumed,
     instantLoaderRevealWords = 1,
     onOpenCreditsModal = null,
     forceInstantPresentation = false,
@@ -87,6 +88,7 @@ const MessageList = ({
                                 podcastAutoLaunchMessageId={podcastAutoLaunchMessageId}
                                 podcastAutoLaunchKey={podcastAutoLaunchKey}
                                 podcastAutoLaunchLang={podcastAutoLaunchLang}
+                                onPodcastAutoLaunchConsumed={onPodcastAutoLaunchConsumed}
                                 instantLoaderRevealWords={instantLoaderRevealWords}
                                 onOpenCreditsModal={onOpenCreditsModal}
                                 forceInstantPresentation={forceInstantPresentation}

@@ -80,7 +80,7 @@ function formatDashaRangeLabel(startRaw, endRaw) {
     return { startLabel, endLabel };
 }
 
-const ChatChartEssence = ({ chartData, dashaData, personName, isLoading }) => {
+const ChatChartEssence = ({ chartData, dashaData, personName, isLoading, onChangeChart }) => {
     const navigate = useNavigate();
     const displayName = (personName && String(personName).trim()) || 'Your';
     const title =
@@ -99,7 +99,19 @@ const ChatChartEssence = ({ chartData, dashaData, personName, isLoading }) => {
     return (
         <div className="chat-chart-essence" aria-label="Chart essence and current dashas">
             <div className="chat-chart-essence__gradient">
-                <h2 className="chat-chart-essence__title">{title}</h2>
+                <div className="chat-chart-essence__header">
+                    <h2 className="chat-chart-essence__title">{title}</h2>
+                    {onChangeChart ? (
+                        <button
+                            type="button"
+                            className="chat-chart-essence__change"
+                            onClick={onChangeChart}
+                            aria-label={`Change chart. Currently reading for ${displayName === 'Your' ? 'your chart' : displayName}`}
+                        >
+                            Change chart
+                        </button>
+                    ) : null}
+                </div>
                 <div className="chat-chart-essence__signs">
                     <div className="chat-chart-essence__sign">
                         <div className="chat-chart-essence__sign-label">☀️ Sun</div>

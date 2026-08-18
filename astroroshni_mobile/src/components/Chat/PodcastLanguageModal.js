@@ -13,6 +13,7 @@ const OPTIONS = [
 export default function PodcastLanguageModal({
   visible,
   selectedLang = 'en',
+  included = false,
   onSelect,
   onClose,
   colors,
@@ -33,10 +34,15 @@ export default function PodcastLanguageModal({
             {t('chat.podcastLanguage.title', 'Choose podcast language')}
           </Text>
           <Text style={[styles.body, { color: sub }]}>
-            {t(
-              'chat.podcastLanguage.body',
-              "We'll generate the audio in the language you pick. English and Hindi only.",
-            )}
+            {included
+              ? t(
+                  'chat.podcastLanguage.premiumBody',
+                  'This Premium answer includes a free podcast. Choose English or Hindi.',
+                )
+              : t(
+                  'chat.podcastLanguage.body',
+                  "We'll generate the audio in the language you pick. English and Hindi only.",
+                )}
           </Text>
           <View style={styles.options}>
             {OPTIONS.map((opt) => {

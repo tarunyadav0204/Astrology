@@ -18,13 +18,42 @@
 }
 
 .chat-chart-essence__title {
-    margin: 0 0 12px;
+    margin: 0;
     font-size: 1rem;
-    font-weight: 700;
     text-align: center;
     color: var(--color-brand);
     font-family: var(--font-display);
     font-weight: 400;
+}
+
+.chat-chart-essence__header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 0 0 12px;
+}
+
+.chat-chart-essence__change {
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 999px;
+    background: var(--color-surface);
+    color: var(--color-brand);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.chat-chart-essence__change:hover,
+.chat-chart-essence__change:focus-visible {
+    color: var(--color-on-accent);
+    background: var(--color-accent-soft);
+    border-color: var(--color-accent-soft);
+    outline: 0;
 }
 
 .chat-chart-essence__signs {

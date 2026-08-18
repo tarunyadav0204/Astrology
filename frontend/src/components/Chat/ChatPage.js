@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import MessageList from './MessageList';
 import { scrollChatThreadAfterMessagesChange } from './chatScrollUtils';
@@ -25,6 +25,8 @@ import {
     INSTANT_LOADER_WORD_MS,
     getInstantReplyPieceDelay,
     getInstantLoaderMaxWords,
+    INSTANT_REPLY_FIRST_PIECE_MS,
+    shouldPaceInstantAnswer,
     splitInstantReply,
 } from '../../constants/instantChatLoader';
 import '../Shared/nativeSelectorChip.css';
@@ -307,8 +309,12 @@ const ChatPage = ({ onLogin }) => {
     const [pendingFollowUpQueryContext, setPendingFollowUpQueryContext] = useState(null);
     const [podcastPromoOpen, setPodcastPromoOpen] = useState(false);
     const [podcastPromoMessageId, setPodcastPromoMessageId] = useState(null);
+    const [podcastPromoIncluded, setPodcastPromoIncluded] = useState(false);
     const [podcastAutoLaunchKey, setPodcastAutoLaunchKey] = useState(0);
     const [podcastAutoLaunchLang, setPodcastAutoLaunchLang] = useState('en');
+    const consumePodcastAutoLaunch = useCallback(() => {
+        setPodcastAutoLaunchKey(0);
+    }, []);
     const [firstPurchaseOffer, setFirstPurchaseOffer] = useState(null);
     const [firstPurchaseOfferModalOpen, setFirstPurchaseOfferModalOpen] = useState(false);
     const [firstPurchaseOfferRemainingSeconds, setFirstPurchaseOfferRemainingSeconds] = useState(0);
@@ -319,6 +325,7 @@ const ChatPage = ({ onLogin }) => {
     const [exitInstantAfterEnd, setExitInstantAfterEnd] = useState(false);
     const [instantLoaderWordCount, setInstantLoaderWordCount] = useState(1);
     const instantRevealTimersRef = useRef(new Set());
+    const instantRevealActiveRef = useRef(new Set());
 
     const hasInstantTypingMessage = useMemo(
         () => messages.some(
@@ -348,30 +355,65 @@ const ChatPage = ({ onLogin }) => {
     useEffect(() => () => {
         instantRevealTimersRef.current.forEach((timer) => clearTimeout(timer));
         instantRevealTimersRef.current.clear();
+        instantRevealActiveRef.current.clear();
     }, []);
 
-    const revealInstantReply = (processingClientId, assistantMessageId, pieces, fullContent) => {
-        if (pieces.length <= 1) return;
-        let elapsed = 0;
-        pieces.slice(1).forEach((piece, index) => {
-            elapsed += getInstantReplyPieceDelay(piece);
-            const timer = setTimeout(() => {
-                instantRevealTimersRef.current.delete(timer);
-                const visibleCount = index + 2;
-                const finished = visibleCount >= pieces.length;
-                setMessages((prev) => prev.map((message) =>
-                    message.processingClientId === processingClientId
-                        || String(message.messageId || '') === String(assistantMessageId)
-                        ? {
-                            ...message,
-                            content: finished ? fullContent : pieces.slice(0, visibleCount).join('\n\n'),
-                            instantStreaming: !finished,
-                        }
-                        : message
-                ));
-            }, elapsed);
-            instantRevealTimersRef.current.add(timer);
-        });
+    const paintInstantReveal = (processingClientId, assistantMessageId, content, streaming) => {
+        setMessages((prev) => prev.map((message) =>
+            message.processingClientId === processingClientId
+                || String(message.messageId || '') === String(assistantMessageId)
+                ? {
+                    ...message,
+                    messageId: assistantMessageId || message.messageId,
+                    content,
+                    loadingMessage: null,
+                    isProcessing: false,
+                    isTyping: false,
+                    instantStreaming: streaming,
+                }
+                : message
+        ));
+    };
+
+    const revealInstantReply = (processingClientId, assistantMessageId, fullContent, onFinished) => {
+        const revealKey = String(processingClientId || assistantMessageId || '');
+        const finish = () => {
+            if (revealKey) instantRevealActiveRef.current.delete(revealKey);
+            onFinished?.();
+        };
+        const pieces = splitInstantReply(fullContent);
+        if (!pieces.length) {
+            finish();
+            return;
+        }
+        if (revealKey) instantRevealActiveRef.current.add(revealKey);
+
+        const showCount = (count) => {
+            const finished = count >= pieces.length;
+            paintInstantReveal(
+                processingClientId,
+                assistantMessageId,
+                finished ? fullContent : pieces.slice(0, count).join('\n\n'),
+                !finished,
+            );
+            if (finished) finish();
+        };
+
+        const firstTimer = setTimeout(() => {
+            instantRevealTimersRef.current.delete(firstTimer);
+            showCount(1);
+            if (pieces.length <= 1) return;
+            let elapsed = 0;
+            pieces.slice(1).forEach((piece, index) => {
+                elapsed += getInstantReplyPieceDelay(piece);
+                const timer = setTimeout(() => {
+                    instantRevealTimersRef.current.delete(timer);
+                    showCount(index + 2);
+                }, elapsed);
+                instantRevealTimersRef.current.add(timer);
+            });
+        }, INSTANT_REPLY_FIRST_PIECE_MS);
+        instantRevealTimersRef.current.add(firstTimer);
     };
 
     const openBirthModalEmpty = () => {
@@ -1232,8 +1274,9 @@ const ChatPage = ({ onLogin }) => {
                 const body = String(status.content || '').trim();
                 const mt = status.message_type || 'answer';
                 const isPremiumTierResponse = String(status.chat_tier || status.chatTier || '').toLowerCase() === 'premium';
-                if (!isPremiumTierResponse && mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
+                if (mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
                     setPodcastPromoMessageId(assistantMessageIdToUpdate);
+                    setPodcastPromoIncluded(isPremiumTierResponse);
                     setPodcastPromoOpen(true);
                 }
                 setMessages((prev) =>
@@ -1544,56 +1587,80 @@ const ChatPage = ({ onLogin }) => {
                         loadFirstPurchaseOffer(assistantMessageId, status.gate_metadata?.first_purchase_bonus || status.first_purchase_bonus || null);
                     }
 
-                    setMessages((prev) => {
-                        const wasInstantTier = prev.some(
-                            (m) =>
+                    const completedFields = {
+                        messageId: assistantMessageId,
+                        loadingMessage: null,
+                        chartInsights: polledChartInsights,
+                        message_type: status.message_type || 'answer',
+                        intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
+                        gate_metadata: status.gate_metadata || null,
+                        terms: status.terms || [],
+                        glossary: status.glossary || {},
+                        summary_image: status.summary_image || null,
+                        follow_up_questions: status.follow_up_questions || [],
+                        next_action: status.next_action || null,
+                        next_best_need: status.next_best_need || null,
+                        next_best_need_title: status.next_best_need_title || null,
+                        next_best_need_reason: status.next_best_need_reason || null,
+                        autoSpeakReply: false,
+                    };
+                    const applyCompletedMessage = ({ visibleContent, streaming }) => {
+                        setMessages((prev) => {
+                            const wasInstantTier = prev.some(
+                                (m) =>
+                                    m.processingClientId === processingClientId
+                                    && String(m.chatTier || '').toLowerCase() === 'instant'
+                            );
+                            const wasPremiumTier = prev.some(
+                                (m) =>
+                                    m.processingClientId === processingClientId
+                                    && String(m.chatTier || m.chat_tier || '').toLowerCase() === 'premium'
+                            ) || String(status.chat_tier || status.chatTier || '').toLowerCase() === 'premium';
+                            if (!gated && !wasInstantTier && String(content).trim().length >= 80) {
+                                setPodcastPromoMessageId(assistantMessageId);
+                                setPodcastPromoIncluded(wasPremiumTier);
+                                setPodcastPromoOpen(true);
+                            }
+                            return prev.map((m) =>
                                 m.processingClientId === processingClientId
-                                && String(m.chatTier || '').toLowerCase() === 'instant'
-                        );
-                        const wasPremiumTier = prev.some(
-                            (m) =>
-                                m.processingClientId === processingClientId
-                                && String(m.chatTier || m.chat_tier || '').toLowerCase() === 'premium'
-                        ) || String(status.chat_tier || status.chatTier || '').toLowerCase() === 'premium';
-                        if (!gated && !wasInstantTier && !wasPremiumTier && String(content).trim().length >= 80) {
-                            setPodcastPromoMessageId(assistantMessageId);
-                            setPodcastPromoOpen(true);
-                        }
-                        return prev.map((m) =>
-                            m.processingClientId === processingClientId
-                                ? {
-                                    ...m,
-                                    messageId: assistantMessageId,
-                                    content,
-                                    loadingMessage: null,
-                                    isProcessing: false,
-                                    isTyping: false,
-                                    instantStreaming: false,
-                                    chartInsights: polledChartInsights,
-                                    message_type: status.message_type || 'answer',
-                                    intent_gate: status.intent_gate || (status.gate_metadata && status.gate_metadata.intent_gate),
-                                    gate_metadata: status.gate_metadata || null,
-                                    terms: status.terms || [],
-                                    glossary: status.glossary || {},
-                                    summary_image: status.summary_image || null,
-                                    follow_up_questions: status.follow_up_questions || [],
-                                    next_action: status.next_action || null,
-                                    next_best_need: status.next_best_need || null,
-                                    next_best_need_title: status.next_best_need_title || null,
-                                    next_best_need_reason: status.next_best_need_reason || null,
-                                    autoSpeakReply: false,
-                                }
-                                : m
-                        );
-                    });
+                                    ? {
+                                        ...m,
+                                        ...completedFields,
+                                        content: visibleContent,
+                                        isProcessing: false,
+                                        isTyping: false,
+                                        instantStreaming: streaming,
+                                    }
+                                    : m
+                            );
+                        });
+                    };
                     const completedElapsedMs = responseStartedAtRef.current !== null
                         ? Date.now() - responseStartedAtRef.current
                         : responseElapsedMs;
                     setResponseStageTimings(
                         buildInstantTimingBreakdown(status.timing, completedElapsedMs)
                     );
-                    setIsLoading(false);
                     fetchBalance();
+
+                    const paceReply = shouldPaceInstantAnswer({
+                        chatTier: responseIsInstant ? 'instant' : status.chat_tier || status.chatTier,
+                        messageType: mt,
+                        content: raw,
+                    });
+                    const revealKey = String(processingClientId || assistantMessageId || '');
+                    if (paceReply && !instantRevealActiveRef.current.has(revealKey)) {
+                        revealInstantReply(processingClientId, assistantMessageId, content, () => {
+                            applyCompletedMessage({ visibleContent: content, streaming: false });
+                            setIsLoading(false);
+                        });
+                        return;
+                    }
+                    if (instantRevealActiveRef.current.has(revealKey)) {
+                        return;
+                    }
+                    applyCompletedMessage({ visibleContent: content, streaming: false });
+                    setIsLoading(false);
                     return;
                 }
 
@@ -1622,17 +1689,7 @@ const ChatPage = ({ onLogin }) => {
                         prev.map((m) => {
                             if (m.processingClientId !== processingClientId) return m;
                             if (String(m.chatTier || '').toLowerCase() === 'instant') {
-                                const partial = String(status.partial_content || '');
-                                return partial
-                                    ? {
-                                        ...m,
-                                        content: partial,
-                                        loadingMessage: null,
-                                        isProcessing: false,
-                                        isTyping: false,
-                                        instantStreaming: true,
-                                    }
-                                    : { ...m, isProcessing: true, isTyping: true };
+                                return { ...m, isProcessing: true, isTyping: true };
                             }
                             if (Array.isArray(loadingList) && loadingList.length > 0) {
                                 const next = loadingList[Math.floor(Math.random() * loadingList.length)];
@@ -1745,21 +1802,8 @@ const ChatPage = ({ onLogin }) => {
                 return;
             }
             if (payload.type === 'content_delta') {
-                const streamedContent = String(payload.content || '');
-                if (!streamedContent) return;
-                setMessages((prev) => prev.map((message) =>
-                    message.processingClientId === processingClientId
-                        ? {
-                            ...message,
-                            messageId: assistantMessageId,
-                            content: streamedContent,
-                            loadingMessage: null,
-                            isProcessing: false,
-                            isTyping: false,
-                            instantStreaming: true,
-                        }
-                        : message
-                ));
+                // Hold the fast socket payload. Instant UI reveals the completed
+                // answer in typing-sized pieces from the completion path.
                 return;
             }
             if (payload.type === 'completed') {
@@ -3142,7 +3186,19 @@ const ChatPage = ({ onLogin }) => {
                                         {birthData?.name || 'Consultation'}
                                     </span>
                                 ) : (
-                                    <span className="chat-header-toolbar__title-focus">Ask Tara</span>
+                                    <button
+                                        type="button"
+                                        className="native-selector-chip chat-header-native-chip"
+                                        onClick={openBirthModalEmpty}
+                                        title="Change chart"
+                                        aria-label={`Change chart. Currently reading for ${birthData?.name || 'your chart'}`}
+                                    >
+                                        <span className="native-selector-chip__icon" aria-hidden="true">👤</span>
+                                        <span className="native-selector-chip__name">
+                                            {birthData?.name || 'Select chart'}
+                                        </span>
+                                        <span className="native-selector-chip__chevron" aria-hidden="true">▾</span>
+                                    </button>
                                 )}
                             </h1>
                             {(isMundaneMode || isPartnershipMode) && (
@@ -3304,16 +3360,28 @@ const ChatPage = ({ onLogin }) => {
 
                     <div className="chat-consultation-rail__context">
                         <span>Reading for</span>
-                        <strong>
-                            {isPartnershipMode && wizardPrimaryChart && wizardSecondaryChart
-                                ? `${wizardPrimaryChart.name} & ${wizardSecondaryChart.name}`
-                                : isMundaneMode
-                                    ? (mundaneForm.country || 'Mundane context')
-                                    : (birthData?.name || 'Selected chart')}
-                        </strong>
-                        <small>
-                            {isPartnershipMode ? 'Partnership synthesis' : isMundaneMode ? 'Mundane astrology' : 'Single-chart consultation'}
-                        </small>
+                        {!isPartnershipMode && !isMundaneMode ? (
+                            <button
+                                type="button"
+                                className="chat-consultation-rail__native"
+                                onClick={openBirthModalEmpty}
+                                aria-label={`Change chart. Currently reading for ${birthData?.name || 'your chart'}`}
+                            >
+                                <strong>{birthData?.name || 'Selected chart'}</strong>
+                                <small>Change chart</small>
+                            </button>
+                        ) : (
+                            <>
+                                <strong>
+                                    {isPartnershipMode && wizardPrimaryChart && wizardSecondaryChart
+                                        ? `${wizardPrimaryChart.name} & ${wizardSecondaryChart.name}`
+                                        : (mundaneForm.country || 'Mundane context')}
+                                </strong>
+                                <small>
+                                    {isPartnershipMode ? 'Partnership synthesis' : 'Mundane astrology'}
+                                </small>
+                            </>
+                        )}
                     </div>
 
                     <div className="chat-consultation-rail__method">
@@ -3322,6 +3390,11 @@ const ChatPage = ({ onLogin }) => {
                     </div>
 
                     <div className="chat-consultation-rail__actions">
+                        {!isPartnershipMode && !isMundaneMode && (
+                            <button type="button" onClick={openBirthModalEmpty}>
+                                Change chart
+                            </button>
+                        )}
                         <button type="button" onClick={() => {
                             resetThreadForWizard(null);
                             setWizardMode(null);
@@ -3354,6 +3427,7 @@ const ChatPage = ({ onLogin }) => {
                                         dashaData={chatDashaData}
                                         personName={birthData?.name}
                                         isLoading={chartEssenceLoading}
+                                        onChangeChart={openBirthModalEmpty}
                                     />
                                 </div>
                             </div>
@@ -3371,6 +3445,7 @@ const ChatPage = ({ onLogin }) => {
                             podcastAutoLaunchMessageId={podcastPromoMessageId}
                             podcastAutoLaunchKey={podcastAutoLaunchKey}
                             podcastAutoLaunchLang={podcastAutoLaunchLang}
+                            onPodcastAutoLaunchConsumed={consumePodcastAutoLaunch}
                             instantLoaderRevealWords={instantLoaderWordCount}
                             onOpenCreditsModal={() => setShowCreditsModal(true)}
                             forceInstantPresentation={isInstantAnalysis}
@@ -3441,12 +3516,15 @@ const ChatPage = ({ onLogin }) => {
             <PodcastPromoModal
                 open={podcastPromoOpen}
                 podcastCost={podcastCost}
+                included={podcastPromoIncluded}
                 onClose={() => {
                     setPodcastPromoOpen(false);
                     setPodcastPromoMessageId(null);
+                    setPodcastPromoIncluded(false);
                 }}
                 onGenerate={(lang) => {
                     setPodcastPromoOpen(false);
+                    setPodcastPromoIncluded(false);
                     setPodcastAutoLaunchLang(String(lang || '').toLowerCase().startsWith('hi') ? 'hi' : 'en');
                     setPodcastAutoLaunchKey((k) => k + 1);
                 }}

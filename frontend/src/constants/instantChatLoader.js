@@ -38,6 +38,17 @@ export function buildInstantTypingLines(wordCount) {
     };
 }
 
+/** Pause after the server answer arrives, so the first sentence does not pop in instantly. */
+export const INSTANT_REPLY_FIRST_PIECE_MS = 1100;
+
+export function shouldPaceInstantAnswer({ chatTier, messageType, content } = {}) {
+    const tier = String(chatTier || '').toLowerCase();
+    const mt = String(messageType || 'answer').toLowerCase();
+    if (tier !== 'instant') return false;
+    if (mt === 'clarification' || mt === 'native_gate') return false;
+    return String(content || '').trim().length > 0;
+}
+
 /** Split a completed instant answer into readable conversational beats. */
 export function splitInstantReply(content, maxPieceLength = 95) {
     const normalized = String(content || '').replace(/\r\n/g, '\n').trim();
@@ -76,5 +87,5 @@ export function splitInstantReply(content, maxPieceLength = 95) {
 
 export function getInstantReplyPieceDelay(piece) {
     const length = String(piece || '').length;
-    return Math.max(1400, Math.min(2600, 900 + length * 17));
+    return Math.max(1800, Math.min(3400, 1100 + length * 22));
 }

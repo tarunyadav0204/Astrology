@@ -6,11 +6,13 @@ const COPY = {
   en: {
     title: 'Choose podcast language',
     body: "We'll generate the audio in the language you pick. English and Hindi only.",
+    premiumBody: 'This Premium answer includes a free podcast. Choose English or Hindi.',
     cancel: 'Cancel',
   },
   hi: {
     title: 'पॉडकास्ट की भाषा चुनें',
     body: 'ऑडियो उसी भाषा में बनेगा जो आप चुनेंगे। केवल अंग्रेज़ी और हिंदी।',
+    premiumBody: 'इस प्रीमियम उत्तर में मुफ़्त पॉडकास्ट शामिल है। अंग्रेज़ी या हिंदी चुनें।',
     cancel: 'रद्द करें',
   },
 };
@@ -22,6 +24,7 @@ export default function PodcastLanguageModal({
   open,
   selectedLang = 'en',
   uiLanguage = 'en',
+  included = false,
   onSelect,
   onClose,
 }) {
@@ -43,7 +46,7 @@ export default function PodcastLanguageModal({
         <h2 id="podcast-lang-title" className="podcast-promo-title">
           {copy.title}
         </h2>
-        <p className="podcast-promo-body">{copy.body}</p>
+        <p className="podcast-promo-body">{included ? copy.premiumBody : copy.body}</p>
         <div className="podcast-lang-options">
           <button
             type="button"

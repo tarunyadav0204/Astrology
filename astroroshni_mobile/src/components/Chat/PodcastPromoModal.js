@@ -3,9 +3,10 @@ import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 /**
- * Shown after a completed chat answer to upsell podcast playback (credits on first generation).
+ * Shown after a completed chat answer to offer podcast playback.
+ * Premium answers use included copy (no extra credits).
  */
-export default function PodcastPromoModal({ visible, onClose, onGenerate, podcastCost, colors }) {
+export default function PodcastPromoModal({ visible, onClose, onGenerate, podcastCost, included, colors }) {
   const { t } = useTranslation();
   const cost = podcastCost ?? 2;
   const text = colors?.text ?? '#111';
@@ -14,20 +15,29 @@ export default function PodcastPromoModal({ visible, onClose, onGenerate, podcas
   const cardBg = colors?.backgroundSecondary ?? colors?.background ?? '#fff';
   const border = colors?.cardBorder ?? colors?.strokeMuted ?? '#eee';
   const primary = colors?.primary ?? '#e91e63';
+  const title = included
+    ? t('chat.podcastPromo.premiumTitle', 'You earned a free podcast')
+    : t('chat.podcastPromo.title', 'Turn this answer into a podcast');
+  const body = included
+    ? t(
+        'chat.podcastPromo.premiumBody',
+        'This Premium question includes a podcast at no extra cost. Choose English or Hindi to listen.',
+      )
+    : t(
+        'chat.podcastPromo.body',
+        'Listen to this consultation on the go. Choose English or Hindi — first-time generation uses {{cost}} credits; replaying the same saved audio is free.',
+        { cost }
+      );
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={[styles.card, { backgroundColor: cardBg, borderColor: border }]}>
           <Text style={[styles.title, { color: text }]}>
-            {t('chat.podcastPromo.title', 'Turn this answer into a podcast')}
+            {title}
           </Text>
           <Text style={[styles.body, { color: sub }]}>
-            {t(
-              'chat.podcastPromo.body',
-              'Listen to this consultation on the go. Choose English or Hindi — first-time generation uses {{cost}} credits; replaying the same saved audio is free.',
-              { cost }
-            )}
+            {body}
           </Text>
           <View style={styles.options}>
             <TouchableOpacity

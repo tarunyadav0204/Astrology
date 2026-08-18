@@ -1895,6 +1895,20 @@ button.chat-header-credits.credits-display:active {
     line-height: 1;
 }
 
+.message-action-buttons .action-btn--podcast-included {
+    width: auto;
+    min-width: 36px;
+    padding: 0 10px;
+    gap: 5px;
+}
+
+.message-action-buttons .podcast-included-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1;
+}
+
 .message-action-buttons .podcast-prep-spinner {
     width: 14px;
     height: 14px;
@@ -2953,6 +2967,29 @@ button.chat-header-credits.credits-display:focus-visible {
 }
 
 .chat-consultation-rail__context small { color: var(--color-cosmic-text-muted); }
+
+.chat-consultation-rail__native {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-1);
+    padding: 0;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+    text-align: center;
+}
+
+.chat-consultation-rail__native:hover strong,
+.chat-consultation-rail__native:focus-visible strong {
+    color: var(--color-accent-soft);
+}
+
+.chat-consultation-rail__native:focus-visible {
+    outline: 0;
+}
+
 .chat-consultation-rail__actions {
     width: 100%;
     display: grid;
