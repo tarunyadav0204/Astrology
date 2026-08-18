@@ -38,6 +38,7 @@ import AppAlertModal from '../Common/AppAlertModal';
 import PodcastPlayerModal from '../PodcastPlayerModal';
 import PodcastLanguageModal from './PodcastLanguageModal';
 import { creditAPI } from '../../services/api';
+import { sharePodcastBase64OnWeb } from '../../utils/sharePodcastWeb';
 import {
   freeDetailRevealClickedStorageKey,
   freeDetailUnlockStorageKey,
@@ -628,6 +629,10 @@ function MessageBubble({
         return;
       }
       const filename = `AstroRoshni-Podcast-${Date.now()}.mp3`;
+      if (Platform.OS === 'web') {
+        await sharePodcastBase64OnWeb(base64Audio, filename);
+        return;
+      }
       const path = `${FileSystem.cacheDirectory}${filename}`;
       await FileSystem.writeAsStringAsync(path, base64Audio, {
         encoding: FileSystem.EncodingType.Base64,

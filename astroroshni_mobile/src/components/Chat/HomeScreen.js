@@ -40,8 +40,6 @@ import { useCredits } from '../../credits/CreditContext';
 import { useAuthGate } from '../../auth/AuthGateContext';
 import { trackAcquisitionFunnelEvent } from '../../services/acquisitionTracking';
 import { extractFirstHttpsUrl } from '../../utils/blogLinks';
-import FomoHomeSheet from './FomoHomeSheet';
-import FomoHomeEntryCard from './FomoHomeEntryCard';
 import KpTodayCarousel from './KpTodayCarousel';
 import PanditHomePanel from '../Pandit/PanditHomePanel';
 import PremiumTodayOverview, { PremiumExploreIntro } from '../Home/PremiumTodayOverview';
@@ -792,70 +790,6 @@ export default function HomeScreen({
     i18n.language,
   ]);
 
-  useEffect(() => {
-    loadHomepageFomo();
-  }, [loadHomepageFomo]);
-
-  // Silent background poll: when LLM wording is still being prepared, retry
-  // periodically and auto-show the FOMO card once the backend returns "ready".
-  useEffect(() => {
-    if (fomoStatus !== 'analyzing') return undefined;
-    let cancelled = false;
-    let pollCount = 0;
-    const timer = setInterval(async () => {
-      if (cancelled) return;
-      pollCount += 1;
-      if (pollCount > FOMO_ANALYZING_MAX_POLLS) {
-        setFomoStatus(null);
-        clearInterval(timer);
-        return;
-      }
-      // Force a fresh network call by clearing the cached-data guard.
-      fomoDataKeyRef.current = '';
-      fomoLoadedAtRef.current = 0;
-      const result = await loadHomepageFomo();
-      if (cancelled) return;
-      if (result) {
-        clearInterval(timer);
-      }
-    }, FOMO_ANALYZING_POLL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [fomoStatus, loadHomepageFomo]);
-
-  // Explicit local testing mode must not depend on React Navigation's focus
-  // lifecycle or the one-prompt slot. HomeScreen is nested inside ChatScreen,
-  // and an already-focused parent or pending informational payload can reserve
-  // that slot before this child mounts. Load and present FOMO directly whenever
-  // this HomeScreen instance (or its selected chart) changes.
-  useEffect(() => {
-    if (!FOMO_ALWAYS_VISIBLE) return undefined;
-
-    let cancelled = false;
-    setShowFomoHomeSheet(false);
-    const timer = setTimeout(async () => {
-      const fomo = await loadHomepageFomo();
-      if (cancelled || !fomo) return;
-      clearHomePrompts();
-      setShowInfoOnlyModal(false);
-      setShowFomoHomeSheet(true);
-    }, 250);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [
-    birthData?.id,
-    birthData?.birth_chart_id,
-    currentNativeData?.id,
-    currentNativeData?.birth_chart_id,
-    clearHomePrompts,
-    loadHomepageFomo,
-  ]);
-
   // Target month for monthly modal: after 10th of current month we promote next month.
   const getMonthlyWelcomeTarget = useCallback(() => {
     const now = new Date();
@@ -873,65 +807,10 @@ export default function HomeScreen({
   }, [getMonthlyWelcomeTarget, t]);
 
   const pickHomePromptForVisit = useCallback(async () => {
-    // Priority: first-question free → chart FOMO → monthly welcome → multi-chart tip → Know Yourself
-    // The explicit testing override moves FOMO to the front so every eligible
-    // local Home visit exercises the new presentation and funnel.
-    if (FOMO_ALWAYS_VISIBLE) return null;
-    const promptState = await loadHomepagePromptState();
-    if (!promptState) return null;
-    const freeExposure = promptState.first_free_question;
-    if (freeQuestionAvailable && !freeExposure?.first_shown_at) {
-      return 'first_question_free';
-    }
-    if (freeQuestionAvailable && freeExposure?.last_shown_at) {
-      const lastShownMs = new Date(freeExposure.last_shown_at).getTime();
-      const stillSameSession = freeExposure.last_session_id === HOME_APP_SESSION_ID;
-      if (
-        stillSameSession
-        && Number.isFinite(lastShownMs)
-        && Date.now() - lastShownMs < FREE_PROMPT_HANDOFF_QUIET_MS
-      ) {
-        return null;
-      }
-    }
-
-    // Do not gate this request on the PWA's local chart cache. A returning user
-    // can have a saved backend chart before birthData/currentNativeData has been
-    // hydrated locally; the authenticated backend is the source of truth and
-    // returns `no_chart` when the user genuinely has no usable chart.
-    const fomo = await loadHomepageFomo();
-    if (fomo?.auto_eligible !== false) return 'chart_fomo';
-
+    // Home intentionally has one lightweight native prompt only. Notification
+    // permission and admin information are handled independently by their own
+    // themed surfaces; sales/FOMO/monthly/multi-chart prompts must not auto-open.
     if (birthData?.id || birthData?.birth_chart_id || currentNativeData?.id || currentNativeData?.birth_chart_id) {
-      const monthlyExposure = promptState.monthly_events;
-      const monthlyShownMs = new Date(monthlyExposure?.last_shown_at || '').getTime();
-      if (
-        !monthlyExposure?.last_shown_at
-        || (Number.isFinite(monthlyShownMs) && Date.now() - monthlyShownMs >= MONTHLY_PROMPT_INTERVAL_MS)
-      ) {
-        return 'monthly_welcome';
-      }
-
-      try {
-        const never = await AsyncStorage.getItem(MULTI_CHART_TIP_NEVER_KEY);
-        if (never !== '1') {
-          const snoozeUntil = await AsyncStorage.getItem(MULTI_CHART_TIP_SNOOZE_KEY);
-          let snoozed = false;
-          if (snoozeUntil) {
-            const until = new Date(snoozeUntil);
-            snoozed = !Number.isNaN(until.getTime()) && until > new Date();
-          }
-          if (!snoozed) {
-            const { storage } = require('../../services/storage');
-            const profiles = await storage.getBirthProfiles();
-            const count = Array.isArray(profiles) ? profiles.length : 0;
-            if (count === 1) return 'multi_chart_tip';
-          }
-        }
-      } catch (e) {
-        /* ignore and continue */
-      }
-
       try {
         const dismissedDate = await AsyncStorage.getItem(KNOW_YOURSELF_DISMISS_KEY);
         if (dismissedDate !== todayDateKey()) return 'know_yourself';
@@ -942,14 +821,10 @@ export default function HomeScreen({
 
     return null;
   }, [
-    freeQuestionAvailable,
     birthData?.id,
     birthData?.birth_chart_id,
     currentNativeData?.id,
     currentNativeData?.birth_chart_id,
-    getMonthlyWelcomeTarget,
-    loadHomepagePromptState,
-    loadHomepageFomo,
   ]);
 
   // Focus boundary: reset the one-prompt-per-visit slot only on enter/leave.
@@ -986,7 +861,6 @@ export default function HomeScreen({
           setShowFirstQuestionFreeModal(true);
           recordHomepagePromptShown('first_free_question');
         }
-        else if (prompt === 'chart_fomo') setShowFomoHomeSheet(true);
         else if (prompt === 'monthly_welcome') {
           setShowMonthlyWelcomeModal(true);
           recordHomepagePromptShown('monthly_events');
@@ -1156,7 +1030,11 @@ export default function HomeScreen({
     const body = String(banner.body || '').trim();
     if (!id || (!title && !body)) return false;
     const platforms = Array.isArray(banner.platforms) ? banner.platforms.map((p) => String(p).toLowerCase()) : [];
-    if (platforms.length && !platforms.includes(Platform.OS)) return false;
+    const platformAllowed = !platforms.length
+      || platforms.includes(Platform.OS)
+      // Existing mobile banners were stored before PWA was an explicit target.
+      || (Platform.OS === 'web' && platforms.some((p) => ['android', 'ios', 'mobile', 'pwa'].includes(p)));
+    if (!platformAllowed) return false;
     try {
       const raw = await AsyncStorage.getItem(homeBannerDismissKey(id));
       if (!raw) return true;
@@ -2395,13 +2273,18 @@ const loadHomeData = async (nativeData = null) => {
               styles.adminHomeBanner,
               androidLightCardFixStyle,
               {
-                backgroundColor: isDark ? 'rgba(34,197,94,0.16)' : 'rgba(34,197,94,0.1)',
-                borderColor: isDark ? 'rgba(34,197,94,0.45)' : 'rgba(22,163,74,0.35)',
+                backgroundColor: colors.surfaceRaised,
+                borderColor: colors.cardBorder,
               },
             ]}
           >
-            <Icon name="megaphone-outline" size={18} color="#16a34a" style={{ marginTop: 2 }} />
+            <View style={[styles.adminHomeBannerIcon, { backgroundColor: colors.accentSoft }]}>
+              <Icon name="megaphone-outline" size={18} color={colors.onAccent} />
+            </View>
             <View style={styles.adminHomeBannerTextCol}>
+              <Text style={[styles.adminHomeBannerEyebrow, { color: colors.accent }]}>
+                {t('premiumUi.chatScreen.brand')}
+              </Text>
               {homeBanner.title ? (
                 <Text style={[styles.adminHomeBannerTitle, { color: colors.text }]}>{homeBanner.title}</Text>
               ) : null}
@@ -2502,15 +2385,6 @@ const loadHomeData = async (nativeData = null) => {
             }}
           />
         ) : null}
-
-        <FomoHomeEntryCard
-          data={fomoHomeData}
-          onPress={() => {
-            homePromptShownThisVisitRef.current = true;
-            clearHomePrompts();
-            setShowFomoHomeSheet(true);
-          }}
-        />
 
         <ReportStudioCard
           navigation={navigation}
@@ -2745,9 +2619,13 @@ const loadHomeData = async (nativeData = null) => {
                 activeOpacity={1}
                 style={[
                   styles.infoOnlyModalCard,
-                  { backgroundColor: isDark ? '#0f172a' : '#ffffff' },
+                  { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder },
                 ]}
               >
+                <View style={[styles.infoOnlyModalIcon, { backgroundColor: colors.accentSoft }]}>
+                  <Icon name="megaphone-outline" size={24} color={colors.onAccent} />
+                </View>
+                <View style={[styles.infoOnlyModalRule, { backgroundColor: colors.accent }]} />
                 <Text style={[styles.infoOnlyModalTitle, { color: colors.text }]}>
                   {infoOnlyModalContent.title || t('home.infoModal.defaultTitle', 'Information')}
                 </Text>
@@ -2800,8 +2678,8 @@ const loadHomeData = async (nativeData = null) => {
                         });
                       }}
                     >
-                      <Text style={styles.infoOnlyModalCloseText}>{t('premiumUi.common.open')}</Text>
-                      <Icon name="arrow-forward" size={17} color="#fff" />
+                      <Text style={[styles.infoOnlyModalCloseText, { color: colors.onPrimary }]}>{t('premiumUi.common.open')}</Text>
+                      <Icon name="arrow-forward" size={17} color={colors.onPrimary} />
                     </TouchableOpacity>
                   ) : null}
                 </View>
@@ -3357,18 +3235,6 @@ const loadHomeData = async (nativeData = null) => {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-
-      <FomoHomeSheet
-        visible={Boolean(
-          showFomoHomeSheet
-          && fomoHomeData?.status === 'ready'
-          && Array.isArray(fomoHomeData?.teasers)
-          && fomoHomeData.teasers.length > 0
-        )}
-        data={fomoHomeData}
-        onDismiss={dismissFomoHome}
-        onAsk={askFomoQuestion}
-      />
 
       {/* Physical Traits Modal */}
       <PhysicalTraitsModal
@@ -4170,19 +4036,38 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 10,
     borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 14,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 3,
+  },
+  adminHomeBannerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   adminHomeBannerTextCol: {
     flex: 1,
     gap: 2,
   },
   adminHomeBannerTitle: {
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: '800',
-    lineHeight: 18,
+    lineHeight: 22,
+  },
+  adminHomeBannerEyebrow: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 4,
   },
   adminHomeBannerBody: {
     fontSize: 13,
@@ -4836,8 +4721,29 @@ const styles = StyleSheet.create({
   },
   infoOnlyModalCard: {
     width: '88%',
-    borderRadius: 16,
-    padding: 18,
+    maxWidth: 420,
+    borderRadius: 28,
+    padding: 24,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.24,
+    shadowRadius: 28,
+    elevation: 12,
+  },
+  infoOnlyModalIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  infoOnlyModalRule: {
+    width: 54,
+    height: 2,
+    borderRadius: 1,
+    marginBottom: 16,
   },
   infoOnlyModalTitle: {
     fontSize: 20,

@@ -1280,7 +1280,7 @@ DEFAULT_HOME_SCREEN_BANNER: Dict[str, Any] = {
     "cta_url": "",
     "frequency": "once",  # once | every_x_days
     "interval_days": 7,
-    "platforms": ["android", "ios"],
+    "platforms": ["android", "ios", "web"],
 }
 
 

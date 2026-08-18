@@ -20,7 +20,11 @@ from auth import get_current_user, User
 from db import get_conn, execute
 from credits.credit_service import CreditService
 from credits.routes import _get_play_credentials
-from tts.podcast_narrator import generate_podcast_script
+from tts.podcast_narrator import (
+  PODCAST_BODY_MAX_SPOKEN_WORDS,
+  constrain_podcast_script,
+  generate_podcast_script,
+)
 from tts.podcast_cache import get_cached_audio, put_cached_audio
 from tts import notebook_lm_podcast
 from activity.publisher import publish_activity
@@ -246,7 +250,7 @@ def _podcast_audio_config(role: str, voice_name: Optional[str] = None, *, minima
   if minimal:
     return texttospeech.AudioConfig(audio_encoding=encoding)
   family = _voice_family(voice_name)
-  speaking_rate = 1.22 if role == "male" else 1.0
+  speaking_rate = 1.15 if role == "male" else 1.0
   if family == "journey":
     return texttospeech.AudioConfig(audio_encoding=encoding)
   if _is_indic_voice(voice_name):
@@ -1284,14 +1288,38 @@ def _podcast_cache_lang(lang: str) -> str:
 
 
 def _podcast_intro_line(native_name: str, lang: str) -> str:
-  """Return a short FEMALE: intro line with the native's name. Used when native_name is provided."""
+  """Return the consistent two-host AstroRoshni programme opening."""
   name = (native_name or "").strip()
-  if not name:
-    return ""
   use_hindi = lang and str(lang).lower().startswith("hi")
   if use_hindi:
-    return f"FEMALE: नमस्ते {name}, यह आपका कॉस्मिक रीडिंग है। [PAUSE:short] चलिए शुरू करते हैं।\n\n"
-  return f"FEMALE: Hey {name}, this is your cosmic reading. [PAUSE:short] Let's dive in.\n\n"
+    listener = f"आज की यह व्यक्तिगत रीडिंग {name} के लिए है" if name else "आज हम आपकी व्यक्तिग रीडिंग लेकर आए हैं"
+    return (
+      f"FEMALE: [RISE:नमस्ते!] [PAUSE:short] AstroRoshni Podcast में आपका स्वागत है। "
+      f"मैं हूँ अनन्या, और {listener}।\n"
+      "MALE: और मैं हूँ अर्जुन। [PAUSE:short] आइए चार्ट के संकेतों को आपकी रोज़मर्रा की ज़िंदगी के मायने में समझते हैं।\n"
+    )
+  listener = f"today's personal reading is for {name}" if name else "today we're opening your personal reading"
+  return (
+    "FEMALE: [RISE:Welcome to the AstroRoshni Podcast.] [PAUSE:short] "
+    f"I'm Ananya, and {listener}.\n"
+    "MALE: And I'm Arjun. [PAUSE:short] Let's turn the chart's strongest signals into what they may mean in real life.\n"
+  )
+
+
+def _podcast_outro_lines(lang: str) -> str:
+  """Return a warm, consistent two-host closing without generic AI phrasing."""
+  use_hindi = lang and str(lang).lower().startswith("hi")
+  if use_hindi:
+    return (
+      "FEMALE: [FALL:आज के लिए बस इतना ही।] [PAUSE:short] अपने लिए सबसे ज़रूरी संकेत को साथ लेकर जाइए।\n"
+      "MALE: सुनने के लिए धन्यवाद। [PAUSE:short] मैं अर्जुन—\n"
+      "FEMALE: और मैं अनन्या। [FALL:फिर मिलेंगे AstroRoshni Podcast पर।]\n"
+    )
+  return (
+    "FEMALE: [FALL:That's our reading for today.] [PAUSE:short] Keep the one insight that felt most useful, and let it guide your next step.\n"
+    "MALE: Thank you for listening. [PAUSE:short] I'm Arjun—\n"
+    "FEMALE: And I'm Ananya. [FALL:We'll meet you again on the AstroRoshni Podcast.]\n"
+  )
 
 
 def _normalize_hindi_ordinals(script: str, lang: str) -> str:
@@ -1413,7 +1441,7 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
             lang,
             title="AstroRoshni Podcast",
             description="Generated from your astrological reading.",
-            length="STANDARD",
+            length="SHORT",
           ),
         )
         logger.info("Podcast: generated via Notebook LM (Discovery Engine), audio_bytes=%d", len(audio_bytes))
@@ -1438,13 +1466,21 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
       if not script or not script.strip():
         raise HTTPException(status_code=500, detail="Podcast script generation produced empty output")
 
-      # Prepend personalized intro when native_name is provided
+      # Frame the generated discussion as a consistent, named AstroRoshni show.
       intro = _podcast_intro_line(request.native_name or "", lang)
-      if intro:
-        script = intro + script
+      outro = _podcast_outro_lines(lang)
+      script = (
+        intro
+        + constrain_podcast_script(script, PODCAST_BODY_MAX_SPOKEN_WORDS)
+        + "\n"
+        + outro
+      )
 
       # Clean up common Hindi ordinal patterns (8wa house → 8वाँ भाव etc.) before we parse segments.
       script = _normalize_hindi_ordinals(script, lang)
+      # Enforce the final budget after adding the personalized intro. This is a
+      # safety net for models that ignore the requested duration.
+      script = constrain_podcast_script(script)
 
       segments = _parse_podcast_script(script)
       if not segments:

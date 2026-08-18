@@ -24,6 +24,7 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 import PodcastPlayerModal from '../PodcastPlayerModal';
 import { goBackOrHome } from '../../navigation/navHelpers';
 import FocusedStatusBar from '../Common/FocusedStatusBar';
+import { sharePodcastBlobOnWeb } from '../../utils/sharePodcastWeb';
 
 export default function PodcastHistoryScreen({ navigation }) {
   useAnalytics('PodcastHistoryScreen');
@@ -101,6 +102,16 @@ export default function PodcastHistoryScreen({ navigation }) {
     setSharingMessageId(entry.message_id);
     try {
       const streamUrl = chatAPI.getPodcastStreamUrl(entry.message_id, entry.lang);
+      if (Platform.OS === 'web') {
+        const response = await fetch(streamUrl, { headers: { Authorization: `Bearer ${token}` } });
+        if (!response.ok) throw new Error('download_failed');
+        const blob = await response.blob();
+        await sharePodcastBlobOnWeb(
+          blob,
+          `AstroRoshni-Podcast-${entry.message_id || Date.now()}.mp3`,
+        );
+        return;
+      }
       const localPath = `${FileSystem.cacheDirectory}AstroRoshni-Podcast-${entry.message_id || Date.now()}.mp3`;
       const { status } = await FileSystem.downloadAsync(streamUrl, localPath, { headers: { Authorization: `Bearer ${token}` } });
       if (status !== 200) throw new Error('download_failed');

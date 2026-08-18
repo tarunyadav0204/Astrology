@@ -7,6 +7,16 @@ import os
 import re
 from dotenv import load_dotenv
 
+
+# At the normal 1.0 speaking rate, 500 spoken words plus the dialogue's prosody
+# pauses produces an episode of roughly 4-5 minutes. Keep a little headroom for
+# the personalized intro that is added by the route.
+PODCAST_MAX_SPOKEN_WORDS = 500
+# The route adds a branded two-host opening and closing. Reserve enough room so
+# those never crowd out the actual reading or push the episode beyond 5 minutes.
+PODCAST_BODY_MAX_SPOKEN_WORDS = 420
+PODCAST_SCRIPT_TARGET_WORDS = 380
+
 env_paths = [
     ".env",
     os.path.join(os.path.dirname(__file__), "..", ".env"),
@@ -67,20 +77,29 @@ def generate_podcast_script(message_content: str, language: str = "en") -> str:
             else "Podcast script (FEMALE: and MALE: only, American English, SHORT turns, talking TO each other with [PAUSE/EMPHASIS/RISE/FALL/SLOW] cues):"
         )
 
-        prompt = f"""Turn the following astrology/chat message into a podcast dialogue between two hosts (FEMALE and MALE) who are actually TALKING TO EACH OTHER—not reading a script. They react to what the other said, interrupt with "Wait" or "So...", echo each other's words, and build on the conversation. Cover every part of the message, but weave it through real back-and-forth.
+        prompt = f"""Turn the following astrology/chat message into a podcast dialogue between AstroRoshni hosts Ananya and Arjun who are actually TALKING TO EACH OTHER—not reading a script. Keep the machine-readable labels FEMALE and MALE exactly as specified: FEMALE is Ananya and MALE is Arjun. They react to what the other said, challenge or clarify an interpretation, and build a shared conclusion.
+
+LENGTH — STRICT:
+- The finished audio must be no longer than 5 minutes at a normal speaking pace.
+- Target about {PODCAST_SCRIPT_TARGET_WORDS} spoken words and never exceed {PODCAST_BODY_MAX_SPOKEN_WORDS} spoken words. Prosody cues and speaker labels do not count as spoken words.
+- Prioritize the reading's conclusions, important timing, cautions, and practical recommendations. Combine related supporting details instead of repeating them.
+- Do not omit a major conclusion merely to explain every minor astrological factor.
 
 HOST PERSONAS (KEEP CONSISTENT THROUGHOUT):
-- FEMALE: Enthusiastic, curious, and playful. She is the audience's proxy and keeps asking for the \"why\" behind the astrology. She should often say things like \"okay but why does that matter?\", \"so in real life that means…\", or \"wait, explain that like I'm new to astrology\".
-- MALE: The expert/analyzer, calm but warm. He is never a dry lecturer. He should sound like he is sharing secrets with a friend: \"here's the cool part\", \"what I love about this chart is…\", \"the wild thing here is…\".
+- FEMALE is ANANYA: warm, perceptive, listener-first and gently playful. She translates astrology into everyday life, notices emotional nuance, and asks the question the listener would ask.
+- MALE is ARJUN: calm, evidence-focused and practical. He explains the strongest chart evidence without turning the episode into a lecture.
 - They should clearly enjoy talking to each other: occasionally tease, gently disagree, or be surprised by what the other notices, but always stay kind and supportive of the listener.
+- Never have either host introduce themselves or sign off. The application adds a consistent branded opening and ending around this body.
 
 DO NOT WRITE LIKE THEY ARE READING:
 - No long monologues. Break every chunk of information into short turns. One person says a bit, the other reacts or asks something, then the first continues or the other adds.
+- No turn may exceed 45 spoken words. Most turns should be 8–25 words.
 - They must REFERENCE what the other just said: "So when you said Mars—", "That thing about the Moon", "Right, so if that's the case...", "So like, more emotional in what way?"
 - Use natural back-channeling: "Yeah", "Right", "Oh okay", "Mm-hmm", "So then...", "Wait, which house?" so it sounds like a real conversation.
 - One can echo or repeat a key word then add: "Mars, yeah. And that's actually the main theme." or "Emotions—exactly. So they might be more..."
 - Questions should be real follow-ups to what was just said, not generic "What about the next topic?" e.g. "So does that mean they should avoid conflict?" or "Is that good or bad for career?"
 - Allow incomplete thoughts or trailing off: "So it's kind of...", "I mean, not that it's bad, but...", "So the Moon in Cancer, that's—" then the other can jump in or ask.
+- A reaction must add value: question the evidence, translate it into daily life, contrast two influences, refine the timing, or advance the recommendation. Do not merely repeat the previous sentence.
 - VARIATION: At least once per episode, one host should be visibly surprised by a specific detail: "Wait, Mars is in the 10th? That's actually huge for their career, right?" or "Hold on, that Saturn placement is wild." Make it about a real chart detail from the message.
 - REPETITION FOR EMPHASIS: Humans repeat key phrases. Use short repeats like "It's a lot of energy. A LOT of energy." or "This is big. Really big." when something is important.
 - FILLERS (SPARINGLY): Sprinkle in "um", "uh", and "like" very lightly—just enough to break perfect AI cadence, not so much that it becomes annoying. Only use them when it feels natural for a human thinking out loud.
@@ -91,7 +110,7 @@ INTERRUPTIONS & LINGUISTIC FILLERS (VERY IMPORTANT FOR CASUAL PODCAST TONE):
 - Use short overlaps in content (one finishes the other’s thought) instead of perfectly clean turn-taking, but STILL keep each line as a single spoken turn starting with FEMALE: or MALE:.
 - Make some lines start mid-thought or as a reaction: "Yeah, and also...", "Right, especially when...", "Wait, so that means...", "Okay but what about...".
 
-COVER EVERYTHING: Every topic, planet, timing, recommendation, and detail from the message must appear—but only by having the hosts discuss it naturally. Move to the next section when one host asks or says something like "What about their career?" or "And the remedies?" so the other can answer. No summarizing; include the substance.
+COVER THE READING, NOT EVERY SENTENCE: Include every major topic, conclusion, important timing window, caution, and practical recommendation. Use only the strongest astrological evidence needed to explain them. Compress or omit repeated and minor supporting details so the episode remains within five minutes.
 
 {lang_instruction}
 
@@ -153,11 +172,55 @@ Message to convert (cover every part, but as a real conversation):
             flags=re.IGNORECASE,
         )
         script = re.sub(r"[^\S\n]{2,}", " ", script)
-        return script
+        return constrain_podcast_script(script, PODCAST_BODY_MAX_SPOKEN_WORDS)
     except Exception as e:
         import logging
         logging.getLogger(__name__).exception("Podcast script generation failed: %s", e)
         return _fallback_script(message_content)
+
+
+def _spoken_word_count(text: str) -> int:
+    """Count words that TTS will speak, excluding role labels and prosody cues."""
+    without_roles = re.sub(r"(?m)^\s*(?:FEMALE|MALE):\s*", "", text or "")
+    without_cues = re.sub(r"\[(?:PAUSE|EMPHASIS|RISE|FALL|SLOW):[^\]]*\]", " ", without_roles)
+    return len(re.findall(r"\S+", without_cues))
+
+
+def constrain_podcast_script(script: str, max_spoken_words: int = PODCAST_MAX_SPOKEN_WORDS) -> str:
+    """Keep complete dialogue turns within the five-minute spoken-word budget."""
+    text = (script or "").strip()
+    if not text or _spoken_word_count(text) <= max_spoken_words:
+        return text
+
+    kept: list[str] = []
+    words_used = 0
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        line_words = _spoken_word_count(line)
+        if words_used + line_words > max_spoken_words:
+            break
+        kept.append(line)
+        words_used += line_words
+
+    # Normally every generated turn is short, but retain a useful sentence if a
+    # malformed model response puts the whole episode into one oversized line.
+    if not kept:
+        role_match = re.match(r"^\s*((?:FEMALE|MALE):\s*)", text)
+        role = role_match.group(1) if role_match else "FEMALE: "
+        body = text[role_match.end():] if role_match else text
+        sentences = re.split(r"(?<=[.!?।])\s+", body)
+        body_kept: list[str] = []
+        for sentence in sentences:
+            candidate = f"{role}{' '.join(body_kept + [sentence])}".strip()
+            if _spoken_word_count(candidate) > max_spoken_words:
+                break
+            body_kept.append(sentence)
+        if body_kept:
+            kept.append(f"{role}{' '.join(body_kept)}".strip())
+
+    return "\n".join(kept).strip()
 
 
 def _fallback_script(message_content: str) -> str:
@@ -169,4 +232,4 @@ def _fallback_script(message_content: str) -> str:
     text = re.sub(r"^#+\s*", "", text, flags=re.MULTILINE)
     text = re.sub(r"\n{3,}", "\n\n", text)
     plain = text.strip() or message_content.strip()
-    return f"FEMALE: {plain}" if plain else ""
+    return constrain_podcast_script(f"FEMALE: {plain}" if plain else "")

@@ -32,7 +32,7 @@ export default function NotificationEnableReminderModal({
   allowGeneralPrompt = false,
 }) {
   const { t } = useTranslation();
-  const { theme, colors } = useTheme();
+  const { colors } = useTheme();
   const { fetchBalance } = useCredits();
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -132,10 +132,6 @@ export default function NotificationEnableReminderModal({
     }
   };
 
-  const overlayBg = theme === 'dark' ? colors.background : '#fff7ed';
-  const cardBg = theme === 'dark' ? colors.backgroundSecondary : '#ffffff';
-  const borderColor = theme === 'dark' ? colors.cardBorder : '#e5e7eb';
-
   return (
     <Modal
       visible={visible}
@@ -144,40 +140,35 @@ export default function NotificationEnableReminderModal({
       statusBarTranslucent
       onRequestClose={onNotNow}
     >
-      <View style={[styles.overlay, { backgroundColor: overlayBg }]}>
-        <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-          <View style={styles.iconWrap}>
-            <Ionicons name="notifications" size={36} color="#ff6b35" />
+      <View style={[styles.overlay, { backgroundColor: colors.overlay }]}>
+        <View style={[styles.card, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+          <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
+            <Ionicons name="notifications-outline" size={30} color={colors.onAccent} />
           </View>
+          <View style={[styles.rule, { backgroundColor: colors.accent }]} />
           <Text style={[styles.title, { color: colors.text }]}>
-            {variant === 'fomo'
-              ? t('fomoHome.notificationTitle')
-              : 'Never miss what matters'}
+            {t('fomoHome.notificationTitle')}
           </Text>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            {variant === 'fomo'
-              ? t('fomoHome.notificationBody')
-              : 'Turn on notifications to hear when your chart reviews, chat updates, or special offers are ready.'}
+            {t('fomoHome.notificationBody')}
           </Text>
           <TouchableOpacity
-            style={[styles.primaryBtn, busy && styles.btnDisabled]}
+            style={[styles.primaryBtn, { backgroundColor: colors.primary }, busy && styles.btnDisabled]}
             onPress={onTurnOn}
             disabled={busy}
             activeOpacity={0.85}
           >
             {busy ? (
-              <ActivityIndicator color="#0f172a" />
+              <ActivityIndicator color={colors.onPrimary} />
             ) : (
-              <Text style={styles.primaryBtnText}>
-                {variant === 'fomo'
-                  ? t('fomoHome.notificationEnable')
-                  : t('premiumUi.chat.turnOnNotifications')}
+              <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>
+                {t('fomoHome.notificationEnable')}
               </Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} onPress={onNotNow} disabled={busy}>
             <Text style={[styles.secondaryBtnText, { color: colors.textSecondary }]}>
-              {variant === 'fomo' ? t('fomoHome.notificationLater') : t('chat.insufficientCreditsLater')}
+              {t('fomoHome.notificationLater')}
             </Text>
           </TouchableOpacity>
           {variant !== 'fomo' ? (
@@ -201,8 +192,8 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 400,
-    borderRadius: 20,
-    padding: 24,
+    borderRadius: 28,
+    padding: 26,
     borderWidth: 1,
     elevation: 8,
     shadowColor: '#000',
@@ -212,7 +203,19 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     alignSelf: 'center',
-    marginBottom: 12,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  rule: {
+    alignSelf: 'center',
+    width: 54,
+    height: 2,
+    borderRadius: 1,
+    marginBottom: 18,
   },
   title: {
     fontSize: 20,
@@ -227,14 +230,12 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   primaryBtn: {
-    backgroundColor: '#ff6b35',
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
     marginBottom: 10,
   },
   primaryBtnText: {
-    color: '#0f172a',
     fontSize: 16,
     fontWeight: '800',
   },

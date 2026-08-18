@@ -8267,8 +8267,9 @@ export default function ChatScreen({ navigation, route }) {
       </SafeAreaView>
 
       <NotificationEnableReminderModal
-        homeActive={showGreeting && !fomoHomeOpen}
+        homeActive={showGreeting && !fomoHomeOpen && !homeInfoModalPayload}
         fomoTriggerNonce={fomoNotificationPromptNonce}
+        allowGeneralPrompt
       />
 
       <AppAlertModal

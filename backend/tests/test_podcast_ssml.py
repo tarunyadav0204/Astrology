@@ -37,11 +37,11 @@ def test_segment_ssml_does_not_keep_commas_or_dots():
     assert "dot" not in ssml.lower()
 
 
-def test_male_podcast_audio_is_faster_than_female():
+def test_male_podcast_host_uses_requested_speaking_rate():
     male = _podcast_audio_config("male")
     female = _podcast_audio_config("female")
-    assert male.speaking_rate > female.speaking_rate
-    assert male.speaking_rate >= 1.2
+    assert male.speaking_rate == 1.15
+    assert female.speaking_rate == 1.0
 
 
 def test_indic_voices_use_break_only_ssml():

@@ -2086,7 +2086,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       cta_url: (homeBannerCtaUrl || '').trim(),
       frequency: homeBannerFrequency === 'every_x_days' ? 'every_x_days' : 'once',
       interval_days: intervalDays,
-      platforms: ['android', 'ios'],
+      platforms: ['android', 'ios', 'web'],
     };
     setHomeBannerSaving(true);
     try {

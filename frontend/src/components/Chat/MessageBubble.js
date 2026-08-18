@@ -943,8 +943,25 @@ const MessageBubble = ({
         if (podcastLoading) return;
 
         skipPodcastCreditsRef.current = false;
+
+        // A green/ready button means at least one language is already cached.
+        // Replay that saved audio directly instead of asking the user to choose
+        // a language again. Prefer their last-used language when both exist.
+        if (podcastReady) {
+            const mid = message.messageId != null ? String(message.messageId) : '';
+            const preferredLang = podcastListenLangRef.current === 'hi' ? 'hi' : 'en';
+            const alternateLang = preferredLang === 'en' ? 'hi' : 'en';
+            const cachedLang = premiumPodcastReadyKeys.has(`${mid}:${preferredLang}`)
+                ? preferredLang
+                : premiumPodcastReadyKeys.has(`${mid}:${alternateLang}`)
+                    ? alternateLang
+                    : preferredLang;
+            await fetchAndPlayPodcast(cachedLang);
+            return;
+        }
+
         setShowPodcastLanguageModal(true);
-    }, [getCleanMessageText, podcastLoading]);
+    }, [fetchAndPlayPodcast, getCleanMessageText, message.messageId, podcastLoading, podcastReady]);
 
     const lastPodcastPromoKeyRef = useRef(0);
     useEffect(() => {
