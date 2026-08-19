@@ -409,7 +409,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [homeBannerCtaLabel, setHomeBannerCtaLabel] = useState('');
   const [homeBannerCtaAction, setHomeBannerCtaAction] = useState('dismiss');
   const [homeBannerCtaUrl, setHomeBannerCtaUrl] = useState('');
-  const [homeBannerFrequency, setHomeBannerFrequency] = useState('once');
+  const [homeBannerFrequency, setHomeBannerFrequency] = useState('always');
   const [homeBannerIntervalDays, setHomeBannerIntervalDays] = useState('7');
   const [homeBannerSaving, setHomeBannerSaving] = useState(false);
   const [geminiModelOptions, setGeminiModelOptions] = useState([]);
@@ -884,7 +884,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setHomeBannerCtaLabel(homeBanner.cta_label || '');
       setHomeBannerCtaAction(homeBanner.cta_action || 'dismiss');
       setHomeBannerCtaUrl(homeBanner.cta_url || '');
-      setHomeBannerFrequency(homeBanner.frequency === 'every_x_days' ? 'every_x_days' : 'once');
+      setHomeBannerFrequency(homeBanner.frequency === 'every_x_days' ? 'every_x_days' : 'always');
       setHomeBannerIntervalDays(String(homeBanner.interval_days ?? '7'));
       setChatCountdownStandardSeconds((timerStandard?.value ?? '110').toString());
       setChatCountdownPremiumSeconds((timerPremium?.value ?? '210').toString());
@@ -2062,8 +2062,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     const id = (homeBannerId || '').trim();
     const title = (homeBannerTitle || '').trim();
     const body = (homeBannerBody || '').trim();
-    if (homeBannerEnabled && !id) {
-      alert('Banner ID is required when the banner is enabled (used so dismiss state can reset when you change campaigns).');
+    if (homeBannerEnabled && homeBannerFrequency === 'every_x_days' && !id) {
+      alert('Banner ID is required for “every X days” so dismiss can be tracked.');
       return;
     }
     if (homeBannerEnabled && !title && !body) {
@@ -2084,7 +2084,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       cta_label: (homeBannerCtaLabel || '').trim(),
       cta_action: homeBannerCtaAction || 'dismiss',
       cta_url: (homeBannerCtaUrl || '').trim(),
-      frequency: homeBannerFrequency === 'every_x_days' ? 'every_x_days' : 'once',
+      frequency: homeBannerFrequency === 'every_x_days' ? 'every_x_days' : 'always',
       interval_days: intervalDays,
       platforms: ['android', 'ios', 'web'],
     };
@@ -7750,13 +7750,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             <div className="settings-section">
               <h3>Home screen banner</h3>
               <p className="settings-hint">
-                Shown on the mobile home screen when users open the app. Toggle on/off, edit copy, and choose whether it appears once or again every X days after dismiss.
-                Change the Banner ID to re-show a new campaign to users who already dismissed the previous one.
+                Shown on the mobile home screen whenever the banner is enabled. Closing it only hides it for the current visit; it comes back the next time the user opens Home.
+                Use “every X days” only if you want it to stay hidden after dismiss until that interval passes.
               </p>
               <div className="setting-item">
                 <div className="setting-info">
                   <strong>Enabled</strong>
-                  <p>When off, the banner is hidden for everyone.</p>
+                  <p>When off, the banner is hidden for everyone. When on, it shows on every Home visit.</p>
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input
@@ -7770,7 +7770,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               <div className="setting-item">
                 <div className="setting-info">
                   <strong>Banner ID</strong>
-                  <p>Stable id for this campaign (e.g. pack-relaunch-2026-07). Required when enabled.</p>
+                  <p>Optional campaign id. Needed only for “every X days” dismiss tracking.</p>
                 </div>
                 <input
                   type="text"
@@ -7808,7 +7808,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               <div className="setting-item">
                 <div className="setting-info">
                   <strong>Frequency</strong>
-                  <p>Once = never again after dismiss (for this Banner ID). Every X days = show again after the interval.</p>
+                  <p>Always = every Home visit while enabled. Every X days = stay hidden after dismiss until the interval.</p>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
                   <select
@@ -7816,7 +7816,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     onChange={(e) => setHomeBannerFrequency(e.target.value)}
                     style={{ minWidth: '200px' }}
                   >
-                    <option value="once">Show once (until dismiss)</option>
+                    <option value="always">Always (every Home visit)</option>
                     <option value="every_x_days">Show every X days</option>
                   </select>
                   {homeBannerFrequency === 'every_x_days' ? (

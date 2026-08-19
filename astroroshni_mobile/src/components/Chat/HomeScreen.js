@@ -1025,30 +1025,32 @@ export default function HomeScreen({
 
   const shouldShowHomeBanner = useCallback(async (banner) => {
     if (!banner?.enabled) return false;
-    const id = String(banner.id || '').trim();
     const title = String(banner.title || '').trim();
     const body = String(banner.body || '').trim();
-    if (!id || (!title && !body)) return false;
+    if (!title && !body) return false;
     const platforms = Array.isArray(banner.platforms) ? banner.platforms.map((p) => String(p).toLowerCase()) : [];
     const platformAllowed = !platforms.length
       || platforms.includes(Platform.OS)
       // Existing mobile banners were stored before PWA was an explicit target.
       || (Platform.OS === 'web' && platforms.some((p) => ['android', 'ios', 'mobile', 'pwa'].includes(p)));
     if (!platformAllowed) return false;
-    try {
-      const raw = await AsyncStorage.getItem(homeBannerDismissKey(id));
-      if (!raw) return true;
-      if (raw === 'forever') return false;
-      const frequency = String(banner.frequency || 'once').toLowerCase();
-      if (frequency !== 'every_x_days') return false;
-      const dismissedAt = new Date(raw);
-      if (Number.isNaN(dismissedAt.getTime())) return true;
-      const intervalDays = Math.max(1, Number(banner.interval_days) || 7);
-      const diffDays = (Date.now() - dismissedAt.getTime()) / (1000 * 60 * 60 * 24);
-      return diffDays >= intervalDays;
-    } catch (_) {
-      return true;
+    const frequency = String(banner.frequency || 'always').toLowerCase();
+    if (frequency === 'every_x_days') {
+      const id = String(banner.id || '').trim();
+      if (!id) return true;
+      try {
+        const raw = await AsyncStorage.getItem(homeBannerDismissKey(id));
+        if (!raw) return true;
+        const dismissedAt = new Date(raw);
+        if (Number.isNaN(dismissedAt.getTime())) return true;
+        const intervalDays = Math.max(1, Number(banner.interval_days) || 7);
+        const diffDays = (Date.now() - dismissedAt.getTime()) / (1000 * 60 * 60 * 24);
+        return diffDays >= intervalDays;
+      } catch (_) {
+        return true;
+      }
     }
+    return true;
   }, []);
 
   const loadHomeBanner = useCallback(async () => {
@@ -1072,9 +1074,9 @@ export default function HomeScreen({
 
   const dismissHomeBanner = useCallback(async () => {
     const id = String(homeBanner?.id || '').trim();
-    const frequency = String(homeBanner?.frequency || 'once').toLowerCase();
+    const frequency = String(homeBanner?.frequency || 'always').toLowerCase();
     setHomeBanner(null);
-    if (!id) return;
+    if (!id || frequency !== 'every_x_days') return;
     try {
       const value = frequency === 'every_x_days' ? new Date().toISOString() : 'forever';
       await AsyncStorage.setItem(homeBannerDismissKey(id), value);
@@ -2126,6 +2128,44 @@ const loadHomeData = async (nativeData = null) => {
           </>
         ) : (
         <>
+
+        {homeBanner ? (
+          <View
+            style={[
+              styles.adminHomeBanner,
+              androidLightCardFixStyle,
+              {
+                backgroundColor: colors.surfaceRaised,
+                borderColor: colors.cardBorder,
+              },
+            ]}
+          >
+            <View style={[styles.adminHomeBannerIcon, { backgroundColor: colors.accentSoft }]}>
+              <Icon name="megaphone-outline" size={18} color={colors.onAccent} />
+            </View>
+            <View style={styles.adminHomeBannerTextCol}>
+              <Text style={[styles.adminHomeBannerEyebrow, { color: colors.accent }]}>
+                {t('premiumUi.chatScreen.brand')}
+              </Text>
+              {homeBanner.title ? (
+                <Text style={[styles.adminHomeBannerTitle, { color: colors.text }]}>{homeBanner.title}</Text>
+              ) : null}
+              {homeBanner.body ? (
+                <Text style={[styles.adminHomeBannerBody, { color: colors.textSecondary }]}>{homeBanner.body}</Text>
+              ) : null}
+              {homeBanner.cta_label && homeBanner.cta_action !== 'none' ? (
+                <TouchableOpacity onPress={handleHomeBannerCta} style={styles.adminHomeBannerCta}>
+                  <Text style={[styles.adminHomeBannerCtaText, { color: colors.primary }]}>
+                    {homeBanner.cta_label}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <TouchableOpacity onPress={dismissHomeBanner} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Icon name="close" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {!showExploreCatalog ? <PremiumTodayOverview
           name={displayData?.name}

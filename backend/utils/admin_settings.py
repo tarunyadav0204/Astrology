@@ -1278,7 +1278,7 @@ DEFAULT_HOME_SCREEN_BANNER: Dict[str, Any] = {
     "cta_label": "",
     "cta_action": "dismiss",  # dismiss | credits | chat | url | none
     "cta_url": "",
-    "frequency": "once",  # once | every_x_days
+    "frequency": "always",  # always | every_x_days
     "interval_days": 7,
     "platforms": ["android", "ios", "web"],
 }
@@ -1315,9 +1315,11 @@ def get_home_screen_banner() -> Dict[str, Any]:
         cta_action = "dismiss"
     out["cta_action"] = cta_action
     out["cta_url"] = str(parsed.get("cta_url") or "").strip()
-    frequency = str(parsed.get("frequency") or "once").strip().lower()
-    if frequency not in ("once", "every_x_days"):
-        frequency = "once"
+    frequency = str(parsed.get("frequency") or "always").strip().lower()
+    if frequency == "once":
+        frequency = "always"
+    if frequency not in ("always", "every_x_days"):
+        frequency = "always"
     out["frequency"] = frequency
     try:
         interval = int(parsed.get("interval_days") or 7)
