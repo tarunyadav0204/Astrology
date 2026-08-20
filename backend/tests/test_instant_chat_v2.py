@@ -3,17 +3,273 @@ from datetime import datetime
 from instant_chat_v2.orchestrator import build_instant_v2_packet, finalize_instant_v2_packet
 from instant_chat_v2.planner import build_query_plan
 from instant_chat_v2.answer_spec import build_answer_spec
+from instant_chat_v2.user_derivation import build_user_derivation
 from chat.instant_chat_pipeline import (
     _build_instant_composer_context,
     _build_instant_composer_prompt_v3,
     _build_event_timing_verdict,
     _instant_real_chart_facts,
+    _mode_selection_from_intent,
     _requested_charts_from_intent,
     _should_force_event_current_window,
     _repair_common_utf8_mojibake,
     _resolve_period_window,
+    _slim_event_prediction_payload,
     _target_focus_calculation_frame,
 )
+
+
+def test_slim_event_prediction_preserves_d1_promise_for_readable_evidence():
+    natal_topic_factors = {
+        "source": "validated_d1_natal_promise",
+        "houses": [{
+            "house": 10,
+            "lord": "Mars",
+            "occupants": ["Jupiter"],
+            "aspecting_planets": ["Saturn"],
+            "tone": "supportive",
+            "supportive_weight": 4.0,
+            "challenging_weight": 1.0,
+            "factors": [],
+        }],
+    }
+    context = _slim_event_prediction_payload(
+        birth_summary={},
+        natal_snapshot={},
+        target_chart_context={},
+        current_dashas_levels={},
+        current_transits_formatted={},
+        instant_parashari={
+            "focus_houses": [2, 6, 10, 11],
+            "natal_topic_factors": natal_topic_factors,
+            "divisional_support": {},
+        },
+        normalized_evidence={
+            "natal_promise": {"status": "supported", "topic_support": "supportive"},
+        },
+        period_window={"start": "2026-08-20", "end": "2027-08-20"},
+        category="career",
+        question="How is my career this year?",
+        chart_data={"planets": {}},
+        house_lordships={},
+    )
+
+    derivation = build_user_derivation(
+        query_plan={"category": "career", "answer_mode": "event_prediction"},
+        verdict={"direction": "supported", "confidence": "medium"},
+        instant_context=context,
+    )
+
+    assert context["normalized_evidence"]["natal_promise"]["status"] == "supported"
+    assert context["_user_evidence"]["natal_topic_factors"] == natal_topic_factors
+    assert derivation["natal_promise"]["d1_house_factors"][0]["house"] == 10
+
+
+def test_explicit_d9_does_not_override_marriage_promise_mode():
+    selection = _mode_selection_from_intent(
+        {
+            "answer_mode": "potential_capacity",
+            "category": "marriage",
+            "chart_focus": {
+                "kind": "chart_specific",
+                "primary": "D9",
+                "explicit": True,
+                "requested": ["D9"],
+            },
+            "evidence_plan": {
+                "question_parts": [{"intent_families": ["factual_chart_lookup"]}],
+            },
+        },
+        "Does my D9 promise marriage?",
+    )
+
+    assert selection["raw_answer_mode"] == "potential_capacity"
+    assert selection["answer_mode"] == "potential_capacity"
+
+
+def test_explicit_named_chart_still_repairs_generic_topic_mode():
+    selection = _mode_selection_from_intent(
+        {
+            "answer_mode": "topic_reading",
+            "category": "general",
+            "chart_focus": {
+                "kind": "chart_specific",
+                "primary": "D9",
+                "explicit": True,
+                "requested": ["D9"],
+            },
+        },
+        "Explain my D9 chart",
+    )
+
+    assert selection["answer_mode"] == "factual_chart_lookup"
+
+
+def test_llm_life_outcome_repairs_conflicting_factual_marriage_mode():
+    selection = _mode_selection_from_intent(
+        {
+            "answer_mode": "factual_chart_lookup",
+            "requested_object": "life_outcome",
+            "mode": "ANALYZE_TOPIC_POTENTIAL",
+            "category": "marriage",
+            "chart_focus": {
+                "kind": "chart_specific",
+                "primary": "D9",
+                "explicit": True,
+                "requested": ["D9"],
+            },
+        },
+        "Is marriage possible in my kundali?",
+    )
+
+    assert selection["raw_answer_mode"] == "factual_chart_lookup"
+    assert selection["requested_object"] == "life_outcome"
+    assert selection["answer_mode"] == "potential_capacity"
+
+
+def test_llm_named_chart_keeps_factual_mode():
+    selection = _mode_selection_from_intent(
+        {
+            "answer_mode": "factual_chart_lookup",
+            "requested_object": "named_chart",
+            "mode": "ANALYZE_TOPIC_POTENTIAL",
+            "category": "general",
+            "chart_focus": {
+                "kind": "chart_specific",
+                "primary": "D9",
+                "explicit": True,
+                "requested": ["D9"],
+            },
+        },
+        "Explain my D9 chart",
+    )
+
+    assert selection["answer_mode"] == "factual_chart_lookup"
+
+
+def test_factual_chart_derivation_does_not_render_generic_natal_promise():
+    derivation = build_user_derivation(
+        query_plan={"answer_mode": "factual_chart_lookup", "category": "marriage"},
+        verdict={"direction": "calculated_chart", "confidence": "medium"},
+        instant_context={
+            "normalized_evidence": {
+                "chart_facts": {
+                    "requested_charts": ["D9"],
+                    "source": "DivisionalChartCalculator",
+                    "calculation_complete": True,
+                    "reading_lines": ["D9 lagna: Pisces", "D9 Mercury: Aries, house 2"],
+                    "charts": {
+                        "D9": {
+                            "domain": {"life_area": "marriage and dharma"},
+                            "lagna": {
+                                "sign_name": "Pisces", "lord": "Jupiter",
+                                "lord_house": 4, "lord_dignity": "enemy",
+                            },
+                            "support_signals": ["Moon supports the lagna lord."],
+                            "caution_signals": ["Saturn influences the partnership house."],
+                            "houses": [],
+                        },
+                    },
+                },
+                "natal_promise": {"status": "not_established"},
+            },
+        },
+    )
+
+    assert "chart_reading" in derivation
+    assert "natal_promise" not in derivation
+    assert derivation["chart_reading"]["fact_groups"][0]["chart"] == "D9"
+    assert derivation["chart_reading"]["fact_groups"][0]["lines"][0] == "D9 ascendant is Pisces."
+
+
+def test_natal_derivation_keeps_relevant_special_astrology_factors():
+    derivation = build_user_derivation(
+        query_plan={"answer_mode": "potential_capacity", "category": "marriage"},
+        verdict={"direction": "supported_natal_promise", "confidence": "medium"},
+        instant_context={
+            "intent_summary": {"category": "marriage", "focus_houses": [2, 7]},
+            "instant_parashari": {
+                "focus_houses": [2, 7],
+                "natal_topic_factors": {
+                    "houses": [{
+                        "house": 7,
+                        "lord": "Saturn",
+                        "tone": "mixed",
+                        "occupants": [],
+                        "aspecting_planets": [],
+                        "factors": [
+                            {
+                                "source": "planet_gandanta",
+                                "planet": "Saturn",
+                                "polarity": "challenging",
+                                "weight": 0.35,
+                                "facts": {"gandanta_name": "Jyeshtha-Mula Gandanta", "intensity": "high"},
+                            },
+                            {
+                                "source": "yogi_lord",
+                                "planet": "Saturn",
+                                "polarity": "supportive",
+                                "weight": 0.25,
+                                "facts": {"special_sign_name": "Capricorn"},
+                            },
+                            {
+                                "source": "avayogi_lord",
+                                "planet": "Saturn",
+                                "polarity": "challenging",
+                                "weight": 0.25,
+                                "facts": {"special_sign_name": "Cancer"},
+                            },
+                            {
+                                "source": "planet_in_dagdha_rashi",
+                                "planet": "Saturn",
+                                "polarity": "challenging",
+                                "weight": 0.25,
+                                "facts": {"dagdha_sign_name": "Leo"},
+                            },
+                            {
+                                "source": "planet_in_tithi_shunya_rashi",
+                                "planet": "Saturn",
+                                "polarity": "challenging",
+                                "weight": 0.25,
+                                "facts": {"tithi_shunya_sign_name": "Virgo"},
+                            },
+                        ],
+                    }],
+                },
+            },
+            "normalized_evidence": {
+                "natal_promise": {"status": "supported", "topic_support": "mixed"},
+            },
+        },
+    )
+
+    house = derivation["natal_promise"]["d1_house_factors"][0]
+    rendered = " ".join([*house["support_notes"], *house["caution_notes"]])
+    assert "Yogi lord" in rendered
+    assert "Gandanta" in rendered
+    assert "Avayogi" in rendered
+    assert "Dagdha Rashi" in rendered
+    assert "Tithi Shunya Rashi" in rendered
+
+    composer = _build_instant_composer_context(
+        {
+            "intent_summary": {"category": "marriage", "answer_mode": "potential_capacity"},
+            "normalized_evidence": {
+                "natal_promise": {"status": "supported", "topic_support": "mixed"},
+            },
+        },
+        {
+            "query_plan": {"answer_mode": "potential_capacity", "category": "marriage"},
+            "verdict": {"direction": "supported_natal_promise", "confidence": "medium"},
+            "answer_spec": {},
+            "user_derivation": derivation,
+        },
+    )
+    composer_special = composer["evidence"]["special_natal_factors"]
+    assert any("Gandanta" in row["effect"] for row in composer_special)
+    assert any("Yogi lord" in row["effect"] for row in composer_special)
+    assert any("Dagdha Rashi" in row["effect"] for row in composer_special)
+    assert any("Tithi Shunya Rashi" in row["effect"] for row in composer_special)
 
 
 def test_event_prediction_keeps_exact_day_window():
@@ -73,6 +329,11 @@ def _context():
             "planets": [{"planet": "Jupiter", "house": 7}],
         },
         "normalized_evidence": {
+            "natal_promise": {
+                "status": "supported",
+                "topic_support": "supportive",
+                "rule": "Natal and divisional evidence only",
+            },
             "primary_drivers": ["The 7th house is active"],
             "secondary_modifiers": ["Saturn can delay"],
             "divisional_specifics": {"d9": "supportive"},
@@ -93,6 +354,36 @@ def _context():
             "claim_gates": {"allow_timing": True},
         },
     }
+
+
+def test_marriage_possibility_uses_natal_promise_without_current_timing():
+    context = _context()
+    context["intent_summary"] = {
+        "category": "marriage",
+        "answer_mode": "potential_capacity",
+        "target_subject": {"key": "self", "label": "self"},
+    }
+    packet = build_instant_v2_packet(
+        question="Is marriage possible in my kundali?",
+        intent=context["intent_summary"],
+        answer_mode="potential_capacity",
+        target_subject={"key": "self", "label": "self"},
+        language="english",
+        instant_context=context,
+    )
+    capabilities = {row["capability"]: row for row in packet["evidence_ledger"]["capabilities"]}
+    assert capabilities["parashari.marriage_promise"]["status"] == "available"
+    assert capabilities["parashari.d9_confirmation"]["status"] == "available"
+    assert packet["verdict"]["direction"] == "supported_natal_promise"
+    composer = _build_instant_composer_context(context, packet)
+    assert "current_timing" not in composer["evidence"]
+    assert "active_areas" not in composer["evidence"]
+    assert composer["answer_contract"]["capacity_rules"]["verdict_direction"] == "supported_natal_promise"
+    prompt = _build_instant_composer_prompt_v3(
+        "Is marriage possible in my kundali?", composer, "english"
+    )
+    assert "static natal-promise question" in prompt
+    assert "Houses 2 or 8 alone cannot establish marriage promise" in prompt
 
 
 def _daily_context():
@@ -217,6 +508,17 @@ def test_exact_day_missing_daily_calculators_is_not_replaced_by_period_evidence(
 
 def test_common_utf8_mojibake_is_repaired_without_touching_other_scripts():
     assert _repair_common_utf8_mojibake("things arenâ\x80\x99t moving — ठीक") == "things aren’t moving — ठीक"
+
+
+def test_common_utf8_mojibake_repairs_hindi_answer():
+    original = "आपके लग्न का उदय हो रहा है और विवाह का योग है।"
+    broken = original.encode("utf-8").decode("latin-1")
+    assert _repair_common_utf8_mojibake(broken) == original
+
+
+def test_common_utf8_mojibake_leaves_valid_multilingual_text_unchanged():
+    original = "Marriage is supported — विवाह का योग है।"
+    assert _repair_common_utf8_mojibake(original) == original
 
 
 def test_planner_does_not_keyword_route_raw_question():

@@ -70,10 +70,10 @@ QUESTION_OPERATIONS: Dict[str, Dict[str, Any]] = {
     },
     "capacity_or_fit": {
         "answer_mode": "potential_capacity",
-        "purpose": "Assess aptitude, promise, suitability or sustainable capacity.",
-        "required_answer": ["core capacity", "best-fit expression", "limitation", "practical direction"],
-        "forbidden": ["confusing ability with current timing", "generic encouragement"],
-        "examples": ["Am I suited for business?", "Can I succeed as a lawyer?"],
+        "purpose": "Assess natal promise, aptitude, suitability or sustainable capacity without confusing it with current timing.",
+        "required_answer": ["clear natal-promise verdict", "direct natal support", "direct natal limitation", "practical direction"],
+        "forbidden": ["confusing natal promise with current timing", "certainty from active houses", "generic encouragement"],
+        "examples": ["Is marriage possible in my kundali?", "Am I suited for business?", "Can I succeed as a lawyer?"],
     },
     "comparison_or_choice": {
         "answer_mode": "comparison_choice",
@@ -98,9 +98,9 @@ QUESTION_OPERATIONS: Dict[str, Dict[str, Any]] = {
     },
     "remedy_follow_up": {
         "answer_mode": "remedy_action",
-        "purpose": "Answer only an explicit Remedies CTA follow-up with a bounded remedy plan.",
-        "required_answer": ["priority problem", "few relevant remedies", "one caution"],
-        "forbidden": ["remedy mode inferred from wording alone", "large generic remedy list"],
+        "purpose": "Answer a Remedies CTA follow-up or a semantically explicit request for astrological remedies with a bounded remedy plan.",
+        "required_answer": ["priority problem", "three relevant remedies with frequency and chart rationale", "one caution"],
+        "forbidden": ["remedy mode inferred from vague advice wording", "large generic remedy list", "forecast presented instead of remedies"],
         "examples": ["Show my remedies", "Open the remedy you suggested"],
     },
     "location_recommendation": {

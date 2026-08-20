@@ -17,9 +17,34 @@ import {
 } from './podcastPlayback';
 import PodcastLanguageModal from './PodcastLanguageModal';
 import { buildInstantTypingLines, INSTANT_LOADER_TAKING_LONGER } from '../../constants/instantChatLoader';
+import { buildReadableEvidence, buildRoutingSummary } from '../../utils/instantEvidence';
 
 const premiumPodcastReadyKeys = new Set();
 const PODCAST_READY_TOAST = 'Podcast ready — tap to listen';
+
+const WHY_TARA_SAYS_THIS = {
+    english: 'Why Tara says this',
+    hindi: 'तारा ऐसा क्यों कहती हैं',
+    es: 'Por qué Tara dice esto',
+    fr: 'Pourquoi Tara dit cela',
+    german: 'Warum Tara das sagt',
+    russian: 'Почему Тара так говорит',
+    chinese: '塔拉为什么这样说',
+    tamil: 'தாரா ஏன் இப்படிச் சொல்கிறார்',
+    telugu: 'తార ఇలా ఎందుకు చెబుతోంది',
+    gujarati: 'તારા આવું કેમ કહે છે',
+    marathi: 'तारा असे का म्हणते',
+};
+
+const CHAT_LANGUAGE_ALIASES = {
+    en: 'english', hi: 'hindi', de: 'german', ru: 'russian', zh: 'chinese',
+    ta: 'tamil', te: 'telugu', gu: 'gujarati', mr: 'marathi',
+};
+
+const whyTaraSaysThis = (language) => WHY_TARA_SAYS_THIS[
+    CHAT_LANGUAGE_ALIASES[String(language || '').toLowerCase()] || String(language || 'english').toLowerCase()
+]
+    || WHY_TARA_SAYS_THIS.english;
 
 const resolveReadyPodcastLang = (messageId, preferredLang) => {
     const mid = messageId != null ? String(messageId) : '';
@@ -1450,7 +1475,7 @@ const MessageBubble = ({
                                 aria-expanded={showInstantEvidence}
                             >
                                 <span aria-hidden="true">◇</span>
-                                Evidence · {instantEvidence?.evidence_ledger?.record_count || 0}
+                                {whyTaraSaysThis(language)}
                             </button>
                         ) : null}
                         {message.role === 'assistant' && !message.isTyping && !message.isProcessing && !message.instantStreaming && content ? (
@@ -1468,65 +1493,56 @@ const MessageBubble = ({
                     </div>
                     {showInstantEvidence && instantEvidence ? (
                         <section className="instant-evidence-inspector" aria-label="Instant answer evidence">
-                            <header>
-                                <div>
-                                    <small>TEST EVIDENCE</small>
-                                    <strong>{instantEvidence?.query_plan?.category || 'general'} · {instantEvidence?.query_plan?.answer_mode || 'reading'}</strong>
-                                    {instantEvidence?.query_plan?.user_goal ? <p>{instantEvidence.query_plan.user_goal}</p> : null}
-                                </div>
-                                <span className={instantEvidence?.verification?.passed ? 'is-pass' : 'is-review'}>
-                                    {instantEvidence?.verification?.passed ? 'Evidence linked' : 'Review needed'}
-                                </span>
-                            </header>
-                            <details open>
-                                <summary>Verdict</summary>
-                                <p>{String(instantEvidence?.verdict?.direction || 'No verdict')}</p>
-                                <div className="instant-evidence-tags">
-                                    <span>Confidence {Math.round(Number(instantEvidence?.verdict?.confidence || 0) * 100)}%</span>
-                                    <span>Method {instantEvidence?.evidence_plan?.methodology_version || '—'}</span>
-                                    {instantEvidence?.query_plan?.target_subject?.label || instantEvidence?.query_plan?.target_subject?.key ? (
-                                        <span>{instantEvidence?.query_plan?.target_subject?.label || instantEvidence?.query_plan?.target_subject?.key}</span>
-                                    ) : null}
-                                    {instantEvidence?.query_plan?.time_scope?.requested ? <span>{instantEvidence.query_plan.time_scope.requested}</span> : null}
-                                    {instantEvidence?.composer_metrics ? (
-                                        <span>{instantEvidence.composer_metrics.prompt_chars || 0} chars · {instantEvidence.composer_metrics.generation_calls || 1} call</span>
-                                    ) : null}
-                                </div>
-                            </details>
-                            <details>
-                                <summary>Calculation plan</summary>
-                                <ul>
-                                    {(instantEvidence?.evidence_ledger?.capabilities || []).map((item) => (
-                                        <li key={item.request_id}>
-                                            <span>{item.capability}{item.evidence_ids?.length ? ` · ${item.evidence_ids.join(', ')}` : ''}</span>
-                                            <em className={`is-${item.status}`}>{item.status}</em>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </details>
-                            <details>
-                                <summary>Evidence ledger</summary>
-                                <ol>
-                                    {(instantEvidence?.evidence_ledger?.records || []).map((item) => (
-                                        <li key={item.evidence_id}>
-                                            <code>{item.evidence_id}</code>
-                                            <div><strong>{item.kind}</strong><small>{item.source} · {Math.round(Number(item.confidence || 0) * 100)}%</small></div>
-                                            <pre>{JSON.stringify(item.value, null, 2)}</pre>
-                                        </li>
-                                    ))}
-                                </ol>
-                            </details>
-                            <details>
-                                <summary>Claim bindings</summary>
-                                <ul>
-                                    {(instantEvidence?.verification?.checks || []).map((item) => (
-                                        <li key={item.claim_id}>
-                                            <span>{item.claim_id}</span>
-                                            <em className={item.passed ? 'is-available' : 'is-not_exposed'}>{item.passed ? 'linked' : 'missing'}</em>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </details>
+                            {(() => {
+                                const routing = buildRoutingSummary(instantEvidence);
+                                const sections = buildReadableEvidence(instantEvidence);
+                                return (
+                                    <>
+                                        <header>
+                                            <div>
+                                                <small>HOW THIS ANSWER WAS DERIVED</small>
+                                                <strong>{instantEvidence?.user_derivation?.event?.label || instantEvidence?.query_plan?.user_goal || routing.category}</strong>
+                                            </div>
+                                            <span className={instantEvidence?.verification?.passed ? 'is-pass' : 'is-review'}>
+                                                {instantEvidence?.verification?.passed ? 'Evidence linked' : 'Review needed'}
+                                            </span>
+                                        </header>
+                                        <div className="instant-routing-summary" aria-label="Answer routing debug">
+                                            <span><small>Final mode</small><strong>{routing.finalMode}</strong></span>
+                                            <span><small>Selected</small><strong>{routing.selectedMode}</strong></span>
+                                            <span><small>Source</small><strong>{routing.source}</strong></span>
+                                            <span><small>Confidence</small><strong>{routing.confidence}</strong></span>
+                                            {routing.changed ? <em>Mode adjusted after routing</em> : null}
+                                            {routing.degraded ? <em>Fallback used</em> : null}
+                                        </div>
+                                        <div className="instant-readable-evidence">
+                                            {sections.map((section) => (
+                                                <article key={section.key}>
+                                                    <header>
+                                                        {section.step ? <b>{section.step}</b> : null}
+                                                        <h4>{section.title}</h4>
+                                                    </header>
+                                                    <ul>
+                                                        {section.lines.map((line, index) => <li key={`${section.key}-${index}`}>{line}</li>)}
+                                                    </ul>
+                                                    {(section.groups || []).map((group) => (
+                                                        <section className="instant-evidence-group" key={`${section.key}-${group.key}`}>
+                                                            <h5>{group.title}</h5>
+                                                            {(group.lines || []).map((line, index) => <p key={`${group.key}-line-${index}`}>{line}</p>)}
+                                                            {(group.items || []).map((item, index) => (
+                                                                <div className="instant-evidence-factor" key={`${group.key}-item-${index}`}>
+                                                                    <strong>{item.title}</strong>
+                                                                    <p>{item.text}</p>
+                                                                </div>
+                                                            ))}
+                                                        </section>
+                                                    ))}
+                                                </article>
+                                            ))}
+                                        </div>
+                                    </>
+                                );
+                            })()}
                         </section>
                     ) : null}
                 </div>

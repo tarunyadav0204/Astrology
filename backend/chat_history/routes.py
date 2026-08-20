@@ -3592,7 +3592,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
     from charts.house_insight_service import build_chart_preview_insights
     from chat.fact_extractor import FactExtractor
     from ai.death_query_guard import is_death_override_unlocked, is_death_related, REFUSAL_MESSAGE
-    from chat.instant_chat_pipeline import generate_instant_chat_response
+    from chat.instant_chat_pipeline import (
+        _repair_common_utf8_mojibake,
+        generate_instant_chat_response,
+    )
 
     processing_started_at = time.time()
 
@@ -4543,7 +4546,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
 
             def _persist_instant_stream_delta(_delta: str, full_text: str) -> None:
                 """Checkpoint visible Gemini text without finalizing or billing the turn."""
-                visible_text = sanitize_text(full_text)
+                # Repair at the streaming boundary. Waiting for final response
+                # cleanup lets mojibake reach WebSocket clients and durable
+                # processing checkpoints first.
+                visible_text = sanitize_text(_repair_common_utf8_mojibake(full_text))
                 if not visible_text:
                     return
                 reveal_prefixes = _instant_stream_reveal_prefixes(

@@ -27,7 +27,30 @@ import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
 import { generatePDF, sharePDFOnWhatsApp, getLogoDataUriForModule, userFacingPdfExportError } from '../../utils/pdfGenerator';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
-import { buildReadableEvidence } from '../../utils/instantEvidence';
+import { buildReadableEvidence, buildRoutingSummary, ROUTING_DEBUG_LABELS } from '../../utils/instantEvidence';
+
+const WHY_TARA_SAYS_THIS = {
+  english: 'Why Tara says this',
+  hindi: 'तारा ऐसा क्यों कहती हैं',
+  es: 'Por qué Tara dice esto',
+  fr: 'Pourquoi Tara dit cela',
+  german: 'Warum Tara das sagt',
+  russian: 'Почему Тара так говорит',
+  chinese: '塔拉为什么这样说',
+  tamil: 'தாரா ஏன் இப்படிச் சொல்கிறார்',
+  telugu: 'తార ఇలా ఎందుకు చెబుతోంది',
+  gujarati: 'તારા આવું કેમ કહે છે',
+  marathi: 'तारा असे का म्हणते',
+};
+
+const CHAT_LANGUAGE_ALIASES = {
+  en: 'english', hi: 'hindi', de: 'german', ru: 'russian', zh: 'chinese',
+  ta: 'tamil', te: 'telugu', gu: 'gujarati', mr: 'marathi',
+};
+
+const whyTaraSaysThis = (language) => WHY_TARA_SAYS_THIS[
+  CHAT_LANGUAGE_ALIASES[String(language || '').toLowerCase()] || String(language || 'english').toLowerCase()
+] || WHY_TARA_SAYS_THIS.english;
 import { chatAPI } from '../../services/api';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -167,7 +190,7 @@ function MessageBubble({
   onPodcastAutoLaunchConsumed,
   forceInstantPresentation = false,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { theme, colors } = useTheme();
   const messageActionStyle = {
     backgroundColor: colors.surfaceRaised,
@@ -1833,7 +1856,8 @@ function MessageBubble({
               >
                 <Ionicons name="diamond-outline" size={14} color={colors.accent} />
                 <Text style={[styles.instantEvidenceToggleText, { color: colors.text }]}>
-                  {t('premiumUi.chat.whyThisAnswer', 'Why this answer')}
+                  {whyTaraSaysThis(language || i18n.resolvedLanguage || i18n.language)
+                    || t('premiumUi.chat.whyThisAnswer', 'Why Tara says this')}
                 </Text>
                 <Ionicons name={showInstantEvidence ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -1853,32 +1877,68 @@ function MessageBubble({
                   </View>
 
                   {(() => {
+                    const routing = buildRoutingSummary(instantEvidence);
                     const sections = buildReadableEvidence(instantEvidence);
-                    if (!sections.length) {
-                      return (
-                        <Text style={[styles.instantEvidenceMeta, { color: colors.textSecondary }]}>
-                          {t('premiumUi.chat.noEvidenceYet', 'Evidence details are not available for this answer.')}
-                        </Text>
-                      );
-                    }
-                    return sections.map((section) => (
-                      <View key={section.key} style={styles.instantEvidenceSection}>
-                        <View style={styles.instantEvidenceSectionTitleRow}>
-                          {section.step ? (
-                            <View style={[styles.instantEvidenceStepBadge, { backgroundColor: colors.accentSoft }]}> 
-                              <Text style={[styles.instantEvidenceStepText, { color: colors.accent }]}>{section.step}</Text>
-                            </View>
-                          ) : null}
-                          <Text style={[styles.instantEvidenceLabel, styles.instantEvidenceSectionTitle, { color: colors.textSecondary }]}>{section.title}</Text>
+                    return (
+                      <>
+                        <View style={[styles.instantRoutingSummary, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+                          <View style={styles.instantRoutingCell}>
+                            <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.finalMode}</Text>
+                            <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.finalMode}</Text>
+                          </View>
+                          <View style={styles.instantRoutingCell}>
+                            <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.selected}</Text>
+                            <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.selectedMode}</Text>
+                          </View>
+                          <View style={styles.instantRoutingCell}>
+                            <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.source}</Text>
+                            <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.source}</Text>
+                          </View>
+                          <View style={styles.instantRoutingCell}>
+                            <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.confidence}</Text>
+                            <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.confidence}</Text>
+                          </View>
+                          {routing.changed ? <Text style={[styles.instantRoutingFlag, { color: colors.warning || colors.accent }]}>{ROUTING_DEBUG_LABELS.adjusted}</Text> : null}
+                          {routing.degraded ? <Text style={[styles.instantRoutingFlag, { color: colors.warning || colors.accent }]}>{ROUTING_DEBUG_LABELS.fallback}</Text> : null}
                         </View>
-                        {section.lines.map((line, index) => (
-                          <View key={`${section.key}_${index}`} style={styles.instantEvidenceBulletRow}>
-                            <View style={[styles.instantEvidenceBulletDot, { backgroundColor: colors.accent }]} />
-                            <Text style={[styles.instantEvidenceBulletText, { color: colors.text }]}>{line}</Text>
+                        {!sections.length ? (
+                          <Text style={[styles.instantEvidenceMeta, { color: colors.textSecondary }]}>
+                            {t('premiumUi.chat.noEvidenceYet', 'Evidence details are not available for this answer.')}
+                          </Text>
+                        ) : sections.map((section) => (
+                          <View key={section.key} style={styles.instantEvidenceSection}>
+                            <View style={styles.instantEvidenceSectionTitleRow}>
+                              {section.step ? (
+                                <View style={[styles.instantEvidenceStepBadge, { backgroundColor: colors.accentSoft }]}>
+                                  <Text style={[styles.instantEvidenceStepText, { color: colors.accent }]}>{section.step}</Text>
+                                </View>
+                              ) : null}
+                              <Text style={[styles.instantEvidenceLabel, styles.instantEvidenceSectionTitle, { color: colors.textSecondary }]}>{section.title}</Text>
+                            </View>
+                            {section.lines.map((line, index) => (
+                              <View key={`${section.key}_${index}`} style={styles.instantEvidenceBulletRow}>
+                                <View style={[styles.instantEvidenceBulletDot, { backgroundColor: colors.accent }]} />
+                                <Text style={[styles.instantEvidenceBulletText, { color: colors.text }]}>{line}</Text>
+                              </View>
+                            ))}
+                            {(section.groups || []).map((group) => (
+                              <View key={`${section.key}_${group.key}`} style={[styles.instantEvidenceGroup, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceMuted }]}>
+                                <Text style={[styles.instantEvidenceGroupTitle, { color: colors.accent }]}>{group.title}</Text>
+                                {(group.lines || []).map((line, index) => (
+                                  <Text key={`${group.key}_line_${index}`} style={[styles.instantEvidenceBulletText, { color: colors.text }]}>{line}</Text>
+                                ))}
+                                {(group.items || []).map((item, index) => (
+                                  <View key={`${group.key}_item_${index}`} style={styles.instantEvidenceFactor}>
+                                    <Text style={[styles.instantEvidenceFactorTitle, { color: colors.text }]}>{item.title}</Text>
+                                    <Text style={[styles.instantEvidenceBulletText, { color: colors.textSecondary }]}>{item.text}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            ))}
                           </View>
                         ))}
-                      </View>
-                    ));
+                      </>
+                    );
                   })()}
                 </View>
               ) : null}
@@ -2885,6 +2945,11 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   instantEvidenceLabel: { marginTop: 8, marginBottom: 4, fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 1 },
   instantEvidenceValue: { fontSize: 13, lineHeight: 17, fontWeight: '800' },
   instantEvidenceMeta: { marginTop: 2, fontSize: 10, lineHeight: 14 },
+  instantRoutingSummary: { marginTop: 10, padding: 9, borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  instantRoutingCell: { width: '47%', gap: 1 },
+  instantRoutingLabel: { fontSize: 8, lineHeight: 10, fontWeight: '900', letterSpacing: 0.8 },
+  instantRoutingValue: { fontSize: 10, lineHeight: 14, fontWeight: '800' },
+  instantRoutingFlag: { width: '100%', fontSize: 9, lineHeight: 12, fontWeight: '800' },
   instantEvidenceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
   instantEvidenceRowName: { flex: 1, fontSize: 10, lineHeight: 14, fontWeight: '600' },
   instantEvidenceRowStatus: { fontSize: 9, lineHeight: 12, fontWeight: '800' },
@@ -2892,6 +2957,10 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   instantEvidenceSection: { marginTop: 8 },
   instantEvidenceSectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 3 },
   instantEvidenceSectionTitle: { flex: 1, marginTop: 0, marginBottom: 0 },
+  instantEvidenceGroup: { marginTop: 8, marginLeft: 22, padding: 10, borderWidth: 1, borderRadius: 12, gap: 6 },
+  instantEvidenceGroupTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 0.7, textTransform: 'uppercase' },
+  instantEvidenceFactor: { paddingTop: 7, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.24)', gap: 2 },
+  instantEvidenceFactorTitle: { fontSize: 12, fontWeight: '700' },
   instantEvidenceStepBadge: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   instantEvidenceStepText: { fontSize: 10, lineHeight: 12, fontWeight: '900' },
   instantEvidenceBulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, paddingVertical: 2 },

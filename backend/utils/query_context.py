@@ -364,11 +364,18 @@ def ensure_remedy_cta_next_action(
 
 def is_remedy_followup_request(intent_or_context: Optional[Dict[str, Any]]) -> bool:
     """
-    True only when the client explicitly marked a Remedies CTA / remedy follow-up.
+    True when the client marked a Remedies CTA/follow-up or the semantic LLM
+    router classified the latest message as an unambiguous remedy request.
     Do not infer from question wording alone.
     """
     if not isinstance(intent_or_context, dict):
         return False
+
+    # Instant's multilingual semantic router may identify a direct remedy ask
+    # without a CTA breadcrumb.  This boolean is structured model output, not
+    # backend keyword matching, and is therefore safe across supported scripts.
+    if bool(intent_or_context.get("explicit_remedy_request")):
+        return True
 
     query_context = intent_or_context.get("query_context")
     if not isinstance(query_context, dict):
@@ -439,8 +446,8 @@ def resolve_remedy_followup_active(
 
 def clamp_remedy_modes_on_intent(result: Optional[Dict[str, Any]], question: str = "") -> None:
     """
-    Mutate an intent-router result so remedy modes only survive with CTA flags.
-    With CTA: force remedy_action. Without: demote remedy_action / RECOMMEND_REMEDY.
+    Mutate an intent-router result so remedy modes only survive with either CTA
+    flags or an explicit semantic remedy decision from the multilingual router.
     """
     if not isinstance(result, dict):
         return

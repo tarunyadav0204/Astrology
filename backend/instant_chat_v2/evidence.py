@@ -167,6 +167,9 @@ def build_evidence_ledger(instant_context: Dict[str, Any], evidence_plan: Dict[s
     }, strength="primary", confidence=0.9)
     _add(records, source="evidence.fusion.legacy", kind="primary_drivers",
          value=normalized.get("primary_drivers"), strength="primary", confidence=0.88)
+    _add(records, source="parashari.natal_promise", kind="natal_promise",
+         value=normalized.get("natal_promise"), strength="primary", confidence=0.9,
+         calculator="parashari_topic_promise")
     _add(records, source="evidence.fusion.legacy", kind="secondary_modifiers",
          value=normalized.get("secondary_modifiers"), strength="supporting", confidence=0.72)
     _add(records, source="parashari.divisional", kind="divisional_confirmation",

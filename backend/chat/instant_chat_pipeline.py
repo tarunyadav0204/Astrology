@@ -17,12 +17,16 @@ from ai.parallel_chat.parallel_agent_payloads import build_parashari_agent_paylo
 from ai.response_parser import ResponseParser
 from calculators import RemedyEngine
 from calculators.chart_calculator import ChartCalculator
+from calculators.gandanta_calculator import GandantaCalculator
+from calculators.planetary_dignities_calculator import PlanetaryDignitiesCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
+from calculators.yogi_calculator import YogiCalculator
 from chat.chat_context_builder import ChatContextBuilder
 from daily_prediction_spine import build_daily_prediction_spine
 from instant_chat_v2 import build_instant_v2_packet, finalize_instant_v2_packet
 from context_agents.base import AgentContext
 from prediction_engine.nakshatra_transit import nakshatra_transit_relation
+from prediction_engine.natal_promise import build_natal_promises
 from shared.dasha_calculator import DashaCalculator
 from utils.admin_settings import get_gemini_instant_model
 from utils.query_context import (
@@ -1271,6 +1275,11 @@ def _slim_event_prediction_payload(
             "answer_skeleton": "Apply timing_policy -> Verdict from strongest future windows -> Phase shifts from MD/AD/PD changes -> Support vs obstruction vs uncertainty -> Practical takeaway",
         },
         "timing_policy": timing_policy,
+        # Promise evidence is static natal evidence, not prompt-heavy timing
+        # workspace.  Preserve its adjudicated status in the slim event path;
+        # otherwise the UI incorrectly reports that the D1 promise was absent
+        # even though the same D1 chart powers the dasha/transit calculations.
+        "natal_promise": dict((normalized_evidence or {}).get("natal_promise") or {}),
         "event_timing_verdict": event_timing_verdict,
         "current_timing": {
             "active_dashas": safe_current_dashas_levels,
@@ -1432,6 +1441,14 @@ def _slim_event_prediction_payload(
         },
         "current_transits_formatted": major_transits,
         "instant_parashari": slim_parashari,
+        # The detailed D1 ledger is display/audit evidence.  Keep it available
+        # to user_derivation while the composer boundary continues to exclude
+        # `_user_evidence` from the Flash Lite prompt.
+        "_user_evidence": {
+            "natal_topic_factors": dict(
+                (instant_parashari or {}).get("natal_topic_factors") or {}
+            ),
+        },
         "normalized_evidence": slim_normalized,
         # Exact-day questions can still be routed through the compact event
         # payload. Keep the authoritative five-level/KP/Moon calculation at
@@ -4240,14 +4257,21 @@ def _apply_llm_chart_fact_mode_guard(
     mode: str,
     intent: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """Coerce topic-style modes to chart-fact only from LLM structured fields."""
+    """Protect explicit named-chart reads without erasing semantic intent.
+
+    ``chart_focus`` describes which chart the user named; it does not by
+    itself describe the question being asked about that chart.  In
+    particular, a natal-promise question may legitimately request D9 as
+    evidence and must remain ``potential_capacity``.  Only generic topic or
+    trait classifications are safe to repair into a named-chart read here.
+    """
     resolved = str(mode or "").strip() or "topic_reading"
     if resolved in _PROTECTED_CHART_FACT_OVERRIDE_MODES:
         return resolved
     if resolved == "factual_chart_lookup":
         return resolved
     if _llm_explicit_chart_focus(intent) or _llm_chart_fact_evidence_family(intent):
-        if resolved in {"topic_reading", "trait_nature", "potential_capacity"}:
+        if resolved in {"topic_reading", "trait_nature"}:
             return "factual_chart_lookup"
     return resolved
 
@@ -4256,7 +4280,7 @@ def _explicit_remedy_followup_requested(
     intent: Optional[Dict[str, Any]],
     question: str = "",
 ) -> bool:
-    """True only for explicit Remedies CTA flags or remedy-chain question text."""
+    """True for a CTA breadcrumb or the router's explicit semantic remedy decision."""
     from utils.query_context import is_remedy_chain_question, is_remedy_followup_request
 
     return is_remedy_followup_request(intent) or is_remedy_chain_question(question)
@@ -4267,7 +4291,7 @@ def _clamp_remedy_answer_mode(
     intent: Optional[Dict[str, Any]],
     question: str = "",
 ) -> str:
-    """Never enter remedy_action unless the Remedies CTA set explicit query_context flags."""
+    """Reject accidental remedy modes, while allowing explicit multilingual remedy asks."""
     resolved = str(mode or "").strip() or "topic_reading"
     if resolved == "remedy_action" and not _explicit_remedy_followup_requested(intent, question):
         if _looks_like_problem_question(question) or _looks_like_remedy_question(question):
@@ -4279,9 +4303,20 @@ def _clamp_remedy_answer_mode(
 def _looks_like_potential_question(question: str, intent: Optional[Dict[str, Any]]) -> bool:
     q = str(question or "").lower()
     cat = str((intent or {}).get("category") or "").lower()
+    chart_context = any(term in q for term in ("birth chart", "kundli", "kundali", "horoscope"))
+    promise_language = any(term in q for term in ("possibility", "possibilities", "possible", "promise", "promised"))
+    if chart_context and promise_language:
+        return True
     markers = [
         "potential", "suited", "good for", "best for", "can i become", "aptitude",
         "strength", "talent", "capacity", "suitable", "promise", "prospects",
+        "possibility in my chart", "possibility in my birth chart", "possibility in my kundli",
+        "possibility in my kundali", "possible in my chart", "possible in my kundli",
+        "possible in my kundali", "possibilities in my chart",
+        "possibilities in my birth chart", "possibilities in my kundli",
+        "possibilities in my kundali", "possibilities of marriage in my chart",
+        "possibilities of marriage in my birth chart", "possibilities of marriage in my kundli",
+        "possibilities of marriage in my kundali",
     ]
     if any(marker in q for marker in markers):
         return True
@@ -4380,14 +4415,21 @@ def _infer_answer_mode(question: str, intent: Optional[Dict[str, Any]], history:
         return "relationship_person"
     if _looks_like_personality_question(question):
         return "trait_nature"
+    # The multilingual LLM router is authoritative. This fallback ordering is
+    # intentionally narrow: an explicit "in my birth chart/kundali" promise
+    # question is natal capacity even when it contains words such as
+    # possibility or marriage. It must be resolved before event timing.
+    if _looks_like_potential_question(question, intent):
+        return "potential_capacity"
     if _looks_like_open_ended_life_event_when(question, intent):
         return "event_prediction"
     if _looks_like_timing_window_question(question, intent):
         return "timing_window"
+    # This is only the deterministic outage fallback. The multilingual LLM
+    # router remains authoritative, but a chart-promise question must not be
+    # degraded into event timing merely because it contains "possibility".
     if _looks_like_event_prediction_question(question, intent):
         return "event_prediction"
-    if _looks_like_potential_question(question, intent):
-        return "potential_capacity"
     return "topic_reading"
 
 
@@ -4405,6 +4447,7 @@ def _build_answer_mode_router_prompt(question: str, intent: Optional[Dict[str, A
         "question": question,
         "intent_mode": str(intent.get("mode") or ""),
         "intent_category": str(intent.get("category") or ""),
+        "explicit_remedy_request": bool(intent.get("explicit_remedy_request")),
         "needs_transits": bool(intent.get("needs_transits")),
         "context_type": str(intent.get("context_type") or ""),
         "chart_focus": intent.get("chart_focus") if isinstance(intent.get("chart_focus"), dict) else None,
@@ -4429,11 +4472,11 @@ Answer mode meanings:
 - trait_nature: user asks about behavior, nature, speech, temperament, personality
 - relationship_person: user asks about the nature/characteristics of spouse/partner/person
 - timing_window: user asks how a named calendar window feels overall (this month, next six months, October 2026) without a single concrete life-event line as the main ask
-- event_prediction: user asks when/if one specific life event will happen (e.g. marriage, job, child, lover returning); prefer this over timing_window even if they add "this year" or similar
-- potential_capacity: user asks suitability, aptitude, promise, fit, capacity
+- event_prediction: user asks whether/when one specific event will materialize in time (e.g. "Will I marry this person?", "When will I get married?", "Will I get this job this year?"); prefer this over timing_window even if they add "this year" or similar
+- potential_capacity: user asks what the natal/birth chart promises or permits, or asks suitability, aptitude, fit or sustainable capacity. A question such as "Is marriage possible in my birth chart/kundali?" belongs here, not event_prediction: it asks for natal marriage promise, not a calendar prediction.
 - comparison_choice: user asks between two or more options
 - problem_diagnosis: user asks why something is blocked, unstable, delayed, leaking, or difficult
-- remedy_action: ONLY when the client already marked this turn as a Remedies CTA follow-up (query_context.remedy_followup / open_remedy / follow_up_type=remedy_action). Never choose remedy_action from wording alone (e.g. "what should I do", "upay", "solution") — those stay problem_diagnosis or topic_reading; the UI will offer a Remedies card when appropriate.
+- remedy_action: choose this when the primary semantic router set explicit_remedy_request=true, or when the client marked a Remedies CTA follow-up. Do not choose it for vague general advice such as "what should I do?".
 - topic_reading: default focused reading when none of the above fit best
 - location_recommendation: where/place/direction recommendation for a stated life goal; this is distinct from event timing
 - dedicated_muhurat_flow: best date/time for an action; requires the event, location/timezone and usable date range
@@ -4484,8 +4527,10 @@ async def _infer_answer_mode_with_llm(
             intent,
         )
         return {
+            "raw_answer_mode": str(mode or "topic_reading"),
             "answer_mode": resolved_mode,
             "target_subject": target_subject or _fallback_target_subject(question),
+            "router_source": "secondary_answer_mode_llm",
             **extra,
         }
 
@@ -4507,10 +4552,22 @@ async def _infer_answer_mode_with_llm(
         )
     except Exception as exc:
         logger.warning("instant answer mode llm classification failed: %s", exc)
-        return _pack("topic_reading", route_action="answer", router_degraded=True)
+        return _pack(
+            "topic_reading",
+            route_action="answer",
+            router_degraded=True,
+            router_source="secondary_answer_mode_llm_error_fallback",
+            router_reason=f"{type(exc).__name__}: {str(exc)[:160]}",
+        )
     if not llm_result.get("success"):
         logger.warning("instant answer mode llm classification unsuccessful: %s", llm_result.get("error"))
-        return _pack("topic_reading", route_action="answer", router_degraded=True)
+        return _pack(
+            "topic_reading",
+            route_action="answer",
+            router_degraded=True,
+            router_source="secondary_answer_mode_llm_error_fallback",
+            router_reason=str(llm_result.get("error") or "unsuccessful classification")[:180],
+        )
     raw = str(llm_result.get("response") or "").strip()
     target_subject: Optional[Dict[str, Any]] = None
     try:
@@ -4543,6 +4600,8 @@ async def _infer_answer_mode_with_llm(
                 needs_year_clarification=needs_year_clarification,
                 route_action=route_action,
                 user_message=str(data.get("user_message") or "").strip(),
+                router_confidence=str(data.get("confidence") or "medium").strip().lower(),
+                router_reason=str(data.get("reason") or "").strip(),
             )
     except Exception:
         pass
@@ -4565,9 +4624,25 @@ async def _infer_answer_mode_with_llm(
             if target_subject is None:
                 target_subject = _fallback_target_subject(question)
             needs_year_clarification = False
-            return _pack(mode, target_subject, needs_year_clarification=needs_year_clarification, route_action="answer")
+            return _pack(
+                mode,
+                target_subject,
+                needs_year_clarification=needs_year_clarification,
+                route_action="answer",
+                router_source="secondary_answer_mode_llm_regex_recovery",
+                router_confidence="low",
+                router_reason="Recovered answer_mode from non-conforming LLM output.",
+            )
     logger.warning("instant answer mode llm output invalid, falling back: %s", _truncate(raw, 240))
-    return _pack("topic_reading", needs_year_clarification=False, route_action="answer", router_degraded=True)
+    return _pack(
+        "topic_reading",
+        needs_year_clarification=False,
+        route_action="answer",
+        router_degraded=True,
+        router_source="secondary_answer_mode_llm_invalid_fallback",
+        router_confidence="low",
+        router_reason="Invalid answer-mode LLM output.",
+    )
 
 
 def _mode_selection_from_intent(
@@ -4576,9 +4651,20 @@ def _mode_selection_from_intent(
 ) -> Optional[Dict[str, Any]]:
     if not isinstance(intent, dict):
         return None
-    mode = str(intent.get("answer_mode") or "").strip()
-    if mode not in ANSWER_MODES:
+    raw_mode = str(intent.get("answer_mode") or "").strip()
+    if raw_mode not in ANSWER_MODES:
         return None
+    mode = raw_mode
+    requested_object = str(intent.get("requested_object") or "").strip().lower()
+    # Validate the primary LLM's semantic fields against one another. This is
+    # intentionally not a keyword parser: the LLM identifies the requested
+    # object in every supported language. A lived outcome cannot become a
+    # chart-fact lookup merely because its supporting chart was named.
+    if mode == "factual_chart_lookup" and requested_object and requested_object != "named_chart":
+        if str(intent.get("mode") or "").strip() == "ANALYZE_TOPIC_POTENTIAL":
+            mode = "potential_capacity"
+        else:
+            mode = "topic_reading"
     # The intent router sometimes labels a request for a named life event's
     # future window as the generic ``timing_window`` mode.  Do not interpret
     # the user's wording here (that would be language-specific and brittle).
@@ -4624,8 +4710,14 @@ def _mode_selection_from_intent(
     if target_subject is None:
         target_subject = {"key": "self", "label": "self", "base_house": 1, "confidence": "medium", "source": "intent_router_default"}
     return {
+        "raw_answer_mode": raw_mode,
         "answer_mode": mode,
+        "requested_object": requested_object or None,
         "target_subject": target_subject,
+        "router_source": "primary_intent_llm",
+        "router_confidence": str(intent.get("answer_mode_confidence") or intent.get("confidence") or "medium").strip().lower(),
+        "router_reason": str(intent.get("answer_mode_reason") or intent.get("reason") or "").strip(),
+        "router_degraded": False,
         "needs_year_clarification": bool(intent.get("needs_year_clarification")),
         "route_action": str(intent.get("route_action") or "answer").strip().lower(),
         "user_message": str(intent.get("clarification_question") or intent.get("route_message") or "").strip(),
@@ -5142,12 +5234,27 @@ def _build_answer_mode_contract(answer_mode: str, category: str, period_window: 
     elif answer_mode == "potential_capacity":
         base.update(
             {
-                "primary_evidence": ["topic_signals", "divisional_support.topic", "natal_snapshot"],
-                "secondary_evidence": ["house_activation"],
-                "avoid_drift": ["current-period overemphasis", "daily transit narration"],
-                "answer_skeleton": "Core promise -> Strongest capacity/fit -> Limitation or caution -> Practical direction",
+                "primary_evidence": ["natal_promise", "topic_signals", "divisional_support.topic", "natal_snapshot"],
+                "secondary_evidence": [],
+                "avoid_drift": [
+                    "current dasha or transit being used to establish natal promise",
+                    "active houses being upgraded into event certainty",
+                    "daily transit narration",
+                    "timing claims when timing was not asked",
+                ],
+                "answer_skeleton": "Clear natal-promise verdict -> Direct natal support -> Direct natal limitation -> Practical next question",
             }
         )
+        if cat in {"marriage", "love", "relationship", "partner", "spouse"}:
+            base["answer_skeleton"] = (
+                "Clear marriage-promise verdict -> D1 seventh-house/lord basis -> D9 confirmation or qualification -> "
+                "Main obstruction/condition -> Ask whether the user wants timing or has a specific relationship concern"
+            )
+            base["avoid_drift"] = list(base["avoid_drift"]) + [
+                "using only houses 2 or 8 to declare marriage promised",
+                "claiming an unconventional spouse or sudden marriage merely from Rahu",
+                "calling marriage definite when D1 and D9 evidence is incomplete",
+            ]
     elif answer_mode == "comparison_choice":
         base.update(
             {
@@ -5183,8 +5290,10 @@ def _build_answer_mode_contract(answer_mode: str, category: str, period_window: 
                     "non-astrological lecture",
                     "generic remedy dump",
                     "mixing diagnosis with remedy instructions",
+                    "replacing remedies with forecasts or favorable dates",
+                    "calling ordinary career advice the remedy",
                 ],
-                "answer_skeleton": "Problem focus -> What is most pressing now -> Constructive house expression -> Remedy layers by category -> Special blockage notes -> One caution",
+                "answer_skeleton": "One-sentence astrological pressure -> Three prioritized remedies, each stating what to do, how often, and why it fits the chart -> One safety or practicality caution -> One natural follow-up question",
             }
         )
     else:
@@ -5685,7 +5794,7 @@ def _instant_parashari_instruction_block(
         primary = ", ".join(str(v) for v in (contract.get("primary_evidence") or [])) or "remedy blueprint and active pressure"
         secondary = ", ".join(str(v) for v in (contract.get("secondary_evidence") or [])) or "supporting modifiers"
         avoid = "; ".join(str(v) for v in (contract.get("avoid_drift") or [])) or "generic remedy dump"
-        skeleton = str(contract.get("answer_skeleton") or "Problem focus -> What is most pressing now -> Remedy layers by category -> Special blockage notes -> One caution")
+        skeleton = str(contract.get("answer_skeleton") or "One-sentence problem focus -> Three prioritized remedies -> One caution -> One natural follow-up question")
         return "\n".join(
             [
                 f"This answer uses universal answer mode `{answer_mode}`.",
@@ -5693,6 +5802,8 @@ def _instant_parashari_instruction_block(
                 "CRITICAL: This is a remedy-only answer, not a full predictive reading.",
                 "CRITICAL: Do not give all astrological schools or a generic upaya list. Build remedies only from the remedy blueprint and the strongest active chart pressure.",
                 "CRITICAL: Keep the remedy language practical, layered, and non-dramatic.",
+                "CRITICAL: Answer the request immediately. Do not replace remedies with forecasts, favorable dates, diagnosis, or advice such as merely work harder / be disciplined.",
+                "CRITICAL: Keep this Instant version concise: normally 3 prioritized remedies. For each, state exactly what to do, how/often to do it, and the astrological reason in plain language.",
                 f"Answer skeleton: {skeleton}.",
                 f"Primary evidence priority: {primary}.",
                 f"Secondary evidence only after primary evidence: {secondary}.",
@@ -5707,9 +5818,10 @@ def _instant_parashari_instruction_block(
                 "- `normalized_evidence.remedy_blueprint.caution`: use this to avoid overcommitting to gemstones or too many remedies at once.",
                 "- `normalized_evidence.current_timing` and `active_dashas_formatted`: use these only to identify the planet(s) currently pressing the issue.",
                 "- `normalized_evidence.divisional_specifics`: use only if the blueprint actually points there. Do not widen into general astrology.",
-                "The user should see a complete remedy reading in one pass — no Follow-up section, no follow-up chips, and no second remedy CTA.",
+                "The user should see a complete remedy reading in one pass — no Follow-up section heading, no follow-up chips, and no second remedy CTA.",
                 "Do not turn the answer into a broad horoscope or a long explanation of all planets.",
                 "If the user is already positively channeling the planet through study, research, service, teaching, building, or disciplined work, say that directly and treat it as the strongest remedy layer.",
+                "End with exactly one short, natural conversational question about which remedy is practical for the user or whether they want its precise routine.",
             ]
         )
     if answer_mode == "event_prediction":
@@ -7010,6 +7122,89 @@ def _instant_real_muhurat_evidence(
         return {}
 
 
+def _compact_natal_topic_factors(
+    chart_data: Dict[str, Any], focus_houses: List[int], birth_data: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Expose validated D1 promise facts without leaking the full engine payload.
+
+    This is display evidence, not an additional interpretation pass.  The
+    underlying promise engine remains the authority for lord condition,
+    occupants, aspects, karakas, yogas, dispositors and contradictory weight.
+    """
+    try:
+        dignities = PlanetaryDignitiesCalculator(chart_data).calculate_planetary_dignities()
+        yogi_points = YogiCalculator(chart_data).calculate_yogi_points(birth_data or {})
+        gandanta = GandantaCalculator(chart_data).calculate_gandanta_analysis()
+        promises, yogas = build_natal_promises(
+            chart_data,
+            dignities,
+            yogi_points=yogi_points,
+            gandanta=gandanta,
+        )
+    except Exception as exc:
+        logger.warning("instant natal promise detail build failed: %s", exc)
+        return {}
+
+    yoga_by_key = {str(row.get("key")): row for row in yogas if isinstance(row, dict)}
+    wanted = {int(house) for house in focus_houses if str(house).isdigit() and 1 <= int(house) <= 12}
+    rows: List[Dict[str, Any]] = []
+    for promise in promises:
+        house = int(promise.get("house") or 0)
+        if house not in wanted:
+            continue
+        factors = []
+        for factor in promise.get("factors") or ():
+            if not isinstance(factor, dict):
+                continue
+            facts = factor.get("facts") if isinstance(factor.get("facts"), dict) else {}
+            factors.append({
+                "source": factor.get("source"),
+                "planet": factor.get("planet"),
+                "polarity": factor.get("polarity"),
+                "weight": factor.get("weight"),
+                "facts": {
+                    key: facts.get(key)
+                    for key in (
+                        "dignity", "combustion", "neecha_bhanga", "placement_house",
+                        "relation", "functional_role", "ruled_houses", "yogakaraka",
+                        "dispositor", "dispositor_house", "compound_relation",
+                        "direct_relations", "nakshatra_name", "nakshatra_lord", "chain",
+                        "origin", "karaka_for_house", "natural_nature", "roles",
+                        "target_house", "special_sign", "special_sign_name",
+                        "dagdha_sign", "dagdha_sign_name", "tithi_shunya_sign",
+                        "tithi_shunya_sign_name", "avayogi_tithi_shunya_overlap",
+                        "avayogi_overlap", "gandanta_name", "gandanta_type",
+                        "intensity", "distance_from_junction", "statuses",
+                    )
+                    if facts.get(key) not in (None, "", [], (), {})
+                },
+            })
+        rows.append({
+            "house": house,
+            "lord": promise.get("lord"),
+            "occupants": list(promise.get("occupants") or ()),
+            "aspecting_planets": list(promise.get("aspecting_planets") or ()),
+            "karakas": list(promise.get("karakas") or ()),
+            "yogas": [
+                {
+                    "key": key,
+                    "name": (yoga_by_key.get(str(key)) or {}).get("name"),
+                    "planets": list((yoga_by_key.get(str(key)) or {}).get("planets") or ()),
+                }
+                for key in promise.get("yogas") or ()
+            ],
+            "tone": promise.get("tone"),
+            "supportive_weight": promise.get("supportive_weight"),
+            "challenging_weight": promise.get("challenging_weight"),
+            "factors": factors,
+        })
+    return {
+        "source": "validated_d1_natal_promise",
+        "policy_version": next((row.get("policy_version") for row in promises), None),
+        "houses": rows,
+    } if rows else {}
+
+
 def _build_instant_context(
     birth_data: Dict[str, Any],
     question: str,
@@ -7168,6 +7363,11 @@ def _build_instant_context(
             continue
         if q or a:
             recent_history.append({"question": q, "answer": a})
+    # The intent LLM, not language-specific Python parsing, decides whether the
+    # user answered the open clarification or started a different request.  Old
+    # marriage/career/etc. context must not steer the composer after a new ask.
+    if str((intent or {}).get("turn_relation") or "").strip().lower() == "new_request":
+        recent_history = []
 
     complexity_hint = {
         "mode": str((intent or {}).get("mode") or "birth"),
@@ -7242,6 +7442,11 @@ def _build_instant_context(
     # Refine category and focus from what the compact evidence found (px.get("cat"))
     category = instant_parashari.get("category") or category
     focus = CATEGORY_FOCUS.get(category, CATEGORY_FOCUS["general"])
+    instant_parashari["natal_topic_factors"] = _compact_natal_topic_factors(
+        chart_data,
+        list(focus.get("houses") or []),
+        birth_data,
+    )
     
     if answer_mode == "event_prediction" and authoritative_event_prediction_dashas:
         instant_parashari["active_dashas_formatted"] = authoritative_event_prediction_dashas
@@ -7640,6 +7845,13 @@ def _build_instant_context(
         "planets": dict(evidence_current_transits_context),
     }
     prompt_instant_parashari = dict(evidence_instant_parashari)
+    # The complete natal factor ledger is intended for the expandable,
+    # astrologer-readable evidence panel.  Keep it out of the Flash Lite
+    # composer context: the fused verdict already carries the answer-bearing
+    # conclusion and resending the full ledger would make Instant slower.
+    user_evidence = {
+        "natal_topic_factors": prompt_instant_parashari.pop("natal_topic_factors", {}),
+    }
     prompt_normalized_evidence = dict(normalized_evidence)
     prompt_current_dashas_levels = evidence_current_dashas_context if is_non_self_target else current_dashas_context
     if answer_mode == "event_prediction" and authoritative_event_prediction_dashas:
@@ -7848,6 +8060,7 @@ def _build_instant_context(
         "current_transits": prompt_current_transits,
         "current_transits_formatted": prompt_transits_context,
         "instant_parashari": prompt_instant_parashari,
+        "_user_evidence": user_evidence,
         "normalized_evidence": prompt_normalized_evidence,
         "daily_prediction_spine": daily_prediction_spine,
         "recent_history": recent_history,
@@ -7861,10 +8074,12 @@ _FOLLOW_UPS_END = "###FOLLOW_UPS_END###"
 
 
 def _repair_common_utf8_mojibake(value: Any) -> str:
-    """Repair punctuation corrupted by a UTF-8/Windows-1252 boundary.
+    """Repair text whose UTF-8 bytes were decoded as a Western encoding.
 
-    Keep this deliberately narrow so translated scripts and user names are
-    never re-encoded or otherwise normalized.
+    Instant responses are multilingual.  A UTF-8/Latin-1 boundary turns Hindi
+    into sequences such as ``à¤``/``à¥`` and smart punctuation into ``â...``.
+    Only accept a round-trip repair when those signatures become less common;
+    genuine translated scripts and ordinary Western text are left untouched.
     """
     text = str(value or "")
     replacements = {
@@ -7878,7 +8093,35 @@ def _repair_common_utf8_mojibake(value: Any) -> str:
     }
     for broken, repaired in replacements.items():
         text = text.replace(broken, repaired)
-    return text
+
+    suspicious = ("à¤", "à¥", "Ã", "Â", "â€", "ðŸ")
+
+    def corruption_score(candidate: str) -> int:
+        return sum(candidate.count(marker) for marker in suspicious)
+
+    def repair_candidate(candidate: str) -> str:
+        if not candidate or corruption_score(candidate) == 0:
+            return candidate
+        for encoding in ("latin-1", "cp1252"):
+            try:
+                repaired = candidate.encode(encoding).decode("utf-8")
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                continue
+            if (
+                corruption_score(repaired) < corruption_score(candidate)
+                and repaired.count("�") <= candidate.count("�")
+            ):
+                return repaired
+        return candidate
+
+    repaired_text = repair_candidate(text)
+    if repaired_text != text:
+        return repaired_text
+
+    # Mixed content can contain both already-correct Unicode and a corrupted
+    # paragraph. Repair those independently instead of re-encoding the valid
+    # script around them.
+    return "\n".join(repair_candidate(line) for line in text.split("\n"))
 
 
 def _parse_speech_followups_from_answer(raw: str) -> tuple[str, List[str]]:
@@ -8535,6 +8778,7 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
         "comparison_rules": answer_spec.get("comparison_rules"),
         "daily_rules": answer_spec.get("daily_rules"),
         "chart_fact_rules": answer_spec.get("chart_fact_rules"),
+        "capacity_rules": answer_spec.get("capacity_rules"),
         "event_rules": compact_event_rules,
         "forbidden": answer_spec.get("forbidden"),
         "answer_order": answer_spec.get("answer_order"),
@@ -8629,6 +8873,18 @@ def _build_instant_answer_blueprint(
             ],
             "user_goal": query_plan.get("user_goal"),
         }
+    if query_plan.get("answer_mode") == "potential_capacity":
+        return {
+            "purpose": "semantic slots for a static natal-promise judgment; not event timing and not prewritten prose",
+            "slots": [
+                {"slot": "clear yes, qualified yes, mixed, or not-established natal-promise verdict", "source": "verdict.direction"},
+                {"slot": "direct natal support or limitation", "source": "evidence.natal_promise and evidence.topic_confirmation"},
+                {"slot": "relevant divisional confirmation or qualification", "source": "evidence.divisional_specifics"},
+                {"slot": "main condition or obstruction without invented biography", "source": "verdict.rationale, evidence.risk_specifics, and evidence.special_natal_factors"},
+                {"slot": "one natural follow-up about timing or the user's real situation", "source": "user_goal"},
+            ],
+            "user_goal": query_plan.get("user_goal"),
+        }
     slots = [{"slot": "direct real-life verdict", "source": "verdict"}]
     if evidence.get("period_topic_forecast"):
         slots.append(
@@ -8699,6 +8955,34 @@ def _build_instant_composer_context(
     birth = instant_context.get("birth_summary")
     birth = birth if isinstance(birth, dict) else {}
 
+    user_derivation = instant_v2_packet.get("user_derivation")
+    user_derivation = user_derivation if isinstance(user_derivation, dict) else {}
+    derived_promise = user_derivation.get("natal_promise")
+    derived_promise = derived_promise if isinstance(derived_promise, dict) else {}
+    special_natal_factors: List[Dict[str, Any]] = []
+    for house_row in derived_promise.get("d1_house_factors") or []:
+        if not isinstance(house_row, dict):
+            continue
+        house = house_row.get("house")
+        for polarity, key in (
+            ("supportive", "special_support_notes"),
+            ("challenging", "special_caution_notes"),
+        ):
+            for note in house_row.get(key) or []:
+                if not str(note or "").strip():
+                    continue
+                special_natal_factors.append({
+                    "house": house,
+                    "polarity": polarity,
+                    "effect": str(note).strip(),
+                })
+                if len(special_natal_factors) >= 8:
+                    break
+            if len(special_natal_factors) >= 8:
+                break
+        if len(special_natal_factors) >= 8:
+            break
+
     compact_query_plan = {
         key: query_plan.get(key)
         for key in (
@@ -8750,6 +9034,7 @@ def _build_instant_composer_context(
 
     evidence = {
         "natal_promise": normalized.get("natal_promise"),
+        "special_natal_factors": special_natal_factors,
         # A future option-comparison already carries its window-specific dasha
         # evidence in the verdict. Supplying the present chain as well invited
         # the composer to explain a 2027 result with a 2026 chain.
@@ -8781,6 +9066,16 @@ def _build_instant_composer_context(
             instant_context.get("daily_prediction_spine") or normalized.get("daily_prediction_spine")
         ) if exact_day else None,
     }
+    if answer_mode == "potential_capacity":
+        # A natal-promise question must not expose current timing as an
+        # alternative reasoning path. This also keeps the composer brief small.
+        evidence = {
+            "natal_promise": evidence.get("natal_promise"),
+            "special_natal_factors": evidence.get("special_natal_factors"),
+            "topic_confirmation": evidence.get("topic_confirmation"),
+            "divisional_specifics": evidence.get("divisional_specifics"),
+            "risk_specifics": evidence.get("risk_specifics"),
+        }
     if exact_day:
         # Exact-day forecasts have their own authoritative calculation spine.
         # Do not let broad-period timing, generic active-area summaries, or slow
@@ -8807,6 +9102,35 @@ def _build_instant_composer_context(
                 "source": chart_facts.get("source"),
                 "charts": compact_charts,
             }
+        }
+    if answer_mode == "remedy_action":
+        # RemedyEngine has already converted the chart, current dasha and
+        # special-point calculations into an actionable remedy plan.  Keep
+        # that plan at the verdict-first composer boundary; otherwise the
+        # writer sees only ordinary topic evidence and improvises generic
+        # career/relationship advice instead of returning remedies.
+        remedy_blueprint = (
+            normalized.get("remedy_blueprint")
+            if isinstance(normalized.get("remedy_blueprint"), dict)
+            else {}
+        )
+        evidence = {
+            "remedy_blueprint": remedy_blueprint,
+            "question_focus": normalized.get("question_focus") or remedy_blueprint.get("question_focus"),
+            "primary_drivers": list(
+                normalized.get("primary_drivers")
+                or remedy_blueprint.get("candidate_planets")
+                or []
+            )[:4],
+            "top_risks": list(
+                normalized.get("top_risks")
+                or remedy_blueprint.get("priority_order")
+                or []
+            )[:4],
+            "special_points": normalized.get("special_points") or remedy_blueprint.get("special_points"),
+            "remedy_sections": normalized.get("remedy_sections") or remedy_blueprint.get("remedy_sections"),
+            "caution": normalized.get("caution") or remedy_blueprint.get("caution"),
+            "current_timing": normalized.get("current_timing"),
         }
     evidence = {key: value for key, value in evidence.items() if value not in (None, "", [], {})}
 
@@ -8876,6 +9200,11 @@ def _build_instant_composer_prompt_v3(
         or str((composer_context.get("intent") or {}).get("answer_mode") or "") == "factual_chart_lookup"
         or str((composer_context.get("query_plan") or {}).get("answer_mode") or "") == "factual_chart_lookup"
     )
+    answer_mode = str(
+        (composer_context.get("intent") or {}).get("answer_mode")
+        or (composer_context.get("query_plan") or {}).get("answer_mode")
+        or ""
+    )
     if is_chart_fact:
         return f"""
 You are Tara in AstroRoshni Instant Chat. The requested chart has already been calculated with placements, dignity, aspects, and house data. Your job is to predict from that chart.
@@ -8906,7 +9235,27 @@ AUTHORITATIVE COMPOSER BRIEF:
 {context_json}
 """.strip()
     period_forecast_rules = ""
-    if is_period_topic_forecast:
+    if answer_mode == "potential_capacity":
+        period_forecast_rules = """
+- This is a static natal-promise question, not a timing question. Do not mention the current dasha, current transits, active houses, or a calendar window.
+- The first sentence must give the exact bounded verdict from `verdict.direction`: supported natal promise, qualified/mixed promise, or not responsibly established from the available evidence. Never upgrade it to "definitely".
+- For marriage, judge D1 seventh-house/lord evidence first and D9 confirmation second. Houses 2 or 8 alone cannot establish marriage promise.
+- Do not claim sudden marriage, an unconventional route, a foreign/different-background spouse, or volatility merely because Rahu exists in the chart.
+- If required D1/D9 capability is missing, say the marriage promise cannot yet be judged responsibly from this packet and ask one precise question; do not substitute current-period activity.
+- Explain what is supported and the main condition in ordinary language. End by asking whether the user wants timing or is asking about a specific relationship.
+"""
+    if answer_mode == "remedy_action":
+        period_forecast_rules = """
+- This is an explicit remedy request. Give remedies, not another diagnosis, forecast, favorable date, or lecture about discipline and patience.
+- `evidence.remedy_blueprint` is the authoritative remedy plan. If it is absent or empty, say that the chart-specific remedy plan could not be prepared and ask one precise clarification; never improvise generic advice as a remedy.
+- Start with one short sentence naming the calculated astrological pressure being addressed.
+- Then give exactly three prioritized, concrete remedies from `remedy_blueprint.remedy_sections`. For each remedy state: what to do, how often or when to do it, and which calculated planet, house function, nakshatra, or special blockage makes it relevant.
+- Prefer constructive house expression first, then the strongest suitable mantra, seva/charity, nakshatra, biological/tree, or behavioral action. Do not dump every available remedy layer.
+- Ordinary career advice such as work consistently, improve communication, seek training, avoid shortcuts, or plan carefully is not a remedy unless it is a concrete `house_expression` or `behavioral` action from the supplied blueprint and its chart connection is stated.
+- Gemstones must remain optional and suitability-dependent. Preserve `evidence.caution`; avoid fear, guarantees, expensive prescriptions, and excessive ritual.
+- Do not give event dates or claim that a remedy guarantees an outcome. End with one natural question about which remedy is practical for the user to follow.
+"""
+    elif is_period_topic_forecast:
         period_forecast_rules = """
 - This is a period-topic forecast, not a generic topic reading.
 - Sentence 1: answer how the requested life area is likely to go overall, using plain real-life language.
@@ -8942,10 +9291,15 @@ AUTHORITATIVE COMPOSER BRIEF:
     else:
         answer_contract = composer_context.get("answer_contract") if isinstance(composer_context.get("answer_contract"), dict) else {}
         word_guidance = str(answer_contract.get("composer_word_target") or "Usually 90-180 words; expand when necessary.")
+        prohibited_additions = (
+            "feedback requests, mode suggestions, or sales copy"
+            if answer_mode == "remedy_action"
+            else "remedies, feedback requests, mode suggestions, or sales copy"
+        )
         speech_rules = f"""
 - Length guidance: {word_guidance} Do not omit a material phase, evidence limitation, or direct answer merely to stay short.
 - End the visible answer with exactly one natural, topic-specific question about the user's real concern or goal.
-- Do not recommend a deeper reading and do not add remedies, feedback requests, mode suggestions, or sales copy.
+- Do not recommend a deeper reading and do not add {prohibited_additions} beyond what this answer mode explicitly requires.
 - Append exactly one final metadata line after the visible answer:
 NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","follow_up_questions":[],"source":"instant"}}
 """
@@ -8964,6 +9318,7 @@ Hard rules:
 - A dated peak is only the most concentrated part of its containing phase. Never present the final or strongest peak as though nothing meaningful happens during the rest of the requested period.
 - A period is "highly active" only when it appears in an allowed/peak window. Copy supplied dates exactly. If no peak exists, call it background activity, not a peak.
 - Include at least one short, understandable astrological reason in every completed answer so it is visibly chart-based. Add more only when needed to explain materially different phases or evidence.
+- `evidence.special_natal_factors` contains only calculated Gandanta, Yogi, Avayogi, Dagdha Rashi, or Tithi Shunya factors connected to the relevant natal houses. If present, use a factor when it materially supports or qualifies the verdict; describe its practical effect in plain language. Do not list every factor, treat a caution as an absolute denial, or invent a special factor that is absent.
 - If evidence is missing, state the limited conclusion plainly. Never fill gaps with generic planet folklore.
 - Preserve all cautions and limitations. For health, describe only allowed susceptibilities, never diagnosis or certainty.
 - For a derived person, keep ownership explicit: these are the native chart's indications for that person, not that person's own chart or dasha.
@@ -9051,6 +9406,19 @@ def _compact_context_for_speech(instant_context: Dict[str, Any]) -> Dict[str, An
         "health_body_area": normalized.get("health_body_area"),
         "option_comparison": normalized.get("option_comparison"),
     }
+    if str(intent_summary.get("answer_mode") or "") == "remedy_action":
+        # The speech/legacy compact path must retain the same authoritative
+        # remedy plan as the verdict-first composer.  Do not make Listen turn
+        # a real remedy answer back into generic chart advice.
+        for key in (
+            "remedy_blueprint",
+            "question_focus",
+            "special_points",
+            "remedy_sections",
+            "follow_up_prompts",
+            "caution",
+        ):
+            compact_normalized[key] = normalized.get(key)
     compact_normalized = {k: v for k, v in compact_normalized.items() if v not in (None, "", [], {})}
 
     compact_parashari = {
@@ -9408,6 +9776,18 @@ async def generate_instant_chat_response(
         ),
         intent,
     )
+    routing_decision = {
+        "selected_mode": str((mode_selection or {}).get("raw_answer_mode") or answer_mode),
+        "final_mode": answer_mode,
+        "source": str((mode_selection or {}).get("router_source") or "unknown"),
+        "confidence": str((mode_selection or {}).get("router_confidence") or "unknown"),
+        "reason": str((mode_selection or {}).get("router_reason") or ""),
+        "degraded": bool((mode_selection or {}).get("router_degraded")),
+        "intent_answer_mode": str((intent or {}).get("answer_mode") or ""),
+        "intent_mode": str((intent or {}).get("mode") or ""),
+        "intent_category": str((intent or {}).get("category") or ""),
+        "post_selection_changed": str((mode_selection or {}).get("raw_answer_mode") or answer_mode) != answer_mode,
+    }
     target_subject = (mode_selection or {}).get("target_subject") if isinstance(mode_selection, dict) else None
     calculations_started = time.perf_counter()
     instant_context = _build_instant_context(
@@ -9430,6 +9810,9 @@ async def generate_instant_chat_response(
                 language=language,
                 instant_context=instant_context,
             )
+            if isinstance(instant_v2_packet.get("query_plan"), dict):
+                instant_v2_packet["query_plan"]["routing_decision"] = routing_decision
+            instant_v2_packet["routing_decision"] = routing_decision
             # The composer receives the compact contract, not the full audit
             # ledger. The full packet is returned for test inspection.
             instant_context["instant_v2_answer_contract"] = {
@@ -9468,6 +9851,11 @@ async def generate_instant_chat_response(
             reduction_pct,
         )
         prompt_context = compact_context
+    elif isinstance(prompt_context, dict) and prompt_context.get("_user_evidence"):
+        # Defensive path for a disabled/failed v2 packet: display-only audit
+        # evidence must never leak into the generation prompt.
+        prompt_context = dict(prompt_context)
+        prompt_context.pop("_user_evidence", None)
     if speech_mode:
         try:
             if _env_flag("SPEECH_LOG_FULL_CONTEXT", False):

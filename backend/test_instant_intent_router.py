@@ -69,6 +69,12 @@ class _TestRouter(IntentRouter):
     def _get_instant_model(self):
         return self._fake_model
 
+    def _get_instant_model_name(self):
+        return self._fake_model._model_name
+
+    async def _generate_instant_content(self, prompt, model_name, timeout_s):
+        return await self._fake_model.generate_content_async(prompt)
+
 
 def _with_dialogue_state(payload):
     payload = dict(payload)
@@ -277,6 +283,61 @@ def test_instant_router_repairs_repeated_clarification_with_llm():
     assert result["dialogue_state"]["unresolved_facts"] == []
     assert len(router._fake_model.prompts) == 2
     assert "CONTRACT REPAIR" in router._fake_model.prompts[1]
+
+
+def test_new_remedy_request_discards_abandoned_marriage_clarification():
+    payload = _with_dialogue_state(
+        {
+            "turn_relation": "new_request",
+            "explicit_remedy_request": True,
+            "status": "READY",
+            "clarification_question": "",
+            "route_action": "answer",
+            "mode": "RECOMMEND_REMEDY_FOR_PROBLEM",
+            "answer_mode": "remedy_action",
+            "category": "career",
+            "target_subject_key": "self",
+            "extracted_context": {},
+            "context_type": "birth",
+            "needs_transits": False,
+            "divisional_charts": ["D1", "D10"],
+            "dialogue_state": {
+                "request_summary": "Career remedies",
+                "known_facts": {"topic": "career"},
+                "unresolved_facts": [],
+                "corrections": [],
+                "ready_to_calculate": True,
+                "readiness_reason": "Direct remedy request",
+                "last_clarification_question": "",
+            },
+        }
+    )
+    router = _TestRouter(payload)
+    result = asyncio.run(
+        router.classify_instant_intent(
+            "When will I get married? What about her career and family?\nShow my career remedies",
+            [],
+            clarification_count=1,
+            language="english",
+            dialogue_state={
+                "request_summary": "Marriage timing or future spouse career and family",
+                "known_facts": {"topic": "marriage"},
+                "unresolved_facts": ["which_question_first"],
+                "corrections": [],
+                "ready_to_calculate": False,
+                "last_clarification_question": "Which topic should I answer first?",
+            },
+            latest_user_reply="Show my career remedies",
+        )
+    )
+
+    assert result["status"] == "READY"
+    assert result["turn_relation"] == "new_request"
+    assert result["explicit_remedy_request"] is True
+    assert result["category"] == "career"
+    assert result["answer_mode"] == "remedy_action"
+    assert result["dialogue_state"]["known_facts"] == {"topic": "career"}
+    assert result["dialogue_state"]["unresolved_facts"] == []
 
 
 if __name__ == "__main__":

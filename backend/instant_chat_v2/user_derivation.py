@@ -60,6 +60,23 @@ TOPIC_HOUSE_MEANINGS = {
     },
 }
 
+DIVISIONAL_HOUSE_MEANINGS = {
+    "marriage": {
+        1: "the overall strength and lived quality of married life",
+        2: "family continuity, shared values and life built together",
+        7: "the spouse, commitment and the marriage bond itself",
+        8: "durability, intimacy and the ability to handle shared pressures",
+        11: "fulfilment, support and gains through partnership",
+    },
+    "relationship": {
+        1: "the overall strength and lived quality of partnership",
+        2: "shared values, family expectations and communication",
+        7: "the partner and the committed relationship itself",
+        8: "trust, intimacy and resilience under pressure",
+        11: "mutual support, fulfilment and shared goals",
+    },
+}
+
 
 def _house_meaning(event_key: str, number: int) -> str:
     return TOPIC_HOUSE_MEANINGS.get(event_key, {}).get(
@@ -122,6 +139,103 @@ def _house_rows(event_key: str, focus_houses: Iterable[Any]) -> List[Dict[str, A
                 "meaning": _house_meaning(event_key, number),
             })
     return rows
+
+
+def _clean_text(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip(" .")
+
+
+def _topic_signal_lines(topic_signals: Any, event_key: str) -> tuple[List[str], List[str]]:
+    """Turn calculated D1 topic signals into readable support/caution facts."""
+    if not isinstance(topic_signals, dict):
+        return [], []
+    supports: List[str] = []
+    cautions: List[str] = []
+    body = topic_signals.get("body")
+    if isinstance(body, str):
+        body = [body]
+    for item in _list(body):
+        text = _clean_text(item.get("txt") if isinstance(item, dict) else item)
+        if text:
+            supports.append(text + ".")
+    house_rows = topic_signals.get("hh") if isinstance(topic_signals.get("hh"), dict) else {}
+    for key, row in house_rows.items():
+        if not isinstance(row, dict):
+            continue
+        house = _house(key)
+        text = _clean_text(row.get("txt"))
+        if not text:
+            continue
+        line = (
+            f"D1 House {house} ({_house_meaning(event_key, house)}) shows {text}."
+            if house else text + "."
+        )
+        score = row.get("sc")
+        try:
+            is_caution = float(score) < 0
+        except (TypeError, ValueError):
+            is_caution = False
+        (cautions if is_caution else supports).append(line)
+    risk = _clean_text(topic_signals.get("risk"))
+    if risk:
+        cautions.append(risk + ".")
+    pattern = _clean_text(topic_signals.get("pattern"))
+    if pattern:
+        supports.append(pattern + ".")
+    return list(dict.fromkeys(supports))[:4], list(dict.fromkeys(cautions))[:3]
+
+
+def _divisional_promise_lines(divisional_support: Any, event_key: str) -> tuple[List[str], List[str], List[Dict[str, Any]]]:
+    """Explain static divisional promise; deliberately ignore current_topic timing."""
+    if not isinstance(divisional_support, dict):
+        return [], [], []
+    topic = divisional_support.get("topic") if isinstance(divisional_support.get("topic"), dict) else {}
+    charts = topic.get("charts") if isinstance(topic.get("charts"), dict) else {}
+    supports: List[str] = []
+    cautions: List[str] = []
+    structured: List[Dict[str, Any]] = []
+    meanings = DIVISIONAL_HOUSE_MEANINGS.get(event_key, {})
+    for code, detail in charts.items():
+        if not isinstance(detail, dict):
+            continue
+        chart_support = _clean_text(detail.get("support")).replace("_", " ")
+        if chart_support:
+            supports.append(
+                f"{code} is rated {chart_support} after checking its relevant houses, their lords and occupants."
+            )
+        rows = [row for row in _list(detail.get("rows")) if isinstance(row, dict)]
+        # The direct topic house is more useful than whichever row happened to
+        # sort first. For marriage/relationship this makes D9 house 7 primary.
+        rows.sort(key=lambda row: (0 if _house(row.get("h")) == 7 else 1, _house(row.get("h")) or 99))
+        for row in rows[:3]:
+            house = _house(row.get("h"))
+            if not house:
+                continue
+            lord = _clean_text(row.get("lord"))
+            lord_house = _house(row.get("lord_h"))
+            occupants = [_clean_text(value) for value in _list(row.get("occ")) if _clean_text(value)]
+            band = _clean_text(row.get("band")).replace("_", " ") or "mixed"
+            meaning = meanings.get(house, _house_meaning(event_key, house))
+            facts = []
+            if lord:
+                facts.append(f"its lord {lord}" + (f" is placed in House {lord_house}" if lord_house else ""))
+            if occupants:
+                facts.append(f"occupants are {', '.join(occupants)}")
+            line = f"In {code}, House {house} governs {meaning}"
+            if facts:
+                line += "; " + ", and ".join(facts)
+            line += f". This factor is rated {band}."
+            (cautions if band == "weak" else supports).append(line)
+            structured.append({
+                "chart": str(code),
+                "house": house,
+                "meaning": meaning,
+                "lord": lord or None,
+                "lord_placement_house": lord_house,
+                "occupants": occupants,
+                "rating": band,
+            })
+    return list(dict.fromkeys(supports))[:5], list(dict.fromkeys(cautions))[:3], structured
 
 
 def _container_segments(value: Any) -> List[Dict[str, Any]]:
@@ -268,11 +382,248 @@ def _transit_rows(segments: List[Dict[str, Any]], normalized: Dict[str, Any],
     return result
 
 
+def _d1_natal_factor_lines(value: Any, event_key: str) -> tuple[List[str], List[str], List[Dict[str, Any]]]:
+    def explain_factor(factor: Dict[str, Any], house: int) -> str:
+        source = str(factor.get("source") or "")
+        planet = str(factor.get("planet") or "the planet")
+        facts = _dict(factor.get("facts"))
+        polarity = str(factor.get("polarity") or "mixed")
+        if source in {"occupant_condition", "aspector_condition"}:
+            role = "occupant" if source.startswith("occupant") else "aspector"
+            dignity = str(facts.get("dignity") or "neutral").replace("_", " ")
+            combustion = str(facts.get("combustion") or "normal").replace("_", " ")
+            extras = [item for item in (dignity if dignity != "neutral" else None, combustion if combustion != "normal" else None) if item]
+            return f"{planet}, a D1 House {house} {role}, is assessed {polarity}" + (f" ({', '.join(extras)})" if extras else "") + "."
+        if source.endswith("functional_lordship"):
+            role = str(facts.get("relation") or "influence")
+            ruled = ", ".join(f"House {item}" for item in _list(facts.get("ruled_houses")))
+            functional = str(facts.get("functional_role") or polarity).replace("_", " ")
+            if functional.startswith("functional "):
+                functional = functional[len("functional "):]
+            return f"{planet}'s {role} influence is functionally {functional}" + (f" because it rules {ruled}" if ruled else "") + "."
+        if source == "placement_dispositor_relationship":
+            relation = str(facts.get("compound_relation") or polarity).replace("_", " ")
+            return f"{planet} is hosted by dispositor {facts.get('dispositor')} in a {relation} fivefold relationship."
+        if source == "fivefold_friendship_with_nakshatra_lord":
+            relation = str(facts.get("compound_relation") or polarity).replace("_", " ")
+            return f"{planet} is in {facts.get('nakshatra_name')} ruled by {facts.get('nakshatra_lord')}, with a {relation} fivefold relationship."
+        if source == "final_dispositor_condition":
+            chain = " → ".join(str(item) for item in _list(facts.get("chain")))
+            return f"The dispositor chain {chain or planet} ends at {planet}, whose condition is {polarity}."
+        if source == "node_conditioned_influence":
+            return f"{planet}'s node influence on D1 House {house} resolves as {polarity} after its lord, sign and conjunction context are checked."
+        if source == "planet_gandanta":
+            name = facts.get("gandanta_name") or "a Gandanta junction"
+            intensity = str(facts.get("intensity") or "").lower()
+            detail = f" with {intensity} intensity" if intensity else ""
+            return f"{planet} is in {name}{detail}, adding transition pressure to D1 House {house}."
+        if source == "lagna_gandanta":
+            name = facts.get("gandanta_name") or "a Gandanta junction"
+            return f"The D1 ascendant is in {name}, adding sensitivity to the chart foundation."
+        if source == "yogi_lord":
+            sign = facts.get("special_sign_name")
+            return f"{planet} is the Yogi lord" + (f" for {sign}" if sign else "") + f" and supports D1 House {house}."
+        if source == "avayogi_lord":
+            sign = facts.get("special_sign_name")
+            overlap = facts.get("avayogi_tithi_shunya_overlap")
+            if overlap:
+                return f"{planet} is both the Avayogi and Tithi Shunya lord; the declared overlap rule makes its effect on D1 House {house} mixed rather than purely obstructive."
+            return f"{planet} is the Avayogi lord" + (f" for {sign}" if sign else "") + f" and adds obstruction to D1 House {house}."
+        if source == "dagdha_rashi_lord":
+            sign = facts.get("special_sign_name")
+            return f"{planet} rules the Dagdha Rashi" + (f" {sign}" if sign else "") + f" and adds pressure to D1 House {house}."
+        if source == "tithi_shunya_lord":
+            sign = facts.get("special_sign_name")
+            return f"{planet} rules the Tithi Shunya Rashi" + (f" {sign}" if sign else "") + f" and restricts D1 House {house}."
+        if source == "planet_in_dagdha_rashi":
+            sign = facts.get("dagdha_sign_name") or facts.get("special_sign_name")
+            return f"{planet} is placed in the Dagdha Rashi" + (f" {sign}" if sign else "") + f", weakening its contribution to D1 House {house}."
+        if source == "planet_in_tithi_shunya_rashi":
+            sign = facts.get("tithi_shunya_sign_name") or facts.get("special_sign_name")
+            return f"{planet} is placed in the Tithi Shunya Rashi" + (f" {sign}" if sign else "") + f", restricting its contribution to D1 House {house}."
+        if source == "combined_special_status":
+            labels = [str(item.get("rule_id") or "").replace("_", " ") for item in _list(facts.get("statuses")) if isinstance(item, dict)]
+            return f"{planet}'s correlated special conditions ({', '.join(labels)}) are counted as one combined influence on D1 House {house}." if labels else ""
+        return ""
+
+    payload = _dict(value)
+    supports: List[str] = []
+    cautions: List[str] = []
+    structured: List[Dict[str, Any]] = []
+    for row in _list(payload.get("houses")):
+        if not isinstance(row, dict):
+            continue
+        house = _house(row.get("house"))
+        if not house:
+            continue
+        lord = str(row.get("lord") or "").strip()
+        occupants = [str(item) for item in _list(row.get("occupants")) if item]
+        aspectors = [str(item) for item in _list(row.get("aspecting_planets")) if item]
+        karakas = [str(item) for item in _list(row.get("karakas")) if item]
+        tone = str(row.get("tone") or "mixed").replace("_", " ")
+        factors = [factor for factor in _list(row.get("factors")) if isinstance(factor, dict)]
+        lord_condition = next((
+            factor for factor in factors
+            if factor.get("source") == "house_lord_condition" and str(factor.get("planet") or "") == lord
+        ), {})
+        lord_facts = _dict(lord_condition.get("facts"))
+        lord_house = _house(lord_facts.get("placement_house"))
+        condition_bits = [str(lord_facts.get("dignity") or "").replace("_", " ")]
+        combustion = str(lord_facts.get("combustion") or "normal").replace("_", " ")
+        if combustion != "normal":
+            condition_bits.append(combustion)
+        if lord_facts.get("neecha_bhanga"):
+            condition_bits.append("with debilitation cancellation")
+        condition = ", ".join(bit for bit in condition_bits if bit and bit != "neutral")
+        meaning = _house_meaning(event_key, house)
+        line = f"D1 House {house} ({meaning}) is ruled by {lord or 'an unavailable lord'}"
+        if lord_house:
+            line += f", placed in House {lord_house}"
+        if condition:
+            line += f" in {condition} condition"
+        line += f"; the combined house assessment is {tone}."
+        (cautions if tone == "challenging" else supports).append(line)
+        if occupants:
+            supports.append(f"D1 House {house} contains {', '.join(occupants)}; their lordship, natural nature and condition are included in the assessment.")
+        else:
+            supports.append(f"D1 House {house} has no classical planetary occupant; its lord and aspects therefore carry more of the judgment.")
+        if aspectors:
+            supports.append(f"D1 House {house} receives classical aspects from {', '.join(aspectors)}.")
+        if karakas:
+            karaka_rows = []
+            for planet in karakas:
+                factor = next((
+                    item for item in factors
+                    if item.get("source") == "natural_karaka_condition" and item.get("planet") == planet
+                ), {})
+                facts = _dict(factor.get("facts"))
+                placement = _house(facts.get("placement_house"))
+                dignity = str(facts.get("dignity") or "neutral").replace("_", " ")
+                karaka_rows.append(f"{planet}" + (f" in House {placement}" if placement else "") + (f" ({dignity})" if dignity != "neutral" else ""))
+            supports.append(f"Natural karaka check for D1 House {house}: {', '.join(karaka_rows)}.")
+        yoga_names = [str(item.get("name") or item.get("key")) for item in _list(row.get("yogas")) if isinstance(item, dict)]
+        if yoga_names:
+            supports.append(f"Relevant validated D1 yoga links for House {house}: {', '.join(yoga_names)}.")
+
+        factor_support = sorted(
+            (item for item in factors if item.get("polarity") == "supportive"),
+            key=lambda item: float(item.get("weight") or 0), reverse=True,
+        )
+        factor_challenges = sorted(
+            (item for item in factors if item.get("polarity") == "challenging"),
+            key=lambda item: float(item.get("weight") or 0), reverse=True,
+        )
+        for factor in factor_support[:3]:
+            detail = explain_factor(factor, house)
+            if detail and detail not in supports:
+                supports.append(detail)
+        for factor in factor_challenges[:3]:
+            detail = explain_factor(factor, house)
+            if detail and detail not in cautions:
+                cautions.append(detail)
+        special_sources = {
+            "planet_gandanta", "lagna_gandanta", "yogi_lord", "avayogi_lord",
+            "dagdha_rashi_lord", "tithi_shunya_lord", "planet_in_dagdha_rashi",
+            "planet_in_tithi_shunya_rashi", "combined_special_status",
+        }
+        special_support = [
+            detail for factor in factor_support if factor.get("source") in special_sources
+            if (detail := explain_factor(factor, house))
+        ]
+        special_cautions = [
+            detail for factor in factor_challenges if factor.get("source") in special_sources
+            if (detail := explain_factor(factor, house))
+        ]
+        support_notes = list(dict.fromkeys([
+            *[detail for factor in factor_support[:2] if (detail := explain_factor(factor, house))],
+            *special_support,
+        ]))
+        caution_notes = list(dict.fromkeys([
+            *[detail for factor in factor_challenges[:2] if (detail := explain_factor(factor, house))],
+            *special_cautions,
+        ]))
+        structured.append({
+            "house": house,
+            "meaning": meaning,
+            "lord": lord,
+            "lord_placement_house": lord_house,
+            "lord_condition": lord_facts,
+            "occupants": occupants,
+            "aspecting_planets": aspectors,
+            "karakas": karakas,
+            "yogas": _list(row.get("yogas")),
+            "tone": row.get("tone"),
+            "supportive_weight": row.get("supportive_weight"),
+            "challenging_weight": row.get("challenging_weight"),
+            "strongest_supports": factor_support[:4],
+            "strongest_challenges": factor_challenges[:4],
+            "support_notes": support_notes,
+            "caution_notes": caution_notes,
+            # Keep these separate from the general audit notes so the answer
+            # composer can receive the small, relevant special-factor subset
+            # without receiving the complete natal factor ledger.
+            "special_support_notes": list(dict.fromkeys(special_support)),
+            "special_caution_notes": list(dict.fromkeys(special_cautions)),
+        })
+    return list(dict.fromkeys(supports)), list(dict.fromkeys(cautions)), structured
+
+
 def build_user_derivation(*, query_plan: Dict[str, Any], verdict: Dict[str, Any],
                           instant_context: Dict[str, Any]) -> Dict[str, Any]:
     """Return calculated, display-ready derivation without changing the LLM prompt."""
     normalized = _dict(instant_context.get("normalized_evidence"))
+    answer_mode = str(query_plan.get("answer_mode") or "")
+    chart_facts = _dict(normalized.get("chart_facts"))
+    if answer_mode == "factual_chart_lookup" and chart_facts:
+        charts = _dict(chart_facts.get("charts"))
+        requested = [str(item) for item in _list(chart_facts.get("requested_charts")) if item]
+        fact_groups: List[Dict[str, Any]] = []
+        for chart_name, raw_chart in charts.items():
+            chart = _dict(raw_chart)
+            domain = _dict(chart.get("domain"))
+            lagna = _dict(chart.get("lagna"))
+            lines: List[str] = []
+            sign_name = lagna.get("sign_name") or chart.get("ascendant")
+            if sign_name:
+                lines.append(f"{chart_name} ascendant is {sign_name}.")
+            if lagna.get("lord"):
+                placement = f" in House {lagna.get('lord_house')}" if lagna.get("lord_house") not in (None, "") else ""
+                dignity = f" ({str(lagna.get('lord_dignity')).replace('_', ' ')})" if lagna.get("lord_dignity") else ""
+                lines.append(f"Its ascendant lord {lagna.get('lord')} is placed{placement}{dignity}.")
+            lines.extend(str(item) for item in _list(chart.get("support_signals")) if item)
+            lines.extend(f"Caution: {item}" for item in _list(chart.get("caution_signals")) if item)
+            focus_rows = [row for row in _list(chart.get("houses")) if isinstance(row, dict) and row.get("focus")]
+            for row in focus_rows:
+                occupants = ", ".join(str(item) for item in _list(row.get("occupants"))) or "no occupants"
+                lines.append(
+                    f"House {row.get('house')} ({row.get('theme') or 'relevant area'}) is ruled by "
+                    f"{row.get('lord') or 'an unavailable lord'} and has {occupants}."
+                )
+            fact_groups.append({
+                "chart": str(chart_name),
+                "life_area": domain.get("life_area"),
+                "lines": list(dict.fromkeys(lines)),
+            })
+        missing = [str(item) for item in _list(chart_facts.get("missing_requested_charts")) if item]
+        return {
+            "schema_version": "instant-user-derivation/v2",
+            "chart_reading": {
+                "requested_charts": requested,
+                "source": chart_facts.get("source"),
+                "calculation_complete": bool(chart_facts.get("calculation_complete")),
+                "fact_groups": fact_groups,
+                "missing_charts": missing,
+            },
+            "conclusion": {
+                "direction": verdict.get("direction") or "calculated_chart",
+                "confidence": verdict.get("confidence"),
+                "why": [str(item) for item in _list(chart_facts.get("reading_lines")) if item][:8],
+            },
+            "limitations": missing,
+            "complete": bool(fact_groups and not missing),
+        }
     parashari = _dict(instant_context.get("instant_parashari"))
+    user_evidence = _dict(instant_context.get("_user_evidence"))
     promise = _dict(normalized.get("natal_promise"))
     event_key = _event_key(query_plan, instant_context)
     focus_houses = parashari.get("focus_houses") or _dict(instant_context.get("intent_summary")).get("focus_houses") or []
@@ -281,12 +632,28 @@ def build_user_derivation(*, query_plan: Dict[str, Any], verdict: Dict[str, Any]
     segments = [row for row in segments if row.get("start") or row.get("chain") or row.get("reasons")]
 
     natal_basis: List[str] = []
-    support = promise.get("topic_support") or promise.get("current_topic_support")
+    support = promise.get("topic_support")
+    if answer_mode != "potential_capacity" and not support:
+        support = promise.get("current_topic_support")
     if support:
         natal_basis.append(f"The {event_key} foundation is rated {str(support).replace('_', ' ')}.")
-    for item in _list(normalized.get("divisional_specifics"))[:2]:
-        if isinstance(item, str) and item.strip():
-            natal_basis.append(item.strip())
+    topic_confirmation = _dict(normalized.get("topic_confirmation"))
+    topic_signals = topic_confirmation.get("topic_signals") or parashari.get("topic_signals") or {}
+    d1_support, d1_cautions, d1_house_factors = _d1_natal_factor_lines(
+        user_evidence.get("natal_topic_factors") or parashari.get("natal_topic_factors"), event_key
+    )
+    if not d1_support and not d1_cautions:
+        d1_support, d1_cautions = _topic_signal_lines(topic_signals, event_key)
+    divisional_support, divisional_cautions, divisional_house_factors = _divisional_promise_lines(
+        parashari.get("divisional_support"), event_key
+    )
+    # Legacy generic lines remain useful for timed questions, but a static
+    # capacity/promise question must never cite current divisional timing as
+    # evidence of natal promise.
+    if answer_mode != "potential_capacity" and not divisional_support:
+        for item in _list(normalized.get("divisional_specifics"))[:2]:
+            if isinstance(item, str) and item.strip():
+                natal_basis.append(item.strip())
     if not natal_basis and promise.get("status"):
         natal_basis.append("The topic-specific natal and divisional checks produced this promise status.")
 
@@ -294,7 +661,7 @@ def build_user_derivation(*, query_plan: Dict[str, Any], verdict: Dict[str, Any]
     strongest = ranked[0] if ranked else (segments[-1] if segments else {})
     missing = _list(verdict.get("missing_required_capabilities"))
     return {
-        "schema_version": "instant-user-derivation/v1",
+        "schema_version": "instant-user-derivation/v2",
         "event": {
             "key": event_key,
             "label": event_key.replace("_", " ").title(),
@@ -303,6 +670,16 @@ def build_user_derivation(*, query_plan: Dict[str, Any], verdict: Dict[str, Any]
         "natal_promise": {
             "status": promise.get("status") or "not_established",
             "basis": natal_basis,
+            "d1_factors": d1_support,
+            "d1_house_factors": d1_house_factors,
+            "divisional_factors": divisional_support,
+            "divisional_house_factors": divisional_house_factors,
+            # This panel is explicitly expandable audit evidence. Do not hide
+            # contradictory natal factors merely to keep it visually short;
+            # those qualifications are what let an astrologer assess whether
+            # the promise judgment is real and balanced.
+            "cautions": list(dict.fromkeys([*d1_cautions, *divisional_cautions])),
+            "evidence_complete": bool(d1_support and divisional_support),
         },
         "dasha_activation": segments,
         "transit_confirmation": _transit_rows(raw_segments, normalized, event_key),

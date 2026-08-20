@@ -70,6 +70,7 @@ from chat.instant_chat_pipeline import (
     _authoritative_active_dasha_context,
     _build_named_dasha_lookup_from_evidence_plan,
     _build_event_timing_verdict,
+    _build_instant_composer_context,
     _compact_context_for_speech,
     _compact_divisional_support,
     _build_instant_prompt,
@@ -80,6 +81,78 @@ from chat.instant_chat_pipeline import (
     _rotate_instant_parashari_for_target,
     _target_context_as_birth_summary,
 )
+
+
+def test_remedy_blueprint_reaches_verdict_first_composer():
+    remedy_blueprint = {
+        "question_focus": "career remedies",
+        "candidate_planets": [{"planet": "Saturn", "house": 2}],
+        "priority_order": ["Saturn", "Rahu"],
+        "remedy_sections": {
+            "house_expression": [
+                {
+                    "action": "Keep a written record of financial commitments",
+                    "frequency": "daily",
+                    "why": "Saturn is active in the second house",
+                }
+            ],
+            "mantras": [{"planet": "Saturn", "mantra": "Om Sham Shanicharaya Namah"}],
+            "charity": [{"planet": "Saturn", "action": "Support elderly workers on Saturdays"}],
+        },
+        "caution": "Use one or two remedies consistently instead of starting many at once.",
+    }
+    context = _build_instant_composer_context(
+        {
+            "intent_summary": {
+                "category": "career",
+                "answer_mode": "remedy_action",
+                "language": "english",
+            },
+            "normalized_evidence": {
+                "remedy_blueprint": remedy_blueprint,
+                "question_focus": "career remedies",
+                "remedy_sections": remedy_blueprint["remedy_sections"],
+                "caution": remedy_blueprint["caution"],
+            },
+            "birth_summary": {"name": "Test"},
+        },
+        {
+            "query_plan": {
+                "category": "career",
+                "answer_mode": "remedy_action",
+                "language": "english",
+            },
+            "verdict": {"direction": "supported", "confidence": "medium"},
+            "answer_spec": {"composer_word_target": "120-180 words"},
+        },
+    )
+
+    assert context["context_profile"] == "instant_composer_v3"
+    assert context["evidence"]["remedy_blueprint"] == remedy_blueprint
+    assert context["evidence"]["remedy_sections"]["mantras"][0]["planet"] == "Saturn"
+    assert context["evidence"]["caution"] == remedy_blueprint["caution"]
+    prompt = _build_instant_prompt("Show my career remedies", context, "english")
+    assert "This is an explicit remedy request. Give remedies" in prompt
+    assert "Do not add remedies" not in prompt
+    assert "exactly three prioritized, concrete remedies" in prompt
+
+
+def test_remedy_blueprint_reaches_speech_compact_context():
+    context = _compact_context_for_speech(
+        {
+            "intent_summary": {"category": "career", "answer_mode": "remedy_action"},
+            "normalized_evidence": {
+                "remedy_blueprint": {"priority_order": ["Saturn"]},
+                "remedy_sections": {"mantras": [{"planet": "Saturn"}]},
+                "caution": "Keep gemstone advice optional.",
+            },
+        }
+    )
+
+    normalized = context["normalized_evidence"]
+    assert normalized["remedy_blueprint"]["priority_order"] == ["Saturn"]
+    assert normalized["remedy_sections"]["mantras"][0]["planet"] == "Saturn"
+    assert normalized["caution"] == "Keep gemstone advice optional."
 
 
 def test_instant_dialogue_state_persists_llm_owned_clarification():
@@ -162,6 +235,46 @@ def test_instant_dialogue_state_blocks_inconsistent_ready_response():
 
     assert result["status"] == "CLARIFY"
     assert result["clarification_question"] == "Who do you mean by he?"
+
+
+def test_new_request_discards_abandoned_clarification_state():
+    router = IntentRouter.__new__(IntentRouter)
+    prior = {
+        "request_summary": "Choose marriage timing or future spouse career",
+        "known_facts": {"topic": "marriage"},
+        "unresolved_facts": ["chosen_topic"],
+        "corrections": [],
+        "ready_to_calculate": False,
+        "last_clarification_question": "Which question would you like to ask first?",
+        "pending_choice_kind": "compound_plan",
+        "answer_mode": "compound_plan",
+    }
+    result = router._finalize_instant_dialogue_state(
+        {
+            "turn_relation": "new_request",
+            "status": "READY",
+            "answer_mode": "topic_reading",
+            "category": "career",
+            "extracted_context": {},
+            "dialogue_state": {
+                "request_summary": "Career remedy guidance",
+                "known_facts": {"topic": "career", "requested_action": "remedies"},
+                "unresolved_facts": [],
+                "corrections": [],
+                "ready_to_calculate": True,
+            },
+        },
+        prior_dialogue_state=prior,
+    )
+
+    assert result["status"] == "READY"
+    assert result["category"] == "career"
+    assert result["dialogue_state"]["known_facts"] == {
+        "topic": "career",
+        "requested_action": "remedies",
+    }
+    assert "last_clarification_question" not in result["dialogue_state"]
+    assert "pending_choice_kind" not in result["dialogue_state"]
 
 
 def test_instant_dialogue_state_allows_ready_only_after_llm_resolves_facts():
@@ -1316,13 +1429,32 @@ def test_infer_answer_mode_married_this_year_prefers_event_prediction():
     assert _infer_answer_mode("When will I get married this year?", intent, []) == "event_prediction"
 
 
-def test_infer_answer_mode_remedy_only_with_cta_flags():
+def test_infer_answer_mode_marriage_possibility_in_chart_is_natal_promise():
+    intent = {"mode": "LIFESPAN_EVENT_TIMING", "category": "marriage"}
+    assert _infer_answer_mode(
+        "Is there any possibility of marriage in my birth chart or kundali?",
+        intent,
+        [],
+    ) == "potential_capacity"
+
+
+def test_infer_answer_mode_remedy_with_cta_or_semantic_router_flag():
     from chat.instant_chat_pipeline import _clamp_remedy_answer_mode, _explicit_remedy_followup_requested
 
     plain = {"mode": "RECOMMEND_REMEDY_FOR_PROBLEM", "answer_mode": "remedy_action", "category": "health"}
     assert not _explicit_remedy_followup_requested(plain)
     assert _infer_answer_mode("What remedies for my anxiety?", plain, []) != "remedy_action"
     assert _clamp_remedy_answer_mode("remedy_action", plain, "what should I do for anxiety") == "problem_diagnosis"
+
+    semantic = {
+        "mode": "RECOMMEND_REMEDY_FOR_PROBLEM",
+        "answer_mode": "remedy_action",
+        "category": "career",
+        "explicit_remedy_request": True,
+    }
+    assert _explicit_remedy_followup_requested(semantic)
+    assert _infer_answer_mode("Show my career remedies", semantic, []) == "remedy_action"
+    assert _clamp_remedy_answer_mode("remedy_action", semantic, "Show my career remedies") == "remedy_action"
 
     cta = {
         "category": "health",

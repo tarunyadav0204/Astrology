@@ -1395,6 +1395,12 @@ class IntentRouter:
         dialogue from being treated as ready after an inconsistent model response.
         """
         prior = dict(prior_dialogue_state or {})
+        turn_relation = str(result.get("turn_relation") or "").strip().lower()
+        # Natural-language understanding stays with the router LLM.  Once it has
+        # identified a self-contained new request, the abandoned clarification
+        # must not donate known/unresolved facts to the new turn.
+        if turn_relation == "new_request":
+            prior = {}
         raw_state = result.get("dialogue_state")
         if not isinstance(raw_state, dict):
             extracted = result.get("extracted_context")
@@ -1642,11 +1648,15 @@ LATEST USER MESSAGE (answer this turn): "{latest_user_reply}"
 
 Task:
 1. Semantically understand the user's question in any language/script.
+   First classify `turn_relation`:
+   - `clarification_answer` only when LATEST USER MESSAGE semantically answers the open clarification (including a short one-word answer).
+   - `follow_up` when it asks about, challenges, or continues the immediately previous answer.
+   - `new_request` when it is a self-contained request with a different subject, goal, life area, or requested action. A new request abandons the unresolved clarification; do not merge its old topic, subject, question parts, known_facts, or unresolved_facts into this turn.
 2. Decide READY vs CLARIFY. Clarify whenever a missing fact would materially change which chart factors, relationship role, event definition, or timing calculation should be used. Resolve ambiguous people and pronouns through conversation; never guess who "he", "she", "they", "that person", or a similar reference means. Clarify when the core topic/event is genuinely unclear, the user asks multiple unrelated life areas, a reference cannot be resolved from recent history/state, OR the mode is RECOMMEND_LOCATION and india-vs-abroad scope is unknown. Do not clarify for one clear domain with multiple facets, follow-up challenges, or natural messy phrasing.
    If the message contains two or more independently answerable questions, set CLARIFY, answer_mode=compound_plan, route_action=clarify, and ask the user in their own language/script to choose just one question first. Do not create calculator work for either part yet.
    If the user asks for compatibility between two charts, set answer_mode=dedicated_partnership_flow and route_action=handoff. Instant Chat does not calculate compatibility.
    After a pick-one clarification, classify only LATEST USER MESSAGE. Do not keep compound_plan just because the abandoned original list is still in history.
-3. Maintain `dialogue_state` as a complete corrected snapshot, not a delta. When prior dialogue_state contains a last_clarification_question, treat LATEST USER MESSAGE as the user's direct answer to that question—even if it is only one word. Semantically apply that answer to known_facts, remove the fact it resolves from unresolved_facts, and do not repeat the same question. Ask the next necessary question only if a different material fact remains unresolved. Ask exactly one natural question at a time in the user's current language/script. Continue clarifying until you have enough information to choose the correct astrological calculation; only then set READY and ready_to_calculate=true.
+3. Maintain `dialogue_state` as a complete corrected snapshot, not a delta. If `turn_relation=clarification_answer`, semantically apply LATEST USER MESSAGE to known_facts, remove the fact it resolves from unresolved_facts, and do not repeat the same question. If `turn_relation=new_request`, create a fresh dialogue_state from LATEST USER MESSAGE only. Ask the next necessary question only if a different material fact remains unresolved. Ask exactly one natural question at a time in the user's current language/script. Continue clarifying until you have enough information to choose the correct astrological calculation; only then set READY and ready_to_calculate=true.
 4. Select the astrology mode, answer mode, subject, category, timeframe/date, chart focus, transit need, and compact divisional chart list.
 
 Modes:
@@ -1657,7 +1667,7 @@ Modes:
 - ANALYZE_PERSONALITY: nature, traits, temperament, self-understanding.
 - ANALYZE_TOPIC_POTENTIAL: "how is my career/marriage/health/money/relationship" style readings.
 - RECOMMEND_LOCATION: ONLY when the user is asking where to relocate / live / settle, or which city / place / country / direction is favorable. Not for "when will I move" timing. Not for marriage/relationship timing, compatibility, or rival questions. Birth-detail lines like "Place: <city>" are NOT a location ask. If location_scope is unknown, CLARIFY and ask whether they want India only, abroad, or both — in the SAME language/script as the current question (LLM-authored wording only).
-- RECOMMEND_REMEDY_FOR_PROBLEM: ONLY when query_context already marks a Remedies CTA follow-up. Wording like "what should I do" / "upay" alone is NOT enough — use ANALYZE_ROOT_CAUSE or ANALYZE_TOPIC_POTENTIAL with answer_mode problem_diagnosis / topic_reading so the UI can offer the Remedies card.
+- RECOMMEND_REMEDY_FOR_PROBLEM: when query_context marks a Remedies CTA follow-up OR the latest user message is an unambiguous direct request for astrological remedies/upayas/corrective actions for one clear problem or life area. Understand this semantically in every supported language; do not depend on English keywords. A vague request such as "what should I do?" is not enough by itself and remains problem_diagnosis/topic_reading.
 
 Answer modes:
 - explanation_mechanism: how/why a previous chart claim was made.
@@ -1673,7 +1683,7 @@ Answer modes:
 - dedicated_partnership_flow: compatibility/synastry between two charts; hand off to Partnership mode.
 - compound_plan: two or more independently answerable questions; clarify and ask for one question only.
 - problem_diagnosis: why something is blocked, delayed, unstable, difficult.
-- remedy_action: ONLY when query_context already marks a Remedies CTA follow-up (remedy_followup / open_remedy / follow_up_type=remedy_action). Never choose from wording alone.
+- remedy_action: when query_context marks a Remedies CTA follow-up OR `explicit_remedy_request=true` because the latest message directly and unambiguously asks for astrological remedies for a clear problem/life area. Do not choose it for vague advice requests.
 - topic_reading: focused reading when no other answer mode fits.
 
 Categories:
@@ -1713,6 +1723,8 @@ Calibration:
 - "How is my relationship with my wife?" -> READY, ANALYZE_TOPIC_POTENTIAL, category relationship or marriage, answer_mode topic_reading, target_subject_key wife, needs_transits false.
 - Named-chart reads in any language (examples of meaning, not keywords): "Explain my D12 chart"; "मेरी D12 / द्वादशांश कुंडली समझाओ"; "मेरा कारकांश चार्ट बताओ"; "Swamsa chart padho" -> READY, factual_chart_lookup, category general, chart_focus.explicit true, requested_chart D12/Karkamsa/Swamsa as appropriate, needs_transits false. Do NOT map these to family/career/soul topic readings.
 - Period/topic reads stay period/topic even if a varga is mentioned as support: "How is my D10 this year?" / "इस साल मेरा दशमांश कैसा है?" -> timing_window or topic_reading, not a named-chart D10-only prediction.
+- Natal-promise questions stay natal-promise questions even when the user names the chart that should support them: "Is marriage possible in my birth chart/kundali?" or "Does my D9 promise marriage?" -> potential_capacity, category marriage, D9 in divisional_charts as evidence, and chart_focus null. The requested outcome is marriage promise, not a description of D9 itself.
+- Always identify what the user is actually asking you to judge in requested_object. Use life_outcome when the requested object is marriage, career, children, health, wealth or another lived outcome—even if the user says "in my chart/kundali/D9". Use named_chart only when the chart itself is the requested object (for example, "explain my D9"). factual_chart_lookup is only valid together with requested_object=named_chart.
 - "How will my health be this year?" -> READY, PREDICT_PERIOD_OUTLOOK, category health, answer_mode timing_window, target_subject_key self, context_type annual, needs_transits true, timeframe this year.
 - "How will my career be in the second half of 2028?" -> READY, PREDICT_PERIOD_OUTLOOK, category career, answer_mode timing_window, target_subject_key self, needs_transits true, timeframe second half of 2028.
 - "Where should I move for my career?" -> CLARIFY, RECOMMEND_LOCATION, category career, answer_mode location_recommendation, location_scope null; clarification_question in the user's language asking India vs abroad vs both.
@@ -1729,6 +1741,8 @@ Calibration:
 
 Return exactly this JSON shape:
 {{
+  "turn_relation": "new_request" or "clarification_answer" or "follow_up",
+  "explicit_remedy_request": true only for an unambiguous direct request for astrological remedies, otherwise false,
   "status": "CLARIFY" or "READY",
   "clarification_question": "same language/script as user, only when CLARIFY",
   "route_action": "answer" or "clarify" or "handoff",
@@ -1745,6 +1759,7 @@ Return exactly this JSON shape:
   "chart_insights": [],
   "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_LOCATION" or "RECOMMEND_REMEDY_FOR_PROBLEM",
   "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
+  "requested_object": "named_chart" or "life_outcome" or "period" or "person" or "mechanism" or "other",
   "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "location_recommendation" or "factual_chart_lookup" or "dedicated_muhurat_flow" or "dedicated_partnership_flow" or "compound_plan" or "problem_diagnosis" or "remedy_action" or "topic_reading",
   "target_subject_key": "one allowed target subject",
   "needs_year_clarification": false,
@@ -1917,10 +1932,11 @@ Rules:
 - Use `ANALYZE_TOPIC_POTENTIAL` for "how is my career/love/money/health" style questions.
 - Use `RECOMMEND_LOCATION` ONLY when the user wants where to relocate/live/settle, or which city/place/country/direction is favorable. Not for "when will I move". Not for marriage timing, love/compatibility, or "whom will he marry". Birth "Place:" fields are NOT a relocate ask.
 - For `RECOMMEND_LOCATION`: if the user has NOT clearly said India-only / abroad-overseas / both, return CLARIFY. Your clarification_question MUST ask that geography preference in the SAME language/script as the current question (LLM-authored; never English-by-default). Set extracted_context.location_scope to "india"|"abroad"|"both" when known, else null.
-- Use `RECOMMEND_REMEDY_FOR_PROBLEM` ONLY when query_context already marks a Remedies CTA follow-up. Plain "what should I do" / upay wording → `ANALYZE_ROOT_CAUSE` + `problem_diagnosis` (not a full remedy dump).
+- Use `RECOMMEND_REMEDY_FOR_PROBLEM` when query_context marks a Remedies CTA follow-up OR the latest message is an unambiguous direct request for astrological remedies/upayas/corrective actions for one clear problem or life area. Set `explicit_remedy_request=true` for the latter. Infer this semantically in every language/script. A vague "what should I do?" is not enough by itself.
 - IMPORTANT: clarification is ALLOWED in instant mode. Do NOT default to READY when the ask is genuinely unclear.
 - All natural-language understanding belongs to you. Resolve ambiguous people, pronouns, relationships, event meanings, and corrections from the current message, recent conversation, and persisted dialogue state. Never guess an unresolved person or relationship.
-- Maintain `dialogue_state` as a complete corrected snapshot on every turn. When prior state contains last_clarification_question, treat LATEST USER MESSAGE as the direct answer to it—even if it is one word. Semantically apply it to known_facts, remove the resolved item from unresolved_facts, and never repeat the same question. Put facts already established by the user in known_facts; put only calculation-relevant missing facts in unresolved_facts; record explicit user corrections; and set ready_to_calculate=true only when the correct chart/evidence calculation can begin.
+- First classify `turn_relation` semantically in every language/script. Use `clarification_answer` only when LATEST USER MESSAGE actually answers the open clarification (a one-word answer can qualify). Use `follow_up` when it continues or challenges the immediately previous answer. Use `new_request` when it is a self-contained request with a different subject, goal, life area, or requested action.
+- Maintain `dialogue_state` as a complete corrected snapshot on every turn. For `clarification_answer`, apply LATEST USER MESSAGE to known_facts, remove the resolved item from unresolved_facts, and never repeat the same question. For `new_request`, abandon the unresolved clarification and build a fresh state from LATEST USER MESSAGE only; never carry its old topic, subject, question parts, known_facts, or unresolved_facts into the new calculation. Put facts already established for the active request in known_facts; put only calculation-relevant missing facts in unresolved_facts; record explicit user corrections; and set ready_to_calculate=true only when the correct chart/evidence calculation can begin.
 - If status is CLARIFY, ask exactly one concise, natural question in the language/script of the CURRENT QUESTION. The next user message may be only a short answer to that question; treat it as continuation, not a new topic.
 - Continue clarification across turns when multiple material facts are missing. Do not start astrological calculation merely because one clarification was answered.
 - Return `CLARIFY` only when the user has not made the core topic specific enough to answer well in one instant reply, or when the message explicitly contains separate unrelated asks.
@@ -1983,7 +1999,7 @@ UNIVERSAL ANSWER MODE:
 - `dedicated_partnership_flow`: compatibility between two charts; return a handoff because Instant Chat does not calculate compatibility
 - `compound_plan`: two or more independently answerable questions; ask the user to choose one question first
 - `problem_diagnosis`: why something is blocked, unstable, delayed, difficult, or leaking
-- `remedy_action`: ONLY when query_context already marks a Remedies CTA follow-up. Wording like remedy/upay/fix/action alone is NOT enough — use `problem_diagnosis` or `topic_reading`.
+- `remedy_action`: when query_context marks a Remedies CTA follow-up OR `explicit_remedy_request=true` for a direct, unambiguous astrological-remedy request. Do not use it for vague general advice.
 - `topic_reading`: focused reading when no other answer mode fits
 
 EVIDENCE PLAN:
@@ -2008,6 +2024,8 @@ CATEGORY for "when will I…" life-event questions (CRITICAL):
 
 Return ONLY this JSON shape:
 {{
+  "turn_relation": "new_request" or "clarification_answer" or "follow_up",
+  "explicit_remedy_request": true only for an unambiguous direct request for astrological remedies, otherwise false,
   "status": "CLARIFY" or "READY",
   "clarification_question": "short question only when status=CLARIFY",
   "route_action": "answer" or "clarify" or "handoff",

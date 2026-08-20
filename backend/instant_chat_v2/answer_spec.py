@@ -47,6 +47,18 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                 "evidence_ids": comparison_ids,
                 "required": True,
             })
+    if query_plan.get("answer_mode") == "potential_capacity":
+        promise_ids = [
+            item.get("evidence_id") for item in ledger.get("records", [])
+            if item.get("kind") in {"natal_promise", "primary_drivers", "divisional_confirmation"}
+            and item.get("evidence_id")
+        ]
+        claims.append({
+            "claim_id": "claim-natal-promise-verdict",
+            "purpose": "Judge whether the natal chart promises the requested outcome, without using current timing as proof",
+            "evidence_ids": promise_ids,
+            "required": True,
+        })
     if not exact_day and query_plan.get("answer_mode") in {"event_timing", "lifetime_event_timing", "month_timing", "event_prediction", "timing_window"}:
         timing_ids = [item.get("evidence_id") for item in ledger.get("records", []) if item.get("kind") == "event_timing_verdict"]
         if timing_ids:
@@ -225,12 +237,37 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
             "target_framing": "Predict from the native's own requested chart.",
             "evidence_limitations": verdict.get("missing_required_capabilities") or [],
         }
+    capacity_rules = None
+    if answer_mode == "potential_capacity":
+        capacity_rules = {
+            "verdict_direction": verdict.get("direction"),
+            "instruction": (
+                "This is a natal-promise judgment, not an event-timing answer. Give only the verdict allowed by "
+                "the fused natal and divisional evidence. Current dasha, transits, and active houses cannot create "
+                "a natal promise and must not be used as proof. For marriage, judge the D1 seventh house and its "
+                "lord first, then D9; use KP seventh-cusp and Jaimini spouse indicators only as confirmation. "
+                "Houses 2 or 8 alone do not prove marriage. Rahu alone does not prove a sudden, unconventional, "
+                "foreign, or different-background spouse. Do not give timing unless the user asks for timing."
+            ),
+        }
     return {
         "schema_version": "instant-answer-spec/v1",
         "tone": "natural, concise, daily-use language",
         "max_words": max_words,
         "composer_word_target": word_target,
-        "answer_order": daily_rules.get("answer_order") if daily_rules else ["direct_answer", "one_chart_reason", "one_caution_if_material", "natural_follow_up_question"],
+        "answer_order": (
+            daily_rules.get("answer_order")
+            if daily_rules
+            else [
+                "clear natal-promise verdict",
+                "direct D1 support or limitation",
+                "relevant divisional confirmation or qualification",
+                "main condition or obstruction",
+                "natural follow-up about timing or the user's real concern",
+            ]
+            if answer_mode == "potential_capacity"
+            else ["direct_answer", "one_chart_reason", "one_caution_if_material", "natural_follow_up_question"]
+        ),
         "presentation_contract": {
             "astrology_is_hidden_evidence": False,
             "opening": "Answer the user's real-life question directly in ordinary language.",
@@ -315,6 +352,7 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
             if verdict.get("direction") == "close_call"
             else None
         ),
+        "capacity_rules": capacity_rules,
         "event_rules": (
             {
                 "hard_horizon_end": (query_plan.get("time_scope") or {}).get("horizon_end"),

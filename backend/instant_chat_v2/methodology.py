@@ -372,8 +372,22 @@ def get_methodology(category: str, answer_mode: str) -> Dict[str, Any]:
             ],
             "high_support": ["transit.double_transit"],
         }
-    elif answer_mode in {"natal_topic", "topic_reading"}:
+    elif answer_mode in {"natal_topic", "topic_reading", "potential_capacity"}:
         result["claim_operations"] = deepcopy(_COMMON["natal_promise"])
+        if answer_mode == "potential_capacity":
+            # Promise/capacity is a static chart judgment. It must be supported
+            # by the domain promise calculation; current dasha activation is
+            # neither necessary nor sufficient evidence for the verdict.
+            promise_capability = f"parashari.{key}_promise"
+            if promise_capability not in result.setdefault("operations", []):
+                result["operations"].append(promise_capability)
+            result["required_for_timing"] = [promise_capability]
+            if key == "marriage":
+                result["required_for_timing"].append("parashari.d9_confirmation")
+                result["confidence_operations"] = {
+                    "high_confidence": ["kp.seventh_cusp_chain"],
+                    "high_support": ["jaimini.darakaraka_upapada"],
+                }
     else:
         result["claim_operations"] = deepcopy(_COMMON["current_state"])
     if answer_mode == "comparison_choice":

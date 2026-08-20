@@ -125,6 +125,25 @@ def fuse_evidence(query_plan: Dict[str, Any], ledger: Dict[str, Any]) -> Dict[st
             windows = []
             rationale = missing_charts or ["The requested chart was not calculated."]
             confidence = 0.35
+    elif query_plan.get("answer_mode") == "potential_capacity":
+        promise = (by_kind.get("natal_promise") or {}).get("value")
+        promise = promise if isinstance(promise, dict) else {}
+        status = str(promise.get("status") or "not_established").strip().lower()
+        if missing_required or status == "not_established":
+            direction = "insufficient_evidence"
+            confidence = 0.38
+        elif status == "supported":
+            direction = "supported_natal_promise"
+            confidence = 0.84
+        else:
+            direction = "qualified_natal_promise"
+            confidence = 0.68
+        windows = []
+        rationale = {
+            "promise_status": status,
+            "topic_support": promise.get("topic_support"),
+            "rule": "Natal promise is judged from natal and relevant divisional evidence; current activation cannot establish it.",
+        }
     elif isinstance(timing, dict) and timing:
         direction = timing.get("verdict") or timing.get("direction") or timing.get("status") or "conditional"
         windows = timing.get("windows") or timing.get("ranked_windows") or timing.get("best_windows") or []
@@ -161,7 +180,7 @@ def fuse_evidence(query_plan: Dict[str, Any], ledger: Dict[str, Any]) -> Dict[st
         windows = []
         rationale = primary[:4] if isinstance(primary, list) else primary
         confidence = 0.72 if primary else 0.35
-    if (timing_mode or calculator_required_mode or exact_day) and missing_required:
+    if (timing_mode or calculator_required_mode or exact_day or query_plan.get("answer_mode") == "potential_capacity") and missing_required:
         if not (query_plan.get("answer_mode") == "factual_chart_lookup" and direction == "calculated_chart"):
             direction = "insufficient_evidence"
             confidence = min(confidence, 0.39)
