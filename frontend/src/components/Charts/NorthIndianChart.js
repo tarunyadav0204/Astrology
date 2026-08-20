@@ -638,16 +638,16 @@ const NorthIndianChart = ({
         preserveAspectRatio="xMidYMid meet"
       >
       {/* Outer square border */}
-      <rect x="5" y="5" width="390" height="390" 
+      <rect x="0" y="0" width="400" height="400"
             fill="var(--color-chart-surface, var(--color-surface-raised))" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1.5"/>
       
       {/* Inner diamond border */}
-      <polygon points="200,5 395,200 200,395 5,200" 
+      <polygon points="200,0 400,200 200,400 0,200"
                fill="none" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1.5"/>
       
       {/* Diagonal lines creating 12 houses */}
-      <line x1="5" y1="5" x2="395" y2="395" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
-      <line x1="395" y1="5" x2="5" y2="395" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
+      <line x1="0" y1="0" x2="400" y2="400" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
+      <line x1="400" y1="0" x2="0" y2="400" stroke="var(--color-chart-line, var(--color-text))" strokeWidth="1"/>
       
 
       
@@ -725,13 +725,14 @@ const NorthIndianChart = ({
             )}
             
             {/* Chart reference highlighting from chat */}
-            {chartRefHighlightState?.type === 'house' && parseInt(chartRefHighlightState.value) === houseNumber && (
-              <circle cx={houseData.center.x} cy={houseData.center.y} r="40" 
-                      fill="rgba(76, 175, 80, 0.3)" stroke="#4caf50" strokeWidth="4" strokeDasharray="8,4"
-                      style={{ pointerEvents: 'none' }}>
-                <animate attributeName="r" values="35;45;35" dur="2s" repeatCount="indefinite"/>
-                <animate attributeName="opacity" values="0.8;0.4;0.8" dur="2s" repeatCount="indefinite"/>
-              </circle>
+            {chartRefHighlightState?.type === 'house' && parseInt(chartRefHighlightState.value, 10) === houseNumber && (
+              <path
+                d={houseData.path}
+                fill="color-mix(in srgb, var(--color-brand) 16%, transparent)"
+                stroke="var(--color-brand)"
+                strokeWidth="3"
+                style={{ pointerEvents: 'none' }}
+              />
             )}
             
             {chartRefHighlightState?.type === 'sign' && rashiIndex === parseInt(chartRefHighlightState.value) - 1 && (

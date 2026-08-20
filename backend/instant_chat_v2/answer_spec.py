@@ -145,7 +145,7 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
         }
     answer_mode = str(query_plan.get("answer_mode") or "topic_reading")
     if answer_mode == "factual_chart_lookup":
-        max_words, word_target = 140, "Usually 30-100 words; add only the context needed to identify the chart/system."
+        max_words, word_target = 280, "Predict from this named chart; usually 120-220 words."
     elif answer_mode in {"event_prediction", "timing_window", "location_recommendation", "dedicated_muhurat_flow"}:
         max_words, word_target = 320, "Usually 140-260 words; preserve every material phase or ranked window."
     elif answer_mode in {"explanation_mechanism", "problem_diagnosis", "comparison_choice"}:
@@ -178,6 +178,52 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                 "experience or should do today. Use PR/SK, Moon/Tara Bala and KP to rank the day; "
                 "MD/AD may explain the background in at most one compact clause."
             ),
+        }
+    if answer_mode == "factual_chart_lookup":
+        return {
+            "schema_version": "instant-answer-spec/v1",
+            "tone": "clear, technical, conversational",
+            "max_words": max_words,
+            "composer_word_target": word_target,
+            "answer_order": [
+                "direct prediction in this chart's life area",
+                "lagna and lagna-lord result",
+                "two strongest supported outcomes",
+                "one main caution",
+                "one compact proof from this named chart",
+                "one domain follow-up",
+            ],
+            "presentation_contract": {
+                "astrology_is_hidden_evidence": True,
+                "opening": "Give a direct life-area prediction from this named chart first.",
+                "technical_detail_limit": (
+                    "Placements, dignity, and aspects are evidence. Cite one compact proof from this chart; "
+                    "do not dump planet-by-planet positions as the answer."
+                ),
+                "invalid_shape": (
+                    "A planet-by-planet placement list; generic D12=parents / D10=career lore without citing "
+                    "this chart's data; a D1 dasha/transit reading; or saying the chart lacks detail when the packet is supplied."
+                ),
+            },
+            "chart_fact_rules": {
+                "instruction": (
+                    "Read only evidence.chart_facts. Predict the chart's domain.life_area from lagna, lagna lord, "
+                    "dignity, occupation, conjunctions, and aspects. Use support_signals and caution_signals. "
+                    "Do not mention current dasha or transits. Do not write a placement inventory."
+                ),
+            },
+            "claims": claims,
+            "forbidden": [
+                "planet-by-planet placement dump as the whole answer",
+                "generic D12=parents lore without citing this D12 packet",
+                "generic D10=career lore without citing this D10 packet",
+                "generic Karkamsa/Swamsa soul essay without citing that chart's packet",
+                "D1 current dasha or transits as the prediction engine",
+                "inventing placements not in chart_facts",
+                "claiming there is not enough detail when the chart packet is supplied",
+            ],
+            "target_framing": "Predict from the native's own requested chart.",
+            "evidence_limitations": verdict.get("missing_required_capabilities") or [],
         }
     return {
         "schema_version": "instant-answer-spec/v1",

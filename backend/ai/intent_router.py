@@ -121,6 +121,7 @@ _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY: dict[str, list[str]] = {
 _CHART_FOCUS_SYNONYMS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("D1", ("d1",)),
     ("LAGNA", ("lagna", "ascendant", "rising sign", "asc")),
+    ("D2", ("d2", "hora")),
     ("D3", ("d3", "drekkana", "dreshkana", "drekkana")),
     ("D4", ("d4", "chaturthamsa", "chaturthamsha")),
     ("D7", ("d7", "saptamsa", "saptamsha")),
@@ -135,8 +136,8 @@ _CHART_FOCUS_SYNONYMS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("D40", ("d40", "khavedamsa", "khavedamsha")),
     ("D45", ("d45", "akshavedamsa", "akshavedamsha")),
     ("D60", ("d60", "shashtiamsa", "shashtiamsha")),
-    ("Karkamsa", ("karkamsa",)),
-    ("Swamsa", ("swamsa",)),
+    ("Karkamsa", ("karkamsa", "karakamsa", "karakamsha", "karakamsha chart", "karkamsa chart")),
+    ("Swamsa", ("swamsa", "swamsha", "swamsa chart")),
 )
 
 _CHART_FOCUS_CUES = (
@@ -168,13 +169,30 @@ def _normalize_chart_focus_code(code: str) -> str:
     return _canonical_divisional_token(token)
 
 
+def pending_compound_topic_choice(dialogue_state: Dict[str, Any] | None) -> bool:
+    """True when Instant already asked the user to pick one topic from a bundled ask."""
+    state = dialogue_state if isinstance(dialogue_state, dict) else {}
+    return str(state.get("pending_choice_kind") or "").strip() == "compound_plan"
+
+
+def _compound_choice_followup_instruction() -> str:
+    return """
+COMPOUND CHOICE FOLLOW-UP (mandatory when dialogue_state.pending_choice_kind is compound_plan):
+The previous turn already asked the user to pick ONE topic from a multi-topic message.
+Classify ONLY LATEST USER MESSAGE. The original bundled list in history is abandoned.
+Do not return compound_plan unless LATEST USER MESSAGE itself still contains two or more unrelated life areas as separate asks.
+Related facets of the chosen domain are ONE question. Example: after a pick-one, "Abt my marriage, is there any possibility of marriage in my kundali?" is one marriage/promise question, not marriage timing + spouse qualities + foreign yoga.
+Return READY for the chosen topic unless a different material fact is still missing (for example whose chart).
+"""
+
+
 def extract_chart_focus_from_question(user_question: str) -> Dict[str, Any] | None:
     """
-    Detect only highly explicit chart-scoped asks such as "analyze my lagna",
+    Detect only highly explicit Latin/English chart-scoped asks such as "analyze my lagna",
     "read my D10", or "interpret my navamsha".
 
-    Broad natural-language inference should come from the LLM intent router, not this
-    deterministic fallback.
+    Instant Chat must not use this for answer-mode routing. The multilingual intent LLM
+    owns chart-focus and factual_chart_lookup classification in every language.
     """
     q = (user_question or "").strip()
     if not q:
@@ -233,9 +251,9 @@ def _canonical_divisional_token(c: str) -> str:
     if not t:
         return ""
     low = t.lower()
-    if low == "karkamsa":
+    if low in {"karkamsa", "karakamsa", "karakamsha"}:
         return "Karkamsa"
-    if low == "swamsa":
+    if low in {"swamsa", "swamsha"}:
         return "Swamsa"
     m = re.match(r"^d(\d+)$", low)
     if m:
@@ -378,12 +396,13 @@ def _usage_totals_from_stages(stages: list[Dict[str, Any]]) -> Dict[str, Any]:
 
 def apply_chart_focus_guards(result: Dict[str, Any], user_question: str) -> None:
     """
-    Attach deterministic chart-focus metadata and ensure explicitly requested divisionals
+    Canonicalize LLM-emitted chart-focus metadata and ensure those divisionals
     are available downstream even when the router category is broad/general.
+
+    Instant Chat routing must not infer chart_focus from English question text.
+    The multilingual intent LLM owns that decision.
     """
     focus = _normalize_chart_focus_payload(result.get("chart_focus"))
-    if not focus:
-        focus = extract_chart_focus_from_question(user_question)
     if not focus:
         return
     primary = _normalize_chart_focus_code(str(focus.get("primary") or ""))
@@ -394,6 +413,8 @@ def apply_chart_focus_guards(result: Dict[str, Any], user_question: str) -> None
             "primary": focus.get("primary"),
             "label": focus.get("label"),
         }
+        if primary:
+            result["extracted_context"].setdefault("requested_chart", primary)
     if not primary or primary == "D1":
         return
     raw = result.get("divisional_charts")
@@ -1407,6 +1428,9 @@ class IntentRouter:
         status = str(result.get("status") or "READY").strip().upper()
         clarification_question = str(result.get("clarification_question") or "").strip()
         prior_question = str(prior.get("last_clarification_question") or "").strip()
+        answer_mode = str(result.get("answer_mode") or state.get("answer_mode") or prior.get("answer_mode") or "").strip()
+        if answer_mode:
+            state["answer_mode"] = answer_mode
 
         if status == "CLARIFY":
             if not clarification_question and prior_question:
@@ -1415,6 +1439,10 @@ class IntentRouter:
             state["ready_to_calculate"] = False
             if clarification_question:
                 state["last_clarification_question"] = clarification_question
+            if answer_mode == "compound_plan":
+                state["pending_choice_kind"] = "compound_plan"
+            else:
+                state.pop("pending_choice_kind", None)
         else:
             # READY is accepted only when the LLM's own state says there are no
             # unresolved facts.  We never decide which facts are required here.
@@ -1425,9 +1453,19 @@ class IntentRouter:
                     result["clarification_question"] = clarification_question or prior_question
                     state["ready_to_calculate"] = False
                     state["last_clarification_question"] = result["clarification_question"]
+                    if (
+                        answer_mode == "compound_plan"
+                        or str(prior.get("pending_choice_kind") or "") == "compound_plan"
+                    ):
+                        state["pending_choice_kind"] = "compound_plan"
+                        state["answer_mode"] = "compound_plan"
+                        result["answer_mode"] = "compound_plan"
+                    else:
+                        state.pop("pending_choice_kind", None)
             else:
                 state["ready_to_calculate"] = True
                 state.pop("last_clarification_question", None)
+                state.pop("pending_choice_kind", None)
 
         extracted_context = result.get("extracted_context")
         if not isinstance(extracted_context, dict):
@@ -1579,6 +1617,7 @@ class IntentRouter:
         force_ready_instruction: str,
         force_clarify_instruction: str,
         dialogue_state_text: str,
+        compound_choice_followup_text: str = "",
     ) -> str:
         return f"""
 You are AstroRoshni's multilingual semantic intent router for instant/speech astrology chat.
@@ -1591,6 +1630,7 @@ Current year: {current_year}; current month: {current_month}
 {clarification_limit_text}
 {force_ready_instruction}
 {force_clarify_instruction}
+{compound_choice_followup_text}
 {history_text}
 
 Persisted dialogue state from earlier clarification turns (authoritative unless
@@ -1605,6 +1645,7 @@ Task:
 2. Decide READY vs CLARIFY. Clarify whenever a missing fact would materially change which chart factors, relationship role, event definition, or timing calculation should be used. Resolve ambiguous people and pronouns through conversation; never guess who "he", "she", "they", "that person", or a similar reference means. Clarify when the core topic/event is genuinely unclear, the user asks multiple unrelated life areas, a reference cannot be resolved from recent history/state, OR the mode is RECOMMEND_LOCATION and india-vs-abroad scope is unknown. Do not clarify for one clear domain with multiple facets, follow-up challenges, or natural messy phrasing.
    If the message contains two or more independently answerable questions, set CLARIFY, answer_mode=compound_plan, route_action=clarify, and ask the user in their own language/script to choose just one question first. Do not create calculator work for either part yet.
    If the user asks for compatibility between two charts, set answer_mode=dedicated_partnership_flow and route_action=handoff. Instant Chat does not calculate compatibility.
+   After a pick-one clarification, classify only LATEST USER MESSAGE. Do not keep compound_plan just because the abandoned original list is still in history.
 3. Maintain `dialogue_state` as a complete corrected snapshot, not a delta. When prior dialogue_state contains a last_clarification_question, treat LATEST USER MESSAGE as the user's direct answer to that question—even if it is only one word. Semantically apply that answer to known_facts, remove the fact it resolves from unresolved_facts, and do not repeat the same question. Ask the next necessary question only if a different material fact remains unresolved. Ask exactly one natural question at a time in the user's current language/script. Continue clarifying until you have enough information to choose the correct astrological calculation; only then set READY and ready_to_calculate=true.
 4. Select the astrology mode, answer mode, subject, category, timeframe/date, chart focus, transit need, and compact divisional chart list.
 
@@ -1627,7 +1668,7 @@ Answer modes:
 - potential_capacity: suitability, promise, aptitude, capacity.
 - comparison_choice: choosing between options.
 - location_recommendation: where to move / which city or direction for a life goal.
-- factual_chart_lookup: an exact fact from D1 or any supported divisional chart, dasha, placement, dignity, aspect, yoga, karaka, lagna, or transit chart.
+- factual_chart_lookup: the user wants the named chart itself interpreted from its calculated data (any language/script). Predict that chart's life area from the calculated packet; do not dump placements as the product, and do not map a named varga to family/career/soul topic_reading just because that chart is associated with that life area. Supported requested_chart codes: D1, D2, D3, D4, D7, D9, D10, D12, D16, D20, D24, D27, D30, D40, D45, D60, Karkamsa, Swamsa.
 - dedicated_muhurat_flow: choosing an auspicious time/date for a specified activity; collect the event, location and usable date range before READY. The location must be either the saved birth location (`muhurat_use_birth_location=true`) or the user's own place text in `muhurat_location_query`; never invent coordinates.
 - dedicated_partnership_flow: compatibility/synastry between two charts; hand off to Partnership mode.
 - compound_plan: two or more independently answerable questions; clarify and ask for one question only.
@@ -1653,6 +1694,9 @@ Date/time rules:
 
 Divisional charts:
 Always keep small. D1/D9 default. Add D10 career/job/business, D7 relationship/children/pregnancy, D30 health/disease, D24 education, D4 property/home, D12 parents/family, Karkamsa/Swamsa soul/purpose.
+CHART-FACT vs TOPIC (semantic, any language):
+- If the asked object is a named varga / Jaimini chart itself (D2–D60, Navamsha, Dashamsha, Dwadasamsa, Hora, Karkamsa/Karakamsha, Swamsa, native-script names, mixed script), set answer_mode=factual_chart_lookup, category=general, chart_focus.explicit=true, extracted_context.requested_chart to the canonical code, and question_parts.intent_families=["factual_chart_lookup"].
+- If they ask how a life area or period is going and a varga is only supporting evidence, leave chart_focus null, put the varga in divisional_charts only, and use topic_reading or timing_window.
 
 Evidence planner:
 - Build an `evidence_plan` that describes what data agents must collect; do not write astrology rule combinations as text.
@@ -1667,6 +1711,8 @@ Evidence planner:
 
 Calibration:
 - "How is my relationship with my wife?" -> READY, ANALYZE_TOPIC_POTENTIAL, category relationship or marriage, answer_mode topic_reading, target_subject_key wife, needs_transits false.
+- Named-chart reads in any language (examples of meaning, not keywords): "Explain my D12 chart"; "मेरी D12 / द्वादशांश कुंडली समझाओ"; "मेरा कारकांश चार्ट बताओ"; "Swamsa chart padho" -> READY, factual_chart_lookup, category general, chart_focus.explicit true, requested_chart D12/Karkamsa/Swamsa as appropriate, needs_transits false. Do NOT map these to family/career/soul topic readings.
+- Period/topic reads stay period/topic even if a varga is mentioned as support: "How is my D10 this year?" / "इस साल मेरा दशमांश कैसा है?" -> timing_window or topic_reading, not a named-chart D10-only prediction.
 - "How will my health be this year?" -> READY, PREDICT_PERIOD_OUTLOOK, category health, answer_mode timing_window, target_subject_key self, context_type annual, needs_transits true, timeframe this year.
 - "How will my career be in the second half of 2028?" -> READY, PREDICT_PERIOD_OUTLOOK, category career, answer_mode timing_window, target_subject_key self, needs_transits true, timeframe second half of 2028.
 - "Where should I move for my career?" -> CLARIFY, RECOMMEND_LOCATION, category career, answer_mode location_recommendation, location_scope null; clarification_question in the user's language asking India vs abroad vs both.
@@ -1679,6 +1725,7 @@ Calibration:
 - Prior question asks who "he" is and LATEST USER MESSAGE is "spouse" -> identity is resolved as spouse. Remove identity from unresolved_facts and NEVER ask who "he" is again. Either ask the next genuinely missing fact or return READY.
 - User corrects "not my boyfriend, my husband" -> update known_facts and corrections. If marriage order/status materially affects the requested calculation and is still unknown, ask the next single question. Do not answer yet.
 - A short reply such as "yes, first marriage" is an answer to the open clarification, not a new astrology question. Merge it into dialogue_state and either ask the next necessary question or mark READY.
+- After Instant asked the user to pick one topic, a follow-up that names one area is READY for that area. "Abt my marriage, is there any possibility of marriage in my kundali?" is one marriage question, not spouse qualities or foreign yoga.
 
 Return exactly this JSON shape:
 {{
@@ -1815,6 +1862,12 @@ Ask exactly one short clarification question to narrow the user's topic.
 Do not ask for birth details.
 """
 
+        compound_choice_followup_text = (
+            _compound_choice_followup_instruction()
+            if pending_compound_topic_choice(prior_dialogue_state)
+            else ""
+        )
+
         prompt = f"""
 You are the lightweight intent router for an astrology chat. Keep this fast and minimal.
 
@@ -1844,6 +1897,7 @@ Current date context:
 {clarification_limit_text}
 {force_ready_instruction}
 {force_clarify_instruction}
+{compound_choice_followup_text}
 {history_text}
 
 Persisted dialogue state from earlier clarification turns (authoritative unless
@@ -1890,8 +1944,11 @@ Rules:
   - "When will I get married and what will my spouse be like?"
   - "You said Rahu activates my 10th house. How?"
   - "Why do you think that about my behavior?"
+  - "Explain my D12 chart"
+  - "Read my Karkamsa"
+  - "Interpret my Swamsa chart"
 - Related facets inside one domain are ONE question, not multiple questions. Examples: job + salary + promotion = career; marriage + spouse + husband/wife + relationship = relationship/marriage; health + stress + work pressure = health/stress.
-- If the user message bundles explicit multiple unrelated asks, prefer `CLARIFY` unless clarification has already been used.
+- If the user message bundles explicit multiple unrelated asks, prefer `CLARIFY` unless a pick-one clarification has already been used. After that, classify only LATEST USER MESSAGE.
 - If asking about an exact day, relative day, or specific date-bound event, return `extracted_context.specific_date` in YYYY-MM-DD.
 - Resolve "today", "tomorrow", and "day after tomorrow" from the current date context above.
 - Daily mode is opt-in: set `daily_intent_confirmed=true` only when the user is truly asking about one exact day.
@@ -1921,7 +1978,7 @@ UNIVERSAL ANSWER MODE:
 - `potential_capacity`: suitability, promise, capacity, aptitude
 - `comparison_choice`: choice between two or more options
 - `location_recommendation`: where to relocate/live/settle for a stated goal
-- `factual_chart_lookup`: exact fact from D1 or any supported divisional, dasha, placement, aspect, yoga, karaka, lagna, or transit chart
+- `factual_chart_lookup`: the asked object is a named chart or calculated fact, in any language. Set chart_focus + requested_chart. Interpret that chart from calculated data (D12 predicts parents/elders from D12, D10 predicts career from D10) rather than routing to family/career/soul topic_reading. A period question that mentions a varga stays timing_window.
 - `dedicated_muhurat_flow`: choose an auspicious date/time for a specified activity; required event, location, and date range must be known. Preserve a user-stated place in `muhurat_location_query` or explicitly select the saved birth location; never invent latitude/longitude.
 - `dedicated_partnership_flow`: compatibility between two charts; return a handoff because Instant Chat does not calculate compatibility
 - `compound_plan`: two or more independently answerable questions; ask the user to choose one question first
@@ -2017,6 +2074,7 @@ Return ONLY this JSON shape:
                 force_ready_instruction=force_ready_instruction,
                 force_clarify_instruction=force_clarify_instruction,
                 dialogue_state_text=dialogue_state_text,
+                compound_choice_followup_text=compound_choice_followup_text,
             )
 
         model_name = self._get_instant_model_name()
@@ -2131,19 +2189,37 @@ Return ONLY this JSON shape:
                 and " ".join(returned_question.casefold().split())
                 == " ".join(prior_question.casefold().split())
             )
-            if repeated_question:
+            repeated_compound_choice = (
+                pending_compound_topic_choice(prior_dialogue_state)
+                and bool(latest_user_reply_text)
+                and str(final.get("status") or "").upper() == "CLARIFY"
+                and str(final.get("answer_mode") or "").strip() == "compound_plan"
+            )
+            if repeated_question or repeated_compound_choice:
                 reject_prior_question_fallback = True
+                repair_reason = (
+                    "Your previous JSON asked the user to pick one topic again after they already chose. "
+                    "Classify ONLY LATEST USER MESSAGE. The original bundled list in history is abandoned. "
+                    "Do not return compound_plan unless LATEST USER MESSAGE itself still has unrelated asks. "
+                    "Related facets of the chosen domain are one question. If another materially different fact "
+                    "is still needed, ask that; otherwise return READY."
+                    if repeated_compound_choice
+                    else (
+                        "Your previous JSON repeated the same clarification after the user supplied a new "
+                        "answer. That is an invalid dialogue-state update. Re-read the persisted "
+                        "last_clarification_question and LATEST USER MESSAGE. Use natural-language "
+                        "understanding to apply the user's reply to known_facts, remove every unresolved "
+                        "fact it resolves, and return a complete corrected JSON object. Do not repeat the "
+                        "previous clarification. If another materially different fact is still needed, "
+                        "ask exactly one different question; otherwise return READY."
+                    )
+                )
                 repair_prompt = f"""
 {prompt}
 
 CONTRACT REPAIR (mandatory):
-Your previous JSON repeated the same clarification after the user supplied a new
-answer. That is an invalid dialogue-state update. Re-read the persisted
-last_clarification_question and LATEST USER MESSAGE. Use natural-language
-understanding to apply the user's reply to known_facts, remove every unresolved
-fact it resolves, and return a complete corrected JSON object. Do not repeat the
-previous clarification. If another materially different fact is still needed,
-ask exactly one different question; otherwise return READY. Return JSON only.
+{repair_reason}
+Return JSON only.
 
 Invalid previous JSON:
 {json.dumps(result, ensure_ascii=False, default=str)}
@@ -2553,17 +2629,10 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
         - "RECOMMEND_REMEDY_FOR_PROBLEM": ONLY when the client already marked a Remedies CTA follow-up. For wording-only asks like "I have anxiety, what can I do?", use ANALYZE_ROOT_CAUSE / problem_diagnosis instead (UI offers Remedies separately).
 
         CHART-FOCUS DETECTION:
-        Decide whether the user is asking for a specific chart/lens reading rather than a normal life-topic reading.
-        - If the user explicitly or implicitly wants a chart-lens reading, set `chart_focus`.
-        - Examples that SHOULD set `chart_focus`:
-          - "Analyze my D10"
-          - "Read my navamsha"
-          - "Analyze my lagna"
-          - broken but clear variants like "career in d10 tell"
-        - Examples that should NOT set `chart_focus`:
-          - "Tell me about my career"
-          - "What career suits me from my chart"
-          - "Marriage prospects in my birth chart"
+        Decide semantically, in the user's language, whether they want a specific chart/lens read rather than a life-topic reading.
+        - If the asked object is a named varga/Jaimini chart itself (any language or script), set `chart_focus` with explicit=true and canonical primary (D1–D60, Karkamsa, Swamsa).
+        - Examples of meaning that SHOULD set `chart_focus`: analyzing D10, reading navamsha/द्वादशांश/कारकांश/Swamsa, "career in d10 tell".
+        - Examples that should NOT set `chart_focus`: career/marriage/life from "my chart", a period outlook that only mentions a varga as support.
         - Mentioning "chart" alone is NOT enough. Only set `chart_focus` when a specific lens/chart is actually the requested object.
 
         Return ONLY a JSON object:

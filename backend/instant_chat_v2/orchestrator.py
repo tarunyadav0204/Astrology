@@ -10,6 +10,7 @@ from .capability_gateway import execute_evidence_plan
 from .compiler import compile_evidence_plan
 from .fusion import fuse_evidence
 from .planner import build_query_plan
+from .user_derivation import build_user_derivation
 
 
 def build_instant_v2_packet(*, question: str, intent: Dict[str, Any] | None,
@@ -43,6 +44,11 @@ def build_instant_v2_packet(*, question: str, intent: Dict[str, Any] | None,
     verdict = fuse_evidence(query_plan, ledger)
     answer_spec = build_answer_spec(query_plan, verdict, ledger)
     verification = verify_answer_spec(answer_spec, ledger)
+    user_derivation = build_user_derivation(
+        query_plan=query_plan,
+        verdict=verdict,
+        instant_context=instant_context,
+    )
     return {
         "schema_version": "instant-audit-packet/v1",
         "test_mode": True,
@@ -53,6 +59,7 @@ def build_instant_v2_packet(*, question: str, intent: Dict[str, Any] | None,
         "verdict": verdict,
         "answer_spec": answer_spec,
         "verification": verification,
+        "user_derivation": user_derivation,
     }
 
 

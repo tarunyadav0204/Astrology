@@ -27,6 +27,7 @@ import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
 import { generatePDF, sharePDFOnWhatsApp, getLogoDataUriForModule, userFacingPdfExportError } from '../../utils/pdfGenerator';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
+import { buildReadableEvidence } from '../../utils/instantEvidence';
 import { chatAPI } from '../../services/api';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -1832,7 +1833,7 @@ function MessageBubble({
               >
                 <Ionicons name="diamond-outline" size={14} color={colors.accent} />
                 <Text style={[styles.instantEvidenceToggleText, { color: colors.text }]}>
-                  {t('premiumUi.chat.evidence')} · {instantEvidence?.evidence_ledger?.record_count || 0}
+                  {t('premiumUi.chat.whyThisAnswer', 'Why this answer')}
                 </Text>
                 <Ionicons name={showInstantEvidence ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -1840,57 +1841,45 @@ function MessageBubble({
                 <View style={[styles.instantEvidencePanel, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
                   <View style={styles.instantEvidenceHeader}>
                     <View style={styles.instantEvidenceHeaderCopy}>
-                      <Text style={[styles.instantEvidenceEyebrow, { color: colors.accent }]}>{t('premiumUi.chat.testEvidence')}</Text>
+                      <Text style={[styles.instantEvidenceEyebrow, { color: colors.accent }]}>
+                        {t('premiumUi.chat.howDerived', 'HOW THIS ANSWER WAS DERIVED')}
+                      </Text>
                       <Text style={[styles.instantEvidenceTitle, { color: colors.text }]}>
-                        {instantEvidence?.query_plan?.category || t('premiumUi.chat.general')} · {instantEvidence?.query_plan?.answer_mode || t('premiumUi.chat.reading')}
+                        {instantEvidence?.user_derivation?.event?.label || instantEvidence?.query_plan?.user_goal || t('premiumUi.chat.reading', 'Reading')}
                       </Text>
-                      {instantEvidence?.query_plan?.user_goal ? (
-                        <Text style={[styles.instantEvidenceMeta, { color: colors.textSecondary }]} numberOfLines={3}>
-                          {instantEvidence.query_plan.user_goal}
+
+                    </View>
+
+                  </View>
+
+                  {(() => {
+                    const sections = buildReadableEvidence(instantEvidence);
+                    if (!sections.length) {
+                      return (
+                        <Text style={[styles.instantEvidenceMeta, { color: colors.textSecondary }]}>
+                          {t('premiumUi.chat.noEvidenceYet', 'Evidence details are not available for this answer.')}
                         </Text>
-                      ) : null}
-                    </View>
-                    <View style={[styles.instantEvidenceStatus, { backgroundColor: colors.accentSoft }]}>
-                      <Text style={[styles.instantEvidenceStatusText, { color: colors.text }]}>
-                        {instantEvidence?.verification?.passed
-                          ? t('premiumUi.chat.evidenceLinked')
-                          : t('premiumUi.chat.reviewEvidence')}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={[styles.instantEvidenceVerdict, { borderColor: colors.cardBorder }]}>
-                    <Text style={[styles.instantEvidenceLabel, { color: colors.textSecondary }]}>{t('premiumUi.chat.verdict')}</Text>
-                    <Text style={[styles.instantEvidenceValue, { color: colors.text }]}>{String(instantEvidence?.verdict?.direction || t('premiumUi.chat.noVerdict'))}</Text>
-                    <Text style={[styles.instantEvidenceMeta, { color: colors.textSecondary }]}>
-                      {t('premiumUi.chat.confidence')} {Math.round(Number(instantEvidence?.verdict?.confidence || 0) * 100)}% · {instantEvidence?.evidence_plan?.methodology_version || '—'}
-                      {instantEvidence?.query_plan?.target_subject?.label || instantEvidence?.query_plan?.target_subject?.key
-                        ? ` · ${instantEvidence?.query_plan?.target_subject?.label || instantEvidence?.query_plan?.target_subject?.key}`
-                        : ''}
-                      {instantEvidence?.query_plan?.time_scope?.requested ? ` · ${instantEvidence.query_plan.time_scope.requested}` : ''}
-                      {instantEvidence?.composer_metrics ? ` · ${instantEvidence.composer_metrics.prompt_chars || 0} chars · ${instantEvidence.composer_metrics.generation_calls || 1} call` : ''}
-                    </Text>
-                  </View>
-                  <Text style={[styles.instantEvidenceLabel, { color: colors.textSecondary }]}>{t('premiumUi.chat.calculationPlan')}</Text>
-                  {(instantEvidence?.evidence_ledger?.capabilities || []).map((item) => (
-                    <View key={item.request_id} style={[styles.instantEvidenceRow, { borderColor: colors.cardBorder }]}>
-                      <Text style={[styles.instantEvidenceRowName, { color: colors.text }]} numberOfLines={2}>
-                        {item.capability}{item.evidence_ids?.length ? ` · ${item.evidence_ids.join(', ')}` : ''}
-                      </Text>
-                      <Text style={[styles.instantEvidenceRowStatus, { color: item.status === 'available' ? colors.success : colors.accent }]}>{item.status}</Text>
-                    </View>
-                  ))}
-                  <Text style={[styles.instantEvidenceLabel, styles.instantEvidenceSectionLabel, { color: colors.textSecondary }]}>{t('premiumUi.chat.evidenceLedger')}</Text>
-                  {(instantEvidence?.evidence_ledger?.records || []).map((item) => (
-                    <View key={item.evidence_id} style={[styles.instantEvidenceRecord, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
-                      <View style={styles.instantEvidenceRecordTop}>
-                        <Text style={[styles.instantEvidenceId, { color: colors.accent }]}>{item.evidence_id}</Text>
-                        <Text style={[styles.instantEvidenceConfidence, { color: colors.textSecondary }]}>{Math.round(Number(item.confidence || 0) * 100)}%</Text>
+                      );
+                    }
+                    return sections.map((section) => (
+                      <View key={section.key} style={styles.instantEvidenceSection}>
+                        <View style={styles.instantEvidenceSectionTitleRow}>
+                          {section.step ? (
+                            <View style={[styles.instantEvidenceStepBadge, { backgroundColor: colors.accentSoft }]}> 
+                              <Text style={[styles.instantEvidenceStepText, { color: colors.accent }]}>{section.step}</Text>
+                            </View>
+                          ) : null}
+                          <Text style={[styles.instantEvidenceLabel, styles.instantEvidenceSectionTitle, { color: colors.textSecondary }]}>{section.title}</Text>
+                        </View>
+                        {section.lines.map((line, index) => (
+                          <View key={`${section.key}_${index}`} style={styles.instantEvidenceBulletRow}>
+                            <View style={[styles.instantEvidenceBulletDot, { backgroundColor: colors.accent }]} />
+                            <Text style={[styles.instantEvidenceBulletText, { color: colors.text }]}>{line}</Text>
+                          </View>
+                        ))}
                       </View>
-                      <Text style={[styles.instantEvidenceRecordKind, { color: colors.text }]}>{item.kind}</Text>
-                      <Text style={[styles.instantEvidenceRecordSource, { color: colors.textSecondary }]}>{item.source}</Text>
-                      <Text style={[styles.instantEvidenceJson, { color: colors.textSecondary }]} numberOfLines={8}>{JSON.stringify(item.value, null, 2)}</Text>
-                    </View>
-                  ))}
+                    ));
+                  })()}
                 </View>
               ) : null}
             </>
@@ -1927,9 +1916,16 @@ function MessageBubble({
             <Text style={[styles.userLabel, { color: colors.onPrimary }]}>{t('chat.you', 'You')}</Text>
           </LinearGradient>
             {chartName ? (
-              <View style={[styles.chartNameBadge, styles.chartNameBadgeUser]}>
-                <Ionicons name="calendar-outline" size={10} color="#1e3a8a" />
-                <Text style={styles.chartNameBadgeTextUser} numberOfLines={1}>{chartName}</Text>
+              <View style={[
+                styles.chartNameBadge,
+                {
+                  backgroundColor: colors.accentSoft,
+                  borderWidth: 1,
+                  borderColor: colors.cardBorder,
+                },
+              ]}>
+                <Ionicons name="calendar-outline" size={10} color={colors.onAccent} />
+                <Text style={[styles.chartNameBadgeText, { color: colors.onAccent }]} numberOfLines={1}>{chartName}</Text>
               </View>
             ) : null}
           </View>
@@ -1987,9 +1983,16 @@ function MessageBubble({
             </Text>
           </LinearGradient>
             {chartName ? (
-              <View style={[styles.chartNameBadge, styles.chartNameBadgeAssistant]}>
-                <Ionicons name="calendar-outline" size={10} color="#7c2d12" />
-                <Text style={styles.chartNameBadgeTextAssistant} numberOfLines={1}>{chartName}</Text>
+              <View style={[
+                styles.chartNameBadge,
+                {
+                  backgroundColor: colors.accentSoft,
+                  borderWidth: 1,
+                  borderColor: colors.cardBorder,
+                },
+              ]}>
+                <Ionicons name="calendar-outline" size={10} color={colors.onAccent} />
+                <Text style={[styles.chartNameBadgeText, { color: colors.onAccent }]} numberOfLines={1}>{chartName}</Text>
               </View>
             ) : null}
             {message.isTyping && (
@@ -2120,10 +2123,10 @@ function MessageBubble({
 
         {isNativeGate && !message.isTyping && (
           <View style={styles.nativeGateActionsWrap}>
-            <Text style={styles.nativeGateHelperText}>
+            <Text style={[styles.nativeGateHelperText, { color: colors.textSecondary }]}>
               {t(
                 'chat.nativeGateTapInstruction',
-                'Please tap one of the options below to continue.'
+                'Please choose one of the options below instead of typing a reply.'
               )}
             </Text>
             {isRelationshipSetupGate ? (
@@ -2156,7 +2159,7 @@ function MessageBubble({
               </View>
             ) : (
               <View style={styles.nativeGateActionsRow}>
-                {(isSubjectChartGate || isPartnershipOfferGate) && (
+                {isSubjectChartGate && (
                   <TouchableOpacity
                     style={styles.nativeGateSelectCta}
                     onPress={() => navigation.navigate('SelectNative', { returnTo: 'Home' })}
@@ -2169,7 +2172,7 @@ function MessageBubble({
                     </Text>
                   </TouchableOpacity>
                 )}
-                {(isSubjectChartGate || isPartnershipOfferGate) && (
+                {isSubjectChartGate && (
                   <TouchableOpacity
                     style={styles.nativeGateCtaOuter}
                     onPress={() => {
@@ -2210,26 +2213,38 @@ function MessageBubble({
                   <>
                     {isPartnershipOfferGate && (
                       <TouchableOpacity
-                        style={styles.nativeGateSecondaryCta}
+                        style={[
+                          styles.nativeGateSecondaryCta,
+                          {
+                            backgroundColor: colors.accentSoft,
+                            borderColor: colors.cardBorder,
+                          },
+                        ]}
                         onPress={() => onStartPartnershipGate && onStartPartnershipGate(gateMetadata)}
                         activeOpacity={0.85}
                         accessibilityRole="button"
                         accessibilityLabel={t('chat.startPartnershipA11y', 'Start partnership study')}
                       >
-                        <Ionicons name="people-outline" size={16} color="#ea580c" style={{ marginRight: 6 }} />
-                        <Text style={styles.nativeGateSecondaryCtaText}>
+                        <Ionicons name="people-outline" size={16} color={colors.onAccent} style={{ marginRight: 6 }} />
+                        <Text style={[styles.nativeGateSecondaryCtaText, { color: colors.onAccent }]}>
                         {t('chat.startPartnershipAnalysis', Platform.OS === 'ios' ? 'Start partnership study' : 'Start Partnership Analysis')}
                         </Text>
                       </TouchableOpacity>
                     )}
                     <TouchableOpacity
-                      style={styles.nativeGatePlainCta}
+                      style={[
+                        styles.nativeGatePlainCta,
+                        {
+                          borderColor: colors.cardBorder,
+                          backgroundColor: colors.surfaceMuted,
+                        },
+                      ]}
                       onPress={() => onContinueSingleChartGate && onContinueSingleChartGate(gateMetadata)}
                       activeOpacity={0.85}
                       accessibilityRole="button"
                       accessibilityLabel={t('chat.continueSingleChartA11y', 'Continue with selected chart only')}
                     >
-                      <Text style={styles.nativeGatePlainCtaText}>
+                      <Text style={[styles.nativeGatePlainCtaText, { color: colors.textSecondary }]}>
                         {t('chat.continueSingleChart', 'Continue with my chart only')}
                       </Text>
                     </TouchableOpacity>
@@ -2874,6 +2889,14 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   instantEvidenceRowName: { flex: 1, fontSize: 10, lineHeight: 14, fontWeight: '600' },
   instantEvidenceRowStatus: { fontSize: 9, lineHeight: 12, fontWeight: '800' },
   instantEvidenceSectionLabel: { marginTop: 12 },
+  instantEvidenceSection: { marginTop: 8 },
+  instantEvidenceSectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 3 },
+  instantEvidenceSectionTitle: { flex: 1, marginTop: 0, marginBottom: 0 },
+  instantEvidenceStepBadge: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  instantEvidenceStepText: { fontSize: 10, lineHeight: 12, fontWeight: '900' },
+  instantEvidenceBulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, paddingVertical: 2 },
+  instantEvidenceBulletDot: { width: 5, height: 5, borderRadius: 3, marginTop: 6 },
+  instantEvidenceBulletText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '600' },
   instantEvidenceRecord: { marginTop: 6, padding: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 9 },
   instantEvidenceRecordTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 6 },
   instantEvidenceId: { fontSize: 9, lineHeight: 12, fontWeight: '900' },
@@ -2964,25 +2987,9 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     gap: 4,
     maxWidth: 140,
   },
-  chartNameBadgeUser: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
-  },
-  chartNameBadgeAssistant: {
-    backgroundColor: 'rgba(255, 107, 53, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.25)',
-  },
-  chartNameBadgeTextUser: {
+  chartNameBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#1e3a8a',
-  },
-  chartNameBadgeTextAssistant: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#7c2d12',
   },
   imageContainer: {
     marginBottom: 15,
@@ -3928,11 +3935,8 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     paddingVertical: 9,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: 'rgba(234, 88, 12, 0.35)',
-    backgroundColor: 'rgba(255, 247, 237, 0.92)',
   },
   nativeGateSecondaryCtaText: {
-    color: '#ea580c',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -3941,18 +3945,14 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     paddingVertical: 9,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: 'rgba(120, 113, 108, 0.28)',
-    backgroundColor: 'rgba(255, 255, 255, 0.82)',
   },
   nativeGatePlainCtaText: {
-    color: '#57534e',
     fontSize: 13,
     fontWeight: '700',
   },
   nativeGateHelperText: {
     fontSize: 13,
     lineHeight: 18,
-    color: '#7c2d12',
     fontWeight: '600',
     marginBottom: 12,
   },

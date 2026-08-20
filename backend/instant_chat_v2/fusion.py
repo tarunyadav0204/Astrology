@@ -96,6 +96,35 @@ def fuse_evidence(query_plan: Dict[str, Any], ledger: Dict[str, Any]) -> Dict[st
         windows = []
         rationale = primary[:2] if isinstance(primary, list) else primary
         confidence = 0.4
+    elif query_plan.get("answer_mode") == "factual_chart_lookup":
+        chart = (by_kind.get("chart_facts") or {}).get("value") if isinstance((by_kind.get("chart_facts") or {}).get("value"), dict) else {}
+        charts = chart.get("charts") if isinstance(chart.get("charts"), dict) else {}
+        reading = [str(line).strip() for line in (chart.get("reading_lines") or []) if str(line).strip()]
+        if not reading and chart.get("reading_text"):
+            reading = [str(chart.get("reading_text"))]
+        missing_charts = [str(item) for item in (chart.get("missing_requested_charts") or []) if str(item).strip()]
+        if charts or reading:
+            direction = "calculated_chart"
+            windows = []
+            signals = []
+            for compact in charts.values():
+                if not isinstance(compact, dict):
+                    continue
+                signals.extend(str(item).strip() for item in (compact.get("support_signals") or []) if str(item).strip())
+                signals.extend(str(item).strip() for item in (compact.get("caution_signals") or []) if str(item).strip())
+            domain_lines = []
+            for compact in charts.values():
+                domain = compact.get("domain") if isinstance(compact, dict) and isinstance(compact.get("domain"), dict) else {}
+                life_area = str(domain.get("life_area") or "").strip()
+                if life_area:
+                    domain_lines.append(life_area)
+            rationale = signals or domain_lines or reading or list(charts.keys())
+            confidence = 0.94 if not missing_charts else 0.72
+        else:
+            direction = "insufficient_evidence"
+            windows = []
+            rationale = missing_charts or ["The requested chart was not calculated."]
+            confidence = 0.35
     elif isinstance(timing, dict) and timing:
         direction = timing.get("verdict") or timing.get("direction") or timing.get("status") or "conditional"
         windows = timing.get("windows") or timing.get("ranked_windows") or timing.get("best_windows") or []
@@ -133,9 +162,10 @@ def fuse_evidence(query_plan: Dict[str, Any], ledger: Dict[str, Any]) -> Dict[st
         rationale = primary[:4] if isinstance(primary, list) else primary
         confidence = 0.72 if primary else 0.35
     if (timing_mode or calculator_required_mode or exact_day) and missing_required:
-        direction = "insufficient_evidence"
-        confidence = min(confidence, 0.39)
-        windows = []
+        if not (query_plan.get("answer_mode") == "factual_chart_lookup" and direction == "calculated_chart"):
+            direction = "insufficient_evidence"
+            confidence = min(confidence, 0.39)
+            windows = []
     confidence_tier = "directional"
     if timing_mode or exact_day:
         high_confidence_complete = bool(high_confidence_capabilities) and high_confidence_capabilities.issubset(available_capabilities)

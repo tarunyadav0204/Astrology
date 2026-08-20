@@ -104,6 +104,19 @@ def _capability_evidence_kinds(capability: str) -> List[str]:
     return []
 
 
+def _segment_rows(value: Any) -> List[Dict[str, Any]]:
+    if isinstance(value, list):
+        return [row for row in value if isinstance(row, dict)]
+    if isinstance(value, dict):
+        rows = value.get("segments") or value.get("periods") or []
+        return [row for row in rows if isinstance(row, dict)]
+    return []
+
+
+def _first_timing_container(*values: Any) -> Any:
+    return next((value for value in values if _segment_rows(value)), {})
+
+
 def build_evidence_ledger(instant_context: Dict[str, Any], evidence_plan: Dict[str, Any]) -> Dict[str, Any]:
     records: List[Dict[str, Any]] = []
     normalized = instant_context.get("normalized_evidence") if isinstance(instant_context.get("normalized_evidence"), dict) else {}
@@ -165,7 +178,23 @@ def build_evidence_ledger(instant_context: Dict[str, Any], evidence_plan: Dict[s
     _add(records, source="timing.fusion", kind="event_timing_verdict",
          value=normalized.get("event_timing_verdict"), strength="primary", confidence=0.9)
     activation_timeline = normalized.get("transit_activation_timeline")
-    activation_segments = normalized.get("window_dasha_segments")
+    # Dasha segment containers live on instant_parashari in the calculation
+    # pipeline. Older normalization copied only the transit timeline, which made
+    # the audit packet claim required dasha evidence was missing even though the
+    # answer composer had already used those calculated segments.
+    window_segments = _first_timing_container(
+        normalized.get("window_dasha_segments"),
+        parashari.get("window_dasha_segments"),
+    )
+    horizon_segments = _first_timing_container(
+        normalized.get("horizon_dasha_segments"),
+        parashari.get("horizon_dasha_segments"),
+    )
+    forward_segments = _first_timing_container(
+        normalized.get("forward_event_dasha_scan"),
+        parashari.get("forward_event_dasha_scan"),
+    )
+    activation_segments = _segment_rows(window_segments) or _segment_rows(horizon_segments)
     if activation_timeline or activation_segments:
         _add(records, source="parashari.transit_activation", kind="transit_activation_timeline",
              value={
@@ -174,7 +203,7 @@ def build_evidence_ledger(instant_context: Dict[str, Any], evidence_plan: Dict[s
                  "window_segments": activation_segments,
              }, strength="primary", confidence=0.92)
     _add(records, source="parashari.dasha_scan", kind="future_dasha_windows",
-         value=normalized.get("forward_event_dasha_scan") or normalized.get("horizon_dasha_segments"),
+         value=(forward_segments or horizon_segments or window_segments),
          strength="primary", confidence=0.88)
     _add(records, source="comparison", kind="option_comparison",
          value=normalized.get("option_comparison"), strength="primary", confidence=0.86)
@@ -182,9 +211,17 @@ def build_evidence_ledger(instant_context: Dict[str, Any], evidence_plan: Dict[s
          value=normalized.get("health_body_area") or normalized.get("body_area_evidence"),
          strength="primary", confidence=0.8)
     chart_facts = normalized.get("chart_facts") if isinstance(normalized.get("chart_facts"), dict) else {}
+    chart_fact_value = {}
+    if isinstance(chart_facts, dict) and (
+        chart_facts.get("charts")
+        or chart_facts.get("missing_requested_charts")
+        or chart_facts.get("reading_text")
+        or chart_facts.get("analysis_brief")
+    ):
+        chart_fact_value = chart_facts
     _add(
         records, source="chart.calculation", kind="chart_facts",
-        value=chart_facts if chart_facts.get("calculation_complete") else {},
+        value=chart_fact_value,
         strength="primary", confidence=0.98, calculator="chart_and_divisional_calculators",
     )
     _add(records, source="jaimini.karaka", kind="karaka_support",

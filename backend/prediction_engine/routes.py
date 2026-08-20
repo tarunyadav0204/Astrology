@@ -33,6 +33,7 @@ from .fomo_repository import (
     birth_chart_hash,
     snapshot_cache_key,
 )
+from .homepage_next_peak import generate_homepage_next_peak
 from .homepage_prompts import HOMEPAGE_PROMPT_KEYS, HomepagePromptRepository
 from .profiles import get_profile
 from .service import PredictionService
@@ -692,6 +693,51 @@ async def get_homepage_fomo(
     finally:
         if capacity_owned_by_request:
             _FOMO_REQUEST_SEMAPHORE.release()
+
+
+@router.get("/homepage-next-peak")
+async def get_homepage_next_peak(
+    birth_chart_id: Optional[int] = Query(default=None, ge=1),
+    horizon_days: int = Query(default=120, ge=30, le=365),
+    current_user: User = Depends(get_current_user),
+):
+    """Forward-looking Parashari peak window for the home card."""
+    try:
+        if birth_chart_id is not None:
+            chart = await run_in_threadpool(
+                _load_owned_birth_chart,
+                birth_chart_id,
+                current_user.userid,
+            )
+        else:
+            chart = await run_in_threadpool(
+                _load_homepage_birth_chart,
+                current_user.userid,
+            )
+        if not chart:
+            return {"status": "no_chart", "peak": None}
+        return await asyncio.wait_for(
+            run_in_threadpool(
+                generate_homepage_next_peak,
+                chart,
+                as_of=date.today(),
+                horizon_days=horizon_days,
+            ),
+            timeout=45,
+        )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Your upcoming chart timing is still being prepared. Please try again shortly.",
+        ) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Homepage next peak failed user=%s", current_user.userid)
+        raise HTTPException(
+            status_code=500,
+            detail="Could not prepare upcoming chart timing.",
+        ) from exc
 
 
 @router.get("/homepage-prompts/state")

@@ -20,6 +20,9 @@ QUESTION_OPERATIONS: Dict[str, Dict[str, Any]] = {
         "examples": [
             "What is my Moon sign?",
             "When does my Mercury mahadasha start?",
+            "Explain my D12 chart",
+            "Read my Karkamsa",
+            "Interpret my Swamsa chart",
             "मेरी कुंडली में गुरु किस भाव में है?",
         ],
     },

@@ -1641,6 +1641,12 @@ const MessageBubble = ({
             }}
         >
             <div className="message-content">
+                {message.role === 'assistant' && message.native_name && !message.isTyping && !message.isProcessing && (
+                    <div className="message-native-chip">{message.native_name}</div>
+                )}
+                {message.role === 'user' && message.native_name && !message.isTyping && !message.isProcessing && (
+                    <div className="message-native-chip message-native-chip--user">{message.native_name}</div>
+                )}
                 {/* Mobile share/delete overlay (positioned inside card so layout does not shift) */}
                 {showActions && !message.isTyping && !message.isProcessing && isMobile() && (
                     <div className="message-bubble-mobile-actions" role="toolbar" aria-label="Message quick actions">
@@ -2085,18 +2091,11 @@ const MessageBubble = ({
                 )}
 
                 {isNativeGate && !message.isTyping && !message.isProcessing && (
-                    <div
-                        className="native-gate-ctas"
-                        style={{
-                            display: 'flex',
-                            flexDirection: 'row',
-                            flexWrap: 'wrap',
-                            alignItems: 'center',
-                            gap: '10px 14px',
-                            marginTop: 10,
-                            marginBottom: 2,
-                        }}
-                    >
+                    <div className="native-gate-actions">
+                        <p className="native-gate-helper">
+                            Please choose one of the options below instead of typing a reply.
+                        </p>
+                        <div className="native-gate-ctas">
                         {showRelationshipOptions && relationshipGateOptions.map((option, index) => {
                             const label = String(option?.label || option?.value || '').trim();
                             const value = String(option?.value || label).trim();
@@ -2186,22 +2185,8 @@ const MessageBubble = ({
                         {isPartnershipOfferGate && onStartPartnershipGate && (
                             <button
                                 type="button"
+                                className="native-gate-cta native-gate-cta--secondary"
                                 onClick={() => onStartPartnershipGate(gateMetadata)}
-                                style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 6,
-                                    padding: '8px 14px',
-                                    borderRadius: 999,
-                                    border: '1px solid rgba(234, 88, 12, 0.28)',
-                                    cursor: 'pointer',
-                                    background: '#fff7ed',
-                                    color: '#c2410c',
-                                    fontWeight: 700,
-                                    fontSize: 14,
-                                    lineHeight: 1.2,
-                                }}
                             >
                                 Start Partnership Analysis
                             </button>
@@ -2209,21 +2194,13 @@ const MessageBubble = ({
                         {(isSubjectChartGate || isPartnershipOfferGate) && onContinueSingleChartGate && (
                             <button
                                 type="button"
+                                className="native-gate-cta native-gate-cta--plain"
                                 onClick={() => onContinueSingleChartGate(gateMetadata)}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    padding: '4px 0',
-                                    cursor: 'pointer',
-                                    color: '#6b7280',
-                                    fontWeight: 700,
-                                    fontSize: 14,
-                                    textDecoration: 'underline',
-                                }}
                             >
                                 Continue with my chart only
                             </button>
                         )}
+                        </div>
                     </div>
                 )}
 

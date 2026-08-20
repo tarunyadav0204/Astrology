@@ -854,6 +854,18 @@ export const nudgeAPI = {
 };
 
 export const predictionAPI = {
+  getHomepageNextPeak: (birthChartId = null, horizonDays = 120) =>
+    api.get(
+      getEndpoint('/prediction-engine/homepage-next-peak'),
+      {
+        params: {
+          horizon_days: horizonDays,
+          ...(birthChartId ? { birth_chart_id: birthChartId } : {}),
+        },
+        ...BACKGROUND_REQUEST_CONFIG,
+        timeout: 45000,
+      },
+    ),
   getHomepageFomo: (
     language = 'en',
     { forceDisplay = false, birthChartId = null, includeIneligible = false } = {},

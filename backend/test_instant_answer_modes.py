@@ -25,7 +25,7 @@ _stub_module("ai.parallel_chat.parallel_agent_payloads", build_parashari_agent_p
 _stub_module("calculators.chart_calculator", ChartCalculator=_Dummy)
 _stub_module("calculators.real_transit_calculator", RealTransitCalculator=_Dummy)
 _stub_module("chat.chat_context_builder", ChatContextBuilder=_Dummy)
-_stub_module("context_agents.base", AgentContext=_Dummy)
+_stub_module("context_agents.base", AgentContext=_Dummy, ContextAgent=_Dummy)
 _stub_module("shared.dasha_calculator", DashaCalculator=_Dummy)
 _stub_module("utils.admin_settings", get_gemini_instant_model=lambda: "stub-model")
 # Keep real remedy-CTA helpers; only stub time resolution for period-window tests.
@@ -57,6 +57,7 @@ from chat.instant_chat_pipeline import (
     _fallback_target_subject,
     _infer_answer_mode,
     _looks_like_open_ended_life_event_when,
+    _mode_selection_from_intent,
     _is_conversational_non_question,
     _instant_lifetime_event_year_clarification_response,
     _merge_adjacent_low_score_event_periods,
@@ -610,6 +611,120 @@ def test_infer_answer_mode_for_explanation():
     assert mode == "explanation_mechanism"
 
 
+def test_infer_answer_mode_named_varga_uses_llm_chart_focus_not_question_language():
+    hindi = _infer_answer_mode(
+        "मेरी द्वादशांश कुंडली समझाओ",
+        {
+            "mode": "ANALYZE_TOPIC_POTENTIAL",
+            "category": "family",
+            "answer_mode": "topic_reading",
+            "chart_focus": {
+                "kind": "chart_specific",
+                "primary": "D12",
+                "explicit": True,
+                "requested": ["D12"],
+            },
+        },
+        [],
+    )
+    assert hindi == "factual_chart_lookup"
+
+
+def test_infer_answer_mode_does_not_keyword_match_english_d12():
+    mode = _infer_answer_mode(
+        "Explain my D12 chart",
+        {"mode": "ANALYZE_TOPIC_POTENTIAL", "category": "family"},
+        [],
+    )
+    assert mode == "topic_reading"
+
+
+def test_infer_answer_mode_named_varga_this_year_keeps_llm_timing():
+    mode = _infer_answer_mode(
+        "इस साल मेरा दशमांश कैसा है?",
+        {
+            "mode": "PREDICT_PERIOD_OUTLOOK",
+            "category": "career",
+            "answer_mode": "timing_window",
+            "needs_transits": True,
+            "chart_focus": {
+                "kind": "chart_specific",
+                "primary": "D10",
+                "explicit": True,
+                "requested": ["D10"],
+            },
+        },
+        [],
+    )
+    assert mode == "timing_window"
+
+
+def test_mode_selection_honors_llm_factual_chart_lookup_in_any_language():
+    selection = _mode_selection_from_intent(
+        {
+            "answer_mode": "factual_chart_lookup",
+            "category": "family",
+            "mode": "ANALYZE_TOPIC_POTENTIAL",
+            "target_subject_key": "self",
+            "chart_focus": {
+                "kind": "chart_specific",
+                "primary": "D12",
+                "explicit": True,
+                "requested": ["D12"],
+            },
+        },
+        "मेरी D12 कुंडली समझाओ",
+    )
+    assert selection is not None
+    assert selection["answer_mode"] == "factual_chart_lookup"
+
+
+def test_mode_selection_coerces_topic_reading_from_llm_chart_focus():
+    selection = _mode_selection_from_intent(
+        {
+            "answer_mode": "topic_reading",
+            "category": "family",
+            "mode": "ANALYZE_TOPIC_POTENTIAL",
+            "chart_focus": {
+                "kind": "chart_specific",
+                "primary": "Karkamsa",
+                "explicit": True,
+                "requested": ["Karkamsa"],
+            },
+        },
+        "mera karakamsha chart batao",
+    )
+    assert selection is not None
+    assert selection["answer_mode"] == "factual_chart_lookup"
+
+
+def test_mode_selection_does_not_parse_question_text_for_chart_facts():
+    selection = _mode_selection_from_intent(
+        {
+            "answer_mode": "topic_reading",
+            "category": "family",
+            "mode": "ANALYZE_TOPIC_POTENTIAL",
+            "target_subject_key": "self",
+        },
+        "Explain my D12 chart",
+    )
+    assert selection is not None
+    assert selection["answer_mode"] == "topic_reading"
+
+
+def test_build_answer_mode_contract_for_factual_chart_lookup():
+    contract = _build_answer_mode_contract(
+        "factual_chart_lookup",
+        "family",
+        {"kind": "current", "span_days": 1},
+        "current",
+    )
+    assert contract["answer_mode"] == "factual_chart_lookup"
+    assert "chart_facts" in contract["primary_evidence"]
+    assert "current dasha dominating the answer" in contract["avoid_drift"]
+    assert "Direct prediction" in contract["answer_skeleton"]
+
+
 def test_infer_answer_mode_for_trait_question():
     mode = _infer_answer_mode(
         "Tell me about my behaviour",
@@ -1039,9 +1154,9 @@ def test_period_anchor_datetime_uses_now_when_inside_window():
 
 
 def test_planet_aspects_house_from_vedic_offsets():
-    assert _planet_aspects_house_from(2, 9, "Saturn") is True  # Saturn 7th
-    assert _planet_aspects_house_from(2, 5, "Saturn") is True  # Saturn 3rd
-    assert _planet_aspects_house_from(2, 12, "Saturn") is True  # Saturn 10th
+    assert _planet_aspects_house_from(2, 8, "Saturn") is True  # Saturn 7th
+    assert _planet_aspects_house_from(2, 4, "Saturn") is True  # Saturn 3rd
+    assert _planet_aspects_house_from(2, 11, "Saturn") is True  # Saturn 10th
     assert _planet_aspects_house_from(2, 6, "Saturn") is False
 
 
@@ -1234,6 +1349,13 @@ def test_conversational_non_question_detects_deferrals():
 
 if __name__ == "__main__":
     test_infer_answer_mode_for_explanation()
+    test_infer_answer_mode_named_varga_uses_llm_chart_focus_not_question_language()
+    test_infer_answer_mode_does_not_keyword_match_english_d12()
+    test_infer_answer_mode_named_varga_this_year_keeps_llm_timing()
+    test_mode_selection_honors_llm_factual_chart_lookup_in_any_language()
+    test_mode_selection_coerces_topic_reading_from_llm_chart_focus()
+    test_mode_selection_does_not_parse_question_text_for_chart_facts()
+    test_build_answer_mode_contract_for_factual_chart_lookup()
     test_infer_answer_mode_for_trait_question()
     test_build_answer_mode_contract_for_trait_nature_uses_personality_axes()
     test_infer_answer_mode_for_period_window()

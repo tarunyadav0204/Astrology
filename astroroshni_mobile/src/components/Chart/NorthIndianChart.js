@@ -23,6 +23,11 @@ const HOUSE_DOT_POINTS_ALT = {
   7: { x: 180, y: 252 }, 8: { x: 300, y: 332 }, 9: { x: 375, y: 282 },
   10: { x: 250, y: 197 }, 11: { x: 375, y: 97 }, 12: { x: 300, y: 62 },
 };
+// House polygons and grid lines must share the same 400×400 frame so
+// active-house fills align with the diagonal/diamond dividers.
+const CHART_SIZE = 400;
+const CHART_MID = CHART_SIZE / 2;
+const CHART_DIAMOND_POINTS = `${CHART_MID},0 ${CHART_SIZE},${CHART_MID} ${CHART_MID},${CHART_SIZE} 0,${CHART_MID}`;
 
 const NorthIndianChart = ({
   chartData,
@@ -282,10 +287,24 @@ const NorthIndianChart = ({
     return planetsInHouse;
   };
 
-  const gridStrokeDash = drawAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1000, 0]
-  });
+  const gridStrokeDash = hideInstructions && cosmicTheme
+    ? 0
+    : drawAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1000, 0],
+      });
+  const useStaticGrid = hideInstructions && cosmicTheme;
+  const GridLine = useStaticGrid ? Line : AnimatedLine;
+  const GridPolygon = useStaticGrid ? Polygon : AnimatedPolygon;
+  const gridDashProps = useStaticGrid
+    ? {}
+    : { strokeDasharray: '600', strokeDashoffset: gridStrokeDash };
+  const diamondDashProps = useStaticGrid
+    ? {}
+    : { strokeDasharray: '1200', strokeDashoffset: gridStrokeDash };
+  const borderDashProps = useStaticGrid
+    ? {}
+    : { strokeDasharray: '1600', strokeDashoffset: gridStrokeDash };
 
   return (
     <View
@@ -302,13 +321,6 @@ const NorthIndianChart = ({
         style={[styles.svg, size ? { width: size, height: size } : null]}
       >
         <Defs>
-          <ClipPath id="chartClip">
-            <Rect
-              x="2" y="2" width="396" height="396"
-              rx={cosmicTheme ? "16" : "0"}
-              ry={cosmicTheme ? "16" : "0"}
-            />
-          </ClipPath>
           <LinearGradient id="chartGradient" x1="0%" y1="0%" x2="100%" y2="100%">
             {cosmicTheme ? (
               theme === 'dark' ? [
@@ -332,45 +344,41 @@ const NorthIndianChart = ({
             Keeping an SVG perimeter as well creates a visibly doubled outline. */}
         {!cosmicTheme ? (
           <AnimatedRect
-            x="2" y="2" width="396" height="396"
+            x="0" y="0" width={CHART_SIZE} height={CHART_SIZE}
             fill="transparent"
             stroke="#e91e63"
             strokeWidth="3"
             rx="0"
             ry="0"
-            strokeDasharray="1600"
-            strokeDashoffset={gridStrokeDash}
+            {...borderDashProps}
             pointerEvents="none"
           />
         ) : null}
 
         {/* Inner diamond border */}
-        <AnimatedPolygon
-          points="200,2 398,200 200,398 2,200"
+        <GridPolygon
+          points={CHART_DIAMOND_POINTS}
           fill="none"
-          stroke={cosmicTheme ? colors.chartLineStrong : "#ff6f00"}
-          strokeWidth={cosmicTheme ? "1.5" : "3"}
-          strokeDasharray="1200"
-          strokeDashoffset={gridStrokeDash}
+          stroke={cosmicTheme ? resolvedGridLine : "#ff6f00"}
+          strokeWidth={cosmicTheme ? resolvedGridLineWidth : "3"}
+          {...diamondDashProps}
           pointerEvents="none"
         />
 
         {/* Diagonal lines */}
-        <G clipPath="url(#chartClip)">
-          <AnimatedLine
-            x1="2" y1="2" x2="398" y2="398"
+        <G>
+          <GridLine
+            x1="0" y1="0" x2={CHART_SIZE} y2={CHART_SIZE}
             stroke={cosmicTheme ? resolvedGridLine : "#ff8a65"}
             strokeWidth={resolvedGridLineWidth}
-            strokeDasharray="600"
-            strokeDashoffset={gridStrokeDash}
+            {...gridDashProps}
             pointerEvents="none"
           />
-          <AnimatedLine
-            x1="398" y1="2" x2="2" y2="398"
+          <GridLine
+            x1={CHART_SIZE} y1="0" x2="0" y2={CHART_SIZE}
             stroke={cosmicTheme ? resolvedGridLine : "#ff8a65"}
             strokeWidth={resolvedGridLineWidth}
-            strokeDasharray="600"
-            strokeDashoffset={gridStrokeDash}
+            {...gridDashProps}
             pointerEvents="none"
           />
         </G>
@@ -390,7 +398,8 @@ const NorthIndianChart = ({
                   d={houseData.path}
                   fill={highlightFill || "rgba(255,215,0,0.18)"}
                   stroke={highlightColor || "#ffd700"}
-                  strokeWidth="4"
+                  strokeWidth="2"
+                  strokeLinejoin="miter"
                   pointerEvents="none"
                 />
               ) : null}

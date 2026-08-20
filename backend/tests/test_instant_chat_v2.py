@@ -8,6 +8,7 @@ from chat.instant_chat_pipeline import (
     _build_instant_composer_prompt_v3,
     _build_event_timing_verdict,
     _instant_real_chart_facts,
+    _requested_charts_from_intent,
     _should_force_event_current_window,
     _repair_common_utf8_mojibake,
     _resolve_period_window,
@@ -727,8 +728,20 @@ def test_requested_divisional_and_jaimini_chart_facts_are_really_calculated():
     )
     assert facts["calculation_complete"] is True
     assert set(facts["charts"]) == {"D12", "SWAMSA", "KARAKAMSHA"}
-    assert facts["charts"]["D12"]["planets"]["Ketu"]["house"] >= 1
+    d12 = facts["charts"]["D12"]
+    assert d12["planets"]["Ketu"]["house"] >= 1
+    assert d12["domain"]["code"] == "D12"
+    assert "parents" in d12["domain"]["life_area"]
+    assert d12["lagna"]["lord"]
+    assert d12["planets"]["Sun"]["dignity"]
+    assert isinstance(d12["planets"]["Sun"]["aspects_to_houses"], list)
+    assert d12["houses"]
+    assert d12["support_signals"] or d12["caution_signals"]
     assert facts["charts"]["SWAMSA"]["atmakaraka"] == "Mars"
+    assert facts["charts"]["KARAKAMSHA"]["domain"]["code"] == "Karkamsa"
+    assert any(line.startswith("D12 lagna:") for line in facts["reading_lines"])
+    assert "D12 Ketu:" in facts["reading_text"]
+    assert "predicts" in (facts.get("analysis_brief") or "")
 
 
 def test_unsupported_chart_fact_is_unavailable_instead_of_guessed():
@@ -739,3 +752,108 @@ def test_unsupported_chart_fact_is_unavailable_instead_of_guessed():
     )
     assert facts["calculation_complete"] is False
     assert facts["missing_requested_charts"] == ["D13"]
+
+
+def test_requested_charts_come_from_llm_fields_not_question_text():
+    assert _requested_charts_from_intent(
+        {
+            "answer_mode": "topic_reading",
+            "category": "family",
+            "divisional_charts": ["D1", "D9", "D12"],
+        },
+        answer_mode="topic_reading",
+    ) == []
+    assert _requested_charts_from_intent(
+        {
+            "chart_focus": {"explicit": True, "primary": "D12", "requested": ["D12"]},
+            "extracted_context": {"requested_chart": "D12"},
+        },
+        answer_mode="factual_chart_lookup",
+    ) == ["D12"]
+    assert "D12" in _requested_charts_from_intent(
+        {
+            "divisional_charts": ["D1", "D9", "D12"],
+            "category": "family",
+        },
+        answer_mode="factual_chart_lookup",
+    )
+
+
+def test_composer_v3_sends_chart_facts_instead_of_family_topic_for_d12():
+    brief = _build_instant_composer_context(
+        {
+            "intent_summary": {"category": "family", "answer_mode": "factual_chart_lookup"},
+            "normalized_evidence": {
+                "chart_facts": {
+                    "requested_charts": ["D12"],
+                    "reading_text": "D12 lagna: Gemini\nD12 Sun: Virgo, house 4",
+                    "reading_lines": ["D12 lagna: Gemini", "D12 Sun: Virgo, house 4"],
+                    "source": "DivisionalChartCalculator",
+                    "charts": {
+                        "D12": {
+                            "ascendant_sign": 2,
+                            "planets": {"Sun": {"sign": 5, "sign_name": "Virgo", "house": 4}},
+                        }
+                    },
+                },
+                "topic_confirmation": {"topic": "family"},
+                "active_areas": ["parents"],
+            },
+            "birth_summary": {"name": "Test"},
+        },
+        {
+            "query_plan": {
+                "category": "family",
+                "answer_mode": "factual_chart_lookup",
+                "special_flow": {"requested_chart": "D12"},
+            },
+            "verdict": {"direction": "calculated_chart"},
+            "answer_spec": {
+                "answer_mode": "factual_chart_lookup",
+                "chart_fact_rules": {"instruction": "Read only evidence.chart_facts."},
+            },
+        },
+    )
+    prompt = _build_instant_composer_prompt_v3("Explain my D12 chart", brief, "english")
+
+    assert brief["query_plan"]["forecast_shape"] == "chart_fact_reading"
+    assert "D12 lagna: Gemini" in (brief["evidence"]["chart_facts"]["reading_text"] or "")
+    assert "topic_confirmation" not in (brief.get("evidence") or {})
+    d12 = ((brief.get("evidence") or {}).get("chart_facts") or {}).get("charts") or {}
+    assert d12["D12"]["domain"]["life_area"]
+    assert d12["D12"]["lagna"]["lord"] == "Mercury"
+    assert brief["answer_blueprint"]["slots"][0]["slot"] == "direct prediction in this chart's life area"
+    assert "Never open with planets" not in prompt
+    assert "predict from that chart" in prompt
+    assert "planet-by-planet placement list" in prompt
+    assert "D12 predicts parents/elders/ancestry FROM this D12 packet" in prompt
+    assert "D12 lagna: Gemini" in prompt
+    assert "reply in english" not in prompt.lower()
+    assert "same language and script as the USER QUESTION" in prompt
+
+
+def test_composer_v3_follows_user_language_after_short_clarification():
+    prompt = _build_instant_composer_prompt_v3(
+        "apni",
+        {
+            "query_plan": {"answer_mode": "event_prediction", "category": "child"},
+            "intent": {"answer_mode": "event_prediction", "category": "child"},
+            "verdict": {"direction": "conditional"},
+            "evidence": {},
+            "answer_blueprint": {"slots": [{"slot": "direct real-life verdict"}]},
+            "answer_contract": {},
+            "recent_history": [
+                {
+                    "question": "Muje baby kab hoga ye janana ha",
+                    "answer": "यह जानने के लिए कि संतान प्राप्ति कब होगी, क्या आप अपनी स्वयं की कुंडली के बारे में पूछ रहे हैं?",
+                }
+            ],
+            "app_language_fallback": "english",
+        },
+        "english",
+    )
+    assert "reply in english" not in prompt.lower()
+    assert "same language and script as the USER QUESTION" in prompt
+    assert "never switch the user-facing answer to English" in prompt
+    assert "apni" in prompt
+    assert "Muje baby kab hoga ye janana ha" in prompt

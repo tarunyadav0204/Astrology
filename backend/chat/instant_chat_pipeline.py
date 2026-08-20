@@ -447,8 +447,12 @@ def _planet_aspects_house_from(transit_house: int, target_house: int, planet: st
     tgt = _norm_house(target_house)
     if th is None or tgt is None:
         return False
-    for off in _PLANET_ASPECT_OFFSETS.get(str(planet or ""), [7]):
-        if _norm_house(th + off) == tgt:
+    # Values in _PLANET_ASPECT_OFFSETS are ordinal aspect numbers (7 means
+    # "7th from the planet"), not zero-based movement offsets. The target is
+    # therefore origin + aspect_number - 1. Adding the ordinal directly made
+    # every aspect one house too far (for example Rahu H7 -> H2 instead of H1).
+    for aspect_number in _PLANET_ASPECT_OFFSETS.get(str(planet or ""), [7]):
+        if _norm_house(th + aspect_number - 1) == tgt:
             return True
     return False
 
@@ -2910,12 +2914,27 @@ def _segment_transit_activation(
             # A natural/category significator can describe an event, but it
             # cannot open that event for timing by itself.
             continue
+        event_links = []
+        for house in sorted(natal_links):
+            mechanisms = []
+            if house in ruled:
+                mechanisms.append("lordship")
+            if natal_house == house:
+                mechanisms.append("natal_occupation")
+            if house in natal_aspects:
+                mechanisms.append("natal_aspect")
+            event_links.append({
+                "house": display_house(house),
+                "native_house": house,
+                "mechanisms": mechanisms,
+            })
         carrier = carriers.setdefault(planet, {
             "planet": planet,
             "levels": [],
             "natal_house": natal_house,
             "natal_longitude": _natal_longitude_from_planet_row(natal),
             "natal_event_houses": set(),
+            "event_links": event_links,
         })
         carrier["levels"].append(level.upper())
         carrier["natal_event_houses"].update(natal_links)
@@ -3018,6 +3037,14 @@ def _segment_transit_activation(
                 else "medium" if delivered
                 else "secondary"
             )
+            delivered_details = [
+                {
+                    "house": display_house(house),
+                    "native_house": house,
+                    "mechanism": "transit_occupation" if transit_house == house else "transit_aspect",
+                }
+                for house in sorted(delivered)
+            ]
             snapshots.append({
                 "start": sample.strftime("%Y-%m-%d"),
                 "end": sample.strftime("%Y-%m-%d"),
@@ -3026,6 +3053,10 @@ def _segment_transit_activation(
                 "trigger_kinds": list(dict.fromkeys(trigger_kinds)),
                 "strength": strength,
                 "trigger_score": primary_score + secondary_score,
+                "transit_native_house": transit_house,
+                "natal_placement_house": natal_house,
+                "carrier_event_houses": [display_house(h) for h in sorted(event_houses)],
+                "delivered_event_houses": delivered_details,
                 "activated_focus_houses": [display_house(h) for h in sorted(delivered or event_houses)],
                 "why": "; ".join(labels),
                 "sample_cadence_days": step_days,
@@ -3076,7 +3107,9 @@ def _segment_transit_activation(
             {
                 "planet": row["planet"],
                 "dasha_levels": list(dict.fromkeys(row["levels"])),
+                "natal_placement_house": row.get("natal_house"),
                 "natal_event_houses": [display_house(h) for h in sorted(row["natal_event_houses"])],
+                "event_links": list(row.get("event_links") or []),
             }
             for row in carriers.values()
         ],
@@ -4171,6 +4204,54 @@ def _looks_like_remedy_question(question: str) -> bool:
     return any(marker in q for marker in markers)
 
 
+_PROTECTED_CHART_FACT_OVERRIDE_MODES = {
+    "comparison_choice",
+    "dedicated_partnership_flow",
+    "compound_plan",
+    "dedicated_muhurat_flow",
+    "location_recommendation",
+    "remedy_action",
+    "timing_window",
+    "event_prediction",
+    "explanation_mechanism",
+}
+
+
+def _llm_explicit_chart_focus(intent: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Return LLM-emitted explicit chart_focus only. Do not parse user wording."""
+    focus = (intent or {}).get("chart_focus") if isinstance((intent or {}).get("chart_focus"), dict) else {}
+    if focus.get("explicit") and (focus.get("primary") or focus.get("requested")):
+        return focus
+    return None
+
+
+def _llm_chart_fact_evidence_family(intent: Optional[Dict[str, Any]]) -> bool:
+    evidence_plan = (intent or {}).get("evidence_plan") if isinstance((intent or {}).get("evidence_plan"), dict) else {}
+    for part in evidence_plan.get("question_parts") or []:
+        if not isinstance(part, dict):
+            continue
+        families = part.get("intent_families") or []
+        if any(str(family or "").strip() == "factual_chart_lookup" for family in families):
+            return True
+    return False
+
+
+def _apply_llm_chart_fact_mode_guard(
+    mode: str,
+    intent: Optional[Dict[str, Any]] = None,
+) -> str:
+    """Coerce topic-style modes to chart-fact only from LLM structured fields."""
+    resolved = str(mode or "").strip() or "topic_reading"
+    if resolved in _PROTECTED_CHART_FACT_OVERRIDE_MODES:
+        return resolved
+    if resolved == "factual_chart_lookup":
+        return resolved
+    if _llm_explicit_chart_focus(intent) or _llm_chart_fact_evidence_family(intent):
+        if resolved in {"topic_reading", "trait_nature", "potential_capacity"}:
+            return "factual_chart_lookup"
+    return resolved
+
+
 def _explicit_remedy_followup_requested(
     intent: Optional[Dict[str, Any]],
     question: str = "",
@@ -4285,10 +4366,12 @@ def _looks_like_event_prediction_question(question: str, intent: Optional[Dict[s
 
 
 def _infer_answer_mode(question: str, intent: Optional[Dict[str, Any]], history: List[Dict[str, Any]]) -> str:
-    if _looks_like_explanatory_followup(question, history):
-        return "explanation_mechanism"
     if _explicit_remedy_followup_requested(intent, question):
         return "remedy_action"
+    if _apply_llm_chart_fact_mode_guard(str((intent or {}).get("answer_mode") or "topic_reading"), intent) == "factual_chart_lookup":
+        return "factual_chart_lookup"
+    if _looks_like_explanatory_followup(question, history):
+        return "explanation_mechanism"
     if _looks_like_comparison_question(question):
         return "comparison_choice"
     if _looks_like_problem_question(question):
@@ -4324,6 +4407,8 @@ def _build_answer_mode_router_prompt(question: str, intent: Optional[Dict[str, A
         "intent_category": str(intent.get("category") or ""),
         "needs_transits": bool(intent.get("needs_transits")),
         "context_type": str(intent.get("context_type") or ""),
+        "chart_focus": intent.get("chart_focus") if isinstance(intent.get("chart_focus"), dict) else None,
+        "requested_chart": ((intent.get("extracted_context") or {}) if isinstance(intent.get("extracted_context"), dict) else {}).get("requested_chart"),
         "recent_history": recent_items,
         "allowed_answer_modes": ANSWER_MODES,
         "allowed_target_subjects": sorted(TARGET_SUBJECTS.keys()),
@@ -4339,7 +4424,7 @@ CRITICAL:
 - Do not be biased by the user's wording. For example, a 'will X happen' question should still map to the mode that best fits the chart-reading task, not what the user seems to want to hear.
 
 Answer mode meanings:
-- factual_chart_lookup: exact calculated fact from any supported chart, dasha, transit, yoga, karaka or strength table
+- factual_chart_lookup: the asked object is a named chart or calculated fact, in any language/script. If INPUT.chart_focus.explicit is true or requested_chart is a named varga/Karkamsa/Swamsa, prefer this over family/career/soul topic_reading. A period outlook that only mentions a varga stays timing_window.
 - explanation_mechanism: user asks how/why a prior chart claim was made
 - trait_nature: user asks about behavior, nature, speech, temperament, personality
 - relationship_person: user asks about the nature/characteristics of spouse/partner/person
@@ -4394,8 +4479,12 @@ async def _infer_answer_mode_with_llm(
     model_name = get_gemini_instant_model()
 
     def _pack(mode: str, target_subject: Optional[Dict[str, Any]] = None, **extra: Any) -> Dict[str, Any]:
+        resolved_mode = _apply_llm_chart_fact_mode_guard(
+            _clamp_remedy_answer_mode(mode, intent, question),
+            intent,
+        )
         return {
-            "answer_mode": _clamp_remedy_answer_mode(mode, intent, question),
+            "answer_mode": resolved_mode,
             "target_subject": target_subject or _fallback_target_subject(question),
             **extra,
         }
@@ -4481,7 +4570,10 @@ async def _infer_answer_mode_with_llm(
     return _pack("topic_reading", needs_year_clarification=False, route_action="answer", router_degraded=True)
 
 
-def _mode_selection_from_intent(intent: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def _mode_selection_from_intent(
+    intent: Optional[Dict[str, Any]],
+    question: str = "",
+) -> Optional[Dict[str, Any]]:
     if not isinstance(intent, dict):
         return None
     mode = str(intent.get("answer_mode") or "").strip()
@@ -4512,7 +4604,12 @@ def _mode_selection_from_intent(intent: Optional[Dict[str, Any]]) -> Optional[Di
         or "future_dasha_event_windows" in evidence_kinds
     ):
         mode = "event_prediction"
-    mode = _clamp_remedy_answer_mode(mode, intent, str(intent.get("original_question") or ""))
+    mode = _clamp_remedy_answer_mode(
+        mode,
+        intent,
+        question or str(intent.get("original_question") or ""),
+    )
+    mode = _apply_llm_chart_fact_mode_guard(mode, intent)
     target_key = _normalize_relationship_target_key(intent.get("target_subject_key") or "")
     target_subject: Optional[Dict[str, Any]] = None
     if target_key in TARGET_SUBJECTS:
@@ -4975,6 +5072,24 @@ def _build_answer_mode_contract(answer_mode: str, category: str, period_window: 
                 "secondary_evidence": ["natal_snapshot", "active_dashas_formatted"],
                 "avoid_drift": ["current-period narrative unless asked", "full marriage timing", "career detours", "using the native's ascendant or Moon as the asked person's direct personality anchor"],
                 "answer_skeleton": "Target-person anchor -> Temperament/value pattern -> Communication/relating style -> One caution",
+            }
+        )
+    elif answer_mode == "factual_chart_lookup":
+        base.update(
+            {
+                "primary_evidence": ["chart_facts", "requested_charts", "chart_focus"],
+                "secondary_evidence": ["natal_snapshot", "karaka_evidence"],
+                "avoid_drift": [
+                    "current dasha dominating the answer",
+                    "planet-by-planet placement dump as the whole answer",
+                    "generic varga textbook essay without citing this chart's data",
+                    "D1 dasha or transits as the prediction engine",
+                    "inventing placements not present in chart_facts",
+                ],
+                "answer_skeleton": (
+                    "Direct prediction in this named chart's life area -> Lagna and lagna-lord result -> "
+                    "Two strongest supported outcomes -> One main caution -> One compact proof from this chart"
+                ),
             }
         )
     elif answer_mode == "timing_window":
@@ -5507,6 +5622,33 @@ def _instant_parashari_instruction_block(
                 "Use plain, mechanism-first wording rather than flattering or dramatic language.",
             ]
         )
+    if answer_mode == "factual_chart_lookup":
+        primary = ", ".join(str(v) for v in (contract.get("primary_evidence") or [])) or "chart_facts"
+        secondary = ", ".join(str(v) for v in (contract.get("secondary_evidence") or [])) or "natal snapshot"
+        avoid = "; ".join(str(v) for v in (contract.get("avoid_drift") or [])) or "topic-reading drift"
+        skeleton = str(
+            contract.get("answer_skeleton")
+            or "Direct prediction in this named chart's life area -> Lagna and lagna-lord result -> Two strongest supported outcomes -> One main caution -> One compact proof from this chart"
+        )
+        return "\n".join(
+            [
+                f"This answer uses universal answer mode `{answer_mode}`.",
+                "CRITICAL: Follow the method instructions below exactly.",
+                "CRITICAL: Predict from the requested chart's calculated packet. Placements, dignity, and aspects are evidence, not the user-facing answer.",
+                "CRITICAL: Your response will be marked failed if you dump planet-by-planet placements, use D1 current dasha/transits, or write generic varga lore without citing this chart's data.",
+                f"Answer skeleton: {skeleton}.",
+                f"Primary evidence priority: {primary}.",
+                f"Secondary evidence only after primary evidence: {secondary}.",
+                f"Avoid these drifts: {avoid}.",
+                "- `normalized_evidence.chart_facts`: this is the only source of truth. Use `charts[X].domain.life_area` as the prediction domain, then lagna/lagna-lord, dignity, occupation, conjunctions, and aspects.",
+                "- Name the requested chart clearly (D12, D9, Karkamsa, Swamsa, etc.) while stating the life-area prediction.",
+                "- If `chart_facts.missing_requested_charts` is present, say that chart could not be calculated. Do not invent it.",
+                "- Use `support_signals` and `caution_signals` to rank outcomes. One compact proof must cite this named chart only.",
+                "- `normalized_evidence.karaka_evidence`: use this only when the requested chart is Karkamsa or Swamsa, to name the Atmakaraka that the chart is built from.",
+                "Do not mention the current dasha chain or transits. Do not answer as a placement inventory.",
+                "A D12 prediction is about parents/elders/ancestry FROM this D12 packet, not D1 family houses. A D10 prediction is about career FROM this D10 packet. Do not write textbook meanings without the supplied facts.",
+            ]
+        )
     if answer_mode == "problem_diagnosis":
         primary = ", ".join(str(v) for v in (contract.get("primary_evidence") or [])) or "risk and activation evidence"
         secondary = ", ".join(str(v) for v in (contract.get("secondary_evidence") or [])) or "secondary modifiers"
@@ -5922,6 +6064,150 @@ def _should_force_event_current_window(
 
 _INSTANT_SUPPORTED_VARGAS = {1, 2, 3, 4, 7, 9, 10, 12, 16, 20, 24, 27, 30, 40, 45, 60}
 
+_CHART_PREDICTION_DOMAINS: Dict[str, Dict[str, Any]] = {
+    "D1": {
+        "code": "D1", "name": "Rasi",
+        "life_area": "overall life pattern and visible results",
+        "predicts": "core life direction, temperament, and how results show in the world",
+        "focus_houses": [1, 4, 7, 10],
+        "house_overlays": {},
+    },
+    "D2": {
+        "code": "D2", "name": "Hora",
+        "life_area": "wealth and material resources",
+        "predicts": "capacity to accumulate, hold, and use resources",
+        "focus_houses": [1, 2, 8, 11],
+        "house_overlays": {},
+    },
+    "D3": {
+        "code": "D3", "name": "Drekkana",
+        "life_area": "siblings, courage, and self-effort",
+        "predicts": "initiative, sibling dynamics, and the will to act",
+        "focus_houses": [1, 3, 11],
+        "house_overlays": {},
+    },
+    "D4": {
+        "code": "D4", "name": "Chaturthamsha",
+        "life_area": "home, property, and inner security",
+        "predicts": "residence, assets, and emotional base",
+        "focus_houses": [1, 4, 10, 12],
+        "house_overlays": {},
+    },
+    "D7": {
+        "code": "D7", "name": "Saptamsha",
+        "life_area": "children, creativity, and progeny",
+        "predicts": "children, creative output, and lineage through offspring",
+        "focus_houses": [1, 5, 7, 9],
+        "house_overlays": {},
+    },
+    "D9": {
+        "code": "D9", "name": "Navamsha",
+        "life_area": "marriage, dharma, and spouse",
+        "predicts": "partnership quality, inner dharma, and how fortune matures",
+        "focus_houses": [1, 5, 7, 9],
+        "house_overlays": {},
+    },
+    "D10": {
+        "code": "D10", "name": "Dashamsha",
+        "life_area": "career, status, and public work",
+        "predicts": "profession, authority, visibility, and work results",
+        "focus_houses": [1, 2, 6, 10, 11],
+        "house_overlays": {},
+    },
+    "D12": {
+        "code": "D12", "name": "Dwadashamsha",
+        "life_area": "parents, elders, ancestry, and inherited family patterns",
+        "predicts": "parental support, ancestral imprint, and how elders shape the native's inner base",
+        "focus_houses": [1, 4, 9, 10, 12],
+        "house_overlays": {
+            1: "native's experience of lineage and parental imprint",
+            4: "mother, home, ancestral property, emotional inheritance",
+            9: "father, dharma from lineage, guidance from elders",
+            10: "status and duty through parents or family",
+            12: "ancestral losses, distant elders, hidden family karma",
+        },
+    },
+    "D16": {
+        "code": "D16", "name": "Shodashamsha",
+        "life_area": "comforts, vehicles, and enjoyments",
+        "predicts": "luxuries, conveyances, and ease in daily comforts",
+        "focus_houses": [1, 4, 11, 12],
+        "house_overlays": {},
+    },
+    "D20": {
+        "code": "D20", "name": "Vimshamsha",
+        "life_area": "spiritual practice and devotion",
+        "predicts": "worship, sadhana, and religious inclination",
+        "focus_houses": [1, 5, 8, 9, 12],
+        "house_overlays": {},
+    },
+    "D24": {
+        "code": "D24", "name": "Chaturvimshamsha",
+        "life_area": "education and learning",
+        "predicts": "study, knowledge, and academic results",
+        "focus_houses": [1, 4, 5, 9],
+        "house_overlays": {},
+    },
+    "D27": {
+        "code": "D27", "name": "Saptavimshamsha",
+        "life_area": "inherent strengths and weaknesses",
+        "predicts": "native stamina, inner fortitude, and fragile spots",
+        "focus_houses": [1, 3, 6, 8],
+        "house_overlays": {},
+    },
+    "D30": {
+        "code": "D30", "name": "Trimshamsha",
+        "life_area": "evils, ailments, and misfortune",
+        "predicts": "vulnerability to trouble, illness, and hidden strain",
+        "focus_houses": [1, 6, 8, 12],
+        "house_overlays": {},
+    },
+    "D40": {
+        "code": "D40", "name": "Khavedamsha",
+        "life_area": "maternal lineage and mother's family",
+        "predicts": "maternal relatives and support from the mother's side",
+        "focus_houses": [1, 4, 11, 12],
+        "house_overlays": {},
+    },
+    "D45": {
+        "code": "D45", "name": "Akshavedamsha",
+        "life_area": "paternal lineage and father's family",
+        "predicts": "paternal relatives and support from the father's side",
+        "focus_houses": [1, 9, 10, 11],
+        "house_overlays": {},
+    },
+    "D60": {
+        "code": "D60", "name": "Shashtyamsha",
+        "life_area": "karmic residue and past-life imprint",
+        "predicts": "subtle karmic tone that colors other results",
+        "focus_houses": [1, 6, 8, 9, 12],
+        "house_overlays": {},
+    },
+    "KARAKAMSHA": {
+        "code": "Karkamsa", "name": "Karakamsa",
+        "life_area": "soul-direction and Atmakaraka path in worldly life",
+        "predicts": "how the Atmakaraka seeks fulfillment in material life",
+        "focus_houses": [1, 5, 9, 10],
+        "house_overlays": {},
+    },
+    "SWAMSA": {
+        "code": "Swamsa", "name": "Swamsa",
+        "life_area": "self-expression of the Atmakaraka",
+        "predicts": "inner vocation, spiritual leaning, and how the soul wants to act",
+        "focus_houses": [1, 5, 9, 10],
+        "house_overlays": {},
+    },
+}
+
+_CHART_PREDICTION_FORMAT = [
+    "direct prediction in this chart's life area",
+    "lagna and lagna-lord result",
+    "two strongest supported outcomes",
+    "one main caution",
+    "one compact proof from this named chart",
+    "one domain follow-up",
+]
+
 
 def _instant_compact_calculated_chart(chart: Dict[str, Any]) -> Dict[str, Any]:
     """Keep exact placements while avoiding a second full chart context."""
@@ -5938,7 +6224,8 @@ def _instant_compact_calculated_chart(chart: Dict[str, Any]) -> Dict[str, Any]:
             for key in (
                 "sign", "sign_name", "house", "longitude", "degree",
                 "degree_in_sign", "nakshatra", "pada", "retrograde",
-                "combust", "exalted", "debilitated",
+                "combust", "exalted", "debilitated", "dignity",
+                "functional_nature", "own_sign", "moolatrikona", "mooltrikona",
             )
             if row.get(key) is not None
         }
@@ -5957,6 +6244,444 @@ def _instant_compact_calculated_chart(chart: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _normalize_instant_chart_code(raw: Any) -> str:
+    label = str(raw or "").strip()
+    if not label:
+        return ""
+    normalized = re.sub(r"[\s_-]+", "", label).upper()
+    if normalized in {"KARAKAMSHA", "KARKAMSA", "KARAKAMSA", "KARKAMSHA"}:
+        return "KARAKAMSHA"
+    if normalized in {"SWAMSA", "SWAMSHA"}:
+        return "SWAMSA"
+    if normalized and normalized[0].isdigit():
+        return f"D{normalized}"
+    if re.fullmatch(r"D\d{1,2}", normalized):
+        return normalized
+    return normalized
+
+
+def _requested_charts_from_intent(intent: Optional[Dict[str, Any]], *, answer_mode: str) -> List[str]:
+    """Collect charts the LLM already named. Do not parse the user question."""
+    intent = intent if isinstance(intent, dict) else {}
+    extracted = intent.get("extracted_context") if isinstance(intent.get("extracted_context"), dict) else {}
+    focus = intent.get("chart_focus") if isinstance(intent.get("chart_focus"), dict) else {}
+    requested: List[str] = []
+    for raw in list(focus.get("requested") or []):
+        code = _normalize_instant_chart_code(raw)
+        if code and code not in requested:
+            requested.append(code)
+    primary = _normalize_instant_chart_code(focus.get("primary"))
+    if primary and primary not in requested:
+        requested.append(primary)
+    extracted_chart = _normalize_instant_chart_code(extracted.get("requested_chart"))
+    if extracted_chart and extracted_chart not in requested:
+        requested.append(extracted_chart)
+    if requested:
+        return requested
+    if str(answer_mode or "").strip() != "factual_chart_lookup":
+        return []
+    extras: List[str] = []
+    for raw in intent.get("divisional_charts") or []:
+        code = _normalize_instant_chart_code(raw)
+        if code and code not in extras:
+            extras.append(code)
+    named = [code for code in extras if code != "D1"]
+    return named or extras
+
+
+def _chart_fact_sign_label(row: Dict[str, Any]) -> str:
+    name = str(row.get("sign_name") or "").strip()
+    if name:
+        return name
+    sign = row.get("sign")
+    if isinstance(sign, int):
+        return SIGN_NAMES[sign % 12]
+    if isinstance(sign, str) and sign.strip():
+        return sign.strip()
+    return "unknown sign"
+
+
+def _chart_prediction_domain(chart_name: str) -> Dict[str, Any]:
+    code = _normalize_instant_chart_code(chart_name)
+    fallback = {
+        "code": chart_name,
+        "name": str(chart_name),
+        "life_area": "the asked chart's native life area",
+        "predicts": "results shown by this named chart",
+        "focus_houses": [1, 4, 7, 10],
+        "house_overlays": {},
+    }
+    domain = _CHART_PREDICTION_DOMAINS.get(code) or fallback
+    return dict(domain)
+
+
+def _houses_aspected_by_planet(planet: str, from_house: Any) -> List[int]:
+    origin = _norm_house(from_house)
+    if origin is None:
+        return []
+    houses: List[int] = []
+    for aspect_number in _PLANET_ASPECT_OFFSETS.get(str(planet or ""), [7]):
+        house = _norm_house(origin + aspect_number - 1)
+        if house is not None and house not in houses:
+            houses.append(house)
+    return houses
+
+
+def _uniq_signal_lines(items: List[str], limit: int = 6) -> List[str]:
+    seen: List[str] = []
+    for item in items:
+        text = str(item or "").strip()
+        if text and text not in seen:
+            seen.append(text)
+        if len(seen) >= limit:
+            break
+    return seen
+
+
+def _chart_prediction_signals(
+    domain: Dict[str, Any],
+    lagna_lord: Optional[str],
+    lagna_lord_row: Optional[Dict[str, Any]],
+    planets: Dict[str, Any],
+    houses: List[Dict[str, Any]],
+) -> tuple:
+    support: List[str] = []
+    caution: List[str] = []
+    focus = {int(h) for h in (domain.get("focus_houses") or [1, 4, 7, 10]) if _safe_int(h) is not None}
+    strong_dignity = {"exalted", "own_sign", "mooltrikona", "moolatrikona"}
+    if isinstance(lagna_lord_row, dict) and lagna_lord:
+        dignity = str(lagna_lord_row.get("dignity") or "")
+        house = lagna_lord_row.get("house")
+        if dignity in strong_dignity:
+            support.append(f"Lagna lord {lagna_lord} is {dignity} in house {house}")
+        elif dignity == "debilitated":
+            caution.append(f"Lagna lord {lagna_lord} is debilitated in house {house}")
+        if house in {6, 8, 12}:
+            caution.append(f"Lagna lord {lagna_lord} occupies dusthana house {house}")
+        elif house in {1, 4, 5, 7, 9, 10, 11}:
+            support.append(f"Lagna lord {lagna_lord} occupies house {house}")
+        received = lagna_lord_row.get("aspects_received") or []
+        for aspect in received:
+            if not isinstance(aspect, dict):
+                continue
+            other = str(aspect.get("planet") or "")
+            tone = str(aspect.get("aspect_tone") or aspect.get("nature") or "")
+            if tone == "benefic" and other:
+                support.append(f"Lagna lord {lagna_lord} is aspected by {other}")
+            elif tone == "malefic" and other:
+                caution.append(f"Lagna lord {lagna_lord} is aspected by {other}")
+    for name, row in planets.items():
+        if not isinstance(row, dict):
+            continue
+        house = _norm_house(row.get("house"))
+        dignity = str(row.get("dignity") or "")
+        nature = str(row.get("natural_nature") or _natural_nature(str(name)))
+        if house in focus and dignity in strong_dignity:
+            support.append(f"{name} is {dignity} in focus house {house}")
+        if house in focus and dignity == "debilitated":
+            caution.append(f"{name} is debilitated in focus house {house}")
+        if house in focus and nature == "benefic":
+            support.append(f"Benefic {name} occupies focus house {house}")
+        if house in focus and nature == "malefic":
+            caution.append(f"Malefic {name} occupies focus house {house}")
+        for asp_house in row.get("aspects_to_houses") or []:
+            target = _norm_house(asp_house)
+            if target not in focus:
+                continue
+            if nature == "benefic":
+                support.append(f"{name} aspects focus house {target}")
+            elif nature == "malefic":
+                caution.append(f"{name} aspects focus house {target}")
+    for house_row in houses:
+        if not isinstance(house_row, dict) or not house_row.get("focus"):
+            continue
+        occupants = [str(p) for p in (house_row.get("occupants") or [])]
+        if not occupants:
+            continue
+        hh = house_row.get("house")
+        if hh in {6, 8, 12} and occupants:
+            caution.append(f"Focus house {hh} occupied by {', '.join(occupants)}")
+    return _uniq_signal_lines(support), _uniq_signal_lines(caution)
+
+
+def _enrich_calculated_chart_for_prediction(chart_name: str, compact: Dict[str, Any]) -> Dict[str, Any]:
+    """Add dignity, aspects, lordships, and domain so the LLM can predict from this chart."""
+    if not isinstance(compact, dict):
+        return {}
+    planets = compact.get("planets") if isinstance(compact.get("planets"), dict) else {}
+    if not planets:
+        return dict(compact)
+    asc_sign = compact.get("ascendant_sign")
+    if not isinstance(asc_sign, int):
+        asc = compact.get("ascendant")
+        try:
+            asc_sign = int(float(asc) / 30) % 12 if asc is not None else None
+        except (TypeError, ValueError):
+            asc_sign = None
+    lordships = _get_house_lordships(int(asc_sign)) if isinstance(asc_sign, int) else {}
+    lagna_lord = _SIGN_LORDS.get(int(asc_sign)) if isinstance(asc_sign, int) else None
+    chart_like = {"planets": planets}
+    house_occupants: Dict[int, List[str]] = {house: [] for house in range(1, 13)}
+    enriched_planets: Dict[str, Any] = {}
+    for name, row in planets.items():
+        if not isinstance(row, dict):
+            continue
+        house = _norm_house(row.get("house"))
+        if house is not None:
+            house_occupants[house].append(str(name))
+        planet_lordships = list(lordships.get(str(name)) or [])
+        dignity = _planet_dignity_status(str(name), _sign_index_from_row(row))
+        calc_dignity = str(row.get("dignity") or "")
+        if calc_dignity in {"exalted", "debilitated", "own_sign", "mooltrikona", "moolatrikona"}:
+            dignity["dignity"] = "mooltrikona" if calc_dignity == "moolatrikona" else calc_dignity
+            dignity["in_own_sign"] = dignity["dignity"] == "own_sign"
+            dignity["in_mooltrikona"] = dignity["dignity"] in {"mooltrikona", "moolatrikona"}
+        conjunctions = [
+            other
+            for other, other_row in planets.items()
+            if other != name
+            and isinstance(other_row, dict)
+            and house is not None
+            and _norm_house(other_row.get("house")) == house
+        ]
+        enriched_planets[str(name)] = {
+            **{key: value for key, value in row.items() if value is not None},
+            "sign_name": _chart_fact_sign_label(row),
+            "house": house,
+            "lordships": planet_lordships,
+            "natural_nature": _natural_nature(str(name)),
+            "functional_nature": _functional_nature(planet_lordships),
+            "dignity": dignity.get("dignity"),
+            "sign_relation": dignity.get("sign_relation"),
+            "in_own_sign": dignity.get("in_own_sign"),
+            "in_mooltrikona": dignity.get("in_mooltrikona"),
+            "sign_lord": dignity.get("sign_lord"),
+            "retrograde": bool(row.get("retrograde")),
+            "combust": bool(row.get("combust")),
+            "conjunctions": conjunctions,
+            "aspects_received": _natal_aspects_to_planet(str(name), chart_like),
+            "aspects_to_houses": _houses_aspected_by_planet(str(name), house),
+        }
+    domain = _chart_prediction_domain(chart_name)
+    overlays = domain.get("house_overlays") if isinstance(domain.get("house_overlays"), dict) else {}
+    focus_houses = {int(h) for h in (domain.get("focus_houses") or []) if _safe_int(h) is not None}
+    houses: List[Dict[str, Any]] = []
+    for house in range(1, 13):
+        sign_index = ((int(asc_sign) + house - 1) % 12) if isinstance(asc_sign, int) else None
+        houses.append(
+            {
+                "house": house,
+                "sign": sign_index,
+                "sign_name": SIGN_NAMES[sign_index] if sign_index is not None else None,
+                "theme": overlays.get(house) or HOUSE_THEME_LABELS.get(house, ""),
+                "lord": _lord_of_house(lordships, house) if lordships else "",
+                "occupants": house_occupants.get(house) or [],
+                "focus": house in focus_houses,
+            }
+        )
+    lagna_lord_row = enriched_planets.get(str(lagna_lord or "")) if lagna_lord else None
+    support_signals, caution_signals = _chart_prediction_signals(
+        domain, lagna_lord, lagna_lord_row if isinstance(lagna_lord_row, dict) else None, enriched_planets, houses,
+    )
+    return {
+        **compact,
+        "domain": {
+            "code": domain.get("code"),
+            "name": domain.get("name"),
+            "life_area": domain.get("life_area"),
+            "predicts": domain.get("predicts"),
+            "focus_houses": list(domain.get("focus_houses") or []),
+        },
+        "lagna": {
+            "sign": asc_sign,
+            "sign_name": SIGN_NAMES[int(asc_sign) % 12] if isinstance(asc_sign, int) else None,
+            "lord": lagna_lord,
+            "lord_house": (lagna_lord_row or {}).get("house") if isinstance(lagna_lord_row, dict) else None,
+            "lord_dignity": (lagna_lord_row or {}).get("dignity") if isinstance(lagna_lord_row, dict) else None,
+            "lord_sign": (lagna_lord_row or {}).get("sign_name") if isinstance(lagna_lord_row, dict) else None,
+        },
+        "planets": enriched_planets,
+        "houses": houses,
+        "support_signals": support_signals,
+        "caution_signals": caution_signals,
+    }
+
+
+def _compact_planet_for_composer_prediction(row: Dict[str, Any]) -> Dict[str, Any]:
+    received = []
+    for aspect in row.get("aspects_received") or []:
+        if isinstance(aspect, dict) and aspect.get("planet"):
+            received.append(
+                {
+                    "planet": aspect.get("planet"),
+                    "tone": aspect.get("aspect_tone") or aspect.get("nature"),
+                }
+            )
+    return {
+        key: value
+        for key, value in {
+            "sign": _chart_fact_sign_label(row),
+            "house": row.get("house"),
+            "dignity": row.get("dignity"),
+            "lordships": list(row.get("lordships") or []),
+            "natural_nature": row.get("natural_nature"),
+            "functional_nature": row.get("functional_nature"),
+            "retrograde": bool(row.get("retrograde")) or None,
+            "combust": bool(row.get("combust")) or None,
+            "conjunctions": list(row.get("conjunctions") or []),
+            "aspects_received": received,
+            "aspects_to_houses": list(row.get("aspects_to_houses") or []),
+        }.items()
+        if value not in (None, "", [], {}, False)
+    }
+
+
+def _compact_chart_for_composer_prediction(chart_name: str, row: Dict[str, Any]) -> Dict[str, Any]:
+    enriched = row if isinstance(row.get("domain"), dict) else _enrich_calculated_chart_for_prediction(chart_name, row)
+    planets = enriched.get("planets") if isinstance(enriched.get("planets"), dict) else {}
+    houses = []
+    for house_row in enriched.get("houses") or []:
+        if not isinstance(house_row, dict):
+            continue
+        houses.append(
+            {
+                key: value
+                for key, value in {
+                    "house": house_row.get("house"),
+                    "sign": house_row.get("sign_name"),
+                    "lord": house_row.get("lord"),
+                    "occupants": house_row.get("occupants") or [],
+                    "theme": house_row.get("theme"),
+                    "focus": bool(house_row.get("focus")) or None,
+                }.items()
+                if value not in (None, "", [], {})
+            }
+        )
+    return {
+        key: value
+        for key, value in {
+            "domain": enriched.get("domain"),
+            "lagna": enriched.get("lagna"),
+            "ayanamsa": enriched.get("ayanamsa"),
+            "atmakaraka": enriched.get("atmakaraka"),
+            "support_signals": enriched.get("support_signals") or [],
+            "caution_signals": enriched.get("caution_signals") or [],
+            "planets": {
+                str(planet): _compact_planet_for_composer_prediction(prow)
+                for planet, prow in planets.items()
+                if isinstance(prow, dict)
+            },
+            "houses": houses,
+        }.items()
+        if value not in (None, "", [], {})
+    }
+
+
+def _format_planet_chart_fact_line(label: str, planet_name: str, row: Dict[str, Any]) -> str:
+    house = row.get("house")
+    house_bit = f", house {house}" if house not in (None, "") else ""
+    extras: List[str] = []
+    dignity = str(row.get("dignity") or "").strip()
+    if dignity and dignity not in {"unknown", "neutral_sign", "neutral"}:
+        extras.append(dignity)
+    if row.get("retrograde"):
+        extras.append("retrograde")
+    if row.get("combust"):
+        extras.append("combust")
+    lordships = row.get("lordships") or []
+    if lordships:
+        extras.append("lords " + "/".join(str(house) for house in lordships))
+    conjunctions = row.get("conjunctions") or []
+    if conjunctions:
+        extras.append("conjunct " + ", ".join(str(item) for item in conjunctions))
+    received = []
+    for aspect in row.get("aspects_received") or []:
+        if isinstance(aspect, dict) and aspect.get("planet"):
+            received.append(str(aspect.get("planet")))
+        elif aspect:
+            received.append(str(aspect))
+    if received:
+        extras.append("aspected by " + ", ".join(received))
+    extra_bit = f" ({', '.join(extras)})" if extras else ""
+    return f"{label} {planet_name}: {_chart_fact_sign_label(row)}{house_bit}{extra_bit}"
+
+
+def _format_chart_fact_reading(chart_facts: Dict[str, Any]) -> Dict[str, Any]:
+    display = {"KARAKAMSHA": "Karkamsa", "SWAMSA": "Swamsa"}
+    lines: List[str] = []
+    analysis: List[str] = []
+    charts = chart_facts.get("charts") if isinstance(chart_facts.get("charts"), dict) else {}
+    for chart_name, compact in charts.items():
+        if not isinstance(compact, dict):
+            continue
+        label = display.get(str(chart_name), str(chart_name))
+        domain = compact.get("domain") if isinstance(compact.get("domain"), dict) else {}
+        lagna = compact.get("lagna") if isinstance(compact.get("lagna"), dict) else {}
+        asc_sign = compact.get("ascendant_sign") if compact.get("ascendant_sign") is not None else lagna.get("sign")
+        if isinstance(asc_sign, int):
+            lagna_name = SIGN_NAMES[asc_sign % 12]
+        else:
+            lagna_name = str(lagna.get("sign_name") or asc_sign or compact.get("ascendant") or "unknown")
+        life_area = str(domain.get("life_area") or "").strip()
+        if life_area:
+            analysis.append(f"{label} predicts {life_area}")
+        lagna_line = f"{label} lagna: {lagna_name}"
+        if lagna.get("lord"):
+            lord_bits = [str(lagna.get("lord"))]
+            if lagna.get("lord_sign"):
+                lord_bits.append(str(lagna.get("lord_sign")))
+            if lagna.get("lord_house") not in (None, ""):
+                lord_bits.append(f"house {lagna.get('lord_house')}")
+            if lagna.get("lord_dignity"):
+                lord_bits.append(str(lagna.get("lord_dignity")))
+            lagna_line += f"; lagna lord {' '.join(lord_bits)}"
+        lines.append(lagna_line.split(";")[0])
+        analysis.append(lagna_line)
+        for signal in compact.get("support_signals") or []:
+            analysis.append(f"{label} support: {signal}")
+        for signal in compact.get("caution_signals") or []:
+            analysis.append(f"{label} caution: {signal}")
+        planets = compact.get("planets") if isinstance(compact.get("planets"), dict) else {}
+        for planet_name, row in planets.items():
+            if not isinstance(row, dict):
+                continue
+            planet_line = _format_planet_chart_fact_line(label, str(planet_name), row)
+            lines.append(planet_line)
+            analysis.append(planet_line)
+        focus_houses = [
+            house_row
+            for house_row in (compact.get("houses") or [])
+            if isinstance(house_row, dict) and house_row.get("focus")
+        ]
+        for house_row in focus_houses:
+            occupants = ", ".join(str(item) for item in (house_row.get("occupants") or [])) or "empty"
+            analysis.append(
+                f"{label} house {house_row.get('house')} ({house_row.get('sign_name') or 'unknown'}), "
+                f"lord {house_row.get('lord') or 'unknown'}, occupants {occupants}: {house_row.get('theme') or ''}"
+            )
+        ayanamsa = compact.get("ayanamsa")
+        if ayanamsa not in (None, ""):
+            lines.append(f"{label} ayanamsa: {ayanamsa}")
+        if compact.get("atmakaraka"):
+            ak_line = f"{label} Atmakaraka: {compact.get('atmakaraka')}"
+            lines.append(ak_line)
+            analysis.append(ak_line)
+    failures = chart_facts.get("calculation_failures") if isinstance(chart_facts.get("calculation_failures"), dict) else {}
+    for missing in chart_facts.get("missing_requested_charts") or []:
+        reason = str(failures.get(missing) or "could not be calculated")
+        lines.append(f"{missing} unavailable: {reason}")
+        analysis.append(f"{missing} unavailable: {reason}")
+    source = str(chart_facts.get("source") or "").strip()
+    if source:
+        lines.append(f"Source: {source}")
+    return {
+        "reading_lines": lines,
+        "reading_text": "\n".join(lines),
+        "analysis_brief": "\n".join(analysis),
+        "prediction_format": list(_CHART_PREDICTION_FORMAT),
+    }
+
+
 def _instant_real_chart_facts(
     *, chart_data: Dict[str, Any], requested_charts: List[str], requested_fact: Any,
     karaka_evidence: Dict[str, Any], d1_snapshot: Dict[str, Any],
@@ -5970,9 +6695,9 @@ def _instant_real_chart_facts(
     for raw in requested_charts or ["D1"]:
         label = str(raw or "").strip()
         normalized = re.sub(r"[\s_-]+", "", label).upper()
-        if normalized in {"KARAKAMSHA", "KARKAMSA"}:
+        if normalized in {"KARAKAMSHA", "KARKAMSA", "KARAKAMSA", "KARKAMSHA"}:
             normalized = "KARAKAMSHA"
-        elif normalized == "SWAMSA":
+        elif normalized in {"SWAMSA", "SWAMSHA"}:
             normalized = "SWAMSA"
         elif normalized and normalized[0].isdigit():
             normalized = f"D{normalized}"
@@ -5990,7 +6715,10 @@ def _instant_real_chart_facts(
     for chart_name in requested:
         try:
             if chart_name == "D1":
-                calculated[chart_name] = _instant_compact_calculated_chart(chart_data) or d1_snapshot
+                calculated[chart_name] = _enrich_calculated_chart_for_prediction(
+                    chart_name,
+                    _instant_compact_calculated_chart(chart_data) or d1_snapshot,
+                )
                 continue
             match = re.fullmatch(r"D(\d{1,2})", chart_name)
             if match:
@@ -6006,7 +6734,7 @@ def _instant_real_chart_facts(
                 compact = _instant_compact_calculated_chart(result)
                 if not compact.get("planets"):
                     raise ValueError("calculator returned no planetary placements")
-                calculated[chart_name] = compact
+                calculated[chart_name] = _enrich_calculated_chart_for_prediction(chart_name, compact)
                 continue
             if chart_name in {"KARAKAMSHA", "SWAMSA"}:
                 karakas = karaka_evidence.get("chara_karakas") if isinstance(karaka_evidence, dict) else {}
@@ -6038,12 +6766,15 @@ def _instant_real_chart_facts(
                 compact = _instant_compact_calculated_chart(result.get(chart_key) or {})
                 if not compact.get("planets"):
                     raise ValueError("calculator returned no planetary placements")
-                calculated[chart_name] = {
-                    **compact,
-                    "atmakaraka": result.get("atmakaraka"),
-                    "atmakaraka_degree_in_d9": result.get("atmakaraka_degree_in_d9"),
-                    "significance": result.get("significance"),
-                }
+                calculated[chart_name] = _enrich_calculated_chart_for_prediction(
+                    chart_name,
+                    {
+                        **compact,
+                        "atmakaraka": result.get("atmakaraka"),
+                        "atmakaraka_degree_in_d9": result.get("atmakaraka_degree_in_d9"),
+                        "significance": result.get("significance"),
+                    },
+                )
                 continue
             missing.append(chart_name)
             failures[chart_name] = "Unknown chart identifier."
@@ -6052,7 +6783,7 @@ def _instant_real_chart_facts(
             missing.append(chart_name)
             failures[chart_name] = str(exc)[:180]
 
-    return {
+    payload = {
         "requested_charts": requested,
         "requested_fact": requested_fact,
         "charts": calculated,
@@ -6062,6 +6793,8 @@ def _instant_real_chart_facts(
         "supported_divisional_charts": [f"D{number}" for number in sorted(_INSTANT_SUPPORTED_VARGAS)],
         "source": "DivisionalChartCalculator and JaiminiChartCalculator",
     }
+    payload.update(_format_chart_fact_reading(payload))
+    return payload
 
 
 def _instant_real_nadi_evidence(chart_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -6725,14 +7458,17 @@ def _build_instant_context(
     if double_transit_evidence:
         normalized_evidence["double_transit"] = double_transit_evidence
 
-    requested_chart = extracted_context.get("requested_chart")
-    chart_focus = (intent or {}).get("chart_focus") if isinstance((intent or {}).get("chart_focus"), dict) else {}
-    requested_charts = list(chart_focus.get("requested") or [])
-    if requested_chart and requested_chart not in requested_charts:
-        requested_charts.append(requested_chart)
+    if isinstance(intent, dict):
+        try:
+            from ai.intent_router import apply_chart_focus_guards
+            apply_chart_focus_guards(intent, question)
+        except Exception:
+            logger.exception("Instant chart-focus guard failed")
+        extracted_context = intent.get("extracted_context") if isinstance(intent.get("extracted_context"), dict) else extracted_context
+    requested_charts = _requested_charts_from_intent(intent, answer_mode=answer_mode)
     normalized_evidence["chart_facts"] = _instant_real_chart_facts(
         chart_data=chart_data,
-        requested_charts=requested_charts or ["D1"],
+        requested_charts=requested_charts,
         requested_fact=extracted_context.get("requested_fact"),
         karaka_evidence=karaka_evidence,
         d1_snapshot=evidence_natal_snapshot,
@@ -6984,6 +7720,35 @@ def _build_instant_context(
         current_dashas_context = {}
         birth_summary = evidence_birth_summary
         recent_history = recent_history[-1:]
+    if answer_mode == "factual_chart_lookup":
+        prompt_current_transits = {}
+        prompt_transits_context = {}
+        prompt_instant_parashari = {
+            k: v
+            for k, v in prompt_instant_parashari.items()
+            if k in {
+                "source",
+                "category",
+                "answer_mode",
+                "period_window",
+                "time_relation",
+            }
+        }
+        prompt_normalized_evidence = {
+            k: v
+            for k, v in prompt_normalized_evidence.items()
+            if k in {
+                "answer_mode_contract",
+                "chart_facts",
+                "karaka_evidence",
+                "natal_snapshot",
+                "claim_gates",
+                "avoid_drift",
+            }
+        }
+        prompt_current_dashas_levels = {}
+        current_dashas_context = {}
+        recent_history = recent_history[-1:]
     if answer_mode == "remedy_action":
         prompt_instant_parashari = {
             k: v
@@ -7042,7 +7807,7 @@ def _build_instant_context(
         prompt_instant_parashari.pop("top_risks", None)
         prompt_normalized_evidence["secondary_modifiers"] = []
         prompt_normalized_evidence.pop("risk_specifics", None)
-    if is_general_month_window:
+    if is_general_month_window and answer_mode != "factual_chart_lookup":
         month_tone = (normalized_evidence.get("month_tone") or {}) if isinstance(normalized_evidence.get("month_tone"), dict) else {}
         if not month_tone.get("enabled"):
             prompt_transits_context.pop("Sun", None)
@@ -7769,7 +8534,11 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
         "current_cause_rules": answer_spec.get("current_cause_rules"),
         "comparison_rules": answer_spec.get("comparison_rules"),
         "daily_rules": answer_spec.get("daily_rules"),
+        "chart_fact_rules": answer_spec.get("chart_fact_rules"),
         "event_rules": compact_event_rules,
+        "forbidden": answer_spec.get("forbidden"),
+        "answer_order": answer_spec.get("answer_order"),
+        "presentation_contract": answer_spec.get("presentation_contract"),
     }
     return {key: value for key, value in compact.items() if value not in (None, "", [], {})}
 
@@ -7844,6 +8613,19 @@ def _build_instant_answer_blueprint(
                 {"slot": "one practical action", "source": "the ranked daily evidence"},
                 {"slot": "one compact astrological reason", "source": "KP plus Moon/Tara plus Sookshma/Prana"},
                 {"slot": "one natural follow-up question", "source": "the user's real concern"},
+            ],
+            "user_goal": query_plan.get("user_goal"),
+        }
+    if query_plan.get("forecast_shape") == "chart_fact_reading" or evidence.get("chart_facts"):
+        return {
+            "purpose": "semantic slots for one named-chart prediction grounded in calculated chart data; not prewritten prose",
+            "slots": [
+                {"slot": "direct prediction in this chart's life area", "source": "evidence.chart_facts.charts.*.domain"},
+                {"slot": "lagna and lagna-lord result", "source": "evidence.chart_facts.charts.*.lagna"},
+                {"slot": "two strongest supported outcomes", "source": "evidence.chart_facts.charts.*.support_signals"},
+                {"slot": "one main caution", "source": "evidence.chart_facts.charts.*.caution_signals"},
+                {"slot": "one compact proof from this named chart", "source": "evidence.chart_facts.analysis_brief"},
+                {"slot": "one domain follow-up", "source": "evidence.chart_facts.charts.*.domain.life_area"},
             ],
             "user_goal": query_plan.get("user_goal"),
         }
@@ -7926,7 +8708,6 @@ def _build_instant_composer_context(
             "interpretation_frame",
             "target_subject",
             "time_scope",
-            "language",
         )
         if query_plan.get(key) not in (None, "", [], {})
     }
@@ -7957,6 +8738,15 @@ def _build_instant_composer_context(
         compact_query_plan["forecast_shape"] = "daily_forecast"
 
     compact_answer_contract = _compact_answer_spec_for_composer(answer_spec)
+
+    chart_facts = normalized.get("chart_facts") if isinstance(normalized.get("chart_facts"), dict) else {}
+    is_chart_fact = str(answer_mode or "") == "factual_chart_lookup"
+    if is_chart_fact:
+        compact_query_plan["forecast_shape"] = "chart_fact_reading"
+        special = query_plan.get("special_flow") if isinstance(query_plan.get("special_flow"), dict) else {}
+        requested_chart = special.get("requested_chart") or (chart_facts.get("requested_charts") or [None])[0]
+        if requested_chart:
+            compact_query_plan["requested_chart"] = requested_chart
 
     evidence = {
         "natal_promise": normalized.get("natal_promise"),
@@ -8000,6 +8790,24 @@ def _build_instant_composer_context(
             "natal_promise": evidence.get("natal_promise"),
             "daily_prediction": evidence.get("daily_prediction"),
         }
+    if is_chart_fact:
+        compact_charts: Dict[str, Any] = {}
+        raw_charts = chart_facts.get("charts") if isinstance(chart_facts.get("charts"), dict) else {}
+        for chart_name, row in raw_charts.items():
+            if not isinstance(row, dict):
+                continue
+            compact_charts[str(chart_name)] = _compact_chart_for_composer_prediction(str(chart_name), row)
+        evidence = {
+            "chart_facts": {
+                "requested_charts": chart_facts.get("requested_charts"),
+                "prediction_format": chart_facts.get("prediction_format") or list(_CHART_PREDICTION_FORMAT),
+                "analysis_brief": chart_facts.get("analysis_brief") or chart_facts.get("reading_text"),
+                "reading_text": chart_facts.get("reading_text"),
+                "missing_requested_charts": chart_facts.get("missing_requested_charts"),
+                "source": chart_facts.get("source"),
+                "charts": compact_charts,
+            }
+        }
     evidence = {key: value for key, value in evidence.items() if value not in (None, "", [], {})}
 
     answer_blueprint = _build_instant_answer_blueprint(
@@ -8030,9 +8838,26 @@ def _build_instant_composer_context(
         "evidence": evidence,
         "answer_blueprint": answer_blueprint,
         "answer_contract": compact_answer_contract,
-        "recent_history": list(instant_context.get("recent_history") or [])[-1:],
+        "recent_history": list(instant_context.get("recent_history") or [])[-2:],
     }
+    app_language = str(query_plan.get("language") or intent.get("language") or "").strip().lower()
+    if app_language:
+        context["app_language_fallback"] = app_language
+    if is_chart_fact:
+        return context
     return _fit_composer_brief(context)
+
+
+def _instant_composer_language_rule(language: str) -> str:
+    """Ask the composer to follow the user's conversation, not the app locale."""
+    fallback = (language or "english").strip().lower() or "english"
+    return (
+        "- Reply in the same language and script as the USER QUESTION and recent user messages. "
+        "If this turn is a short clarification answer, keep the language of the original question in USER QUESTION or recent_history. "
+        "Chart evidence and this brief are English internally; never switch the user-facing answer to English because of that. "
+        f"The app language setting `{fallback}` is only a fallback when the conversation language is truly unclear. "
+        "If the user mixes languages or writes a regional language in Latin letters, mirror that mix instead of switching to English or a more formal script."
+    )
 
 
 def _build_instant_composer_prompt_v3(
@@ -8043,10 +8868,43 @@ def _build_instant_composer_prompt_v3(
     speech_mode: bool = False,
 ) -> str:
     """Small, verdict-first prompt for the evidence-driven Instant pipeline."""
-    language_label = (language or "english").strip().lower()
     context_json = json.dumps(composer_context, ensure_ascii=False, separators=(",", ":"))
     is_period_topic_forecast = str((composer_context.get("query_plan") or {}).get("forecast_shape") or "") == "period_topic_forecast"
     is_daily_forecast = str((composer_context.get("query_plan") or {}).get("forecast_shape") or "") == "daily_forecast"
+    is_chart_fact = (
+        str((composer_context.get("query_plan") or {}).get("forecast_shape") or "") == "chart_fact_reading"
+        or str((composer_context.get("intent") or {}).get("answer_mode") or "") == "factual_chart_lookup"
+        or str((composer_context.get("query_plan") or {}).get("answer_mode") or "") == "factual_chart_lookup"
+    )
+    if is_chart_fact:
+        return f"""
+You are Tara in AstroRoshni Instant Chat. The requested chart has already been calculated with placements, dignity, aspects, and house data. Your job is to predict from that chart.
+
+Hard rules:
+{_instant_composer_language_rule(language)}
+- Predict lived results in `evidence.chart_facts.charts[X].domain.life_area`. D12 predicts parents/elders/ancestry FROM this D12 packet; D10 predicts career FROM this D10 packet; D9 predicts marriage/dharma FROM this D9 packet; Karkamsa/Swamsa predict soul-direction FROM that chart. Do not write a textbook varga essay, and do not use D1 dasha or transits.
+- Use ONLY `evidence.chart_facts`. Every claim must be grounded in lagna/lagna-lord, dignity, occupation, conjunction, or aspect in the packet.
+- Placements are hidden evidence. Do not answer as a planet-by-planet placement list.
+- Required output shape:
+  1. First sentence: a direct prediction for this chart's life area.
+  2. How lagna and lagna lord shape that area.
+  3. Two strongest supported outcomes.
+  4. One main caution.
+  5. One compact proof citing only this named chart.
+  6. One short follow-up in this same life area, if natural.
+- Prefer `support_signals` and `caution_signals`, then `analysis_brief`.
+- Do not say the chart lacks detail when `charts` or `analysis_brief` are supplied.
+- If `missing_requested_charts` is present, say that chart could not be calculated. Do not invent data.
+- No HTML, tables, JSON except required metadata, internal tags, or hidden reasoning.
+- Append exactly one final metadata line after the visible answer:
+NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","follow_up_questions":[],"source":"instant"}}
+
+USER QUESTION:
+{question}
+
+AUTHORITATIVE COMPOSER BRIEF:
+{context_json}
+""".strip()
     period_forecast_rules = ""
     if is_period_topic_forecast:
         period_forecast_rules = """
@@ -8095,7 +8953,7 @@ NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","fol
 You are Tara in AstroRoshni Instant Chat. The astrology has already been calculated, normalized, and fused. Your only job is to turn the supplied verdict into a useful conversational answer. Do not recalculate or reinterpret raw astrology.
 
 Hard rules:
-- Reply in {language_label}, matching the user's script and everyday level of formality.
+{_instant_composer_language_rule(language)}
 - Answer the real-life question in the first sentence. Never open with planets, dashas, dates, evidence IDs, or house numbers.
 - Treat `verdict` and `answer_contract` as authoritative. Use `evidence` only to explain them; never invent a stronger conclusion.
 - Fill `answer_blueprint` in order. It contains semantic answer slots, not prose to repeat. The first slot must become a concrete answer to what the user asked.
@@ -8281,7 +9139,6 @@ def _build_instant_prompt(
             language,
             speech_mode=speech_mode,
         )
-    language_label = (language or "english").strip().lower()
     context_json = json.dumps(instant_context, ensure_ascii=False, separators=(",", ":"))
     intent_summary = instant_context.get("intent_summary") or {}
     category = str(intent_summary.get("category") or "general")
@@ -8421,7 +9278,7 @@ Astrological method:
 {timing_lock_block}
 
 Style rules:
-- Language: {language_label}
+{_instant_composer_language_rule(language)}
 {length_rule}
 - Use daily-use language, not consultant language. Prefer phrases such as "right now", "this phase", "work pressure", "money matters", or "relationship tension" over abstract phrases such as "current energetic configuration", "professional materialization", or "relational dynamics".
 - Keep astrology credible but easy to follow: give the result in normal language first, then one compact chart reason. Do not make the user decode jargon.
@@ -8506,7 +9363,7 @@ async def generate_instant_chat_response(
         )
 
     mode_started = time.perf_counter()
-    mode_selection = _mode_selection_from_intent(intent)
+    mode_selection = _mode_selection_from_intent(intent, question)
     structured_parts = (
         ((intent or {}).get("evidence_plan") or {}).get("question_parts")
         if isinstance((intent or {}).get("evidence_plan"), dict)
@@ -8543,10 +9400,13 @@ async def generate_instant_chat_response(
         )
     if bool((mode_selection or {}).get("needs_year_clarification")):
         return _instant_lifetime_event_year_clarification_response(language, speech_mode=speech_mode)
-    answer_mode = _clamp_remedy_answer_mode(
-        str((mode_selection or {}).get("answer_mode") or "topic_reading"),
+    answer_mode = _apply_llm_chart_fact_mode_guard(
+        _clamp_remedy_answer_mode(
+            str((mode_selection or {}).get("answer_mode") or "topic_reading"),
+            intent,
+            question,
+        ),
         intent,
-        question,
     )
     target_subject = (mode_selection or {}).get("target_subject") if isinstance(mode_selection, dict) else None
     calculations_started = time.perf_counter()
@@ -8584,6 +9444,9 @@ async def generate_instant_chat_response(
     prompt_context = instant_context
     if instant_v2_packet:
         prompt_context = _build_instant_composer_context(instant_context, instant_v2_packet)
+        fallback_language = str(language or "").strip().lower()
+        if fallback_language:
+            prompt_context["app_language_fallback"] = fallback_language
         full_chars = _json_size(instant_context)
         compact_chars = _json_size(prompt_context)
         reduction_pct = round(((full_chars - compact_chars) / full_chars) * 100.0, 1) if full_chars else 0.0

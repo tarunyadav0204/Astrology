@@ -17,6 +17,45 @@ def test_extract_chart_focus_detects_d10():
     assert focus["explicit"] is True
 
 
+def test_extract_chart_focus_detects_d12_explain():
+    from ai.intent_router import extract_chart_focus_from_question
+
+    focus = extract_chart_focus_from_question("Explain my D12 chart")
+
+    assert focus is not None
+    assert focus["primary"] == "D12"
+    assert focus["explicit"] is True
+
+
+def test_extract_chart_focus_detects_d2_and_jaimini_spellings():
+    from ai.intent_router import extract_chart_focus_from_question
+
+    d2 = extract_chart_focus_from_question("Read my D2 chart")
+    assert d2 is not None
+    assert d2["primary"] == "D2"
+
+    karkamsa = extract_chart_focus_from_question("Tell me about my karakamsha")
+    assert karkamsa is not None
+    assert karkamsa["primary"] == "Karkamsa"
+
+    swamsa = extract_chart_focus_from_question("Interpret my Swamsa chart")
+    assert swamsa is not None
+    assert swamsa["primary"] == "Swamsa"
+
+
+def test_extract_chart_focus_covers_supported_vargas():
+    from ai.intent_router import extract_chart_focus_from_question
+
+    for code in (
+        "D2", "D3", "D4", "D7", "D9", "D10", "D12", "D16",
+        "D20", "D24", "D27", "D30", "D40", "D45", "D60",
+    ):
+        focus = extract_chart_focus_from_question(f"Explain my {code} chart")
+        assert focus is not None, code
+        assert focus["primary"] == code
+        assert focus["explicit"] is True
+
+
 def test_extract_chart_focus_detects_lagna_as_d1_scope():
     from ai.intent_router import extract_chart_focus_from_question
 
@@ -34,13 +73,22 @@ def test_apply_chart_focus_guards_adds_requested_chart_and_metadata():
         "category": "general",
         "divisional_charts": ["D1", "D9"],
         "extracted_context": {},
+        "chart_focus": {
+            "kind": "chart_specific",
+            "primary": "D9",
+            "label": "Navamsha",
+            "explicit": True,
+            "phrase": "navamsha",
+            "requested": ["D9"],
+        },
     }
 
-    apply_chart_focus_guards(result, "Interpret my navamsha chart")
+    apply_chart_focus_guards(result, "मेरी नवमांश कुंडली समझाओ")
 
     assert result["chart_focus"]["primary"] == "D9"
     assert "D9" in result["divisional_charts"]
-    assert result["extracted_context"]["chart_focus"]["label"] == "D9"
+    assert result["extracted_context"]["chart_focus"]["label"] == "Navamsha"
+    assert result["extracted_context"]["requested_chart"] == "D9"
 
 
 def test_apply_chart_focus_guards_skips_generic_birth_chart_for_career_topic():

@@ -88,7 +88,7 @@ def test_transit_cannot_create_event_when_dasha_carriers_lack_natal_permission()
         chart_data=_chart(),
         house_lordships={"Saturn": [4], "Rahu": [2], "Jupiter": [9]},
         period_window={"start": "2026-08-01", "end": "2026-08-20"},
-        focus_houses=[10],
+        focus_houses=[6],
         transit_calc=_FakeTransitCalculator({("Saturn", "2026-08-08"): 1.0}),
         ascendant_longitude=0.0,
         category="career",

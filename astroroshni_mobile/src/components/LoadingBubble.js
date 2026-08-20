@@ -7,21 +7,6 @@ import { useTranslation } from 'react-i18next';
 import { stopAnimatedValue, stopAnimationLoop } from '../utils/safeAnimated';
 import { DISPLAY_FONT_FAMILY } from '../theme/tokens';
 
-const HOUSE_DOMAINS = {
-    1: 'SELF & IDENTITY',
-    2: 'WEALTH & FAMILY',
-    3: 'COURAGE & COMMUNICATION',
-    4: 'HOME & INNER LIFE',
-    5: 'CREATIVITY & CHILDREN',
-    6: 'WORK & WELLBEING',
-    7: 'PARTNERSHIPS',
-    8: 'CHANGE & SHARED RESOURCES',
-    9: 'WISDOM & PURPOSE',
-    10: 'CAREER & PUBLIC LIFE',
-    11: 'GAINS & COMMUNITY',
-    12: 'REST & RELEASE',
-};
-
 const PLANET_NAMES = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu'];
 
 function getInsightPlanets(chartData, houseNumber) {
@@ -37,6 +22,7 @@ const LoadingBubble = ({
     expectedWaitSeconds = 80,
     startedAt = null,
 }) => {
+    const CHART_INSIGHT_SIZE = 276;
     const { t } = useTranslation();
     const { theme, colors } = useTheme();
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -299,7 +285,7 @@ const LoadingBubble = ({
                     <Animated.View style={[styles.insightFocusHeader, { opacity: fadeAnim }]}>
                         <Text style={[styles.insightFocusEyebrow, { color: colors.accent }]}>{t('premiumUi.chat.currentInsight')}</Text>
                         <Text style={[styles.insightFocusTitle, { color: colors.textInverse }]}>
-                            {t('premiumUi.chat.houseNumber', { number: insightHouse })} · {t(`premiumUi.chat.houseDomains.${insightHouse}`)}
+                            {t('premiumUi.chat.houseNumber', { number: insightHouse })} · {t(`premiumUi.home.houseAreas.${insightHouse}`)}
                         </Text>
                         <Text style={[styles.insightFocusDetail, { color: colors.textInverseMuted }]}>{focusDetail}</Text>
                     </Animated.View>
@@ -317,6 +303,7 @@ const LoadingBubble = ({
                                 onDarkSurface
                                 gridLineColor={colors.textInverseMuted}
                                 gridLineWidth={1.5}
+                                size={CHART_INSIGHT_SIZE}
                             />
                         </Animated.View>
                     )}
@@ -648,9 +635,11 @@ const styles = StyleSheet.create({
         height: 276,
         borderRadius: 18,
         borderWidth: 1,
-        padding: 8,
+        padding: 0,
         marginBottom: 10,
         overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     chartLegend: {
         width: '100%',

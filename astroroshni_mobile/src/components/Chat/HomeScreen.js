@@ -43,6 +43,8 @@ import { extractFirstHttpsUrl } from '../../utils/blogLinks';
 import KpTodayCarousel from './KpTodayCarousel';
 import PanditHomePanel from '../Pandit/PanditHomePanel';
 import PremiumTodayOverview, { PremiumExploreIntro } from '../Home/PremiumTodayOverview';
+import ComingUpDetailSheet from '../Home/ComingUpDetailSheet';
+import { buildComingUpAskMessage } from '../Home/ComingUpChartCard';
 import { getWebBottomInset, refreshWebShellHeight } from '../../platform/webSafeArea';
 
 let createPortal = null;
@@ -72,6 +74,7 @@ const MONTHLY_PROMPT_INTERVAL_MS = 15 * 24 * 60 * 60 * 1000;
 const FOMO_FEATURE_RECHECK_MS = 60 * 1000;
 const FOMO_ANALYZING_POLL_MS = 30 * 1000;
 const FOMO_ANALYZING_MAX_POLLS = 6;
+const NEXT_PEAK_RECHECK_MS = 5 * 60 * 1000;
 const homeBannerDismissKey = (bannerId) => `${HOME_BANNER_DISMISS_PREFIX}${bannerId}`;
 const todayDateKey = () => new Date().toISOString().slice(0, 10);
 const roundPanchangCoord = (value) => Math.round(parseFloat(value) * 100) / 100;
@@ -431,6 +434,13 @@ export default function HomeScreen({
   const [dashData, setDashData] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [kpTodayData, setKpTodayData] = useState(null);
+  const [nextPeakData, setNextPeakData] = useState(null);
+  const [nextPeakLoading, setNextPeakLoading] = useState(false);
+  const [showNextPeakSheet, setShowNextPeakSheet] = useState(false);
+  const nextPeakLoadedAtRef = useRef(0);
+  const nextPeakKeyRef = useRef('');
+  const nextPeakDataRef = useRef(null);
+  const nextPeakLoadPromiseRef = useRef(null);
   const [activeTab, setActiveTab] = useState('today');
   const [showExploreCatalog, setShowExploreCatalog] = useState(false);
   const premiumHomeScrollRef = useRef(null);
@@ -552,6 +562,63 @@ export default function HomeScreen({
     }, [])
   );
 
+  const loadNextPeak = useCallback(async (nativeData) => {
+    const chartRow = nativeData || currentNativeData || birthData;
+    if (!chartRow?.date) return null;
+    const chartId = chartRow.id || chartRow.birth_chart_id || null;
+    const requestKey = `${chartId || 'default'}:${todayDateKey()}`;
+    if (
+      nextPeakKeyRef.current === requestKey
+      && Date.now() - nextPeakLoadedAtRef.current < NEXT_PEAK_RECHECK_MS
+    ) {
+      return nextPeakDataRef.current;
+    }
+    if (nextPeakLoadPromiseRef.current) {
+      return nextPeakLoadPromiseRef.current;
+    }
+
+    const run = (async () => {
+      try {
+        const { storage } = require('../../services/storage');
+        const token = await storage.getAuthToken();
+        if (!token) return null;
+        setNextPeakLoading(true);
+        const response = await predictionAPI.getHomepageNextPeak(chartId);
+        const data = response?.data || null;
+        nextPeakKeyRef.current = requestKey;
+        nextPeakLoadedAtRef.current = Date.now();
+        if (data?.status === 'ready' || data?.status === 'theme_only') {
+          nextPeakDataRef.current = data;
+          setNextPeakData(data);
+        } else {
+          nextPeakDataRef.current = null;
+          setNextPeakData(null);
+        }
+        return data;
+      } catch (_) {
+        nextPeakDataRef.current = null;
+        setNextPeakData(null);
+        return null;
+      } finally {
+        setNextPeakLoading(false);
+        nextPeakLoadPromiseRef.current = null;
+      }
+    })();
+
+    nextPeakLoadPromiseRef.current = run;
+    return run;
+  }, [
+    birthData?.date,
+    birthData?.id,
+    birthData?.birth_chart_id,
+    currentNativeData?.date,
+    currentNativeData?.id,
+    currentNativeData?.birth_chart_id,
+  ]);
+
+  const loadNextPeakRef = useRef(loadNextPeak);
+  loadNextPeakRef.current = loadNextPeak;
+
   useFocusEffect(
     React.useCallback(() => {
       let cancelled = false;
@@ -577,6 +644,10 @@ export default function HomeScreen({
           if (!cancelled) {
             markHomeDataRefreshed(nativeData, targetDate);
           }
+        }
+
+        if (!cancelled && nativeData?.date) {
+          loadNextPeakRef.current(nativeData);
         }
 
         const now = Date.now();
@@ -1481,6 +1552,31 @@ const loadHomeData = async (nativeData = null) => {
     return t(`home.planet_names.${planetName}`, planetName);
   };
 
+  const askNextPeakQuestion = useCallback((peakPayload) => {
+    const peak = peakPayload?.peak || nextPeakData?.peak;
+    if (!peak) return;
+    const initialMessage = buildComingUpAskMessage(peak, t, getLocalizedPlanetName);
+    onOptionSelect?.({
+      action: 'question',
+      initialMessage,
+      queryContext: {
+        source: 'homepage_next_peak',
+        peak_start: peak.peak_start,
+        peak_end: peak.peak_end,
+        mahadasha: peak.mahadasha,
+        antardasha: peak.antardasha,
+        pratyantardasha: peak.pratyantardasha,
+        activated_houses: (peak.activated_houses || []).map((row) => row.house),
+        activation_strength: peak.activation_strength,
+        suppress_mode_intro: true,
+      },
+    });
+  }, [nextPeakData, onOptionSelect, t]);
+
+  const openNextPeakTimeline = useCallback(() => {
+    requireBirthChart((data) => navigation.navigate('ActivationExplorer', { birthData: data }));
+  }, [navigation, requireBirthChart]);
+
   const getLocalizedNakshatraName = (nakshatraName) => {
     if (!nakshatraName) return t('common.unknown', 'Unknown');
     const key = NAKSHATRA_KEY_BY_NAME[nakshatraName] || String(nakshatraName).replace(/\s+/g, '_');
@@ -2210,6 +2306,12 @@ const loadHomeData = async (nativeData = null) => {
           onOpenAscendant={() => setActiveInsight(getSignInsight('ascendant', chartData?.houses?.[0]?.sign))}
           onOpenMoon={() => setActiveInsight(getSignInsight('moon', chartData?.planets?.Moon?.sign))}
           onOpenSun={() => setActiveInsight(getSignInsight('sun', chartData?.planets?.Sun?.sign))}
+          nextPeakData={nextPeakData}
+          nextPeakLoading={nextPeakLoading}
+          localizePlanet={getLocalizedPlanetName}
+          onNextPeakAsk={() => askNextPeakQuestion(nextPeakData)}
+          onNextPeakTimeline={openNextPeakTimeline}
+          onNextPeakOpenDetail={() => setShowNextPeakSheet(true)}
           todayPredictions={(currentNativeData || birthData)?.date ? (
             <KpTodayCarousel
               embedded
@@ -3275,6 +3377,20 @@ const loadHomeData = async (nativeData = null) => {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      <ComingUpDetailSheet
+        visible={showNextPeakSheet}
+        data={nextPeakData}
+        onClose={() => setShowNextPeakSheet(false)}
+        onAskTara={() => {
+          setShowNextPeakSheet(false);
+          askNextPeakQuestion(nextPeakData);
+        }}
+        onOpenTimeline={() => {
+          setShowNextPeakSheet(false);
+          openNextPeakTimeline();
+        }}
+      />
 
       {/* Physical Traits Modal */}
       <PhysicalTraitsModal

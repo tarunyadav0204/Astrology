@@ -21,6 +21,8 @@ import accountNotifications from './account-notifications.json';
 import accountSecurityActions from './account-security-actions.json';
 import authDeep from './auth-deep.json';
 import homeRecommendations from './home-recommendations.json';
+import houseLifeAreas from './house-life-areas.json';
+import homeNextPeak from './home-next-peak.json';
 import appUpdate from './app-update.json';
 import chatModes from './chat-modes.json';
 import chatModeSelector from './chat-mode-selector.json';
@@ -71,6 +73,11 @@ const normalizedPremiumUi = Object.fromEntries(
     {
       ...copy,
       chatScreen: premiumUi[CHAT_SCREEN_SOURCE[language]]?.chatScreen || copy.chatScreen,
+      home: {
+        ...copy.home,
+        houseAreas: houseLifeAreas[language] || houseLifeAreas.english,
+      },
+      homeNextPeak: homeNextPeak[language] || homeNextPeak.english,
     },
   ]),
 );

@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 import { useTranslation } from 'react-i18next';
 import { buildKpHomeRecommendations } from '../../utils/kpHomeRecommendations';
+import ComingUpChartCard from './ComingUpChartCard';
 
 const LANGUAGE_LOCALES = { english: 'en-IN', hindi: 'hi-IN', es: 'es-ES', french: 'fr-FR', german: 'de-DE', russian: 'ru-RU', chinese: 'zh-CN', mandarin: 'zh-CN', tamil: 'ta-IN', telugu: 'te-IN', gujarati: 'gu-IN', marathi: 'mr-IN' };
 const formatToday = (language) => new Intl.DateTimeFormat(LANGUAGE_LOCALES[language] || 'en-IN', {
@@ -109,6 +110,12 @@ export default function PremiumTodayOverview({
   onOpenAscendant,
   onOpenMoon,
   onOpenSun,
+  nextPeakData,
+  nextPeakLoading,
+  localizePlanet,
+  onNextPeakAsk,
+  onNextPeakTimeline,
+  onNextPeakOpenDetail,
 }) {
   const { colors, typography } = useTheme();
   const { t, i18n } = useTranslation();
@@ -195,6 +202,18 @@ export default function PremiumTodayOverview({
         </View>
       ) : null}
 
+      {hasChart ? (
+        <ComingUpChartCard
+          data={nextPeakData}
+          loading={nextPeakLoading}
+          nativeName={name}
+          localizePlanet={localizePlanet}
+          onPressDetail={onNextPeakOpenDetail}
+          onAskTara={onNextPeakAsk}
+          onOpenTimeline={onNextPeakTimeline}
+        />
+      ) : null}
+
       {todayPredictions ? (
         <View style={styles.predictionSection}>
           <View style={styles.sectionHeader}>
@@ -206,18 +225,6 @@ export default function PremiumTodayOverview({
           {todayPredictions}
         </View>
       ) : null}
-
-      <View style={styles.sectionHeader}>
-        <View>
-          <Text style={[styles.sectionEyebrow, typography.eyebrow, { color: colors.primary }]}>{t('premiumUi.home.rightNow')}</Text>
-          <Text style={[styles.sectionTitle, typography.sectionTitle, { color: colors.text }]}>{t('premiumUi.home.timingGlance')}</Text>
-        </View>
-      </View>
-      <View style={styles.metrics}>
-        <Metric label={t('premiumUi.home.activePeriod')} value={mahadasha ? t('premiumUi.home.mahadasha', { name: mahadasha }) : null} onPress={hasChart ? onOpenDasha : onCreateChart} colors={colors} icon="time-outline" calculating={t('premiumUi.home.calculating')} />
-        <Metric label={t('premiumUi.home.todaysNakshatra')} value={nakshatra} onPress={onOpenNakshatra} colors={colors} icon="star-outline" calculating={t('premiumUi.home.calculating')} />
-        <Metric label={t('premiumUi.home.dayWindow')} value={panchangWindow || t('premiumUi.home.openPanchang')} onPress={onOpenPanchang} colors={colors} icon="sunny-outline" calculating={t('premiumUi.home.calculating')} />
-      </View>
 
       <View style={styles.sectionHeader}>
         <View>
@@ -255,6 +262,18 @@ export default function PremiumTodayOverview({
             <Recommendation number="03" title={t('premiumUi.home.karmaPatterns')} body={t('premiumUi.home.karmaBody')} onPress={onOpenKarma} colors={colors} />
           </>
         )}
+      </View>
+
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={[styles.sectionEyebrow, typography.eyebrow, { color: colors.primary }]}>{t('premiumUi.home.rightNow')}</Text>
+          <Text style={[styles.sectionTitle, typography.sectionTitle, { color: colors.text }]}>{t('premiumUi.home.timingGlance')}</Text>
+        </View>
+      </View>
+      <View style={styles.metrics}>
+        <Metric label={t('premiumUi.home.activePeriod')} value={mahadasha ? t('premiumUi.home.mahadasha', { name: mahadasha }) : null} onPress={hasChart ? onOpenDasha : onCreateChart} colors={colors} icon="time-outline" calculating={t('premiumUi.home.calculating')} />
+        <Metric label={t('premiumUi.home.todaysNakshatra')} value={nakshatra} onPress={onOpenNakshatra} colors={colors} icon="star-outline" calculating={t('premiumUi.home.calculating')} />
+        <Metric label={t('premiumUi.home.dayWindow')} value={panchangWindow || t('premiumUi.home.openPanchang')} onPress={onOpenPanchang} colors={colors} icon="sunny-outline" calculating={t('premiumUi.home.calculating')} />
       </View>
 
       <TouchableOpacity onPress={onOpenExplore} activeOpacity={0.82} style={[styles.exploreButton, { borderColor: colors.borderStrong }]}>

@@ -6174,13 +6174,33 @@ export default function ChatScreen({ navigation, route }) {
                 </>
               ) : (
                 <>
-                  <View style={styles.instantHeaderLiveGroup}>
-                    <Ionicons name="flash-outline" size={16} color={colors.accent} />
-                    <Text style={[styles.instantHeaderReadyText, { color: colors.textInverse }]} numberOfLines={1}>
-                      {t('instantBilling.splitRate', 'First minute {{first}} credits · then {{following}} credits per started minute', {
-                        first: instantChatFirstMinuteCost,
-                        following: instantChatPerMinuteCost,
-                      })}
+                  <View style={styles.instantHeaderReadyGroup}>
+                    <Ionicons name="flash-outline" size={16} color={colors.accent} style={styles.instantHeaderReadyIcon} />
+                    <Text
+                      style={[styles.instantHeaderReadyText, { color: colors.textInverse }]}
+                      numberOfLines={compactHeaderChrome ? 1 : 2}
+                      accessibilityLabel={t(
+                        'instantBilling.splitRate',
+                        'First minute {{first}} credits · then {{following}} credits per started minute',
+                        {
+                          first: instantChatFirstMinuteCost,
+                          following: instantChatPerMinuteCost,
+                        },
+                      )}
+                    >
+                      {compactHeaderChrome
+                        ? t('instantBilling.splitRateShort', '{{first}} first · {{following}}/min', {
+                            first: instantChatFirstMinuteCost,
+                            following: instantChatPerMinuteCost,
+                          })
+                        : t(
+                            'instantBilling.splitRate',
+                            'First minute {{first}} credits · then {{following}} credits per started minute',
+                            {
+                              first: instantChatFirstMinuteCost,
+                              following: instantChatPerMinuteCost,
+                            },
+                          )}
                     </Text>
                   </View>
                   <View style={styles.instantHeaderActions}>
@@ -6194,11 +6214,13 @@ export default function ChatScreen({ navigation, route }) {
                       accessibilityLabel={t('instantBilling.changeMode', 'Mode')}
                     >
                       <Ionicons name="options-outline" size={15} color={colors.textInverse} />
-                      <Text
-                        style={[styles.instantHeaderActionText, { color: colors.textInverse }]}
-                      >
-                        {t('instantBilling.changeMode', 'Mode')}
-                      </Text>
+                      {!compactHeaderChrome ? (
+                        <Text
+                          style={[styles.instantHeaderActionText, { color: colors.textInverse }]}
+                        >
+                          {t('instantBilling.changeMode', 'Mode')}
+                        </Text>
+                      ) : null}
                     </TouchableOpacity>
                   </View>
                 </>
@@ -9551,6 +9573,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  instantHeaderReadyGroup: {
+    minWidth: 0,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingTop: 2,
+  },
   instantHeaderLiveLabel: {
     marginRight: 7,
     fontSize: 12,
@@ -9587,10 +9616,16 @@ const styles = StyleSheet.create({
   },
   instantHeaderReadyText: {
     minWidth: 0,
+    flex: 1,
     flexShrink: 1,
     marginLeft: 6,
+    marginRight: 4,
     fontSize: 12,
     fontWeight: '700',
+    lineHeight: 16,
+  },
+  instantHeaderReadyIcon: {
+    marginTop: 1,
   },
   instantHeaderStart: {
     minWidth: 68,
