@@ -17,6 +17,7 @@ import { sortActivatedHousesByScore } from '../../utils/houseLifeAreas';
 export default function ComingUpDetailSheet({
   visible,
   data,
+  localizePlanet,
   onClose,
   onAskTara,
   onOpenTimeline,
@@ -24,10 +25,57 @@ export default function ComingUpDetailSheet({
   const { colors, typography } = useTheme();
   const { t } = useTranslation();
   const peak = data?.peak;
+  const isBackground = peak?.display_mode === 'background';
   const areas = useMemo(
     () => sortActivatedHousesByScore(peak?.activated_houses || [], t),
     [peak?.activated_houses, t],
   );
+
+  const planetName = (planet) => localizePlanet?.(planet) || planet || '';
+  const dashaRoles = (levels = []) => levels.map((level) => t(
+    `premiumUi.homeNextPeak.role${String(level).toUpperCase()}`,
+  )).join(' + ');
+
+  const explainActivation = (reason = {}, house) => {
+    if (reason.kind === 'direct_transit' && reason.transit) {
+      const lines = (reason.natal_support || []).map((support) => {
+        const mechanisms = support.mechanisms || [];
+        const mechanism = mechanisms.includes('natal_occupation')
+          ? 'Occupation'
+          : mechanisms.includes('lordship') ? 'Lordship' : 'Aspect';
+        return t(`premiumUi.homeNextPeak.reasonNatal${mechanism}`, {
+          planet: planetName(support.planet),
+          roles: dashaRoles(support.dasha_levels),
+          natalHouse: support.natal_house,
+          house,
+        });
+      });
+      const transit = reason.transit;
+      lines.push(t(
+        transit.mechanism === 'transit_occupation'
+          ? 'premiumUi.homeNextPeak.reasonTransitOccupation'
+          : 'premiumUi.homeNextPeak.reasonTransitAspect',
+        {
+          planet: planetName(transit.planet),
+          roles: dashaRoles(transit.dasha_levels),
+          transitHouse: transit.house,
+          house,
+        },
+      ));
+      lines.push(t('premiumUi.homeNextPeak.reasonFullyActivated'));
+      return lines;
+    }
+    const planet = planetName(reason.planet);
+    const prefix = reason.kind === 'pd_background' ? 'Background' : 'Direct';
+    const mechanism = {
+      transit_occupation: 'Occupation',
+      transit_aspect: 'Aspect',
+      natal_occupation: 'Occupation',
+      lordship: 'Lordship',
+      natal_aspect: 'Aspect',
+    }[reason.mechanism] || 'Linked';
+    return [t(`premiumUi.homeNextPeak.reason${prefix}${mechanism}`, { planet })];
+  };
 
   if (!peak) return null;
 
@@ -50,13 +98,22 @@ export default function ComingUpDetailSheet({
             <Text style={[styles.dates, { color: colors.text }]}>
               {peak.peak_start} – {peak.peak_end}
             </Text>
-            {peak.mechanism_summary ? (
-              <Text style={[styles.body, { color: colors.textSecondary }]}>{peak.mechanism_summary}</Text>
+            {isBackground ? (
+              <View style={[styles.backgroundNote, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+                <Text style={[styles.backgroundTitle, { color: colors.text }]}>
+                  {t('premiumUi.homeNextPeak.backgroundLabel')}
+                </Text>
+                <Text style={[styles.body, { color: colors.textSecondary }]}>
+                  {t('premiumUi.homeNextPeak.backgroundBody')}
+                </Text>
+              </View>
             ) : null}
             {areas.length ? (
               <View style={styles.list}>
                 <Text style={[styles.listLabel, { color: colors.textTertiary }]}>
-                  {t('premiumUi.homeNextPeak.areasActivated')}
+                  {t(isBackground
+                    ? 'premiumUi.homeNextPeak.backgroundLabel'
+                    : 'premiumUi.homeNextPeak.areasActivated')}
                 </Text>
                 {areas.map((row, index) => (
                   <View
@@ -67,10 +124,18 @@ export default function ComingUpDetailSheet({
                       <Text style={[styles.rowTitle, { color: colors.text }]}>{row.label}</Text>
                       <Text style={[styles.rowMeta, { color: colors.textSecondary }]}>
                         {t('premiumUi.homeNextPeak.houseLabel', { number: row.house })}
-                        {' · '}
-                        {t('premiumUi.homeNextPeak.scoreLabel', { score: row.score || 0 })}
                       </Text>
-                      {index === 0 ? (
+                      <View style={styles.reasonGroup}>
+                        {explainActivation(row.reason, row.house).map((line, reasonIndex) => (
+                          <Text
+                            key={`${row.house}-reason-${reasonIndex}`}
+                            style={[styles.reason, { color: colors.textSecondary }]}
+                          >
+                            {line}
+                          </Text>
+                        ))}
+                      </View>
+                      {index === 0 && (areas.length === 1 || Number(row.score) > Number(areas[1]?.score)) ? (
                         <Text style={[styles.strongest, { color: colors.textTertiary }]}>
                           {t('premiumUi.homeNextPeak.strongestLink')}
                         </Text>
@@ -145,6 +210,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
   },
+  backgroundNote: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 6,
+  },
+  backgroundTitle: {
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 14,
+    fontWeight: '600',
+  },
   list: {
     gap: 10,
     marginTop: 4,
@@ -171,6 +247,15 @@ const styles = StyleSheet.create({
   rowMeta: {
     fontFamily: DISPLAY_FONT_FAMILY,
     fontSize: 13,
+  },
+  reason: {
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  reasonGroup: {
+    marginTop: 4,
+    gap: 5,
   },
   strongest: {
     marginTop: 4,

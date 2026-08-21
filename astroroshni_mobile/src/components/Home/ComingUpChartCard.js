@@ -50,6 +50,7 @@ export default function ComingUpChartCard({
 
   const peak = data?.peak;
   const pdHandoff = data?.pd_handoff;
+  const isBackground = peak?.display_mode === 'background';
   const areas = useMemo(
     () => sortActivatedHousesByScore(peak?.activated_houses || [], t),
     [peak?.activated_houses, t],
@@ -81,6 +82,14 @@ export default function ComingUpChartCard({
         <Text style={[styles.eyebrow, typography.eyebrow, { color: colors.primary }]}>
           {t('premiumUi.homeNextPeak.eyebrow', { name: shortNativeName(nativeName) || t('premiumUi.home.explorer') })}
         </Text>
+        {isBackground ? (
+          <View style={[styles.modePill, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+            <Ionicons name="layers-outline" size={13} color={colors.textSecondary} />
+            <Text style={[styles.modePillText, { color: colors.textSecondary }]}>
+              {t('premiumUi.homeNextPeak.backgroundLabel')}
+            </Text>
+          </View>
+        ) : null}
         <Text style={[styles.title, { color: colors.text }]}>
           {dateTitle}
           {nearLabel ? (
@@ -101,12 +110,16 @@ export default function ComingUpChartCard({
           </Text>
         ) : null}
         <Text style={[styles.mechanism, { color: colors.textSecondary }]} numberOfLines={3}>
-          {peak.mechanism_summary || t('premiumUi.homeNextPeak.themeOnlyBody')}
+          {isBackground
+            ? t('premiumUi.homeNextPeak.backgroundBody')
+            : (peak.mechanism_summary || t('premiumUi.homeNextPeak.themeOnlyBody'))}
         </Text>
         {areas.length ? (
           <View style={styles.areaBlock}>
             <Text style={[styles.areaLabel, { color: colors.textTertiary }]}>
-              {t('premiumUi.homeNextPeak.areasActivated')}
+              {t(isBackground
+                ? 'premiumUi.homeNextPeak.backgroundLabel'
+                : 'premiumUi.homeNextPeak.areasActivated')}
             </Text>
             {areas.map((row) => (
               <View key={row.house} style={styles.areaRow}>
@@ -151,7 +164,10 @@ export function buildComingUpAskMessage(peak, t, localizePlanet) {
   const areaText = areas.length
     ? areas.join(', ')
     : houseLifeAreaLabel(peak.activated_houses?.[0]?.house, t);
-  return t('premiumUi.homeNextPeak.askPrefill', {
+  const key = peak.display_mode === 'background'
+    ? 'premiumUi.homeNextPeak.backgroundAskPrefill'
+    : 'premiumUi.homeNextPeak.askPrefill';
+  return t(key, {
     start: peak.peak_start,
     end: peak.peak_end,
     areas: areaText,
@@ -174,6 +190,22 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     marginBottom: 6,
+  },
+  modePill: {
+    alignSelf: 'flex-start',
+    minHeight: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  modePillText: {
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 12,
+    fontWeight: '600',
   },
   title: {
     fontFamily: DISPLAY_FONT_FAMILY,

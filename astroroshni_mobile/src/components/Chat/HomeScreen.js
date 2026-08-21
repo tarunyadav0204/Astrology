@@ -3381,6 +3381,7 @@ const loadHomeData = async (nativeData = null) => {
       <ComingUpDetailSheet
         visible={showNextPeakSheet}
         data={nextPeakData}
+        localizePlanet={getLocalizedPlanetName}
         onClose={() => setShowNextPeakSheet(false)}
         onAskTara={() => {
           setShowNextPeakSheet(false);

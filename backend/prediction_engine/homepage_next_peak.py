@@ -17,7 +17,9 @@ from chat.instant_chat_pipeline import (
 
 HOMEPAGE_NEXT_PEAK_HORIZON_DAYS = 120
 PD_HANDOFF_DAYS = 21
-MIN_HOUSE_SCORE = 1
+MAX_DISPLAY_HOUSES = 3
+MIN_DIRECT_HOUSE_SCORE = 60
+MIN_RELATIVE_HOUSE_SCORE = 0.45
 
 
 def _ascendant_sign_index(chart: Dict[str, Any]) -> int:
@@ -25,6 +27,12 @@ def _ascendant_sign_index(chart: Dict[str, Any]) -> int:
 
 
 def _house_scores_from_period(period: Dict[str, Any]) -> Dict[int, int]:
+    """Score only houses directly delivered by a transit trigger.
+
+    ``activated_focus_houses`` can fall back to every natal house connected to
+    a dasha carrier.  That is useful calculation context, but it is too broad
+    to tell a user that all of those life areas are actively manifesting.
+    """
     scores: Dict[int, int] = {}
     peaks = list(period.get("peak_activation_windows") or [])
     if not peaks:
@@ -42,17 +50,149 @@ def _house_scores_from_period(period: Dict[str, Any]) -> Dict[int, int]:
                 continue
             native_house = int(house)
             scores[native_house] = scores.get(native_house, 0) + state_weight + trigger_score
-        for house in peak.get("activated_focus_houses") or []:
+    return scores
+
+
+def _background_house_scores(period: Dict[str, Any]) -> Dict[int, int]:
+    """Rank the current/forthcoming PD's natal themes for a quiet fallback."""
+    scores: Dict[int, int] = {}
+    pd = str(period.get("pratyantardasha") or "").strip()
+    for carrier in period.get("carrier_planets") or []:
+        levels = {str(level).lower() for level in (carrier.get("dasha_levels") or [])}
+        if "pd" not in levels and str(carrier.get("planet") or "").strip() != pd:
+            continue
+        event_links = list(carrier.get("event_links") or [])
+        for link in event_links:
+            house = link.get("house") or link.get("native_house")
+            if house is None:
+                continue
+            mechanisms = {str(item) for item in (link.get("mechanisms") or [])}
+            score = 0
+            if "natal_occupation" in mechanisms:
+                score += 45
+            if "lordship" in mechanisms:
+                score += 35
+            if "natal_aspect" in mechanisms:
+                score += 20
+            native_house = int(house)
+            scores[native_house] = scores.get(native_house, 0) + max(score, 10)
+        if not event_links:
+            for house in carrier.get("natal_event_houses") or []:
+                if house is None:
+                    continue
+                native_house = int(house)
+                scores[native_house] = scores.get(native_house, 0) + 30
+    # Older/cached scan rows may not contain carrier detail. Keep the fallback
+    # useful, while still applying the strict three-area cap below.
+    if not scores:
+        for house in period.get("activated_focus_houses") or []:
             if house is None:
                 continue
             native_house = int(house)
-            scores[native_house] = scores.get(native_house, 0) + (state_weight // 2) + max(trigger_score // 2, 1)
-    for house in period.get("activated_focus_houses") or []:
-        if house is None:
-            continue
-        native_house = int(house)
-        scores[native_house] = scores.get(native_house, 0) + 10
+            scores[native_house] = scores.get(native_house, 0) + 10
     return scores
+
+
+def _rank_display_houses(
+    scores: Dict[int, int],
+    *,
+    state: str,
+    direct: bool,
+) -> List[Dict[str, Any]]:
+    valid = [(house, score) for house, score in scores.items() if 1 <= house <= 12]
+    if not valid:
+        return []
+    valid.sort(key=lambda item: (-item[1], item[0]))
+    top_score = valid[0][1]
+    rows = []
+    for house, score in valid:
+        if direct and (
+            score < MIN_DIRECT_HOUSE_SCORE
+            or score < (top_score * MIN_RELATIVE_HOUSE_SCORE)
+        ):
+            continue
+        rows.append({"house": house, "score": score, "state": state})
+        if len(rows) >= MAX_DISPLAY_HOUSES:
+            break
+    return rows
+
+
+def _display_house_reasons(
+    period: Dict[str, Any],
+    houses: List[Dict[str, Any]],
+    *,
+    display_mode: str,
+) -> List[Dict[str, Any]]:
+    """Attach structured explanation data without baking UI copy into the API."""
+    reasons_by_house: Dict[int, Dict[str, Any]] = {}
+    if display_mode == "highly_active":
+        natal_links_by_house: Dict[int, List[Dict[str, Any]]] = {}
+        for carrier in period.get("carrier_planets") or []:
+            for link in carrier.get("event_links") or []:
+                house = link.get("native_house") or link.get("house")
+                if house is None:
+                    continue
+                natal_links_by_house.setdefault(int(house), []).append({
+                    "planet": carrier.get("planet"),
+                    "dasha_levels": list(carrier.get("dasha_levels") or []),
+                    "natal_house": carrier.get("natal_placement_house"),
+                    "mechanisms": list(link.get("mechanisms") or []),
+                })
+        for links in natal_links_by_house.values():
+            links.sort(key=lambda row: (
+                -len(row.get("dasha_levels") or []),
+                0 if "natal_occupation" in (row.get("mechanisms") or []) else 1,
+                str(row.get("planet") or ""),
+            ))
+        for peak in period.get("peak_activation_windows") or []:
+            if str(peak.get("strength") or "") != "high":
+                continue
+            for detail in peak.get("delivered_event_houses") or []:
+                house = detail.get("native_house") or detail.get("house")
+                if house is None:
+                    continue
+                native_house = int(house)
+                reasons_by_house.setdefault(native_house, {
+                    "kind": "direct_transit",
+                    "transit": {
+                        "planet": peak.get("planet"),
+                        "house": peak.get("transit_native_house"),
+                        "mechanism": detail.get("mechanism") or "transit_aspect",
+                        "dasha_levels": list(peak.get("dasha_levels") or []),
+                    },
+                    "natal_support": natal_links_by_house.get(native_house, [])[:2],
+                })
+    else:
+        pd = str(period.get("pratyantardasha") or "").strip()
+        for carrier in period.get("carrier_planets") or []:
+            levels = {str(level).lower() for level in (carrier.get("dasha_levels") or [])}
+            if "pd" not in levels and str(carrier.get("planet") or "").strip() != pd:
+                continue
+            for link in carrier.get("event_links") or []:
+                house = link.get("house") or link.get("native_house")
+                if house is None:
+                    continue
+                mechanisms = list(link.get("mechanisms") or [])
+                # Choose the clearest, strongest human explanation.
+                mechanism = next(
+                    (item for item in ("natal_occupation", "lordship", "natal_aspect") if item in mechanisms),
+                    "dasha_connection",
+                )
+                reasons_by_house[int(house)] = {
+                    "kind": "pd_background",
+                    "planet": carrier.get("planet") or pd,
+                    "mechanism": mechanism,
+                    "dasha_levels": list(carrier.get("dasha_levels") or []),
+                }
+    return [
+        {**row, "reason": reasons_by_house.get(int(row["house"]), {
+            "kind": "pd_background" if display_mode == "background" else "direct_transit",
+            "planet": period.get("pratyantardasha"),
+            "mechanism": "dasha_connection",
+            "dasha_levels": ["PD"],
+        })}
+        for row in houses
+    ]
 
 
 def _period_peak_band(period: Dict[str, Any]) -> Optional[Tuple[str, str]]:
@@ -84,14 +224,17 @@ def _period_sort_key(period: Dict[str, Any], *, as_of: date) -> Optional[Tuple[d
     if not band:
         return None
     start = _parse_ymd(band[0])
-    if start is None or start.date() < as_of:
+    end = _parse_ymd(band[1])
+    if start is None or end is None or end.date() < as_of:
         return None
     strength_rank = {
         "highly_active": 0,
         "active": 1,
         "background": 2,
     }.get(str(period.get("activation_strength") or ""), 3)
-    return (start.date(), strength_rank, -int(period.get("relevance_score") or 0))
+    # A peak already underway is as relevant as one beginning today.
+    effective_start = max(start.date(), as_of)
+    return (effective_start, strength_rank, -int(period.get("relevance_score") or 0))
 
 
 def _select_period(
@@ -100,8 +243,20 @@ def _select_period(
     as_of: date,
     pd_handoff_soon: bool,
 ) -> Optional[Dict[str, Any]]:
+    # A user-facing "Coming up" claim must have a real high-strength transit
+    # peak. Choose the nearest such period, not merely the nearest dasha band.
     eligible: List[Tuple[Tuple, Dict[str, Any]]] = []
     for period in periods:
+        if str(period.get("activation_strength") or "") != "highly_active":
+            continue
+        # Strength alone is insufficient for the card. A strong claim must
+        # identify at least one house directly delivered by the transit.
+        if not _rank_display_houses(
+            _house_scores_from_period(period),
+            state="fully_reinforced",
+            direct=True,
+        ):
+            continue
         if pd_handoff_soon and str(period.get("time_status") or "") == "current":
             continue
         key = _period_sort_key(period, as_of=as_of)
@@ -110,21 +265,21 @@ def _select_period(
     eligible.sort(key=lambda item: item[0])
     if eligible:
         return eligible[0][1]
-    if pd_handoff_soon:
-        fallback: List[Tuple[Tuple, Dict[str, Any]]] = []
-        for period in periods:
-            if str(period.get("time_status") or "") != "future":
-                continue
-            key = _period_sort_key(period, as_of=as_of)
-            if key is not None:
-                fallback.append((key, period))
-        fallback.sort(key=lambda item: item[0])
-        if fallback:
-            return fallback[0][1]
-    for period in periods:
-        key = _period_sort_key(period, as_of=as_of)
-        if key is not None:
-            return period
+    # No high transit peak: show the PD's quieter natal themes instead. When a
+    # handoff is imminent, prefer the next PD; otherwise use the current PD.
+    preferred_status = "future" if pd_handoff_soon else "current"
+    background = [
+        period for period in periods
+        if str(period.get("time_status") or "") == preferred_status
+    ]
+    if not background:
+        background = list(periods)
+    background.sort(key=lambda period: (
+        _parse_ymd(period.get("start")) or datetime.max,
+        -int(period.get("relevance_score") or 0),
+    ))
+    if background:
+        return background[0]
     return None
 
 
@@ -243,20 +398,38 @@ def generate_homepage_next_peak(
     if not selected:
         return {"status": "empty", "peak": None, "pd_handoff": pd_handoff}
 
+    direct_scores = _house_scores_from_period(selected)
+    direct_houses = _rank_display_houses(
+        direct_scores,
+        state=_house_state_from_period(selected),
+        direct=True,
+    )
+    display_mode = (
+        "highly_active"
+        if str(selected.get("activation_strength") or "") == "highly_active" and direct_houses
+        else "background"
+    )
     band = _period_peak_band(selected)
     if not band:
         return {"status": "empty", "peak": None, "pd_handoff": pd_handoff}
 
-    house_scores = _house_scores_from_period(selected)
-    activated_houses = [
-        {
-            "house": house,
-            "score": score,
-            "state": _house_state_from_period(selected),
-        }
-        for house, score in sorted(house_scores.items(), key=lambda item: (-item[1], item[0]))
-        if score >= MIN_HOUSE_SCORE and 1 <= house <= 12
-    ]
+    if display_mode == "background":
+        # A current PD may have begun in the past. The card describes what is
+        # quietly active from today onward, not a retroactive date range.
+        band_start = _parse_ymd(band[0])
+        if band_start is None or band_start.date() < as_of:
+            band = (as_of.isoformat(), band[1])
+
+    activated_houses = direct_houses if display_mode == "highly_active" else _rank_display_houses(
+        _background_house_scores(selected),
+        state="pd_background",
+        direct=False,
+    )
+    activated_houses = _display_house_reasons(
+        selected,
+        activated_houses,
+        display_mode=display_mode,
+    )
     if not activated_houses:
         return {
             "status": "theme_only",
@@ -269,6 +442,7 @@ def generate_homepage_next_peak(
                 "pratyantardasha": selected.get("pratyantardasha"),
                 "mechanism_summary": _mechanism_summary(selected),
                 "activation_strength": selected.get("activation_strength"),
+                "display_mode": display_mode,
                 "activated_houses": [],
             },
             "pd_handoff": pd_handoff,
@@ -286,6 +460,7 @@ def generate_homepage_next_peak(
             "pratyantardasha": selected.get("pratyantardasha"),
             "mechanism_summary": _mechanism_summary(selected),
             "activation_strength": selected.get("activation_strength"),
+            "display_mode": display_mode,
             "activated_houses": activated_houses,
         },
         "pd_handoff": pd_handoff,
