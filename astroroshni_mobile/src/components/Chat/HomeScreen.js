@@ -425,6 +425,7 @@ export default function HomeScreen({
     url: '',
   });
   const [homeBanner, setHomeBanner] = useState(null);
+  const [showHomeBannerSheet, setShowHomeBannerSheet] = useState(false);
   const knowYourselfAnim = useRef(new Animated.Value(0)).current;
   /** One promotional home prompt per Home focus visit (info modal counts as the visit slot). */
   const homePromptShownThisVisitRef = useRef(false);
@@ -1146,6 +1147,7 @@ export default function HomeScreen({
   const dismissHomeBanner = useCallback(async () => {
     const id = String(homeBanner?.id || '').trim();
     const frequency = String(homeBanner?.frequency || 'always').toLowerCase();
+    setShowHomeBannerSheet(false);
     setHomeBanner(null);
     if (!id || frequency !== 'every_x_days') return;
     try {
@@ -1159,6 +1161,7 @@ export default function HomeScreen({
   const handleHomeBannerCta = useCallback(async () => {
     const action = String(homeBanner?.cta_action || 'dismiss').toLowerCase();
     const url = String(homeBanner?.cta_url || '').trim();
+    setShowHomeBannerSheet(false);
     await dismissHomeBanner();
     if (action === 'credits') {
       const ok = await requireAuthForPaid({
@@ -2226,41 +2229,43 @@ const loadHomeData = async (nativeData = null) => {
         <>
 
         {homeBanner ? (
-          <View
+          <TouchableOpacity
             style={[
-              styles.adminHomeBanner,
+              styles.adminHomeBannerRibbon,
               androidLightCardFixStyle,
               {
                 backgroundColor: colors.surfaceRaised,
                 borderColor: colors.cardBorder,
               },
             ]}
+            activeOpacity={0.86}
+            onPress={() => setShowHomeBannerSheet(true)}
           >
-            <View style={[styles.adminHomeBannerIcon, { backgroundColor: colors.accentSoft }]}>
-              <Icon name="megaphone-outline" size={18} color={colors.onAccent} />
+            <View style={[styles.adminHomeBannerRibbonIcon, { backgroundColor: colors.accentSoft }]}>
+              <Icon name="megaphone-outline" size={16} color={colors.onAccent} />
             </View>
-            <View style={styles.adminHomeBannerTextCol}>
-              <Text style={[styles.adminHomeBannerEyebrow, { color: colors.accent }]}>
-                {t('premiumUi.chatScreen.brand')}
+            <View style={styles.adminHomeBannerRibbonCopy}>
+              <Text style={[styles.adminHomeBannerRibbonTitle, { color: colors.text }]} numberOfLines={1}>
+                {homeBanner.title || homeBanner.body}
               </Text>
-              {homeBanner.title ? (
-                <Text style={[styles.adminHomeBannerTitle, { color: colors.text }]}>{homeBanner.title}</Text>
-              ) : null}
-              {homeBanner.body ? (
-                <Text style={[styles.adminHomeBannerBody, { color: colors.textSecondary }]}>{homeBanner.body}</Text>
-              ) : null}
-              {homeBanner.cta_label && homeBanner.cta_action !== 'none' ? (
-                <TouchableOpacity onPress={handleHomeBannerCta} style={styles.adminHomeBannerCta}>
-                  <Text style={[styles.adminHomeBannerCtaText, { color: colors.primary }]}>
-                    {homeBanner.cta_label}
-                  </Text>
-                </TouchableOpacity>
+              {homeBanner.title && homeBanner.body ? (
+                <Text style={[styles.adminHomeBannerRibbonBody, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {homeBanner.body}
+                </Text>
               ) : null}
             </View>
-            <TouchableOpacity onPress={dismissHomeBanner} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Icon name="close" size={18} color={colors.textSecondary} />
+            <Icon name="chevron-forward" size={17} color={colors.accent} />
+            <TouchableOpacity
+              onPress={(event) => {
+                event?.stopPropagation?.();
+                dismissHomeBanner();
+              }}
+              style={[styles.adminHomeBannerRibbonClose, { borderColor: colors.cardBorder }]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Icon name="close" size={14} color={colors.textSecondary} />
             </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         ) : null}
 
         {!showExploreCatalog ? <PremiumTodayOverview
@@ -2410,41 +2415,43 @@ const loadHomeData = async (nativeData = null) => {
         ) : null}
 
         {homeBanner ? (
-          <View
+          <TouchableOpacity
             style={[
-              styles.adminHomeBanner,
+              styles.adminHomeBannerRibbon,
               androidLightCardFixStyle,
               {
                 backgroundColor: colors.surfaceRaised,
                 borderColor: colors.cardBorder,
               },
             ]}
+            activeOpacity={0.86}
+            onPress={() => setShowHomeBannerSheet(true)}
           >
-            <View style={[styles.adminHomeBannerIcon, { backgroundColor: colors.accentSoft }]}>
-              <Icon name="megaphone-outline" size={18} color={colors.onAccent} />
+            <View style={[styles.adminHomeBannerRibbonIcon, { backgroundColor: colors.accentSoft }]}>
+              <Icon name="megaphone-outline" size={16} color={colors.onAccent} />
             </View>
-            <View style={styles.adminHomeBannerTextCol}>
-              <Text style={[styles.adminHomeBannerEyebrow, { color: colors.accent }]}>
-                {t('premiumUi.chatScreen.brand')}
+            <View style={styles.adminHomeBannerRibbonCopy}>
+              <Text style={[styles.adminHomeBannerRibbonTitle, { color: colors.text }]} numberOfLines={1}>
+                {homeBanner.title || homeBanner.body}
               </Text>
-              {homeBanner.title ? (
-                <Text style={[styles.adminHomeBannerTitle, { color: colors.text }]}>{homeBanner.title}</Text>
-              ) : null}
-              {homeBanner.body ? (
-                <Text style={[styles.adminHomeBannerBody, { color: colors.textSecondary }]}>{homeBanner.body}</Text>
-              ) : null}
-              {homeBanner.cta_label && homeBanner.cta_action !== 'none' ? (
-                <TouchableOpacity onPress={handleHomeBannerCta} style={styles.adminHomeBannerCta}>
-                  <Text style={[styles.adminHomeBannerCtaText, { color: colors.primary }]}>
-                    {homeBanner.cta_label}
-                  </Text>
-                </TouchableOpacity>
+              {homeBanner.title && homeBanner.body ? (
+                <Text style={[styles.adminHomeBannerRibbonBody, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {homeBanner.body}
+                </Text>
               ) : null}
             </View>
-            <TouchableOpacity onPress={dismissHomeBanner} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Icon name="close" size={18} color={colors.textSecondary} />
+            <Icon name="chevron-forward" size={17} color={colors.accent} />
+            <TouchableOpacity
+              onPress={(event) => {
+                event?.stopPropagation?.();
+                dismissHomeBanner();
+              }}
+              style={[styles.adminHomeBannerRibbonClose, { borderColor: colors.cardBorder }]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Icon name="close" size={14} color={colors.textSecondary} />
             </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         ) : null}
 
         {/* At-a-Glance Ticker */}
@@ -3166,6 +3173,57 @@ const loadHomeData = async (nativeData = null) => {
         </>
         )}
       </VerticalPageScroll>
+
+      <Modal
+        visible={Boolean(homeBanner && showHomeBannerSheet)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowHomeBannerSheet(false)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          style={[styles.adminHomeBannerSheetOverlay, { backgroundColor: colors.overlay }]}
+          onPress={() => setShowHomeBannerSheet(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.adminHomeBannerSheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}
+            onPress={() => {}}
+          >
+            <View style={[styles.adminHomeBannerSheetHandle, { backgroundColor: colors.cardBorder }]} />
+            <View style={styles.adminHomeBannerSheetHeader}>
+              <View style={[styles.adminHomeBannerSheetIcon, { backgroundColor: colors.accentSoft }]}>
+                <Icon name="megaphone-outline" size={20} color={colors.onAccent} />
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowHomeBannerSheet(false)}
+                style={[styles.adminHomeBannerSheetClose, { borderColor: colors.cardBorder }]}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Icon name="close" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            {homeBanner?.title ? (
+              <Text style={[styles.adminHomeBannerSheetTitle, { color: colors.text }]}>{homeBanner.title}</Text>
+            ) : null}
+            {homeBanner?.body ? (
+              <Text style={[styles.adminHomeBannerSheetBody, { color: colors.textSecondary }]}>{homeBanner.body}</Text>
+            ) : null}
+            {homeBanner?.cta_label && homeBanner?.cta_action !== 'none' ? (
+              <TouchableOpacity
+                onPress={handleHomeBannerCta}
+                style={[styles.adminHomeBannerSheetCta, { backgroundColor: colors.accent }]}
+                activeOpacity={0.86}
+              >
+                <Text style={[styles.adminHomeBannerSheetCtaText, { color: colors.onAccent }]}>
+                  {homeBanner.cta_label}
+                </Text>
+                <Icon name="arrow-forward" size={18} color={colors.onAccent} />
+              </TouchableOpacity>
+            ) : null}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Mini Insight Modal — shared by personal + pandit header chips */}
       <Modal
@@ -4188,56 +4246,122 @@ const styles = StyleSheet.create({
     height: 24,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
-  adminHomeBanner: {
+  adminHomeBannerRibbon: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
+    alignItems: 'center',
+    gap: 9,
     borderWidth: 1,
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    borderRadius: 16,
+    minHeight: 52,
+    paddingLeft: 10,
+    paddingRight: 8,
+    paddingVertical: 8,
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 18,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  adminHomeBannerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  adminHomeBannerRibbonIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  adminHomeBannerTextCol: {
+  adminHomeBannerRibbonCopy: {
     flex: 1,
-    gap: 2,
+    minWidth: 0,
   },
-  adminHomeBannerTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    lineHeight: 22,
-  },
-  adminHomeBannerEyebrow: {
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 2,
-    marginBottom: 4,
-  },
-  adminHomeBannerBody: {
+  adminHomeBannerRibbonTitle: {
     fontSize: 13,
-    lineHeight: 18,
+    fontWeight: '800',
+    lineHeight: 17,
+  },
+  adminHomeBannerRibbonBody: {
+    marginTop: 1,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: '600',
   },
-  adminHomeBannerCta: {
-    marginTop: 6,
-    alignSelf: 'flex-start',
+  adminHomeBannerRibbonClose: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  adminHomeBannerCtaText: {
-    fontSize: 13,
+  adminHomeBannerSheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  adminHomeBannerSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    paddingHorizontal: 22,
+    paddingTop: 10,
+    paddingBottom: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 22,
+    elevation: 16,
+  },
+  adminHomeBannerSheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  adminHomeBannerSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  adminHomeBannerSheetIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adminHomeBannerSheetClose: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adminHomeBannerSheetTitle: {
+    fontSize: 25,
+    lineHeight: 31,
     fontWeight: '800',
+  },
+  adminHomeBannerSheetBody: {
+    marginTop: 8,
+    fontSize: 15,
+    lineHeight: 23,
+    fontWeight: '500',
+  },
+  adminHomeBannerSheetCta: {
+    minHeight: 50,
+    marginTop: 22,
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  adminHomeBannerSheetCtaText: {
+    fontSize: 15,
+    fontWeight: '900',
   },
 
   container: {

@@ -101,8 +101,10 @@ const INSTANT_LOADER_FALLBACKS = [
   'Checking your chart context…',
   'Looking at the active timing…',
 ];
-const INSTANT_LOADER_WORD_MS = 1700;
-const INSTANT_LOADER_MAX_WORDS = INSTANT_LOADER_LINES.length + 2;
+const INSTANT_LOADER_WORD_MS = 2200;
+// Keep the normal thinking sequence calm. The recovery message is exceptional
+// and should only appear after the usual Instant response window has passed.
+const INSTANT_LOADER_MAX_WORDS = INSTANT_LOADER_LINES.length + 7;
 const INSTANT_REPLY_FIRST_PIECE_MS = 1100;
 
 const shouldPaceInstantAnswer = ({ chatTier, messageType, content } = {}) => {
@@ -554,6 +556,9 @@ export default function ChatScreen({ navigation, route }) {
   const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
   const [showInstantEndConfirm, setShowInstantEndConfirm] = useState(false);
   const [pendingModeAfterInstantEnd, setPendingModeAfterInstantEnd] = useState(null);
+  const [instantReceipt, setInstantReceipt] = useState(null);
+  const [instantIdleSecondsLeft, setInstantIdleSecondsLeft] = useState(null);
+  const instantLastActivityAtRef = useRef(Date.now());
   const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
   const [showPremiumBadge, setShowPremiumBadge] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
@@ -3800,6 +3805,9 @@ export default function ChatScreen({ navigation, route }) {
       if (!target) target = await createSession();
       if (!target) return null;
       const next = await instantBilling.start(target);
+      instantLastActivityAtRef.current = Date.now();
+      setInstantIdleSecondsLeft(null);
+      setInstantReceipt(null);
       setShowGreeting(false);
       return next;
     } catch (error) {
@@ -3813,7 +3821,17 @@ export default function ChatScreen({ navigation, route }) {
 
   const endInstantConsultation = async (reason = 'user_ended') => {
     try {
+      const beforeEnd = instantBilling.state;
       const next = await instantBilling.end(reason);
+      const finalState = next || beforeEnd;
+      if (finalState) {
+        setInstantReceipt({
+          durationSeconds: Number(finalState.elapsed_seconds || beforeEnd?.elapsed_seconds || 0),
+          creditsUsed: Number(finalState.charged_credits || beforeEnd?.charged_credits || 0),
+          reason,
+        });
+      }
+      setInstantIdleSecondsLeft(null);
       setShowInstantEndConfirm(false);
       return next;
     } catch (error) {
@@ -3824,6 +3842,35 @@ export default function ChatScreen({ navigation, route }) {
       return null;
     }
   };
+
+  const markInstantActivity = useCallback(() => {
+    if (!instantBilling.active) return;
+    instantLastActivityAtRef.current = Date.now();
+    setInstantIdleSecondsLeft(null);
+  }, [instantBilling.active]);
+
+  useEffect(() => {
+    if (!instantBilling.active) {
+      setInstantIdleSecondsLeft(null);
+      return undefined;
+    }
+    instantLastActivityAtRef.current = Date.now();
+    const timer = setInterval(() => {
+      if (loading || isTyping) {
+        instantLastActivityAtRef.current = Date.now();
+        setInstantIdleSecondsLeft(null);
+        return;
+      }
+      const idleSeconds = Math.floor((Date.now() - instantLastActivityAtRef.current) / 1000);
+      if (idleSeconds >= 180) {
+        clearInterval(timer);
+        endInstantConsultation('client_inactivity');
+        return;
+      }
+      setInstantIdleSecondsLeft(idleSeconds >= 150 ? 180 - idleSeconds : null);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [instantBilling.active, isTyping, loading]);
 
   const replaceInstantConsultation = async (newChatSessionId) => {
     if (!instantBilling.active) return null;
@@ -5900,8 +5947,8 @@ export default function ChatScreen({ navigation, route }) {
       : inputScopeNativeTrimmed;
   const activeMahadasha = dashaData?.maha_dashas?.find((period) => period?.current)?.planet || null;
   const instantRemainingSeconds = Number(instantBilling.state?.remaining_seconds || 0);
-  const instantBalanceCritical = instantBilling.active && instantRemainingSeconds > 0 && instantRemainingSeconds <= 120;
-  const instantBalanceLow = instantBilling.active && instantRemainingSeconds > 120 && instantRemainingSeconds <= 300;
+  const instantBalanceCritical = instantBilling.active && instantRemainingSeconds > 0 && instantRemainingSeconds <= 60;
+  const instantBalanceLow = instantBilling.active && instantRemainingSeconds > 60 && instantRemainingSeconds <= 300;
 
   return (
     <View style={styles.container}>
@@ -6011,7 +6058,11 @@ export default function ChatScreen({ navigation, route }) {
                 <View style={styles.activeChatTitleWrap}>
                   <View style={[styles.activeChatDot, { backgroundColor: colors.accent }]} />
                   <View style={styles.activeChatTitleCopy}>
-                    <Text style={[styles.activeChatTitle, { color: colors.textInverse }]}>{t('premiumUi.home.askTara')}</Text>
+                    <Text style={[styles.activeChatTitle, { color: colors.textInverse }]}>
+                      {isInstantAnalysis && instantBilling.active
+                        ? t('instantBilling.headerTitle', 'Instant with Tara')
+                        : t('premiumUi.home.askTara')}
+                    </Text>
                     <Text style={[styles.activeChatSubtitle, { color: colors.textInverseMuted }]} numberOfLines={1}>
                       {birthData?.name || 'Private consultation'}
                     </Text>
@@ -6108,12 +6159,12 @@ export default function ChatScreen({ navigation, route }) {
             style={[
               styles.instantHeaderSession,
               {
-                backgroundColor: colors.headerSurface,
+                backgroundColor: colors.surfaceRaised,
                 borderColor: instantBalanceCritical
                   ? (colors.danger || '#c24141')
                   : instantBalanceLow
                     ? (colors.warning || colors.accent)
-                    : colors.cosmicLine,
+                    : colors.cardBorder,
               },
             ]}
           >
@@ -6121,51 +6172,45 @@ export default function ChatScreen({ navigation, route }) {
               {instantBilling.active ? (
                 <>
                   <View style={styles.instantHeaderLiveGroup}>
-                    <View
-                      style={[
-                        styles.instantLiveDot,
-                        { backgroundColor: instantBalanceCritical ? (colors.danger || '#c24141') : (colors.success || '#27805f') },
-                      ]}
-                    />
-                    {viewportWidth >= 460 ? (
-                      <Text style={[styles.instantHeaderLiveLabel, { color: colors.textInverse }]} numberOfLines={1}>
-                        {t('instantBilling.live', 'Instant consultation live')}
+                    <View style={[styles.instantHeaderLiveMark, { backgroundColor: colors.accentSoft }]}>
+                      <View
+                        style={[
+                          styles.instantLiveDot,
+                          { backgroundColor: instantBalanceCritical ? (colors.danger || '#c24141') : (colors.success || '#27805f') },
+                        ]}
+                      />
+                    </View>
+                    <View style={styles.instantHeaderIdentity}>
+                      <Text style={[styles.instantHeaderLiveLabel, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {t('instantBilling.liveShort', 'LIVE')}
                       </Text>
-                    ) : null}
-                    <Text style={[styles.instantHeaderMetric, { color: colors.textInverse }]}>
-                      {formatMeterTime(instantBilling.state?.elapsed_seconds)}
-                    </Text>
-                    <View style={[styles.instantHeaderDivider, { backgroundColor: colors.cosmicLine }]} />
-                    <Text style={[styles.instantHeaderMetric, { color: colors.textInverse }]} numberOfLines={1}>
-                      {instantBilling.state?.balance ?? credits} {t('instantBilling.creditsLeft', 'Credits left')}
-                    </Text>
+                      <View style={styles.instantHeaderTimeRow}>
+                        <Ionicons name="time-outline" size={14} color={colors.text} />
+                        <Text style={[styles.instantHeaderMetric, { color: colors.text }]}>
+                          {formatMeterTime(instantBilling.state?.elapsed_seconds)}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={[styles.instantHeaderBalancePill, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+                      <Ionicons name="sparkles-outline" size={13} color={colors.accent} />
+                      <Text style={[styles.instantHeaderBalanceText, { color: colors.text }]} numberOfLines={1}>
+                        {instantBilling.state?.balance ?? credits}
+                      </Text>
+                      <Text style={[styles.instantHeaderBalanceUnit, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {t('instantBilling.creditsLeft', 'Credits left')}
+                      </Text>
+                    </View>
                   </View>
                   <View style={styles.instantHeaderActions}>
                     <TouchableOpacity
-                      onPress={() => {
-                        setShowModeSelector(false);
-                        setShowChatModeIntro(true);
-                      }}
-                      style={[styles.instantHeaderAction, { borderColor: colors.cosmicLine }]}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('instantBilling.changeMode', 'Mode')}
-                    >
-                      <Ionicons name="options-outline" size={15} color={colors.textInverse} />
-                      <Text
-                        style={[styles.instantHeaderActionText, { color: colors.textInverse }]}
-                      >
-                        {t('instantBilling.changeMode', 'Mode')}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
                       onPress={() => setShowInstantEndConfirm(true)}
-                      style={[styles.instantHeaderAction, { borderColor: colors.cosmicLine }]}
+                      style={[styles.instantHeaderAction, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceMuted }]}
                       accessibilityRole="button"
                       accessibilityLabel={t('instantBilling.end', 'End')}
                     >
-                      <Ionicons name="stop-circle-outline" size={16} color={colors.textInverse} />
+                      <Ionicons name="stop-circle-outline" size={16} color={colors.danger || colors.primary} />
                       <Text
-                        style={[styles.instantHeaderActionText, { color: colors.textInverse }]}
+                        style={[styles.instantHeaderActionText, { color: colors.danger || colors.primary }]}
                       >
                         {t('instantBilling.end', 'End')}
                       </Text>
@@ -6177,7 +6222,7 @@ export default function ChatScreen({ navigation, route }) {
                   <View style={styles.instantHeaderReadyGroup}>
                     <Ionicons name="flash-outline" size={16} color={colors.accent} style={styles.instantHeaderReadyIcon} />
                     <Text
-                      style={[styles.instantHeaderReadyText, { color: colors.textInverse }]}
+                      style={[styles.instantHeaderReadyText, { color: colors.text }]}
                       numberOfLines={compactHeaderChrome ? 1 : 2}
                       accessibilityLabel={t(
                         'instantBilling.splitRate',
@@ -6209,14 +6254,14 @@ export default function ChatScreen({ navigation, route }) {
                         setShowModeSelector(false);
                         setShowChatModeIntro(true);
                       }}
-                      style={[styles.instantHeaderAction, { borderColor: colors.cosmicLine }]}
+                      style={[styles.instantHeaderAction, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceMuted }]}
                       accessibilityRole="button"
                       accessibilityLabel={t('instantBilling.changeMode', 'Mode')}
                     >
-                      <Ionicons name="options-outline" size={15} color={colors.textInverse} />
+                      <Ionicons name="options-outline" size={15} color={colors.text} />
                       {!compactHeaderChrome ? (
                         <Text
-                          style={[styles.instantHeaderActionText, { color: colors.textInverse }]}
+                          style={[styles.instantHeaderActionText, { color: colors.text }]}
                         >
                           {t('instantBilling.changeMode', 'Mode')}
                         </Text>
@@ -6237,7 +6282,7 @@ export default function ChatScreen({ navigation, route }) {
                 <Ionicons name="warning-outline" size={15} color={colors.onAccent || '#fff'} />
                 <Text style={[styles.instantHeaderWarningText, { color: colors.onAccent || '#fff' }]} numberOfLines={1}>
                   {instantBalanceCritical
-                    ? t('instantBilling.lowBalance', 'Less than 5 minutes left · Add credits')
+                    ? t('instantBilling.oneMinuteLeft', 'About 1 minute left · Add credits')
                     : t('instantBilling.lowBalance', 'Less than 5 minutes left · Add credits')}
                 </Text>
               </TouchableOpacity>
@@ -6245,7 +6290,85 @@ export default function ChatScreen({ navigation, route }) {
             {instantBilling.error ? (
               <Text style={[styles.instantBillingError, { color: colors.danger || '#c24141' }]}>{instantBilling.error}</Text>
             ) : null}
+            {instantIdleSecondsLeft != null ? (
+              <View style={[styles.instantIdleWarning, { borderTopColor: colors.cosmicLine }]}>
+                <Text style={[styles.instantIdleWarningText, { color: colors.text }]} numberOfLines={2}>
+                  {t('instantBilling.idleWarning', 'Still there? This consultation will end in {{seconds}}s.', { seconds: instantIdleSecondsLeft })}
+                </Text>
+                <TouchableOpacity onPress={markInstantActivity} style={[styles.instantIdleKeepButton, { borderColor: colors.cosmicLine }]}>
+                  <Text style={[styles.instantHeaderActionText, { color: colors.text, marginLeft: 0 }]}>
+                    {t('instantBilling.keepGoing', 'Keep chatting')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
+        ) : null}
+
+        {!showGreeting && !partnershipMode && !isMundane && isInstantAnalysis && instantReceipt && !instantBilling.active ? (
+          <LinearGradient
+            colors={[colors.surfaceRaised, colors.surfaceMuted]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.instantReceiptCard, { borderColor: colors.cardBorder }]}
+          >
+            <View style={[styles.instantReceiptOrbitLarge, { borderColor: colors.cosmicLine }]} />
+            <View style={[styles.instantReceiptOrbitSmall, { borderColor: colors.cosmicLine }]} />
+            <View style={styles.instantReceiptHeading}>
+              <View style={[styles.instantReceiptIcon, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
+                <Ionicons name="checkmark" size={21} color={colors.accent} />
+              </View>
+              <View style={styles.instantReceiptCopy}>
+                <Text style={[styles.instantReceiptTitle, { color: colors.text }]}>
+                  {t('instantBilling.receiptTitle', 'Consultation ended')}
+                </Text>
+                <Text style={[styles.instantReceiptSubtitle, { color: colors.textSecondary }]}>
+                  {t('instantBilling.receiptSubtitle', 'Your conversation is saved and ready whenever you return.')}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.instantReceiptSummary, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+              <View style={styles.instantReceiptStat}>
+                <Text style={[styles.instantReceiptStatLabel, { color: colors.textSecondary }]}>
+                  {t('instantBilling.durationLabel', 'Duration')}
+                </Text>
+                <Text style={[styles.instantReceiptStatValue, { color: colors.text }]}>
+                  {formatMeterTime(instantReceipt.durationSeconds)}
+                </Text>
+              </View>
+              <View style={[styles.instantReceiptStatDivider, { backgroundColor: colors.cardBorder }]} />
+              <View style={styles.instantReceiptStat}>
+                <Text style={[styles.instantReceiptStatLabel, { color: colors.textSecondary }]}>
+                  {t('instantBilling.creditsUsedLabel', 'Credits used')}
+                </Text>
+                <Text style={[styles.instantReceiptStatValue, { color: colors.text }]}>
+                  {instantReceipt.creditsUsed}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={() => setInstantReceipt(null)}
+              style={[styles.instantReceiptPrimaryButton, { backgroundColor: colors.accent }]}
+              activeOpacity={0.88}
+            >
+              <Ionicons name="flash-outline" size={17} color={colors.onAccent} />
+              <Text style={[styles.instantReceiptPrimaryText, { color: colors.onAccent }]}>
+                {t('instantBilling.again', 'Instant again')}
+              </Text>
+              <Ionicons name="arrow-forward" size={17} color={colors.onAccent} />
+            </TouchableOpacity>
+            <Text style={[styles.instantReceiptExploreLabel, { color: colors.textSecondary }]}>
+              {t('instantBilling.exploreDeeper', 'Or continue with a deeper reading')}
+            </Text>
+            <View style={styles.instantReceiptActions}>
+              <TouchableOpacity onPress={() => { setInstantReceipt(null); applyChatMode('standard'); }} style={[styles.instantReceiptButton, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceRaised }]}>
+                <Text style={[styles.instantReceiptButtonText, { color: colors.text }]}>{t('chat.modeStandard', 'Standard')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setInstantReceipt(null); applyChatMode('premium'); }} style={[styles.instantReceiptButton, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceRaised }]}>
+                <Text style={[styles.instantReceiptButtonText, { color: colors.text }]}>{t('chat.modePremium', 'Premium')}</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
         ) : null}
 
         {!showGreeting && firstPurchaseBonusOffer && firstPurchaseBonusRemainingSeconds > 0 && !firstPurchaseBonusModalVisible && (
@@ -6827,6 +6950,19 @@ export default function ChatScreen({ navigation, route }) {
                 style={{ marginHorizontal: 12, marginBottom: 8 }}
               />
             ) : null}
+            {isInstantAnalysis && instantBilling.active && instantBalanceCritical ? (
+              <TouchableOpacity
+                style={[styles.instantComposerTopUp, { backgroundColor: colors.accentSoft, borderColor: colors.selectionBorder }]}
+                onPress={() => navigation.navigate('Credits')}
+                accessibilityRole="button"
+              >
+                <Ionicons name="wallet-outline" size={16} color={colors.accent} />
+                <Text style={[styles.instantComposerTopUpText, { color: colors.text }]} numberOfLines={1}>
+                  {t('instantBilling.oneMinuteLeft', 'About 1 minute left · Add credits')}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+              </TouchableOpacity>
+            ) : null}
             <LinearGradient
               colors={[colors.surfaceRaised || colors.surface, colors.surfaceRaised || colors.surface]}
               style={[
@@ -6915,10 +7051,14 @@ export default function ChatScreen({ navigation, route }) {
                     : null,
                 ]}
                 value={inputText}
-                onFocus={() => setIsComposerFocused(true)}
+                onFocus={() => {
+                  setIsComposerFocused(true);
+                  markInstantActivity();
+                }}
                 onBlur={() => setIsComposerFocused(false)}
                 onChangeText={(text) => {
                   setInputText(text);
+                  markInstantActivity();
                   if (Platform.OS === 'web' && !text) {
                     setWebComposerHeight(44);
                   }
@@ -6932,7 +7072,10 @@ export default function ChatScreen({ navigation, route }) {
                 }}
                 placeholder={
                   activeWaitSideMessage ? "Reply while the full answer is prepared..." :
-                  loading ? "Analyzing..." :
+                  loading
+                    ? (isInstantAnalysis
+                        ? t('instantBilling.replying', 'Tara is replying…')
+                        : "Analyzing...") :
                   freeQuestionNotificationGate
                     ? "Turn on notifications to unlock your free question"
                   : credits < effectiveChatCost ? "Insufficient credits" :
@@ -6947,7 +7090,7 @@ export default function ChatScreen({ navigation, route }) {
                 maxLength={500}
                 editable={
                   !!activeWaitSideMessage ||
-                  (!loading && !instantBilling.busy && (credits >= effectiveChatCost || freeQuestionNotificationGate) && !(partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3)))
+                  ((isInstantAnalysis || !loading) && !instantBilling.busy && (credits >= effectiveChatCost || freeQuestionNotificationGate) && !(partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3)))
                 }
                 multiline
                 // RN Web: without rows=1, <textarea> defaults to 2 rows and placeholder sits high.
@@ -6956,7 +7099,7 @@ export default function ChatScreen({ navigation, route }) {
                 blurOnSubmit={false}
               />
 
-              {!partnershipMode && !isMundane && !freeQuestionAvailable && (
+              {!partnershipMode && !isMundane && !freeQuestionAvailable && !(isInstantAnalysis && instantBilling.active) && (
                 <TouchableOpacity
                   style={[
                     styles.chatModeIdentityButton,
@@ -9557,12 +9700,21 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   instantHeaderSession: {
-    borderBottomWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    marginHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
   },
   instantHeaderSessionMain: {
-    minHeight: 34,
+    minHeight: 38,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -9573,6 +9725,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  instantHeaderLiveMark: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 9,
+  },
+  instantHeaderIdentity: {
+    flexShrink: 0,
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  instantHeaderTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 1,
+  },
   instantHeaderReadyGroup: {
     minWidth: 0,
     flex: 1,
@@ -9581,19 +9751,37 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   instantHeaderLiveLabel: {
-    marginRight: 7,
-    fontSize: 12,
+    fontSize: 9,
+    lineHeight: 11,
     fontWeight: '900',
+    letterSpacing: 1.2,
   },
   instantHeaderMetric: {
-    fontSize: 12,
+    marginLeft: 4,
+    fontSize: 13,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
-  instantHeaderDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 16,
-    marginHorizontal: 8,
+  instantHeaderBalancePill: {
+    minWidth: 0,
+    flexShrink: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  instantHeaderBalanceText: {
+    marginLeft: 5,
+    fontSize: 12,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+  },
+  instantHeaderBalanceUnit: {
+    marginLeft: 4,
+    fontSize: 9,
+    fontWeight: '700',
   },
   instantHeaderActions: {
     flexShrink: 0,
@@ -9605,9 +9793,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginLeft: 6,
+    minHeight: 34,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    marginLeft: 7,
   },
   instantHeaderActionText: {
     marginLeft: 4,
@@ -9655,6 +9844,171 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     fontSize: 11,
     fontWeight: '900',
+  },
+  instantIdleWarning: {
+    marginTop: 6,
+    paddingTop: 7,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  instantIdleWarningText: {
+    flex: 1,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '700',
+  },
+  instantIdleKeepButton: {
+    marginLeft: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderRadius: 999,
+  },
+  instantReceiptCard: {
+    marginHorizontal: 12,
+    marginTop: 10,
+    marginBottom: 4,
+    padding: 16,
+    borderWidth: 1,
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 3,
+  },
+  instantReceiptOrbitLarge: {
+    position: 'absolute',
+    width: 116,
+    height: 116,
+    borderRadius: 58,
+    borderWidth: 1,
+    right: -38,
+    top: -54,
+    opacity: 0.5,
+  },
+  instantReceiptOrbitSmall: {
+    position: 'absolute',
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 1,
+    right: -15,
+    top: -35,
+    opacity: 0.7,
+  },
+  instantReceiptHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  instantReceiptIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  instantReceiptCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  instantReceiptTitle: {
+    fontFamily: typographyTokens.display.fontFamily,
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: '700',
+  },
+  instantReceiptSubtitle: {
+    marginTop: 3,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  instantReceiptSummary: {
+    marginTop: 15,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    paddingVertical: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  instantReceiptStat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  instantReceiptStatDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 30,
+  },
+  instantReceiptStatLabel: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  instantReceiptStatValue: {
+    marginTop: 2,
+    fontSize: 16,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+  },
+  instantReceiptPrimaryButton: {
+    minHeight: 46,
+    marginTop: 12,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  instantReceiptPrimaryText: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  instantReceiptExploreLabel: {
+    marginTop: 13,
+    marginBottom: 7,
+    textAlign: 'center',
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '700',
+  },
+  instantReceiptActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  instantReceiptButton: {
+    flex: 1,
+    minHeight: 36,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  instantReceiptButtonText: {
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  instantComposerTopUp: {
+    marginBottom: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  instantComposerTopUpText: {
+    flex: 1,
+    marginHorizontal: 8,
+    fontSize: 12,
+    fontWeight: '800',
   },
   instantMeterTopRow: {
     flexDirection: 'row',

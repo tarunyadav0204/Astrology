@@ -2860,7 +2860,7 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   instantMessageRow: {
     width: '100%',
     paddingHorizontal: 12,
-    marginVertical: 7,
+    marginVertical: 5,
   },
   instantMessageRowUser: {
     alignItems: 'flex-end',
@@ -2869,11 +2869,10 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     alignItems: 'flex-start',
   },
   instantMessageBubble: {
-    maxWidth: '84%',
+    maxWidth: '82%',
     minWidth: 72,
     paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 7,
+    paddingVertical: 11,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 18,
   },
@@ -2892,9 +2891,9 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     fontWeight: '400',
   },
   instantMessageTime: {
-    marginTop: 4,
+    marginTop: 5,
     alignSelf: 'flex-end',
-    fontSize: 10,
+    fontSize: 9,
     lineHeight: 13,
   },
   instantInlineTyping: {

@@ -34,6 +34,7 @@ import planetaryPositions from './planetary-positions.json';
 import firstPurchaseStarter from './first-purchase-starter.json';
 import instantChatPacing from './instant-chat-pacing.json';
 import instantBilling from './instant-billing.json';
+import instantExperience from './instant-experience.json';
 
 const INSTANT_MODE_ACTION_COPY = Object.freeze({
   english: 'Mode',
@@ -100,6 +101,7 @@ const normalizedPremiumUi = Object.fromEntries(
 ].forEach(([baseCopy, billingCopy, language]) => {
   baseCopy.instantBilling = {
     ...billingCopy,
+    ...(instantExperience[language] || instantExperience.english),
     changeMode: INSTANT_MODE_ACTION_COPY[language],
   };
 });
