@@ -214,6 +214,9 @@ def build_priority_body_zones(
     *,
     lords_nakshatra: Optional[Dict[str, Any]] = None,
     current_dashas: Optional[Dict[str, Any]] = None,
+    divisional_charts: Optional[Dict[str, Any]] = None,
+    planet_conditions: Optional[Dict[str, Any]] = None,
+    requested_category: str = "health",
 ) -> Dict[str, Any]:
     planets = chart.get("planets") or {}
     houses = chart.get("houses") or []
@@ -295,10 +298,22 @@ def build_priority_body_zones(
             bucket = zone_weights.setdefault(key, {
                 "zone": zone,
                 "weight": 0,
+                "standing_weight": 0,
                 "sources": [],
                 "why": [],
+                "natal_layers": [],
+                "activation_sources": [],
             })
             bucket["weight"] += int(row.get("score") or 0)
+            bucket["standing_weight"] += int(row.get("score") or 0)
+            if zone in (row.get("house_zones") or []):
+                layer = f"house_anatomy:H{row['house']}"
+                if layer not in bucket["natal_layers"]:
+                    bucket["natal_layers"].append(layer)
+            if zone in (row.get("sign_zones") or []):
+                layer = f"sign_anatomy:{row.get('sign')}"
+                if layer not in bucket["natal_layers"]:
+                    bucket["natal_layers"].append(layer)
             src = f"H{row['house']} {row.get('sign')}"
             if src not in bucket["sources"]:
                 bucket["sources"].append(src)
@@ -317,8 +332,15 @@ def build_priority_body_zones(
             continue
         for zone in meta.get("zones") or []:
             key = zone.lower()
-            bucket = zone_weights.setdefault(key, {"zone": zone, "weight": 0, "sources": [], "why": []})
+            bucket = zone_weights.setdefault(key, {
+                "zone": zone, "weight": 0, "standing_weight": 0,
+                "sources": [], "why": [], "natal_layers": [], "activation_sources": [],
+            })
             bucket["weight"] += 3
+            bucket["standing_weight"] += 3
+            layer = f"planet_karaka:{planet}"
+            if layer not in bucket["natal_layers"]:
+                bucket["natal_layers"].append(layer)
             label = f"{planet} in H{h}"
             if label not in bucket["sources"]:
                 bucket["sources"].append(label)
@@ -331,8 +353,15 @@ def build_priority_body_zones(
     for hint in _nakshatra_zone_hints(lords_nakshatra or {}):
         for zone in hint.get("zones") or []:
             key = zone.lower()
-            bucket = zone_weights.setdefault(key, {"zone": zone, "weight": 0, "sources": [], "why": []})
+            bucket = zone_weights.setdefault(key, {
+                "zone": zone, "weight": 0, "standing_weight": 0,
+                "sources": [], "why": [], "natal_layers": [], "activation_sources": [],
+            })
             bucket["weight"] += 2
+            bucket["standing_weight"] += 2
+            layer = f"nakshatra:{hint.get('source')}"
+            if layer not in bucket["natal_layers"]:
+                bucket["natal_layers"].append(layer)
             src = f"{hint.get('nakshatra')} ({hint.get('source')})"
             if src not in bucket["sources"]:
                 bucket["sources"].append(src)
@@ -354,11 +383,16 @@ def build_priority_body_zones(
         sign_zones = list((SIGN_BODY.get(sign) or {}).get("zones") or []) if sign is not None else []
         for zone in _merge_zones(karaka_zones[:3], house_zones[:2], sign_zones[:2]):
             key = zone.lower()
-            bucket = zone_weights.setdefault(key, {"zone": zone, "weight": 0, "sources": [], "why": []})
+            bucket = zone_weights.setdefault(key, {
+                "zone": zone, "weight": 0, "standing_weight": 0,
+                "sources": [], "why": [], "natal_layers": [], "activation_sources": [],
+            })
             bucket["weight"] += 2
             src = f"Current {label}: {planet}"
             if src not in bucket["sources"]:
                 bucket["sources"].append(src)
+            if src not in bucket["activation_sources"]:
+                bucket["activation_sources"].append(src)
 
     event_patterns = _build_event_patterns(planets, houses, residents_map, house_map)
 
@@ -368,8 +402,15 @@ def build_priority_body_zones(
             key = str(zone).strip().lower()
             if not key:
                 continue
-            bucket = zone_weights.setdefault(key, {"zone": zone, "weight": 0, "sources": [], "why": []})
+            bucket = zone_weights.setdefault(key, {
+                "zone": zone, "weight": 0, "standing_weight": 0,
+                "sources": [], "why": [], "natal_layers": [], "activation_sources": [],
+            })
             bucket["weight"] += 5
+            bucket["standing_weight"] += 5
+            layer = f"event_pattern:{pattern.get('key') or 'health'}"
+            if layer not in bucket["natal_layers"]:
+                bucket["natal_layers"].append(layer)
             title = pattern.get("title") or pattern.get("key")
             if title and title not in bucket["sources"]:
                 bucket["sources"].append(str(title))
@@ -385,6 +426,50 @@ def build_priority_body_zones(
             f"Astrological attention theme: {item['zone']}. "
             "Not a diagnosis — discuss symptoms with a qualified doctor."
         )
+
+        # A dasha or transit can activate a natal susceptibility, but cannot
+        # create one.  Named body-part claims therefore require at least two
+        # independent natal calculation families.  This prevents a single
+        # generic sign/planet association from becoming a scary medical claim.
+        layer_families = {
+            str(layer).split(":", 1)[0]
+            for layer in (item.get("natal_layers") or [])
+            if layer
+        }
+        standing_weight = int(item.get("standing_weight") or 0)
+        item["confluence_count"] = len(layer_families)
+        item["callout_allowed"] = len(layer_families) >= 2 and standing_weight >= 8
+        item["confidence"] = (
+            "high" if len(layer_families) >= 3 and standing_weight >= 14
+            else "medium" if item["callout_allowed"]
+            else "directional"
+        )
+
+    major_vulnerabilities = [
+        {
+            "zone": item.get("zone"),
+            "confidence": item.get("confidence"),
+            "confluence_count": item.get("confluence_count"),
+            "standing_weight": item.get("standing_weight"),
+            "natal_layers": list(item.get("natal_layers") or [])[:6],
+            "activation_sources": list(item.get("activation_sources") or [])[:3],
+            "sources": list(item.get("sources") or [])[:5],
+            "why": list(item.get("why") or [])[:4],
+        }
+        for item in priority_zones
+        if item.get("callout_allowed")
+    ][:3]
+
+    medical_profile = _build_medical_profile(
+        chart=chart,
+        house_map=house_map,
+        major_vulnerabilities=major_vulnerabilities,
+        event_patterns=event_patterns,
+        divisional_charts=divisional_charts or {},
+        planet_conditions=planet_conditions or {},
+        current_dashas=current_dashas or {},
+        requested_category=requested_category,
+    )
 
     return {
         "disclaimer": (
@@ -404,8 +489,254 @@ def build_priority_body_zones(
             for r in scored[:8]
         ],
         "priority_zones": priority_zones,
+        "major_vulnerabilities": major_vulnerabilities,
         "event_patterns": event_patterns,
-        "top_zone_names": [z.get("zone") for z in priority_zones[:5]],
+        "top_zone_names": [z.get("zone") for z in major_vulnerabilities],
+        "claim_policy": {
+            "named_body_part_requires": "At least two independent natal calculation families and standing weight >= 8.",
+            "timing_cannot_create_vulnerability": True,
+            "diagnosis_allowed": False,
+        },
+        "medical_profile": medical_profile,
+    }
+
+
+def _chart_payload(chart: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(chart, dict):
+        return {}
+    nested = chart.get("divisional_chart")
+    return nested if isinstance(nested, dict) else chart
+
+
+def _division_planets(chart: Dict[str, Any]) -> Dict[str, Any]:
+    payload = _chart_payload(chart)
+    planets = payload.get("planets")
+    return planets if isinstance(planets, dict) else {}
+
+
+def _division_name(raw: str) -> str:
+    value = str(raw or "").lower()
+    for code in ("d30", "d8", "d6", "d3"):
+        if value == code or value.startswith(code + "_"):
+            return code.upper()
+    return str(raw or "").upper()
+
+
+def _condition_row(planet: str, raw: Dict[str, Any]) -> Dict[str, Any]:
+    row = raw.get(planet) if isinstance(raw, dict) else {}
+    row = row if isinstance(row, dict) else {}
+    dignity = row.get("dignity_analysis") if isinstance(row.get("dignity_analysis"), dict) else row
+    strength = row.get("strength_analysis") if isinstance(row.get("strength_analysis"), dict) else row
+    combustion = row.get("combustion_status")
+    if isinstance(combustion, dict):
+        combustion = combustion.get("status") or ("combust" if combustion.get("is_combust") else "normal")
+    return {
+        "planet": planet,
+        "dignity": dignity.get("dignity"),
+        "functional_nature": dignity.get("functional_nature"),
+        "strength_multiplier": dignity.get("strength_multiplier"),
+        "shadbala_rupas": strength.get("shadbala_rupas") or strength.get("total_rupas"),
+        "shadbala_grade": strength.get("shadbala_grade") or strength.get("grade"),
+        "combustion": combustion,
+        "retrograde": row.get("retrograde"),
+    }
+
+
+def _mechanisms_for_zone(zone: str, sources: List[str]) -> List[str]:
+    text = " ".join([str(zone)] + [str(v) for v in sources]).lower()
+    mechanisms: List[str] = []
+    mapping = (
+        ("acute / inflammatory", ("mars", "blood", "heat", "inflammation", "accident", "surgery")),
+        ("chronic / degenerative", ("saturn", "bone", "joint", "chronic", "teeth")),
+        ("toxic / unusual", ("rahu", "toxin", "unusual", "hard-to-trace")),
+        ("hidden / depleting", ("ketu", "hidden", "fatigue", "void")),
+        ("nervous / functional", ("mercury", "nerve", "speech", "respiratory")),
+        ("fluid / hormonal", ("moon", "venus", "fluid", "hormone", "kidney", "reproductive")),
+        ("metabolic / growth", ("jupiter", "liver", "fat", "growth", "immunity")),
+    )
+    for label, needles in mapping:
+        if any(needle in text for needle in needles):
+            mechanisms.append(label)
+    return mechanisms[:3] or ["constitutional susceptibility"]
+
+
+def _build_medical_profile(
+    *,
+    chart: Dict[str, Any],
+    house_map: List[Dict[str, Any]],
+    major_vulnerabilities: List[Dict[str, Any]],
+    event_patterns: List[Dict[str, Any]],
+    divisional_charts: Dict[str, Any],
+    planet_conditions: Dict[str, Any],
+    current_dashas: Dict[str, Any],
+    requested_category: str,
+) -> Dict[str, Any]:
+    """Normalize medical-astrology evidence before any language generation.
+
+    D1 establishes susceptibility. Vargas can confirm or weaken confidence but
+    never create a vulnerability. Timing can activate only a D1-established
+    theme. This contract deliberately contains no disease names.
+    """
+    planets = chart.get("planets") or {}
+    houses_by_number = {int(row.get("house")): row for row in house_map if row.get("house")}
+    ascendant = chart.get("ascendant")
+    try:
+        asc_sign = _sign_index(int(float(ascendant) / 30)) if ascendant is not None else None
+    except (TypeError, ValueError):
+        asc_sign = None
+    # Some callers intentionally pass the compact chart shape without the
+    # ascendant longitude.  House 1 still carries the calculated rising sign;
+    # never silently turn a missing longitude into Aries.
+    if asc_sign is None:
+        asc_sign = _house_sign(chart.get("houses") or [], 1)
+    lagna_lord = SIGN_LORDS.get(asc_sign) if asc_sign is not None else None
+    constitution = {
+        "ascendant_sign": SIGN_NAMES[asc_sign] if asc_sign is not None else None,
+        "ascendant_lord": lagna_lord,
+        "ascendant_lord_house": _planet_house(planets, lagna_lord) if lagna_lord else None,
+        "sun_house": _planet_house(planets, "Sun"),
+        "moon_house": _planet_house(planets, "Moon"),
+        "core_houses": [
+            {
+                "house": h,
+                "role": (HOUSE_BODY.get(h) or {}).get("role"),
+                "sign": (houses_by_number.get(h) or {}).get("sign"),
+                "lord": (houses_by_number.get(h) or {}).get("lord"),
+                "lord_house": (houses_by_number.get(h) or {}).get("lord_house"),
+                "residents": (houses_by_number.get(h) or {}).get("residents") or [],
+                "aspecting_planets": (houses_by_number.get(h) or {}).get("aspecting_planets") or [],
+                "pressure_score": (houses_by_number.get(h) or {}).get("score"),
+            }
+            for h in (1, 6, 8, 12)
+        ],
+    }
+
+    condition_planets = {"Sun", "Moon", "Mars", "Saturn", "Rahu", "Ketu"}
+    condition_planets.update(
+        str((houses_by_number.get(h) or {}).get("lord") or "") for h in (1, 6, 8, 12)
+    )
+    conditions = [
+        _condition_row(planet, planet_conditions)
+        for planet in sorted(condition_planets)
+        if planet and planet in planets
+    ]
+
+    divisions: Dict[str, Dict[str, Any]] = {}
+    for raw_name, raw_chart in (divisional_charts or {}).items():
+        code = _division_name(raw_name)
+        if code not in {"D3", "D6", "D8", "D30"}:
+            continue
+        dplanets = _division_planets(raw_chart)
+        divisions[code] = {
+            "available": bool(dplanets),
+            "planets": {
+                planet: {
+                    "house": _planet_house(dplanets, planet),
+                    "sign": _planet_sign(dplanets, planet),
+                }
+                for planet in condition_planets
+                if planet and planet in dplanets
+            },
+        }
+
+    confirmations: List[Dict[str, Any]] = []
+    enhanced_vulnerabilities: List[Dict[str, Any]] = []
+    for vulnerability in major_vulnerabilities:
+        sources = list(vulnerability.get("sources") or [])
+        # The compact source labels intentionally omit some technical detail
+        # (for example, the surgery label itself).  Recover the actual natal
+        # actors from both those labels and their human-readable reasons so a
+        # varga confirmation is not lost merely because the UI copy is short.
+        source_evidence = sources + list(vulnerability.get("why") or [])
+        source_planets = [
+            p for p in PLANET_KARAKA
+            if any(p.lower() in str(src).lower() for src in source_evidence)
+        ]
+        repeated: List[str] = []
+        for code, division in divisions.items():
+            for planet in source_planets:
+                drow = (division.get("planets") or {}).get(planet) or {}
+                if drow.get("house") in DUSTHANA:
+                    repeated.append(f"{code}: {planet} repeats in health-sensitive House {drow.get('house')}")
+        confidence = str(vulnerability.get("confidence") or "directional")
+        if len(repeated) >= 2 and confidence == "medium":
+            confidence = "high"
+        enhanced = {
+            **vulnerability,
+            "confidence": confidence,
+            "mechanisms": _mechanisms_for_zone(str(vulnerability.get("zone") or ""), sources),
+            "divisional_repetition": repeated[:5],
+        }
+        enhanced_vulnerabilities.append(enhanced)
+        if repeated:
+            confirmations.append({"zone": vulnerability.get("zone"), "repetitions": repeated[:5]})
+
+    benefics = {"Jupiter", "Venus", "Moon", "Mercury"}
+    protection: List[str] = []
+    for h in (1, 6, 8, 12):
+        row = houses_by_number.get(h) or {}
+        supporting = [p for p in (row.get("aspecting_planets") or []) if p in benefics]
+        if supporting:
+            protection.append(f"House {h} receives support from {', '.join(supporting)}")
+    for row in conditions:
+        if row.get("dignity") in {"exalted", "own_sign", "moolatrikona", "mooltrikona_sign"}:
+            protection.append(f"{row.get('planet')} has strong dignity ({row.get('dignity')})")
+
+    pattern_by_key = {str(row.get("key") or ""): row for row in event_patterns}
+    activated_vulnerabilities = [
+        {
+            "zone": row.get("zone"),
+            "confidence": row.get("confidence"),
+            "activation_sources": list(row.get("activation_sources") or [])[:4],
+        }
+        for row in enhanced_vulnerabilities
+        if row.get("activation_sources")
+    ]
+    judgments = {
+        "constitutional": {
+            "supported": bool(enhanced_vulnerabilities),
+            "vulnerabilities": enhanced_vulnerabilities[:3],
+        },
+        "current": {
+            "active": bool(activated_vulnerabilities),
+            "activation_only": True,
+            "activated_vulnerabilities": activated_vulnerabilities[:3],
+            "rule": "Current timing may activate only a natal susceptibility listed above.",
+        },
+        "surgery": {
+            "supported": "surgery_crisis_susceptibility" in pattern_by_key,
+            "evidence": pattern_by_key.get("surgery_crisis_susceptibility"),
+        },
+        "accident": {
+            "supported": "accident_injury_susceptibility" in pattern_by_key,
+            "evidence": pattern_by_key.get("accident_injury_susceptibility"),
+        },
+        "recovery": {
+            "supported": bool(protection),
+            "protective_factors": protection[:5],
+        },
+    }
+    return {
+        "requested_category": requested_category,
+        "constitution": constitution,
+        "planet_conditions": conditions,
+        "divisional_health_charts": divisions,
+        "divisional_confirmations": confirmations,
+        "protective_factors": protection[:6],
+        "major_vulnerabilities": enhanced_vulnerabilities[:3],
+        "mechanism_legend": {
+            "acute / inflammatory": "fast, heat, injury or inflammatory expression",
+            "chronic / degenerative": "slow, structural or recurring expression",
+            "nervous / functional": "stress, nerve or regulation-related expression",
+            "fluid / hormonal": "fluid, renal, reproductive or hormonal expression",
+        },
+        "judgments": judgments,
+        "rules": [
+            "D1 must establish susceptibility.",
+            "D3/D6/D8/D30 may strengthen or weaken confidence, never create a new vulnerability.",
+            "Dasha and transit may time only an established natal vulnerability.",
+            "A body-system susceptibility is not a diagnosis.",
+        ],
     }
 
 

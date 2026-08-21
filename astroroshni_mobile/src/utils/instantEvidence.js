@@ -278,6 +278,35 @@ export const buildReadableEvidence = (packet) => {
       lines: ['This saved answer contains the old evidence format. Ask the question again to generate the complete derivation chain.'],
     }];
   }
+  const medical = derivation.medical_reading;
+  if (medical && typeof medical === 'object') {
+    const sections = [];
+    if ((medical.constitutional_lines || []).length) sections.push({
+      key: 'medical-constitution', title: 'Constitutional health foundation',
+      lines: unique(medical.constitutional_lines),
+    });
+    (medical.vulnerability_groups || []).forEach((group, index) => sections.push({
+      key: `medical-vulnerability-${index}`, title: `${group.title} · calculated susceptibility`,
+      lines: unique(group.lines || []),
+    }));
+    if ((medical.condition_lines || []).length) sections.push({
+      key: 'medical-condition', title: 'Planet strength and condition',
+      lines: unique(medical.condition_lines),
+    });
+    if ((medical.judgment_lines || []).length) sections.push({
+      key: 'medical-judgment', title: `What this means for ${humanize(medical.category || 'health').toLowerCase()}`,
+      lines: unique(medical.judgment_lines),
+    });
+    sections.push({
+      key: 'medical-safety', title: 'How to use this reading',
+      lines: unique([
+        (medical.divisions_checked || []).length ? `Divisional checks used: ${medical.divisions_checked.join(', ')}.` : null,
+        medical.safety,
+      ]),
+    });
+    return sections.filter((section) => section.lines?.length)
+      .map((section, index) => ({ ...section, step: index + 1 }));
+  }
   const chartReading = derivation.chart_reading;
   if (chartReading && typeof chartReading === 'object') {
     const requested = chartReading.requested_charts || [];

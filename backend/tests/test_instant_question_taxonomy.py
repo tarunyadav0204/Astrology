@@ -48,6 +48,22 @@ def test_supported_router_domains_do_not_silently_fall_back_to_general():
         assert len(method.get("operations") or []) >= 3, label
 
 
+def test_health_family_has_distinct_calculator_contracts():
+    expected_divisionals = {
+        "health": {"parashari.d3_confirmation", "parashari.d30_confirmation"},
+        "mental_wellbeing": {"parashari.d9_confirmation", "parashari.d30_confirmation"},
+        "surgery": {"parashari.d6_confirmation", "parashari.d8_confirmation", "parashari.d30_confirmation"},
+        "accident": {"parashari.d3_confirmation", "parashari.d8_confirmation", "parashari.d30_confirmation"},
+        "recovery": {"parashari.d6_confirmation", "parashari.d30_confirmation"},
+    }
+    for domain, required in expected_divisionals.items():
+        method = get_methodology(domain, "event_prediction")
+        operations = set(method.get("operations") or [])
+        assert "parashari.health_body_area" in operations
+        assert required <= operations
+
+
+
 def test_conversation_state_contract_covers_ambiguity_correction_and_safety():
     assert {
         "clear_first_turn", "ambiguous_reference", "clarification_reply",

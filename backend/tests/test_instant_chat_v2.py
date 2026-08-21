@@ -910,6 +910,37 @@ def test_answer_spec_preserves_window_facts_without_inviting_fact_fusion():
     assert "Never fuse two facts" in spec["event_rules"]["instruction"]
 
 
+def test_health_answer_spec_only_allows_confluent_major_vulnerabilities():
+    query_plan = {
+        "category": "surgery",
+        "answer_mode": "topic_reading",
+        "time_scope": {},
+    }
+    verdict = {"ranked_windows": []}
+    ledger = {"records": [{
+        "evidence_id": "ev-health",
+        "kind": "health_body_area",
+        "value": {
+            "major_vulnerabilities": [{
+                "zone": "knees",
+                "confidence": "high",
+                "confluence_count": 3,
+            }],
+            "priority_zones": [
+                {"zone": "heart", "confidence": "directional"},
+                {"zone": "knees", "confidence": "high"},
+            ],
+        },
+    }]}
+
+    spec = build_answer_spec(query_plan, verdict, ledger)
+
+    assert spec["health_rules"]["allowed_zone_names"] == ["knees"]
+    assert spec["health_rules"]["health_question_type"] == "surgery"
+    assert "Never state that surgery is required" in spec["health_rules"]["category_safety"]
+    assert "heart" not in spec["health_rules"]["allowed_zone_names"]
+
+
 def test_timing_confidence_requires_named_calculator_families():
     limited = build_instant_v2_packet(
         question="When will I marry?", intent=_intent(), answer_mode="event_timing",

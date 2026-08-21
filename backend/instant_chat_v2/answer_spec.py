@@ -121,16 +121,24 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
             ),
         }
     health_rules = None
-    if query_plan.get("category") == "health":
+    health_category = str(query_plan.get("category") or "").lower()
+    if health_category in {"health", "mental_wellbeing", "surgery", "accident", "recovery"}:
         health_record = next(
             (item for item in ledger.get("records", []) if item.get("kind") == "health_body_area"),
             None,
         )
         health_value = (health_record or {}).get("value")
         priority_zones = health_value.get("priority_zones") if isinstance(health_value, dict) else []
+        major_vulnerabilities = (
+            health_value.get("major_vulnerabilities") if isinstance(health_value, dict) else []
+        )
+        medical_profile = (
+            health_value.get("medical_profile") if isinstance(health_value, dict) else {}
+        )
+        medical_profile = medical_profile if isinstance(medical_profile, dict) else {}
         allowed_zones = [
             str(item.get("zone") or "").strip()
-            for item in (priority_zones or [])[:5]
+            for item in (major_vulnerabilities or [])[:3]
             if isinstance(item, dict) and str(item.get("zone") or "").strip()
         ]
         if health_record and allowed_zones:
@@ -141,8 +149,39 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                 "required": True,
             })
         health_rules = {
+            "health_question_type": health_category,
             "allowed_zone_names": allowed_zones,
+            "major_vulnerabilities": major_vulnerabilities or [],
+            "broader_directional_zones": priority_zones or [],
+            "calculated_medical_profile": medical_profile,
             "medical_framing": "Astrological susceptibility only; never a diagnosis or prediction of illness.",
+            "answer_order": [
+                "direct practical answer to the user's exact health subtype",
+                "constitutional susceptibility only if calculated",
+                "whether it is currently activated, kept separate from natal susceptibility",
+                "protective or recovery factors",
+                "safe practical guidance and one natural follow-up question",
+            ],
+            "body_part_claim": (
+                "You may name the strongest allowed zone as a major constitutional vulnerability only when it "
+                "appears in allowed_zone_names. Explain the independent chart factors supplied for it and say "
+                "'the chart suggests susceptibility' or 'an area needing preventive attention'. If the list is "
+                "empty, do not invent or name a body part."
+            ),
+            "category_safety": {
+                "mental_wellbeing": "Describe stress or emotional sensitivity only; never infer a psychiatric diagnosis.",
+                "surgery": "Never state that surgery is required or certain. Separate surgical susceptibility from timing suitability.",
+                "accident": "Never predict that an accident will happen. Describe calculated injury susceptibility and cautious periods only.",
+                "recovery": "Never promise recovery or a medical outcome; describe supportive or pressured recovery symbolism only.",
+                "health": "Separate constitutional vulnerability, current activation, and practical prevention guidance.",
+            }.get(health_category),
+            "evidence_hierarchy": (
+                "Use the requested-category judgment and D1 constitution first. D3/D6/D8/D30 only confirm "
+                "a D1-established vulnerability. Dignity, functional nature, combustion and Shadbala modify "
+                "severity or protection. Dasha/transit only activate an established natal theme and must never "
+                "create a body-part claim. Mention the concrete mechanism (acute/inflammatory, chronic/structural, "
+                "nervous/functional, fluid/hormonal, or other supplied mechanism) in plain language."
+            ),
             "timing_framing": (
                 "No ranked health-risk window exists inside the requested horizon. Do not call the requested "
                 "period heightened, dangerous, acute, or high-risk. Present the allowed zones only as standing "

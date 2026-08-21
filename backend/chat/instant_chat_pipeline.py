@@ -17,9 +17,11 @@ from ai.parallel_chat.parallel_agent_payloads import build_parashari_agent_paylo
 from ai.response_parser import ResponseParser
 from calculators import RemedyEngine
 from calculators.chart_calculator import ChartCalculator
+from calculators.divisional_chart_calculator import DivisionalChartCalculator
 from calculators.gandanta_calculator import GandantaCalculator
 from calculators.planetary_dignities_calculator import PlanetaryDignitiesCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
+from calculators.shadbala_calculator import ShadbalaCalculator
 from calculators.yogi_calculator import YogiCalculator
 from chat.chat_context_builder import ChatContextBuilder
 from daily_prediction_spine import build_daily_prediction_spine
@@ -7752,7 +7754,8 @@ def _build_instant_context(
         )
         if option_comparison:
             normalized_evidence["option_comparison"] = option_comparison
-    if category == "health":
+    health_categories = {"health", "mental_wellbeing", "surgery", "accident", "recovery"}
+    if category in health_categories:
         # Body-area claims must come from the established Parashari body-zone
         # calculator, never from the language model's general knowledge.  This
         # is susceptibility evidence only; the answer contract still forbids a
@@ -7760,15 +7763,73 @@ def _build_instant_context(
         try:
             from reports.context.health_body_zones import build_priority_body_zones
 
+            medical_calc_started = time.monotonic()
+            health_divisions: Dict[str, Any] = {}
+            divisional_calc = DivisionalChartCalculator(chart_data)
+            for division_number in (3, 6, 8, 30):
+                try:
+                    health_divisions[f"D{division_number}"] = (
+                        divisional_calc.calculate_divisional_chart(division_number)
+                    )
+                except Exception:
+                    logger.exception(
+                        "Instant medical divisional calculation failed D%s",
+                        division_number,
+                    )
+
+            health_conditions = (
+                PlanetaryDignitiesCalculator(chart_data).calculate_planetary_dignities()
+            )
+            try:
+                shadbala = ShadbalaCalculator(chart_data, birth_data).calculate_shadbala()
+            except Exception:
+                logger.exception("Instant medical Shadbala calculation failed")
+                shadbala = {}
+            for planet, strength in (shadbala or {}).items():
+                if not isinstance(strength, dict):
+                    continue
+                health_conditions.setdefault(planet, {})["strength_analysis"] = {
+                    "total_rupas": strength.get("total_rupas"),
+                    "grade": strength.get("grade"),
+                    "ishta_percent": strength.get("ishta_percent"),
+                    "kashta_percent": strength.get("kashta_percent"),
+                    "result_tendency": strength.get("result_tendency"),
+                }
+
             body_zone_evidence = build_priority_body_zones(
                 chart_data,
                 current_dashas=current_dashas,
+                divisional_charts=health_divisions,
+                planet_conditions=health_conditions,
+                requested_category=category,
             )
+            event_patterns = list(body_zone_evidence.get("event_patterns") or [])
+            if category in {"surgery", "accident"}:
+                category_marker = "surgery" if category == "surgery" else "accident"
+                event_patterns = [
+                    item for item in event_patterns
+                    if category_marker in str(item.get("key") or "").lower()
+                ]
             normalized_evidence["health_body_area"] = {
-                "priority_zones": list(body_zone_evidence.get("priority_zones") or [])[:3],
-                "event_patterns": list(body_zone_evidence.get("event_patterns") or [])[:3],
+                # Only these zones have enough independent natal confluence to
+                # support a named body-system vulnerability in user-facing text.
+                "major_vulnerabilities": list(body_zone_evidence.get("major_vulnerabilities") or [])[:3],
+                # Keep the broader ranking in evidence/debug output. It must not
+                # be promoted to a body-part claim by the answer model.
+                "priority_zones": list(body_zone_evidence.get("priority_zones") or [])[:5],
+                "event_patterns": event_patterns[:3],
+                "house_map": list(body_zone_evidence.get("house_map") or [])[:8],
+                "claim_policy": body_zone_evidence.get("claim_policy"),
+                "medical_profile": body_zone_evidence.get("medical_profile"),
                 "disclaimer": body_zone_evidence.get("disclaimer"),
             }
+            logger.info(
+                "INSTANT_MEDICAL_PROFILE category=%s divisions=%s conditions=%s elapsed_ms=%.1f",
+                category,
+                sorted(health_divisions),
+                len(health_conditions),
+                (time.monotonic() - medical_calc_started) * 1000.0,
+            )
         except Exception:
             logger.exception("Instant health body-zone evidence calculation failed")
     final_event_prediction_dashas: Dict[str, Any] = {}

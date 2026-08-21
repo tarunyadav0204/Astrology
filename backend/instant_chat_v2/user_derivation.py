@@ -573,6 +573,94 @@ def build_user_derivation(*, query_plan: Dict[str, Any], verdict: Dict[str, Any]
     """Return calculated, display-ready derivation without changing the LLM prompt."""
     normalized = _dict(instant_context.get("normalized_evidence"))
     answer_mode = str(query_plan.get("answer_mode") or "")
+    health_category = str(query_plan.get("category") or "").lower()
+    health_value = _dict(normalized.get("health_body_area"))
+    medical_profile = _dict(health_value.get("medical_profile"))
+    if health_category in {"health", "mental_wellbeing", "surgery", "accident", "recovery"} and medical_profile:
+        constitution = _dict(medical_profile.get("constitution"))
+        constitutional_lines: List[str] = []
+        if constitution.get("ascendant_sign"):
+            constitutional_lines.append(
+                f"D1 ascendant is {constitution.get('ascendant_sign')}; its lord "
+                f"{constitution.get('ascendant_lord') or 'is unavailable'} is placed in "
+                f"House {constitution.get('ascendant_lord_house') or 'an unavailable house'}."
+            )
+        if constitution.get("sun_house") or constitution.get("moon_house"):
+            constitutional_lines.append(
+                f"Sun is in House {constitution.get('sun_house') or '—'} and Moon is in "
+                f"House {constitution.get('moon_house') or '—'} in the D1 health foundation."
+            )
+        for row in _list(constitution.get("core_houses")):
+            if not isinstance(row, dict):
+                continue
+            residents = ", ".join(str(item) for item in _list(row.get("residents"))) or "no occupants"
+            aspects = ", ".join(str(item) for item in _list(row.get("aspecting_planets"))) or "no calculated aspects"
+            constitutional_lines.append(
+                f"House {row.get('house')} ({row.get('role') or 'health role'}) is ruled by "
+                f"{row.get('lord') or '—'} from House {row.get('lord_house') or '—'}; "
+                f"occupants: {residents}; aspects: {aspects}."
+            )
+
+        vulnerability_groups: List[Dict[str, Any]] = []
+        for item in _list(medical_profile.get("major_vulnerabilities")):
+            if not isinstance(item, dict) or not item.get("zone"):
+                continue
+            lines = []
+            mechanisms = [str(value) for value in _list(item.get("mechanisms")) if value]
+            if mechanisms:
+                lines.append(f"Likely expression pattern: {', '.join(mechanisms)}.")
+            lines.extend(str(value) for value in _list(item.get("why")) if value)
+            repetitions = [str(value) for value in _list(item.get("divisional_repetition")) if value]
+            if repetitions:
+                lines.append("Divisional repetition: " + "; ".join(repetitions) + ".")
+            lines.append(
+                f"Confidence: {str(item.get('confidence') or 'directional').replace('_', ' ')}; "
+                f"supported by {item.get('confluence_count') or 0} independent natal layers."
+            )
+            vulnerability_groups.append({"title": str(item.get("zone")).title(), "lines": lines})
+
+        condition_lines: List[str] = []
+        for row in _list(medical_profile.get("planet_conditions")):
+            if not isinstance(row, dict) or not row.get("planet"):
+                continue
+            details = [
+                str(row.get("dignity") or "").replace("_", " "),
+                str(row.get("functional_nature") or "").replace("_", " "),
+                f"Shadbala {row.get('shadbala_grade')}" if row.get("shadbala_grade") else None,
+                "combust" if row.get("combustion") == "combust" else None,
+                "retrograde" if row.get("retrograde") else None,
+            ]
+            details = [value for value in details if value]
+            if details:
+                condition_lines.append(f"{row.get('planet')}: {', '.join(details)}.")
+
+        requested_judgment = _dict(_dict(medical_profile.get("judgments")).get(health_category))
+        judgment_lines = []
+        if requested_judgment:
+            judgment_lines.append(
+                f"The calculated {health_category.replace('_', ' ')} judgment is "
+                f"{'supported' if requested_judgment.get('supported') or requested_judgment.get('active') else 'not established'}; "
+                "this is an astrological susceptibility judgment, not a medical diagnosis."
+            )
+        judgment_lines.extend(str(item) for item in _list(medical_profile.get("protective_factors")) if item)
+        return {
+            "schema_version": "instant-user-derivation/v2",
+            "medical_reading": {
+                "category": health_category,
+                "constitutional_lines": constitutional_lines,
+                "vulnerability_groups": vulnerability_groups,
+                "condition_lines": condition_lines,
+                "judgment_lines": judgment_lines,
+                "divisions_checked": sorted(_dict(medical_profile.get("divisional_health_charts")).keys()),
+                "safety": "This describes astrological susceptibility and timing, not a diagnosis or certainty.",
+            },
+            "conclusion": {
+                "direction": verdict.get("direction"),
+                "confidence": verdict.get("confidence"),
+            },
+            "limitations": _list(verdict.get("missing_required_capabilities")),
+            "complete": bool(constitutional_lines and vulnerability_groups),
+        }
     chart_facts = _dict(normalized.get("chart_facts"))
     if answer_mode == "factual_chart_lookup" and chart_facts:
         charts = _dict(chart_facts.get("charts"))
