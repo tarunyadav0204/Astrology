@@ -155,6 +155,7 @@ def apply_normal_answer_remedy_guards(
     question: str = "",
     language: str = "",
     remedy_followup_active: bool = False,
+    suppress_remedy_cta: bool = False,
 ) -> tuple[str, Optional[Dict[str, Any]], List[Any]]:
     """
     For normal answers: strip leaked inline remedy plans and keep/ensure the Remedies CTA card.
@@ -169,6 +170,10 @@ def apply_normal_answer_remedy_guards(
             answer_mode="remedy_action",
         )
     cleaned = strip_inline_remedy_sections_from_content(content)
+    if suppress_remedy_cta:
+        action_type = str((next_action or {}).get("type") or "").strip().lower()
+        action = next_action if action_type not in {"", "none", "remedy"} else None
+        return cleaned, action, list(follow_up_questions or [])
     action = ensure_remedy_cta_next_action(
         next_action,
         answer_mode=answer_mode,

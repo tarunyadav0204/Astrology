@@ -248,6 +248,25 @@ def test_strip_inline_remedy_sections_keeps_cta_eligible():
     assert action["type"] == "remedy"
 
 
+def test_constitutional_health_can_suppress_current_pressure_remedy_card():
+    from utils.query_context import apply_normal_answer_remedy_guards
+
+    cleaned, action, followups = apply_normal_answer_remedy_guards(
+        content="Your constitutional vulnerabilities are the jaw and upper back.",
+        next_action={"type": "none"},
+        follow_up_questions=["Have you noticed recurring tension?"],
+        answer_mode="topic_reading",
+        category="health",
+        question="What are my health vulnerabilities?",
+        remedy_followup_active=False,
+        suppress_remedy_cta=True,
+    )
+
+    assert cleaned.startswith("Your constitutional vulnerabilities")
+    assert action is None
+    assert followups == ["Have you noticed recurring tension?"]
+
+
 def test_strip_remedy_followup_prompts_from_content():
     from utils.query_context import apply_remedy_mode_delivery_guards, strip_remedy_followup_prompts_from_content
 

@@ -123,6 +123,52 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
     health_rules = None
     health_category = str(query_plan.get("category") or "").lower()
     if health_category in {"health", "mental_wellbeing", "surgery", "accident", "recovery"}:
+        semantic_time = time_scope.get("semantic") if isinstance(time_scope.get("semantic"), dict) else {}
+        semantic_kind = str(semantic_time.get("kind") or "none").strip().lower()
+        requested_time = time_scope.get("requested")
+        requested_time_text = (
+            str(requested_time or "").strip().lower()
+            if not isinstance(requested_time, (dict, list, tuple, set))
+            else ""
+        )
+        generic_router_scopes = {
+            "", "none",
+            # Timeless birth-chart/constitution aliases emitted by different
+            # versions of the semantic router. These describe the evidence
+            # frame, not a requested forecast period.
+            "birth", "birth_chart", "natal", "natal_chart", "constitutional",
+            "constitution", "lifetime",
+            # Generic router defaults. These also do not prove that the user
+            # explicitly requested timing unless semantic kind/mode agrees.
+            "current", "present", "now", "current_or_next", "as_of",
+        }
+        answer_mode = str(query_plan.get("answer_mode") or "topic_reading").strip().lower()
+        timing_answer_modes = {
+            "event_timing", "lifetime_event_timing", "month_timing",
+            "timing_window", "daily_forecast",
+        }
+        # `query_context.time_scope` may be populated with the router's generic
+        # default "current" even when the user asked a timeless constitutional
+        # question.  It is not an explicit timing request unless the semantic
+        # timeframe or selected answer mode independently confirms timing.
+        explicit_requested_time = bool(
+            requested_time
+            and (
+                isinstance(requested_time, (dict, list, tuple, set))
+                or requested_time_text not in generic_router_scopes
+            )
+        )
+        explicit_health_time_scope = bool(
+            explicit_requested_time
+            or exact_day
+            or semantic_kind not in {"", "none", "current"}
+            # `event_prediction` is intentionally not enough on its own. The
+            # router can select it for questions such as "Do I have a risk of
+            # diabetes?", which ask about constitutional susceptibility rather
+            # than a calendar forecast. Timing needs an explicit user timeframe
+            # (or a genuinely timing-specific mode).
+            or answer_mode in timing_answer_modes
+        )
         health_record = next(
             (item for item in ledger.get("records", []) if item.get("kind") == "health_body_area"),
             None,
@@ -141,6 +187,40 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
             for item in (major_vulnerabilities or [])[:3]
             if isinstance(item, dict) and str(item.get("zone") or "").strip()
         ]
+        allowed_zone_evidence = []
+        for item in (major_vulnerabilities or [])[:3]:
+            if not isinstance(item, dict):
+                continue
+            zone = str(item.get("zone") or "").strip()
+            if not zone or zone not in allowed_zones:
+                continue
+            allowed_zone_evidence.append({
+                "zone": zone,
+                "anatomical_members": list(item.get("anatomical_members") or [])[:6],
+                "confidence": item.get("confidence"),
+                "confluence_count": item.get("confluence_count"),
+                "primary_medical_factors": list(item.get("primary_medical_factors") or [])[:3],
+                "confirmation_factors": list(item.get("confirmation_factors") or [])[:3],
+                "natal_layers": list(item.get("natal_layers") or [])[:6],
+                "sources": list(item.get("sources") or [])[:5],
+                "why": list(item.get("why") or [])[:4],
+                "mechanisms": list(item.get("mechanisms") or [])[:3],
+                "divisional_repetition": list(item.get("divisional_repetition") or [])[:5],
+                "activation_sources": list(item.get("activation_sources") or [])[:3],
+            })
+        allowed_mechanisms = sorted({
+            str(mechanism).strip()
+            for item in allowed_zone_evidence
+            for mechanism in (item.get("mechanisms") or [])
+            if str(mechanism).strip()
+        })
+        condition_susceptibilities = list(medical_profile.get("condition_susceptibilities") or [])
+        protective_factors = list(medical_profile.get("protective_factors") or [])
+        requested_horizon = {
+            "start": time_scope.get("as_of"),
+            "end": time_scope.get("horizon_end"),
+            "requested": requested_time,
+        }
         if health_record and allowed_zones:
             claims.append({
                 "claim_id": "claim-health-body-area",
@@ -150,15 +230,21 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
             })
         health_rules = {
             "health_question_type": health_category,
+            "is_time_bound_question": explicit_health_time_scope,
             "allowed_zone_names": allowed_zones,
+            "allowed_zone_evidence": allowed_zone_evidence,
+            "allowed_mechanisms": allowed_mechanisms,
             "major_vulnerabilities": major_vulnerabilities or [],
             "broader_directional_zones": priority_zones or [],
             "calculated_medical_profile": medical_profile,
+            "condition_susceptibilities": condition_susceptibilities,
+            "protective_factors": protective_factors,
+            "requested_horizon": requested_horizon,
             "medical_framing": "Astrological susceptibility only; never a diagnosis or prediction of illness.",
             "answer_order": [
-                "direct practical answer to the user's exact health subtype",
-                "constitutional susceptibility only if calculated",
-                "whether it is currently activated, kept separate from natal susceptibility",
+                "plain-language ranked constitutional vulnerabilities (maximum three)",
+                "one concrete natal reason for each named vulnerability",
+                "current activation only when the question is time-bound and an explicit activation record supports it",
                 "protective or recovery factors",
                 "safe practical guidance and one natural follow-up question",
             ],
@@ -166,14 +252,28 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                 "You may name the strongest allowed zone as a major constitutional vulnerability only when it "
                 "appears in allowed_zone_names. Explain the independent chart factors supplied for it and say "
                 "'the chart suggests susceptibility' or 'an area needing preventive attention'. If the list is "
-                "empty, do not invent or name a body part."
+                "empty, do not invent or name a body part. Treat anatomical_members as one regional finding: "
+                "never split face/lips/chin or heart/spine/upper-back into separate independent vulnerabilities."
             ),
             "category_safety": {
-                "mental_wellbeing": "Describe stress or emotional sensitivity only; never infer a psychiatric diagnosis.",
+                "mental_wellbeing": (
+                    "You may describe an elevated calculated vulnerability to mental/emotional regulation when it appears "
+                    "in condition_susceptibilities. Name possible expressions such as rumination, detachment, sleep disruption "
+                    "or emotional strain, but never declare a psychiatric disorder. Preserve the exact relationship stated in "
+                    "the supplied evidence: an aspect is not a conjunction, and neither may be called a nodal-axis placement. "
+                    "Never say the Moon is with Ketu, conjunct Ketu, or on the Rahu-Ketu axis unless the supplied evidence says "
+                    "that exact relationship. Recommend professional assessment when persistent symptoms or impaired "
+                    "functioning are present."
+                ),
+                "health": (
+                    "Separate constitutional vulnerability, timed activation, and practical prevention. Do not hide a "
+                    "calculated elevated BP, metabolic/blood-sugar, or mental-wellbeing susceptibility, but state it only "
+                    "as preventive attention—not a diagnosis—using the supplied confluence and protective factors. Suggest "
+                    "ordinary clinical screening only when supplied responsible_guidance explicitly supports it."
+                ),
                 "surgery": "Never state that surgery is required or certain. Separate surgical susceptibility from timing suitability.",
                 "accident": "Never predict that an accident will happen. Describe calculated injury susceptibility and cautious periods only.",
                 "recovery": "Never promise recovery or a medical outcome; describe supportive or pressured recovery symbolism only.",
-                "health": "Separate constitutional vulnerability, current activation, and practical prevention guidance.",
             }.get(health_category),
             "evidence_hierarchy": (
                 "Use the requested-category judgment and D1 constitution first. D3/D6/D8/D30 only confirm "
@@ -181,6 +281,32 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                 "severity or protection. Dasha/transit only activate an established natal theme and must never "
                 "create a body-part claim. Mention the concrete mechanism (acute/inflammatory, chronic/structural, "
                 "nervous/functional, fluid/hormonal, or other supplied mechanism) in plain language."
+            ),
+            "claim_allow_list": (
+                "Every named body area must come from allowed_zone_names. Every expression pattern such as "
+                "acute/inflammatory, chronic/structural, nervous/functional, or fluid/hormonal must come from "
+                "allowed_mechanisms and must be attached to the specific zone whose allowed_zone_evidence "
+                "contains it. Do not generalize one zone's mechanism to the whole body. Do not introduce a "
+                "new body system, symptom, condition, severity, or acute-versus-degenerative comparison."
+            ),
+            "constitutional_question_rule": (
+                "This question asks for standing health vulnerabilities, not current timing. Keep the answer "
+                "anchored to natal constitution. Do not narrate the current dasha or claim Houses 6/8 are "
+                "currently activated unless the user explicitly asks about now/today/this period and the "
+                "adjudicated evidence contains that exact activation."
+                if not explicit_health_time_scope
+                else "The question includes a time scope; current activation still requires an explicit adjudicated activation record."
+            ),
+            "forbidden_topics": (
+                [
+                    "current period",
+                    "current dasha or MD/AD/PD",
+                    "current transit",
+                    "currently active houses",
+                    "timing windows or calendar forecasts",
+                ]
+                if not explicit_health_time_scope
+                else []
             ),
             "timing_framing": (
                 "No ranked health-risk window exists inside the requested horizon. Do not call the requested "
@@ -192,6 +318,46 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
             "dasha_framing": (
                 "Do not name an MD/AD/PD chain unless every named level is explicitly visible in current_dasha "
                 "evidence. Never infer a current sub-period from a future timing window."
+            ),
+            "period_forecast_rule": (
+                {
+                    "hard_horizon": requested_horizon,
+                    "required_sequence": [
+                        "overall outlook for exactly the requested period",
+                        "standing natal vulnerabilities supported by allowed_zone_evidence",
+                        "chronological comparison of every materially distinct phase inside the horizon",
+                        "for each sensitive phase: natal vulnerability plus explicit dasha activation plus transit confirmation",
+                        "protective factors and restrained preventive guidance",
+                        "one natural follow-up question",
+                    ],
+                    "activation_gate": (
+                        "A natal vulnerability is not a forecast. Call a phase heightened only when the same health theme "
+                        "has explicit dasha activation and transit confirmation in that dated phase. With dasha support but "
+                        "no transit confirmation, call it background vigilance. With neither, do not forecast manifestation."
+                    ),
+                    "phase_labels": [
+                        "background vigilance",
+                        "heightened susceptibility",
+                        "supportive/protective phase",
+                    ],
+                    "gandanta_rule": (
+                        "Gandanta is a natal sensitivity modifier only. It cannot by itself create a health forecast, date a "
+                        "phase, or prove that a vulnerability will manifest."
+                    ),
+                    "medical_advice_rule": (
+                        "Do not recommend, reject, delay, or prefer any treatment. Never advise avoiding experimental, "
+                        "conventional, or other treatment from astrology. Do not invent sleep, digestion, diet, posture, "
+                        "fitness, or another body-system recommendation unless that exact concern is present in calculated "
+                        "medical evidence or supplied responsible_guidance. General advice may be limited to routine care, "
+                        "appropriate screening, observing persistent symptoms, and consulting a qualified professional."
+                    ),
+                    "scope_rule": (
+                        "Do not mention any date after hard_horizon.end. Do not extend 'this year' into the next year. "
+                        "Do not collapse the period into one broad window when multiple calculated phases are supplied."
+                    ),
+                }
+                if explicit_health_time_scope
+                else None
             ),
         }
     answer_mode = str(query_plan.get("answer_mode") or "topic_reading")

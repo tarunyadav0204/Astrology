@@ -4684,6 +4684,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 question=combined_question,
                 language=language,
                 remedy_followup_active=remedy_active,
+                suppress_remedy_cta=bool(result.get("suppress_remedy_cta")),
             )
             result["response"] = cleaned_response
             result["next_action"] = cleaned_action

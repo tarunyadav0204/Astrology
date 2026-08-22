@@ -100,7 +100,14 @@ def build_query_plan(
         or resolved_period.get("target_date")
         or as_of_day
     ) if exact_day else None
-    horizon_end = _add_months(as_of_day, duration_months)
+    # Prefer the semantic router's resolved calendar boundary.  A request such
+    # as "this year" means the remainder of that calendar year, not a rolling
+    # twelve months from today.
+    resolved_horizon_end = _date_text(
+        resolved_period.get("end")
+        or resolved_period.get("horizon_end")
+    ) if resolved_period else None
+    horizon_end = resolved_horizon_end or _add_months(as_of_day, duration_months)
     if str(answer_mode or "") == "event_prediction" and (
         semantic_value not in (None, "") or semantic_duration not in (None, "")
     ):

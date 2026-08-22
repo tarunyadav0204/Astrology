@@ -1,10 +1,13 @@
 from datetime import datetime
 
+import pytest
+
 from instant_chat_v2.orchestrator import build_instant_v2_packet, finalize_instant_v2_packet
 from instant_chat_v2.planner import build_query_plan
 from instant_chat_v2.answer_spec import build_answer_spec
 from instant_chat_v2.user_derivation import build_user_derivation
 from chat.instant_chat_pipeline import (
+    _build_period_topic_forecast,
     _build_instant_composer_context,
     _build_instant_composer_prompt_v3,
     _build_event_timing_verdict,
@@ -549,6 +552,35 @@ def test_planner_preserves_llm_resolved_user_goal():
     assert plan["user_goal"] == "understand whether career improves this year"
 
 
+def test_planner_uses_resolved_calendar_end_for_this_year():
+    intent = _intent("health")
+    intent["period_window"] = {
+        "kind": "year",
+        "start": "2026-01-01",
+        "end": "2026-12-31",
+    }
+    intent.setdefault("evidence_plan", {})["question_parts"] = [{
+        "timeframe": {
+            "kind": "relative_range",
+            "value": "this year",
+            "duration_months": 12,
+        },
+    }]
+    intent["extracted_context"] = {"timeframe": "this year"}
+
+    plan = build_query_plan(
+        question="How will be my health this year?",
+        intent=intent,
+        answer_mode="timing_window",
+        target_subject={"key": "self"},
+        language="english",
+        as_of="2026-08-22",
+    )
+
+    assert plan["time_scope"]["as_of"] == "2026-08-22"
+    assert plan["time_scope"]["horizon_end"] == "2026-12-31"
+
+
 def test_marriage_packet_exposes_plan_evidence_and_claim_bindings():
     packet = build_instant_v2_packet(
         question="When will I get married?",
@@ -925,6 +957,9 @@ def test_health_answer_spec_only_allows_confluent_major_vulnerabilities():
                 "zone": "knees",
                 "confidence": "high",
                 "confluence_count": 3,
+                "sources": ["H10 Capricorn", "Saturn in H6"],
+                "why": ["H10 lord Saturn sits in dusthana H6"],
+                "mechanisms": ["chronic / degenerative"],
             }],
             "priority_zones": [
                 {"zone": "heart", "confidence": "directional"},
@@ -937,8 +972,339 @@ def test_health_answer_spec_only_allows_confluent_major_vulnerabilities():
 
     assert spec["health_rules"]["allowed_zone_names"] == ["knees"]
     assert spec["health_rules"]["health_question_type"] == "surgery"
+    assert spec["health_rules"]["allowed_mechanisms"] == ["chronic / degenerative"]
+    assert spec["health_rules"]["allowed_zone_evidence"][0]["sources"] == [
+        "H10 Capricorn", "Saturn in H6"
+    ]
     assert "Never state that surgery is required" in spec["health_rules"]["category_safety"]
     assert "heart" not in spec["health_rules"]["allowed_zone_names"]
+
+
+def test_broad_health_vulnerability_question_forbids_current_period_narration():
+    query_plan = {
+        "category": "health",
+        "answer_mode": "topic_reading",
+        "time_scope": {
+            "requested": None,
+            "semantic": {"kind": "none"},
+            "relation": "current_or_next",
+            "as_of": "2026-08-21",
+            "is_exact_day": False,
+        },
+    }
+    verdict = {"ranked_windows": []}
+    ledger = {"records": [{
+        "evidence_id": "ev-health",
+        "kind": "health_body_area",
+        "value": {
+            "major_vulnerabilities": [{
+                "zone": "spine",
+                "confidence": "high",
+                "sources": ["Sun in H2", "H5 Leo"],
+                "mechanisms": ["chronic / degenerative"],
+                "activation_sources": ["Current mahadasha: Saturn"],
+            }],
+            "priority_zones": [],
+        },
+    }]}
+
+    spec = build_answer_spec(query_plan, verdict, ledger)
+
+    rule = spec["health_rules"]["constitutional_question_rule"]
+    assert "standing health vulnerabilities" in rule
+    assert "Do not narrate the current dasha" in rule
+
+
+@pytest.mark.parametrize(
+    "router_scope",
+    [
+        "current", "birth", "birth_chart", "natal", "natal_chart",
+        "constitutional", "constitution", "lifetime",
+    ],
+)
+def test_router_default_scope_does_not_turn_health_vulnerability_into_timing(router_scope):
+    query_plan = {
+        "category": "health",
+        "answer_mode": "topic_reading",
+        "time_scope": {
+            "requested": router_scope,
+            "semantic": {"kind": "none"},
+            "relation": "current_or_next",
+            "as_of": "2026-08-21",
+            "is_exact_day": False,
+        },
+    }
+    ledger = {"records": [{
+        "evidence_id": "ev-health",
+        "kind": "health_body_area",
+        "value": {
+            "major_vulnerabilities": [{
+                "zone": "heart and upper spine/back",
+                "confidence": "medium",
+                "sources": ["Sixth lord in Leo"],
+                "activation_sources": ["Current Saturn-Rahu period"],
+            }],
+        },
+    }]}
+
+    spec = build_answer_spec(query_plan, {"ranked_windows": []}, ledger)
+
+    assert spec["health_rules"]["is_time_bound_question"] is False
+    assert "current dasha or MD/AD/PD" in spec["health_rules"]["forbidden_topics"]
+
+
+def test_explicit_health_timing_mode_still_allows_supported_current_activation():
+    query_plan = {
+        "category": "health",
+        "answer_mode": "event_prediction",
+        "time_scope": {
+            "requested": "right now",
+            "semantic": {"kind": "relative_range", "value": "right now"},
+            "relation": "current_or_next",
+            "as_of": "2026-08-21",
+            "is_exact_day": False,
+        },
+    }
+    ledger = {"records": [{
+        "evidence_id": "ev-health",
+        "kind": "health_body_area",
+        "value": {"major_vulnerabilities": [{"zone": "spine", "confidence": "medium"}]},
+    }]}
+
+    spec = build_answer_spec(query_plan, {"ranked_windows": []}, ledger)
+
+    assert spec["health_rules"]["is_time_bound_question"] is True
+    assert spec["health_rules"]["forbidden_topics"] == []
+
+
+def test_health_risk_question_is_not_timed_by_generic_event_prediction_mode():
+    query_plan = {
+        "category": "health",
+        "answer_mode": "event_prediction",
+        "time_scope": {
+            "requested": "current",
+            "semantic": {"kind": "current"},
+            "relation": "current_or_next",
+            "as_of": "2026-08-22",
+            "horizon_end": "2028-12-31",
+            "is_exact_day": False,
+        },
+    }
+    ledger = {"records": [{
+        "evidence_id": "ev-health",
+        "kind": "health_body_area",
+        "value": {"major_vulnerabilities": [{"zone": "cardiovascular regulation"}]},
+    }]}
+
+    spec = build_answer_spec(query_plan, {"ranked_windows": [{
+        "start": "2026-01-01", "end": "2026-04-06",
+    }]}, ledger)
+
+    assert spec["health_rules"]["is_time_bound_question"] is False
+    assert "timing windows or calendar forecasts" in spec["health_rules"]["forbidden_topics"]
+
+
+def test_composer_removes_ranked_and_transit_windows_before_as_of_date():
+    brief = _build_instant_composer_context(
+        {
+            "intent_summary": {"category": "career", "answer_mode": "timing_window"},
+            "normalized_evidence": {
+                "transit_activation_timeline": {"peak_windows": [
+                    {"start": "2026-01-01", "end": "2026-04-06", "planet": "Rahu"},
+                    {"start": "2026-09-01", "end": "2026-10-01", "planet": "Mercury"},
+                ]},
+            },
+        },
+        {
+            "query_plan": {
+                "category": "career",
+                "answer_mode": "timing_window",
+                "time_scope": {"as_of": "2026-08-22", "horizon_end": "2026-12-31"},
+            },
+            "verdict": {"ranked_windows": [
+                {"start": "2026-01-01", "end": "2026-04-06", "label": "past"},
+                {"start": "2026-09-01", "end": "2026-10-01", "label": "future"},
+            ]},
+            "answer_spec": {},
+        },
+    )
+
+    assert [row["label"] for row in brief["verdict"]["ranked_windows"]] == ["future"]
+    assert [
+        row["planet"] for row in brief["evidence"]["transit_activation_timeline"]["peak_windows"]
+    ] == ["Mercury"]
+
+
+def test_yearly_health_contract_requires_activation_chain_and_strict_horizon():
+    query_plan = {
+        "category": "health",
+        "answer_mode": "timing_window",
+        "time_scope": {
+            "requested": "this year",
+            "semantic": {"kind": "relative_range", "value": "this year"},
+            "relation": "current_to_future",
+            "as_of": "2026-08-22",
+            "horizon_end": "2026-12-31",
+            "is_exact_day": False,
+        },
+    }
+    ledger = {"records": [{
+        "evidence_id": "ev-health",
+        "kind": "health_body_area",
+        "value": {
+            "major_vulnerabilities": [{
+                "zone": "heart and upper spine/back",
+                "confidence": "medium",
+                "why": ["Sixth lord occupies Leo"],
+                "mechanisms": ["chronic / structural"],
+            }],
+            "medical_profile": {
+                "protective_factors": ["Jupiter supports the disease axis"],
+                "condition_susceptibilities": [],
+            },
+        },
+    }]}
+
+    spec = build_answer_spec(query_plan, {"ranked_windows": []}, ledger)
+    health = spec["health_rules"]
+    forecast = health["period_forecast_rule"]
+
+    assert health["is_time_bound_question"] is True
+    assert forecast["hard_horizon"]["end"] == "2026-12-31"
+    assert "explicit dasha activation and transit confirmation" in forecast["activation_gate"]
+    assert "Gandanta is a natal sensitivity modifier only" in forecast["gandanta_rule"]
+    assert "Do not recommend, reject, delay, or prefer any treatment" in forecast["medical_advice_rule"]
+    assert "Do not extend 'this year' into the next year" in forecast["scope_rule"]
+    assert health["protective_factors"] == ["Jupiter supports the disease axis"]
+
+
+def test_yearly_health_forecast_joins_dates_to_calculated_vulnerabilities():
+    normalized = {
+        "window_rules": {"year_like": True},
+        "current_timing": {"period_window": {"start": "2026-08-22", "end": "2026-12-31"}},
+        "window_dasha_segments": {"segments": [{
+            "start": "2026-09-19",
+            "end": "2026-12-31",
+            "mahadasha": "Saturn",
+            "antardasha": "Rahu",
+            "pratyantardasha": "Mercury",
+            "relevance_score": 17,
+            "natal_promise_status": "supported_by_active_dasha_carriers",
+            "activated_focus_houses": [6, 8],
+            "peak_activation_windows": [{
+                "start": "2026-10-13", "end": "2026-11-02",
+                "trigger_score": 8, "why": "Mercury reinforces the natal health axis",
+            }],
+        }]},
+    }
+    health_rules = {
+        "allowed_zone_evidence": [{
+            "zone": "heart and upper spine/back",
+            "confidence": "medium",
+            "mechanisms": ["chronic / structural"],
+            "why": ["Sixth lord occupies Leo"],
+        }],
+        "condition_susceptibilities": [{
+            "title": "vascular-pressure susceptibility",
+            "risk_level": "directional",
+            "interpretation": "monitor pressure-related sensitivity",
+        }],
+        "protective_factors": ["Jupiter supports House 6"],
+    }
+
+    forecast = _build_period_topic_forecast(
+        normalized,
+        "health",
+        {"as_of": "2026-08-22", "horizon_end": "2026-12-31"},
+        health_rules=health_rules,
+    )
+
+    phase = forecast["chronological_phases"][0]
+    health = phase["health_forecast"]
+    assert health["health_level"] == "strongest_watch_period"
+    assert health["activated_health_houses"] == [6, 8]
+    assert health["transit_confirmed"] is True
+    assert health["possible_body_regions"][0]["zone"] == "heart and upper spine/back"
+    assert health["possible_condition_patterns"][0]["title"] == "vascular-pressure susceptibility"
+    assert "general wellness advice" in forecast["health_narration_contract"]
+
+
+def test_broad_health_composer_receives_only_ranked_zone_contract():
+    health_rules = {
+        "health_question_type": "health",
+        "is_time_bound_question": False,
+        "allowed_zone_names": ["face", "spine", "mouth"],
+        "allowed_zone_evidence": [
+            {
+                "zone": "face",
+                "confidence": "high",
+                "why": ["Malefics in House 2"],
+                "mechanisms": ["chronic / degenerative"],
+                "activation_sources": ["Current Saturn period"],
+            },
+            {
+                "zone": "spine",
+                "confidence": "high",
+                "why": ["House 5 lord under pressure"],
+                "mechanisms": ["structural"],
+                "activation_sources": ["Current Rahu transit"],
+            },
+            {
+                "zone": "mouth",
+                "confidence": "high",
+                "why": ["Sixth lord shares House 2 with Mars"],
+                "mechanisms": ["acute / inflammatory"],
+            },
+        ],
+        "constitutional_question_rule": "Standing natal susceptibility only.",
+        "forbidden_topics": ["current dasha", "current transit"],
+    }
+    brief = _build_instant_composer_context(
+        {
+            "intent_summary": {"category": "health", "answer_mode": "topic_reading"},
+            "normalized_evidence": {
+                "current_timing": {"mahadasha": "Saturn"},
+                "active_areas": [6, 8],
+                "transit_activation_timeline": {"peak_windows": [{"planet": "Rahu"}]},
+                "health_body_area": {"current_dasha": "Saturn-Rahu-Saturn"},
+                "natal_promise": {"status": "supported"},
+            },
+            "birth_summary": {"name": "Test"},
+            "recent_history": [
+                {"question": "What period am I in?", "answer": "Saturn-Rahu-Saturn."}
+            ],
+        },
+        {
+            "query_plan": {
+                "category": "health",
+                "answer_mode": "topic_reading",
+                "user_goal": "Understand health vulnerabilities",
+                "time_scope": {"is_exact_day": False},
+            },
+            "verdict": {"direction": "constitutional susceptibility"},
+            "answer_spec": {"health_rules": health_rules},
+        },
+    )
+
+    assert set(brief["evidence"]) == {"health_rules"}
+    compact_rules = brief["evidence"]["health_rules"]
+    assert [row["zone"] for row in compact_rules["allowed_zone_evidence"]] == [
+        "face", "spine", "mouth"
+    ]
+    assert all("activation_sources" not in row for row in compact_rules["allowed_zone_evidence"])
+    assert brief["answer_blueprint"]["slots"][0]["slot"].startswith("ranked susceptibility")
+    assert brief["verdict"]["scope"] == "natal constitution only; no current timing"
+    assert "rationale" not in brief["verdict"]
+    assert not brief.get("recent_history")
+    assert compact_rules["forbidden_topics"] == ["current dasha", "current transit"]
+    prompt = _build_instant_composer_prompt_v3(
+        "What are my health vulnerabilities?", brief, "english"
+    )
+    assert "Do not mention a current period" in prompt
+    assert "NATAL-ONLY HEALTH EVIDENCE" in prompt
+    assert "Saturn-Rahu-Saturn" not in prompt
+    assert '"verdict"' not in prompt
+    assert '"recent_history"' not in prompt
 
 
 def test_timing_confidence_requires_named_calculator_families():

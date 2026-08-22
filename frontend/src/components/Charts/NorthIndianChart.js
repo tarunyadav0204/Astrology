@@ -28,11 +28,14 @@ export const getTopTrianglePlanetPosition = (houseNumber, planetIndex, totalPlan
   if (![2, 12].includes(houseNumber) || totalPlanets < 1) return null;
 
   const rowCounts = getTopTriangleRowCounts(totalPlanets);
+  // Reserve the lower tip of the triangle for its sign number. Even the
+  // three-row layout therefore finishes high enough that degree/nakshatra
+  // detail cannot collide with that number.
   const rowY = rowCounts.length === 1
-    ? [34]
+    ? [28]
     : rowCounts.length === 2
-      ? [23, 57]
-      : [17, 43, 68];
+      ? [18, 48]
+      : [12, 34, 56];
 
   let rowIndex = 0;
   let indexInRow = planetIndex;
@@ -57,6 +60,52 @@ export const getTopTrianglePlanetPosition = (houseNumber, planetIndex, totalPlan
   };
 };
 
+// The four narrow side houses need a bounded vertical lane.  This must be
+// used for every dense count, because the rendered collection can also
+// include Gulika, Mandi or Indu Lagna in addition to the visible planets.
+// Falling through to the generic 5+ layout lets the final item cross the
+// diagonal into the neighbouring house.
+export const getSideTrianglePlanetPosition = (houseNumber, planetIndex, totalPlanets) => {
+  if (![3, 5, 9, 11].includes(houseNumber) || totalPlanets < 2) return null;
+
+  const isLeft = houseNumber === 3 || houseNumber === 5;
+  const isLower = houseNumber === 5 || houseNumber === 9;
+  // Keep the complete label group (symbol plus its two detail lines) clear of
+  // both diagonals.  The previous x=35/y=48 anchor put the symbol itself on
+  // the upper diagonal even though its centre was technically inside.
+  const startY = isLower ? 260 : 60;
+  const endY = isLower ? 340 : 145;
+  const spacing = totalPlanets > 1 ? (endY - startY) / (totalPlanets - 1) : 0;
+
+  return {
+    x: isLeft ? 25 : 375,
+    y: startY + (planetIndex * spacing),
+  };
+};
+
+// Keep sign numbers in the open part of each North Indian chart compartment.
+// The previous offsets put the narrow triangular houses almost directly on a
+// diagonal (and, for houses 11/12, could place the number outside the house).
+// Absolute SVG coordinates make the spacing stable at every rendered size.
+const RASHI_NUMBER_POSITIONS = {
+  1: { x: 200, y: 165 },
+  2: { x: 100, y: 88 },
+  3: { x: 75, y: 110 },
+  4: { x: 150, y: 205 },
+  5: { x: 75, y: 290 },
+  6: { x: 100, y: 318 },
+  7: { x: 200, y: 250 },
+  8: { x: 300, y: 318 },
+  9: { x: 325, y: 290 },
+  10: { x: 250, y: 205 },
+  11: { x: 325, y: 110 },
+  12: { x: 300, y: 88 },
+};
+
+export const getRashiNumberPosition = (houseNumber) => (
+  RASHI_NUMBER_POSITIONS[houseNumber] || { x: 200, y: 200 }
+);
+
 /**
  * NORTH INDIAN CHART POSITIONING REFERENCE
  * ========================================
@@ -78,19 +127,10 @@ export const getTopTrianglePlanetPosition = (houseNumber, planetIndex, totalPlan
  * House 11: (330, 110) - Right triangle
  * House 12: (290, 70) - Top-right triangle
  * 
- * RASHI POSITIONING (X, Y offsets from center):
- * House 1: (-5, -5) - moved up
- * House 2: (-5, +35) - bottom of inverted triangle
- * House 3: (+10, +5) - moved right
- * House 4: (+40, +5) - moved far right
- * House 5: (+10, +5) - moved right
- * House 6: (-5, -10) - moved up
- * House 7: (-5, -10) - moved up
- * House 8: (-5, -10) - moved up
- * House 9: (-20, +5) - moved left
- * House 10: (-40, +5) - moved far left
- * House 11: (-15, +5) - moved left
- * House 12: (-5, +35) - bottom of inverted triangle
+ * RASHI POSITIONING:
+ * Sign numbers use RASHI_NUMBER_POSITIONS above. Narrow edge houses keep the
+ * label centred between their two diagonals instead of deriving it from the
+ * looser house/planet centre.
  * 
  * PLANET POSITIONING RULES:
  * - Houses 2,12: Inverted triangles - planets above rashi
@@ -745,29 +785,14 @@ const NorthIndianChart = ({
             )}
             
             {/* Rashi number (Aries=1, Taurus=2, etc.) */}
-            <text x={houseNumber === 1 ? houseData.center.x - 5 :
-                     houseNumber === 2 ? houseData.center.x - 10 :
-                     houseNumber === 3 ? houseData.center.x + 10 :
-                     houseNumber === 4 ? houseData.center.x + 40 :
-                     houseNumber === 5 ? houseData.center.x + 10 :
-                     houseNumber === 6 ? houseData.center.x - 15 :
-                     houseNumber === 7 ? houseData.center.x - 5 :
-                     houseNumber === 8 ? houseData.center.x - 5 :
-                     houseNumber === 9 ? houseData.center.x - 20 :
-                     houseNumber === 10 ? houseData.center.x - 50 :
-                     houseNumber === 11 ? houseData.center.x - 25 :
-                     houseData.center.x - 5} 
-                  y={houseNumber === 1 ? houseData.center.y + 55 :
-                     houseNumber === 2 ? houseData.center.y + 25 :
-                     houseNumber === 6 ? houseData.center.y - 10 :
-                     houseNumber === 7 ? houseData.center.y - 40 :
-                     houseNumber === 8 ? houseData.center.y - 10 :
-                     houseNumber === 12 ? houseData.center.y + 20 : 
-                     houseNumber === 5 ? houseData.center.y + 10 : houseData.center.y + 5} 
+            <text x={getRashiNumberPosition(houseNumber).x}
+                  y={getRashiNumberPosition(houseNumber).y}
                   fontSize="15" 
                   fill={customAscendant === rashiIndex ? 'var(--color-brand)' : 'var(--color-chart-text-muted, var(--color-text-muted))'}
                   fontWeight={customAscendant === rashiIndex ? "900" : "bold"}
                   opacity="0.85"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
                   style={{ pointerEvents: 'none' }}>
               {rashiIndex + 1}
             </text>
@@ -802,10 +827,14 @@ const NorthIndianChart = ({
               const isVeryDenseHouse = totalPlanets >= 3;
               let planetX, planetY;
               const topTrianglePosition = getTopTrianglePlanetPosition(houseNumber, pIndex, totalPlanets);
+              const sideTrianglePosition = getSideTrianglePlanetPosition(houseNumber, pIndex, totalPlanets);
               
               if (topTrianglePosition) {
                 planetX = topTrianglePosition.x;
                 planetY = topTrianglePosition.y;
+              } else if (sideTrianglePosition) {
+                planetX = sideTrianglePosition.x;
+                planetY = sideTrianglePosition.y;
               } else if (totalPlanets === 1) {
                 if (houseNumber === 1) {
                   planetX = houseData.center.x;
@@ -830,23 +859,7 @@ const NorthIndianChart = ({
                   planetY = houseData.center.y - 10;
                 }
               } else if (totalPlanets <= 4) {
-                // Houses 3, 5, 9, 11: Vertical arrangement (single column)
-                if ([3, 5, 9, 11].includes(houseNumber)) {
-                  const rowSpacing = 40;
-                  if (houseNumber === 3) {
-                    planetX = houseData.center.x - 35;
-                    planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
-                  } else if (houseNumber === 5) {
-                    planetX = houseData.center.x - 25;
-                    planetY = houseData.center.y - 20 + (pIndex * rowSpacing);
-                  } else if (houseNumber === 9) {
-                    planetX = houseData.center.x + 45;
-                    planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
-                  } else if (houseNumber === 11) {
-                    planetX = houseData.center.x + 35;
-                    planetY = houseData.center.y - 45 + (pIndex * rowSpacing);
-                  }
-                } else {
+                if (![3, 5, 9, 11].includes(houseNumber)) {
                   // Other houses: 2-column arrangement
                   const row = Math.floor(pIndex / 2);
                   const col = pIndex % 2;

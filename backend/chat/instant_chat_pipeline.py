@@ -7762,6 +7762,7 @@ def _build_instant_context(
         # diagnosis or medical certainty.
         try:
             from reports.context.health_body_zones import build_priority_body_zones
+            from reports.context.shared_branch_context import build_nakshatra_context
 
             medical_calc_started = time.monotonic()
             health_divisions: Dict[str, Any] = {}
@@ -7796,8 +7797,38 @@ def _build_instant_context(
                     "result_tendency": strength.get("result_tendency"),
                 }
 
+            # The medical body-area foundation requires the 6th lord's exact
+            # nakshatra.  Reports already supplied this layer, but Instant Chat
+            # previously omitted it and therefore could not apply the same
+            # classical sixth-house chain.
+            sixth_lord = _lord_of_house(house_lordships, 6)
+            lords_nakshatra: Dict[str, Any] = {}
+            if sixth_lord:
+                try:
+                    nakshatra_context = build_nakshatra_context(chart_data)
+                    nak_positions = (
+                        nakshatra_context.get("positions")
+                        if isinstance(nakshatra_context, dict)
+                        else {}
+                    ) or {}
+                    nak_row = nak_positions.get(sixth_lord) or {}
+                    lords_nakshatra["sixth_lord"] = {
+                        "planet": sixth_lord,
+                        "nakshatra": {
+                            "planet": sixth_lord,
+                            "nakshatra": nak_row.get("nakshatra_name") or nak_row.get("nakshatra"),
+                            "lord": nak_row.get("nakshatra_lord"),
+                            "pada": nak_row.get("pada"),
+                            "deity": nak_row.get("nakshatra_deity"),
+                            "longitude": nak_row.get("longitude"),
+                        },
+                    }
+                except Exception:
+                    logger.exception("Instant medical nakshatra calculation failed")
+
             body_zone_evidence = build_priority_body_zones(
                 chart_data,
+                lords_nakshatra=lords_nakshatra,
                 current_dashas=current_dashas,
                 divisional_charts=health_divisions,
                 planet_conditions=health_conditions,
@@ -7810,17 +7841,31 @@ def _build_instant_context(
                     item for item in event_patterns
                     if category_marker in str(item.get("key") or "").lower()
                 ]
+            medical_profile = body_zone_evidence.get("medical_profile") or {}
+            profile_vulnerabilities = (
+                medical_profile.get("major_vulnerabilities")
+                if isinstance(medical_profile, dict)
+                else []
+            )
             normalized_evidence["health_body_area"] = {
                 # Only these zones have enough independent natal confluence to
                 # support a named body-system vulnerability in user-facing text.
-                "major_vulnerabilities": list(body_zone_evidence.get("major_vulnerabilities") or [])[:3],
+                # Prefer the normalized medical profile because it attaches the
+                # exact allowed mechanism and divisional confirmation to each
+                # zone.  The composer must not infer those links itself.
+                "major_vulnerabilities": list(
+                    profile_vulnerabilities
+                    or body_zone_evidence.get("major_vulnerabilities")
+                    or []
+                )[:3],
                 # Keep the broader ranking in evidence/debug output. It must not
                 # be promoted to a body-part claim by the answer model.
                 "priority_zones": list(body_zone_evidence.get("priority_zones") or [])[:5],
                 "event_patterns": event_patterns[:3],
+                "sixth_house_chain": body_zone_evidence.get("sixth_house_chain") or {},
                 "house_map": list(body_zone_evidence.get("house_map") or [])[:8],
                 "claim_policy": body_zone_evidence.get("claim_policy"),
-                "medical_profile": body_zone_evidence.get("medical_profile"),
+                "medical_profile": medical_profile,
                 "disclaimer": body_zone_evidence.get("disclaimer"),
             }
             logger.info(
@@ -8470,6 +8515,7 @@ def _build_period_topic_forecast(
     normalized: Dict[str, Any],
     category: str,
     time_scope: Optional[Dict[str, Any]] = None,
+    health_rules: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Create the compact, chronological forecast the composer must narrate.
 
@@ -8496,6 +8542,72 @@ def _build_period_topic_forecast(
         period["start"] = window_start
     if window_end:
         period["end"] = window_end
+
+    health_rules = health_rules if isinstance(health_rules, dict) else {}
+    is_health = _normalize_event_category(category) in {
+        "health", "mental_wellbeing", "surgery", "accident", "recovery",
+    }
+
+    def health_phase_detail(
+        houses: List[int],
+        peaks: List[Dict[str, Any]],
+        permission: str,
+    ) -> Dict[str, Any]:
+        """Join dated activation evidence to already-calculated natal risks.
+
+        The language model must not infer a disease from a dasha house.  This
+        adapter therefore exposes only body zones and condition
+        susceptibilities that the medical calculator has already permitted.
+        """
+        if not is_health or not health_rules:
+            return {}
+        active = {int(h) for h in houses if str(h).isdigit()}
+        health_active = sorted(active & {1, 6, 8, 12})
+        has_dasha_permission = permission == "supported_by_active_dasha_carriers"
+        has_transit_confirmation = bool(peaks)
+        if has_dasha_permission and has_transit_confirmation and health_active:
+            level = "strongest_watch_period"
+        elif has_dasha_permission and health_active:
+            level = "elevated_watch_period"
+        else:
+            level = "background_only"
+
+        zones = []
+        if level != "background_only":
+            for row in list(health_rules.get("allowed_zone_evidence") or [])[:3]:
+                if not isinstance(row, dict) or not row.get("zone"):
+                    continue
+                zones.append({
+                    "zone": row.get("zone"),
+                    "confidence": row.get("confidence"),
+                    "possible_expression": list(row.get("mechanisms") or [])[:3],
+                    "natal_basis": list(row.get("why") or row.get("sources") or [])[:2],
+                    "calculated_activation_basis": list(row.get("activation_sources") or [])[:3],
+                })
+        conditions = []
+        if level != "background_only":
+            for row in list(health_rules.get("condition_susceptibilities") or [])[:3]:
+                if not isinstance(row, dict) or not row.get("title"):
+                    continue
+                conditions.append({
+                    "title": row.get("title"),
+                    "risk_level": row.get("risk_level"),
+                    "interpretation": row.get("interpretation"),
+                })
+        return {
+            "health_level": level,
+            "activated_health_houses": health_active,
+            "dasha_permission": has_dasha_permission,
+            "transit_confirmed": has_transit_confirmation,
+            "possible_body_regions": zones,
+            "possible_condition_patterns": conditions,
+            "protective_factors": list(health_rules.get("protective_factors") or [])[:3],
+            "claim_rule": (
+                "Describe these only as heightened astrological susceptibility during this period, "
+                "never as a diagnosis or certain illness. If this is background_only, do not claim a "
+                "health problem is likely in the period."
+            ),
+        }
 
     phases: List[Dict[str, Any]] = []
     seen: set[tuple[Any, ...]] = set()
@@ -8540,8 +8652,7 @@ def _build_period_topic_forecast(
             if permission == "supported_by_active_dasha_carriers"
             else "background_only"
         )
-        phases.append(
-            {
+        phase = {
                 "start": phase_start,
                 "end": phase_end,
                 "dasha_chain": " - ".join(
@@ -8557,14 +8668,17 @@ def _build_period_topic_forecast(
                 "manifestation_candidates": _period_topic_manifestations(category, houses, row.get("predicted_result_areas")),
                 "peak_windows": peaks,
             }
-        )
+        health_detail = health_phase_detail(houses, peaks, permission)
+        if health_detail:
+            phase["health_forecast"] = health_detail
+        phases.append(phase)
         if len(phases) >= 10:
             break
 
     if not phases:
         return {}
     strongest = max(phases, key=lambda item: float(item.get("relevance_score") or 0))
-    return {
+    result = {
         "forecast_shape": "period_topic_forecast",
         "category": _normalize_event_category(category),
         "period": period,
@@ -8581,6 +8695,14 @@ def _build_period_topic_forecast(
             "use the fused verdict/support/risk evidence to decide whether delivery is constructive, demanding, or mixed."
         ),
     }
+    if is_health and health_rules:
+        result["health_narration_contract"] = (
+            "Answer the paid question directly: identify the dated strongest and elevated watch periods, "
+            "state which supplied body regions or condition patterns could be more susceptible in each, "
+            "and explain the dasha trigger plus dated transit reinforcement. Cover quieter phases briefly. "
+            "Do not replace this with routine, consistency, vitality-management, or general wellness advice."
+        )
+    return result
 
 
 def _compact_forward_event_scan(scan: Any, *, limit: int = 6) -> Dict[str, Any]:
@@ -8681,6 +8803,41 @@ def _compact_composer_windows(rows: Any, *, limit: int = 5) -> List[Dict[str, An
         for row in rows[:limit]
         if isinstance(row, dict)
     ]
+
+
+def _bound_composer_windows(
+    rows: Any,
+    *,
+    start: Any = None,
+    end: Any = None,
+    limit: int = 5,
+) -> List[Dict[str, Any]]:
+    """Remove historical/out-of-scope windows before the writer sees them."""
+    # Compact every candidate before applying the output limit; otherwise five
+    # historical rows at the front could hide a valid sixth future window.
+    compact = _compact_composer_windows(
+        rows,
+        limit=len(rows) if isinstance(rows, list) else limit,
+    )
+    scope_start = str(start or "").strip()[:10]
+    scope_end = str(end or "").strip()[:10]
+    bounded: List[Dict[str, Any]] = []
+    for row in compact:
+        row_start = str(row.get("start") or "").strip()[:10]
+        row_end = str(row.get("end") or row_start).strip()[:10]
+        if scope_start and row_end and row_end < scope_start:
+            continue
+        if scope_end and row_start and row_start > scope_end:
+            continue
+        item = dict(row)
+        if scope_start and row_start and row_start < scope_start:
+            item["start"] = scope_start
+        if scope_end and row_end and row_end > scope_end:
+            item["end"] = scope_end
+        bounded.append(item)
+        if len(bounded) >= limit:
+            break
+    return bounded
 
 
 def _limit_composer_value(
@@ -8824,6 +8981,45 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
         "career_manifestations": event_rules.get("career_manifestations"),
         "derived_subject_rule": event_rules.get("derived_subject_rule"),
     }
+    health_rules = answer_spec.get("health_rules")
+    health_rules = health_rules if isinstance(health_rules, dict) else {}
+    compact_health_rules: Dict[str, Any] = {}
+    if health_rules:
+        time_bound_health = bool(health_rules.get("is_time_bound_question"))
+        zone_rows: List[Dict[str, Any]] = []
+        for row in list(health_rules.get("allowed_zone_evidence") or [])[:3]:
+            if not isinstance(row, dict):
+                continue
+            compact_row = {
+                key: row.get(key)
+                for key in (
+                    "zone", "anatomical_members", "confidence", "confluence_count", "sources", "why",
+                    "mechanisms", "divisional_repetition", "primary_medical_factors",
+                    "confirmation_factors",
+                )
+                if row.get(key) not in (None, "", [], {})
+            }
+            # Activation sources belong only to an explicitly time-bound
+            # health forecast. They must never leak into a constitutional
+            # vulnerability answer merely because the calculator recorded them.
+            if time_bound_health and row.get("activation_sources"):
+                compact_row["activation_sources"] = row.get("activation_sources")
+            zone_rows.append(compact_row)
+        compact_health_rules = {
+            key: health_rules.get(key)
+            for key in (
+                "health_question_type", "is_time_bound_question",
+                "allowed_zone_names", "allowed_mechanisms",
+                "answer_order", "constitutional_question_rule",
+                "forbidden_topics",
+                "category_safety", "claim_allow_list", "forbidden_claims",
+                "requested_horizon", "period_forecast_rule", "timing_framing",
+                "dasha_framing", "protective_factors", "condition_susceptibilities",
+            )
+            if health_rules.get(key) not in (None, "", [], {})
+        }
+        compact_health_rules["allowed_zone_evidence"] = zone_rows
+
     compact = {
         "max_words": answer_spec.get("max_words"),
         "composer_word_target": answer_spec.get("composer_word_target"),
@@ -8834,7 +9030,7 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
         "target_framing": answer_spec.get("target_framing"),
         "required_derived_opening": answer_spec.get("required_derived_opening"),
         "evidence_limitations": answer_spec.get("evidence_limitations"),
-        "health_rules": answer_spec.get("health_rules"),
+        "health_rules": compact_health_rules,
         "current_cause_rules": answer_spec.get("current_cause_rules"),
         "comparison_rules": answer_spec.get("comparison_rules"),
         "daily_rules": answer_spec.get("daily_rules"),
@@ -8907,6 +9103,37 @@ def _build_instant_answer_blueprint(
     the adjudicated verdict, progression, peak, or material caution inside a
     compact evidence object.
     """
+    health_rules = (
+        evidence.get("health_rules")
+        if isinstance(evidence.get("health_rules"), dict)
+        else {}
+    )
+    if health_rules and not health_rules.get("is_time_bound_question"):
+        return {
+            "purpose": "semantic slots for a constitutional health-susceptibility reading; not a current-period forecast",
+            "slots": [
+                {
+                    "slot": "ranked susceptibility zones in the exact supplied order",
+                    "source": "evidence.health_rules.allowed_zone_evidence",
+                },
+                {
+                    "slot": "one zone-specific natal reason for each zone without borrowing mechanisms",
+                    "source": "each matching evidence.health_rules.allowed_zone_evidence row",
+                },
+                {
+                    "slot": "ordinary prevention guidance without diagnosis",
+                    "source": "the allowed zones only",
+                },
+                {"slot": "one natural symptom-or-prevention follow-up", "source": "user_goal"},
+            ],
+            "forbidden_content": [
+                "current dasha, current transit, or currently active houses",
+                "body systems, symptoms, severity, or diagnoses absent from the zone evidence",
+                "combining mechanisms across zones",
+                "acute-versus-chronic comparison not explicitly supplied for that same zone",
+            ],
+            "user_goal": query_plan.get("user_goal"),
+        }
     if query_plan.get("forecast_shape") == "daily_forecast":
         return {
             "purpose": "semantic slots for one exact-day forecast; not prewritten prose",
@@ -9056,10 +9283,15 @@ def _build_instant_composer_context(
         )
         if query_plan.get(key) not in (None, "", [], {})
     }
+    time_scope = query_plan.get("time_scope") if isinstance(query_plan.get("time_scope"), dict) else {}
+    scope_start = time_scope.get("as_of")
+    scope_end = time_scope.get("horizon_end")
     compact_verdict = {
         "direction": verdict.get("direction"),
         "confidence": verdict.get("confidence"),
-        "ranked_windows": _compact_composer_windows(verdict.get("ranked_windows")),
+        "ranked_windows": _bound_composer_windows(
+            verdict.get("ranked_windows"), start=scope_start, end=scope_end
+        ),
         "rationale": verdict.get("rationale"),
         "modifiers": verdict.get("modifiers"),
         "missing_required_capabilities": verdict.get("missing_required_capabilities"),
@@ -9070,19 +9302,53 @@ def _build_instant_composer_context(
 
     answer_mode = str(intent.get("answer_mode") or query_plan.get("answer_mode") or "")
     category = str(intent.get("category") or query_plan.get("category") or "general")
+    health_rules = (
+        answer_spec.get("health_rules")
+        if isinstance(answer_spec, dict) and isinstance(answer_spec.get("health_rules"), dict)
+        else {}
+    )
     period_topic_forecast = (
-        _build_period_topic_forecast(normalized, category, query_plan.get("time_scope"))
-        if answer_mode == "timing_window" and _normalize_event_category(category) not in {"general", "timing"}
+        _build_period_topic_forecast(
+            normalized,
+            category,
+            query_plan.get("time_scope"),
+            health_rules=health_rules,
+        )
+        if (
+            answer_mode == "timing_window"
+            or (
+                answer_mode == "event_prediction"
+                and _normalize_event_category(category)
+                in {"health", "mental_wellbeing", "surgery", "accident", "recovery"}
+            )
+        )
+        and _normalize_event_category(category) not in {"general", "timing"}
         else {}
     )
     if period_topic_forecast:
         compact_query_plan["forecast_shape"] = "period_topic_forecast"
-    time_scope = query_plan.get("time_scope") if isinstance(query_plan.get("time_scope"), dict) else {}
     exact_day = bool(time_scope.get("is_exact_day"))
     if exact_day:
         compact_query_plan["forecast_shape"] = "daily_forecast"
 
     compact_answer_contract = _compact_answer_spec_for_composer(answer_spec)
+    broad_health_question = bool(
+        health_rules and not health_rules.get("is_time_bound_question")
+    )
+    if broad_health_question:
+        # The generic adjudicated verdict may legitimately contain current
+        # dasha/transit rationale for other answer shapes.  A constitutional
+        # vulnerability question must not expose that alternate narrative to
+        # the writer, even when the natal health evidence is already clean.
+        compact_verdict = {
+            "direction": "constitutional susceptibility",
+            "confidence": verdict.get("confidence"),
+            "scope": "natal constitution only; no current timing",
+        }
+        compact_verdict = {
+            key: value for key, value in compact_verdict.items()
+            if value not in (None, "", [], {})
+        }
 
     chart_facts = normalized.get("chart_facts") if isinstance(normalized.get("chart_facts"), dict) else {}
     is_chart_fact = str(answer_mode or "") == "factual_chart_lookup"
@@ -9108,10 +9374,12 @@ def _build_instant_composer_context(
         "active_areas": list(normalized.get("active_areas") or [])[:4],
         "topic_confirmation": normalized.get("topic_confirmation"),
         "transit_activation_timeline": {
-            "peak_windows": _compact_composer_windows(
+            "peak_windows": _bound_composer_windows(
                 (normalized.get("transit_activation_timeline") or {}).get("peak_windows")
                 if isinstance(normalized.get("transit_activation_timeline"), dict)
-                else []
+                else [],
+                start=scope_start,
+                end=scope_end,
             ),
             "high_activity_claim_gate": (
                 (normalized.get("transit_activation_timeline") or {}).get("high_activity_claim_gate")
@@ -9127,6 +9395,13 @@ def _build_instant_composer_context(
             instant_context.get("daily_prediction_spine") or normalized.get("daily_prediction_spine")
         ) if exact_day else None,
     }
+    if broad_health_question:
+        # A constitutional health question must not expose dasha, transit, or
+        # generic active-area data to the writer. Those are valid elsewhere,
+        # but here they create a competing timing narrative and encourage the
+        # model to claim that Houses 6/8 are "currently active" without an
+        # adjudicated health-timing question.
+        evidence = {"health_rules": compact_answer_contract.get("health_rules")}
     if answer_mode == "potential_capacity":
         # A natal-promise question must not expose current timing as an
         # alternative reasoning path. This also keeps the composer brief small.
@@ -9223,7 +9498,15 @@ def _build_instant_composer_context(
         "evidence": evidence,
         "answer_blueprint": answer_blueprint,
         "answer_contract": compact_answer_contract,
-        "recent_history": list(instant_context.get("recent_history") or [])[-2:],
+        # Prior turns can contain perfectly valid dasha discussion, but it is
+        # not evidence for a fresh, non-time-bound health susceptibility
+        # question.  Excluding it prevents timing language from leaking back
+        # into an otherwise natal-only composer brief.
+        "recent_history": (
+            []
+            if broad_health_question
+            else list(instant_context.get("recent_history") or [])[-2:]
+        ),
     }
     app_language = str(query_plan.get("language") or intent.get("language") or "").strip().lower()
     if app_language:
@@ -9256,6 +9539,64 @@ def _build_instant_composer_prompt_v3(
     context_json = json.dumps(composer_context, ensure_ascii=False, separators=(",", ":"))
     is_period_topic_forecast = str((composer_context.get("query_plan") or {}).get("forecast_shape") or "") == "period_topic_forecast"
     is_daily_forecast = str((composer_context.get("query_plan") or {}).get("forecast_shape") or "") == "daily_forecast"
+    composer_health_rules = (
+        (composer_context.get("evidence") or {}).get("health_rules")
+        if isinstance(composer_context.get("evidence"), dict)
+        else {}
+    )
+    if not isinstance(composer_health_rules, dict) or not composer_health_rules:
+        composer_health_rules = (
+            (composer_context.get("answer_contract") or {}).get("health_rules")
+            if isinstance(composer_context.get("answer_contract"), dict)
+            else {}
+        )
+    composer_health_rules = composer_health_rules if isinstance(composer_health_rules, dict) else {}
+    is_constitutional_health = bool(
+        composer_health_rules and not composer_health_rules.get("is_time_bound_question")
+    )
+    is_time_bound_health = bool(
+        composer_health_rules and composer_health_rules.get("is_time_bound_question")
+    )
+    if is_constitutional_health:
+        # Use a dedicated, deliberately small prompt.  The generic Instant
+        # composer explains several timing answer shapes and even explicit
+        # negative instructions were not enough to stop a small model from
+        # borrowing that vocabulary.  This prompt contains no timing workflow
+        # for it to imitate.
+        natal_health_context = {
+            "scope": "natal constitution only",
+            "native": composer_context.get("native") or {},
+            "health_rules": composer_health_rules,
+        }
+        natal_health_json = json.dumps(
+            natal_health_context, ensure_ascii=False, separators=(",", ":")
+        )
+        return f"""
+You are Tara in AstroRoshni Instant Chat. Write one natal constitutional-health susceptibility reading from the calculated evidence below.
+
+{_instant_composer_language_rule(language)}
+
+Required answer:
+1. Answer directly by naming the supplied anatomical regions in their exact ranked order.
+2. Explain each region only from its own `allowed_zone_evidence` row. Do not move a reason or mechanism from one region to another.
+3. Give ordinary preventive care guidance without diagnosis, certainty, fear, or invented symptoms.
+4. End with exactly one natural question about symptoms or preventive care.
+
+Absolute exclusions:
+- Do not mention a current period, Mahadasha, Antardasha, Pratyantardasha, dasha, transit, active houses, today, now, or any timing window.
+- Do not say any vulnerability is currently active.
+- Do not add any body area, condition, severity, or mechanism absent from the supplied evidence.
+- Do not recalculate the chart. Do not add headings, bullets, disclaimers, remedies, sales copy, or feedback requests.
+
+Append exactly one final metadata line after the visible answer:
+NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","follow_up_questions":[],"source":"instant"}}
+
+USER QUESTION:
+{question}
+
+NATAL-ONLY HEALTH EVIDENCE:
+{natal_health_json}
+""".strip()
     is_chart_fact = (
         str((composer_context.get("query_plan") or {}).get("forecast_shape") or "") == "chart_fact_reading"
         or str((composer_context.get("intent") or {}).get("answer_mode") or "") == "factual_chart_lookup"
@@ -9338,6 +9679,27 @@ AUTHORITATIVE COMPOSER BRIEF:
 - Do not dump all five dasha levels, houses, scores, school verdicts, or Panchanga fields. Give one compact understandable astrology reason after the practical answer.
 - If any mandatory daily evidence is missing, ask one precise clarification or state that a responsible exact-day judgment is not available; never substitute a generic period forecast.
 """
+    constitutional_health_rules = ""
+    if is_constitutional_health:
+        constitutional_health_rules = """
+- This is a natal constitutional-susceptibility reading. It is not a current-period or timing forecast.
+- Use this exact visible structure: (1) name the supplied ranked anatomical regions, (2) explain each only from its own natal row, (3) give ordinary preventive guidance, and (4) ask one natural follow-up.
+- Do not mention or imply the current period, Mahadasha, Antardasha, Pratyantardasha, dasha, transit, currently active houses, or any calendar window. Those subjects are forbidden for this answer even if you remember them from general astrology.
+- Do not say a vulnerability is active now. Timing requires a separate time-bound question and explicit timing evidence.
+"""
+    elif is_time_bound_health:
+        constitutional_health_rules = """
+- This is a time-bound health forecast. Obey `health_rules.period_forecast_rule` as a hard contract.
+- Stay strictly inside `health_rules.requested_horizon`; "this year" must never extend into the following year.
+- Begin by naming the strongest dated health watch period and the possible calculated health problem/body region in plain language. Then compare every materially distinct supplied phase chronologically.
+- Keep three layers separate: standing natal vulnerability, dated dasha activation, and dated transit confirmation. A natal vulnerability alone is not an active health forecast. Dasha support without transit confirmation is background vigilance, not likely manifestation.
+- Treat `period_topic_forecast.chronological_phases[*].health_forecast` as authoritative. For each `strongest_watch_period` or `elevated_watch_period`, state its exact dates, its allowed possible body regions or condition patterns, the activated health houses, and whether a dated transit confirms it. Briefly identify quieter phases as lower concern.
+- A paying user is asking when health trouble is more plausible and what form it could take. Do not evade that question with "generally stable", "maintain a routine", "manage vitality", "be consistent", or other generic wellness language unless the calculated phase record truly contains no elevated period; even then, explicitly say which calculations were checked and that no convergence was found.
+- Name only body regions and condition susceptibilities allowed by `health_rules`. Never invent sleep, digestion, diet, posture, fitness, a symptom, or another body system.
+- Gandanta is only a natal modifier and must never be the principal reason that a dated health phase is active.
+- Never recommend or reject a medical treatment and never advise avoiding experimental or conventional treatment. Use restrained preventive language and qualified medical care where appropriate.
+- State protective factors when supplied. Never predict illness, diagnosis, recovery, hospitalization, surgery, or an acute event as certain.
+"""
     speech_rules = ""
     if speech_mode:
         speech_rules = f"""
@@ -9382,10 +9744,12 @@ Hard rules:
 - `evidence.special_natal_factors` contains only calculated Gandanta, Yogi, Avayogi, Dagdha Rashi, or Tithi Shunya factors connected to the relevant natal houses. If present, use a factor when it materially supports or qualifies the verdict; describe its practical effect in plain language. Do not list every factor, treat a caution as an absolute denial, or invent a special factor that is absent.
 - If evidence is missing, state the limited conclusion plainly. Never fill gaps with generic planet folklore.
 - Preserve all cautions and limitations. For health, describe only allowed susceptibilities, never diagnosis or certainty.
+- For a constitutional health question, copy the ranked zones in `health_rules.allowed_zone_evidence` order. Do not reorder them. Explain each zone only from its own row. The composer brief intentionally contains no current timing: never add a dasha, transit, or "currently active" statement from general astrology knowledge.
 - For a derived person, keep ownership explicit: these are the native chart's indications for that person, not that person's own chart or dasha.
 - An MD-AD-PD sequence is a dasha chain. MD is the major period, AD the sub-period, and PD the sub-sub-period; never rename a level.
 - No HTML, tables, JSON except required metadata, internal tags, evidence IDs, decorative headings, disclaimers, or hidden reasoning.
 {period_forecast_rules}
+{constitutional_health_rules}
 {speech_rules}
 
 USER QUESTION:
@@ -9734,7 +10098,7 @@ Style rules:
 - Obey `instant_v2_answer_contract.answer_spec.composer_word_target` as a hard output limit. Count conservatively and finish under 120 visible words.
 - If the verdict direction is `insufficient_option_evidence`, explicitly say the chart does not reliably distinguish the options. Do not use phrases such as "leans toward", "favors", "more likely", or any equivalent winner. Give only the shared supported context and end with one question about which option is appearing in real life.
 - Obey `instant_v2_answer_contract.answer_spec.limitation_instruction` literally. Missing health-body-area evidence forbids naming an organ, body system, symptom, or recovery window.
-- For health answers, obey `instant_v2_answer_contract.answer_spec.health_rules` literally. Name only its `allowed_zone_names`; frame them as astrological susceptibilities, not diagnoses. If it says there is no ranked risk window inside the requested horizon, do not describe that horizon as heightened, dangerous, acute, or high-risk. Do not name a current MD/AD/PD chain unless every level is explicitly present in current-dasha evidence.
+- For health answers, obey `instant_v2_answer_contract.answer_spec.health_rules` literally. Name only its `allowed_zone_names`; frame them as astrological susceptibilities, not diagnoses. For each named zone, use only the reasons and mechanisms inside that same zone's `allowed_zone_evidence`. Never borrow a mechanism from another zone or invent a connecting body system. If the user asks for general vulnerabilities, rank up to three standing natal susceptibilities, explain one concrete chart reason for each, then give prevention-oriented guidance; do not turn it into a current-period forecast. If it says there is no ranked risk window inside the requested horizon, do not describe that horizon as heightened, dangerous, acute, or high-risk. Do not name a current MD/AD/PD chain unless every level is explicitly present in current-dasha evidence.
 - When the comparison verdict is `close_call`, do not call either option more supported, favored, stronger, or more likely—even by "slightly". Compare their distinct windows and mechanisms, then ask which is materially emerging.
 - Obey `instant_v2_answer_contract.answer_spec.timing_sequence` literally. For a current-problem-plus-improvement question, explain the supplied current cause, give the earliest materially better window first, and identify a later peak only as a later strengthening—not as the first relief.
 - Obey `instant_v2_answer_contract.answer_spec.current_cause_rules` literally. It is an allow-list: never add a natal conjunction, placement, lordship, or generic planet effect that is absent from it.
@@ -10087,6 +10451,15 @@ async def generate_instant_chat_response(
         or "general"
     )
     remedy_active = _explicit_remedy_followup_requested(intent, question)
+    health_rules = (
+        ((instant_v2_packet or {}).get("answer_spec") or {}).get("health_rules")
+        if isinstance(instant_v2_packet, dict)
+        else None
+    )
+    suppress_remedy_cta = bool(
+        isinstance(health_rules, dict)
+        and not health_rules.get("is_time_bound_question")
+    )
     response_content, next_action, combined_followups = apply_normal_answer_remedy_guards(
         content=response_content,
         next_action=next_action if next_action else None,
@@ -10100,6 +10473,7 @@ async def generate_instant_chat_response(
         question=question,
         language=(language or "english").strip().lower(),
         remedy_followup_active=remedy_active,
+        suppress_remedy_cta=suppress_remedy_cta,
     )
     next_action = next_action or {}
     if not combined_followups and speech_followups and not remedy_active:
@@ -10135,6 +10509,7 @@ async def generate_instant_chat_response(
         "response": response_content,
         "prediction_anchor_meta": prediction_anchor_meta,
         "event_timing_verdict": event_timing_verdict,
+        "suppress_remedy_cta": suppress_remedy_cta,
         "error": None,
         "chat_llm_model": llm_result.get("chat_llm_model") or model_name,
         "timing": {

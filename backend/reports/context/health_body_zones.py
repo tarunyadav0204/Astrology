@@ -8,6 +8,8 @@ Never diagnoses disease — only chart-grounded susceptibility themes.
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
 
 SIGN_NAMES = [
@@ -63,6 +65,116 @@ SIGN_LORDS = {
     0: "Mars", 1: "Venus", 2: "Mercury", 3: "Moon", 4: "Sun", 5: "Mercury",
     6: "Venus", 7: "Mars", 8: "Jupiter", 9: "Saturn", 10: "Saturn", 11: "Jupiter",
 }
+
+# Nakshatra Purusha anatomy.  This is intentionally kept separate from the
+# broader temperament hints below: for medical ranking the 6th lord's exact
+# nakshatra supplies a concrete anatomical candidate, not merely a doshic tone.
+# Canonical 27-fold Nakshatra Purusha anatomy used by the health engine.
+# Source family: Narada-Purana anatomical sequence, as summarized in the
+# supplied Dr. K. S. Charak computational framework.  Keep this as one table:
+# reports, Instant, and evidence UI must never maintain competing mappings.
+NAKSHATRA_BODY: Dict[str, List[str]] = {
+    "ashwini": ["knees"],
+    "bharani": ["head"],
+    "krittika": ["waist"],
+    "rohini": ["legs"],
+    "mrigashira": ["eyes"],
+    "ardra": ["hair"],
+    "punarvasu": ["fingers"],
+    "pushya": ["mouth", "face"],
+    "ashlesha": ["nails"],
+    "magha": ["nose"],
+    "purva phalguni": ["private parts"],
+    "uttara phalguni": ["private parts"],
+    "hasta": ["hands"],
+    "chitra": ["forehead"],
+    "swati": ["teeth"],
+    "vishakha": ["upper limbs"],
+    "anuradha": ["heart"],
+    "jyeshtha": ["tongue"],
+    "mula": ["feet"],
+    "moola": ["feet"],
+    "purva ashada": ["thighs"],
+    "purvashada": ["thighs"],
+    "purva ashadha": ["thighs"],
+    "uttara ashada": ["thighs"],
+    "uttarashada": ["thighs"],
+    "uttara ashadha": ["thighs"],
+    "shravana": ["ears"],
+    "dhanishta": ["back"],
+    "shatabhisha": ["chin"],
+    "shatabhishak": ["chin"],
+    "purva bhadrapada": ["sides of body"],
+    "uttara bhadrapada": ["sides of body"],
+    "revati": ["armpits", "groins"],
+}
+
+# Production payloads have historically used several transliterations and
+# separators for the same nakshatra.  Resolve those at one boundary so every
+# one of the 27 mappings works for reports, Instant and evidence rendering.
+NAKSHATRA_ALIASES: Dict[str, str] = {
+    "aswini": "ashwini",
+    "asvini": "ashwini",
+    "krttika": "krittika",
+    "mrigasira": "mrigashira",
+    "mrgasira": "mrigashira",
+    "mrgashira": "mrigashira",
+    "mrugasira": "mrigashira",
+    "aslesha": "ashlesha",
+    "aslesa": "ashlesha",
+    "pusya": "pushya",
+    "pushyami": "pushya",
+    "citra": "chitra",
+    "svati": "swati",
+    "visakha": "vishakha",
+    "jyeshta": "jyeshtha",
+    "jyestha": "jyeshtha",
+    "moola": "mula",
+    "poorvaphalguni": "purvaphalguni",
+    "uttaraphalguni": "uttaraphalguni",
+    "poorvaashada": "purvaashada",
+    "poorvaashadha": "purvaashada",
+    "purvashada": "purvaashada",
+    "poorvashadha": "purvaashada",
+    "purvaashadha": "purvaashada",
+    "uttarashada": "uttaraashada",
+    "uttaraashadha": "uttaraashada",
+    "sravana": "shravana",
+    "dhanista": "dhanishta",
+    "satabhisa": "shatabhisha",
+    "satabhisha": "shatabhisha",
+    "satabhishak": "shatabhisha",
+    "shatabhishak": "shatabhisha",
+    "poorvabhadrapada": "purvabhadrapada",
+    "purvabhadra": "purvabhadrapada",
+    "uttarabhadra": "uttarabhadrapada",
+    "revathi": "revati",
+}
+
+
+def _nakshatra_key(value: Any) -> str:
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    ascii_text = "".join(char for char in text if not unicodedata.combining(char))
+    key = re.sub(r"[^a-z]", "", ascii_text.lower())
+    return NAKSHATRA_ALIASES.get(key, key)
+
+
+def _nakshatra_body_zones(value: Any) -> List[str]:
+    key = _nakshatra_key(value)
+    for canonical_name, zones in NAKSHATRA_BODY.items():
+        if _nakshatra_key(canonical_name) == key:
+            return list(zones)
+    return []
+
+# Closely related anatomical labels must read as one vulnerability, not as
+# several independent findings.  These families are deliberately small: they
+# merge synonyms/one clinical region while leaving genuinely different organs
+# (for example liver versus thighs) separate.
+ANATOMICAL_FAMILIES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
+    ("face and jaw (including lips and chin)", ("face", "forehead", "lips", "chin", "mouth")),
+    ("heart and upper spine/back", ("heart", "spine", "upper back", "heart region")),
+    ("hips and thighs", ("hips", "thighs", "right thigh", "left thigh")),
+)
 
 MALEFICS = {"Mars", "Saturn", "Rahu", "Ketu"}
 DUSTHANA = {6, 8, 12}
@@ -183,13 +295,13 @@ def _nakshatra_zone_hints(lords_nakshatra: Dict[str, Any]) -> List[Dict[str, Any
         name = str(nak.get("nakshatra") or nak.get("name") or "").strip()
         if not name:
             continue
-        lower = name.lower()
+        lower = _nakshatra_key(name)
         zones: List[str] = []
         tone = ""
         if lower in {"swati", "ashwini", "shatabhisha", "punarvasu"}:
             zones = ["nerves", "breath", "circulation", "anxiety tone"]
             tone = "Vayu / airy nervous-respiratory flavour"
-        elif lower in {"magha", "uttara phalguni", "purva phalguni", "krittika"}:
+        elif lower in {"magha", "uttaraphalguni", "purvaphalguni", "krittika"}:
             zones = ["spine", "digestion heat", "vital fire"]
             tone = "solar / pitta heat flavour"
         elif lower in {"rohini", "hasta", "revati"}:
@@ -207,6 +319,116 @@ def _nakshatra_zone_hints(lords_nakshatra: Dict[str, Any]) -> List[Dict[str, Any
                 "tone": tone,
             })
     return hints
+
+
+def _sixth_lord_nakshatra(lords_nakshatra: Dict[str, Any]) -> Dict[str, Any]:
+    row = (lords_nakshatra or {}).get("sixth_lord") or {}
+    nak = row.get("nakshatra") or {}
+    name = str(nak.get("nakshatra") or nak.get("name") or "").strip()
+    lord = nak.get("lord") or nak.get("nakshatra_lord")
+    return {
+        "planet": row.get("planet"),
+        "name": name or None,
+        "lord": lord,
+        "pada": nak.get("pada"),
+        "zones": _nakshatra_body_zones(name),
+    }
+
+
+def _add_primary_medical_factor(
+    buckets: Dict[str, Dict[str, Any]],
+    *,
+    zones: List[str],
+    factor: str,
+    label: str,
+    base_weight: int,
+) -> None:
+    """Add a 6th-house-chain factor while preserving its provenance.
+
+    Earlier items in a classical anatomical list are more specific, so they
+    receive a small ordering advantage.  This prevents four broad synonyms
+    from tying and being selected arbitrarily.
+    """
+    for index, zone in enumerate(zones or []):
+        key = str(zone).strip().lower()
+        if not key:
+            continue
+        weight = max(base_weight - (index * 2), base_weight - 6)
+        bucket = buckets.setdefault(key, {
+            "zone": zone, "weight": 0, "standing_weight": 0,
+            "sources": [], "why": [], "natal_layers": [],
+            "activation_sources": [], "primary_medical_factors": [],
+            "primary_medical_factor_rank": {},
+        })
+        bucket["weight"] += weight
+        bucket["standing_weight"] += weight
+        layer = f"sixth_chain:{factor}"
+        if layer not in bucket["natal_layers"]:
+            bucket["natal_layers"].append(layer)
+        if factor not in bucket["primary_medical_factors"]:
+            bucket["primary_medical_factors"].append(factor)
+        ranks = bucket.setdefault("primary_medical_factor_rank", {})
+        ranks[factor] = min(int(ranks.get(factor, index)), index)
+        if label not in bucket["sources"]:
+            bucket["sources"].append(label)
+        if label not in bucket["why"]:
+            bucket["why"].append(label)
+
+
+def _group_anatomical_families(buckets: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Collapse anatomical synonyms without multiplying their evidence.
+
+    A single Magha calculation can yield lips, chin and face.  Summing those
+    labels would falsely turn one calculation into three confirmations.  The
+    merged family therefore keeps the strongest score for a member and unions
+    provenance lists; genuinely different calculation factors remain visible.
+    """
+    member_to_family = {
+        member: (label, members)
+        for label, members in ANATOMICAL_FAMILIES
+        for member in members
+    }
+    grouped: Dict[str, Dict[str, Any]] = {}
+    list_fields = (
+        "sources", "why", "natal_layers", "activation_sources",
+        "primary_medical_factors", "confirmation_factors",
+    )
+    for raw_key, raw_bucket in buckets.items():
+        family = member_to_family.get(str(raw_key).strip().lower())
+        label = family[0] if family else str(raw_bucket.get("zone") or raw_key)
+        members = family[1] if family else (str(raw_bucket.get("zone") or raw_key),)
+        key = label.lower()
+        target = grouped.setdefault(key, {
+            "zone": label,
+            "anatomical_members": [],
+            "weight": 0,
+            "standing_weight": 0,
+            **{field: [] for field in list_fields},
+            "primary_medical_factor_rank": {},
+        })
+        # Synonyms produced by the same calculation are alternatives, not
+        # additive evidence.  The highest member score represents the family.
+        target["weight"] = max(int(target.get("weight") or 0), int(raw_bucket.get("weight") or 0))
+        target["standing_weight"] = max(
+            int(target.get("standing_weight") or 0),
+            int(raw_bucket.get("standing_weight") or 0),
+        )
+        raw_zone = str(raw_bucket.get("zone") or raw_key).strip()
+        if raw_zone and raw_zone not in target["anatomical_members"]:
+            target["anatomical_members"].append(raw_zone)
+        for member in members:
+            if member in buckets and member not in target["anatomical_members"]:
+                target["anatomical_members"].append(member)
+        for field in list_fields:
+            for value in raw_bucket.get(field) or []:
+                if value not in target[field]:
+                    target[field].append(value)
+        for factor, rank in (raw_bucket.get("primary_medical_factor_rank") or {}).items():
+            current = target["primary_medical_factor_rank"].get(factor)
+            target["primary_medical_factor_rank"][factor] = (
+                int(rank) if current is None else min(int(current), int(rank))
+            )
+    return grouped
 
 
 def build_priority_body_zones(
@@ -290,8 +512,90 @@ def build_priority_body_zones(
 
     scored.sort(key=lambda r: (-int(r.get("score") or 0), int(r.get("house") or 99)))
 
-    # Aggregate priority zone cards
+    # The classical medical foundation is the 6th-house chain. It establishes
+    # the only anatomy eligible to become a named major vulnerability:
+    # sign in H6, sign occupied by its lord, and the lord's nakshatra.
+    sixth_sign = _house_sign(houses, 6)
+    sixth_lord = _lord_of_house(houses, 6)
+    sixth_lord_sign = _planet_sign(planets, sixth_lord) if sixth_lord else None
+    sixth_nakshatra = _sixth_lord_nakshatra(lords_nakshatra or {})
+    sixth_house_chain = {
+        "sixth_house_sign": SIGN_NAMES[sixth_sign] if sixth_sign is not None else None,
+        "sixth_house_sign_zones": list((SIGN_BODY.get(sixth_sign) or {}).get("zones") or []),
+        "sixth_lord": sixth_lord,
+        "sixth_lord_house": _planet_house(planets, sixth_lord) if sixth_lord else None,
+        "sixth_lord_sign": SIGN_NAMES[sixth_lord_sign] if sixth_lord_sign is not None else None,
+        "sixth_lord_sign_zones": list((SIGN_BODY.get(sixth_lord_sign) or {}).get("zones") or []),
+        "sixth_lord_nakshatra": sixth_nakshatra.get("name"),
+        "sixth_lord_nakshatra_pada": sixth_nakshatra.get("pada"),
+        "sixth_lord_nakshatra_lord": sixth_nakshatra.get("lord"),
+        "sixth_lord_nakshatra_zones": sixth_nakshatra.get("zones") or [],
+    }
+
+    # Aggregate priority zone cards.
     zone_weights: Dict[str, Dict[str, Any]] = {}
+    if sixth_sign is not None:
+        _add_primary_medical_factor(
+            zone_weights,
+            zones=sixth_house_chain["sixth_house_sign_zones"],
+            factor="sixth_house_sign",
+            label=(
+                f"The sign in House 6 is {SIGN_NAMES[sixth_sign]}, linking the disease axis "
+                f"to {', '.join(sixth_house_chain['sixth_house_sign_zones'][:3])}."
+            ),
+            base_weight=18,
+        )
+    if sixth_lord and sixth_lord_sign is not None:
+        _add_primary_medical_factor(
+            zone_weights,
+            zones=sixth_house_chain["sixth_lord_sign_zones"],
+            factor="sixth_lord_sign",
+            label=(
+                f"House 6 lord {sixth_lord} is in {SIGN_NAMES[sixth_lord_sign]}, focusing its "
+                f"health indication on {', '.join(sixth_house_chain['sixth_lord_sign_zones'][:3])}."
+            ),
+            base_weight=20,
+        )
+    if sixth_nakshatra.get("name") and sixth_nakshatra.get("zones"):
+        pada_text = f" pada {sixth_nakshatra.get('pada')}" if sixth_nakshatra.get("pada") else ""
+        lord_text = f", ruled by {sixth_nakshatra.get('lord')}" if sixth_nakshatra.get("lord") else ""
+        _add_primary_medical_factor(
+            zone_weights,
+            zones=sixth_nakshatra["zones"],
+            factor="sixth_lord_nakshatra",
+            label=(
+                f"House 6 lord {sixth_lord} occupies {sixth_nakshatra['name']}{pada_text}{lord_text}; "
+                f"its anatomical focus is {', '.join(sixth_nakshatra['zones'][:3])}."
+            ),
+            base_weight=24,
+        )
+        nak_lord = str(sixth_nakshatra.get("lord") or "").strip()
+        nak_lord_house = _planet_house(planets, nak_lord) if nak_lord else None
+        nak_lord_sign = _planet_sign(planets, nak_lord) if nak_lord else None
+        if nak_lord and nak_lord_house:
+            confirmation = (
+                f"Its nakshatra lord {nak_lord} is placed in House {nak_lord_house}"
+                + (
+                    f" in {SIGN_NAMES[nak_lord_sign]}"
+                    if nak_lord_sign is not None else ""
+                )
+                + ", confirming how this anatomical indication is expressed."
+            )
+            for zone in sixth_nakshatra["zones"]:
+                bucket = zone_weights.get(str(zone).strip().lower())
+                if not bucket:
+                    continue
+                bucket["weight"] += 3
+                bucket["standing_weight"] += 3
+                confirmations = bucket.setdefault("confirmation_factors", [])
+                if "nakshatra_lord_condition" not in confirmations:
+                    confirmations.append("nakshatra_lord_condition")
+                if "sixth_chain:nakshatra_lord_condition" not in bucket["natal_layers"]:
+                    bucket["natal_layers"].append("sixth_chain:nakshatra_lord_condition")
+                if confirmation not in bucket["sources"]:
+                    bucket["sources"].append(confirmation)
+                if confirmation not in bucket["why"]:
+                    bucket["why"].append(confirmation)
     for row in scored[:8]:
         for zone in row.get("fused_zones") or []:
             key = zone.lower()
@@ -418,7 +722,25 @@ def build_priority_body_zones(
             if summary and summary not in bucket["why"]:
                 bucket["why"].append(str(summary)[:160])
 
-    priority_zones = sorted(zone_weights.values(), key=lambda z: -int(z.get("weight") or 0))[:8]
+    # Present anatomical regions rather than duplicate synonyms such as
+    # "face", "lips" and "chin" as separate vulnerabilities.
+    zone_weights = _group_anatomical_families(zone_weights)
+
+    priority_zones = sorted(
+        zone_weights.values(),
+        key=lambda z: (
+            0 if z.get("primary_medical_factors") else 1,
+            min(
+                (
+                    {"sixth_lord_nakshatra": 0, "sixth_lord_sign": 1, "sixth_house_sign": 2}.get(factor, 9)
+                    for factor in (z.get("primary_medical_factors") or [])
+                ),
+                default=9,
+            ),
+            -len(z.get("primary_medical_factors") or []),
+            -int(z.get("weight") or 0),
+        ),
+    )[:8]
     for item in priority_zones:
         item["why"] = (item.get("why") or [])[:4]
         item["sources"] = (item.get("sources") or [])[:5]
@@ -431,19 +753,54 @@ def build_priority_body_zones(
         # create one.  Named body-part claims therefore require at least two
         # independent natal calculation families.  This prevents a single
         # generic sign/planet association from becoming a scary medical claim.
-        layer_families = {
-            str(layer).split(":", 1)[0]
-            for layer in (item.get("natal_layers") or [])
-            if layer
-        }
+        primary_factor_count = len(item.get("primary_medical_factors") or [])
+        confirmation_factor_count = len(item.get("confirmation_factors") or [])
         standing_weight = int(item.get("standing_weight") or 0)
-        item["confluence_count"] = len(layer_families)
-        item["callout_allowed"] = len(layer_families) >= 2 and standing_weight >= 8
+        # Each limb of the classical sixth-house chain is an independently
+        # calculated anatomical factor.  Do not collapse H6 sign, sixth-lord
+        # sign and sixth-lord nakshatra into one opaque evidence count.
+        item["confluence_count"] = primary_factor_count + confirmation_factor_count
+        # Confirmation cannot invent anatomy. Other houses, karakas and vargas
+        # may only strengthen or weaken a 6th-house-chain candidate.
+        has_primary_basis = bool(item.get("primary_medical_factors"))
+        item["callout_allowed"] = has_primary_basis and standing_weight >= 12
         item["confidence"] = (
-            "high" if len(layer_families) >= 3 and standing_weight >= 14
+            "high" if item["confluence_count"] >= 3 and standing_weight >= 14
             else "medium" if item["callout_allowed"]
             else "directional"
         )
+
+    # Keep the result clinically readable: take the strongest anatomical
+    # candidate from each distinct limb of the classical sixth-house chain
+    # before allowing another synonym from the same limb.  Otherwise a broad
+    # sign such as Leo can consume all three cards and hide H6 or nakshatra.
+    selected_major_zones: List[Dict[str, Any]] = []
+    selected_zone_names = set()
+    for factor in ("sixth_lord_nakshatra", "sixth_lord_sign", "sixth_house_sign"):
+        candidates = [
+                item for item in priority_zones
+                if item.get("callout_allowed")
+                and factor in (item.get("primary_medical_factors") or [])
+                and str(item.get("zone") or "").lower() not in selected_zone_names
+        ]
+        candidate = min(
+            candidates,
+            key=lambda item: (
+                int((item.get("primary_medical_factor_rank") or {}).get(factor, 99)),
+                -int(item.get("standing_weight") or 0),
+            ),
+            default=None,
+        )
+        if candidate:
+            selected_major_zones.append(candidate)
+            selected_zone_names.add(str(candidate.get("zone") or "").lower())
+    for candidate in priority_zones:
+        zone_name = str(candidate.get("zone") or "").lower()
+        if len(selected_major_zones) >= 3:
+            break
+        if candidate.get("callout_allowed") and zone_name not in selected_zone_names:
+            selected_major_zones.append(candidate)
+            selected_zone_names.add(zone_name)
 
     major_vulnerabilities = [
         {
@@ -453,16 +810,19 @@ def build_priority_body_zones(
             "standing_weight": item.get("standing_weight"),
             "natal_layers": list(item.get("natal_layers") or [])[:6],
             "activation_sources": list(item.get("activation_sources") or [])[:3],
+            "primary_medical_factors": list(item.get("primary_medical_factors") or [])[:3],
+            "confirmation_factors": list(item.get("confirmation_factors") or [])[:3],
+            "anatomical_members": list(item.get("anatomical_members") or [])[:6],
             "sources": list(item.get("sources") or [])[:5],
             "why": list(item.get("why") or [])[:4],
         }
-        for item in priority_zones
-        if item.get("callout_allowed")
-    ][:3]
+        for item in selected_major_zones[:3]
+    ]
 
     medical_profile = _build_medical_profile(
         chart=chart,
         house_map=house_map,
+        sixth_house_chain=sixth_house_chain,
         major_vulnerabilities=major_vulnerabilities,
         event_patterns=event_patterns,
         divisional_charts=divisional_charts or {},
@@ -490,10 +850,14 @@ def build_priority_body_zones(
         ],
         "priority_zones": priority_zones,
         "major_vulnerabilities": major_vulnerabilities,
+        "sixth_house_chain": sixth_house_chain,
         "event_patterns": event_patterns,
         "top_zone_names": [z.get("zone") for z in major_vulnerabilities],
         "claim_policy": {
-            "named_body_part_requires": "At least two independent natal calculation families and standing weight >= 8.",
+            "named_body_part_requires": (
+                "The zone must originate in the sign in House 6, the sign occupied by its lord, "
+                "or the 6th lord's nakshatra; other natal layers may only confirm and rank it."
+            ),
             "timing_cannot_create_vulnerability": True,
             "diagnosis_allowed": False,
         },
@@ -564,6 +928,7 @@ def _build_medical_profile(
     *,
     chart: Dict[str, Any],
     house_map: List[Dict[str, Any]],
+    sixth_house_chain: Dict[str, Any],
     major_vulnerabilities: List[Dict[str, Any]],
     event_patterns: List[Dict[str, Any]],
     divisional_charts: Dict[str, Any],
@@ -647,11 +1012,14 @@ def _build_medical_profile(
         # (for example, the surgery label itself).  Recover the actual natal
         # actors from both those labels and their human-readable reasons so a
         # varga confirmation is not lost merely because the UI copy is short.
-        source_evidence = sources + list(vulnerability.get("why") or [])
-        source_planets = [
-            p for p in PLANET_KARAKA
-            if any(p.lower() in str(src).lower() for src in source_evidence)
-        ]
+        primary_factors = set(vulnerability.get("primary_medical_factors") or [])
+        source_planets: List[str] = []
+        sixth_lord = str(sixth_house_chain.get("sixth_lord") or "").strip()
+        nakshatra_lord = str(sixth_house_chain.get("sixth_lord_nakshatra_lord") or "").strip()
+        if sixth_lord:
+            source_planets.append(sixth_lord)
+        if "sixth_lord_nakshatra" in primary_factors and nakshatra_lord and nakshatra_lord not in source_planets:
+            source_planets.append(nakshatra_lord)
         repeated: List[str] = []
         for code, division in divisions.items():
             for planet in source_planets:
@@ -659,8 +1027,6 @@ def _build_medical_profile(
                 if drow.get("house") in DUSTHANA:
                     repeated.append(f"{code}: {planet} repeats in health-sensitive House {drow.get('house')}")
         confidence = str(vulnerability.get("confidence") or "directional")
-        if len(repeated) >= 2 and confidence == "medium":
-            confidence = "high"
         enhanced = {
             **vulnerability,
             "confidence": confidence,
@@ -683,6 +1049,24 @@ def _build_medical_profile(
             protection.append(f"{row.get('planet')} has strong dignity ({row.get('dignity')})")
 
     pattern_by_key = {str(row.get("key") or ""): row for row in event_patterns}
+    condition_keys = {
+        "vascular_pressure_tone",
+        "mental_emotional_regulation_susceptibility",
+        "metabolic_blood_sugar_susceptibility",
+    }
+    condition_susceptibilities = [
+        {
+            "key": row.get("key"),
+            "title": row.get("title"),
+            "risk_level": row.get("risk_level") or "directional",
+            "evidence": list(row.get("evidence") or [])[:5],
+            "interpretation": row.get("summary"),
+            "responsible_guidance": row.get("user_framing"),
+            "diagnosis": False,
+        }
+        for row in event_patterns
+        if str(row.get("key") or "") in condition_keys
+    ]
     activated_vulnerabilities = [
         {
             "zone": row.get("zone"),
@@ -715,15 +1099,18 @@ def _build_medical_profile(
             "supported": bool(protection),
             "protective_factors": protection[:5],
         },
+        "condition_susceptibilities": condition_susceptibilities,
     }
     return {
         "requested_category": requested_category,
         "constitution": constitution,
+        "sixth_house_chain": sixth_house_chain,
         "planet_conditions": conditions,
         "divisional_health_charts": divisions,
         "divisional_confirmations": confirmations,
         "protective_factors": protection[:6],
         "major_vulnerabilities": enhanced_vulnerabilities[:3],
+        "condition_susceptibilities": condition_susceptibilities,
         "mechanism_legend": {
             "acute / inflammatory": "fast, heat, injury or inflammatory expression",
             "chronic / degenerative": "slow, structural or recurring expression",
@@ -758,6 +1145,28 @@ def _build_event_patterns(
         if not h:
             return []
         return [p for p in (residents_map.get(h) or []) if p != planet]
+
+    def house_row(house: Optional[int]) -> Dict[str, Any]:
+        return next((row for row in house_map if row.get("house") == house), {})
+
+    def pressure_on_planet(planet: str) -> List[str]:
+        """Return independent natal pressure indicators, not a diagnosis."""
+        house = _planet_house(planets, planet)
+        if not house:
+            return []
+        indicators: List[str] = []
+        conjunctions = [p for p in company(planet) if p in MALEFICS and p != planet]
+        if conjunctions:
+            indicators.append(f"{planet} is conjunct {', '.join(conjunctions)} in House {house}")
+        aspectors = [
+            p for p in (house_row(house).get("aspecting_planets") or [])
+            if p in MALEFICS and p != planet
+        ]
+        if aspectors:
+            indicators.append(f"{planet} receives pressure from {', '.join(aspectors)}")
+        if house in DUSTHANA:
+            indicators.append(f"{planet} is placed in health-sensitive House {house}")
+        return indicators
 
     # Accident / injury: 6th lord with Mars/Rahu
     if lord6:
@@ -841,20 +1250,40 @@ def _build_event_patterns(
                 ],
             })
 
-    # Vascular / BP tone: Sun/Mars/Saturn pressure in fire signs or kendras/dusthanas
-    bp_planets = []
-    for p in ("Sun", "Mars", "Saturn", "Rahu"):
-        h = _planet_house(planets, p)
-        s = _planet_sign(planets, p)
-        if h is None:
-            continue
-        if p in {"Mars", "Saturn", "Rahu"} and (
-            h in {1, 2, 4, 6, 8, 10} or (s in {0, 4, 8, 9}) or any(
-                x in MALEFICS for x in company(p)
-            )
-        ):
-            bp_planets.append(f"{p} in H{h}")
-    if len(bp_planets) >= 2:
+    # Vascular / BP regulation. A broad Mars/Saturn/Rahu placement is not
+    # sufficient: require independent convergence across the Sun/vascular
+    # karaka, heart houses, and a heat-pressure combination.
+    bp_factors: List[str] = []
+    sun_pressure = pressure_on_planet("Sun")
+    if sun_pressure:
+        bp_factors.append(f"Vital/vascular karaka under pressure: {sun_pressure[0]}")
+    for heart_house, label in ((4, "cardiac foundation"), (5, "heart and circulation")):
+        row = house_row(heart_house)
+        actors = list(dict.fromkeys(
+            [p for p in (row.get("residents") or []) if p in MALEFICS]
+            + [p for p in (row.get("aspecting_planets") or []) if p in MALEFICS]
+        ))
+        if actors:
+            bp_factors.append(f"House {heart_house} ({label}) is under pressure from {', '.join(actors)}")
+    pressure_pairs = []
+    for planet in ("Mars", "Saturn", "Rahu"):
+        co = [p for p in company(planet) if p in {"Mars", "Saturn", "Rahu"} and p != planet]
+        if co:
+            pair = " + ".join(sorted((planet, co[0])))
+            if pair not in pressure_pairs:
+                pressure_pairs.append(pair)
+    if pressure_pairs:
+        bp_factors.append(f"Heat/pressure combination: {', '.join(pressure_pairs)}")
+    pitta_actors = []
+    for planet in ("Sun", "Mars", "Ketu"):
+        sign = _planet_sign(planets, planet)
+        house = _planet_house(planets, planet)
+        if sign in {0, 4, 8} and house in {1, 4, 5, 6, 8, 10}:
+            pitta_actors.append(planet)
+    if len(pitta_actors) >= 2:
+        bp_factors.append(f"Concentrated Pitta/heat signature: {', '.join(pitta_actors)}")
+    bp_factors = list(dict.fromkeys(bp_factors))
+    if len(bp_factors) >= 2:
         patterns.append({
             "key": "vascular_pressure_tone",
             "title": "Vascular / blood-pressure tone",
@@ -864,7 +1293,121 @@ def _build_event_patterns(
                 "lifestyle pacing and medical monitoring if symptoms exist; not a BP diagnosis."
             ),
             "zones": ["blood pressure tone", "blood", "heart", "head"],
-            "evidence": bp_planets[:4],
+            "evidence": bp_factors[:4],
+            "risk_level": "elevated" if len(bp_factors) >= 3 else "moderate",
+            "user_framing": (
+                "The chart shows a preventive-attention signal for vascular or blood-pressure regulation. "
+                "It does not establish hypertension; routine BP checks are sensible, especially if symptoms or family history exist."
+            ),
+        })
+
+    # Mental/emotional regulation: keep conjunction, aspect and broader
+    # multi-factor pressure distinct.  In particular, a Ketu aspect to the
+    # Moon must never be relabelled as the Moon occupying the nodal axis.
+    moon_house = _planet_house(planets, "Moon")
+    moon_company = company("Moon")
+    mental_evidence: List[str] = []
+    moon_shares_house_with_ketu = "Ketu" in moon_company
+    if moon_shares_house_with_ketu:
+        mental_evidence.append(f"Moon shares House {moon_house} with Ketu")
+    mental_evidence.extend(pressure_on_planet("Moon"))
+    mercury_pressure = pressure_on_planet("Mercury")
+    if mercury_pressure:
+        mental_evidence.append(mercury_pressure[0])
+    for mental_house, label in ((4, "emotional security"), (5, "judgment and emotional processing")):
+        row = house_row(mental_house)
+        malefic_residents = [p for p in (row.get("residents") or []) if p in MALEFICS]
+        malefic_aspects = [p for p in (row.get("aspecting_planets") or []) if p in MALEFICS]
+        if malefic_residents or malefic_aspects:
+            actors = list(dict.fromkeys(malefic_residents + malefic_aspects))
+            mental_evidence.append(f"House {mental_house} ({label}) is under pressure from {', '.join(actors)}")
+    mental_evidence = list(dict.fromkeys(mental_evidence))
+    moon_receives_ketu_aspect = any(
+        line.startswith("Moon receives pressure from") and "Ketu" in line
+        for line in mental_evidence
+    )
+    if moon_shares_house_with_ketu:
+        mental_summary = (
+            "Moon and Ketu sharing a house, together with the other calculated mental-regulation factors, "
+            "can show detachment, rumination, sleep disruption, emotional volatility or periods of "
+            "psychological strain. This is a vulnerability signal, not proof of a mental disorder."
+        )
+    elif moon_receives_ketu_aspect:
+        mental_summary = (
+            "Ketu's calculated aspect to the Moon, together with the other Moon, Mercury and emotional-house "
+            "pressure factors listed here, can show detachment, rumination, sleep disruption, emotional "
+            "volatility or periods of psychological strain. This is a vulnerability signal, not proof of a "
+            "mental disorder. The Moon is not conjunct Ketu or on the nodal axis."
+        )
+    else:
+        mental_summary = (
+            "The combined calculated pressure on the Moon, Mercury and emotional-regulation houses can show "
+            "rumination, sleep disruption, emotional volatility or periods of psychological strain. This is "
+            "a vulnerability signal, not proof of a mental disorder."
+        )
+    if moon_shares_house_with_ketu or len(mental_evidence) >= 3:
+        patterns.append({
+            "key": "mental_emotional_regulation_susceptibility",
+            "title": "Mental and emotional regulation susceptibility",
+            "summary": mental_summary,
+            "zones": ["mind", "sleep", "nervous regulation"],
+            "evidence": mental_evidence[:5],
+            "risk_level": "elevated" if len(mental_evidence) >= 3 else "moderate",
+            "user_framing": (
+                "This pattern deserves preventive attention to mental wellbeing. If persistent anxiety, low mood, "
+                "confusion, severe sleep disturbance, or loss of functioning is present, professional assessment is appropriate."
+            ),
+        })
+
+    # Metabolic/blood-sugar susceptibility needs a confluence: Jupiter/Venus
+    # condition plus the food/metabolism/disease axis. Never infer diabetes
+    # from Jupiter or Venus alone.
+    metabolic_evidence: List[str] = []
+    metabolic_factor_classes = set()
+    jupiter_pressure = pressure_on_planet("Jupiter")
+    if jupiter_pressure:
+        metabolic_factor_classes.add("jupiter")
+        metabolic_evidence.append(f"Jupiter/metabolic karaka under pressure: {jupiter_pressure[0]}")
+    venus_house = _planet_house(planets, "Venus")
+    venus_pressure = pressure_on_planet("Venus")
+    lord6 = _lord_of_house(houses, 6)
+    if venus_house == 6:
+        metabolic_factor_classes.add("venus")
+        metabolic_evidence.append("Venus/endocrine karaka is placed in House 6")
+    elif lord6 and lord6 in company("Venus"):
+        metabolic_factor_classes.add("venus")
+        metabolic_evidence.append(f"Venus/endocrine karaka is conjunct House 6 lord {lord6}")
+    elif venus_pressure:
+        metabolic_factor_classes.add("venus")
+        metabolic_evidence.append(f"Venus/endocrine karaka under pressure: {venus_pressure[0]}")
+    h2 = house_row(2)
+    h6 = house_row(6)
+    metabolic_axis_planets = {"Jupiter", "Venus", "Moon", "Rahu", "Saturn"}
+    for house, label, row in ((2, "food and intake", h2), (6, "disease and regulation", h6)):
+        actors = [
+            p for p in list(row.get("residents") or []) + list(row.get("aspecting_planets") or [])
+            if p in metabolic_axis_planets
+        ]
+        actors = list(dict.fromkeys(actors))
+        if len(actors) >= 2:
+            metabolic_factor_classes.add(f"axis_h{house}")
+            metabolic_evidence.append(f"House {house} ({label}) is linked with {', '.join(actors)}")
+    metabolic_evidence = list(dict.fromkeys(metabolic_evidence))
+    if len(metabolic_factor_classes) >= 2:
+        patterns.append({
+            "key": "metabolic_blood_sugar_susceptibility",
+            "title": "Metabolic / blood-sugar regulation susceptibility",
+            "summary": (
+                "Multiple metabolism, intake and disease-axis factors converge. This can justify preventive "
+                "attention to blood-sugar and metabolic regulation, but it does not establish diabetes."
+            ),
+            "zones": ["metabolic regulation", "blood sugar tone", "liver", "pancreatic-endocrine axis"],
+            "evidence": metabolic_evidence[:5],
+            "risk_level": "elevated" if len(metabolic_factor_classes) >= 3 else "moderate",
+            "user_framing": (
+                "If there is family history, weight change, excess thirst/urination, fatigue, or prior abnormal results, "
+                "routine glucose/HbA1c screening is a prudent medical check."
+            ),
         })
 
     # Sinus / face / throat: 2nd house malefics
@@ -903,4 +1446,7 @@ def _build_event_patterns(
                 "evidence": [f"8th lord {lord8}", f"Company: {', '.join(co) or '—'}"],
             })
 
-    return patterns[:6]
+    # Keep distinct responsible condition signals available to the prompt and
+    # evidence UI. The previous six-item cap could silently discard mental or
+    # metabolic findings after accident/surgery/house patterns were added.
+    return patterns[:10]

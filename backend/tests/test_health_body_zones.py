@@ -27,7 +27,7 @@ def test_major_health_vulnerability_requires_natal_confluence():
 
     assert result["claim_policy"]["diagnosis_allowed"] is False
     assert result["major_vulnerabilities"]
-    assert all(item["confluence_count"] >= 2 for item in result["major_vulnerabilities"])
+    assert all(item["primary_medical_factors"] for item in result["major_vulnerabilities"])
     assert all(item["standing_weight"] >= 8 for item in result["major_vulnerabilities"])
 
 
@@ -79,7 +79,9 @@ def test_medical_profile_uses_d1_constitution_and_all_health_divisions():
     assert {row["house"] for row in profile["constitution"]["core_houses"]} == {1, 6, 8, 12}
     assert set(profile["divisional_health_charts"]) == {"D3", "D6", "D8", "D30"}
     assert any(row["planet"] == "Mars" and row["dignity"] == "own_sign" for row in profile["planet_conditions"])
-    assert any(row["divisional_repetition"] for row in profile["major_vulnerabilities"])
+    # Mars is unrelated to this chart's sixth-house anatomical chain, so its
+    # repetition must not inflate confidence for every named body region.
+    assert not any(row["divisional_repetition"] for row in profile["major_vulnerabilities"])
 
 
 def test_divisional_charts_confirm_but_do_not_create_health_vulnerability():
@@ -121,3 +123,195 @@ def test_surgery_accident_and_recovery_are_separate_judgments():
     assert judgments["surgery"]["supported"] is True
     assert judgments["accident"]["supported"] is False
     assert judgments["recovery"]["supported"] is True
+
+
+def test_named_vulnerabilities_originate_in_the_sixth_house_chain():
+    result = build_priority_body_zones(
+        _chart(),
+        lords_nakshatra={
+            "sixth_lord": {
+                "planet": "Mercury",
+                "nakshatra": {
+                    "nakshatra": "Chitra",
+                    "lord": "Mars",
+                    "pada": 2,
+                },
+            }
+        },
+    )
+
+    chain = result["sixth_house_chain"]
+    assert chain["sixth_house_sign"] == "Virgo"
+    assert chain["sixth_lord"] == "Mercury"
+    assert chain["sixth_lord_sign"] == "Gemini"
+    assert chain["sixth_lord_nakshatra"] == "Chitra"
+    assert chain["sixth_lord_nakshatra_zones"] == ["forehead"]
+    assert result["major_vulnerabilities"]
+    assert all(row["primary_medical_factors"] for row in result["major_vulnerabilities"])
+
+
+def test_unrelated_afflicted_anatomy_can_confirm_but_not_create_a_named_zone():
+    result = build_priority_body_zones(
+        _chart(),
+        lords_nakshatra={
+            "sixth_lord": {
+                "planet": "Mercury",
+                "nakshatra": {"nakshatra": "Chitra", "lord": "Mars", "pada": 2},
+            }
+        },
+    )
+
+    assert all(row["primary_medical_factors"] for row in result["major_vulnerabilities"])
+
+
+def _cancer_magha_chart():
+    # Cancer ascendant: Sagittarius occupies H6; its lord Jupiter occupies Leo
+    # in H2 and is in Magha. This is the concrete chart shape reported by the
+    # user and must produce three distinct anatomical foundations.
+    houses = [
+        {"house": house, "sign": (3 + house - 1) % 12}
+        for house in range(1, 13)
+    ]
+    return {
+        "houses": houses,
+        "planets": {
+            "Sun": {"house": 9, "sign": 11},
+            "Moon": {"house": 4, "sign": 6},
+            "Mars": {"house": 2, "sign": 4},
+            "Mercury": {"house": 8, "sign": 10},
+            "Jupiter": {"house": 2, "sign": 4},
+            "Venus": {"house": 11, "sign": 1},
+            "Saturn": {"house": 2, "sign": 4},
+            "Rahu": {"house": 2, "sign": 4},
+            "Ketu": {"house": 8, "sign": 10},
+        },
+        "graha_drishti_by_house": {},
+    }
+
+
+def test_sixth_house_foundations_use_canonical_magha_mapping():
+    result = build_priority_body_zones(
+        _cancer_magha_chart(),
+        lords_nakshatra={
+            "sixth_lord": {
+                "planet": "Jupiter",
+                "nakshatra": {"nakshatra": "Magha", "lord": "Ketu", "pada": 3},
+            }
+        },
+    )
+
+    major = result["major_vulnerabilities"]
+    assert [row["zone"] for row in major] == ["nose", "heart and upper spine/back", "hips and thighs"]
+    assert major[0]["primary_medical_factors"] == ["sixth_lord_nakshatra"]
+    assert major[0]["confirmation_factors"] == ["nakshatra_lord_condition"]
+    assert set(major[0]["anatomical_members"]) == {"nose"}
+    assert major[1]["primary_medical_factors"] == ["sixth_lord_sign"]
+    assert major[2]["primary_medical_factors"] == ["sixth_house_sign"]
+
+
+def test_all_27_nakshatra_anatomy_mappings_are_available():
+    expected = {
+        "Ashwini": ["knees"], "Bharani": ["head"], "Krittika": ["waist"],
+        "Rohini": ["legs"], "Mrigashira": ["eyes"], "Ardra": ["hair"],
+        "Punarvasu": ["fingers"], "Pushya": ["mouth", "face"], "Ashlesha": ["nails"],
+        "Magha": ["nose"], "Purva Phalguni": ["private parts"],
+        "Uttara Phalguni": ["private parts"], "Hasta": ["hands"], "Chitra": ["forehead"],
+        "Swati": ["teeth"], "Vishakha": ["upper limbs"], "Anuradha": ["heart"],
+        "Jyeshtha": ["tongue"], "Mula": ["feet"], "Purva Ashadha": ["thighs"],
+        "Uttara Ashadha": ["thighs"], "Shravana": ["ears"], "Dhanishta": ["back"],
+        "Shatabhisha": ["chin"], "Purva Bhadrapada": ["sides of body"],
+        "Uttara Bhadrapada": ["sides of body"], "Revati": ["armpits", "groins"],
+    }
+    for name, zones in expected.items():
+        result = build_priority_body_zones(
+            _chart(),
+            lords_nakshatra={
+                "sixth_lord": {
+                    "planet": "Mercury",
+                    "nakshatra": {"nakshatra": name, "lord": "Mars", "pada": 1},
+                }
+            },
+        )
+        assert result["sixth_house_chain"]["sixth_lord_nakshatra_zones"] == zones
+
+
+def test_nakshatra_spelling_and_transliteration_variants_use_same_mapping():
+    variants = {
+        "Mrigasira": ["eyes"],
+        "Āśleṣā": ["nails"],
+        "Poorva-Ashadha": ["thighs"],
+        "Śravaṇa": ["ears"],
+        "Satabhishak": ["chin"],
+        "Uttara Bhadra": ["sides of body"],
+    }
+    for name, expected in variants.items():
+        result = build_priority_body_zones(
+            _chart(),
+            lords_nakshatra={
+                "sixth_lord": {
+                    "planet": "Mercury",
+                    "nakshatra": {"nakshatra": name, "lord": "Mars", "pada": 1},
+                }
+            },
+        )
+        assert result["sixth_house_chain"]["sixth_lord_nakshatra_zones"] == expected
+
+
+def test_moon_ketu_is_exposed_as_responsible_susceptibility_not_diagnosis():
+    chart = _chart()
+    chart["planets"]["Moon"] = {"house": 8, "sign": 7}
+    chart["planets"]["Ketu"] = {"house": 8, "sign": 7}
+    result = build_priority_body_zones(chart, requested_category="mental_wellbeing")
+    signals = result["medical_profile"]["condition_susceptibilities"]
+    mental = next(row for row in signals if row["key"] == "mental_emotional_regulation_susceptibility")
+    assert mental["diagnosis"] is False
+    assert any("Moon shares House 8 with Ketu" in line for line in mental["evidence"])
+    assert "sharing a house" in mental["interpretation"]
+    assert "professional assessment" in mental["responsible_guidance"]
+
+
+def test_ketu_aspect_to_moon_is_not_mislabeled_as_nodal_axis_or_conjunction():
+    chart = _cancer_magha_chart()
+    chart["graha_drishti_by_house"] = {
+        4: [{"planet": "Saturn"}, {"planet": "Ketu"}],
+        5: [{"planet": "Mars"}],
+    }
+
+    result = build_priority_body_zones(chart, requested_category="mental_wellbeing")
+    signals = result["medical_profile"]["condition_susceptibilities"]
+    mental = next(row for row in signals if row["key"] == "mental_emotional_regulation_susceptibility")
+
+    assert "Moon receives pressure from Saturn, Ketu" in mental["evidence"]
+    assert "Ketu's calculated aspect to the Moon" in mental["interpretation"]
+    assert "Moon is not conjunct Ketu or on the nodal axis" in mental["interpretation"]
+    assert "Moon-Ketu/mental-axis" not in mental["interpretation"]
+
+
+def test_bp_signal_requires_convergence_and_recommends_checking_not_diagnosis():
+    chart = _chart()
+    chart["planets"]["Sun"] = {"house": 5, "sign": 4}
+    chart["planets"]["Mars"] = {"house": 5, "sign": 4}
+    chart["planets"]["Saturn"] = {"house": 5, "sign": 4}
+    result = build_priority_body_zones(chart)
+    signals = result["medical_profile"]["condition_susceptibilities"]
+    vascular = next(row for row in signals if row["key"] == "vascular_pressure_tone")
+    assert vascular["risk_level"] == "elevated"
+    assert vascular["diagnosis"] is False
+    assert "does not establish hypertension" in vascular["responsible_guidance"]
+    assert "routine BP checks" in vascular["responsible_guidance"]
+
+
+def test_metabolic_signal_requires_independent_factors_and_names_screening():
+    chart = _chart()
+    chart["planets"]["Jupiter"] = {"house": 2, "sign": 1}
+    chart["planets"]["Rahu"] = {"house": 2, "sign": 1}
+    chart["planets"]["Venus"] = {"house": 6, "sign": 5}
+    result = build_priority_body_zones(chart)
+    signals = result["medical_profile"]["condition_susceptibilities"]
+    metabolic = next(
+        row for row in signals if row["key"] == "metabolic_blood_sugar_susceptibility"
+    )
+    assert metabolic["risk_level"] == "elevated"
+    assert metabolic["diagnosis"] is False
+    assert "does not establish diabetes" in metabolic["interpretation"]
+    assert "glucose/HbA1c screening" in metabolic["responsible_guidance"]

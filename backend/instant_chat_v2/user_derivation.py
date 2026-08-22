@@ -619,6 +619,19 @@ def build_user_derivation(*, query_plan: Dict[str, Any], verdict: Dict[str, Any]
             )
             vulnerability_groups.append({"title": str(item.get("zone")).title(), "lines": lines})
 
+        for item in _list(medical_profile.get("condition_susceptibilities")):
+            if not isinstance(item, dict) or not item.get("title"):
+                continue
+            lines = []
+            if item.get("risk_level"):
+                lines.append(f"Calculated signal: {item.get('risk_level')} astrological susceptibility; not a diagnosis.")
+            lines.extend(str(value) for value in _list(item.get("evidence")) if value)
+            if item.get("interpretation"):
+                lines.append(str(item.get("interpretation")))
+            if item.get("responsible_guidance"):
+                lines.append(str(item.get("responsible_guidance")))
+            vulnerability_groups.append({"title": str(item.get("title")), "lines": lines})
+
         condition_lines: List[str] = []
         for row in _list(medical_profile.get("planet_conditions")):
             if not isinstance(row, dict) or not row.get("planet"):
@@ -652,7 +665,12 @@ def build_user_derivation(*, query_plan: Dict[str, Any], verdict: Dict[str, Any]
                 "condition_lines": condition_lines,
                 "judgment_lines": judgment_lines,
                 "divisions_checked": sorted(_dict(medical_profile.get("divisional_health_charts")).keys()),
-                "safety": "This describes astrological susceptibility and timing, not a diagnosis or certainty.",
+                "safety": (
+                    "This describes constitutional astrological susceptibility, not current timing, "
+                    "a diagnosis or certainty."
+                    if health_category == "health"
+                    else "This describes astrological susceptibility and timing, not a diagnosis or certainty."
+                ),
             },
             "conclusion": {
                 "direction": verdict.get("direction"),
