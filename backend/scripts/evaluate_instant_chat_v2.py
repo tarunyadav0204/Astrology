@@ -40,12 +40,25 @@ REFERENCE_CHART: Dict[str, Any] = {
     "timezone": 5.5,
 }
 
+SYNTHETIC_QA_CHART: Dict[str, Any] = {
+    "name": "Synthetic QA",
+    "gender": "Male",
+    "date": "1990-01-01",
+    "time": "12:00:00",
+    "place": "Synthetic equatorial test coordinate",
+    "latitude": 0.0,
+    "longitude": 0.0,
+    "timezone": 0.0,
+}
+
 QUESTIONS = [
     "What is my strongest marriage window during the next three years?",
     "Am I more likely to receive a promotion or change jobs during the next twelve months?",
     "Why has money felt unstable recently, and when is it likely to improve?",
     "Which health area needs the most caution during the next six months?",
     "Is my wife's career likely to improve during the coming year?",
+    "When was I married?",
+    "When did I get married?",
 ]
 
 
@@ -189,7 +202,12 @@ def _summary(row: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-async def run(question_indexes: list[int] | None = None, *, judge: bool = True) -> list[Dict[str, Any]]:
+async def run(
+    question_indexes: list[int] | None = None,
+    *,
+    judge: bool = True,
+    birth_data: Dict[str, Any] | None = None,
+) -> list[Dict[str, Any]]:
     logging.disable(logging.CRITICAL)
     router = IntentRouter()
     analyzer = GeminiChatAnalyzer()
@@ -208,7 +226,7 @@ async def run(question_indexes: list[int] | None = None, *, judge: bool = True) 
             result = await generate_instant_chat_response(
                 analyzer,
                 question=question,
-                birth_data=REFERENCE_CHART,
+                birth_data=birth_data or REFERENCE_CHART,
                 intent=intent,
                 history=[],
                 language="english",
@@ -227,8 +245,17 @@ def main() -> int:
     parser.add_argument("--details", action="store_true")
     parser.add_argument("--index", type=int, action="append", choices=range(len(QUESTIONS)))
     parser.add_argument("--no-judge", action="store_true")
+    parser.add_argument(
+        "--synthetic-chart",
+        action="store_true",
+        help="Use an explicitly fictional chart so provider-facing QA transmits no real birth details.",
+    )
     args = parser.parse_args()
-    rows = asyncio.run(run(args.index, judge=not args.no_judge))
+    rows = asyncio.run(run(
+        args.index,
+        judge=not args.no_judge,
+        birth_data=SYNTHETIC_QA_CHART if args.synthetic_chart else REFERENCE_CHART,
+    ))
     if not args.details:
         rows = [_summary(row) for row in rows]
     print(json.dumps(rows, ensure_ascii=False, indent=2 if args.pretty else None, default=str))

@@ -1,0 +1,83 @@
+@prefix ar: <https://astroroshni.com/ontology/core#> .
+@prefix domain: <https://astroroshni.com/ontology/domain#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://astroroshni.com/ontology/life-domains>
+    a owl:Ontology ;
+    rdfs:label "AstroRoshni canonical life domains"@en ;
+    owl:versionInfo "1.0.0" .
+
+ar:LifeDomain a owl:Class ; rdfs:label "Life domain"@en .
+ar:DomainTopic a owl:Class ; rdfs:label "Domain topics"@en .
+ar:QuestionOperation a owl:Class ; rdfs:label "Question operation"@en .
+ar:hasDomainTopic a owl:ObjectProperty ; rdfs:label "Domain topics"@en .
+ar:stableId a owl:DatatypeProperty ; rdfs:label "Stable identifier"@en .
+ar:runtimeKey a owl:DatatypeProperty ; rdfs:label "Runtime key"@en .
+
+# Thirteen canonical parent life domains.
+domain:SelfLifeOverview a ar:LifeDomain ; ar:stableId "domain.self_overview" ; skos:prefLabel "Self and life overview"@en ; ar:hasDomainTopic domain:General, domain:Self .
+domain:CareerWorkPublicRole a ar:LifeDomain ; ar:stableId "domain.career" ; skos:prefLabel "Career, work and public role"@en ; ar:hasDomainTopic domain:Career, domain:Business, domain:Employment, domain:Authority, domain:JobChange, domain:Project, domain:Reputation, domain:Government, domain:Retirement .
+domain:WealthFinance a ar:LifeDomain ; ar:stableId "domain.wealth" ; skos:prefLabel "Wealth and finance"@en ; ar:hasDomainTopic domain:Wealth, domain:Income, domain:Debt, domain:Investment, domain:Inheritance .
+domain:HealthWellbeing a ar:LifeDomain ; ar:stableId "domain.health" ; skos:prefLabel "Health and wellbeing"@en ; ar:hasDomainTopic domain:Health, domain:MentalWellbeing, domain:Surgery, domain:Accident, domain:Recovery .
+domain:MarriageRelationships a ar:LifeDomain ; ar:stableId "domain.relationships" ; skos:prefLabel "Marriage and relationships"@en ; ar:hasDomainTopic domain:Marriage, domain:Relationship, domain:Separation .
+domain:ChildrenParenthood a ar:LifeDomain ; ar:stableId "domain.children" ; skos:prefLabel "Children and parenthood"@en ; ar:hasDomainTopic domain:Progeny, domain:Adoption .
+domain:FamilyRelatives a ar:LifeDomain ; ar:stableId "domain.family" ; skos:prefLabel "Family and relatives"@en ; ar:hasDomainTopic domain:Family, domain:Mother, domain:Father, domain:Siblings .
+domain:EducationExamsResearch a ar:LifeDomain ; ar:stableId "domain.education" ; skos:prefLabel "Education, exams and research"@en ; ar:hasDomainTopic domain:Education, domain:Exams, domain:Research .
+domain:HomePropertyVehicles a ar:LifeDomain ; ar:stableId "domain.home_property" ; skos:prefLabel "Home, property and vehicles"@en ; ar:hasDomainTopic domain:Property, domain:Vehicles .
+domain:TravelRelocationForeignLife a ar:LifeDomain ; ar:stableId "domain.foreign_life" ; skos:prefLabel "Travel, relocation and foreign life"@en ; ar:hasDomainTopic domain:Foreign, domain:Immigration, domain:Location .
+domain:LegalCompetitionConflict a ar:LifeDomain ; ar:stableId "domain.legal_competition" ; skos:prefLabel "Legal, competition and conflict"@en ; ar:hasDomainTopic domain:Legal, domain:Competition .
+domain:FriendsCreativityPerformance a ar:LifeDomain ; ar:stableId "domain.social_creative" ; skos:prefLabel "Friends, creativity and performance"@en ; ar:hasDomainTopic domain:Friends, domain:Creativity, domain:Sports .
+domain:SpiritualityPurposeKarma a ar:LifeDomain ; ar:stableId "domain.spirituality" ; skos:prefLabel "Spirituality, purpose and karma"@en ; ar:hasDomainTopic domain:Spirituality, domain:LifePurpose, domain:Karma .
+
+# Existing Instant taxonomy keys mapped beneath one parent each.
+domain:General a ar:DomainTopic ; ar:runtimeKey "general" ; skos:prefLabel "General life overview"@en .
+domain:Self a ar:DomainTopic ; ar:runtimeKey "self" ; skos:prefLabel "Self, temperament and personality"@en .
+domain:Career a ar:DomainTopic ; ar:runtimeKey "career" ; skos:prefLabel "Career"@en .
+domain:Business a ar:DomainTopic ; ar:runtimeKey "business" ; skos:prefLabel "Business"@en .
+domain:Employment a ar:DomainTopic ; ar:runtimeKey "employment" ; skos:prefLabel "Employment"@en .
+domain:Authority a ar:DomainTopic ; ar:runtimeKey "authority" ; skos:prefLabel "Authority, promotion and leadership"@en .
+domain:JobChange a ar:DomainTopic ; ar:runtimeKey "job_change" ; skos:prefLabel "Job change and resignation"@en .
+domain:Project a ar:DomainTopic ; ar:runtimeKey "project" ; skos:prefLabel "Projects and execution"@en .
+domain:Reputation a ar:DomainTopic ; ar:runtimeKey "reputation" ; skos:prefLabel "Reputation and public standing"@en .
+domain:Government a ar:DomainTopic ; ar:runtimeKey "government" ; skos:prefLabel "Government and public-sector work"@en .
+domain:Retirement a ar:DomainTopic ; ar:runtimeKey "retirement" ; skos:prefLabel "Retirement"@en .
+domain:Wealth a ar:DomainTopic ; ar:runtimeKey "wealth" ; skos:prefLabel "Wealth"@en .
+domain:Income a ar:DomainTopic ; ar:runtimeKey "income" ; skos:prefLabel "Income and compensation"@en .
+domain:Debt a ar:DomainTopic ; ar:runtimeKey "debt" ; skos:prefLabel "Debt and repayment"@en .
+domain:Investment a ar:DomainTopic ; ar:runtimeKey "investment" ; skos:prefLabel "Investment and speculation"@en .
+domain:Inheritance a ar:DomainTopic ; ar:runtimeKey "inheritance" ; skos:prefLabel "Inheritance, insurance and settlement"@en .
+domain:Health a ar:DomainTopic ; ar:runtimeKey "health" ; skos:prefLabel "Overall health"@en .
+domain:MentalWellbeing a ar:DomainTopic ; ar:runtimeKey "mental_wellbeing" ; skos:prefLabel "Mental and emotional wellbeing"@en .
+domain:Surgery a ar:DomainTopic ; ar:runtimeKey "surgery" ; skos:prefLabel "Surgery and procedures"@en .
+domain:Accident a ar:DomainTopic ; ar:runtimeKey "accident" ; skos:prefLabel "Accident and injury susceptibility"@en .
+domain:Recovery a ar:DomainTopic ; ar:runtimeKey "recovery" ; skos:prefLabel "Recovery and rehabilitation"@en .
+domain:Marriage a ar:DomainTopic ; ar:runtimeKey "marriage" ; skos:prefLabel "Marriage and spouse"@en .
+domain:Relationship a ar:DomainTopic ; ar:runtimeKey "relationship" ; skos:prefLabel "Love and relationships"@en .
+domain:Separation a ar:DomainTopic ; ar:runtimeKey "separation" ; skos:prefLabel "Separation, divorce and reconciliation"@en .
+domain:Progeny a ar:DomainTopic ; ar:runtimeKey "progeny" ; skos:prefLabel "Progeny, pregnancy and childbirth"@en .
+domain:Adoption a ar:DomainTopic ; ar:runtimeKey "adoption" ; skos:prefLabel "Adoption and stepchildren"@en .
+domain:Family a ar:DomainTopic ; ar:runtimeKey "family" ; skos:prefLabel "Family"@en .
+domain:Mother a ar:DomainTopic ; ar:runtimeKey "mother" ; skos:prefLabel "Mother"@en .
+domain:Father a ar:DomainTopic ; ar:runtimeKey "father" ; skos:prefLabel "Father"@en .
+domain:Siblings a ar:DomainTopic ; ar:runtimeKey "siblings" ; skos:prefLabel "Siblings"@en .
+domain:Education a ar:DomainTopic ; ar:runtimeKey "education" ; skos:prefLabel "Education and learning"@en .
+domain:Exams a ar:DomainTopic ; ar:runtimeKey "exams" ; skos:prefLabel "Exams and competitive selection"@en .
+domain:Research a ar:DomainTopic ; ar:runtimeKey "research" ; skos:prefLabel "Research and deep study"@en .
+domain:Property a ar:DomainTopic ; ar:runtimeKey "property" ; skos:prefLabel "Home and property"@en .
+domain:Vehicles a ar:DomainTopic ; ar:runtimeKey "vehicles" ; skos:prefLabel "Vehicles"@en .
+domain:Foreign a ar:DomainTopic ; ar:runtimeKey "foreign" ; skos:prefLabel "Foreign travel and life"@en .
+domain:Immigration a ar:DomainTopic ; ar:runtimeKey "immigration" ; skos:prefLabel "Immigration and relocation"@en .
+domain:Location a ar:DomainTopic ; ar:runtimeKey "location" ; skos:prefLabel "Location recommendation"@en .
+domain:Legal a ar:DomainTopic ; ar:runtimeKey "legal" ; skos:prefLabel "Legal matters and litigation"@en .
+domain:Competition a ar:DomainTopic ; ar:runtimeKey "competition" ; skos:prefLabel "Competition, rivals and conflict"@en .
+domain:Friends a ar:DomainTopic ; ar:runtimeKey "friends" ; skos:prefLabel "Friends, networks and community"@en .
+domain:Creativity a ar:DomainTopic ; ar:runtimeKey "creativity" ; skos:prefLabel "Creativity and arts"@en .
+domain:Sports a ar:DomainTopic ; ar:runtimeKey "sports" ; skos:prefLabel "Sports and performance"@en .
+domain:Spirituality a ar:DomainTopic ; ar:runtimeKey "spirituality" ; skos:prefLabel "Spirituality and soul direction"@en .
+domain:LifePurpose a ar:DomainTopic ; ar:runtimeKey "life_purpose" ; skos:prefLabel "Life purpose and calling"@en .
+domain:Karma a ar:DomainTopic ; ar:runtimeKey "karma" ; skos:prefLabel "Karma and repeating patterns"@en .
+
+# Muhurat is deliberately an operation, not a fourteenth life domain.
+domain:Muhurat a ar:QuestionOperation ; ar:stableId "operation.muhurat" ; ar:runtimeKey "muhurat" ; skos:prefLabel "Muhurat and electional timing"@en .

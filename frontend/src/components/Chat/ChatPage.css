@@ -207,28 +207,8 @@
     animation: instant-session-pulse 1.2s ease-in-out infinite;
 }
 
-.chat-response-stages {
-    display: inline-flex;
-    align-items: center;
-    min-height: 2.35rem;
-    max-width: 22rem;
-    padding: 0 0.75rem;
-    overflow: hidden;
-    color: var(--color-text-muted);
-    background: color-mix(in srgb, var(--color-surface-raised) 96%, var(--color-accent) 4%);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-pill);
-    font-size: 0.68rem;
-    font-weight: 750;
-    line-height: 1;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    font-variant-numeric: tabular-nums;
-}
-
 @media (max-width: 968px) {
-    .chat-response-timer,
-    .chat-response-stages { display: none; }
+    .chat-response-timer { display: none; }
 }
 
 .chat-header-btn {
@@ -498,9 +478,17 @@ button.chat-header-credits.credits-display:active {
 }
 
 .message-bubble--instant {
+    flex-direction: column;
+    align-items: flex-start;
     width: auto;
     max-width: 100%;
     margin: 0;
+}
+
+.message-bubble--instant.user { align-items: flex-end; }
+
+.message-bubble--instant.message-bubble--timeline {
+    width: 100%;
 }
 
 .message-bubble--instant .message-content--instant {
@@ -562,9 +550,9 @@ button.chat-header-credits.credits-display:active {
     align-items: center;
     gap: 0.3rem;
     padding: 0.22rem 0.5rem;
-    color: var(--color-brand);
-    background: color-mix(in srgb, var(--color-brand) 8%, var(--color-surface));
-    border: 1px solid color-mix(in srgb, var(--color-brand) 30%, var(--color-border));
+    color: var(--color-on-accent);
+    background: var(--color-accent-soft);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
     border-radius: 999px;
     font: inherit;
     font-size: 0.68rem;
@@ -2694,9 +2682,9 @@ button.chat-header-credits.credits-display:active {
 .chat-header-instant {
     position: relative;
     min-width: 0;
-    flex: 1 1 42rem;
-    max-width: 48rem;
-    min-height: 3.4rem;
+    flex: 0 1 auto;
+    max-width: 40rem;
+    min-height: 3rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -2720,7 +2708,7 @@ button.chat-header-credits.credits-display:active {
 }
 
 .chat-header-instant__identity {
-    min-width: 11rem;
+    min-width: 10rem;
     display: flex;
     align-items: center;
     gap: var(--space-2);
@@ -2758,8 +2746,7 @@ button.chat-header-credits.credits-display:active {
 .chat-header-instant__identity small { color: var(--color-text-muted); font-size: var(--text-xs); white-space: nowrap; }
 
 .chat-header-instant__metrics {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(5.25rem, 1fr));
+    display: flex;
     align-items: center;
     border-left: 1px solid var(--color-border);
     border-right: 1px solid var(--color-border);
@@ -2772,7 +2759,6 @@ button.chat-header-credits.credits-display:active {
     padding: 0 var(--space-3);
 }
 
-.chat-header-instant__metrics > span + span { border-left: 1px solid var(--color-border); }
 .chat-header-instant__metrics small { color: var(--color-text-muted); font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 .chat-header-instant__metrics strong { color: var(--color-text); font-size: var(--text-md); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
@@ -4096,3 +4082,96 @@ button.chat-header-credits.credits-display:focus-visible {
     border: 0 !important;
     box-shadow: none !important;
 }
+
+.marriage-timeline-card {
+    width: min(100%, 620px);
+    margin: 12px 0 4px;
+    padding: 16px;
+    color: var(--color-text);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--color-surface-raised) 94%, var(--color-accent-soft)), var(--color-surface));
+    border: 1px solid color-mix(in srgb, var(--color-accent) 28%, var(--color-border));
+    border-radius: var(--radius-lg, 18px);
+    box-shadow: var(--shadow-sm);
+    box-sizing: border-box;
+}
+
+.marriage-timeline-card__eyebrow {
+    margin-bottom: 5px;
+    color: var(--color-accent);
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+.marriage-timeline-card__title {
+    font-size: 17px;
+    font-weight: 850;
+    line-height: 1.3;
+}
+
+.marriage-timeline-card__reason,
+.marriage-timeline-card__trust-note {
+    color: var(--color-text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.marriage-timeline-card__reason { margin-top: 5px; }
+.marriage-timeline-card__trust-note { margin-top: 10px; }
+
+.marriage-timeline-card__options {
+    display: grid;
+    gap: 8px;
+    margin-top: 13px;
+}
+
+.marriage-timeline-option {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) 20px;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    min-height: 54px;
+    padding: 9px 10px;
+    color: var(--color-text);
+    text-align: left;
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md, 13px);
+    cursor: pointer;
+    transition: transform .15s ease, border-color .15s ease, background .15s ease;
+}
+
+.marriage-timeline-option:hover:not(:disabled),
+.marriage-timeline-option:focus-visible:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent-soft) 9%, var(--color-surface-raised));
+}
+
+.marriage-timeline-option:disabled { cursor: default; opacity: .48; }
+.marriage-timeline-option--selected:disabled { opacity: 1; border-color: var(--color-success); }
+
+.marriage-timeline-option__rank {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    color: var(--color-accent);
+    font-size: 11px;
+    font-weight: 900;
+    background: color-mix(in srgb, var(--color-accent-soft) 14%, transparent);
+    border-radius: 50%;
+}
+
+.marriage-timeline-option__copy { display: grid; min-width: 0; gap: 2px; }
+.marriage-timeline-option__copy strong {
+    color: var(--color-text);
+    font-size: 16px;
+    font-weight: 850;
+    line-height: 1.25;
+    letter-spacing: -.01em;
+}
+.marriage-timeline-option__copy small { color: var(--color-text-muted); font-size: 11px; line-height: 1.35; }
+.marriage-timeline-option__control { color: var(--color-accent); font-size: 20px; font-weight: 800; }

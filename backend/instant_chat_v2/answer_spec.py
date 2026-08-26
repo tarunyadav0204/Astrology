@@ -2,10 +2,110 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List
+
+from instant_chat_v2.career import (
+    CAREER_ALIASES,
+    CAREER_PROFILES,
+    answer_contract as build_career_answer_contract,
+    career_profile,
+    classify_career_decision,
+    classify_manifestations as classify_career_manifestations,
+    is_career_decision,
+)
+
+
+def _normalized_anatomy_terms(values: Any) -> set[str]:
+    """Return comparable anatomy tokens without confusing signs with houses."""
+    terms: set[str] = set()
+    for value in values or []:
+        text = str(value or "").strip().lower()
+        if not text:
+            continue
+        terms.add(text)
+        terms.update(
+            token
+            for token in re.findall(r"[a-z]+", text)
+            if len(token) >= 4 and token not in {"region", "including", "organs"}
+        )
+    # Compact profile labels and the calculator's anatomy vocabulary are not
+    # always identical (for example "pelvic" versus "pelvis").  Expand only
+    # explicit anatomy synonyms; never infer a house from a sign number.
+    if terms & {"pelvic", "pelvis"}:
+        terms.update({"pelvic", "pelvis"})
+    if terms & {"anorectal", "anus", "rectum", "rectal"}:
+        terms.update({"anorectal", "anus", "rectum", "rectal"})
+    if terms & {"shoulder", "shoulders"}:
+        terms.update({"shoulder", "shoulders"})
+    return terms
+
+
+def _health_zone_anatomy_basis(item: Dict[str, Any], sixth_chain: Dict[str, Any]) -> List[str]:
+    """Recover immutable sixth-house causes when a compact profile dropped them.
+
+    The destination house and the occupied sign are deliberately separate. A
+    sixth lord in Gemini (sign 3) and House 8 must never become "House 3".
+    """
+    supplied = [
+        str(value).strip()
+        for value in (item.get("primary_medical_reasons") or [])
+        if str(value).strip()
+    ]
+    if supplied:
+        return supplied[:3]
+    if not isinstance(sixth_chain, dict):
+        return []
+
+    region_terms = _normalized_anatomy_terms(
+        [item.get("zone"), *(item.get("anatomical_members") or [])]
+    )
+
+    def matches(key: str) -> bool:
+        return bool(region_terms & _normalized_anatomy_terms(sixth_chain.get(key) or []))
+
+    lord = str(sixth_chain.get("sixth_lord") or "the sixth lord").strip()
+    reasons: List[str] = []
+    if matches("sixth_lord_nakshatra_zones"):
+        nakshatra = str(sixth_chain.get("sixth_lord_nakshatra") or "").strip()
+        pada = sixth_chain.get("sixth_lord_nakshatra_pada")
+        nak_lord = str(sixth_chain.get("sixth_lord_nakshatra_lord") or "").strip()
+        zones = list(sixth_chain.get("sixth_lord_nakshatra_zones") or [])
+        if nakshatra:
+            detail = f"House 6 lord {lord} occupies {nakshatra}"
+            if pada:
+                detail += f" pada {pada}"
+            if nak_lord:
+                detail += f", ruled by {nak_lord}"
+            reasons.append(f"{detail}; its anatomical focus is {', '.join(zones[:3])}.")
+    if matches("sixth_lord_sign_zones"):
+        sign = str(sixth_chain.get("sixth_lord_sign") or "").strip()
+        zones = list(sixth_chain.get("sixth_lord_sign_zones") or [])
+        if sign:
+            reasons.append(
+                f"House 6 lord {lord} is in {sign}, focusing its health indication on {', '.join(zones[:3])}."
+            )
+    if matches("sixth_house_sign_zones"):
+        sign = str(sixth_chain.get("sixth_house_sign") or "").strip()
+        zones = list(sixth_chain.get("sixth_house_sign_zones") or [])
+        if sign:
+            reasons.append(
+                f"The sign in House 6 is {sign}, linking the disease axis to {', '.join(zones[:3])}."
+            )
+    if matches("sixth_lord_house_zones"):
+        house = sixth_chain.get("sixth_lord_house")
+        zones = list(sixth_chain.get("sixth_lord_house_zones") or [])
+        if house:
+            reasons.append(
+                f"House 6 lord {lord} is placed in House {house}; that house's anatomical field includes {', '.join(zones[:4])}."
+            )
+    return list(dict.fromkeys(reasons))[:3]
 
 
 def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledger: Dict[str, Any]) -> Dict[str, Any]:
+    category = str(query_plan.get("category") or "").strip().lower()
+    is_career = category in CAREER_PROFILES or category in CAREER_ALIASES
+    career = career_profile(category, query_plan.get("career_subtype")) if is_career else None
     evidence_ids = [item.get("evidence_id") for item in ledger.get("records", []) if item.get("evidence_id")]
     primary_ids = verdict.get("evidence_ids") or evidence_ids[:2]
     claims: List[Dict[str, Any]] = [
@@ -60,7 +160,10 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
             "required": True,
         })
     if not exact_day and query_plan.get("answer_mode") in {"event_timing", "lifetime_event_timing", "month_timing", "event_prediction", "timing_window"}:
-        timing_ids = [item.get("evidence_id") for item in ledger.get("records", []) if item.get("kind") == "event_timing_verdict"]
+        timing_ids = [
+            item.get("evidence_id") for item in ledger.get("records", [])
+            if item.get("kind") in {"event_timing_verdict", "historical_dasha_windows"}
+        ]
         if timing_ids:
             claims.append({
                 "claim_id": "claim-timing-window",
@@ -123,8 +226,6 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
     health_rules = None
     health_category = str(query_plan.get("category") or "").lower()
     if health_category in {"health", "mental_wellbeing", "surgery", "accident", "recovery"}:
-        semantic_time = time_scope.get("semantic") if isinstance(time_scope.get("semantic"), dict) else {}
-        semantic_kind = str(semantic_time.get("kind") or "none").strip().lower()
         requested_time = time_scope.get("requested")
         requested_time_text = (
             str(requested_time or "").strip().lower()
@@ -161,7 +262,6 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
         explicit_health_time_scope = bool(
             explicit_requested_time
             or exact_day
-            or semantic_kind not in {"", "none", "current"}
             # `event_prediction` is intentionally not enough on its own. The
             # router can select it for questions such as "Do I have a risk of
             # diabetes?", which ask about constitutional susceptibility rather
@@ -178,17 +278,21 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
         major_vulnerabilities = (
             health_value.get("major_vulnerabilities") if isinstance(health_value, dict) else []
         )
+        sixth_house_chain = (
+            health_value.get("sixth_house_chain") if isinstance(health_value, dict) else {}
+        )
+        sixth_house_chain = sixth_house_chain if isinstance(sixth_house_chain, dict) else {}
         medical_profile = (
             health_value.get("medical_profile") if isinstance(health_value, dict) else {}
         )
         medical_profile = medical_profile if isinstance(medical_profile, dict) else {}
         allowed_zones = [
             str(item.get("zone") or "").strip()
-            for item in (major_vulnerabilities or [])[:3]
+            for item in (major_vulnerabilities or [])[:4]
             if isinstance(item, dict) and str(item.get("zone") or "").strip()
         ]
         allowed_zone_evidence = []
-        for item in (major_vulnerabilities or [])[:3]:
+        for item in (major_vulnerabilities or [])[:4]:
             if not isinstance(item, dict):
                 continue
             zone = str(item.get("zone") or "").strip()
@@ -200,6 +304,7 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                 "confidence": item.get("confidence"),
                 "confluence_count": item.get("confluence_count"),
                 "primary_medical_factors": list(item.get("primary_medical_factors") or [])[:3],
+                "anatomy_basis": _health_zone_anatomy_basis(item, sixth_house_chain),
                 "confirmation_factors": list(item.get("confirmation_factors") or [])[:3],
                 "natal_layers": list(item.get("natal_layers") or [])[:6],
                 "sources": list(item.get("sources") or [])[:5],
@@ -232,6 +337,8 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
             "health_question_type": health_category,
             "is_time_bound_question": explicit_health_time_scope,
             "allowed_zone_names": allowed_zones,
+            "required_zone_count": len(allowed_zones),
+            "require_all_allowed_zones": bool(allowed_zones) and not explicit_health_time_scope,
             "allowed_zone_evidence": allowed_zone_evidence,
             "allowed_mechanisms": allowed_mechanisms,
             "major_vulnerabilities": major_vulnerabilities or [],
@@ -242,7 +349,7 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
             "requested_horizon": requested_horizon,
             "medical_framing": "Astrological susceptibility only; never a diagnosis or prediction of illness.",
             "answer_order": [
-                "plain-language ranked constitutional vulnerabilities (maximum three)",
+                "all retained plain-language constitutional vulnerabilities in their supplied ranked order",
                 "one concrete natal reason for each named vulnerability",
                 "current activation only when the question is time-bound and an explicit activation record supports it",
                 "protective or recovery factors",
@@ -254,6 +361,16 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                 "'the chart suggests susceptibility' or 'an area needing preventive attention'. If the list is "
                 "empty, do not invent or name a body part. Treat anatomical_members as one regional finding: "
                 "never split face/lips/chin or heart/spine/upper-back into separate independent vulnerabilities."
+            ),
+            "anatomy_explanation_rule": (
+                "Explain why a body area was selected only from that zone's anatomy_basis. Valid anatomical "
+                "contributors include the sign in House 6, the 6th lord's sign and nakshatra, and the anatomical "
+                "field of the house occupied by the 6th lord. The destination house also describes expression "
+                "or context (acute, chronic, hidden, recurrent, crisis or procedural). Never turn one contributor "
+                "alone into a narrow condition: for example, a 6th lord in House 8 may support anorectal, pelvic, "
+                "excretory or reproductive susceptibility, but does not by itself establish fissures. A named "
+                "condition requires corroboration from the supplied sign, nakshatra, planets and relevant health "
+                "houses, and must remain a susceptibility rather than a diagnosis."
             ),
             "category_safety": {
                 "mental_wellbeing": (
@@ -455,6 +572,66 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                 "foreign, or different-background spouse. Do not give timing unless the user asks for timing."
             ),
         }
+    career_rules = None
+    if career:
+        material_windows = []
+        career_decision = is_career_decision(category, career.get("subtype"))
+        timing_requested = answer_mode in {"timing_window", "event_prediction"} or career_decision
+        for row in ((timing_value.get("material_future_progression") or []) if timing_requested else []):
+            if not isinstance(row, dict) or not (row.get("start") or row.get("end")):
+                continue
+            activated_houses = row.get("activated_focus_houses") or []
+            manifestations = classify_career_manifestations(activated_houses)
+            material_windows.append({
+                "start": row.get("start"),
+                "end": row.get("end"),
+                "chain": row.get("chain"),
+                "activated_focus_houses": row.get("activated_focus_houses") or [],
+                "manifestations": manifestations,
+                "decision_matrix": (
+                    classify_career_decision(activated_houses) if career_decision else None
+                ),
+                "why": row.get("why"),
+            })
+        career_rules = {
+            "profile": career,
+            "answer_contract": build_career_answer_contract(answer_mode, career["subtype"]),
+            "material_windows": material_windows,
+            "required_foundation": {
+                "D1": "Professional promise, work capacity, income linkage and natal obstacles.",
+                "D10": "How profession, role, authority, execution and recognition express in practice.",
+            },
+            "manifestation_gate": (
+                "Use only manifestations supplied for that window. House activation is activity, not delivery. "
+                "An offer, promotion, joining, salary increase, business contract or exit needs the matching "
+                "multi-house manifestation gate; never infer it from House 10 or a high score alone."
+            ),
+            "decision_gate": (
+                "For job-change, resignation and job-security questions, use each window's decision_matrix. "
+                "Judge H6/H10 continuity, H3/H10/H12 change and separation, H2/H6/H10/H11 landing support, "
+                "and H8 disruption pressure separately. Give a direct stay/change verdict, but never advise "
+                "resignation from career fit, dissatisfaction, H8 pressure, or H12 alone. If landing support is "
+                "missing, recommend preparation or a secured offer before leaving."
+                if career_decision else None
+            ),
+            "career_fit_rule": (
+                "For career fit, use evidence.career_foundation.vocation_synthesis as the controlling result. "
+                "Answer in this order: strongest work functions; up to three suitable fields; preferred environment; "
+                "job/business/hybrid inclination; one limitation. Explain the repeated D1, D10, Amatyakaraka and "
+                "Karakamsha signatures supplied there. Do not invent an exact job title, do not rank from one planet, "
+                "and do not let Shadbala create a vocation indication that is absent from those chart layers."
+            ),
+            "static_profile_rule": (
+                "For genuine vocation/profile topic_reading and potential_capacity only, answer from the natal professional foundation: "
+                "D1, D10, Amatyakaraka and Karkamsa when supplied. Do not cite dasha, transit, dates, years, "
+                "peaks or delivery windows unless the user explicitly asks when or names a period. This does not "
+                "apply to present job-change, resignation or job-security decisions."
+            ),
+            "remedy_rule": (
+                "For remedy_action, provide exactly three remedies present in calculated remedy evidence. Each must "
+                "include the action, frequency and chart reason. Never substitute generic discipline, training or patience."
+            ),
+        }
     return {
         "schema_version": "instant-answer-spec/v1",
         "tone": "natural, concise, daily-use language",
@@ -558,9 +735,11 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
             else None
         ),
         "capacity_rules": capacity_rules,
+        "career_rules": career_rules,
         "event_rules": (
             {
                 "hard_horizon_end": (query_plan.get("time_scope") or {}).get("horizon_end"),
+                "retrospective": bool((query_plan.get("time_scope") or {}).get("retrospective")),
                 "window_comparison": timing_value.get("comparison"),
                 "window_score_delta": timing_value.get("score_delta"),
                 "window_answer_rule": timing_value.get("answer_rule"),
@@ -568,6 +747,17 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                     {
                         "start": row.get("start"),
                         "end": row.get("end"),
+                        **({
+                            "phase_start": row.get("phase_start"),
+                            "phase_end": row.get("phase_end"),
+                            "phase_dasha_chain": row.get("phase_dasha_chain"),
+                            "phase_granularity": row.get("phase_granularity"),
+                            "mahadasha": row.get("mahadasha"),
+                            "antardasha": row.get("antardasha"),
+                            "pratyantardasha": row.get("pratyantardasha"),
+                            "strongest_pd_window": row.get("strongest_pd_window"),
+                            "probable_peak_windows": list(row.get("probable_peak_windows") or [])[:2],
+                        } if bool((query_plan.get("time_scope") or {}).get("retrospective")) else {}),
                         "chain": row.get("chain"),
                         "why": row.get("why"),
                     }
@@ -578,11 +768,26 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                     {
                         "start": row.get("start"),
                         "end": row.get("end"),
+                        **({
+                            "phase_start": row.get("phase_start"),
+                            "phase_end": row.get("phase_end"),
+                            "phase_dasha_chain": row.get("phase_dasha_chain"),
+                            "phase_granularity": row.get("phase_granularity"),
+                            "mahadasha": row.get("mahadasha"),
+                            "antardasha": row.get("antardasha"),
+                            "pratyantardasha": row.get("pratyantardasha"),
+                            "strongest_pd_window": row.get("strongest_pd_window"),
+                            "probable_peak_windows": list(row.get("probable_peak_windows") or [])[:2],
+                        } if bool((query_plan.get("time_scope") or {}).get("retrospective")) else {}),
                         "chain": row.get("chain"),
                         "activated_focus_houses": row.get("activated_focus_houses") or [],
                         "why": row.get("why"),
                     }
-                    for row in (timing_value.get("material_future_progression") or [])
+                    for row in (
+                        (verdict.get("ranked_windows") or [])
+                        if bool((query_plan.get("time_scope") or {}).get("retrospective"))
+                        else (timing_value.get("material_future_progression") or [])
+                    )
                     if isinstance(row, dict) and (row.get("start") or row.get("end"))
                 ],
                 "dasha_level_terms": {
@@ -591,9 +796,12 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                     "PD": "Pratyantardasha / sub-sub-period",
                 },
                 "career_manifestations": (
-                    ["more calls", "more effort", "interviews", "visibility"]
-                    if query_plan.get("category") == "career"
-                    else []
+                    [
+                        manifestation
+                        for row in (career_rules or {}).get("material_windows", [])
+                        for manifestation in row.get("manifestations", [])
+                    ]
+                    if career_rules else []
                 ),
                 "derived_subject_rule": (
                     "Say 'the derived Nth-house indications for your [subject]'—never 'her/his Nth house'. "
@@ -603,7 +811,16 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                     else None
                 ),
                 "instruction": (
-                    "Never state a date after hard_horizon_end. If a supplied window was clipped, use the clipped end. "
+                    (
+                        "This is retrospective event discovery. Present the supplied past windows as ranked probable periods, "
+                        "not the actual or proven marriage date. For every row, distinguish its broad MD-AD phase from its "
+                        "strongest_pd_window: name that PD as a sub-sub-period and copy its start/end dates. Then give one or "
+                        "two supplied probable_peak_windows as narrower concentrations. Never label the whole MD-AD phase "
+                        "with the winning PD planet. Ask which period matches the user's real history. "
+                        if bool((query_plan.get("time_scope") or {}).get("retrospective")) else
+                        "Never state a date after hard_horizon_end. If a supplied window was clipped, use the clipped end. "
+                    )
+                    +
                     "Obey window_answer_rule and window_score_delta when describing relative strength; a small gap must not become a definitive strongest-window claim. "
                     "Copy start/end values from allowed_timing_windows without changing their order or moving a year. "
                     "Treat every semicolon-separated item in a window's why field as an independent fact. "

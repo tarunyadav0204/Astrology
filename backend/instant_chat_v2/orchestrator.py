@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import re
 from typing import Any, Dict
 
 from .answer_spec import build_answer_spec, verify_answer_spec
@@ -73,11 +74,25 @@ def finalize_instant_v2_packet(packet: Dict[str, Any], *, answer: str) -> Dict[s
         "within_word_budget": len(clean_answer.split()) <= max_words,
         "ends_with_conversational_question": clean_answer.rstrip().endswith("?"),
     }
+    graph_policy = (result.get("answer_spec") or {}).get("knowledge_graph_policy") or {}
+    timing_claim_pattern = re.compile(
+        r"\b(?:19|20)\d{2}\b|\b(?:january|february|march|april|may|june|july|august|"
+        r"september|october|november|december)\b|\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",
+        re.IGNORECASE,
+    )
+    response_checks["graph_claim_permission_respected"] = not (
+        graph_policy.get("claim_permission") == "directional_only_no_timing"
+        and bool(timing_claim_pattern.search(clean_answer))
+    )
     verification["answer_present"] = response_checks["answer_present"]
     verification["response_checks"] = response_checks
     # `passed` deliberately describes contract integrity, not semantic proof of
     # every sentence. A later independent verifier will own that stronger claim.
-    verification["passed"] = bool(verification.get("passed")) and response_checks["answer_present"]
+    verification["passed"] = (
+        bool(verification.get("passed"))
+        and response_checks["answer_present"]
+        and response_checks["graph_claim_permission_respected"]
+    )
     result["verification"] = verification
     result["answer_preview"] = clean_answer[:500]
     return result

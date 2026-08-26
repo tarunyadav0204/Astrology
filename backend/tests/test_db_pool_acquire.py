@@ -43,3 +43,26 @@ def test_pool_acquire_remains_bounded(monkeypatch, caplog):
         db._acquire_from_pool(ExhaustedPool(), dict_rows=False)
 
     assert "db_pool_acquire_timeout" in caplog.text
+
+
+def test_pool_acquire_reuses_connection_returned_while_pool_growth_times_out(monkeypatch):
+    from psycopg2 import OperationalError
+
+    connection = object()
+
+    class RecoveringPool:
+        def __init__(self):
+            self.calls = 0
+            self._used = {1: object()}
+            self._pool = []
+
+        def getconn(self):
+            self.calls += 1
+            if self.calls == 1:
+                self._pool.append(connection)
+                raise OperationalError("connection timed out")
+            return self._pool.pop()
+
+    pool = RecoveringPool()
+    assert db._acquire_from_pool(pool, dict_rows=False) is connection
+    assert pool.calls == 2

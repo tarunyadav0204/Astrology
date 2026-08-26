@@ -40,6 +40,7 @@ def _ensure_google_stub():
 
 _ensure_google_stub()
 
+import ai.intent_router as intent_router_module
 from ai.intent_router import IntentRouter
 
 
@@ -74,6 +75,95 @@ class _TestRouter(IntentRouter):
 
     async def _generate_instant_content(self, prompt, model_name, timeout_s):
         return await self._fake_model.generate_content_async(prompt)
+
+
+class _TimeoutThenSuccessRouter(_TestRouter):
+    def __init__(self, payload):
+        super().__init__(payload)
+        self.attempts = 0
+
+    async def _generate_instant_content(self, prompt, model_name, timeout_s):
+        self.attempts += 1
+        if self.attempts == 1:
+            raise TimeoutError()
+        return await super()._generate_instant_content(prompt, model_name, timeout_s)
+
+
+def test_instant_intent_model_uses_admin_selected_instant_model(monkeypatch):
+    monkeypatch.setattr(intent_router_module, "get_instant_chat_model", lambda: "deepseek-chat")
+    router = IntentRouter.__new__(IntentRouter)
+    assert router._get_instant_model_name() == "deepseek-chat"
+
+
+def test_instant_intent_generation_uses_deepseek_when_selected(monkeypatch):
+    request_args = {}
+
+    class _FakeCompletions:
+        async def create(self, **kwargs):
+            request_args.update(kwargs)
+            return types.SimpleNamespace(
+                choices=[types.SimpleNamespace(message=types.SimpleNamespace(content='{"status":"READY"}'))],
+                usage=types.SimpleNamespace(
+                    prompt_tokens=12,
+                    completion_tokens=4,
+                    total_tokens=16,
+                    prompt_tokens_details=types.SimpleNamespace(cached_tokens=2),
+                ),
+            )
+
+    class _FakeAsyncOpenAI:
+        def __init__(self, **kwargs):
+            self.chat = types.SimpleNamespace(completions=_FakeCompletions())
+
+    monkeypatch.setitem(sys.modules, "openai", types.SimpleNamespace(AsyncOpenAI=_FakeAsyncOpenAI))
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setattr(
+        intent_router_module,
+        "get_instant_chat_llm_provider",
+        lambda: intent_router_module.CHAT_LLM_DEEPSEEK,
+    )
+
+    router = IntentRouter.__new__(IntentRouter)
+    response = asyncio.run(router._generate_instant_content("route this", "deepseek-chat", 5.0))
+
+    assert response.text == '{"status":"READY"}'
+    assert response.usage_metadata.prompt_token_count == 12
+    assert response.usage_metadata.cached_content_token_count == 2
+    assert request_args["model"] == "deepseek-chat"
+    assert request_args["extra_body"] == {"thinking": {"type": "disabled"}}
+
+
+def test_instant_router_retries_builtin_timeout_with_empty_message(monkeypatch):
+    payload = _with_dialogue_state(
+        {
+            "status": "READY",
+            "mode": "ANALYZE_TOPIC_POTENTIAL",
+            "answer_mode": "topic_reading",
+            "extracted_context": {},
+            "context_type": "birth",
+            "category": "career",
+            "needs_transits": False,
+            "divisional_charts": ["D1", "D10"],
+        }
+    )
+    router = _TimeoutThenSuccessRouter(payload)
+    monkeypatch.setattr(intent_router_module.asyncio, "sleep", lambda *_: _async_noop())
+
+    result = asyncio.run(
+        router.classify_instant_intent(
+            "How is my career overall?",
+            [],
+            language="english",
+        )
+    )
+
+    assert router.attempts == 2
+    assert result["status"] == "READY"
+    assert result["category"] == "career"
+
+
+async def _async_noop():
+    return None
 
 
 def _with_dialogue_state(payload):

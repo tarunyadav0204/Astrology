@@ -54,6 +54,88 @@ def _add(records: List[Dict[str, Any]], *, source: str, kind: str, value: Any,
     })
 
 
+def _health_body_area_for_ledger(value: Any) -> Any:
+    """Keep health claim causes when producing the bounded evidence ledger.
+
+    ``_compact`` intentionally keeps only the first 24 keys of nested
+    calculator dictionaries.  Medical zone rows and the sixth-house chain are
+    wider than that, and their insertion order is not an API contract.  The
+    answer spec is built from this ledger, so dropping a late anatomy field
+    leaves the composer with a permitted body area but no permitted reason.
+
+    Select the small authoritative subset explicitly before generic
+    compaction.  This keeps the persisted/debug payload bounded without making
+    answer generation depend on dictionary key order.
+    """
+    if not isinstance(value, dict):
+        return value
+
+    zone_keys = (
+        "zone",
+        "anatomical_members",
+        "confidence",
+        "confluence_count",
+        "primary_medical_reasons",
+        "primary_medical_factors",
+        "confirmation_factors",
+        "natal_layers",
+        "sources",
+        "why",
+        "mechanisms",
+        "divisional_repetition",
+        "activation_sources",
+    )
+    chain_keys = (
+        "sixth_house",
+        "sixth_house_sign",
+        "sixth_house_sign_zones",
+        "sixth_lord",
+        "sixth_lord_house",
+        "sixth_lord_house_zones",
+        "sixth_lord_sign",
+        "sixth_lord_sign_zones",
+        "sixth_lord_nakshatra",
+        "sixth_lord_nakshatra_pada",
+        "sixth_lord_nakshatra_lord",
+        "sixth_lord_nakshatra_zones",
+    )
+
+    def selected(source: Any, keys: tuple[str, ...]) -> Dict[str, Any]:
+        if not isinstance(source, dict):
+            return {}
+        return {
+            key: source.get(key)
+            for key in keys
+            if source.get(key) not in (None, "", [], {})
+        }
+
+    result = {
+        "major_vulnerabilities": [
+            selected(row, zone_keys)
+            for row in list(value.get("major_vulnerabilities") or [])[:4]
+            if isinstance(row, dict)
+        ],
+        "priority_zones": list(value.get("priority_zones") or [])[:5],
+        "event_patterns": list(value.get("event_patterns") or [])[:3],
+        "sixth_house_chain": selected(value.get("sixth_house_chain"), chain_keys),
+        "house_map": list(value.get("house_map") or [])[:8],
+        "claim_policy": value.get("claim_policy"),
+        "disclaimer": value.get("disclaimer"),
+    }
+    medical_profile = value.get("medical_profile")
+    if isinstance(medical_profile, dict):
+        result["medical_profile"] = {
+            key: medical_profile.get(key)
+            for key in (
+                "health_question_type",
+                "condition_susceptibilities",
+                "protective_factors",
+            )
+            if medical_profile.get(key) not in (None, "", [], {})
+        }
+    return {key: item for key, item in result.items() if item not in (None, "", [], {})}
+
+
 def _capability_evidence_kinds(capability: str) -> List[str]:
     name = str(capability or "").lower()
     if name == "daily.five_level_dasha":
@@ -69,7 +151,7 @@ def _capability_evidence_kinds(capability: str) -> List[str]:
     if "dasha_windows" in name:
         # Timing permission requires an actual calculated dasha scan. A fused
         # verdict or a transit timeline cannot stand in for dasha evidence.
-        return ["future_dasha_windows"]
+        return ["future_dasha_windows", "historical_dasha_windows"]
     if name == "parashari.activations":
         return ["active_houses"]
     if re.search(r"(?:^|\.)d\d+(?:_|\.|$)", name) or "divisional" in name:
@@ -84,7 +166,7 @@ def _capability_evidence_kinds(capability: str) -> List[str]:
         return ["double_transit_support"]
     if name.startswith("transit."):
         # A current planet snapshot is not an event trigger window.
-        return ["transit_activation_timeline"]
+        return ["transit_activation_timeline", "historical_event_windows"]
     if name == "comparison.option_specific_evidence":
         return ["option_comparison"]
     if name == "parashari.health_body_area":
@@ -197,6 +279,10 @@ def build_evidence_ledger(instant_context: Dict[str, Any], evidence_plan: Dict[s
         normalized.get("forward_event_dasha_scan"),
         parashari.get("forward_event_dasha_scan"),
     )
+    historical_segments = _first_timing_container(
+        normalized.get("historical_event_dasha_scan"),
+        parashari.get("historical_event_dasha_scan"),
+    )
     activation_segments = _segment_rows(window_segments) or _segment_rows(horizon_segments)
     if activation_timeline or activation_segments:
         _add(records, source="parashari.transit_activation", kind="transit_activation_timeline",
@@ -208,10 +294,22 @@ def build_evidence_ledger(instant_context: Dict[str, Any], evidence_plan: Dict[s
     _add(records, source="parashari.dasha_scan", kind="future_dasha_windows",
          value=(forward_segments or horizon_segments or window_segments),
          strength="primary", confidence=0.88)
+    _add(records, source="parashari.historical_dasha_scan", kind="historical_dasha_windows",
+         value=historical_segments, strength="primary", confidence=0.88)
+    historical_transit_periods = [
+        row for row in _segment_rows(historical_segments)
+        if row.get("peak_activation_windows") or row.get("transit_trigger_windows")
+    ]
+    _add(records, source="transit.historical_event_scan", kind="historical_event_windows",
+         value={**historical_segments, "periods": historical_transit_periods}
+         if historical_transit_periods else {},
+         strength="supporting", confidence=0.82)
     _add(records, source="comparison", kind="option_comparison",
          value=normalized.get("option_comparison"), strength="primary", confidence=0.86)
     _add(records, source="parashari.health", kind="health_body_area",
-         value=normalized.get("health_body_area") or normalized.get("body_area_evidence"),
+         value=_health_body_area_for_ledger(
+             normalized.get("health_body_area") or normalized.get("body_area_evidence")
+         ),
          strength="primary", confidence=0.8)
     chart_facts = normalized.get("chart_facts") if isinstance(normalized.get("chart_facts"), dict) else {}
     chart_fact_value = {}

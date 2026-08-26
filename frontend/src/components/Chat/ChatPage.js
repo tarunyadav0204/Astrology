@@ -44,33 +44,6 @@ function formatResponseDuration(value) {
     return `${(milliseconds / 1000).toFixed(1)}s`;
 }
 
-function buildInstantTimingBreakdown(timing, endToEndMs) {
-    if (!timing || timing.kind !== 'instant_chat_usage' || !Array.isArray(timing.stages)) {
-        return null;
-    }
-    const buckets = { intent: 0, calculate: 0, compose: 0 };
-    timing.stages.forEach((stage) => {
-        const name = String(stage?.stage || '').toLowerCase();
-        const elapsed = Math.max(0, Number(stage?.elapsed_ms || 0));
-        if (name.includes('intent') || name === 'answer_mode') buckets.intent += elapsed;
-        else if (name === 'calculations_and_evidence' || name === 'prompt_build') buckets.calculate += elapsed;
-        else if (name === 'instant_answer') buckets.compose += elapsed;
-    });
-    const measured = buckets.intent + buckets.calculate + buckets.compose;
-    const delivery = Math.max(0, Number(endToEndMs || 0) - measured);
-    const parts = [
-        ['Intent', buckets.intent],
-        ['Calc', buckets.calculate],
-        ['AI', buckets.compose],
-        ['UI', delivery],
-    ].filter(([, value]) => value >= 50);
-    if (!parts.length) return null;
-    return {
-        label: parts.map(([label, value]) => `${label} ${formatResponseDuration(value)}`).join(' · '),
-        title: parts.map(([label, value]) => `${label}: ${formatResponseDuration(value)}`).join('\n'),
-    };
-}
-
 /** Single-chart wizard: empty `{}` is truthy in JS — require real fields before showing a “profile ready” card. */
 function isBirthChartReadyForChat(data) {
     const norm = normalizeBirthDetailsForChat(data);
@@ -235,7 +208,6 @@ const ChatPage = ({ onLogin }) => {
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [responseElapsedMs, setResponseElapsedMs] = useState(null);
-    const [responseStageTimings, setResponseStageTimings] = useState(null);
     const responseStartedAtRef = useRef(null);
     const [showCreditsModal, setShowCreditsModal] = useState(false);
     const [showContextModal, setShowContextModal] = useState(false);
@@ -255,7 +227,6 @@ const ChatPage = ({ onLogin }) => {
             const startedAt = Date.now();
             responseStartedAtRef.current = startedAt;
             setResponseElapsedMs(0);
-            setResponseStageTimings(null);
             const timer = window.setInterval(() => {
                 setResponseElapsedMs(Date.now() - startedAt);
             }, 100);
@@ -777,6 +748,19 @@ const ChatPage = ({ onLogin }) => {
     // --- chat-v2 async flow (mobile parity) ---
     const [chatV2SessionId, setChatV2SessionId] = useState(null);
     const instantBilling = useInstantBillingSession({ refreshBalance: fetchBalance });
+    const endingInstantForContextChangeRef = useRef(false);
+    const endInstantForContextChange = useCallback(async (reason) => {
+        if (!instantBilling.active || endingInstantForContextChangeRef.current) return null;
+        endingInstantForContextChangeRef.current = true;
+        try {
+            return await instantBilling.end(reason);
+        } catch (error) {
+            console.warn('[ChatPage] Could not end Instant consultation after context change:', error);
+            return null;
+        } finally {
+            endingInstantForContextChangeRef.current = false;
+        }
+    }, [instantBilling.active, instantBilling.end]);
     const [showInstantEndConfirm, setShowInstantEndConfirm] = useState(false);
     const singleChartSessionStorageKey = useMemo(() => getSingleChartSessionStorageKey(birthData), [birthData]);
     const [personalChartData, setPersonalChartData] = useState(null);
@@ -1108,6 +1092,7 @@ const ChatPage = ({ onLogin }) => {
         const prev = prevSingleChartSessionKeyRef.current;
 
         if (prev !== null && prev !== key) {
+            void endInstantForContextChange('chart_changed');
             try {
                 localStorage.removeItem(prev);
             } catch {
@@ -1130,6 +1115,7 @@ const ChatPage = ({ onLogin }) => {
         wizardMode,
         isMundaneMode,
         birthData,
+        endInstantForContextChange,
     ]);
 
     // After single-chart key effect: avoids loadChatHistory racing past a native switch and refilling the thread.
@@ -1177,6 +1163,7 @@ const ChatPage = ({ onLogin }) => {
     ]);
 
     const resetThreadForWizard = (nextMode) => {
+        void endInstantForContextChange('consultation_context_changed');
         setMessages([]);
         subjectGateOverrideRef.current = null;
         subjectGateMemoryRef.current = [];
@@ -1635,12 +1622,6 @@ const ChatPage = ({ onLogin }) => {
                             );
                         });
                     };
-                    const completedElapsedMs = responseStartedAtRef.current !== null
-                        ? Date.now() - responseStartedAtRef.current
-                        : responseElapsedMs;
-                    setResponseStageTimings(
-                        buildInstantTimingBreakdown(status.timing, completedElapsedMs)
-                    );
                     fetchBalance();
 
                     const paceReply = shouldPaceInstantAnswer({
@@ -2156,7 +2137,7 @@ const ChatPage = ({ onLogin }) => {
             && instantBilling.state?.chat_session_id
             && instantBilling.state.chat_session_id === chatV2SessionId
         );
-        if (requestedInstant && !activeForConversation) {
+        if (requestedInstant && !activeForConversation && !options?.instant_timeline_selection) {
             await startInstantConsultation();
             return;
         }
@@ -3207,7 +3188,7 @@ const ChatPage = ({ onLogin }) => {
                                 </p>
                             )}
                         </div>
-                        {instantChatEnabled && !isPartnershipMode && !isMundaneMode && (
+                        {instantChatEnabled && isInstantAnalysis && !isPartnershipMode && !isMundaneMode && (
                             <section
                                 className={`chat-header-instant ${instantBilling.active ? 'chat-header-instant--live' : 'chat-header-instant--ready'} ${instantBilling.state?.low_balance ? 'chat-header-instant--low' : ''}`}
                                 aria-label="Instant consultation controls"
@@ -3228,7 +3209,6 @@ const ChatPage = ({ onLogin }) => {
                                     <>
                                         <div className="chat-header-instant__metrics" aria-live="polite">
                                             <span><small>Time</small><strong>{formatInstantDuration(instantBilling.state?.elapsed_seconds)}</strong></span>
-                                            <span><small>Credits left</small><strong>{instantBilling.state?.balance ?? credits}</strong></span>
                                         </div>
                                         <div className="chat-header-instant__actions">
                                             {instantBilling.state?.low_balance && (
@@ -3272,25 +3252,14 @@ const ChatPage = ({ onLogin }) => {
                         )}
                         <div className="chat-header-toolbar__actions">
                             {responseElapsedMs !== null && (
-                                <>
-                                    <div
-                                        className={`chat-response-timer ${isLoading ? 'chat-response-timer--running' : 'chat-response-timer--complete'}`}
-                                        aria-label={`Response time ${formatResponseDuration(responseElapsedMs)}`}
-                                        title={isLoading ? 'Response timer running' : 'Response completed'}
-                                    >
-                                        <span className="chat-response-timer__dot" aria-hidden="true" />
-                                        <span aria-hidden="true">{formatResponseDuration(responseElapsedMs)}</span>
-                                    </div>
-                                    {!isLoading && responseStageTimings && (
-                                        <div
-                                            className="chat-response-stages"
-                                            title={responseStageTimings.title}
-                                            aria-label={`Response stages: ${responseStageTimings.label}`}
-                                        >
-                                            {responseStageTimings.label}
-                                        </div>
-                                    )}
-                                </>
+                                <div
+                                    className={`chat-response-timer ${isLoading ? 'chat-response-timer--running' : 'chat-response-timer--complete'}`}
+                                    aria-label={`Response time ${formatResponseDuration(responseElapsedMs)}`}
+                                    title={isLoading ? 'Response timer running' : 'Response completed'}
+                                >
+                                    <span className="chat-response-timer__dot" aria-hidden="true" />
+                                    <span aria-hidden="true">{formatResponseDuration(responseElapsedMs)}</span>
+                                </div>
                             )}
                             {!isMundaneMode && !isPartnershipMode && instantChatEnabled && speechChatEnabled && birthData && (
                             <button

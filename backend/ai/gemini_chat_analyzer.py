@@ -450,7 +450,13 @@ class GeminiChatAnalyzer:
             usage["total_tokens"] = int(tt)
         return {"text": content, "usage": usage}
 
-    async def _deepseek_chat_completion(self, prompt: str, model_id: str) -> Dict[str, Any]:
+    async def _deepseek_chat_completion(
+        self,
+        prompt: str,
+        model_id: str,
+        stream_callback: Optional[Callable[[str, str], None]] = None,
+        deepseek_thinking_enabled: Optional[bool] = None,
+    ) -> Dict[str, Any]:
         """DeepSeek chat via OpenAI-compatible API."""
         try:
             from openai import AsyncOpenAI
@@ -469,12 +475,80 @@ class GeminiChatAnalyzer:
         client = AsyncOpenAI(api_key=api_key, base_url=f"{base_url}/v1", timeout=600.0)
 
         # DeepSeek API allows max_tokens in [1, 8192] only (not Gemini/OpenAI-sized limits).
-        resp = await client.chat.completions.create(
-            model=model_clean,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
-            max_tokens=8192,
-        )
+        request_args = {
+            "model": model_clean,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.0,
+            "max_tokens": 8192,
+        }
+        # DeepSeek V4 defaults to thinking mode. Instant Chat explicitly
+        # disables it for low latency; callers that omit this option preserve
+        # the provider/model default used by Standard and Premium chat.
+        if deepseek_thinking_enabled is not None:
+            request_args["extra_body"] = {
+                "thinking": {
+                    "type": "enabled" if deepseek_thinking_enabled else "disabled"
+                }
+            }
+        if stream_callback is not None:
+            stream = await client.chat.completions.create(
+                **request_args,
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+            content_parts: List[str] = []
+            usage_obj = None
+            published_text = ""
+            # Persisting every provider token is both wasteful and, for sync
+            # callbacks, can throttle the async DeepSeek stream itself.  A
+            # small character batch still feels live while keeping transport
+            # latency independent from database/UI checkpoint work.
+            try:
+                publish_chars = max(
+                    24,
+                    min(160, int(os.getenv("DEEPSEEK_STREAM_PUBLISH_CHARS", "48"))),
+                )
+            except (TypeError, ValueError):
+                publish_chars = 48
+            async for chunk in stream:
+                chunk_usage = getattr(chunk, "usage", None)
+                if chunk_usage is not None:
+                    usage_obj = chunk_usage
+                choices = getattr(chunk, "choices", None) or []
+                if not choices:
+                    continue
+                delta_obj = getattr(choices[0], "delta", None)
+                delta = str(getattr(delta_obj, "content", None) or "")
+                if not delta:
+                    continue
+                content_parts.append(delta)
+                full_text = "".join(content_parts)
+                if not published_text or len(full_text) - len(published_text) >= publish_chars:
+                    publish_delta = full_text[len(published_text):]
+                    # The callback performs synchronous database work.  Keep
+                    # it off the provider event loop so it cannot consume the
+                    # Instant answer timeout.
+                    await asyncio.to_thread(stream_callback, publish_delta, full_text)
+                    published_text = full_text
+            content = "".join(content_parts).strip()
+            if not content:
+                raise RuntimeError("Blank DeepSeek streaming response content")
+            if content != published_text:
+                await asyncio.to_thread(
+                    stream_callback,
+                    content[len(published_text):],
+                    content,
+                )
+            usage: Dict[str, Any] = {
+                "input_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
+                "output_tokens": int(getattr(usage_obj, "completion_tokens", 0) or 0),
+            }
+            total = getattr(usage_obj, "total_tokens", None)
+            if total is not None:
+                usage["total_tokens"] = int(total or 0)
+            return {"text": content, "usage": usage, "transport": "deepseek_stream"}
+
+        resp = await client.chat.completions.create(**request_args)
         if not resp.choices:
             raise RuntimeError("Empty DeepSeek choices")
         content = (resp.choices[0].message.content or "").strip()
@@ -505,8 +579,10 @@ class GeminiChatAnalyzer:
         llm_log_tag: Optional[str] = None,
         request_timeout_s: Optional[float] = None,
         force_gemini: bool = False,
+        provider_override: Optional[str] = None,
         use_gemini_rest: bool = False,
         gemini_thinking_level: Optional[str] = None,
+        deepseek_thinking_enabled: Optional[bool] = None,
         stream_callback: Optional[Callable[[str, str], None]] = None,
     ) -> Dict[str, Any]:
         """
@@ -544,10 +620,15 @@ class GeminiChatAnalyzer:
             if request_timeout_s is None
             else max(1.0, min(600.0, float(request_timeout_s)))
         )
+        requested_provider = str(provider_override or "").strip().lower()
         llm_provider = (
             "gemini"
             if force_gemini
-            else (get_chat_llm_provider_premium() if premium_analysis else get_chat_llm_provider())
+            else (
+                requested_provider
+                if requested_provider in {"gemini", CHAT_LLM_OPENAI, CHAT_LLM_DEEPSEEK, CHAT_LLM_GEMMA}
+                else (get_chat_llm_provider_premium() if premium_analysis else get_chat_llm_provider())
+            )
         )
         model_name = ""
         token_usage: Dict[str, Any] = {"input_tokens": 0, "output_tokens": 0}
@@ -583,9 +664,18 @@ class GeminiChatAnalyzer:
                 response_text = (oa or {}).get("text")
                 token_usage = (oa or {}).get("usage") or token_usage
             elif llm_provider == CHAT_LLM_DEEPSEEK:
-                model_name = get_deepseek_premium_model() if premium_analysis else get_deepseek_chat_model()
+                model_name = (
+                    str(model_name_override).strip()
+                    if model_name_override
+                    else (get_deepseek_premium_model() if premium_analysis else get_deepseek_chat_model())
+                )
                 ds = await asyncio.wait_for(
-                    self._deepseek_chat_completion(prompt, model_name),
+                    self._deepseek_chat_completion(
+                        prompt,
+                        model_name,
+                        stream_callback,
+                        deepseek_thinking_enabled,
+                    ),
                     timeout=timeout_s,
                 )
                 response_text = (ds or {}).get("text")

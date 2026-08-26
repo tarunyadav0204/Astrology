@@ -3,7 +3,7 @@ from .base_calculator import BaseCalculator
 class ProfessionCalculator(BaseCalculator):
     """Calculate professional aptitude using real Vedic calculations"""
     
-    def __init__(self, chart_data=None):
+    def __init__(self, chart_data=None, birth_data=None):
         super().__init__(chart_data or {})
         
         # Initialize real calculators
@@ -11,7 +11,12 @@ class ProfessionCalculator(BaseCalculator):
         from .planetary_dignities_calculator import PlanetaryDignitiesCalculator
         from .chara_karaka_calculator import CharaKarakaCalculator
         
-        self.shadbala_calc = ShadbalaCalculator(chart_data)
+        # Classical Shadbala contains time-dependent components and therefore
+        # cannot be calculated from an already-built chart alone.  Keep this
+        # argument optional for backwards compatibility with older callers,
+        # while allowing prediction paths that have the birth record to pass
+        # it through intact.
+        self.shadbala_calc = ShadbalaCalculator(chart_data, birth_data)
         self.dignities_calc = PlanetaryDignitiesCalculator(chart_data)
         self.chara_karaka_calc = CharaKarakaCalculator(chart_data)
         

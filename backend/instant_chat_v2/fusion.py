@@ -58,7 +58,30 @@ def fuse_evidence(query_plan: Dict[str, Any], ledger: Dict[str, Any]) -> Dict[st
     daily_synthesis = (by_kind.get("daily_school_synthesis") or {}).get("value")
     daily_synthesis = daily_synthesis if isinstance(daily_synthesis, dict) else {}
     daily_judgment = daily_synthesis.get("daily_judgment") if isinstance(daily_synthesis.get("daily_judgment"), dict) else {}
-    if exact_day:
+    historical = (by_kind.get("historical_dasha_windows") or {}).get("value")
+    retrospective = bool(time_scope.get("retrospective"))
+    if retrospective:
+        historical = historical if isinstance(historical, dict) else {}
+        windows = [
+            row for row in (historical.get("periods") or [])
+            if (
+                isinstance(row, dict)
+                and (row.get("start") or row.get("end"))
+                and int(row.get("transit_trigger_score") or 0) > 0
+                and bool(row.get("peak_activation_windows") or row.get("transit_trigger_windows"))
+            )
+        ][:3]
+        direction = "probable_past_windows" if windows else "insufficient_historical_evidence"
+        rationale = {
+            "scan_start": historical.get("horizon_start"),
+            "scan_end": historical.get("horizon_end"),
+            "minimum_age": historical.get("minimum_age"),
+            "claim_rule": historical.get("claim_rule") or (
+                "These are probable past periods, not proof of the actual event date."
+            ),
+        }
+        confidence = 0.72 if windows else 0.35
+    elif exact_day:
         tara = daily_judgment.get("moon_tara_quality") if isinstance(daily_judgment.get("moon_tara_quality"), dict) else {}
         direction = (
             "insufficient_evidence" if missing_required else
@@ -214,7 +237,7 @@ def fuse_evidence(query_plan: Dict[str, Any], ledger: Dict[str, Any]) -> Dict[st
             "high_support_complete": high_support_complete,
             "available": sorted(available_capabilities),
         },
-        "ranked_windows": windows[:5] if isinstance(windows, list) else windows,
+        "ranked_windows": windows[:3] if retrospective and isinstance(windows, list) else windows[:5] if isinstance(windows, list) else windows,
         "rationale": rationale,
         "modifiers": modifiers[:5] if isinstance(modifiers, list) else modifiers,
         "conflicts": conflicts,

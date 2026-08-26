@@ -105,7 +105,7 @@ const INSTANT_LOADER_WORD_MS = 2200;
 // Keep the normal thinking sequence calm. The recovery message is exceptional
 // and should only appear after the usual Instant response window has passed.
 const INSTANT_LOADER_MAX_WORDS = INSTANT_LOADER_LINES.length + 7;
-const INSTANT_REPLY_FIRST_PIECE_MS = 1100;
+const INSTANT_REPLY_FIRST_PIECE_MS = 0;
 
 const shouldPaceInstantAnswer = ({ chatTier, messageType, content } = {}) => {
   const tier = String(chatTier || '').toLowerCase();
@@ -148,8 +148,8 @@ const splitInstantReply = (content, maxPieceLength = 95) => {
 };
 
 const getInstantReplyPieceDelay = (piece) => Math.max(
-  1800,
-  Math.min(3400, 1100 + String(piece || '').length * 22),
+  1400,
+  Math.min(2700, 850 + String(piece || '').length * 18),
 );
 const parseChatHttpError = (error) => {
   const message = String(error?.message || '');

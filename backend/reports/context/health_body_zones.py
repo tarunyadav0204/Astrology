@@ -42,7 +42,10 @@ HOUSE_BODY: Dict[int, Dict[str, Any]] = {
     5: {"zones": ["stomach", "spine", "heart region"], "role": "stomach / spine"},
     6: {"zones": ["abdomen", "immunity", "acute illness sites"], "role": "disease / immunity / accidents"},
     7: {"zones": ["kidneys", "lower back", "partner-stress body"], "role": "balance / lumbar"},
-    8: {"zones": ["chronic organs", "nerves", "surgery / crisis sites"], "role": "chronic / surgery / sudden events"},
+    8: {
+        "zones": ["anus", "rectum", "pelvis", "excretory organs", "reproductive organs"],
+        "role": "chronic / surgery / sudden events",
+    },
     9: {"zones": ["hips", "thighs", "liver", "long journeys risk"], "role": "thighs / fortune / travel body"},
     10: {"zones": ["knees", "bones", "joints", "career strain body"], "role": "knees / structure"},
     11: {"zones": ["calves", "ankles", "circulation"], "role": "circulation / gains body"},
@@ -174,6 +177,7 @@ ANATOMICAL_FAMILIES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
     ("face and jaw (including lips and chin)", ("face", "forehead", "lips", "chin", "mouth")),
     ("heart and upper spine/back", ("heart", "spine", "upper back", "heart region")),
     ("hips and thighs", ("hips", "thighs", "right thigh", "left thigh")),
+    ("anorectal and pelvic region", ("anus", "rectum", "pelvis", "excretory organs")),
 )
 
 MALEFICS = {"Mars", "Saturn", "Rahu", "Ketu"}
@@ -358,6 +362,7 @@ def _add_primary_medical_factor(
             "zone": zone, "weight": 0, "standing_weight": 0,
             "sources": [], "why": [], "natal_layers": [],
             "activation_sources": [], "primary_medical_factors": [],
+            "primary_medical_reasons": [],
             "primary_medical_factor_rank": {},
         })
         bucket["weight"] += weight
@@ -373,6 +378,8 @@ def _add_primary_medical_factor(
             bucket["sources"].append(label)
         if label not in bucket["why"]:
             bucket["why"].append(label)
+        if label not in bucket["primary_medical_reasons"]:
+            bucket["primary_medical_reasons"].append(label)
 
 
 def _group_anatomical_families(buckets: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
@@ -392,6 +399,7 @@ def _group_anatomical_families(buckets: Dict[str, Dict[str, Any]]) -> Dict[str, 
     list_fields = (
         "sources", "why", "natal_layers", "activation_sources",
         "primary_medical_factors", "confirmation_factors",
+        "primary_medical_reasons",
     )
     for raw_key, raw_bucket in buckets.items():
         family = member_to_family.get(str(raw_key).strip().lower())
@@ -513,17 +521,21 @@ def build_priority_body_zones(
     scored.sort(key=lambda r: (-int(r.get("score") or 0), int(r.get("house") or 99)))
 
     # The classical medical foundation is the 6th-house chain. It establishes
-    # the only anatomy eligible to become a named major vulnerability:
-    # sign in H6, sign occupied by its lord, and the lord's nakshatra.
+    # the anatomy eligible to become a named major vulnerability: sign in H6,
+    # sign occupied by its lord, the lord's nakshatra, and the anatomical field
+    # of the house occupied by the 6th lord.  The destination house is a valid
+    # contributor, but no one factor is sufficient for a narrow diagnosis.
     sixth_sign = _house_sign(houses, 6)
     sixth_lord = _lord_of_house(houses, 6)
     sixth_lord_sign = _planet_sign(planets, sixth_lord) if sixth_lord else None
     sixth_nakshatra = _sixth_lord_nakshatra(lords_nakshatra or {})
+    sixth_lord_house = _planet_house(planets, sixth_lord) if sixth_lord else None
     sixth_house_chain = {
         "sixth_house_sign": SIGN_NAMES[sixth_sign] if sixth_sign is not None else None,
         "sixth_house_sign_zones": list((SIGN_BODY.get(sixth_sign) or {}).get("zones") or []),
         "sixth_lord": sixth_lord,
-        "sixth_lord_house": _planet_house(planets, sixth_lord) if sixth_lord else None,
+        "sixth_lord_house": sixth_lord_house,
+        "sixth_lord_house_zones": list((HOUSE_BODY.get(sixth_lord_house) or {}).get("zones") or []),
         "sixth_lord_sign": SIGN_NAMES[sixth_lord_sign] if sixth_lord_sign is not None else None,
         "sixth_lord_sign_zones": list((SIGN_BODY.get(sixth_lord_sign) or {}).get("zones") or []),
         "sixth_lord_nakshatra": sixth_nakshatra.get("name"),
@@ -596,6 +608,20 @@ def build_priority_body_zones(
                     bucket["sources"].append(confirmation)
                 if confirmation not in bucket["why"]:
                     bucket["why"].append(confirmation)
+    if sixth_lord and sixth_lord_house:
+        destination_zones = sixth_house_chain["sixth_lord_house_zones"]
+        _add_primary_medical_factor(
+            zone_weights,
+            zones=destination_zones,
+            factor="sixth_lord_house",
+            label=(
+                f"House 6 lord {sixth_lord} is placed in House {sixth_lord_house}; "
+                f"that house's anatomical field includes {', '.join(destination_zones[:4])}."
+            ),
+            # This is a real anatomical limb of the medical chain, but ranks
+            # below the exact nakshatra and rashi mappings unless corroborated.
+            base_weight=16,
+        )
     for row in scored[:8]:
         for zone in row.get("fused_zones") or []:
             key = zone.lower()
@@ -732,7 +758,12 @@ def build_priority_body_zones(
             0 if z.get("primary_medical_factors") else 1,
             min(
                 (
-                    {"sixth_lord_nakshatra": 0, "sixth_lord_sign": 1, "sixth_house_sign": 2}.get(factor, 9)
+                    {
+                        "sixth_lord_nakshatra": 0,
+                        "sixth_lord_sign": 1,
+                        "sixth_house_sign": 2,
+                        "sixth_lord_house": 3,
+                    }.get(factor, 9)
                     for factor in (z.get("primary_medical_factors") or [])
                 ),
                 default=9,
@@ -740,7 +771,7 @@ def build_priority_body_zones(
             -len(z.get("primary_medical_factors") or []),
             -int(z.get("weight") or 0),
         ),
-    )[:8]
+    )
     for item in priority_zones:
         item["why"] = (item.get("why") or [])[:4]
         item["sources"] = (item.get("sources") or [])[:5]
@@ -770,18 +801,32 @@ def build_priority_body_zones(
             else "directional"
         )
 
-    # Keep the result clinically readable: take the strongest anatomical
-    # candidate from each distinct limb of the classical sixth-house chain
-    # before allowing another synonym from the same limb.  Otherwise a broad
-    # sign such as Leo can consume all three cards and hide H6 or nakshatra.
+    # Keep the general-vulnerability answer compact while preserving every
+    # distinct limb of the classical sixth-house chain.  The exact nakshatra,
+    # lord-sign and H6-sign regions come first; the sixth lord's destination
+    # house may add one further, distinct anatomical region.  In particular,
+    # a 6th lord in H8 must not lose the anorectal/pelvic field merely because
+    # three more specific sign/nakshatra regions were already selected.
     selected_major_zones: List[Dict[str, Any]] = []
     selected_zone_names = set()
-    for factor in ("sixth_lord_nakshatra", "sixth_lord_sign", "sixth_house_sign"):
+    for factor in (
+        "sixth_lord_nakshatra",
+        "sixth_lord_sign",
+        "sixth_house_sign",
+        "sixth_lord_house",
+    ):
+        # A destination-house body field is broad. Preserve it as a major
+        # constitutional callout when the disease lord lands in a medical
+        # dusthana (H6/H8/H12); elsewhere it remains available in the full
+        # evidence ranking without displacing the three precise rashi/star
+        # regions. This makes 6L-in-8 retain the anorectal/pelvic indication.
+        if factor == "sixth_lord_house" and sixth_lord_house not in DUSTHANA:
+            continue
         candidates = [
-                item for item in priority_zones
-                if item.get("callout_allowed")
-                and factor in (item.get("primary_medical_factors") or [])
-                and str(item.get("zone") or "").lower() not in selected_zone_names
+            item for item in priority_zones
+            if item.get("callout_allowed")
+            and factor in (item.get("primary_medical_factors") or [])
+            and str(item.get("zone") or "").lower() not in selected_zone_names
         ]
         candidate = min(
             candidates,
@@ -791,16 +836,9 @@ def build_priority_body_zones(
             ),
             default=None,
         )
-        if candidate:
+        if candidate and len(selected_major_zones) < 4:
             selected_major_zones.append(candidate)
             selected_zone_names.add(str(candidate.get("zone") or "").lower())
-    for candidate in priority_zones:
-        zone_name = str(candidate.get("zone") or "").lower()
-        if len(selected_major_zones) >= 3:
-            break
-        if candidate.get("callout_allowed") and zone_name not in selected_zone_names:
-            selected_major_zones.append(candidate)
-            selected_zone_names.add(zone_name)
 
     major_vulnerabilities = [
         {
@@ -811,12 +849,13 @@ def build_priority_body_zones(
             "natal_layers": list(item.get("natal_layers") or [])[:6],
             "activation_sources": list(item.get("activation_sources") or [])[:3],
             "primary_medical_factors": list(item.get("primary_medical_factors") or [])[:3],
+            "primary_medical_reasons": list(item.get("primary_medical_reasons") or [])[:3],
             "confirmation_factors": list(item.get("confirmation_factors") or [])[:3],
             "anatomical_members": list(item.get("anatomical_members") or [])[:6],
             "sources": list(item.get("sources") or [])[:5],
             "why": list(item.get("why") or [])[:4],
         }
-        for item in selected_major_zones[:3]
+        for item in selected_major_zones[:4]
     ]
 
     medical_profile = _build_medical_profile(
@@ -855,8 +894,8 @@ def build_priority_body_zones(
         "top_zone_names": [z.get("zone") for z in major_vulnerabilities],
         "claim_policy": {
             "named_body_part_requires": (
-                "The zone must originate in the sign in House 6, the sign occupied by its lord, "
-                "or the 6th lord's nakshatra; other natal layers may only confirm and rank it."
+                "The zone must originate in the sign in House 6, the sign or house occupied by "
+                "its lord, or the 6th lord's nakshatra; other natal layers may only confirm and rank it."
             ),
             "timing_cannot_create_vulnerability": True,
             "diagnosis_allowed": False,
@@ -1079,7 +1118,7 @@ def _build_medical_profile(
     judgments = {
         "constitutional": {
             "supported": bool(enhanced_vulnerabilities),
-            "vulnerabilities": enhanced_vulnerabilities[:3],
+            "vulnerabilities": enhanced_vulnerabilities[:4],
         },
         "current": {
             "active": bool(activated_vulnerabilities),
@@ -1109,7 +1148,7 @@ def _build_medical_profile(
         "divisional_health_charts": divisions,
         "divisional_confirmations": confirmations,
         "protective_factors": protection[:6],
-        "major_vulnerabilities": enhanced_vulnerabilities[:3],
+        "major_vulnerabilities": enhanced_vulnerabilities[:4],
         "condition_susceptibilities": condition_susceptibilities,
         "mechanism_legend": {
             "acute / inflammatory": "fast, heat, injury or inflammatory expression",

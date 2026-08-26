@@ -26,11 +26,37 @@ from calculators.yogi_calculator import YogiCalculator
 from chat.chat_context_builder import ChatContextBuilder
 from daily_prediction_spine import build_daily_prediction_spine
 from instant_chat_v2 import build_instant_v2_packet, finalize_instant_v2_packet
+from instant_chat_v2.career import (
+    CAREER_ALIASES,
+    CAREER_PROFILES,
+    answer_contract as build_career_answer_contract,
+    build_vocation_synthesis,
+    career_profile,
+    classify_manifestations as classify_career_manifestations,
+    is_career_decision,
+    is_career_category,
+    is_career_relationship,
+    is_static_career_profile,
+    normalize_career_subtype,
+)
+from instant_chat_v2.health import HEALTH_ALIASES, HEALTH_PROFILES
+from instant_chat_v2.graph_live import apply_live_graph_policy, enforce_live_graph_answer
+from instant_chat_v2.marriage_timeline import (
+    apply_timeline_intent_guard,
+    build_phase_action,
+    build_selection_response,
+)
+from instant_aspect_policy import instant_activation_aspects
 from context_agents.base import AgentContext
 from prediction_engine.nakshatra_transit import nakshatra_transit_relation
 from prediction_engine.natal_promise import build_natal_promises
 from shared.dasha_calculator import DashaCalculator
-from utils.admin_settings import get_gemini_instant_model
+from utils.admin_settings import (
+    CHAT_LLM_DEEPSEEK,
+    CHAT_LLM_GEMINI,
+    get_instant_chat_llm_provider,
+    get_instant_chat_model,
+)
 from utils.query_context import (
     is_remedy_followup_request,
     NO_INLINE_REMEDY_PLAN_RULE,
@@ -128,6 +154,24 @@ CATEGORY_FOCUS = {
     "general": {"houses": [1, 4, 7, 10], "planets": ["Moon", "Sun", "Jupiter"]},
 }
 
+# Career routing, calculation, evidence and answer composition must all use
+# one policy.  Keep the legacy names as aliases because older clients and
+# stored intent rows still send them.
+for _career_name, _career_policy in CAREER_PROFILES.items():
+    CATEGORY_FOCUS[_career_name] = {
+        "houses": list(_career_policy["houses"]),
+        "planets": list(_career_policy["planets"]),
+    }
+for _career_alias, _career_name in CAREER_ALIASES.items():
+    CATEGORY_FOCUS[_career_alias] = dict(CATEGORY_FOCUS[_career_name])
+for _health_name, _health_policy in HEALTH_PROFILES.items():
+    CATEGORY_FOCUS[_health_name] = {
+        "houses": list(_health_policy["houses"]),
+        "planets": list(_health_policy["planets"]),
+    }
+for _health_alias, _health_name in HEALTH_ALIASES.items():
+    CATEGORY_FOCUS[_health_alias] = dict(CATEGORY_FOCUS[_health_name])
+
 EVENT_CATEGORY_PRIORITIES = {
     "career": {"house_weights": {10: 3.0, 6: 2.5, 11: 2.0, 2: 1.5}, "planet_weights": {"Saturn": 2.0, "Sun": 1.8, "Mercury": 1.8, "Jupiter": 1.4}},
     "job": {"house_weights": {10: 3.0, 6: 2.5, 11: 2.0, 2: 1.5}, "planet_weights": {"Saturn": 2.0, "Sun": 1.8, "Mercury": 1.8, "Jupiter": 1.4}},
@@ -150,6 +194,25 @@ EVENT_CATEGORY_PRIORITIES = {
     "general": {"house_weights": {1: 2.0, 4: 2.0, 7: 2.0, 10: 2.0}, "planet_weights": {"Moon": 1.4, "Sun": 1.4, "Jupiter": 1.4}},
 }
 
+for _career_name, _career_policy in CAREER_PROFILES.items():
+    _houses = list(_career_policy["houses"])
+    _planets = list(_career_policy["planets"])
+    EVENT_CATEGORY_PRIORITIES[_career_name] = {
+        "house_weights": {house: max(1.2, 3.0 - (index * 0.45)) for index, house in enumerate(_houses)},
+        "planet_weights": {planet: max(1.2, 2.0 - (index * 0.18)) for index, planet in enumerate(_planets)},
+    }
+for _career_alias, _career_name in CAREER_ALIASES.items():
+    EVENT_CATEGORY_PRIORITIES[_career_alias] = dict(EVENT_CATEGORY_PRIORITIES[_career_name])
+for _health_name, _health_policy in HEALTH_PROFILES.items():
+    _houses = list(_health_policy["houses"])
+    _planets = list(_health_policy["planets"])
+    EVENT_CATEGORY_PRIORITIES[_health_name] = {
+        "house_weights": {house: max(1.2, 3.0 - (index * 0.4)) for index, house in enumerate(_houses)},
+        "planet_weights": {planet: max(1.2, 2.0 - (index * 0.18)) for index, planet in enumerate(_planets)},
+    }
+for _health_alias, _health_name in HEALTH_ALIASES.items():
+    EVENT_CATEGORY_PRIORITIES[_health_alias] = dict(EVENT_CATEGORY_PRIORITIES[_health_name])
+
 EVENT_ANSWER_LABELS = {
     "career": "career growth",
     "job": "job matters",
@@ -171,6 +234,10 @@ EVENT_ANSWER_LABELS = {
     "higher_studies": "higher studies",
     "general": "this event",
 }
+EVENT_ANSWER_LABELS.update({
+    name: str(profile["label"])
+    for name, profile in HEALTH_PROFILES.items()
+})
 
 HOUSE_THEME_LABELS = {
     1: "self, vitality, personal direction",
@@ -263,6 +330,9 @@ PARASHARI_TOPIC_MAP = {
     "trading": "wealth",
     "health": "health",
     "disease": "health",
+    "mental_wellbeing": "health",
+    "accident": "health",
+    "recovery": "health",
     "property": "wealth",
     "relocation": "career",
     "visa": "career",
@@ -301,6 +371,7 @@ EVENT_CATEGORY_ALIASES = {
     "masters": "higher_studies",
     "phd": "higher_studies",
 }
+EVENT_CATEGORY_ALIASES.update(HEALTH_ALIASES)
 
 # Natural significators for instant event-horizon scan (MD/AD relevance), beyond house lordships.
 EVENT_CATEGORY_KARAKAS: Dict[str, frozenset] = {
@@ -330,20 +401,12 @@ EVENT_CATEGORY_KARAKAS: Dict[str, frozenset] = {
     "higher_studies": frozenset({"Jupiter", "Mercury", "Moon", "Rahu"}),
     "general": frozenset({"Moon", "Sun", "Jupiter"}),
 }
+for _health_name, _health_policy in HEALTH_PROFILES.items():
+    EVENT_CATEGORY_KARAKAS[_health_name] = frozenset(_health_policy["planets"])
+for _health_alias, _health_name in HEALTH_ALIASES.items():
+    EVENT_CATEGORY_KARAKAS[_health_alias] = EVENT_CATEGORY_KARAKAS[_health_name]
 
 _INSTANT_EVENT_HORIZON_DAYS = int(365 * 3)
-
-_PLANET_ASPECT_OFFSETS = {
-    "Sun": [7],
-    "Moon": [7],
-    "Mercury": [7],
-    "Venus": [7],
-    "Mars": [4, 7, 8],
-    "Jupiter": [5, 7, 9],
-    "Saturn": [3, 7, 10],
-    "Rahu": [5, 7, 9],
-    "Ketu": [5, 7, 9],
-}
 
 _NATURAL_NATURE = {
     "Sun": "malefic",
@@ -453,14 +516,26 @@ def _planet_aspects_house_from(transit_house: int, target_house: int, planet: st
     tgt = _norm_house(target_house)
     if th is None or tgt is None:
         return False
-    # Values in _PLANET_ASPECT_OFFSETS are ordinal aspect numbers (7 means
-    # "7th from the planet"), not zero-based movement offsets. The target is
-    # therefore origin + aspect_number - 1. Adding the ordinal directly made
-    # every aspect one house too far (for example Rahu H7 -> H2 instead of H1).
-    for aspect_number in _PLANET_ASPECT_OFFSETS.get(str(planet or ""), [7]):
+    # Instant policy values are ordinal aspect numbers (7 means "7th from the
+    # planet"), not zero-based movement offsets. The target is therefore
+    # origin + aspect_number - 1. Rahu/Ketu deliberately expose only the 7th
+    # aspect here; occupation/conjunction is handled separately.
+    for aspect_number in instant_activation_aspects(planet, include_conjunction=False):
         if _norm_house(th + aspect_number - 1) == tgt:
             return True
     return False
+
+
+def _planet_aspect_number_from(origin_house: int, target_house: int, planet: str) -> Optional[int]:
+    """Return the classical ordinal aspect that connects two houses, if any."""
+    origin = _norm_house(origin_house)
+    target = _norm_house(target_house)
+    if origin is None or target is None:
+        return None
+    for aspect_number in instant_activation_aspects(planet, include_conjunction=False):
+        if _norm_house(origin + aspect_number - 1) == target:
+            return int(aspect_number)
+    return None
 
 
 def _sign_index_from_row(row: Dict[str, Any]) -> Optional[int]:
@@ -876,6 +951,7 @@ def _cluster_best_future_event_windows(periods: List[Dict[str, Any]], best_row: 
 def _build_event_timing_verdict(
     *,
     category: str,
+    career_subtype: Any = None,
     forward_scan_periods: List[Dict[str, Any]],
     horizon_segments: List[Dict[str, Any]],
     current_chain_rows: List[Dict[str, Any]],
@@ -1108,15 +1184,18 @@ def _build_event_timing_verdict(
         ],
         "career_layer_contract": (
             {
-                "activation": "more calls, effort, interviews, visibility",
-                "offer": "offer letter likely",
-                "joining": "start date / settle-in",
+                "profile": career_profile(category, career_subtype),
+                "manifestations": classify_career_manifestations(
+                    (future_claim_contract or current_claim_contract or {}).get("activated_focus_houses") or [],
+                    career_subtype,
+                ),
                 "rule": (
-                    "For career/job questions, executive summary must separate Activation vs Offer vs Joining. "
-                    "Never let one dasha date mean all three."
+                    "Use only the supplied house-gated manifestation stages. Separate activity, "
+                    "formalization, execution/joining, compensation, stability and exit pressure; "
+                    "never let one dasha date mean all of them."
                 ),
             }
-            if _normalize_event_category(category) == "career"
+            if is_career_category(category)
             else None
         ),
     }
@@ -1133,6 +1212,7 @@ def _slim_event_prediction_payload(
     normalized_evidence: Dict[str, Any],
     period_window: Dict[str, Any],
     category: str,
+    career_subtype: Any = None,
     question: str,
     chart_data: Dict[str, Any],
     house_lordships: Dict[str, List[int]],
@@ -1141,6 +1221,19 @@ def _slim_event_prediction_payload(
     daily_prediction_spine: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     focus_houses = list((instant_parashari or {}).get("focus_houses") or [])
+    historical_scan = (
+        (instant_parashari or {}).get("historical_event_dasha_scan")
+        or (normalized_evidence or {}).get("historical_event_dasha_scan")
+        or {}
+    )
+    is_retrospective = bool(
+        isinstance(historical_scan, dict)
+        and (
+            historical_scan.get("periods")
+            or str(((normalized_evidence or {}).get("timing_policy") or {}).get("time_direction") or "").lower()
+            == "retrospective"
+        )
+    )
     is_target_relative = str((target_chart_context or {}).get("key") or "self") != "self"
     prediction_house_lordships = (
         dict((target_chart_context or {}).get("target_house_lordships") or {})
@@ -1234,15 +1327,116 @@ def _slim_event_prediction_payload(
         and (clipped := _clip_to_requested_horizon(row)) is not None
     ]
     timing_policy = dict((normalized_evidence or {}).get("timing_policy") or {})
-    event_timing_verdict = _build_event_timing_verdict(
-        category=category,
-        forward_scan_periods=forward_scan_periods,
-        horizon_segments=horizon_segments,
-        current_chain_rows=current_chain_rows,
-        timing_policy=timing_policy,
-        focus_houses=focus_houses,
-        current_transits=current_transits_formatted,
-    )
+    if is_retrospective:
+        def _compact_historical_period(row: Dict[str, Any]) -> Dict[str, Any]:
+            peaks = []
+            for peak in list(row.get("peak_activation_windows") or [])[:4]:
+                if not isinstance(peak, dict):
+                    continue
+                peaks.append({
+                    key: peak.get(key)
+                    for key in (
+                        "start", "end", "planet", "dasha_levels", "trigger_kinds",
+                        "strength", "trigger_score", "activated_focus_houses", "why",
+                    )
+                    if peak.get(key) not in (None, "", [], {})
+                })
+            carriers = []
+            for carrier in list(row.get("carrier_planets") or [])[:3]:
+                if not isinstance(carrier, dict):
+                    continue
+                carriers.append({
+                    key: carrier.get(key)
+                    for key in (
+                        "planet", "dasha_levels", "natal_placement_house", "natal_event_houses",
+                    )
+                    if carrier.get(key) not in (None, "", [], {})
+                })
+            return {
+                key: value
+                for key, value in {
+                    "start": row.get("start"),
+                    "end": row.get("end"),
+                    "phase_start": row.get("phase_start"),
+                    "phase_end": row.get("phase_end"),
+                    "phase_dasha_chain": row.get("phase_dasha_chain"),
+                    "phase_granularity": row.get("phase_granularity"),
+                    "mahadasha": row.get("mahadasha"),
+                    "antardasha": row.get("antardasha"),
+                    "pratyantardasha": row.get("pratyantardasha"),
+                    "strongest_pd_window": row.get("strongest_pd_window"),
+                    "relevance_score": row.get("relevance_score"),
+                    "historical_marriage_rank_score": row.get("historical_marriage_rank_score"),
+                    "period_strength": row.get("period_strength"),
+                    "period_label": row.get("period_label"),
+                    "time_status": "past",
+                    "activated_focus_houses": row.get("activated_focus_houses"),
+                    "natal_promise_status": row.get("natal_promise_status"),
+                    "activation_strength": row.get("activation_strength"),
+                    "transit_trigger_score": row.get("transit_trigger_score"),
+                    "carrier_planets": carriers,
+                    "peak_activation_windows": peaks,
+                    "probable_peak_windows": list(row.get("probable_peak_windows") or [])[:4],
+                    "predicted_result_areas": list(row.get("predicted_result_areas") or [])[:4],
+                    "why": row.get("why"),
+                    "claim_rule": row.get("claim_rule"),
+                }.items()
+                if value not in (None, "", [], {})
+            }
+
+        historical_periods = [
+            _compact_historical_period(row)
+            for row in list(historical_scan.get("periods") or [])
+            if isinstance(row, dict) and (row.get("start") or row.get("end"))
+        ][:6]
+        transit_confirmed_periods = [
+            row for row in historical_periods
+            if int(row.get("transit_trigger_score") or 0) > 0
+            and bool(row.get("peak_activation_windows"))
+        ]
+        event_timing_verdict = {
+            "event_category": category,
+            "answer_event_label": EVENT_ANSWER_LABELS.get(category, "marriage"),
+            "verdict": "probable_past_windows" if transit_confirmed_periods else "insufficient_historical_evidence",
+            "comparison": "ranked probable past periods",
+            "confidence": "medium" if transit_confirmed_periods else "low",
+            "ranked_windows": transit_confirmed_periods[:3],
+            "answer_rule": (
+                "Present each MD-AD range as a broad probable past phase and its supplied probable_peak_windows "
+                "as narrower astrological concentrations. Never call a peak the known marriage date. Ask the user "
+                "whether a phase is close or to enter the actual date."
+            ),
+            "required_answer_points": [
+                "Give no more than three strongest past periods in ranked order.",
+                "For each period, give the broad MD-AD phase before one or two probable peak dates.",
+                "Explain the dasha and historical transit convergence for each period.",
+                "Ask whether one is close or invite the user to enter the actual date.",
+            ],
+            "forbidden_answer_moves": [
+                "Do not claim that a probable period is the actual marriage date.",
+                "Do not include a future or current period.",
+                "Do not invent an exact day from a broad activation window.",
+            ],
+            "claim_contract": {
+                "claim_type": "probable_past_periods_only",
+                "historical_scope_start": historical_scan.get("horizon_start"),
+                "historical_scope_end": historical_scan.get("horizon_end"),
+                "claim_rule": historical_scan.get("claim_rule"),
+            },
+        }
+    else:
+        historical_periods = []
+        transit_confirmed_periods = []
+        event_timing_verdict = _build_event_timing_verdict(
+            category=category,
+            career_subtype=career_subtype,
+            forward_scan_periods=forward_scan_periods,
+            horizon_segments=horizon_segments,
+            current_chain_rows=current_chain_rows,
+            timing_policy=timing_policy,
+            focus_houses=focus_houses,
+            current_transits=current_transits_formatted,
+        )
     for seg in horizon_segments[:8]:
         future_windows.append(
             {
@@ -1274,7 +1468,11 @@ def _slim_event_prediction_payload(
         "answer_mode_contract": {
             "answer_mode": "event_prediction",
             "category": category,
-            "answer_skeleton": "Apply timing_policy -> Verdict from strongest future windows -> Phase shifts from MD/AD/PD changes -> Support vs obstruction vs uncertainty -> Practical takeaway",
+            "answer_skeleton": (
+                "Apply retrospective timing policy -> Rank probable past windows -> Explain dasha/transit convergence -> Ask which matches"
+                if is_retrospective
+                else "Apply timing_policy -> Verdict from strongest future windows -> Phase shifts from MD/AD/PD changes -> Support vs obstruction vs uncertainty -> Practical takeaway"
+            ),
         },
         "timing_policy": timing_policy,
         # Promise evidence is static natal evidence, not prompt-heavy timing
@@ -1283,7 +1481,7 @@ def _slim_event_prediction_payload(
         # even though the same D1 chart powers the dasha/transit calculations.
         "natal_promise": dict((normalized_evidence or {}).get("natal_promise") or {}),
         "event_timing_verdict": event_timing_verdict,
-        "current_timing": {
+        "current_timing": ({
             "active_dashas": safe_current_dashas_levels,
             "current_dasha_chain": current_chain,
             "authoritative_current_dasha_display": current_display,
@@ -1298,19 +1496,19 @@ def _slim_event_prediction_payload(
                 if compact_target_context["key"] != "self"
                 else "This is the native's own dasha."
             ),
-        },
+        } if not is_retrospective else {}),
         "dasha_level_effects": list((normalized_evidence or {}).get("dasha_level_effects") or [])[:5],
-        "future_windows": future_windows,
-        "forward_event_dasha_scan": {
+        "future_windows": ([] if is_retrospective else future_windows),
+        "forward_event_dasha_scan": ({
             "horizon_days": ((instant_parashari or {}).get("forward_event_dasha_scan") or {}).get("horizon_days"),
             "horizon_end": requested_horizon_end or ((instant_parashari or {}).get("forward_event_dasha_scan") or {}).get("horizon_end"),
             "periods": forward_scan_periods[:8],
-        },
-        "horizon_dasha_segments": {
+        } if not is_retrospective else {}),
+        "horizon_dasha_segments": ({
             "enabled": bool(horizon_segments),
             "segments": horizon_segments[:8],
             "label": ((instant_parashari or {}).get("horizon_dasha_segments") or {}).get("label"),
-        },
+        } if not is_retrospective else {}),
         "topic_houses": _topic_house_rows(
             focus_houses,
             prediction_house_lordships,
@@ -1345,17 +1543,29 @@ def _slim_event_prediction_payload(
                 f"Native chart current chain: {current_display}; interpret it only through the derived {compact_target_context['label']} frame."
                 if current_display and compact_target_context["key"] != "self"
                 else f"Current chain: {current_display}." if current_display else ""
-            ),
+            ) if not is_retrospective else "",
             *([] if is_target_relative else [
                 f"Divisional support: {line}"
                 for line in list((normalized_evidence or {}).get("divisional_specifics") or [])[:2]
             ]),
             *[
+                f"Probable past window {row.get('start')}–{row.get('end')}: "
+                f"broad {row.get('phase_dasha_chain') or (str(row.get('mahadasha')) + '-' + str(row.get('antardasha')))} phase; "
+                f"probable peaks {row.get('probable_peak_windows') or row.get('peak_activation_windows')}; "
+                f"(houses {row.get('activated_focus_houses')}; {row.get('why')})"
+                for row in transit_confirmed_periods[:3]
+            ],
+            *[
                 f"Future window {row.get('start')}–{row.get('end')}: {row.get('chain')} (score {row.get('score')}; houses {row.get('activated_focus_houses')}; {row.get('why')})"
-                for row in future_windows[:4]
+                for row in ([] if is_retrospective else future_windows[:4])
             ],
         ],
     }
+    if is_retrospective:
+        slim_normalized["historical_event_dasha_scan"] = {
+            **dict(historical_scan),
+            "periods": historical_periods,
+        }
     # Preserve compact calculator provenance required by the v2 confidence
     # contract. These are already bounded by the evidence ledger compactor.
     for evidence_key in (
@@ -1368,6 +1578,21 @@ def _slim_event_prediction_payload(
     ):
         if (normalized_evidence or {}).get(evidence_key) not in (None, "", [], {}):
             slim_normalized[evidence_key] = (normalized_evidence or {}).get(evidence_key)
+    if is_career_category(category) and not is_target_relative:
+        career_foundation = _compact_career_foundation(
+            category,
+            career_subtype,
+            (instant_parashari or {}).get("natal_topic_factors") or {},
+            (instant_parashari or {}).get("divisional_support") or {},
+            (normalized_evidence or {}).get("chart_facts") or {},
+            (normalized_evidence or {}).get("karaka_evidence") or {},
+            (normalized_evidence or {}).get("profession_evidence") or {},
+        )
+        slim_normalized["career_foundation"] = career_foundation
+        slim_normalized["answer_mode_contract"]["career_contract"] = build_career_answer_contract(
+            "event_prediction",
+            career_foundation.get("career_subtype"),
+        )
     if named_dasha_lookup:
         slim_normalized["named_dasha_lookup"] = named_dasha_lookup
         slim_normalized["primary_drivers"] = [
@@ -1386,7 +1611,7 @@ def _slim_event_prediction_payload(
         "focus_houses": focus_houses,
         "topic_key": (instant_parashari or {}).get("topic_key"),
         "current_chain": current_chain_rows,
-        "future_windows": future_windows,
+        "future_windows": ([] if is_retrospective else future_windows),
         "forward_event_dasha_scan": slim_normalized["forward_event_dasha_scan"],
         "horizon_dasha_segments": slim_normalized["horizon_dasha_segments"],
         "topic_houses": _topic_house_rows(focus_houses, house_lordships, chart_data),
@@ -1395,16 +1620,29 @@ def _slim_event_prediction_payload(
         "major_transits": major_transits,
         "horizon_transit_anchors": (instant_parashari or {}).get("horizon_transit_anchors") or {},
     }
+    if is_retrospective:
+        slim_parashari["historical_event_dasha_scan"] = slim_normalized["historical_event_dasha_scan"]
+    if slim_normalized.get("career_foundation"):
+        slim_parashari["career_foundation"] = slim_normalized["career_foundation"]
     if named_dasha_lookup:
         slim_parashari["named_dasha_lookup"] = named_dasha_lookup
     return {
         "birth_summary": birth_summary,
         "intent_summary": {
             "category": category,
+            "career_subtype": (
+                career_profile(category, career_subtype)["subtype"]
+                if is_career_category(category)
+                else None
+            ),
             "mode": "LIFESPAN_EVENT_TIMING",
             "answer_mode": "event_prediction",
             "period_window": period_window,
-            "time_relation": str((normalized_evidence.get("current_timing") or {}).get("time_relation") or "current") if isinstance(normalized_evidence, dict) else "current",
+            "time_relation": (
+                "past"
+                if is_retrospective
+                else str((normalized_evidence.get("current_timing") or {}).get("time_relation") or "current") if isinstance(normalized_evidence, dict) else "current"
+            ),
             "focus_houses": focus_houses,
             "extracted_context": {"timeframe": question},
             "target_subject": {
@@ -1432,16 +1670,16 @@ def _slim_event_prediction_payload(
             },
         },
         "target_chart_context": compact_target_context,
-        "current_dashas": {
+        "current_dashas": ({
             "as_of": str((period_window or {}).get("start") or ""),
             "levels": safe_current_dashas_levels,
             "named_dasha_lookup": named_dasha_lookup or {},
-        },
-        "current_transits": {
+        } if not is_retrospective else {}),
+        "current_transits": ({
             "as_of_local": str((period_window or {}).get("start") or ""),
             "planets": major_transits,
-        },
-        "current_transits_formatted": major_transits,
+        } if not is_retrospective else {}),
+        "current_transits_formatted": ({} if is_retrospective else major_transits),
         "instant_parashari": slim_parashari,
         # The detailed D1 ledger is display/audit evidence.  Keep it available
         # to user_derivation while the composer boundary continues to exclude
@@ -1802,6 +2040,129 @@ def _conversational_ack_response(language: str, *, speech_mode: bool) -> Dict[st
         },
         "skip_instant_credit_charge": True,
     }
+
+
+def _marriage_timeline_selection_response(
+    result: Dict[str, Any],
+    language: str,
+    *,
+    speech_mode: bool,
+) -> Dict[str, Any]:
+    """Package a deterministic timeline refinement without another LLM charge."""
+    body = str(result.get("body") or "").strip()
+    next_action = result.get("next_action") if isinstance(result.get("next_action"), dict) else None
+    response = _conversational_ack_response(language, speech_mode=speech_mode)
+    response.update(
+        {
+            "response": body,
+            "raw_response": body,
+            "chat_llm_model": "__marriage_timeline__",
+            "llm_response_chars": len(body),
+            "next_action": next_action,
+            "next_best_need": (next_action or {}).get("type"),
+            "next_best_need_confidence": (next_action or {}).get("confidence"),
+            "next_best_need_title": (next_action or {}).get("title"),
+            "next_best_need_reason": (next_action or {}).get("reason"),
+            "instant_context_summary": {
+                "category": "marriage",
+                "mode": "LIFESPAN_EVENT_TIMING",
+                "answer_mode": "event_prediction",
+                "time_relation": "past",
+                "timeline_stage": result.get("stage"),
+                "target_subject": {"key": "self", "label": "self", "base_house": 1},
+            },
+        }
+    )
+    response["timing"] = {
+        **dict(response.get("timing") or {}),
+        "chat_llm_model": "__marriage_timeline__",
+        "marriage_timeline_selection": True,
+    }
+    return response
+
+
+# This is deliberately narrow. Natural-language medical triage belongs to the
+# multilingual intent LLM; these patterns are only a defence-in-depth circuit
+# breaker for unmistakable, actively occurring emergency symptoms.
+_OBVIOUS_ACUTE_MEDICAL_EMERGENCY_PATTERNS = (
+    re.compile(r"\b(?:i\s+(?:have|am\s+having|feel)|having|experiencing)\s+(?:a\s+)?(?:chest\s+pain|chest\s+pressure|chest\s+tightness)\b", re.I),
+    re.compile(r"\b(?:chest\s+pain|chest\s+pressure|chest\s+tightness)\s+(?:right\s+now|now|currently)\b", re.I),
+    re.compile(r"\b(?:cannot|can't|can\s+not)\s+breathe\b", re.I),
+    re.compile(r"\b(?:face\s+droop|slurred\s+speech|sudden\s+one-sided\s+weakness)\b", re.I),
+)
+
+
+def _instant_medical_triage_decision(
+    question: str,
+    intent: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, str]]:
+    """Return an urgent triage decision before any astrology is calculated."""
+    text = str(question or "").strip()
+    if any(pattern.search(text) for pattern in _OBVIOUS_ACUTE_MEDICAL_EMERGENCY_PATTERNS):
+        return {"urgency": "emergency", "user_message": "", "source": "direct_fail_safe"}
+
+    triage = (intent or {}).get("medical_triage")
+    if isinstance(triage, dict):
+        urgency = str(triage.get("urgency") or "none").strip().lower()
+        if urgency in {"urgent", "emergency"}:
+            return {
+                "urgency": urgency,
+                "user_message": str(triage.get("user_message") or "").strip(),
+                "source": "semantic_router",
+            }
+
+    return None
+
+
+def _instant_medical_triage_response(
+    language: str,
+    *,
+    speech_mode: bool,
+    urgency: str,
+    localized_message: str = "",
+    source: str,
+) -> Dict[str, Any]:
+    """Package an uncharged medical-safety response with no astrology content."""
+    lang = str(language or "english").strip().lower()
+    body = str(localized_message or "").strip()
+    if not body and lang.startswith("hi"):
+        body = (
+            "सीने में दर्द जैसी समस्या मेडिकल इमरजेंसी हो सकती है। ज्योतिष यह तय नहीं कर सकता कि यह गंभीर है या नहीं। "
+            "अगर दर्द अभी है, नया या तेज है, बढ़ रहा है, या सांस फूलने, पसीना, मतली, चक्कर, बेहोशी, अथवा बांह, "
+            "जबड़े या पीठ में फैलते दर्द के साथ है, तो अभी 112/108 पर कॉल करें या नजदीकी इमरजेंसी विभाग जाएँ। "
+            "खुद गाड़ी न चलाएँ। दर्द हल्का हो तब भी आज ही तुरंत चिकित्सा जाँच कराएँ।"
+        )
+    elif not body:
+        body = (
+            "Chest pain can be a medical emergency. Astrology cannot determine whether it is serious. "
+            "If the pain is happening now, is new, severe, persistent or worsening, or comes with shortness of breath, "
+            "sweating, nausea, faintness, or pain spreading to your arm, jaw or back, call emergency services now "
+            "(India: 112/108) or go to the nearest emergency department. Do not drive yourself. "
+            "Even if it feels mild, seek prompt medical evaluation today."
+        )
+
+    response = _conversational_ack_response(language, speech_mode=speech_mode)
+    response.update({
+        "response": body,
+        "raw_response": body,
+        "llm_response_chars": len(body),
+        "chat_llm_model": "__medical_safety_triage__",
+        "follow_up_questions": [],
+        "skip_instant_credit_charge": True,
+        "instant_evidence_debug": None,
+    })
+    response["timing"].update({
+        "medical_safety_triage": True,
+        "medical_urgency": urgency,
+        "medical_triage_source": source,
+        "calculator_execution_skipped": True,
+    })
+    response["instant_context_summary"].update({
+        "category": "health",
+        "answer_mode": "medical_safety_triage",
+        "mode": "medical_safety_triage",
+    })
+    return response
 
 
 def _instant_route_response(
@@ -2334,6 +2695,71 @@ def _life_stage_from_age(age_years: Optional[int]) -> str:
     return "senior"
 
 
+def _is_retrospective_event_request(
+    intent: Optional[Dict[str, Any]],
+    *,
+    answer_mode: str,
+    category: str,
+    question: str = "",
+) -> bool:
+    """Resolve retrospective direction, including an explicit-tense safety net.
+
+    The semantic router is authoritative, but a degraded/compact router result
+    can occasionally omit its time fields.  An unambiguous English past-event
+    construction is safe to recover here; it must not be allowed to fall
+    through to a future/current event scan.
+    """
+    def is_past_value(value: Any) -> bool:
+        token = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+        return bool(
+            token in {"past", "open_past", "historical", "retrospective"}
+            or token.startswith(("past_", "historical_", "retrospective_"))
+            or token.endswith("_past")
+        )
+
+    if str(answer_mode or "") not in {
+        "event_prediction", "event_timing", "lifetime_event_timing", "timing_window",
+    }:
+        return False
+    if _normalize_event_category(category) not in {"marriage", "relationship", "love"}:
+        return False
+    payload = intent if isinstance(intent, dict) else {}
+    relation = str(payload.get("time_relation") or "").strip().lower()
+    if is_past_value(relation):
+        return True
+    extracted = payload.get("extracted_context") if isinstance(payload.get("extracted_context"), dict) else {}
+    dialogue = (
+        extracted.get("instant_dialogue")
+        if isinstance(extracted.get("instant_dialogue"), dict)
+        else payload.get("dialogue_state") if isinstance(payload.get("dialogue_state"), dict)
+        else {}
+    )
+    known_facts = dialogue.get("known_facts") if isinstance(dialogue.get("known_facts"), dict) else {}
+    dialogue_direction = str(
+        known_facts.get("timing_type")
+        or known_facts.get("timing_direction")
+        or known_facts.get("time_relation")
+        or known_facts.get("time_direction")
+        or ""
+    ).strip().lower()
+    if is_past_value(dialogue_direction):
+        return True
+    evidence_plan = payload.get("evidence_plan") if isinstance(payload.get("evidence_plan"), dict) else {}
+    for part in evidence_plan.get("question_parts") or []:
+        timeframe = part.get("timeframe") if isinstance(part, dict) and isinstance(part.get("timeframe"), dict) else {}
+        if is_past_value(timeframe.get("kind")):
+            return True
+    if any(
+        str(need.get("kind") or "").startswith("historical_")
+        for need in (evidence_plan.get("evidence_needs") or [])
+        if isinstance(need, dict)
+    ):
+        return True
+    normalized_question = " ".join(str(question or "").strip().lower().split())
+    return bool(re.search(
+        r"\bwhen\s+(?:did|was|were)\b.{0,80}\b(?:married|marriage|wedding)\b",
+        normalized_question,
+    ))
 def _timing_policy_for_instant_event(
     *,
     age_years: Optional[int],
@@ -2493,18 +2919,24 @@ def _build_forward_event_dasha_scan(
     limit: int = 12,
     raw_periods: Optional[List[Dict[str, Any]]] = None,
     house_display_map: Optional[Dict[int, int]] = None,
+    scan_start: Optional[datetime] = None,
+    scan_end: Optional[datetime] = None,
+    time_direction: str = "future",
 ) -> Dict[str, Any]:
-    """Ranked MD/AD/PD segments over the next ~3 years relevant to the event category."""
+    """Rank MD/AD/PD segments in a bounded future or historical range."""
     cat = str(category or "general").lower()
     karakas = EVENT_CATEGORY_KARAKAS.get(cat, frozenset())
     now_local = _as_naive_local_datetime(now_local)
-    end_local = now_local + timedelta(days=_INSTANT_EVENT_HORIZON_DAYS)
+    range_start = _as_naive_local_datetime(scan_start or now_local)
+    end_local = _as_naive_local_datetime(scan_end or (now_local + timedelta(days=_INSTANT_EVENT_HORIZON_DAYS)))
+    if end_local < range_start:
+        range_start, end_local = end_local, range_start
     if raw_periods is not None:
         raw_rows = raw_periods
     else:
         calc = DashaCalculator()
         try:
-            raw_rows = calc.get_dasha_periods_for_range(birth_data, now_local, end_local)
+            raw_rows = calc.get_dasha_periods_for_range(birth_data, range_start, end_local)
         except Exception as exc:
             logger.warning("forward event dasha scan failed: %s", exc)
             return {"horizon_days": _INSTANT_EVENT_HORIZON_DAYS, "periods": [], "error": str(exc)}
@@ -2596,7 +3028,7 @@ def _build_forward_event_dasha_scan(
         }
         if transit_calc is not None and ascendant_longitude is not None:
             transit_activation = _segment_transit_activation(
-                segment_start=max(st, now_local),
+                segment_start=max(st, range_start),
                 segment_end=min(en, end_local),
                 chain=chain,
                 chart_data=chart_data or {},
@@ -2640,7 +3072,10 @@ def _build_forward_event_dasha_scan(
                     else "active period" if transit_activation.get("activation_strength") == "active"
                     else "background period"
                 ),
-                "time_status": "current" if is_current_chain else "future",
+                "time_status": (
+                    "past" if str(time_direction).lower() in {"past", "historical", "retrospective"}
+                    else "current" if is_current_chain else "future"
+                ),
                 "activated_focus_houses": sorted(activated_focus),
                 "natal_promise_status": (
                     "supported_by_active_dasha_carriers"
@@ -2664,13 +3099,283 @@ def _build_forward_event_dasha_scan(
     )
     periods = scored_rows[:limit]
     return {
-        "horizon_days": _INSTANT_EVENT_HORIZON_DAYS,
+        "horizon_days": max(0, (end_local - range_start).days),
+        "horizon_start": range_start.strftime("%Y-%m-%d"),
         "horizon_end": end_local.strftime("%Y-%m-%d"),
+        "time_direction": str(time_direction or "future"),
         "focus_houses": sorted(display_map.values()) if display_map else list(focus_houses),
         "native_calculation_houses": sorted(focus) if display_map else list(focus_houses),
         "house_frame": "target_relative" if display_map else "native",
         "periods": periods,
     }
+
+
+def _historical_marriage_candidate_pool(
+    periods: List[Dict[str, Any]],
+    house_lordships: Dict[str, Any],
+    *,
+    limit: int = 64,
+) -> List[Dict[str, Any]]:
+    """Preserve marriage-capable life phases before expensive transit scoring.
+
+    A global natal-score cutoff is unsafe for retrospective questions: a
+    modest Jupiter-Venus period can acquire decisive historical transit
+    confirmation, while repeated Saturn levels can occupy every high natal
+    rank before transits are calculated.  Keep a bounded, coverage-oriented
+    pool containing the global leaders, every primary marriage AD, and the
+    strongest period from each two-year life band.
+    """
+    rows = [row for row in periods if isinstance(row, dict)]
+    if not rows:
+        return []
+
+    seventh_lords = {
+        str(planet)
+        for planet, houses in (house_lordships or {}).items()
+        if 7 in {_norm_house(house) for house in (houses or [])}
+    }
+    primary_antardashas = {"Venus", "Jupiter"} | seventh_lords
+    selected: List[Dict[str, Any]] = []
+    seen: set[tuple[Any, ...]] = set()
+
+    def add(row: Dict[str, Any]) -> None:
+        key = (
+            row.get("start"), row.get("end"), row.get("mahadasha"),
+            row.get("antardasha"), row.get("pratyantardasha"),
+        )
+        if key in seen:
+            return
+        seen.add(key)
+        selected.append(row)
+
+    # Retain the strongest global natal candidates for continuity with the
+    # existing scorer, but do not let them be the only periods transit-scored.
+    for row in rows[:12]:
+        add(row)
+
+    # Venus/Jupiter ADs and the seventh-lord AD are primary marriage delivery
+    # phases.  Keep every PD inside them so a strong transit is not discarded
+    # merely because its natal-only PD score is modest.
+    for row in rows:
+        if str(row.get("antardasha") or "") in primary_antardashas:
+            add(row)
+
+    # Preserve chronological coverage for an unknown past event instead of
+    # allowing one later mahadasha to monopolize the candidate pool.
+    band_best: Dict[int, Dict[str, Any]] = {}
+    for row in rows:
+        start = _parse_ymd(row.get("start"))
+        if start is None:
+            continue
+        band = start.year // 2
+        incumbent = band_best.get(band)
+        if incumbent is None or int(row.get("relevance_score") or 0) > int(incumbent.get("relevance_score") or 0):
+            band_best[band] = row
+    for band in sorted(band_best):
+        add(band_best[band])
+
+    # The pool is intentionally bounded for Instant latency.  Global leaders
+    # are already first; the remaining rows retain primary-AD and life-band
+    # coverage in deterministic order.
+    return selected[: max(1, int(limit))]
+
+
+def _historical_marriage_rank_score(
+    row: Dict[str, Any],
+    house_lordships: Dict[str, Any],
+) -> int:
+    """Rank past marriage windows without triple-counting one planet's links."""
+    houses = {_norm_house(house) for house in (row.get("activated_focus_houses") or [])}
+    houses.discard(None)
+    score = sum({7: 32, 2: 14, 11: 14, 5: 8}.get(int(house), 0) for house in houses)
+
+    seventh_lords = {
+        str(planet)
+        for planet, ruled in (house_lordships or {}).items()
+        if 7 in {_norm_house(house) for house in (ruled or [])}
+    }
+    levels = [
+        ("MD", str(row.get("mahadasha") or "")),
+        ("AD", str(row.get("antardasha") or "")),
+        ("PD", str(row.get("pratyantardasha") or "")),
+    ]
+    # Count each planet once for its natal role. Repetition across levels gets
+    # only the small role-specific level bonus below.
+    for planet in {planet for _, planet in levels if planet}:
+        if planet == "Venus":
+            score += 16
+        elif planet == "Jupiter":
+            score += 12
+        elif planet in seventh_lords:
+            score += 12
+        else:
+            score += 4
+
+    level_weights = {"MD": 10, "AD": 16, "PD": 4}
+    seventh_level_weights = {"MD": 8, "AD": 6, "PD": 4}
+    for level, planet in levels:
+        if planet in {"Venus", "Jupiter"}:
+            score += level_weights[level]
+        if planet in seventh_lords:
+            score += seventh_level_weights[level]
+
+    transit_score = max(0, min(14, int(row.get("transit_trigger_score") or 0)))
+    score += transit_score * 2
+    peaks = [peak for peak in (row.get("peak_activation_windows") or []) if isinstance(peak, dict)]
+    if peaks:
+        score += 12
+        peak_houses = {
+            _norm_house(house)
+            for peak in peaks
+            for house in (peak.get("activated_focus_houses") or [])
+        }
+        peak_houses.discard(None)
+        score += min(8, len(peak_houses) * 2)
+    return int(score)
+
+
+def _rank_historical_marriage_periods(
+    periods: List[Dict[str, Any]],
+    house_lordships: Dict[str, Any],
+    *,
+    limit: int = 12,
+    phase_bounds: Optional[Dict[tuple[str, str], tuple[str, str]]] = None,
+) -> List[Dict[str, Any]]:
+    """Put transit-confirmed marriage windows first, then apply the final cap."""
+    ranked: List[Dict[str, Any]] = []
+    for source in periods:
+        if not isinstance(source, dict):
+            continue
+        row = dict(source)
+        row["historical_marriage_rank_score"] = _historical_marriage_rank_score(
+            row, house_lordships
+        )
+        ranked.append(row)
+
+    def confirmed(row: Dict[str, Any]) -> bool:
+        return bool(
+            int(row.get("transit_trigger_score") or 0) > 0
+            and row.get("peak_activation_windows")
+        )
+
+    ranked.sort(
+        key=lambda row: (
+            0 if confirmed(row) else 1,
+            -int(row.get("historical_marriage_rank_score") or 0),
+            -int(row.get("relevance_score") or 0),
+            _parse_ymd(row.get("start")) or datetime.max,
+        )
+    )
+    # One long MD-AD phase contains several adjacent PD rows. Returning three
+    # variants of that same phase is false precision and crowds out other
+    # genuinely distinct life periods. Lead with the best row from each MD-AD
+    # phase, then use alternates only if the caller requests more rows than
+    # there are distinct phases.
+    def merge_peak_windows(phase_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        raw_peaks: List[Dict[str, Any]] = []
+        for phase_row in phase_rows:
+            for peak in phase_row.get("peak_activation_windows") or []:
+                if not isinstance(peak, dict) or _parse_ymd(peak.get("start")) is None:
+                    continue
+                item = dict(peak)
+                item["supporting_pratyantardasha"] = phase_row.get("pratyantardasha")
+                raw_peaks.append(item)
+        raw_peaks.sort(key=lambda peak: _parse_ymd(peak.get("start")) or datetime.max)
+
+        clusters: List[List[Dict[str, Any]]] = []
+        for peak in raw_peaks:
+            start = _parse_ymd(peak.get("start"))
+            end = _parse_ymd(peak.get("end")) or start
+            if not clusters:
+                clusters.append([peak])
+                continue
+            previous_end = max(
+                (_parse_ymd(item.get("end")) or _parse_ymd(item.get("start")) or datetime.min)
+                for item in clusters[-1]
+            )
+            if start and start <= previous_end + timedelta(days=30):
+                clusters[-1].append(peak)
+            else:
+                clusters.append([peak])
+
+        merged: List[Dict[str, Any]] = []
+        for cluster in clusters:
+            strongest = max(
+                cluster,
+                key=lambda peak: (
+                    int(peak.get("trigger_score") or 0),
+                    -((_parse_ymd(peak.get("start")) or datetime.max) - datetime.min).days,
+                ),
+            )
+            starts = [_parse_ymd(peak.get("start")) for peak in cluster]
+            ends = [_parse_ymd(peak.get("end")) or _parse_ymd(peak.get("start")) for peak in cluster]
+            start = min(value for value in starts if value is not None)
+            end = max(value for value in ends if value is not None)
+            merged.append({
+                "start": start.strftime("%Y-%m-%d"),
+                "end": end.strftime("%Y-%m-%d"),
+                "probable_peak_date": strongest.get("start"),
+                "probable_peak_end": strongest.get("end") or strongest.get("start"),
+                "planet": strongest.get("planet"),
+                "trigger_score": strongest.get("trigger_score"),
+                "strength": strongest.get("strength"),
+                "activated_focus_houses": strongest.get("activated_focus_houses") or [],
+                "supporting_pratyantardashas": list(dict.fromkeys(
+                    str(peak.get("supporting_pratyantardasha") or "")
+                    for peak in cluster
+                    if peak.get("supporting_pratyantardasha")
+                )),
+                "why": strongest.get("why"),
+                "claim_type": "probable_peak_not_confirmed_event_date",
+            })
+        merged.sort(key=lambda peak: (-int(peak.get("trigger_score") or 0), str(peak.get("start") or "")))
+        return merged[:4]
+
+    def diversify(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        phase_groups: Dict[tuple[str, str], List[Dict[str, Any]]] = {}
+        for row in rows:
+            phase = (
+                str(row.get("mahadasha") or ""),
+                str(row.get("antardasha") or ""),
+            )
+            phase_groups.setdefault(phase, []).append(row)
+
+        phase_leaders: List[Dict[str, Any]] = []
+        alternates: List[Dict[str, Any]] = []
+        for phase, phase_rows in phase_groups.items():
+            leader = dict(phase_rows[0])
+            bounds = (phase_bounds or {}).get(phase)
+            phase_start = bounds[0] if bounds else min(str(row.get("start") or "") for row in phase_rows)
+            phase_end = bounds[1] if bounds else max(str(row.get("end") or "") for row in phase_rows)
+            strongest_pd = {
+                "start": leader.get("start"),
+                "end": leader.get("end"),
+                "pratyantardasha": leader.get("pratyantardasha"),
+                "rank_score": leader.get("historical_marriage_rank_score"),
+            }
+            peaks = merge_peak_windows(phase_rows)
+            leader.update({
+                "start": phase_start,
+                "end": phase_end,
+                "phase_start": phase_start,
+                "phase_end": phase_end,
+                "phase_dasha_chain": " - ".join(value for value in phase if value),
+                "phase_granularity": "MD_AD",
+                "strongest_pd_window": strongest_pd,
+                "probable_peak_windows": peaks,
+                "peak_activation_windows": peaks,
+                "claim_rule": (
+                    "The MD-AD dates are the broader marriage-capable phase. Peak dates are probable "
+                    "astrological concentrations, not the factual marriage date until the user confirms one."
+                ),
+            })
+            phase_leaders.append(leader)
+            alternates.extend(phase_rows[1:])
+        return phase_leaders + alternates
+
+    confirmed_rows = [row for row in ranked if confirmed(row)]
+    unconfirmed_rows = [row for row in ranked if not confirmed(row)]
+    return (diversify(confirmed_rows) + diversify(unconfirmed_rows))[: max(1, int(limit))]
 
 
 def _build_comparison_option_evidence(
@@ -2933,14 +3638,26 @@ def _segment_transit_activation(
             # A natural/category significator can describe an event, but it
             # cannot open that event for timing by itself.
             continue
+        # The verdict only consumes links to the requested career houses, but
+        # the explanation must retain the planet's complete natal activation
+        # pattern. Otherwise a Saturn MD/PD can appear to activate only the
+        # career subset even though its occupation, lordships and aspects also
+        # activate houses such as 4, 7 and 8.
+        all_natal_aspects = {
+            house for house in range(1, 13)
+            if natal_house and _planet_aspects_house_from(natal_house, house, planet)
+        }
+        all_natal_links = set(ruled) | all_natal_aspects
+        if natal_house:
+            all_natal_links.add(natal_house)
         event_links = []
-        for house in sorted(natal_links):
+        for house in sorted(all_natal_links):
             mechanisms = []
             if house in ruled:
                 mechanisms.append("lordship")
             if natal_house == house:
                 mechanisms.append("natal_occupation")
-            if house in natal_aspects:
+            if house in all_natal_aspects:
                 mechanisms.append("natal_aspect")
             event_links.append({
                 "house": display_house(house),
@@ -3061,6 +3778,10 @@ def _segment_transit_activation(
                     "house": display_house(house),
                     "native_house": house,
                     "mechanism": "transit_occupation" if transit_house == house else "transit_aspect",
+                    "aspect_number": (
+                        None if transit_house == house
+                        else _planet_aspect_number_from(transit_house, house, planet)
+                    ),
                 }
                 for house in sorted(delivered)
             ]
@@ -3074,6 +3795,10 @@ def _segment_transit_activation(
                 "trigger_score": primary_score + secondary_score,
                 "transit_native_house": transit_house,
                 "natal_placement_house": natal_house,
+                "natal_reaspect_number": (
+                    _planet_aspect_number_from(transit_house, natal_house, planet)
+                    if "own_natal_aspect" in trigger_kinds else None
+                ),
                 "carrier_event_houses": [display_house(h) for h in sorted(event_houses)],
                 "delivered_event_houses": delivered_details,
                 "activated_focus_houses": [display_house(h) for h in sorted(delivered or event_houses)],
@@ -4521,7 +5246,8 @@ async def _infer_answer_mode_with_llm(
     history: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     prompt = _build_answer_mode_router_prompt(question, intent, history)
-    model_name = get_gemini_instant_model()
+    model_name = get_instant_chat_model()
+    instant_provider = get_instant_chat_llm_provider()
 
     def _pack(mode: str, target_subject: Optional[Dict[str, Any]] = None, **extra: Any) -> Dict[str, Any]:
         resolved_mode = _apply_llm_chart_fact_mode_guard(
@@ -4548,9 +5274,15 @@ async def _infer_answer_mode_with_llm(
                 10.0,
                 maximum=20.0,
             ),
-            force_gemini=True,
-            use_gemini_rest=True,
-            gemini_thinking_level=_instant_thinking_level(model_name),
+            force_gemini=False,
+            provider_override=instant_provider,
+            use_gemini_rest=instant_provider == CHAT_LLM_GEMINI,
+            gemini_thinking_level=(
+                _instant_thinking_level(model_name) if instant_provider == CHAT_LLM_GEMINI else None
+            ),
+            deepseek_thinking_enabled=(
+                False if instant_provider == CHAT_LLM_DEEPSEEK else None
+            ),
         )
     except Exception as exc:
         logger.warning("instant answer mode llm classification failed: %s", exc)
@@ -4687,9 +5419,31 @@ def _mode_selection_from_intent(
     # Only an actual event-timing intent should enter the event scanner. A
     # period/topic outlook may still request transit context, but that does not
     # turn "which health area" into "when will recovery happen".
-    if mode in {"timing_window", "problem_diagnosis"} and (
-        "event_timing" in question_families
-        or "future_dasha_event_windows" in evidence_kinds
+    event_timing_contract = bool(
+        str(intent.get("mode") or "").strip().upper()
+        in {"LIFESPAN_EVENT_TIMING", "PREDICT_EVENT_TIMING"}
+        or "event_timing" in question_families
+        or any(
+            value in evidence_kinds
+            for value in {
+                "future_dasha_event_windows",
+                "historical_dasha_event_windows",
+                "historical_transit_event_windows",
+            }
+        )
+    )
+    # A new life-event timing request cannot coherently be an explanation of a
+    # prior answer. Providers occasionally emit that contradictory pair even
+    # while correctly returning LIFESPAN_EVENT_TIMING and open_past. Preserve
+    # explanation mode only for a genuine follow-up turn.
+    turn_relation = str(intent.get("turn_relation") or "new_request").strip().lower()
+    explicit_retrospective_question = bool(re.search(
+        r"\bwhen\s+(?:did|was|were)\b.{0,80}\b(?:married|marriage|wedding)\b",
+        " ".join(str(question or "").strip().lower().split()),
+    ))
+    if mode in {"timing_window", "problem_diagnosis", "explanation_mechanism"} and (
+        event_timing_contract
+        and (turn_relation != "follow_up" or explicit_retrospective_question)
     ):
         mode = "event_prediction"
     mode = _clamp_remedy_answer_mode(
@@ -5307,8 +6061,41 @@ def _build_answer_mode_contract(answer_mode: str, category: str, period_window: 
                 "answer_skeleton": "Direct answer -> Strongest chart reasons -> One support and one caution -> Practical takeaway",
             }
         )
-    if cat in {"career", "job", "promotion", "business"} and answer_mode in {"topic_reading", "potential_capacity"}:
-        base["answer_skeleton"] = "Career promise -> Best fit/work function -> Current support or drag -> Practical direction"
+    if is_career_category(cat):
+        profile = career_profile(cat)
+        career_contract = build_career_answer_contract(answer_mode, profile["subtype"])
+        base["career_contract"] = career_contract
+        base["answer_skeleton"] = career_contract["required_shape"]
+        family = str(career_contract.get("question_family") or "profile")
+        evidence_by_family = {
+            "profile": ["career_foundation"],
+            "vocation": ["career_foundation"],
+            "diagnosis": ["career_foundation", "current_timing", "active_areas"],
+            "timing": ["career_foundation", "career_manifestations", "transit_activation_timeline"],
+            "comparison": ["career_foundation", "option_comparison"],
+            "decision": ["career_foundation", "career_decision", "current_timing"],
+            "remedy": ["remedy_blueprint"],
+        }
+        base["primary_evidence"] = evidence_by_family.get(family, ["career_foundation"])
+        career_avoid_drift = [
+            career_contract.get(key)
+            for key in (
+                "career_not_wealth_rule",
+                "event_certainty_rule",
+                "diagnosis_rule",
+                "recognition_rule",
+                "decision_rule",
+                "fit_rule",
+                "remedy_rule",
+            )
+            if str(career_contract.get(key) or "").strip()
+        ]
+        base["avoid_drift"] = list(dict.fromkeys([
+            *(base.get("avoid_drift") or []),
+            *career_avoid_drift,
+            "generic career advice instead of a professional outcome",
+            "invented offer, promotion, selection, joining, resignation or business result",
+        ]))
     elif cat in {"marriage", "love", "relationship", "partner", "spouse"} and answer_mode in {"topic_reading"}:
         base["answer_skeleton"] = "Relationship promise -> Current activation -> Support vs friction -> Practical guidance"
     return base
@@ -5439,11 +6226,17 @@ def _normalize_instant_evidence(
     horizon_lines: List[str] = []
     horizon_segment_lines: List[str] = []
     if answer_mode == "event_prediction":
-        fd_scan = instant_parashari.get("forward_event_dasha_scan") or {}
+        historical_scan = instant_parashari.get("historical_event_dasha_scan") or {}
+        retrospective = bool(historical_scan.get("periods"))
+        fd_scan = historical_scan if retrospective else (instant_parashari.get("forward_event_dasha_scan") or {})
         strong_lines: List[str] = []
         weak_lines: List[str] = []
         for p in (fd_scan.get("periods") or [])[:10]:
-            window_prefix = "current window" if str(p.get("time_status") or "").strip().lower() == "current" else "future window"
+            window_prefix = (
+                "probable past window" if retrospective
+                else "current window" if str(p.get("time_status") or "").strip().lower() == "current"
+                else "future window"
+            )
             line = (
                 f"{window_prefix} {p.get('start')}–{p.get('end')}: "
                 f"{p.get('mahadasha')}–{p.get('antardasha')}–{p.get('pratyantardasha')} "
@@ -5457,7 +6250,7 @@ def _normalize_instant_evidence(
             else:
                 strong_lines.append(line)
         horizon_lines = strong_lines + weak_lines
-        for seg in (horizon_dasha_segments.get("segments") or [])[:6]:
+        for seg in ([] if retrospective else (horizon_dasha_segments.get("segments") or []))[:6]:
             horizon_segment_lines.append(
                 f"horizon phase {seg.get('start')}–{seg.get('end')}: "
                 f"{seg.get('mahadasha')}-{seg.get('antardasha')}-{seg.get('pratyantardasha')} "
@@ -5493,7 +6286,7 @@ def _normalize_instant_evidence(
         "dominant_house_signals": dominant_houses,
         "active_areas": active_area_rows,
         "window_area_mechanisms": window_area_lines,
-        "current_timing": {
+        "current_timing": ({
             "active_dashas": current_dashas_context,
             "current_dasha_chain": current_chain,
             "authoritative_current_dasha_display": current_chain_display,
@@ -5501,7 +6294,7 @@ def _normalize_instant_evidence(
             "authoritative_current_dasha_fact": authoritative_current_dasha_fact,
             "time_relation": instant_parashari.get("time_relation"),
             "period_window": period_window,
-        },
+        } if not instant_parashari.get("historical_event_dasha_scan") else {}),
         "topic_confirmation": {
             "topic_signals": topic_signals,
             "topic_support": topic_support,
@@ -5527,6 +6320,11 @@ def _normalize_instant_evidence(
         "contradiction_flags": contradiction_flags,
         "avoid_drift": contract.get("avoid_drift") or [],
     }
+    if str(category or "").lower() in CAREER_ALIASES or str(category or "").lower() in CAREER_PROFILES:
+        profile = career_profile(category, instant_parashari.get("career_subtype"))
+        activated = [row.get("house") for row in active_area_rows if isinstance(row, dict)]
+        normalized["career_profile"] = profile
+        normalized["career_manifestations"] = classify_career_manifestations(activated)
     if answer_mode == "remedy_action":
         try:
             remedy_blueprint = RemedyEngine(
@@ -5553,9 +6351,12 @@ def _normalize_instant_evidence(
             logger.warning("remedy blueprint build failed: %s", exc)
     if answer_mode == "event_prediction":
         normalized["timing_policy"] = instant_parashari.get("timing_policy") or {}
-        normalized["forward_event_dasha_scan"] = instant_parashari.get("forward_event_dasha_scan") or {}
-        normalized["horizon_dasha_segments"] = horizon_dasha_segments
-        normalized["horizon_transit_anchors"] = instant_parashari.get("horizon_transit_anchors") or {}
+        if instant_parashari.get("historical_event_dasha_scan"):
+            normalized["historical_event_dasha_scan"] = instant_parashari.get("historical_event_dasha_scan") or {}
+        else:
+            normalized["forward_event_dasha_scan"] = instant_parashari.get("forward_event_dasha_scan") or {}
+            normalized["horizon_dasha_segments"] = horizon_dasha_segments
+            normalized["horizon_transit_anchors"] = instant_parashari.get("horizon_transit_anchors") or {}
     if answer_mode in {"event_prediction", "timing_window"}:
         normalized["window_dasha_segments"] = window_dasha_segments
     return normalized
@@ -6139,6 +6940,56 @@ def _instant_real_karaka_evidence(chart_data: Dict[str, Any]) -> Dict[str, Any]:
         return {}
 
 
+def _instant_compact_profession_evidence(
+    chart_data: Dict[str, Any],
+    birth_data: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Reuse the deterministic profession engine for career-fit questions only.
+
+    The engine is intentionally not run for ordinary career/timing questions:
+    it performs Shadbala, dignity and Chara Karaka calculations and would add
+    avoidable latency.  Its verbose result is reduced to answer-bearing facts.
+    """
+    try:
+        from calculators.profession_calculator import ProfessionCalculator
+
+        result = ProfessionCalculator(
+            chart_data,
+            birth_data=birth_data,
+        ).calculate_professional_analysis()
+        if not isinstance(result, dict):
+            return {}
+        tenth = result.get("tenth_house_analysis") if isinstance(result.get("tenth_house_analysis"), dict) else {}
+        ak_amk = (
+            result.get("atmakaraka_amatyakaraka_analysis")
+            if isinstance(result.get("atmakaraka_amatyakaraka_analysis"), dict)
+            else {}
+        )
+        return {
+            "source": "profession_calculator",
+            "tenth_house": {
+                "sign": tenth.get("house_sign"),
+                "lord": tenth.get("house_lord"),
+                "lord_strength_rupas": tenth.get("lord_shadbala_rupas"),
+                "lord_dignity": tenth.get("lord_dignity"),
+                "occupants": list(tenth.get("planets_in_house") or ()),
+                "strength_grade": tenth.get("house_strength_grade"),
+            },
+            "vocation_significators": ak_amk,
+            # Retained only as audit evidence. The legacy recommendations are
+            # based mainly on strongest planets and must never drive the user
+            # answer; _compact_career_foundation replaces them with the
+            # cross-chart vocation synthesis.
+            "legacy_ranked_fields": list(result.get("profession_recommendations") or ())[:3],
+            "planetary_strengths": result.get("planetary_career_strengths") or {},
+            "career_yogas": list(result.get("professional_yogas") or ())[:4],
+            "professional_obstacles": list(result.get("career_obstacles") or ())[:3],
+        }
+    except Exception:
+        logger.exception("Instant deterministic profession calculation failed")
+        return {}
+
+
 def _instant_real_kp_evidence(birth_data: Dict[str, Any]) -> Dict[str, Any]:
     """Calculate the compact KP payload required by the exact-day spine."""
     try:
@@ -6390,6 +7241,21 @@ def _requested_charts_from_intent(intent: Optional[Dict[str, Any]], *, answer_mo
     extracted_chart = _normalize_instant_chart_code(extracted.get("requested_chart"))
     if extracted_chart and extracted_chart not in requested:
         requested.append(extracted_chart)
+    category = intent.get("category")
+    subtype = intent.get("career_subtype")
+    static_career_profile = is_static_career_profile(
+        category, subtype, answer_mode=answer_mode
+    )
+    if static_career_profile:
+        # A static career profile needs the Jaimini vocation signature as well
+        # as D1 and D10. Timing-only questions can stay on their bounded packet.
+        for code in ("D1", "D10", "KARAKAMSHA"):
+            if code not in requested:
+                requested.append(code)
+    elif is_career_decision(category, subtype) or is_career_relationship(category, subtype):
+        for code in ("D1", "D10"):
+            if code not in requested:
+                requested.append(code)
     if requested:
         return requested
     if str(answer_mode or "").strip() != "factual_chart_lookup":
@@ -6434,7 +7300,7 @@ def _houses_aspected_by_planet(planet: str, from_house: Any) -> List[int]:
     if origin is None:
         return []
     houses: List[int] = []
-    for aspect_number in _PLANET_ASPECT_OFFSETS.get(str(planet or ""), [7]):
+    for aspect_number in instant_activation_aspects(planet, include_conjunction=False):
         house = _norm_house(origin + aspect_number - 1)
         if house is not None and house not in houses:
             houses.append(house)
@@ -7207,6 +8073,339 @@ def _compact_natal_topic_factors(
     } if rows else {}
 
 
+def _compact_marriage_pathway_evidence(
+    natal_topic_factors: Any,
+    divisional_support: Any,
+) -> Dict[str, Any]:
+    """Bounded D1/D9 evidence for love-led versus family-mediated marriage."""
+    wanted = {2, 5, 7, 9, 11}
+    natal = natal_topic_factors if isinstance(natal_topic_factors, dict) else {}
+    rows: List[Dict[str, Any]] = []
+    lord_links: List[Dict[str, Any]] = []
+    for row in natal.get("houses") or []:
+        if not isinstance(row, dict) or _safe_int(row.get("house")) not in wanted:
+            continue
+        factors = []
+        for factor in list(row.get("factors") or [])[:8]:
+            if not isinstance(factor, dict):
+                continue
+            factors.append({
+                key: factor.get(key)
+                for key in ("source", "planet", "polarity", "weight", "facts")
+                if factor.get(key) not in (None, "", [], {})
+            })
+        lord = str(row.get("lord") or "").strip()
+        lord_placement_house = None
+        for factor in factors:
+            facts = factor.get("facts") if isinstance(factor.get("facts"), dict) else {}
+            if str(factor.get("planet") or "").strip() == lord:
+                lord_placement_house = _safe_int(facts.get("placement_house"))
+                if lord_placement_house is not None:
+                    break
+        compact_row = {
+            key: value
+            for key, value in {
+                "house": row.get("house"),
+                "lord": lord,
+                "lord_placement_house": lord_placement_house,
+                "occupants": list(row.get("occupants") or []),
+                "aspecting_planets": list(row.get("aspecting_planets") or []),
+                "karakas": list(row.get("karakas") or []),
+                "tone": row.get("tone"),
+                "supportive_weight": row.get("supportive_weight"),
+                "challenging_weight": row.get("challenging_weight"),
+                "factors": factors,
+            }.items()
+            if value not in (None, "", [], {})
+        }
+        rows.append(compact_row)
+        if lord and lord_placement_house in wanted:
+            lord_links.append({
+                "from_house": int(row.get("house")),
+                "lord": lord,
+                "to_house": lord_placement_house,
+                "source_house_tone": row.get("tone"),
+                "claim_rule": "This is a natal lord-placement link, not a dasha or transit activation.",
+            })
+    rows.sort(key=lambda row: int(row.get("house") or 0))
+    return {
+        "scope": "static natal pathway comparison",
+        "love_led_houses": [5, 7],
+        "family_mediated_houses": [2, 7, 9, 11],
+        "comparison_rule": (
+            "Compare actual links, lord/occupant/aspect evidence and tone across both pathways. "
+            "Do not infer a link merely because both house rows exist. D9 may confirm or qualify D1, not replace it."
+        ),
+        "tone_fidelity_rule": (
+            "Copy each D1 house tone exactly. Challenging is not supportive; mixed is not strongly supportive. "
+            "Do not call any static house active or activated."
+        ),
+        "d1_house_evidence": rows,
+        "natal_lord_links": lord_links,
+        "d9_confirmation": _compact_divisional_topic_payload(
+            divisional_support if isinstance(divisional_support, dict) else {}
+        ),
+    } if rows else {}
+
+
+_SPOUSE_MEETING_CHANNELS = {
+    1: "through personal initiative or a setting centered on the native",
+    2: "through family, relatives, shared values, food, finance or a family-linked setting",
+    3: "through communication, siblings, neighbors, short travel, messages or a local connection",
+    4: "through home, family roots, property, education or a familiar residential setting",
+    5: "through romance, studies, creativity, entertainment, children or a hobby",
+    6: "through work routines, service, colleagues, health care or a practical obligation",
+    7: "through a direct introduction, client, agreement, business contact or one-to-one setting",
+    8: "through in-laws, shared resources, research, healing or a major life transition",
+    9: "through higher education, long travel, religion, ceremony, a mentor or a different background",
+    10: "through career, public life, authority, reputation or a professional setting",
+    11: "through friends, groups, professional networks, community or social connections",
+    12: "through distance, a foreign link, travel, a private setting, retreat or institution",
+}
+
+
+def _compact_spouse_meeting_evidence(
+    natal_topic_factors: Any,
+    person_profile_axes: Any,
+    divisional_support: Any,
+) -> Dict[str, Any]:
+    """Build a natal-only, auditable probable spouse-meeting channel."""
+    natal = natal_topic_factors if isinstance(natal_topic_factors, dict) else {}
+    wanted = {3, 7, 9, 11, 12}
+    rows: List[Dict[str, Any]] = []
+    seventh_lord = ""
+    seventh_lord_house = None
+    for row in natal.get("houses") or []:
+        if not isinstance(row, dict) or _safe_int(row.get("house")) not in wanted:
+            continue
+        house = int(row.get("house"))
+        lord = str(row.get("lord") or "").strip()
+        factors = []
+        for factor in list(row.get("factors") or [])[:8]:
+            if not isinstance(factor, dict):
+                continue
+            compact_factor = {
+                key: factor.get(key)
+                for key in ("source", "planet", "polarity", "weight", "facts")
+                if factor.get(key) not in (None, "", [], {})
+            }
+            factors.append(compact_factor)
+            facts = compact_factor.get("facts") if isinstance(compact_factor.get("facts"), dict) else {}
+            if house == 7 and str(compact_factor.get("planet") or "").strip() == lord:
+                placement = _safe_int(facts.get("placement_house"))
+                if placement is not None:
+                    seventh_lord = lord
+                    seventh_lord_house = placement
+        rows.append({
+            key: value
+            for key, value in {
+                "house": house,
+                "channel_meaning": _SPOUSE_MEETING_CHANNELS[house],
+                "lord": lord,
+                "occupants": list(row.get("occupants") or []),
+                "aspecting_planets": list(row.get("aspecting_planets") or []),
+                "tone": row.get("tone"),
+                "supportive_weight": row.get("supportive_weight"),
+                "challenging_weight": row.get("challenging_weight"),
+                "factors": factors,
+            }.items()
+            if value not in (None, "", [], {})
+        })
+    rows.sort(key=lambda row: int(row.get("house") or 0))
+    static_profile = [
+        str(line) for line in (person_profile_axes or [])
+        if str(line).strip() and not re.search(r"\b(current|active|dasha|period|transit)\b", str(line), re.I)
+    ][:4]
+    d9 = _compact_divisional_topic_payload(
+        divisional_support if isinstance(divisional_support, dict) else {}
+    ).get("topic") or {}
+    required_present = {int(row["house"]) for row in rows}
+    return {
+        "scope": "static natal meeting-channel probability; no timing",
+        "required_channel_houses": [3, 7, 9, 11, 12],
+        "required_channel_houses_present": sorted(required_present),
+        "evidence_complete": wanted.issubset(required_present) and seventh_lord_house is not None and bool(d9),
+        "primary_channel": ({
+            "basis": "seventh-lord natal placement",
+            "seventh_lord": seventh_lord,
+            "placement_house": seventh_lord_house,
+            "probable_context": _SPOUSE_MEETING_CHANNELS.get(seventh_lord_house),
+            "claim_rule": "This is a probable context from natal placement, not a known fact or a timing activation.",
+        } if seventh_lord_house is not None else {}),
+        "channel_house_evidence": rows,
+        "derived_spouse_frame": static_profile,
+        "d9_confirmation": d9,
+        "answer_rule": (
+            "Lead with the seventh-lord destination as the primary probable context. Add a secondary channel only "
+            "when its house row supplies a concrete lord, occupant, aspect or tone connection. Copy tones exactly."
+        ),
+        "forbidden_inferences": [
+            "Do not infer work or duty from Saturn unless House 6 or House 10 is the supplied meeting context.",
+            "Do not infer a shared circle unless House 11 is concretely supported.",
+            "Do not mention dasha, transit, a Saturn-driven period, a date or a life phase.",
+            "Do not claim the probable context is how the meeting factually happened without user confirmation.",
+        ],
+    }
+
+
+def _compact_career_foundation(
+    category: str,
+    routed_subtype: Any,
+    natal_topic_factors: Any,
+    divisional_support: Any,
+    chart_facts: Any = None,
+    karaka_evidence: Any = None,
+    profession_evidence: Any = None,
+) -> Dict[str, Any]:
+    """Build the bounded D1 + D10 professional foundation sent to Instant.
+
+    The full natal audit remains available to the evidence UI.  The writer gets
+    only the relevant professional houses and the already-calculated D10 rows,
+    preventing both missing-D1 answers and large-context regression.
+    """
+    profile = career_profile(category, routed_subtype)
+    wanted = set(profile["houses"])
+    d1_rows: List[Dict[str, Any]] = []
+    natal = natal_topic_factors if isinstance(natal_topic_factors, dict) else {}
+    for row in natal.get("houses") or []:
+        if not isinstance(row, dict) or _safe_int(row.get("house")) not in wanted:
+            continue
+        factors = []
+        for factor in row.get("factors") or []:
+            if not isinstance(factor, dict):
+                continue
+            facts = factor.get("facts") if isinstance(factor.get("facts"), dict) else {}
+            factors.append({
+                "planet": factor.get("planet"),
+                "source": factor.get("source"),
+                "polarity": factor.get("polarity"),
+                "functional_role": facts.get("functional_role"),
+                "dignity": facts.get("dignity"),
+                "placement_house": facts.get("placement_house"),
+            })
+        d1_rows.append({
+            "house": row.get("house"),
+            "lord": row.get("lord"),
+            "lord_placement_house": row.get("lord_placement_house"),
+            "occupants": list(row.get("occupants") or []),
+            "aspects": list(row.get("aspecting_planets") or []),
+            "tone": row.get("tone"),
+            "key_factors": factors[:4],
+        })
+    compact_divisional = _compact_divisional_topic_payload(
+        divisional_support if isinstance(divisional_support, dict) else {}
+    )
+    d10: Dict[str, Any] = {}
+    for bucket_name in ("topic", "current_topic"):
+        bucket = compact_divisional.get(bucket_name) or {}
+        chart = (bucket.get("charts") or {}).get("D10") or (bucket.get("charts") or {}).get("10")
+        if isinstance(chart, dict):
+            d10[bucket_name] = chart
+    facts = chart_facts if isinstance(chart_facts, dict) else {}
+    calculated_charts = facts.get("charts") if isinstance(facts.get("charts"), dict) else {}
+    calculated_d1 = calculated_charts.get("D1") if isinstance(calculated_charts.get("D1"), dict) else {}
+
+    # Some static-career routes do not run the separate natal-promise audit.
+    # Build the same bounded professional house rows from the calculated D1
+    # chart rather than telling the writer that the career foundation is
+    # missing (or leaving it to invent generic professions).
+    if not d1_rows and calculated_d1:
+        d1_planets = calculated_d1.get("planets") if isinstance(calculated_d1.get("planets"), dict) else {}
+        d1_houses = calculated_d1.get("houses") if isinstance(calculated_d1.get("houses"), list) else []
+        houses_by_number = {
+            _safe_int(row.get("house")): row
+            for row in d1_houses
+            if isinstance(row, dict) and _safe_int(row.get("house")) is not None
+        }
+        for house in sorted(wanted):
+            house_row = houses_by_number.get(house) or {}
+            occupants = list(house_row.get("occupants") or [])
+            if not occupants:
+                occupants = [
+                    str(planet) for planet, placement in d1_planets.items()
+                    if isinstance(placement, dict) and _norm_house(placement.get("house")) == house
+                ]
+            aspects = [
+                str(planet) for planet, placement in d1_planets.items()
+                if isinstance(placement, dict) and house in (placement.get("aspects_to_houses") or [])
+            ]
+            d1_rows.append({
+                "house": house,
+                "lord": house_row.get("lord"),
+                "lord_placement_house": next((
+                    placement.get("house")
+                    for planet, placement in d1_planets.items()
+                    if isinstance(placement, dict) and str(planet) == str(house_row.get("lord"))
+                ), None),
+                "occupants": occupants,
+                "aspects": aspects,
+                "tone": None,
+                "source": "authoritative_calculated_D1",
+            })
+    if isinstance(calculated_charts.get("D10"), dict):
+        d10["calculated_chart"] = calculated_charts["D10"]
+    karakas = (
+        karaka_evidence.get("chara_karakas")
+        if isinstance(karaka_evidence, dict) and isinstance(karaka_evidence.get("chara_karakas"), dict)
+        else {}
+    )
+    amatyakaraka = karakas.get("Amatyakaraka") if isinstance(karakas.get("Amatyakaraka"), dict) else {}
+    karkamsa = calculated_charts.get("KARAKAMSHA")
+    profession = dict(profession_evidence) if isinstance(profession_evidence, dict) else {}
+    calculated_d10 = d10.get("calculated_chart") if isinstance(d10.get("calculated_chart"), dict) else {}
+    vocation_synthesis = build_vocation_synthesis(
+        d1_houses=d1_rows,
+        d1_chart=calculated_d1,
+        d10_chart=calculated_d10,
+        amatyakaraka=amatyakaraka,
+        karakamsha_chart=karkamsa if isinstance(karkamsa, dict) else {},
+        planetary_strengths=profession.get("planetary_strengths") or {},
+    )
+    # Never expose the old strongest-planet recommendation as a competing
+    # answer source. The audit copy remains available under an explicit legacy
+    # key, while all answer-bearing fields come from repeated chart evidence.
+    profession["vocation_synthesis"] = vocation_synthesis
+    profession["ranked_fields"] = vocation_synthesis.get("suitable_fields") or []
+    mandatory_missing = []
+    if not d1_rows:
+        mandatory_missing.append("D1")
+    if not d10:
+        mandatory_missing.append("D10")
+    return {
+        "career_subtype": profile["subtype"],
+        "focus_houses": profile["houses"],
+        "career_planets": profile["planets"],
+        "D1": {"source": natal.get("source"), "houses": d1_rows},
+        "D10": d10,
+        "amatyakaraka": {
+            "planet": amatyakaraka.get("planet"),
+            "house": amatyakaraka.get("house"),
+            "sign": amatyakaraka.get("sign"),
+            "degree_in_sign": amatyakaraka.get("degree_in_sign"),
+        } if amatyakaraka else {},
+        "KARAKAMSHA": karkamsa if isinstance(karkamsa, dict) else {},
+        "career_fit": profession,
+        "vocation_synthesis": vocation_synthesis,
+        "mandatory_evidence_complete": not mandatory_missing,
+        "missing_mandatory_evidence": mandatory_missing,
+        "interpretation_rules": [
+            "D1 establishes professional promise and life-level delivery.",
+            "D10 confirms role, work environment, authority and professional expression.",
+            "House 2 describes pay or resources only; it must not replace the career verdict.",
+            "If mandatory_evidence_complete is false, state that the reading is limited; never convert missing evidence into a negative career verdict.",
+            "For a static career profile, synthesize D1 and D10 first, then use Amatyakaraka and Karkamsa as the Jaimini vocation signature.",
+            "For vocation, use vocation_synthesis as the controlling result: work functions first, then suitable fields, environment, and job/business/hybrid structure.",
+            "Within vocation_synthesis, read tenth_lord_signature and combination_signatures first. A planet conjoined with the D1 10th lord modifies the profession itself; do not treat it as a generic occupant of the 10th lord's placement house.",
+            "When Mars, Saturn and Rahu connect to the D1 10th lord, explicitly consider engineering, technical systems, software, automation, AI/digital platforms and emerging technology. Jupiter in that cluster adds architecture, strategy, knowledge and advisory responsibility. Present these as supported vocational directions, not a guaranteed job title.",
+            "Only recommend work functions, fields, and environments present in vocation_synthesis. Never invent adjacent professions or generic career labels.",
+            "If vocation_synthesis.suitable_fields is empty, say the calculated vocation signature is incomplete and ask one focused clarification instead of guessing.",
+            "Do not infer a profession from a single strong planet or from Shadbala alone; strength only qualifies a vocation signature already repeated across charts.",
+            "Do not introduce dasha, transit, dates, peaks, or delivery windows unless the user asks when, names a period, or asks about a time-bound outcome.",
+            "For career fit, use the deterministic career_fit packet for ranked fields; use Amatyakaraka and Karkamsa as confirmation after D1 and D10.",
+        ],
+    }
+
+
 def _build_instant_context(
     birth_data: Dict[str, Any],
     question: str,
@@ -7226,17 +8425,31 @@ def _build_instant_context(
 
     category = _normalize_event_category(str((intent or {}).get("category") or "general"))
     focus = CATEGORY_FOCUS.get(category, CATEGORY_FOCUS["general"])
+    marriage_subtype = str((intent or {}).get("marriage_subtype") or "").lower()
+    marriage_route_houses = {
+        "love_vs_arranged": [2, 5, 7, 9, 11],
+        "spouse_meeting": [3, 7, 9, 11, 12],
+        "spouse_details": [4, 7, 9, 10, 12],
+    }
+    if str(category or "").lower() == "marriage" and marriage_subtype in marriage_route_houses:
+        focus = {**focus, "houses": marriage_route_houses[marriage_subtype]}
     focus_planets = set(focus["planets"]) | {"Moon"}
 
     query_context = (intent or {}).get("query_context") if isinstance((intent or {}).get("query_context"), dict) else None
     extracted_context = (intent or {}).get("extracted_context") if isinstance((intent or {}).get("extracted_context"), dict) else {}
     now_local = resolve_query_now(query_context)
     resolved_answer_mode = str(answer_mode_override or "").strip()
+    retrospective_event = _is_retrospective_event_request(
+        intent,
+        answer_mode=resolved_answer_mode,
+        category=category,
+        question=question,
+    )
     period_window = _resolve_period_window(intent, now_local, question)
     # Event-window scans always start from the actual query date. The legacy
     # period resolver treats phrases containing "year" as a calendar-year
     # outlook and can otherwise anchor "next three years" to 1 January.
-    if _should_force_event_current_window(resolved_answer_mode, period_window):
+    if _should_force_event_current_window(resolved_answer_mode, period_window) and not retrospective_event:
         period_window = {
             "kind": "current",
             "start": now_local.strftime("%Y-%m-%d"),
@@ -7246,7 +8459,27 @@ def _build_instant_context(
             "use_pd": True,
             "use_sk_pr": False,
         }
+    if retrospective_event:
+        birth_start = _parse_birth_date_only(birth_data)
+        if birth_start is not None:
+            try:
+                history_start = birth_start.replace(year=birth_start.year + 16)
+            except ValueError:
+                history_start = birth_start.replace(year=birth_start.year + 16, day=28)
+        else:
+            history_start = now_local - timedelta(days=365 * 40)
+        period_window = {
+            "kind": "historical_range",
+            "start": history_start.strftime("%Y-%m-%d"),
+            "end": now_local.strftime("%Y-%m-%d"),
+            "span_days": max(1, (now_local.date() - history_start.date()).days),
+            "label": "probable past event periods",
+            "use_pd": True,
+            "use_sk_pr": False,
+        }
     time_relation = _period_time_relation(period_window, now_local)
+    if retrospective_event:
+        time_relation = "past"
     dasha_anchor = _as_naive_local_datetime(_period_anchor_datetime(period_window, now_local))
     dasha_calc = DashaCalculator()
     current_dashas = dasha_calc.calculate_current_dashas(birth_data, dasha_anchor)
@@ -7379,6 +8612,11 @@ def _build_instant_context(
     }
 
     answer_mode = str(answer_mode_override or "").strip() or _infer_answer_mode(question, intent, history)
+    # Retrospective life-event discovery always needs the historical event
+    # scanner. A router may label the surface request ``timing_window``; keep
+    # that harmless variation from bypassing the event-prediction scan below.
+    if retrospective_event:
+        answer_mode = "event_prediction"
     target_subject = target_subject_override if isinstance(target_subject_override, dict) else None
     authoritative_event_prediction_dashas: Dict[str, Any] = {}
     if answer_mode == "event_prediction" and not dasha_calc_fallback:
@@ -7444,6 +8682,14 @@ def _build_instant_context(
     # Refine category and focus from what the compact evidence found (px.get("cat"))
     category = instant_parashari.get("category") or category
     focus = CATEGORY_FOCUS.get(category, CATEGORY_FOCUS["general"])
+    marriage_subtype = str((intent or {}).get("marriage_subtype") or "").lower()
+    marriage_route_houses = {
+        "love_vs_arranged": [2, 5, 7, 9, 11],
+        "spouse_meeting": [3, 7, 9, 11, 12],
+        "spouse_details": [4, 7, 9, 10, 12],
+    }
+    if str(category or "").lower() == "marriage" and marriage_subtype in marriage_route_houses:
+        focus = {**focus, "houses": marriage_route_houses[marriage_subtype]}
     instant_parashari["natal_topic_factors"] = _compact_natal_topic_factors(
         chart_data,
         list(focus.get("houses") or []),
@@ -7469,7 +8715,7 @@ def _build_instant_context(
     birth_dt_for_age = _parse_birth_date_only(birth_data)
     age_years = _compute_age_years(birth_dt_for_age, now_local)
     life_stage = _life_stage_from_age(age_years)
-    if answer_mode == "event_prediction":
+    if answer_mode == "event_prediction" and not retrospective_event:
         instant_parashari["timing_policy"] = _timing_policy_for_instant_event(
             age_years=age_years,
             life_stage=life_stage,
@@ -7519,6 +8765,87 @@ def _build_instant_context(
             category=category,
             raw_periods=event_horizon_raw_periods,
         )
+    if answer_mode == "event_prediction" and retrospective_event:
+        instant_parashari["timing_policy"] = {
+            "time_direction": "retrospective",
+            "claim_type": "probable_past_periods_only",
+            "rule": (
+                "Rank past marriage-capable periods from natal promise, D9, dasha carriers and historical "
+                "transit reinforcement. Never claim the actual marriage date without user confirmation."
+            ),
+        }
+        history_start = _parse_ymd(period_window.get("start")) or (now_local - timedelta(days=365 * 40))
+        history_end = _parse_ymd(period_window.get("end")) or now_local
+        historical_raw_periods: List[Dict[str, Any]] = []
+        try:
+            historical_raw_periods = dasha_calc.get_dasha_periods_for_range(
+                birth_data,
+                _as_naive_local_datetime(history_start),
+                _as_naive_local_datetime(history_end),
+            )
+        except Exception as exc:
+            logger.warning("historical marriage dasha prebuild failed: %s", exc)
+        natal_candidates = _build_forward_event_dasha_scan(
+            birth_data=birth_data,
+            now_local=now_local,
+            house_lordships=dict(house_lordships),
+            focus_houses=list(focus["houses"]),
+            category=category,
+            chart_data=chart_data,
+            current_dashas=current_dashas,
+            raw_periods=historical_raw_periods,
+            scan_start=history_start,
+            scan_end=history_end,
+            time_direction="past",
+            limit=max(1, len(historical_raw_periods)),
+        )
+        historical_candidates = _historical_marriage_candidate_pool(
+            list(natal_candidates.get("periods") or []),
+            dict(house_lordships),
+        )
+        historical_scan = _build_forward_event_dasha_scan(
+            birth_data=birth_data,
+            now_local=now_local,
+            house_lordships=dict(house_lordships),
+            focus_houses=list(focus["houses"]),
+            category=category,
+            chart_data=chart_data,
+            transit_calc=transit_calc,
+            ascendant_longitude=ascendant_longitude,
+            current_dashas=current_dashas,
+            raw_periods=historical_candidates,
+            scan_start=history_start,
+            scan_end=history_end,
+            time_direction="past",
+            limit=max(1, len(historical_candidates)),
+        )
+        phase_bounds: Dict[tuple[str, str], tuple[str, str]] = {}
+        for row in natal_candidates.get("periods") or []:
+            if not isinstance(row, dict):
+                continue
+            phase = (str(row.get("mahadasha") or ""), str(row.get("antardasha") or ""))
+            start = str(row.get("start") or "")
+            end = str(row.get("end") or "")
+            if not start or not end:
+                continue
+            current = phase_bounds.get(phase)
+            phase_bounds[phase] = (
+                min(start, current[0]) if current else start,
+                max(end, current[1]) if current else end,
+            )
+        historical_scan["periods"] = _rank_historical_marriage_periods(
+            list(historical_scan.get("periods") or []),
+            dict(house_lordships),
+            limit=12,
+            phase_bounds=phase_bounds,
+        )
+        historical_scan["candidate_pool_size"] = len(historical_candidates)
+        historical_scan["ranking_method"] = "marriage_evidence_then_historical_transit"
+        historical_scan["claim_rule"] = (
+            "These are ranked probable periods, not the known or proven marriage date. Ask the user which period matches."
+        )
+        historical_scan["minimum_age"] = 16
+        instant_parashari["historical_event_dasha_scan"] = historical_scan
     if str((period_window or {}).get("kind") or "") in {"day", "window"}:
         instant_parashari["window_dasha_segments"] = _window_dasha_segments_for_period(
             birth_data=birth_data,
@@ -7847,6 +9174,47 @@ def _build_instant_context(
                 if isinstance(medical_profile, dict)
                 else []
             )
+            # The normalized profile can be intentionally compact.  Merge it
+            # with the calculator rows by zone instead of replacing those rows,
+            # otherwise exact causes such as "Mars in Gemini, House 8" are
+            # dropped before the answer contract is built.
+            calculated_vulnerabilities = list(
+                body_zone_evidence.get("major_vulnerabilities") or []
+            )
+            calculated_by_zone = {
+                str(row.get("zone") or "").strip().lower(): row
+                for row in calculated_vulnerabilities
+                if isinstance(row, dict) and str(row.get("zone") or "").strip()
+            }
+            merged_vulnerabilities: List[Dict[str, Any]] = []
+            seen_health_zones = set()
+            for profile_row in list(profile_vulnerabilities or []):
+                if not isinstance(profile_row, dict):
+                    continue
+                zone_key = str(profile_row.get("zone") or "").strip().lower()
+                base_row = calculated_by_zone.get(zone_key) or {}
+                merged_row = {**base_row, **profile_row}
+                for rich_key in (
+                    "primary_medical_reasons",
+                    "primary_medical_factors",
+                    "anatomical_members",
+                    "confirmation_factors",
+                    "natal_layers",
+                    "sources",
+                    "why",
+                ):
+                    if not profile_row.get(rich_key) and base_row.get(rich_key):
+                        merged_row[rich_key] = base_row[rich_key]
+                merged_vulnerabilities.append(merged_row)
+                if zone_key:
+                    seen_health_zones.add(zone_key)
+            for calculated_row in calculated_vulnerabilities:
+                if not isinstance(calculated_row, dict):
+                    continue
+                zone_key = str(calculated_row.get("zone") or "").strip().lower()
+                if zone_key and zone_key not in seen_health_zones:
+                    merged_vulnerabilities.append(calculated_row)
+                    seen_health_zones.add(zone_key)
             normalized_evidence["health_body_area"] = {
                 # Only these zones have enough independent natal confluence to
                 # support a named body-system vulnerability in user-facing text.
@@ -7854,10 +9222,8 @@ def _build_instant_context(
                 # exact allowed mechanism and divisional confirmation to each
                 # zone.  The composer must not infer those links itself.
                 "major_vulnerabilities": list(
-                    profile_vulnerabilities
-                    or body_zone_evidence.get("major_vulnerabilities")
-                    or []
-                )[:3],
+                    merged_vulnerabilities or calculated_vulnerabilities
+                )[:4],
                 # Keep the broader ranking in evidence/debug output. It must not
                 # be promoted to a body-part claim by the answer model.
                 "priority_zones": list(body_zone_evidence.get("priority_zones") or [])[:5],
@@ -7932,6 +9298,7 @@ def _build_instant_context(
             normalized_evidence=normalized_evidence,
             period_window=period_window,
             category=category,
+            career_subtype=(intent or {}).get("career_subtype"),
             question=question,
             chart_data=chart_data,
             house_lordships=house_lordships,
@@ -7959,11 +9326,71 @@ def _build_instant_context(
         "natal_topic_factors": prompt_instant_parashari.pop("natal_topic_factors", {}),
     }
     prompt_normalized_evidence = dict(normalized_evidence)
+    if category in CAREER_ALIASES or category in CAREER_PROFILES:
+        career_subtype = career_profile(category, (intent or {}).get("career_subtype"))["subtype"]
+        profession_evidence = (
+            _instant_compact_profession_evidence(chart_data, birth_data)
+            if is_static_career_profile(
+                category, career_subtype, answer_mode=answer_mode
+            )
+            else {}
+        )
+        career_foundation = _compact_career_foundation(
+            category,
+            (intent or {}).get("career_subtype"),
+            user_evidence.get("natal_topic_factors"),
+            evidence_instant_parashari.get("divisional_support") or {},
+            normalized_evidence.get("chart_facts") or {},
+            normalized_evidence.get("karaka_evidence") or {},
+            profession_evidence,
+        )
+        prompt_instant_parashari["career_foundation"] = career_foundation
+        prompt_normalized_evidence["career_foundation"] = career_foundation
+    if (
+        str(category or "").lower() == "marriage"
+        and str((intent or {}).get("marriage_subtype") or "").lower() == "love_vs_arranged"
+    ):
+        marriage_pathway_evidence = _compact_marriage_pathway_evidence(
+            user_evidence.get("natal_topic_factors"),
+            evidence_instant_parashari.get("divisional_support") or {},
+        )
+        prompt_normalized_evidence["marriage_pathway_comparison"] = marriage_pathway_evidence
+    if (
+        str(category or "").lower() == "marriage"
+        and str((intent or {}).get("marriage_subtype") or "").lower() == "spouse_meeting"
+    ):
+        prompt_normalized_evidence["spouse_meeting_context"] = _compact_spouse_meeting_evidence(
+            user_evidence.get("natal_topic_factors"),
+            normalized_evidence.get("person_profile_axes") or [],
+            evidence_instant_parashari.get("divisional_support") or {},
+        )
     prompt_current_dashas_levels = evidence_current_dashas_context if is_non_self_target else current_dashas_context
     if answer_mode == "event_prediction" and authoritative_event_prediction_dashas:
         prompt_current_dashas_levels = authoritative_event_prediction_dashas
         prompt_instant_parashari = dict(prompt_instant_parashari)
         prompt_instant_parashari["active_dashas_formatted"] = authoritative_event_prediction_dashas
+    static_career_profile = is_static_career_profile(
+        category, (intent or {}).get("career_subtype"), answer_mode=answer_mode
+    )
+    if static_career_profile:
+        # Static vocation questions must not inherit incidental timing context
+        # from the session. Keep only the natal/divisional career foundation.
+        prompt_current_dashas_levels = {}
+        prompt_current_transits = {}
+        prompt_transits_context = {}
+        prompt_instant_parashari = {
+            key: value
+            for key, value in prompt_instant_parashari.items()
+            if key not in {
+                "active_dashas",
+                "active_dashas_formatted",
+                "current_dashas",
+                "forward_periods",
+                "horizon_segments",
+                "transit_confirmation",
+                "transit_windows",
+            }
+        }
     claim_gates = (normalized_evidence.get("claim_gates") or {}) if isinstance(normalized_evidence.get("claim_gates"), dict) else {}
     if answer_mode == "trait_nature":
         prompt_current_transits = {}
@@ -8141,7 +9568,7 @@ def _build_instant_context(
     if not isinstance(session_extracted, dict):
         session_extracted = (intent or {}).get("extracted_context") if isinstance((intent or {}).get("extracted_context"), dict) else {}
 
-    return {
+    context_result = {
         "birth_summary": evidence_birth_summary if is_non_self_target else birth_summary,
         "intent_summary": {
             "category": category,
@@ -8173,6 +9600,7 @@ def _build_instant_context(
         "complexity_hint": complexity_hint,
         "named_dasha_lookup": named_dasha_lookup,
     }
+    return context_result
 
 
 _FOLLOW_UPS_START = "###FOLLOW_UPS_START###"
@@ -8574,7 +10002,7 @@ def _build_period_topic_forecast(
 
         zones = []
         if level != "background_only":
-            for row in list(health_rules.get("allowed_zone_evidence") or [])[:3]:
+            for row in list(health_rules.get("allowed_zone_evidence") or [])[:4]:
                 if not isinstance(row, dict) or not row.get("zone"):
                     continue
                 zones.append({
@@ -8668,6 +10096,8 @@ def _build_period_topic_forecast(
                 "manifestation_candidates": _period_topic_manifestations(category, houses, row.get("predicted_result_areas")),
                 "peak_windows": peaks,
             }
+        if _normalize_event_category(category) in CAREER_ALIASES or _normalize_event_category(category) in CAREER_PROFILES:
+            phase["career_manifestations"] = classify_career_manifestations(houses)
         health_detail = health_phase_detail(houses, peaks, permission)
         if health_detail:
             phase["health_forecast"] = health_detail
@@ -8687,7 +10117,7 @@ def _build_period_topic_forecast(
         "chronological_phases": phases,
         "strongest_phase": {
             key: strongest.get(key)
-            for key in ("start", "end", "phase_state", "manifestation_candidates", "peak_windows")
+            for key in ("start", "end", "phase_state", "manifestation_candidates", "career_manifestations", "peak_windows")
         },
         "narration_rule": (
             "Cover the full requested period in chronological phases. A peak window is a peak within its "
@@ -8777,10 +10207,18 @@ def _compact_composer_windows(rows: Any, *, limit: int = 5) -> List[Dict[str, An
         "start",
         "end",
         "label",
+        "option",
+        "event_profile",
         "chain",
         "mahadasha",
         "antardasha",
         "pratyantardasha",
+        "phase_start",
+        "phase_end",
+        "phase_dasha_chain",
+        "phase_granularity",
+        "strongest_pd_window",
+        "probable_peak_windows",
         "planet",
         "dasha_levels",
         "strength",
@@ -8917,8 +10355,140 @@ def _limit_composer_value(
 
 def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) -> Dict[str, Any]:
     """Fit the composer JSON to a latency-safe envelope in two semantic passes."""
+    source_evidence = context.get("evidence") if isinstance(context.get("evidence"), dict) else {}
+    source_career = (
+        source_evidence.get("career_foundation")
+        if isinstance(source_evidence.get("career_foundation"), dict)
+        else {}
+    )
+    source_vocation = (
+        source_career.get("vocation_synthesis")
+        if isinstance(source_career.get("vocation_synthesis"), dict)
+        else {}
+    )
+    source_career_decision = (
+        source_evidence.get("career_decision")
+        if isinstance(source_evidence.get("career_decision"), dict)
+        else {}
+    )
+    source_option_comparison = (
+        source_evidence.get("option_comparison")
+        if isinstance(source_evidence.get("option_comparison"), dict)
+        else {}
+    )
+    source_query_plan = context.get("query_plan") if isinstance(context.get("query_plan"), dict) else {}
+    source_verdict = context.get("verdict") if isinstance(context.get("verdict"), dict) else {}
+    source_contract = context.get("answer_contract") if isinstance(context.get("answer_contract"), dict) else {}
+    source_event_rules = (
+        source_contract.get("event_rules")
+        if isinstance(source_contract.get("event_rules"), dict)
+        else {}
+    )
+    source_retrospective_windows = (
+        _compact_composer_windows(source_verdict.get("ranked_windows"), limit=3)
+        if bool((source_query_plan.get("time_scope") or {}).get("retrospective"))
+        else []
+    )
+
+    def restore_vocation(payload: Dict[str, Any]) -> None:
+        """Keep answer-bearing career combinations through depth limiting."""
+        if not source_vocation:
+            return
+        payload_evidence = payload.setdefault("evidence", {})
+        if not isinstance(payload_evidence, dict):
+            return
+        payload_career = payload_evidence.setdefault("career_foundation", {})
+        if not isinstance(payload_career, dict):
+            return
+        payload_career["vocation_synthesis"] = _limit_composer_value(
+            source_vocation,
+            max_depth=7,
+            list_limit=7,
+            string_limit=180,
+        )
+
+    def restore_career_decision(payload: Dict[str, Any]) -> None:
+        """Keep the calculated cause of every stay/change verdict.
+
+        The generic depth limiter used to retain the verdict matrix while
+        dropping its nested dasha carriers and transit confirmations.  That
+        made both the writer and the readable audit UI see only a bare list of
+        active houses.  These rows are answer-bearing evidence, not optional
+        diagnostics, so preserve them through both compaction passes.
+        """
+        if not source_career_decision:
+            return
+        payload_evidence = payload.setdefault("evidence", {})
+        if not isinstance(payload_evidence, dict):
+            return
+        payload_evidence["career_decision"] = _limit_composer_value(
+            source_career_decision,
+            max_depth=9,
+            list_limit=12,
+            string_limit=220,
+        )
+
+    def restore_option_comparison(payload: Dict[str, Any]) -> None:
+        """Keep each comparison option attached to its own calculated window."""
+        if not source_option_comparison:
+            return
+        rows: List[Dict[str, Any]] = []
+        for option in list(source_option_comparison.get("options") or [])[:3]:
+            if not isinstance(option, dict):
+                continue
+            window = option.get("best_window") if isinstance(option.get("best_window"), dict) else {}
+            rows.append({
+                "label": option.get("label"),
+                "event_profile": option.get("event_profile"),
+                "peak_score": option.get("peak_score"),
+                "focus_houses": option.get("target_relative_focus_houses"),
+                "best_window": {
+                    key: window.get(key)
+                    for key in (
+                        "start", "end", "mahadasha", "antardasha", "pratyantardasha",
+                        "relevance_score", "activated_focus_houses", "predicted_result_areas", "why",
+                    )
+                    if window.get(key) not in (None, "", [], {})
+                },
+            })
+        payload_evidence = payload.setdefault("evidence", {})
+        if isinstance(payload_evidence, dict):
+            payload_evidence["option_comparison"] = {
+                "as_of": source_option_comparison.get("as_of"),
+                "horizon_end": source_option_comparison.get("horizon_end"),
+                "options": rows,
+                "comparison": source_option_comparison.get("comparison"),
+                "writer_rule": (
+                    "Never attach one option's best_window, dasha chain, score, or why to another option."
+                ),
+            }
+
+    def restore_retrospective_windows(payload: Dict[str, Any]) -> None:
+        """PD boundaries and probable peaks are answer-bearing, not diagnostics."""
+        if not source_retrospective_windows:
+            return
+        payload_verdict = payload.setdefault("verdict", {})
+        if isinstance(payload_verdict, dict):
+            payload_verdict["ranked_windows"] = source_retrospective_windows
+        payload_contract = payload.setdefault("answer_contract", {})
+        if not isinstance(payload_contract, dict):
+            return
+        payload_rules = payload_contract.setdefault("event_rules", {})
+        if not isinstance(payload_rules, dict):
+            return
+        payload_rules["allowed_timing_windows"] = _compact_composer_windows(
+            source_event_rules.get("allowed_timing_windows"), limit=3
+        )
+        payload_rules["required_material_windows"] = _compact_composer_windows(
+            source_event_rules.get("required_material_windows"), limit=3
+        )
+
     compact = _limit_composer_value(context)
     compact = compact if isinstance(compact, dict) else {}
+    restore_vocation(compact)
+    restore_career_decision(compact)
+    restore_option_comparison(compact)
+    restore_retrospective_windows(compact)
     if _json_size(compact) <= target_chars:
         return compact
 
@@ -8929,6 +10499,53 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
         string_limit=180,
     )
     tighter = tighter if isinstance(tighter, dict) else {}
+    restore_vocation(tighter)
+    restore_career_decision(tighter)
+    restore_option_comparison(tighter)
+    restore_retrospective_windows(tighter)
+
+    # The shallow emergency pass above intentionally drops nested collections.
+    # Constitutional-health cause facts live one level deeper than each zone
+    # row (``anatomy_basis`` / ``why``), so losing them leaves the writer with
+    # region names but no permitted astrological explanation.  Restore the
+    # authoritative compact health contract after generic size reduction.  It
+    # is small, answer-critical, and must take precedence over optional
+    # diagnostics when fitting the latency envelope.
+    source_health = (
+        source_evidence.get("health_rules")
+        if isinstance(source_evidence.get("health_rules"), dict)
+        else {}
+    )
+    if source_health and not source_health.get("is_time_bound_question"):
+        tighter_evidence = tighter.setdefault("evidence", {})
+        if isinstance(tighter_evidence, dict):
+            tighter_evidence["health_rules"] = _limit_composer_value(
+                source_health,
+                max_depth=6,
+                list_limit=6,
+                string_limit=180,
+            )
+        source_contract = (
+            context.get("answer_contract")
+            if isinstance(context.get("answer_contract"), dict)
+            else {}
+        )
+        if isinstance(source_contract.get("health_rules"), dict):
+            tighter_contract = tighter.setdefault("answer_contract", {})
+            if isinstance(tighter_contract, dict):
+                tighter_contract["health_rules"] = _limit_composer_value(
+                    source_contract["health_rules"],
+                    max_depth=6,
+                    list_limit=6,
+                    string_limit=180,
+                )
+    # The emergency depth limiter above can keep ``career_foundation`` while
+    # silently dropping the dictionaries inside
+    # ``vocation_synthesis.combination_signatures``.  Those conjunctions are
+    # the answer-bearing career evidence (for example Mars-Saturn-Rahu), not
+    # optional diagnostics. Restore that bounded synthesis after the generic
+    # pass so the writer receives the same individualized result calculated by
+    # the career engine.
     if _json_size(tighter) <= target_chars:
         return tighter
 
@@ -8987,7 +10604,7 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
     if health_rules:
         time_bound_health = bool(health_rules.get("is_time_bound_question"))
         zone_rows: List[Dict[str, Any]] = []
-        for row in list(health_rules.get("allowed_zone_evidence") or [])[:3]:
+        for row in list(health_rules.get("allowed_zone_evidence") or [])[:4]:
             if not isinstance(row, dict):
                 continue
             compact_row = {
@@ -8995,7 +10612,7 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
                 for key in (
                     "zone", "anatomical_members", "confidence", "confluence_count", "sources", "why",
                     "mechanisms", "divisional_repetition", "primary_medical_factors",
-                    "confirmation_factors",
+                    "anatomy_basis", "confirmation_factors",
                 )
                 if row.get(key) not in (None, "", [], {})
             }
@@ -9009,7 +10626,8 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
             key: health_rules.get(key)
             for key in (
                 "health_question_type", "is_time_bound_question",
-                "allowed_zone_names", "allowed_mechanisms",
+                "allowed_zone_names", "required_zone_count", "require_all_allowed_zones",
+                "allowed_mechanisms",
                 "answer_order", "constitutional_question_rule",
                 "forbidden_topics",
                 "category_safety", "claim_allow_list", "forbidden_claims",
@@ -9019,6 +10637,25 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
             if health_rules.get(key) not in (None, "", [], {})
         }
         compact_health_rules["allowed_zone_evidence"] = zone_rows
+
+    graph_policy = answer_spec.get("knowledge_graph_policy")
+    graph_policy = graph_policy if isinstance(graph_policy, dict) else {}
+    compact_graph_policy = {
+        key: graph_policy.get(key)
+        for key in (
+            "live", "enforcement", "domain", "ontology_version", "runtime_key",
+            "ontology_resource", "question_type", "expected_answer_mode", "mode_match",
+            "evidence_status", "required_factors", "observed_factors",
+            "missing_required_factors", "default_exclusions",
+            "unexpected_default_exclusions", "required_capabilities",
+            "decision_rules", "guardrails", "answer_contract", "evidence_policy",
+            "required_output_sections", "instruction",
+            "claim_permission", "timing_missing_factors",
+            "marriage_pathway_rules",
+            "spouse_meeting_rules",
+        )
+        if graph_policy.get(key) not in (None, "", [], {})
+    }
 
     compact = {
         "max_words": answer_spec.get("max_words"),
@@ -9031,11 +10668,15 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
         "required_derived_opening": answer_spec.get("required_derived_opening"),
         "evidence_limitations": answer_spec.get("evidence_limitations"),
         "health_rules": compact_health_rules,
+        "knowledge_graph_policy": compact_graph_policy,
         "current_cause_rules": answer_spec.get("current_cause_rules"),
         "comparison_rules": answer_spec.get("comparison_rules"),
         "daily_rules": answer_spec.get("daily_rules"),
         "chart_fact_rules": answer_spec.get("chart_fact_rules"),
         "capacity_rules": answer_spec.get("capacity_rules"),
+        "career_rules": answer_spec.get("career_rules"),
+        "marriage_pathway_rules": answer_spec.get("marriage_pathway_rules"),
+        "spouse_meeting_rules": answer_spec.get("spouse_meeting_rules"),
         "event_rules": compact_event_rules,
         "forbidden": answer_spec.get("forbidden"),
         "answer_order": answer_spec.get("answer_order"),
@@ -9108,6 +10749,101 @@ def _build_instant_answer_blueprint(
         if isinstance(evidence.get("health_rules"), dict)
         else {}
     )
+    career_decision = (
+        evidence.get("career_decision")
+        if isinstance(evidence.get("career_decision"), dict)
+        else {}
+    )
+    if query_plan.get("forecast_shape") == "career_decision":
+        return {
+            "purpose": "semantic slots for a calculated stay-or-change decision; not a vocation-fit profile",
+            "slots": [
+                {
+                    "slot": "direct safe verdict",
+                    "source": "evidence.career_decision.permission and verdict.direction",
+                },
+                {
+                    "slot": "continuity in the present job",
+                    "source": "evidence.career_decision.windows[].decision_matrix.continuity_support",
+                },
+                {
+                    "slot": "change and separation support",
+                    "source": "evidence.career_decision.windows[].decision_matrix.change_momentum and separation_support",
+                },
+                {
+                    "slot": "next-role and income landing support",
+                    "source": "evidence.career_decision.windows[].decision_matrix.landing_support",
+                },
+                {
+                    "slot": "safest practical action",
+                    "source": "evidence.career_decision.guidance",
+                },
+                {
+                    "slot": "one natural follow-up about a secured offer, concrete workplace problem, or intended transition window",
+                    "source": "user_goal",
+                },
+            ],
+            "hard_gate": {
+                "affirmative_exit_allowed": bool(career_decision.get("affirmative_exit_allowed")),
+                "supported_transition_windows": career_decision.get("supported_transition_windows") or [],
+                "rule": (
+                    "Never describe landing support as missing inside a planned_transition_supported window. "
+                    "Recommend resignation only when affirmative_exit_allowed is true; otherwise advise staying "
+                    "while preparing or ask for the missing offer/window. A supported window has all four "
+                    "calculated gates, but remains astrological support rather than a real-world guarantee. "
+                    "If supported_transition_windows is empty, explicitly say that no supported change window "
+                    "was established in the calculated horizon and do not present any other date as favorable."
+                ),
+            },
+            "forbidden_content": [
+                "advising resignation from career fit, dissatisfaction, House 8 pressure, or House 12 alone",
+                "turning a better-fit vocation profile into permission to leave the current job",
+                "an affirmative leave recommendation when affirmative_exit_allowed is false",
+                "inventing a transition date or supported window not present in evidence.career_decision.windows",
+                "calling a non-supported window a job-change window",
+                "saying next-role landing support is absent for a planned_transition_supported window",
+            ],
+            "user_goal": query_plan.get("user_goal"),
+        }
+    if (
+        query_plan.get("answer_mode") in {"topic_reading", "potential_capacity"}
+        and evidence.get("career_foundation")
+    ):
+        return {
+            "purpose": "semantic slots for a timeless career-profile reading; not a forecast and not prewritten prose",
+            "slots": [
+                {
+                    "slot": "direct overall career pattern and working style",
+                    "source": "evidence.career_foundation.D1 and evidence.career_foundation.D10",
+                },
+                {
+                    "slot": "professional strengths and environments where they express well",
+                    "source": "evidence.career_foundation.D10 and evidence.career_foundation.career_fit",
+                },
+                {
+                    "slot": "vocation signature",
+                    "source": "evidence.career_foundation.amatyakaraka and evidence.career_foundation.KARAKAMSHA",
+                },
+                {
+                    "slot": "main natal pressure or condition",
+                    "source": "evidence.natal_promise, evidence.risk_specifics, and evidence.special_natal_factors",
+                },
+                {
+                    "slot": "one practical career implication",
+                    "source": "the natal and vocational facts above",
+                },
+                {
+                    "slot": "one natural follow-up about role, industry, work style, or present concern",
+                    "source": "user_goal",
+                },
+            ],
+            "forbidden_content": [
+                "dates, years, windows, peaks, or future phases",
+                "current dasha, current transit, or currently active houses",
+                "promotion, joining, compensation, or event-timing claims",
+            ],
+            "user_goal": query_plan.get("user_goal"),
+        }
     if health_rules and not health_rules.get("is_time_bound_question"):
         return {
             "purpose": "semantic slots for a constitutional health-susceptibility reading; not a current-period forecast",
@@ -9245,6 +10981,8 @@ def _build_instant_composer_context(
 
     user_derivation = instant_v2_packet.get("user_derivation")
     user_derivation = user_derivation if isinstance(user_derivation, dict) else {}
+    career_reading = user_derivation.get("career_reading")
+    career_reading = career_reading if isinstance(career_reading, dict) else {}
     derived_promise = user_derivation.get("natal_promise")
     derived_promise = derived_promise if isinstance(derived_promise, dict) else {}
     special_natal_factors: List[Dict[str, Any]] = []
@@ -9286,6 +11024,8 @@ def _build_instant_composer_context(
     time_scope = query_plan.get("time_scope") if isinstance(query_plan.get("time_scope"), dict) else {}
     scope_start = time_scope.get("as_of")
     scope_end = time_scope.get("horizon_end")
+    if time_scope.get("retrospective"):
+        scope_start = None
     compact_verdict = {
         "direction": verdict.get("direction"),
         "confidence": verdict.get("confidence"),
@@ -9302,6 +11042,41 @@ def _build_instant_composer_context(
 
     answer_mode = str(intent.get("answer_mode") or query_plan.get("answer_mode") or "")
     category = str(intent.get("category") or query_plan.get("category") or "general")
+    career_foundation = (
+        normalized.get("career_foundation")
+        if isinstance(normalized.get("career_foundation"), dict)
+        else {}
+    )
+    career_reading = (
+        user_derivation.get("career_reading")
+        if isinstance(user_derivation.get("career_reading"), dict)
+        else {}
+    )
+    career_subtype = normalize_career_subtype(
+        category,
+        intent.get("career_subtype")
+        or query_plan.get("career_subtype")
+        or career_foundation.get("career_subtype")
+        or career_reading.get("subtype"),
+    )
+    career_contract = (
+        build_career_answer_contract(answer_mode, career_subtype)
+        if is_career_category(category)
+        else {}
+    )
+    career_family = str(career_contract.get("question_family") or "")
+    career_diagnosis_question = career_family == "diagnosis"
+    career_relationship_question = is_career_relationship(category, career_subtype)
+    career_decision_question = is_career_decision(category, career_subtype)
+    if is_career_category(category):
+        compact_query_plan["career_subtype"] = career_subtype
+    if career_decision_question:
+        compact_query_plan["forecast_shape"] = "career_decision"
+    static_career_profile = is_static_career_profile(
+        category,
+        career_subtype,
+        answer_mode=answer_mode,
+    )
     health_rules = (
         answer_spec.get("health_rules")
         if isinstance(answer_spec, dict) and isinstance(answer_spec.get("health_rules"), dict)
@@ -9332,6 +11107,12 @@ def _build_instant_composer_context(
         compact_query_plan["forecast_shape"] = "daily_forecast"
 
     compact_answer_contract = _compact_answer_spec_for_composer(answer_spec)
+    if career_contract:
+        # The normalized evidence contract is category-level.  Replace its
+        # generic career contract with the exact subtype/family contract that
+        # was selected for this turn (recognition, stagnation, decision, etc.).
+        compact_answer_contract["career_contract"] = career_contract
+        compact_answer_contract["answer_skeleton"] = career_contract.get("required_shape")
     broad_health_question = bool(
         health_rules and not health_rules.get("is_time_bound_question")
     )
@@ -9345,6 +11126,49 @@ def _build_instant_composer_context(
             "confidence": verdict.get("confidence"),
             "scope": "natal constitution only; no current timing",
         }
+    if static_career_profile:
+        # Routing is already correct for questions such as "How is my career
+        # overall?".  Do not let the final writer see incidental horizon,
+        # dasha, or transit fields that were calculated for other answer
+        # shapes.  A prompt warning is insufficient when the evidence itself
+        # contradicts it, so enforce the boundary structurally.
+        compact_query_plan.pop("time_scope", None)
+        compact_query_plan.pop("forecast_shape", None)
+        compact_verdict = {
+            key: value
+            for key, value in {
+                "direction": verdict.get("direction"),
+                "confidence": verdict.get("confidence"),
+                "missing_required_capabilities": verdict.get("missing_required_capabilities"),
+                "scope": "natal and vocational profile only; no event timing",
+            }.items()
+            if value not in (None, "", [], {})
+        }
+        # Static vocation/capacity answers must not inherit the generic event
+        # contract assembled upstream. Keeping event windows here gives the
+        # composer a second, contradictory route to dated predictions.
+        for key in ("activation_prediction_rules", "event_rules", "current_cause_rules", "daily_rules"):
+            compact_answer_contract.pop(key, None)
+
+    if career_diagnosis_question:
+        # A causal "why" question is neither a static vocation profile nor a
+        # future forecast.  Keep only an auditable current trigger, when one is
+        # actually present, and never expose ranked future windows to the
+        # writer merely because the calculation workspace produced them.
+        compact_query_plan.pop("time_scope", None)
+        compact_query_plan.pop("forecast_shape", None)
+        compact_verdict = {
+            key: value
+            for key, value in {
+                "direction": verdict.get("direction"),
+                "confidence": verdict.get("confidence"),
+                "missing_required_capabilities": verdict.get("missing_required_capabilities"),
+                "scope": "career cause diagnosis; current trigger only when directly evidenced; no future timing",
+            }.items()
+            if value not in (None, "", [], {})
+        }
+        for key in ("activation_prediction_rules", "event_rules", "current_cause_rules", "daily_rules"):
+            compact_answer_contract.pop(key, None)
         compact_verdict = {
             key: value for key, value in compact_verdict.items()
             if value not in (None, "", [], {})
@@ -9388,13 +11212,178 @@ def _build_instant_composer_context(
             ),
         },
         "divisional_specifics": list(normalized.get("divisional_specifics") or [])[:3],
+        "career_foundation": normalized.get("career_foundation"),
         "risk_specifics": list(normalized.get("risk_specifics") or [])[:3],
         "health_body_area": normalized.get("health_body_area"),
         "option_comparison": normalized.get("option_comparison"),
+        "marriage_pathway_comparison": normalized.get("marriage_pathway_comparison"),
+        "spouse_meeting_context": normalized.get("spouse_meeting_context"),
+        "historical_event_dasha_scan": normalized.get("historical_event_dasha_scan"),
         "daily_prediction": _compact_daily_prediction_for_composer(
             instant_context.get("daily_prediction_spine") or normalized.get("daily_prediction_spine")
         ) if exact_day else None,
     }
+    live_graph_policy = (
+        compact_answer_contract.get("knowledge_graph_policy")
+        if isinstance(compact_answer_contract.get("knowledge_graph_policy"), dict)
+        else {}
+    )
+    graph_exclusions = {
+        str(value) for value in live_graph_policy.get("default_exclusions") or []
+    }
+    graph_excludes_timing = bool(
+        live_graph_policy.get("live")
+        and any(
+            marker in value.lower()
+            for value in graph_exclusions
+            for marker in ("dashaactivation", "transitactivation", "transitconfirmation")
+        )
+    )
+    if graph_excludes_timing:
+        # Enforce authored static/timing separation on the data boundary. The
+        # writer cannot leak incidental dates or activations it never receives.
+        compact_query_plan.pop("time_scope", None)
+        compact_query_plan.pop("forecast_shape", None)
+        evidence["current_timing"] = None
+        evidence["period_topic_forecast"] = None
+        evidence["transit_activation_timeline"] = None
+        if isinstance(evidence.get("natal_promise"), dict):
+            evidence["natal_promise"] = {
+                key: value for key, value in evidence["natal_promise"].items()
+                if key not in {"current_topic_support", "dasha_permission_segment_count", "rule"}
+            }
+        if isinstance(evidence.get("topic_confirmation"), dict):
+            evidence["topic_confirmation"] = {
+                key: value for key, value in evidence["topic_confirmation"].items()
+                if key != "current_topic_support"
+            }
+        evidence["divisional_specifics"] = [
+            line for line in list(evidence.get("divisional_specifics") or [])
+            if not re.search(r"\b(current|active|dasha|period|transit)\b", str(line), re.I)
+        ]
+        compact_verdict.pop("ranked_windows", None)
+        compact_verdict["scope"] = "static graph route; natal/topic evidence only; no timing"
+        for key in ("activation_prediction_rules", "event_rules", "current_cause_rules", "daily_rules"):
+            compact_answer_contract.pop(key, None)
+    if career_decision_question:
+        career_rules = (
+            answer_spec.get("career_rules")
+            if isinstance(answer_spec, dict) and isinstance(answer_spec.get("career_rules"), dict)
+            else {}
+        )
+        rich_windows = [
+            row for row in (career_reading.get("delivery_windows") or [])
+            if isinstance(row, dict)
+        ]
+        raw_windows = career_rules.get("material_windows") or rich_windows
+
+        def _matching_rich_career_window(row: Dict[str, Any]) -> Dict[str, Any]:
+            """Join the decision verdict to its auditable dasha/transit record."""
+            def normalized_chain(value: Any) -> str:
+                # Material windows and calculator windows may use hyphens or
+                # en-dashes for the same MD/AD/PD chain.
+                return "".join(char.lower() for char in str(value or "") if char.isalnum())
+
+            for candidate in rich_windows:
+                same_dates = (
+                    str(candidate.get("start") or "") == str(row.get("start") or "")
+                    and str(candidate.get("end") or "") == str(row.get("end") or "")
+                )
+                same_chain = (
+                    not row.get("chain")
+                    or not candidate.get("chain")
+                    or normalized_chain(candidate.get("chain")) == normalized_chain(row.get("chain"))
+                )
+                if same_dates and same_chain:
+                    return candidate
+            return {}
+
+        decision_windows: List[Dict[str, Any]] = []
+        for row in raw_windows:
+            if not isinstance(row, dict):
+                continue
+            rich_row = _matching_rich_career_window(row)
+            matrix = row.get("decision_matrix") if isinstance(row.get("decision_matrix"), dict) else {}
+            if not matrix and isinstance(rich_row.get("decision_matrix"), dict):
+                matrix = rich_row.get("decision_matrix") or {}
+            activated_houses = list(matrix.get("active_houses") or [])
+            compact_row = {
+                "start": row.get("start") or rich_row.get("start"),
+                "end": row.get("end") or rich_row.get("end"),
+                "chain": row.get("chain") or rich_row.get("chain"),
+                "activated_focus_houses": (
+                    activated_houses
+                    or rich_row.get("activated_focus_houses")
+                    or []
+                ),
+                "decision_matrix": matrix,
+                "manifestations": row.get("manifestations") or row.get("stages") or [],
+                "why": row.get("why") or rich_row.get("why"),
+                "dasha_carriers": (
+                    row.get("dasha_carriers")
+                    or rich_row.get("dasha_carriers")
+                    or []
+                ),
+                "transit_confirmations": (
+                    row.get("transit_confirmations")
+                    or rich_row.get("transit_confirmations")
+                    or []
+                ),
+            }
+            decision_windows.append({
+                key: value for key, value in compact_row.items()
+                if value not in (None, "", [], {})
+            })
+        supported_windows = [
+            row for row in decision_windows
+            if (row.get("decision_matrix") or {}).get("verdict") == "planned_transition_supported"
+        ]
+        unsupported_windows = [
+            row for row in decision_windows
+            if (row.get("decision_matrix") or {}).get("verdict") != "planned_transition_supported"
+        ]
+        affirmative_exit_allowed = bool(supported_windows)
+        safe_guidance = (
+            "A planned transition has calculated change, separation, and next-role landing support. "
+            "Discuss only the supplied supported windows and still advise securing the next role or income before resigning."
+            if affirmative_exit_allowed
+            else
+            "The available calculations do not authorize resignation. Keep the current role while preparing options, "
+            "or ask about a secured offer or a specific intended transition window."
+        )
+        evidence["career_decision"] = {
+            "subtype": career_subtype,
+            "permission": (
+                "planned_transition_supported" if affirmative_exit_allowed else "resignation_not_authorized"
+            ),
+            "affirmative_exit_allowed": affirmative_exit_allowed,
+            "guidance": safe_guidance,
+            "windows": decision_windows,
+            "supported_transition_windows": supported_windows,
+            "non_transition_windows": unsupported_windows,
+            "required_logic": {
+                "continuity": "H6 + H10; H2/H11 strengthen employment and income continuity.",
+                "change_and_separation": "H3 + H10 indicate an initiated role change; H12 is required for separation.",
+                "next_role_landing": "H2 + H6 + H10 + H11 support income, employment, role, and gains in the next position.",
+                "not_permission": "Career fit, dissatisfaction, H8 disruption, or H12 alone never authorizes resignation.",
+            },
+            "composer_rule": (
+                "Positive change dates may be named only from supported_transition_windows."
+                if affirmative_exit_allowed else
+                "No supported transition window was calculated. Do not name any supplied window as a good time "
+                "to leave or change jobs; say that the calculated horizon does not yet establish one."
+            ),
+        }
+        compact_verdict = {
+            "direction": (
+                "planned transition supported only in supplied windows"
+                if affirmative_exit_allowed
+                else "do not resign on the available evidence"
+            ),
+            "confidence": verdict.get("confidence") or ("medium" if affirmative_exit_allowed else "low"),
+            "scope": "calculated stay/change/separation/landing decision",
+            "guidance": safe_guidance,
+        }
     if broad_health_question:
         # A constitutional health question must not expose dasha, transit, or
         # generic active-area data to the writer. Those are valid elsewhere,
@@ -9402,6 +11391,71 @@ def _build_instant_composer_context(
         # model to claim that Houses 6/8 are "currently active" without an
         # adjudicated health-timing question.
         evidence = {"health_rules": compact_answer_contract.get("health_rules")}
+    if career_diagnosis_question:
+        evidence = {
+            "natal_promise": evidence.get("natal_promise"),
+            "career_foundation": evidence.get("career_foundation"),
+            "special_natal_factors": evidence.get("special_natal_factors"),
+            "current_timing": evidence.get("current_timing"),
+            "active_areas": evidence.get("active_areas"),
+            "topic_confirmation": evidence.get("topic_confirmation"),
+            "divisional_specifics": evidence.get("divisional_specifics"),
+            "risk_specifics": evidence.get("risk_specifics"),
+            # This is the adjudicated question-specific diagnosis.  Without
+            # it the composer sees only the generic D1/D10 foundation and is
+            # tempted to invent a timing story for questions such as
+            # "why am I not getting recognition?".
+            "career_diagnosis": career_reading.get("diagnosis"),
+        }
+    if career_relationship_question:
+        evidence = {
+            "natal_promise": evidence.get("natal_promise"),
+            "career_relationship": career_reading.get("relationship"),
+            "special_natal_factors": evidence.get("special_natal_factors"),
+        }
+        compact_verdict = {
+            "direction": "role-specific workplace relationship",
+            "confidence": verdict.get("confidence") or "medium",
+            "scope": career_reading.get("relationship", {}).get("target"),
+        }
+    if static_career_profile:
+        natal_promise = evidence.get("natal_promise")
+        natal_promise = dict(natal_promise) if isinstance(natal_promise, dict) else natal_promise
+        if isinstance(natal_promise, dict):
+            for key in (
+                "current_topic_support",
+                "dasha_permission_segment_count",
+                "dasha_permission",
+                "transit_permission",
+                "rule",
+            ):
+                natal_promise.pop(key, None)
+        topic_confirmation = evidence.get("topic_confirmation")
+        topic_confirmation = (
+            dict(topic_confirmation) if isinstance(topic_confirmation, dict) else topic_confirmation
+        )
+        # ``topic_signals.fn`` is an older generic function list. Once the
+        # chart-specific vocation synthesis exists, leaving this parallel list
+        # in the brief lets the writer choose generic administration/process
+        # labels over the actual 10th-lord combinations.
+        if (
+            isinstance(topic_confirmation, dict)
+            and isinstance(evidence.get("career_foundation"), dict)
+            and (evidence.get("career_foundation") or {}).get("vocation_synthesis")
+        ):
+            topic_signals = topic_confirmation.get("topic_signals")
+            if isinstance(topic_signals, dict):
+                topic_signals = dict(topic_signals)
+                topic_signals.pop("fn", None)
+                topic_confirmation["topic_signals"] = topic_signals
+        evidence = {
+            "natal_promise": natal_promise,
+            "career_foundation": evidence.get("career_foundation"),
+            "special_natal_factors": evidence.get("special_natal_factors"),
+            "topic_confirmation": topic_confirmation,
+            "divisional_specifics": evidence.get("divisional_specifics"),
+            "risk_specifics": evidence.get("risk_specifics"),
+        }
     if answer_mode == "potential_capacity":
         # A natal-promise question must not expose current timing as an
         # alternative reasoning path. This also keeps the composer brief small.
@@ -9411,6 +11465,15 @@ def _build_instant_composer_context(
             "topic_confirmation": evidence.get("topic_confirmation"),
             "divisional_specifics": evidence.get("divisional_specifics"),
             "risk_specifics": evidence.get("risk_specifics"),
+            # Static career-capacity questions (for example, "what career
+            # will I do?") require the calculated D1/D10/Jaimini vocation
+            # synthesis.  Dropping this here left only the old generic
+            # topic_signals.fn labels for the composer, even though the
+            # calculation stage had produced the correct individualized
+            # signature.
+            "career_foundation": (
+                evidence.get("career_foundation") if static_career_profile else None
+            ),
         }
     if exact_day:
         # Exact-day forecasts have their own authoritative calculation spine.
@@ -9492,6 +11555,7 @@ def _build_instant_composer_context(
             "period_window": intent.get("period_window"),
             "time_relation": intent.get("time_relation"),
             "target_subject": intent.get("target_subject") or query_plan.get("target_subject"),
+            "career_subtype": career_subtype if is_career_category(category) else None,
         },
         "query_plan": compact_query_plan,
         "verdict": compact_verdict,
@@ -9504,10 +11568,17 @@ def _build_instant_composer_context(
         # into an otherwise natal-only composer brief.
         "recent_history": (
             []
-            if broad_health_question
+            if broad_health_question or static_career_profile or career_diagnosis_question or graph_excludes_timing
             else list(instant_context.get("recent_history") or [])[-2:]
         ),
     }
+    context["intent"] = {
+        key: value for key, value in context["intent"].items()
+        if value not in (None, "", [], {})
+    }
+    if static_career_profile or career_diagnosis_question:
+        context["intent"].pop("period_window", None)
+        context["intent"].pop("time_relation", None)
     app_language = str(query_plan.get("language") or intent.get("language") or "").strip().lower()
     if app_language:
         context["app_language_fallback"] = app_language
@@ -9520,12 +11591,405 @@ def _instant_composer_language_rule(language: str) -> str:
     """Ask the composer to follow the user's conversation, not the app locale."""
     fallback = (language or "english").strip().lower() or "english"
     return (
-        "- Reply in the same language and script as the USER QUESTION and recent user messages. "
+        f"- The resolved language of the latest user message is `{fallback}`. Use it as the controlling language. "
+        "Write in the same language and script as the USER QUESTION and latest user message, using recent user messages for natural tone. "
         "If this turn is a short clarification answer, keep the language of the original question in USER QUESTION or recent_history. "
         "Chart evidence and this brief are English internally; never switch the user-facing answer to English because of that. "
         f"The app language setting `{fallback}` is only a fallback when the conversation language is truly unclear. "
         "If the user mixes languages or writes a regional language in Latin letters, mirror that mix instead of switching to English or a more formal script."
     )
+
+
+def _instant_relational_voice_contract() -> str:
+    """Shared user-facing voice for every Instant LLM answer path."""
+    return """RELATIONAL VOICE CONTRACT:
+- Sound like a warm, emotionally perceptive and honest personal guide. The user should feel understood as a person, not processed as a question.
+- Infer the human need behind the question—uncertainty, hope, fear, validation, direction, reassurance or self-understanding—and respond to it naturally without naming or announcing that inference.
+- Answer directly first, then translate the supported result into lived experience: what the pattern may feel like, how it may show up, and why it matters to this person.
+- Make empathy specific through the substance of the answer. Never add canned lines such as "I understand how you feel", "that must be difficult", or "the universe has a plan".
+- Preserve emotional nuance. Explain mixed evidence as competing needs or pressures rather than calling it merely unclear. Make difficult indications illuminating, not frightening; make supportive indications encouraging, not guaranteed.
+- Use psychologically perceptive language without diagnosing mental-health conditions, inventing motives, claiming to know hidden feelings, or presenting astrology as fixed identity or fate. Protect the user's agency and include a useful reflection or next step when appropriate.
+- Match the user's emotional intensity. Be gentle for vulnerable subjects, energizing for opportunities, grounding for anxiety and direct for decisions. Do not make every answer dramatic.
+- Use natural modern conversation, not forced youth slang, excessive emojis, therapy-speak, mystical theatre, pet names or manufactured intimacy.
+- End with one specific, emotionally meaningful question that helps reveal the user's real concern or lived situation; never use a generic continuation or sales question.
+- Never encourage dependency or imply Tara is conscious, uniquely understands the user, replaces people or professionals, or is the only guidance they need."""
+
+
+def _build_budgeted_instant_prompt(
+    question: str,
+    context: Dict[str, Any],
+    language: str,
+) -> str:
+    """Compact equivalent used only when the full house prompt exceeds budget."""
+    context_json = json.dumps(context, ensure_ascii=False, default=str, separators=(",", ":"))
+    return f"""You are AstroRoshni's Instant Chat answer composer.
+Answer the user's astrology question from the supplied adjudicated context only.
+{_instant_composer_language_rule(language)}
+{_instant_relational_voice_contract()}
+- Lead with the direct real-world answer. Stay under the contract word limit and end with one natural question.
+- Treat query_plan, verdict, answer_contract, and evidence as strict. Never invent a date, body area, option winner, chart fact, activated house, or causal factor.
+- A live knowledge_graph_policy is authoritative. Obey its exclusions, required sections, guardrails, claim_permission, and limitation_instruction. Missing required factors mean the dependent conclusion is unavailable.
+- Never mention a date after query_plan.time_scope.horizon_end. Use only ranked/allowed windows attached to their own evidence.
+- When query_plan.time_scope.retrospective is true, rank only past windows and describe them as probable periods that need user confirmation; never claim you recovered the factual marriage date.
+- For retrospective marriage timing, every ranked window must show: (1) the broad MD-AD phase, (2) the exact strongest_pd_window as an MD-AD-PD sub-sub-period with its start and end dates, and (3) one or two probable_peak_windows. Never label the whole MD-AD phase with its winning PD planet.
+- For comparisons, evaluate both options from option-specific evidence. If evidence does not distinguish them, do not choose a winner.
+- For comparisons, every date, dasha chain, score, and reason belongs only to the option row that contains it. Never attach one option's window to the other.
+- MD, AD, and PD mean major, sub-, and sub-sub-period. Never call the PD planet the sub-period lord.
+- Health statements are susceptibilities, not diagnoses. Name only zones explicitly allowed by health_rules and recommend professional care for persistent symptoms.
+- Translate astrology into ordinary life language; use at most one compact technical reason unless the user asks why.
+- Do not expose internal IDs or JSON. Do not add a decorative heading.
+- Finish the response with exactly: NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":""}}
+
+USER QUESTION:
+{question}
+
+ADJUDICATED CONTEXT:
+{context_json}""".strip()
+
+
+def _build_retrospective_budget_context(context: Dict[str, Any]) -> Dict[str, Any]:
+    """Keep phase, PD and peak dates under the compact prompt budget.
+
+    Generic emergency depth limiting is unsafe for retrospective timing because
+    the decisive PD and peak rows are nested below each broad MD-AD phase.
+    """
+    if not isinstance(context, dict):
+        return {}
+    query_plan = context.get("query_plan") if isinstance(context.get("query_plan"), dict) else {}
+    time_scope = query_plan.get("time_scope") if isinstance(query_plan.get("time_scope"), dict) else {}
+    if not time_scope.get("retrospective"):
+        return {}
+    verdict = context.get("verdict") if isinstance(context.get("verdict"), dict) else {}
+    windows: List[Dict[str, Any]] = []
+    for row in list(verdict.get("ranked_windows") or [])[:3]:
+        if not isinstance(row, dict):
+            continue
+        strongest = row.get("strongest_pd_window") if isinstance(row.get("strongest_pd_window"), dict) else {}
+        peaks = []
+        for peak in list(row.get("probable_peak_windows") or [])[:2]:
+            if not isinstance(peak, dict):
+                continue
+            peaks.append({
+                key: peak.get(key)
+                for key in (
+                    "probable_peak_date", "probable_peak_end", "planet",
+                    "supporting_pratyantardashas", "strength", "activated_focus_houses",
+                )
+                if peak.get(key) not in (None, "", [], {})
+            })
+        windows.append({
+            key: value
+            for key, value in {
+                "start": row.get("start"),
+                "end": row.get("end"),
+                "phase_dasha_chain": row.get("phase_dasha_chain"),
+                "phase_granularity": row.get("phase_granularity"),
+                "mahadasha": row.get("mahadasha"),
+                "antardasha": row.get("antardasha"),
+                "strongest_pd_window": {
+                    key: strongest.get(key)
+                    for key in ("start", "end", "pratyantardasha")
+                    if strongest.get(key) not in (None, "")
+                },
+                "probable_peak_windows": peaks,
+            }.items()
+            if value not in (None, "", [], {})
+        })
+    answer_contract = context.get("answer_contract") if isinstance(context.get("answer_contract"), dict) else {}
+    graph_policy = (
+        answer_contract.get("knowledge_graph_policy")
+        if isinstance(answer_contract.get("knowledge_graph_policy"), dict)
+        else {}
+    )
+    return {
+        "context_profile": "instant_retrospective_budget_v1",
+        "query_plan": {
+            "category": query_plan.get("category"),
+            "answer_mode": query_plan.get("answer_mode"),
+            "time_scope": time_scope,
+        },
+        "verdict": {
+            "direction": verdict.get("direction"),
+            "confidence": verdict.get("confidence"),
+            "ranked_windows": windows,
+            "claim_rule": (
+                (verdict.get("rationale") or {}).get("claim_rule")
+                if isinstance(verdict.get("rationale"), dict) else None
+            ),
+        },
+        "answer_contract": {
+            "max_words": answer_contract.get("max_words"),
+            "knowledge_graph_policy": {
+                key: graph_policy.get(key)
+                for key in ("live", "domain", "runtime_key", "question_type", "guardrails")
+                if graph_policy.get(key) not in (None, "", [], {})
+            },
+            "required_structure": [
+                "For each ranked row, state the broad MD-AD phase and its dates.",
+                "Then state strongest_pd_window as the PD/sub-sub-period and copy its exact dates.",
+                "Then state one or two probable_peak_windows as narrower concentrations.",
+                "Never call a probable period the user's confirmed marriage date.",
+            ],
+        },
+        "app_language_fallback": context.get("app_language_fallback"),
+    }
+
+
+def _instant_response_language(
+    question: str,
+    intent: Optional[Dict[str, Any]],
+    app_language: str,
+) -> str:
+    """Prefer the multilingual router's latest-message language over UI locale.
+
+    The mobile UI language controls chrome and may legitimately differ from
+    the language typed in chat. The semantic router sees the full message and
+    owns mixed/romanized-language detection; the UI value is only a fallback
+    for older cached or degraded intent payloads.
+    """
+    intent = intent if isinstance(intent, dict) else {}
+    text = str(question or "")
+    script_languages = (
+        (r"[\u0900-\u097f]", "hindi"),
+        (r"[\u0980-\u09ff]", "bengali"),
+        (r"[\u0a80-\u0aff]", "gujarati"),
+        (r"[\u0b80-\u0bff]", "tamil"),
+        (r"[\u0c00-\u0c7f]", "telugu"),
+        (r"[\u0c80-\u0cff]", "kannada"),
+        (r"[\u0d00-\u0d7f]", "malayalam"),
+    )
+    for pattern, language_name in script_languages:
+        if re.search(pattern, text):
+            return language_name
+    # Override a bad router/UI locale only for unmistakably English syntax.
+    # This is language detection, not intent routing. Requiring multiple
+    # English function words avoids misclassifying Romanized Hindi/Hinglish.
+    english_function_words = {
+        "a", "an", "and", "are", "am", "can", "could", "do", "does",
+        "for", "from", "how", "i", "in", "is", "me", "my", "of", "on",
+        "should", "the", "this", "to", "what", "when", "where", "which",
+        "why", "will", "with", "would", "you", "your",
+    }
+    latin_tokens = re.findall(r"[A-Za-z]+", text.lower())
+    if len({token for token in latin_tokens if token in english_function_words}) >= 2:
+        return "english"
+    routed = str(
+        intent.get("response_language")
+        or intent.get("detected_language")
+        or ""
+    ).strip().lower()
+    if routed:
+        return routed[:40]
+    # Latin-script ambiguity (English versus romanized Indian languages)
+    # remains delegated to the app preference when syntax is inconclusive.
+    return str(app_language or "english").strip().lower() or "english"
+
+
+def _instant_answer_language_error(answer: str, response_language: str) -> str | None:
+    """Detect a clearly wrong output script for fail-closed Health correction."""
+    visible = str(answer or "").split("NEXT_ACTION_META:", 1)[0]
+    language = str(response_language or "").strip().lower()
+    devanagari_count = len(re.findall(r"[\u0900-\u097f]", visible))
+    latin_count = len(re.findall(r"[A-Za-z]", visible))
+    if language in {"english", "en"} and devanagari_count >= 8:
+        return "answer language mismatch: expected English from the latest user question, received Devanagari/Hindi"
+    if language in {"hindi", "hi"} and latin_count >= 40 and devanagari_count == 0:
+        return "answer language mismatch: expected Hindi from the latest user question, received Latin-only text"
+    return None
+
+
+_HEALTH_FACT_PLANETS = (
+    "Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu",
+)
+_HEALTH_FACT_SIGNS = (
+    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+)
+_HEALTH_FACT_NAKSHATRAS = (
+    "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra",
+    "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni",
+    "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha",
+    "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana",
+    "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati",
+)
+
+
+def _constitutional_health_required_rows(health_rules: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Return the exact calculated rows that the health composer may verbalize."""
+    rows: List[Dict[str, Any]] = []
+    for rank, row in enumerate(list(health_rules.get("allowed_zone_evidence") or []), start=1):
+        if not isinstance(row, dict) or not row.get("zone"):
+            continue
+        anatomy_basis = [str(value).strip() for value in (row.get("anatomy_basis") or []) if str(value).strip()]
+        why = [str(value).strip() for value in (row.get("why") or []) if str(value).strip()]
+        cause_facts = anatomy_basis or why
+        anchors = list(dict.fromkeys(
+            anchor
+            for fact in cause_facts
+            for anchor in _constitutional_health_fact_anchors(fact)
+        ))
+        marker_payload = "|".join([
+            str(row.get("zone") or "").strip(),
+            *anchors,
+        ]).replace("]", "").replace("[", "")
+        rows.append({
+            "rank": rank,
+            "region": str(row.get("zone") or "").strip(),
+            "required_cause_facts": cause_facts,
+            "allowed_mechanisms": list(row.get("mechanisms") or []),
+            "confidence": row.get("confidence"),
+            # A localized answer may translate every region, graha, sign and
+            # house noun. This exact temporary marker lets the deterministic
+            # validator bind that translated sentence back to its calculated
+            # row. It is removed before anything is shown to the user.
+            "validation_marker": f"[[HEALTH_EVIDENCE_{rank}:{marker_payload}]]",
+        })
+    return rows
+
+
+def _resolve_constitutional_health_rules(
+    prompt_context: Optional[Dict[str, Any]],
+    instant_v2_packet: Optional[Dict[str, Any]],
+    instant_context: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Resolve constitutional rules across every supported packet shape.
+
+    Composer compaction intentionally moves fields around for different answer
+    routes.  Validation must follow the authoritative answer specification, not
+    assume that `evidence.health_rules` is always populated.
+    """
+    candidates: List[Any] = []
+    for container in (prompt_context, instant_v2_packet, instant_context):
+        if not isinstance(container, dict):
+            continue
+        evidence = container.get("evidence")
+        if isinstance(evidence, dict):
+            candidates.append(evidence.get("health_rules"))
+        answer_contract = container.get("answer_contract")
+        if isinstance(answer_contract, dict):
+            candidates.append(answer_contract.get("health_rules"))
+        answer_spec = container.get("answer_spec")
+        if isinstance(answer_spec, dict):
+            candidates.append(answer_spec.get("health_rules"))
+        v2_contract = container.get("instant_v2_answer_contract")
+        if isinstance(v2_contract, dict):
+            v2_answer_spec = v2_contract.get("answer_spec")
+            if isinstance(v2_answer_spec, dict):
+                candidates.append(v2_answer_spec.get("health_rules"))
+
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        if candidate.get("is_time_bound_question"):
+            continue
+        if candidate.get("allowed_zone_evidence"):
+            return candidate
+    return {}
+
+
+def _constitutional_health_fact_anchors(fact: str) -> List[str]:
+    """Extract invariant chart nouns from a calculated anatomical cause.
+
+    These names and house numbers remain stable even when the surrounding prose
+    is translated.  Requiring them prevents a small model from replacing, for
+    example, `Mars in House 8` with `Mars in House 1` or `Moon in House 6`.
+    """
+    text = str(fact or "")
+    anchors: List[str] = []
+    for value in (*_HEALTH_FACT_PLANETS, *_HEALTH_FACT_SIGNS, *_HEALTH_FACT_NAKSHATRAS):
+        if re.search(rf"\b{re.escape(value)}\b", text, flags=re.IGNORECASE):
+            anchors.append(value)
+    for house in re.findall(r"\bHouse\s+(\d{1,2})\b", text, flags=re.IGNORECASE):
+        anchors.append(f"House {house}")
+    return list(dict.fromkeys(anchors))
+
+
+def _validate_constitutional_health_answer(
+    answer: str,
+    required_rows: List[Dict[str, Any]],
+    *,
+    strict_sentence_binding: bool = True,
+) -> List[str]:
+    """Reject health prose that drops or changes calculated anatomical causes."""
+    visible = str(answer or "").split("NEXT_ACTION_META:", 1)[0]
+    normalized = re.sub(r"\s+", " ", visible).strip()
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", normalized) if part.strip()]
+    errors: List[str] = []
+    for row in required_rows:
+        region = str(row.get("region") or "").strip()
+        validation_marker = str(row.get("validation_marker") or "").strip()
+        localized_row_bound = bool(
+            not strict_sentence_binding
+            and validation_marker
+            and validation_marker in visible
+        )
+        region_tokens = [
+            token.lower()
+            for token in re.findall(r"[A-Za-z]+", region)
+            if len(token) >= 4 and token.lower() not in {"including", "region"}
+        ]
+        if not localized_row_bound and region and region.lower() not in normalized.lower() and not any(
+            re.search(rf"\b{re.escape(token)}\b", normalized, flags=re.IGNORECASE)
+            for token in region_tokens
+        ):
+            errors.append(f"missing region: {region}")
+        facts = list(row.get("required_cause_facts") or [])
+        if not facts:
+            errors.append(f"{region}: missing calculated cause evidence")
+            continue
+        fact_anchor_sets = [
+            _constitutional_health_fact_anchors(str(fact))
+            for fact in facts
+            if str(fact).strip()
+        ]
+        fact_anchor_sets = [anchors for anchors in fact_anchor_sets if anchors]
+        def _anchor_is_present(anchor: str) -> bool:
+            house_match = re.fullmatch(r"House\s+(\d{1,2})", anchor, flags=re.IGNORECASE)
+            if house_match:
+                number = house_match.group(1)
+                return bool(re.search(
+                    rf"(?:\bHouse\s+{number}\b|\b{number}(?:st|nd|rd|th)\s+(?:house|lord)\b|\blord\s+of\s+(?:the\s+)?(?:House\s+)?{number}\b)",
+                    normalized,
+                    flags=re.IGNORECASE,
+                ))
+            return bool(re.search(rf"\b{re.escape(anchor)}\b", normalized, flags=re.IGNORECASE))
+
+        def _anchor_is_present_in(anchor: str, sentence: str) -> bool:
+            house_match = re.fullmatch(r"House\s+(\d{1,2})", anchor, flags=re.IGNORECASE)
+            if house_match:
+                number = house_match.group(1)
+                return bool(re.search(
+                    rf"(?:\bHouse\s+{number}\b|\b{number}(?:st|nd|rd|th)\s+(?:house|lord)\b|\blord\s+of\s+(?:the\s+)?(?:House\s+)?{number}\b)",
+                    sentence,
+                    flags=re.IGNORECASE,
+                ))
+            return bool(re.search(rf"\b{re.escape(anchor)}\b", sentence, flags=re.IGNORECASE))
+
+        anchors_present_globally = fact_anchor_sets and any(
+            all(_anchor_is_present(anchor) for anchor in anchors)
+            for anchors in fact_anchor_sets
+        )
+        anchors_bound_to_region = True
+        if strict_sentence_binding and fact_anchor_sets and region_tokens:
+            region_sentences = [
+                sentence
+                for sentence in sentences
+                if any(re.search(rf"\b{re.escape(token)}\b", sentence, flags=re.IGNORECASE) for token in region_tokens)
+            ]
+            anchors_bound_to_region = any(
+                all(_anchor_is_present_in(anchor, sentence) for anchor in anchors)
+                for sentence in region_sentences
+                for anchors in fact_anchor_sets
+            )
+        if not localized_row_bound and fact_anchor_sets and (not anchors_present_globally or not anchors_bound_to_region):
+            expected = " or ".join(" + ".join(anchors) for anchors in fact_anchor_sets)
+            errors.append(f"{region}: missing or misassigned immutable cause anchors ({expected})")
+    return errors
+
+
+def _strip_constitutional_health_validation_markers(answer: str) -> str:
+    """Remove temporary multilingual fact-binding markers before display."""
+    return re.sub(r"\s*\[\[HEALTH_EVIDENCE_\d+:[^\]]*\]\]", "", str(answer or "")).strip()
 
 
 def _build_instant_composer_prompt_v3(
@@ -9563,10 +12027,23 @@ def _build_instant_composer_prompt_v3(
         # negative instructions were not enough to stop a small model from
         # borrowing that vocabulary.  This prompt contains no timing workflow
         # for it to imitate.
+        # Give the small composer only the adjudicated zone rows it is allowed
+        # to verbalize.  Passing the wider health foundation here made it easy
+        # to confuse a planet's lordship (for example, Mars as ascendant lord)
+        # with its actual house placement (Mars in House 8).
+        required_zone_rows = _constitutional_health_required_rows(composer_health_rules)
         natal_health_context = {
             "scope": "natal constitution only",
             "native": composer_context.get("native") or {},
-            "health_rules": composer_health_rules,
+            "knowledge_graph_policy": (
+                (composer_context.get("answer_contract") or {}).get("knowledge_graph_policy")
+                if isinstance(composer_context.get("answer_contract"), dict)
+                else {}
+            ),
+            "required_zone_count": composer_health_rules.get("required_zone_count"),
+            "required_zone_rows": required_zone_rows,
+            "protective_factors": composer_health_rules.get("protective_factors") or [],
+            "condition_susceptibilities": composer_health_rules.get("condition_susceptibilities") or [],
         }
         natal_health_json = json.dumps(
             natal_health_context, ensure_ascii=False, separators=(",", ":")
@@ -9575,12 +12052,23 @@ def _build_instant_composer_prompt_v3(
 You are Tara in AstroRoshni Instant Chat. Write one natal constitutional-health susceptibility reading from the calculated evidence below.
 
 {_instant_composer_language_rule(language)}
+{_instant_relational_voice_contract()}
 
 Required answer:
-1. Answer directly by naming the supplied anatomical regions in their exact ranked order.
-2. Explain each region only from its own `allowed_zone_evidence` row. Do not move a reason or mechanism from one region to another.
-3. Give ordinary preventive care guidance without diagnosis, certainty, fear, or invented symptoms.
-4. End with exactly one natural question about symptoms or preventive care.
+0. Follow the language and script of the USER QUESTION. The app-language fallback or internal English evidence must not override the user's actual language.
+0a. The live `knowledge_graph_policy` is authoritative. Follow its guardrails and required output sections, never use its default exclusions, and do not infer any missing required factor.
+1. Answer directly by naming every supplied anatomical region in its exact ranked order. None may be omitted, including a region derived from the anatomical field of the house occupied by the 6th lord.
+2. Give every region its own explicit explanatory sentence. That sentence must name the region and faithfully express at least one item from that row's `required_cause_facts`; a bare label or a shared phrase such as "these areas are inflammatory" does not satisfy this requirement.
+3. Treat every planet, sign, nakshatra, lordship and house number in `required_cause_facts` as immutable calculated data. Translate the prose when needed, but never replace, infer, or change those facts. If the fact says the 6th lord is placed in House 8, the visible answer must say House 8—not House 1 or any other house.
+   When the answer is not English, copy that row's `validation_marker` exactly at the end of its explanatory sentence. This temporary marker is mandatory for every row and will be removed before display. Do not translate, alter, or collect the markers elsewhere.
+4. When a row is derived from the house occupied by the 6th lord, explicitly state that exact destination house and connect its supplied anatomical field to the named region. Do not reduce this to a generic acute/inflammatory mechanism.
+5. Explain each region only from its own `required_zone_rows` row. Do not move a reason or mechanism from one region to another and do not combine multiple regions under one shared explanation.
+6. Give ordinary preventive care guidance without diagnosis, certainty, fear, or invented symptoms.
+7. End with exactly one natural question about symptoms or preventive care.
+
+Completeness and length:
+- Use roughly 140-220 visible words when four regions are supplied. Completeness is more important than making this answer unusually short.
+- Before finishing, compare the visible answer against every row in `required_zone_rows`: every region must have a distinct cause sentence and every planet/house fact must still match exactly.
 
 Absolute exclusions:
 - Do not mention a current period, Mahadasha, Antardasha, Pratyantardasha, dasha, transit, active houses, today, now, or any timing window.
@@ -9607,12 +12095,113 @@ NATAL-ONLY HEALTH EVIDENCE:
         or (composer_context.get("query_plan") or {}).get("answer_mode")
         or ""
     )
+    answer_contract = (
+        composer_context.get("answer_contract")
+        if isinstance(composer_context.get("answer_contract"), dict)
+        else {}
+    )
+    career_contract = (
+        answer_contract.get("career_contract")
+        if isinstance(answer_contract.get("career_contract"), dict)
+        else {}
+    )
+    career_family = str(career_contract.get("question_family") or "")
+    career_subtype = str(career_contract.get("career_subtype") or "")
+    career_rules = ""
+    if career_contract:
+        career_rules = """
+- This is a career answer. `answer_contract.career_contract` is a hard evidence boundary, not optional guidance.
+- Use only the selected career question family. Do not turn a profile or diagnosis into a forecast, and do not turn a decision into a career-fit answer.
+- Future dates, years, peaks and windows are forbidden unless `allow_dated_timing` is true. Never manufacture timing from remembered astrology or from a current dasha label.
+- Current dasha or transit may be mentioned only when `allow_current_activation` is true and the supplied evidence explicitly connects it to the diagnosed career mechanism.
+"""
+        if career_family == "diagnosis":
+            career_rules += """
+- This is a present problem diagnosis. Give: direct cause -> recurring D1/D10 mechanism -> verified present trigger only if supplied -> one concrete action -> one follow-up question.
+- Do not promise that recognition is coming. Do not cite a future date, year, peak or window.
+- Do not say Saturn or a dasha creates behind-the-scenes work, delay, invisibility or lack of praise unless the supplied diagnostic evidence states that exact causal link.
+"""
+            if career_subtype == "recognition":
+                career_rules += """
+- Recognition must be explained as a conversion chain: House 6 effort/workload -> House 10 visibility/authority -> House 11 recognition/reward -> House 2 compensation.
+- Hard work alone does not prove recognition. Identify the first unsupported or difficult conversion in that chain from `evidence.career_diagnosis`; do not substitute vocation fields or future timing.
+"""
+        elif career_family == "relationship":
+            career_rules += """
+- This is a workplace-relationship reading, not a vocation profile and not a generic career forecast. The named counterpart in `evidence.career_relationship.target` is the entire subject of the answer.
+- Use `evidence.career_relationship.house_roles` as a semantic matrix. Explain the likely relationship dynamic by combining the supplied D1 role houses with their D10 confirmation; do not replace them with the generic Houses 2, 6, 10 and 11 career template.
+- For a manager or authority relationship, House 9 describes guidance, judgment, senior authority and the native's receptivity to counsel; House 10 describes hierarchy, reputation and accountability; House 6 describes everyday service, disagreement and friction; House 11 describes support, recognition and fulfilment through that authority.
+- For colleagues or peers, use the supplied peer-communication, daily-work, team-support and professional-standing roles. For direct reports, clients, business partners or mentors, use only their supplied role meanings rather than borrowing the manager rules.
+- Give: (1) the likely relationship trajectory, (2) the strongest supportive mechanism, (3) the main friction mechanism, (4) one practical way to improve the dynamic, and (5) exactly one natural clarification about the present relationship.
+- Do not discuss suitable industries, technical identity, career fields, 10th-lord vocation combinations, Amatyakaraka or Karakamsha unless the user separately asks what work they should do.
+- Do not mention dasha, transit, dates or future windows unless the user explicitly asks when the relationship changes and authoritative timing evidence is supplied.
+"""
+        elif career_family in {"profile", "vocation"}:
+            career_rules += """
+- This is timeless professional profile/vocation analysis. Use D1, D10, Amatyakaraka and Karakamsha where supplied. No dasha, transit or calendar timing.
+"""
+        elif career_family == "timing":
+            career_rules += """
+- Use only the dated windows supplied by the calculation. Explain the delivery stage and distinguish activity, visibility, recognition, compensation and joining.
+"""
+    graph_policy = (
+        answer_contract.get("knowledge_graph_policy")
+        if isinstance(answer_contract.get("knowledge_graph_policy"), dict)
+        else {}
+    )
+    marriage_pathway_contract = (
+        answer_contract.get("marriage_pathway_rules")
+        if isinstance(answer_contract.get("marriage_pathway_rules"), dict)
+        else graph_policy.get("marriage_pathway_rules")
+        if isinstance(graph_policy.get("marriage_pathway_rules"), dict)
+        else {}
+    )
+    spouse_meeting_contract = (
+        answer_contract.get("spouse_meeting_rules")
+        if isinstance(answer_contract.get("spouse_meeting_rules"), dict)
+        else graph_policy.get("spouse_meeting_rules")
+        if isinstance(graph_policy.get("spouse_meeting_rules"), dict)
+        else {}
+    )
+    marriage_rules = ""
+    if str(graph_policy.get("runtime_key") or "") == "love_arranged_marriage":
+        past_relation = str(marriage_pathway_contract.get("question_time_relation") or "") == "past"
+        marriage_rules = """
+- This is a love-led versus family-mediated marriage-pathway comparison, not a general marriage-promise reading and not a marriage-timing reading.
+- Start with one direct comparative verdict: love-led stronger, family-mediated stronger, mixed/hybrid, or insufficient comparative evidence. Do not merely say that marriage itself is supported.
+- Explain both sides before finishing from `evidence.marriage_pathway_comparison`: love-led evidence uses actual House 5 to House 7 commitment links with D9 confirmation; family-mediated evidence uses actual Houses 2, 7, 9 and 11 family/formalization/continuity links with D9 confirmation. Describe only connections present in `d1_house_evidence`; do not manufacture a link merely because two house rows exist.
+- Treat every `d1_house_evidence[*].tone` as immutable. If House 2 is challenging or House 11 is mixed, say exactly that; never describe either as stronger or supportive. Use `natal_lord_links` for real connections and distinguish connection from strength.
+- This is static natal evidence. Never use "active", "activated", "activation", "currently", or equivalent timing language for any house. Say natal support, challenge, mixed tone, lord-placement link, occupation, aspect, or D9 confirmation instead.
+- A hybrid result is meaningful: for example, personal choice followed by family approval, or a family introduction followed by genuine attachment. Do not force a binary answer when both pathways are supported.
+- Do not mention historical-data scarcity, dasha, transit, dates, timing periods, sudden changes, hidden matters, or generic marriage potential unless that exact comparative evidence appears in the brief.
+- End with one verification question about whether this matches how the marriage happened. Do not ask whether the user is currently in a relationship or considering an arranged setup.
+"""
+        if past_relation:
+            marriage_rules += """
+- The marriage is already in the past. Use past tense throughout: say what was more likely to have happened. Never say "will", "on the cards", or otherwise turn the answer into a future prediction.
+"""
+    elif str(graph_policy.get("runtime_key") or "") == "spouse_meeting":
+        past_relation = str(spouse_meeting_contract.get("question_time_relation") or "") == "past"
+        marriage_rules = """
+- This asks for a probable spouse-meeting context from static natal evidence. Use only `evidence.spouse_meeting_context`; generic marriage promise, spouse personality and timing evidence cannot answer it.
+- Lead with `primary_channel.probable_context`, which comes from the natal placement of the seventh lord. Name it as the strongest probable context, not a recovered historical fact.
+- Explain that placement in one compact sentence. Add at most one secondary channel, and only when its own `channel_house_evidence` row supplies a concrete connection. Copy every supplied tone exactly.
+- Never mention dasha, transit, activation, a Saturn-driven or Venus-driven period, a date, or a life phase. A planet's natural symbolism is not permission to invent work, duty, comfort, attraction or a shared circle.
+- In particular, do not say work/duty unless House 6 or House 10 is the supplied meeting context, and do not say friends/shared circle unless House 11 is concretely supported.
+- Keep the derived-chart disclosure clear: this is the native chart's probable context for meeting the spouse, not the spouse's own chart and not certainty about the venue.
+- End by asking whether this probable context matches how the meeting actually happened.
+"""
+        if past_relation:
+            marriage_rules += """
+- The meeting already happened. Use past tense throughout and do not turn the answer into a future prediction.
+"""
     if is_chart_fact:
         return f"""
 You are Tara in AstroRoshni Instant Chat. The requested chart has already been calculated with placements, dignity, aspects, and house data. Your job is to predict from that chart.
 
 Hard rules:
 {_instant_composer_language_rule(language)}
+{_instant_relational_voice_contract()}
 - Predict lived results in `evidence.chart_facts.charts[X].domain.life_area`. D12 predicts parents/elders/ancestry FROM this D12 packet; D10 predicts career FROM this D10 packet; D9 predicts marriage/dharma FROM this D9 packet; Karkamsa/Swamsa predict soul-direction FROM that chart. Do not write a textbook varga essay, and do not use D1 dasha or transits.
 - Use ONLY `evidence.chart_facts`. Every claim must be grounded in lagna/lagna-lord, dignity, occupation, conjunction, or aspect in the packet.
 - Placements are hidden evidence. Do not answer as a planet-by-planet placement list.
@@ -9712,7 +12301,6 @@ AUTHORITATIVE COMPOSER BRIEF:
 - Use zero to three short follow-ups and valid JSON inside the markers.
 """
     else:
-        answer_contract = composer_context.get("answer_contract") if isinstance(composer_context.get("answer_contract"), dict) else {}
         word_guidance = str(answer_contract.get("composer_word_target") or "Usually 90-180 words; expand when necessary.")
         prohibited_additions = (
             "feedback requests, mode suggestions, or sales copy"
@@ -9731,10 +12319,12 @@ You are Tara in AstroRoshni Instant Chat. The astrology has already been calcula
 
 Hard rules:
 {_instant_composer_language_rule(language)}
+{_instant_relational_voice_contract()}
 - Answer the real-life question in the first sentence. Never open with planets, dashas, dates, evidence IDs, or house numbers.
 - Treat `verdict` and `answer_contract` as authoritative. Use `evidence` only to explain them; never invent a stronger conclusion.
+- If `query_plan.confirmed_life_event` is present, its date is a fact supplied by the user. Acknowledge it as confirmed, do not present competing probable windows, and never claim astrology discovered or proved that date. Use calculated exact-day evidence only to explain what was active around the confirmed event.
 - Fill `answer_blueprint` in order. It contains semantic answer slots, not prose to repeat. The first slot must become a concrete answer to what the user asked.
-- Follow this reasoning order internally: natal promise -> active dasha delivery -> dated transit repetition -> real-life outcome. Show the user the outcome, not this workflow.
+- For career, follow `answer_contract.career_contract` only. For non-career event/timing questions, reason internally from natal promise to dasha delivery to dated transit confirmation to real-life outcome.
 - Translate supported areas into concrete life language. Never leave the user to decode house numbers or a list of dasha phases.
 - When `query_plan.forecast_shape` is `period_topic_forecast`, the answer format is mandatory: (1) a direct overall verdict, (2) the chronological progression across the full requested period, (3) the strongest opportunity and main pressure/caution, and (4) one practical takeaway. Use `evidence.period_topic_forecast.chronological_phases`; do not collapse multiple phases into one generic year summary.
 - For a broad period, give two or three supported real-life manifestations. Describe what is likely to happen or require attention, not merely which astrological sectors are active.
@@ -9744,12 +12334,14 @@ Hard rules:
 - `evidence.special_natal_factors` contains only calculated Gandanta, Yogi, Avayogi, Dagdha Rashi, or Tithi Shunya factors connected to the relevant natal houses. If present, use a factor when it materially supports or qualifies the verdict; describe its practical effect in plain language. Do not list every factor, treat a caution as an absolute denial, or invent a special factor that is absent.
 - If evidence is missing, state the limited conclusion plainly. Never fill gaps with generic planet folklore.
 - Preserve all cautions and limitations. For health, describe only allowed susceptibilities, never diagnosis or certainty.
-- For a constitutional health question, copy the ranked zones in `health_rules.allowed_zone_evidence` order. Do not reorder them. Explain each zone only from its own row. The composer brief intentionally contains no current timing: never add a dasha, transit, or "currently active" statement from general astrology knowledge.
+- For a constitutional health question, name every ranked zone in `health_rules.allowed_zone_evidence` in exact order; `required_zone_count` is mandatory, not a maximum. Do not reorder or omit the fourth region to shorten the answer. Explain each zone only from its own row. The composer brief intentionally contains no current timing: never add a dasha, transit, or "currently active" statement from general astrology knowledge.
 - For a derived person, keep ownership explicit: these are the native chart's indications for that person, not that person's own chart or dasha.
 - An MD-AD-PD sequence is a dasha chain. MD is the major period, AD the sub-period, and PD the sub-sub-period; never rename a level.
 - No HTML, tables, JSON except required metadata, internal tags, evidence IDs, decorative headings, disclaimers, or hidden reasoning.
 {period_forecast_rules}
 {constitutional_health_rules}
+{career_rules}
+{marriage_rules}
 {speech_rules}
 
 USER QUESTION:
@@ -9810,6 +12402,7 @@ def _compact_context_for_speech(instant_context: Dict[str, Any]) -> Dict[str, An
         "natal_promise": normalized.get("natal_promise"),
         "transit_activation_timeline": normalized.get("transit_activation_timeline"),
         "divisional_specifics": list(normalized.get("divisional_specifics") or [])[:3],
+        "career_foundation": normalized.get("career_foundation"),
         "risk_specifics": list(normalized.get("risk_specifics") or [])[:3],
         "stable_transits": _compact_planet_map(stable_transits, keep_planets),
         "claim_gates": normalized.get("claim_gates"),
@@ -10072,6 +12665,7 @@ Astrological method:
 
 Style rules:
 {_instant_composer_language_rule(language)}
+{_instant_relational_voice_contract()}
 {length_rule}
 - Use daily-use language, not consultant language. Prefer phrases such as "right now", "this phase", "work pressure", "money matters", or "relationship tension" over abstract phrases such as "current energetic configuration", "professional materialization", or "relational dynamics".
 - Keep astrology credible but easy to follow: give the result in normal language first, then one compact chart reason. Do not make the user decode jargon.
@@ -10093,22 +12687,26 @@ Style rules:
 - Start from `normalized_evidence.primary_drivers` and only then bring in `secondary_modifiers`.
 - Use `normalized_evidence.answer_mode_contract.answer_skeleton` as the structural backbone of the response.
 - If `instant_v2_answer_contract` is present, treat its query plan, verdict, answer order, evidence IDs, and forbidden-claim list as a strict answer contract. Do not add a factual or timing claim merely because it sounds plausible.
+- When `answer_contract.knowledge_graph_policy.live` is true, that compiled graph route is authoritative for this answer. Follow its required output sections, decision rules, evidence policy and guardrails. Never use a factor listed in `default_exclusions`. If `missing_required_factors` is non-empty, state only what the available evidence supports and do not manufacture the missing conclusion. Do not switch to a different question type or answer mode.
+- For career questions, obey `instant_v2_answer_contract.answer_spec.career_rules` literally. For job-change, resignation, or job-security decisions, give a direct stay/prepare/transition recommendation from the supplied decision matrices. Compare continuity (H6+H10), change (H3+H10), separation (H10+H12), and landing support (H2+H6+H10+H11). H8 means disruption or restructuring only; it is never permission to resign. Do not substitute career fit, Amatyakaraka, Karakamsha, suitable fields, or personality for this decision evidence. If landing support is absent, advise preparation rather than resignation unless the user reports a real-world safety, health, or ethical emergency.
 - `instant_v2_answer_contract.evidence_records` is authoritative when any legacy summary conflicts with it. Never change the MD/AD/PD planets, active houses, or dates stated in those records.
 - Obey `instant_v2_answer_contract.answer_spec.dasha_level_terms`: a displayed MD-AD-PD chain contains three separate levels. Never call the whole chain a Mahadasha/Antardasha or call its PD planet the sub-period lord.
 - Obey `instant_v2_answer_contract.answer_spec.composer_word_target` as a hard output limit. Count conservatively and finish under 120 visible words.
 - If the verdict direction is `insufficient_option_evidence`, explicitly say the chart does not reliably distinguish the options. Do not use phrases such as "leans toward", "favors", "more likely", or any equivalent winner. Give only the shared supported context and end with one question about which option is appearing in real life.
 - Obey `instant_v2_answer_contract.answer_spec.limitation_instruction` literally. Missing health-body-area evidence forbids naming an organ, body system, symptom, or recovery window.
-- For health answers, obey `instant_v2_answer_contract.answer_spec.health_rules` literally. Name only its `allowed_zone_names`; frame them as astrological susceptibilities, not diagnoses. For each named zone, use only the reasons and mechanisms inside that same zone's `allowed_zone_evidence`. Never borrow a mechanism from another zone or invent a connecting body system. If the user asks for general vulnerabilities, rank up to three standing natal susceptibilities, explain one concrete chart reason for each, then give prevention-oriented guidance; do not turn it into a current-period forecast. If it says there is no ranked risk window inside the requested horizon, do not describe that horizon as heightened, dangerous, acute, or high-risk. Do not name a current MD/AD/PD chain unless every level is explicitly present in current-dasha evidence.
+- For health answers, obey `instant_v2_answer_contract.answer_spec.health_rules` literally. Name only its `allowed_zone_names`; frame them as astrological susceptibilities, not diagnoses. For each named zone, use only the reasons and mechanisms inside that same zone's `allowed_zone_evidence`. Never borrow a mechanism from another zone or invent a connecting body system. If the user asks for general vulnerabilities, include every retained standing natal susceptibility in exact ranked order (the mandatory count is `required_zone_count`), explain one concrete chart reason for each, then give prevention-oriented guidance; do not turn it into a current-period forecast. If it says there is no ranked risk window inside the requested horizon, do not describe that horizon as heightened, dangerous, acute, or high-risk. Do not name a current MD/AD/PD chain unless every level is explicitly present in current-dasha evidence.
 - When the comparison verdict is `close_call`, do not call either option more supported, favored, stronger, or more likely—even by "slightly". Compare their distinct windows and mechanisms, then ask which is materially emerging.
 - Obey `instant_v2_answer_contract.answer_spec.timing_sequence` literally. For a current-problem-plus-improvement question, explain the supplied current cause, give the earliest materially better window first, and identify a later peak only as a later strengthening—not as the first relief.
 - Obey `instant_v2_answer_contract.answer_spec.current_cause_rules` literally. It is an allow-list: never add a natal conjunction, placement, lordship, or generic planet effect that is absent from it.
 - For event predictions, mention every distinct `event_rules.required_material_windows` entry in chronological order when supplied. Apply `event_rules.dasha_level_terms` exactly: MD is major period, AD is sub-period, and PD is sub-sub-period. Never call a PD planet the sub-period lord.
+- For retrospective marriage timing, each ranked row is a broad MD-AD phase. State that broad phase first, then explicitly state the start/end and planet from its `strongest_pd_window`, and then give one or two supplied `probable_peak_windows`. Never attach the PD planet label to the entire MD-AD range, and never omit the PD dates when `strongest_pd_window` is present.
 - Obey `instant_v2_answer_contract.answer_spec.comparison_rules` literally and keep its required conclusion logically consistent in every sentence.
+- For comparison answers, keep each `evidence.option_comparison.options[].best_window` attached to that same option. Never explain the favored option with the other option's window, dasha chain, score, or `why`.
 - If `query_plan.time_scope.horizon_end` is present, never mention or imply a date after it, even if a legacy evidence block contains a later date. The v2 filtered ranked windows win.
 - When explaining a dated future window, use only the dasha chain attached to that exact window. Never use `current_timing` or the present MD/AD/PD chain as the astrological reason for a later window.
 - Obey `instant_v2_answer_contract.answer_spec.target_framing`. For a spouse, child, parent, or other derived subject without that person's own birth data, say "your chart's indications for your wife/child/etc." Never call the native's dasha "her dasha" or "his dasha".
 - If `instant_v2_answer_contract.verdict.missing_required_capabilities` is non-empty, state the supported directional evidence but do not invent the missing specificity. For a comparison without option-specific evidence, do not pick a winner; say what the chart supports and ask the one real-life distinction needed next.
-- For time-bound questions, use only windows in `instant_v2_answer_contract.verdict` or `normalized_evidence.event_timing_verdict`. Never restart a window before the context's as-of date, and never replace the user's requested horizon with the current calendar year.
+- For future time-bound questions, use only windows in `instant_v2_answer_contract.verdict` or `normalized_evidence.event_timing_verdict`; never restart a future window before the context's as-of date. For a retrospective query, use only ranked historical windows, keep every date in the past, and call them probable periods rather than the actual event date.
 - For health answers, translate difficult 8th/12th-house or hidden-pressure evidence into restrained self-care language such as rest, routine, observation, and checking persistent symptoms with a qualified professional. Do not claim recovery complications, isolation, acute danger, or a medical outcome unless that exact conclusion is explicit in the adjudicated health evidence.
 - For event-prediction answers, obey `normalized_evidence.event_timing_verdict.claim_contract` as a hard evidence gate. A focus house is only a possible topic house; it is not active in a timing window unless that same window lists it in `activated_focus_houses` or names it in `why`.
 - For event-prediction answers, never translate a raw line like "Jupiter rules focus house(s) [9]" into "Jupiter rules the progeny house" or another named domain house unless that exact domain house number is explicitly active in the same window. Safer wording is "Jupiter activates an event-relevant support house" or the exact house theme from `allowed_house_themes`.
@@ -10138,9 +12736,33 @@ async def generate_instant_chat_response(
     intent: Optional[Dict[str, Any]],
     history: List[Dict[str, Any]],
     language: str = "english",
+    latest_user_question: Optional[str] = None,
     speech_mode: bool = False,
     stream_callback: Optional[Callable[[str, str], None]] = None,
 ) -> Dict[str, Any]:
+    intent = apply_timeline_intent_guard(intent)
+    requested_app_language = str(language or "english").strip().lower() or "english"
+    language = _instant_response_language(
+        latest_user_question or question,
+        intent,
+        requested_app_language,
+    )
+    medical_triage = _instant_medical_triage_decision(question, intent)
+    if medical_triage:
+        return _instant_medical_triage_response(
+            language,
+            speech_mode=speech_mode,
+            urgency=str(medical_triage.get("urgency") or "emergency"),
+            localized_message=str(medical_triage.get("user_message") or ""),
+            source=str(medical_triage.get("source") or "safety_gate"),
+        )
+    timeline_result = build_selection_response(birth_data=birth_data, intent=intent)
+    if timeline_result:
+        return _marriage_timeline_selection_response(
+            timeline_result,
+            language,
+            speech_mode=speech_mode,
+        )
     if _is_conversational_non_question(question):
         return _conversational_ack_response(language, speech_mode=speech_mode)
 
@@ -10201,6 +12823,13 @@ async def generate_instant_chat_response(
         ),
         intent,
     )
+    # Preserve an already structured comparison.  The secondary mode router
+    # may see future-tense wording and collapse a two-option decision into a
+    # single event prediction, which discards one side of the evidence plan.
+    # The primary router's explicit comparison contract is stronger evidence
+    # than that later generic classification.
+    if str((intent or {}).get("answer_mode") or "").strip() == "comparison_choice":
+        answer_mode = "comparison_choice"
     routing_decision = {
         "selected_mode": str((mode_selection or {}).get("raw_answer_mode") or answer_mode),
         "final_mode": answer_mode,
@@ -10212,6 +12841,8 @@ async def generate_instant_chat_response(
         "intent_mode": str((intent or {}).get("mode") or ""),
         "intent_category": str((intent or {}).get("category") or ""),
         "post_selection_changed": str((mode_selection or {}).get("raw_answer_mode") or answer_mode) != answer_mode,
+        "response_language": language,
+        "app_language_fallback": requested_app_language,
     }
     target_subject = (mode_selection or {}).get("target_subject") if isinstance(mode_selection, dict) else None
     calculations_started = time.perf_counter()
@@ -10238,6 +12869,14 @@ async def generate_instant_chat_response(
             if isinstance(instant_v2_packet.get("query_plan"), dict):
                 instant_v2_packet["query_plan"]["routing_decision"] = routing_decision
             instant_v2_packet["routing_decision"] = routing_decision
+            # Resolve the compiled domain route before the composer context is
+            # built. Career, Health and Marriage graph rules are authoritative
+            # for this generation rather than post-answer shadow diagnostics.
+            instant_v2_packet = apply_live_graph_policy(
+                instant_v2_packet,
+                intent=intent,
+                context=instant_context,
+            )
             # The composer receives the compact contract, not the full audit
             # ledger. The full packet is returned for test inspection.
             instant_context["instant_v2_answer_contract"] = {
@@ -10300,16 +12939,53 @@ async def generate_instant_chat_response(
             )
         except Exception as exc:
             logger.warning("SPEECH_DEBUG instant_llm_context_full_log_failed error=%s", str(exc)[:200])
-    prompt_started = time.perf_counter()
-    prompt = _build_instant_prompt(question, prompt_context, language, speech_mode=speech_mode)
     try:
         prompt_budget = max(8000, int(os.getenv("INSTANT_CHAT_PROMPT_CHAR_BUDGET", "15000") or 15000))
     except (TypeError, ValueError):
         prompt_budget = 15000
+    prompt_started = time.perf_counter()
+    authoritative_prompt_context = prompt_context
+    prompt = _build_instant_prompt(question, prompt_context, language, speech_mode=speech_mode)
     if len(prompt) > prompt_budget:
-        # Do not silently cut authoritative evidence or add a second rewrite
-        # call. Surface budget drift so the compact packet can be corrected at
-        # its source without weakening the current answer.
+        # Fit against the complete prompt, not just the JSON brief.  The fixed
+        # composer instructions are sizeable, so a 9.5k context can otherwise
+        # produce a 20k+ request.  Re-run semantic compaction while retaining
+        # the verdict and answer-bearing domain contracts.
+        fixed_chars = max(0, len(prompt) - _json_size(prompt_context))
+        context_budget = max(3000, prompt_budget - fixed_chars - 250)
+        prompt_context = _fit_composer_brief(prompt_context, target_chars=context_budget)
+        prompt = _build_instant_prompt(question, prompt_context, language, speech_mode=speech_mode)
+    if len(prompt) > prompt_budget and not speech_mode:
+        # Some domain combinations make the fixed full instruction block alone
+        # larger than the configured envelope.  Use the concise equivalent and
+        # reserve the remaining space for adjudicated evidence; never truncate
+        # JSON or silently exceed the declared budget.
+        compact_fixed = len(_build_budgeted_instant_prompt(question, {}, language))
+        compact_budget = max(2500, prompt_budget - compact_fixed - 250)
+        prompt_context = _fit_composer_brief(prompt_context, target_chars=compact_budget)
+        prompt = _build_budgeted_instant_prompt(question, prompt_context, language)
+        if len(prompt) > prompt_budget:
+            retrospective_budget_context = _build_retrospective_budget_context(
+                authoritative_prompt_context
+            )
+            prompt_context = (
+                retrospective_budget_context
+                if retrospective_budget_context
+                else _limit_composer_value(
+                    prompt_context, max_depth=3, list_limit=3, string_limit=120
+                )
+            )
+            prompt = _build_budgeted_instant_prompt(question, prompt_context, language)
+        if len(prompt) > prompt_budget:
+            prompt_context = {
+                key: _limit_composer_value(
+                    prompt_context.get(key), max_depth=2, list_limit=2, string_limit=100
+                )
+                for key in ("query_plan", "verdict", "evidence", "answer_contract")
+                if isinstance(prompt_context, dict) and prompt_context.get(key) not in (None, {}, [])
+            }
+            prompt = _build_budgeted_instant_prompt(question, prompt_context, language)
+    if len(prompt) > prompt_budget:
         logger.warning(
             "INSTANT_PERF prompt_budget_exceeded prompt_chars=%s budget_chars=%s profile=%s",
             len(prompt),
@@ -10317,7 +12993,8 @@ async def generate_instant_chat_response(
             (prompt_context or {}).get("context_profile"),
         )
     _finish_local_stage("prompt_build", prompt_started)
-    model_name = get_gemini_instant_model()
+    model_name = get_instant_chat_model()
+    instant_provider = get_instant_chat_llm_provider()
     if instant_v2_packet:
         instant_v2_packet["composer_brief"] = prompt_context
         instant_v2_packet["composer_metrics"] = {
@@ -10349,11 +13026,33 @@ async def generate_instant_chat_response(
     )
     thinking_level = _instant_thinking_level(model_name)
     logger.info(
-        "INSTANT_PERF latency_policy model=%s thinking_level=%s timeout_s=%.1f transport=genai_rest",
+        "INSTANT_PERF latency_policy model=%s thinking_level=%s deepseek_thinking=%s timeout_s=%.1f transport=%s",
         model_name,
         thinking_level or "model_default",
+        "disabled" if instant_provider == CHAT_LLM_DEEPSEEK else "not_applicable",
         answer_timeout_s,
+        "deepseek_chat_completions" if instant_provider == CHAT_LLM_DEEPSEEK else "genai_rest",
     )
+    response_health_rules = _resolve_constitutional_health_rules(
+        prompt_context,
+        instant_v2_packet,
+        instant_context,
+    )
+    constitutional_health_rows = (
+        _constitutional_health_required_rows(response_health_rules)
+        if response_health_rules and not response_health_rules.get("is_time_bound_question")
+        else []
+    )
+    if response_health_rules:
+        logger.info(
+            "INSTANT_HEALTH_FACT_GATE active rows=%s sources=%s",
+            len(constitutional_health_rows),
+            json.dumps(constitutional_health_rows, ensure_ascii=False, default=str),
+        )
+    # Constitutional health claims are buffered until their immutable chart
+    # facts pass validation.  Streaming an invented placement and correcting it
+    # afterwards is worse than showing this one answer shape atomically.
+    generation_stream_callback = None if constitutional_health_rows else stream_callback
     started_at = datetime.utcnow()
     llm_result = await analyzer.generate_text_from_prompt(
         prompt,
@@ -10362,10 +13061,12 @@ async def generate_instant_chat_response(
         model_name_override=model_name,
         llm_log_tag="instant_chat",
         request_timeout_s=answer_timeout_s,
-        force_gemini=True,
-        use_gemini_rest=True,
-        gemini_thinking_level=thinking_level,
-        stream_callback=stream_callback,
+        force_gemini=False,
+        provider_override=instant_provider,
+        use_gemini_rest=instant_provider == CHAT_LLM_GEMINI,
+        gemini_thinking_level=(thinking_level if instant_provider == CHAT_LLM_GEMINI else None),
+        deepseek_thinking_enabled=(False if instant_provider == CHAT_LLM_DEEPSEEK else None),
+        stream_callback=generation_stream_callback,
     )
     elapsed_s = max(0.0, (datetime.utcnow() - started_at).total_seconds())
     pipeline_elapsed_s = max(0.0, time.perf_counter() - pipeline_started)
@@ -10397,13 +13098,15 @@ async def generate_instant_chat_response(
             "error": error_text,
             "chat_llm_model": llm_result.get("chat_llm_model") or model_name,
             "timing": {
-                "chat_llm_provider": "gemini",
+                "chat_llm_provider": instant_provider,
                 "chat_llm_model": llm_result.get("chat_llm_model") or model_name,
                 "instant_chat": True,
                 "total_request_time": pipeline_elapsed_s,
                 "answer_model_time": elapsed_s,
                 "instant_stage_timings_ms": stage_timings_ms,
-                "instant_transport": "genai_rest_stream" if stream_callback else "genai_rest",
+                "instant_transport": (
+                    "genai_rest_stream" if stream_callback else "genai_rest"
+                ) if instant_provider == CHAT_LLM_GEMINI else "deepseek_chat_completions",
                 "instant_thinking_level": thinking_level,
             },
             "token_usage": llm_result.get("token_usage") or {},
@@ -10417,6 +13120,130 @@ async def generate_instant_chat_response(
         }
 
     raw_response = _repair_common_utf8_mojibake(llm_result.get("response")).strip()
+    strict_health_fact_binding = bool(
+        str(language or "english").strip().lower() in {"english", "en"}
+        and not re.search(r"[^\x00-\x7F]", str(question or ""))
+    )
+    health_fact_validation_errors = (
+        _validate_constitutional_health_answer(
+            raw_response,
+            constitutional_health_rows,
+            strict_sentence_binding=strict_health_fact_binding,
+        )
+        if constitutional_health_rows
+        else []
+    )
+    if constitutional_health_rows:
+        if language_error := _instant_answer_language_error(raw_response, language):
+            health_fact_validation_errors.append(language_error)
+    health_fact_correction_attempted = False
+    health_fact_correction_applied = False
+    if health_fact_validation_errors:
+        health_fact_correction_attempted = True
+        logger.error(
+            "INSTANT_HEALTH_FACT_REJECTED errors=%s answer=%r required_rows=%s",
+            health_fact_validation_errors,
+            raw_response[:1200],
+            json.dumps(constitutional_health_rows, ensure_ascii=False, default=str),
+        )
+        correction_prompt = f"""
+Your previous constitutional-health answer was rejected because it changed or omitted calculated chart facts.
+
+{_instant_composer_language_rule(language)}
+{_instant_relational_voice_contract()}
+
+The rejected answer may itself use the wrong language. Do not copy its language; follow the USER QUESTION below.
+
+Rewrite the complete answer once. Use every region in ranked order. For each region, state one distinct cause sentence using only that row's exact `required_cause_facts`. Planet, sign, nakshatra and house data are immutable. When the answer is not English, copy each row's exact `validation_marker` at the end of that row's explanatory sentence; it is mandatory, must not be translated, and will be removed before display. Do not mention dashas, transits, timing, current periods, diagnoses, or additional body regions. End with one natural preventive-care or symptom question, followed by the required metadata line.
+
+VALIDATION FAILURES:
+{json.dumps(health_fact_validation_errors, ensure_ascii=False)}
+
+AUTHORITATIVE CALCULATED ROWS:
+{json.dumps(constitutional_health_rows, ensure_ascii=False, separators=(",", ":"))}
+
+USER QUESTION:
+{question}
+
+REJECTED ANSWER:
+{raw_response}
+
+Append exactly:
+NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","follow_up_questions":[],"source":"instant"}}
+""".strip()
+        correction_request_id = _log_instant_llm_request(
+            stage="instant_health_fact_correction",
+            model_name=model_name,
+            prompt=correction_prompt,
+            context={"required_zone_rows": constitutional_health_rows},
+            answer_mode=answer_mode,
+            speech_mode=speech_mode,
+            compacted=True,
+        )
+        correction_started = datetime.utcnow()
+        corrected_result = await analyzer.generate_text_from_prompt(
+            correction_prompt,
+            premium_analysis=False,
+            model_override=None,
+            model_name_override=model_name,
+            llm_log_tag="instant_chat_health_fact_correction",
+            request_timeout_s=answer_timeout_s,
+            force_gemini=False,
+            provider_override=instant_provider,
+            use_gemini_rest=instant_provider == CHAT_LLM_GEMINI,
+            gemini_thinking_level=(thinking_level if instant_provider == CHAT_LLM_GEMINI else None),
+            deepseek_thinking_enabled=(False if instant_provider == CHAT_LLM_DEEPSEEK else None),
+            stream_callback=None,
+        )
+        correction_elapsed_s = max(0.0, (datetime.utcnow() - correction_started).total_seconds())
+        _log_instant_llm_response(
+            request_id=correction_request_id,
+            stage="instant_health_fact_correction",
+            model_name=model_name,
+            prompt=correction_prompt,
+            result=corrected_result,
+            elapsed_s=correction_elapsed_s,
+        )
+        corrected_raw = _repair_common_utf8_mojibake(corrected_result.get("response")).strip()
+        corrected_errors = (
+            _validate_constitutional_health_answer(
+                corrected_raw,
+                constitutional_health_rows,
+                strict_sentence_binding=strict_health_fact_binding,
+            )
+            if corrected_result.get("success")
+            else [str(corrected_result.get("error") or "correction generation failed")]
+        )
+        if corrected_result.get("success"):
+            if language_error := _instant_answer_language_error(corrected_raw, language):
+                corrected_errors.append(language_error)
+        if corrected_errors:
+            logger.error(
+                "INSTANT_HEALTH_FACT_CORRECTION_REJECTED errors=%s answer=%r",
+                corrected_errors,
+                corrected_raw[:1200],
+            )
+            # Never return confidently wrong chart placements. The evidence is
+            # still available to the UI for audit, while the user gets an
+            # honest retry request instead of fabricated astrology.
+            raw_response = (
+                "I could not produce a reliable health-susceptibility explanation from the calculated chart facts. "
+                "Please try this question again.\n\n"
+                'NEXT_ACTION_META: {"type":"none","title":"","reason":"","confidence":"low","follow_up_questions":[],"source":"instant"}'
+            )
+            health_fact_validation_errors = corrected_errors
+        else:
+            raw_response = corrected_raw
+            llm_result = corrected_result
+            elapsed_s += correction_elapsed_s
+            health_fact_validation_errors = []
+            health_fact_correction_applied = True
+    if constitutional_health_rows:
+        raw_response = _strip_constitutional_health_validation_markers(raw_response)
+    if constitutional_health_rows and stream_callback is not None:
+        # Publish only the validated/corrected answer; no incorrect partial
+        # placement ever reaches the processing message shown to the user.
+        stream_callback(raw_response, raw_response)
     if speech_mode:
         response_text, speech_followups = _parse_speech_followups_from_answer(raw_response)
         response_text = _strip_speech_answer_greeting(response_text)
@@ -10426,6 +13253,32 @@ async def generate_instant_chat_response(
     parsed_response = ResponseParser.parse_images_in_chat_response(response_text)
     response_content = parsed_response.get("content") or response_text
     response_content, prediction_anchor_meta = ResponseParser.parse_prediction_anchor_metadata(response_content)
+    if instant_v2_packet:
+        response_content = enforce_live_graph_answer(
+            response_content,
+            instant_v2_packet,
+            language=language,
+        )
+        graph_policy = ((instant_v2_packet.get("answer_spec") or {}).get("knowledge_graph_policy") or {})
+        if graph_policy.get("live") and not str(response_content or "").rstrip().endswith("?"):
+            domain = str(graph_policy.get("domain") or "").lower()
+            if str(language or "").lower().startswith("hi"):
+                follow_up = (
+                    "क्या कोई खास लक्षण या चिंता है जिसे आप ध्यान में रखना चाहते हैं?"
+                    if domain == "health"
+                    else "वास्तविक जीवन में अभी कौन-सा विकल्प ठोस रूप से सामने आ रहा है?"
+                    if domain == "career"
+                    else "क्या आप उपलब्ध गैर-समयबद्ध संकेत जानना चाहेंगे?"
+                )
+            else:
+                follow_up = (
+                    "Is there a specific symptom or concern you want me to keep in view?"
+                    if domain == "health"
+                    else "Which option is already becoming concrete in real life?"
+                    if domain == "career"
+                    else "Would you like the supported non-timing indications instead?"
+                )
+            response_content = f"{str(response_content or '').rstrip()}\n\n{follow_up}"
     if speech_mode:
         response_content = _strip_speech_answer_greeting(response_content)
         response_content = _polish_speech_event_answer(response_content, prompt_context)
@@ -10435,9 +13288,15 @@ async def generate_instant_chat_response(
     # latency, can distort multilingual wording, and makes the experience no
     # longer instant.
     contract_enforcement = {
-        "applied": False,
-        "reason": "single_call_contract_in_primary_prompt",
-        "generation_calls": 1,
+        "applied": health_fact_correction_applied,
+        "reason": (
+            "health_fact_validation_and_correction"
+            if health_fact_correction_attempted
+            else "single_call_contract_in_primary_prompt"
+        ),
+        "generation_calls": 2 if health_fact_correction_attempted else 1,
+        "health_fact_validation_passed": not health_fact_validation_errors,
+        "health_fact_validation_errors": health_fact_validation_errors,
     } if instant_v2_packet else None
     if instant_v2_packet:
         instant_v2_packet = finalize_instant_v2_packet(
@@ -10476,6 +13335,19 @@ async def generate_instant_chat_response(
         suppress_remedy_cta=suppress_remedy_cta,
     )
     next_action = next_action or {}
+    graph_policy = (
+        ((instant_v2_packet or {}).get("answer_spec") or {}).get("knowledge_graph_policy") or {}
+        if isinstance(instant_v2_packet, dict)
+        else {}
+    )
+    if (
+        not speech_mode
+        and str(graph_policy.get("runtime_key") or "").strip().lower() == "marriage_history"
+    ):
+        phase_action = build_phase_action((instant_v2_packet or {}).get("verdict"))
+        if phase_action:
+            next_action = phase_action
+            combined_followups = []
     if not combined_followups and speech_followups and not remedy_active:
         combined_followups = list(speech_followups)
     logger.info(
@@ -10513,13 +13385,15 @@ async def generate_instant_chat_response(
         "error": None,
         "chat_llm_model": llm_result.get("chat_llm_model") or model_name,
         "timing": {
-            "chat_llm_provider": "gemini",
+            "chat_llm_provider": instant_provider,
             "chat_llm_model": llm_result.get("chat_llm_model") or model_name,
             "instant_chat": True,
             "total_request_time": pipeline_elapsed_s,
             "answer_model_time": elapsed_s,
             "instant_stage_timings_ms": stage_timings_ms,
-            "instant_transport": "genai_rest_stream" if stream_callback else "genai_rest",
+            "instant_transport": (
+                "genai_rest_stream" if stream_callback else "genai_rest"
+            ) if instant_provider == CHAT_LLM_GEMINI else "deepseek_chat_completions",
             "instant_thinking_level": thinking_level,
         },
         "token_usage": llm_result.get("token_usage") or {},

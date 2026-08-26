@@ -46,7 +46,8 @@ def test_instant_answer_uses_exactly_one_generation_call(monkeypatch):
 
     monkeypatch.setattr(pipeline, "_build_instant_context", lambda **kwargs: compact_context)
     monkeypatch.setattr(pipeline, "build_instant_v2_packet", lambda **kwargs: packet)
-    monkeypatch.setattr(pipeline, "get_gemini_instant_model", lambda: "models/gemini-flash-lite-test")
+    monkeypatch.setattr(pipeline, "get_instant_chat_llm_provider", lambda: "gemini")
+    monkeypatch.setattr(pipeline, "get_instant_chat_model", lambda: "models/gemini-flash-lite-test")
     monkeypatch.setattr(
         pipeline,
         "finalize_instant_v2_packet",

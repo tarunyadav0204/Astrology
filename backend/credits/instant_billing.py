@@ -22,6 +22,7 @@ RECONNECT_GRACE_SECONDS = max(
     int(os.getenv("INSTANT_BILLING_RECONNECT_GRACE_SECONDS", "75") or 75),
 )
 LOW_BALANCE_MINUTES = max(1, int(os.getenv("INSTANT_BILLING_LOW_BALANCE_MINUTES", "5") or 5))
+_SCHEMA_READY = False
 
 
 class InstantBillingError(Exception):
@@ -32,6 +33,9 @@ class InstantBillingError(Exception):
 
 
 def ensure_table(conn) -> None:
+    global _SCHEMA_READY
+    if _SCHEMA_READY:
+        return
     execute(
         conn,
         """
@@ -77,6 +81,7 @@ def ensure_table(conn) -> None:
         ON instant_billing_sessions(userid) WHERE status = 'active'
         """,
     )
+    _SCHEMA_READY = True
 
 
 def _balance_for_update(conn, userid: int) -> int:

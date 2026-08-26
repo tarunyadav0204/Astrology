@@ -12,9 +12,9 @@ from typing import Any, Dict, List, Optional
 
 from panchang.panchang_calculator import PanchangCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
-from calculators.vedic_graha_drishti import DEFAULT_ASPECTS, GRAHA_HOUSE_ASPECTS
 from context_agents.compact_vedic import SIGN_NAMES, house_lordships_from_ascendant
 from daily.daily_micro_intents import get_daily_micro_intent_profile
+from instant_aspect_policy import instant_activation_aspects
 from shared.dasha_calculator import DashaCalculator
 from utils.query_context import resolve_query_now
 
@@ -337,7 +337,7 @@ def _build_trigger_evidence(
             conjunction_details.append(_target_snapshot(natal_planet, row))
             score += 25 if natal_planet == planet else 10
 
-    available_aspects = GRAHA_HOUSE_ASPECTS.get(planet, DEFAULT_ASPECTS)
+    available_aspects = instant_activation_aspects(planet)
     for aspect_number in available_aspects:
         target_house = _aspected_house(transit_house, aspect_number)
         target_planets = [

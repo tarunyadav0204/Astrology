@@ -10,6 +10,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from auth import get_current_user
 from db import get_conn, execute
+from utils.llm_pricing import deepseek_rate_usd_per_million
 
 # YYYY-MM-DD for date filters (today / this month)
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -363,6 +364,7 @@ def _parallel_stage_cost_breakdown_inr(
     parallel_usage: Optional[Dict[str, Any]],
     fallback_model_name: Optional[str],
     fx: float,
+    priced_at: Any = None,
 ) -> Optional[Dict[str, float]]:
     if not isinstance(parallel_usage, dict):
         return None
@@ -384,7 +386,7 @@ def _parallel_stage_cost_breakdown_inr(
         output_t = max(0, int(st.get("output_tokens") or 0))
         if non_cached_t <= 0 and input_t > 0:
             non_cached_t = max(input_t - cached_t, 0)
-        rates = _resolve_model_rate(model_name, max(input_t, non_cached_t))
+        rates = _resolve_model_rate(model_name, max(input_t, non_cached_t), priced_at=priced_at)
         input_non_cached_cost_inr += (non_cached_t / 1_000_000.0) * float(rates["input"]) * fx
         input_cached_cost_inr += (
             (cached_t / 1_000_000.0)
@@ -404,24 +406,24 @@ def _parallel_stage_cost_breakdown_inr(
             if target_tokens <= 0:
                 continue
             target_model = (target.get("llm_model") or fallback_model_name or "").strip() or None
-            rates_target = _resolve_model_rate(target_model, target_tokens)
+            rates_target = _resolve_model_rate(target_model, target_tokens, priced_at=priced_at)
             cache_setup_cost_inr += (target_tokens / 1_000_000.0) * float(rates_target["input"]) * fx
     else:
         standard_setup_tokens = max(0, int(totals.get("cache_setup_input_tokens_standard") or 0))
         premium_setup_tokens = max(0, int(totals.get("cache_setup_input_tokens_premium") or 0))
         if standard_setup_tokens > 0:
             standard_model = (totals.get("cache_setup_llm_model_standard") or fallback_model_name or "").strip() or None
-            rates_standard = _resolve_model_rate(standard_model, standard_setup_tokens)
+            rates_standard = _resolve_model_rate(standard_model, standard_setup_tokens, priced_at=priced_at)
             cache_setup_cost_inr += (standard_setup_tokens / 1_000_000.0) * float(rates_standard["input"]) * fx
         if premium_setup_tokens > 0:
             premium_model = (totals.get("cache_setup_llm_model_premium") or fallback_model_name or "").strip() or None
-            rates_premium = _resolve_model_rate(premium_model, premium_setup_tokens)
+            rates_premium = _resolve_model_rate(premium_model, premium_setup_tokens, priced_at=priced_at)
             cache_setup_cost_inr += (premium_setup_tokens / 1_000_000.0) * float(rates_premium["input"]) * fx
 
     if cache_setup_cost_inr <= 0:
         legacy_setup_tokens = max(0, int(totals.get("cache_setup_input_tokens") or 0))
         if legacy_setup_tokens > 0:
-            rates_legacy = _resolve_model_rate(fallback_model_name, legacy_setup_tokens)
+            rates_legacy = _resolve_model_rate(fallback_model_name, legacy_setup_tokens, priced_at=priced_at)
             cache_setup_cost_inr += (legacy_setup_tokens / 1_000_000.0) * float(rates_legacy["input"]) * fx
 
     return {
@@ -585,36 +587,36 @@ _CHAT_MODEL_RATE_USD_PER_1M: Dict[str, Dict[str, float]] = {
     "gpt-5.4-pro": {"input": 15.00, "output": 60.00},
     # DeepSeek (api-docs.deepseek.com/quick_start/pricing): cache-miss input + output; no >200k tier in public table.
     "deepseek-chat": {
-        "input_le_200k": 0.28,
-        "input_gt_200k": 0.28,
-        "cached_input_le_200k": 0.28,
-        "cached_input_gt_200k": 0.28,
-        "output_le_200k": 0.42,
-        "output_gt_200k": 0.42,
+        "input_le_200k": 0.22,
+        "input_gt_200k": 0.22,
+        "cached_input_le_200k": 0.007,
+        "cached_input_gt_200k": 0.007,
+        "output_le_200k": 0.66,
+        "output_gt_200k": 0.66,
     },
     "deepseek-reasoner": {
-        "input_le_200k": 0.28,
-        "input_gt_200k": 0.28,
-        "cached_input_le_200k": 0.28,
-        "cached_input_gt_200k": 0.28,
-        "output_le_200k": 0.42,
-        "output_gt_200k": 0.42,
+        "input_le_200k": 0.22,
+        "input_gt_200k": 0.22,
+        "cached_input_le_200k": 0.007,
+        "cached_input_gt_200k": 0.007,
+        "output_le_200k": 0.66,
+        "output_gt_200k": 0.66,
     },
-    "deepseek-v4": {
-        "input_le_200k": 0.28,
-        "input_gt_200k": 0.28,
-        "cached_input_le_200k": 0.28,
-        "cached_input_gt_200k": 0.28,
-        "output_le_200k": 0.42,
-        "output_gt_200k": 0.42,
+    "deepseek-v4-flash": {
+        "input_le_200k": 0.22,
+        "input_gt_200k": 0.22,
+        "cached_input_le_200k": 0.007,
+        "cached_input_gt_200k": 0.007,
+        "output_le_200k": 0.66,
+        "output_gt_200k": 0.66,
     },
-    "deepseek-v4-reasoner": {
-        "input_le_200k": 0.28,
-        "input_gt_200k": 0.28,
-        "cached_input_le_200k": 0.28,
-        "cached_input_gt_200k": 0.28,
-        "output_le_200k": 0.42,
-        "output_gt_200k": 0.42,
+    "deepseek-v4-pro": {
+        "input_le_200k": 0.66,
+        "input_gt_200k": 0.66,
+        "cached_input_le_200k": 0.022,
+        "cached_input_gt_200k": 0.022,
+        "output_le_200k": 1.98,
+        "output_gt_200k": 1.98,
     },
 }
 
@@ -646,11 +648,16 @@ def _row_optional_int(val: Any) -> Optional[int]:
         return None
 
 
-def _resolve_model_rate(model_name: Optional[str], input_tokens_est: int = 0) -> Dict[str, float]:
+def _resolve_model_rate(
+    model_name: Optional[str], input_tokens_est: int = 0, *, priced_at: Any = None
+) -> Dict[str, Any]:
     if not model_name:
         return {"input": 0.10, "cached_input": 0.10, "output": 0.40, "tier": "le_200k"}
     m = str(model_name).strip()
     tier = "gt_200k" if int(input_tokens_est or 0) > 200_000 else "le_200k"
+    deepseek_rate = deepseek_rate_usd_per_million(m, priced_at=priced_at)
+    if deepseek_rate is not None:
+        return deepseek_rate
     if m in _CHAT_MODEL_RATE_USD_PER_1M:
         cfg = _CHAT_MODEL_RATE_USD_PER_1M[m]
         if "input_le_200k" not in cfg:
@@ -1292,7 +1299,7 @@ async def get_admin_chat_user_thread(
             output_cost_inr = 0.0
             cost_inr = 0.0
             if sender_key == "assistant":
-                rates = _resolve_model_rate(model or None, int(llm_input_tokens or 0))
+                rates = _resolve_model_rate(model or None, int(llm_input_tokens or 0), priced_at=row[4])
                 input_t = int(llm_input_tokens or 0)
                 output_t = int(llm_output_tokens or 0)
                 cached_t = int(llm_cached_input_tokens or 0)
@@ -1300,7 +1307,9 @@ async def get_admin_chat_user_thread(
                 if non_cached_t <= 0 and input_t > 0:
                     non_cached_t = max(input_t - cached_t, 0)
 
-                stage_costs = _parallel_stage_cost_breakdown_inr(parallel_llm_usage, model or None, fx)
+                stage_costs = _parallel_stage_cost_breakdown_inr(
+                    parallel_llm_usage, model or None, fx, priced_at=row[4]
+                )
                 if stage_costs is not None:
                     input_non_cached_cost_inr = float(stage_costs["input_non_cached_cost_inr"])
                     input_cached_cost_inr = float(stage_costs["input_cached_cost_inr"])
@@ -1891,7 +1900,11 @@ async def get_event_timeline_history(
             if non_cached_input_tokens <= 0 and input_tokens > 0:
                 non_cached_input_tokens = max(input_tokens - cached_input_tokens, 0)
 
-            rates = _resolve_model_rate(model, max(input_tokens, non_cached_input_tokens))
+            rates = _resolve_model_rate(
+                model,
+                max(input_tokens, non_cached_input_tokens),
+                priced_at=(r[7] or r[6]),
+            )
             non_cached_tokens_for_cost = non_cached_input_tokens if non_cached_input_tokens > 0 else input_tokens
             cached_tokens_for_cost = cached_input_tokens if cached_input_tokens > 0 else 0
             input_cost_non_cached_inr = (non_cached_tokens_for_cost / 1_000_000.0) * float(rates["input"]) * fx
@@ -2140,7 +2153,6 @@ async def get_session_details(
             session_input_tokens_est = sum(
                 _approx_tokens(r[2]) for r in msg_rows if str(r[1] or "").strip().lower() == "user"
             )
-            rates = _resolve_model_rate(chat_llm_model, session_input_tokens_est)
             fx = _usd_to_inr_rate()
             total_inr = 0.0
             total_input_non_cached_inr = 0.0
@@ -2174,6 +2186,11 @@ async def get_session_details(
                     non_cached_t = int(raw_non_cached_in or 0)
                     if non_cached_t <= 0 and input_t > 0:
                         non_cached_t = max(input_t - cached_t, 0)
+                    rates = _resolve_model_rate(
+                        chat_llm_model,
+                        max(input_t, non_cached_t, session_input_tokens_est),
+                        priced_at=r[3],
+                    )
                     input_non_cached_cost_inr = (
                         ((non_cached_t if input_t > 0 else 0) / 1_000_000.0)
                         * float(rates["input"])
@@ -2195,6 +2212,7 @@ async def get_session_details(
                         parallel_usage_for_cost,
                         chat_llm_model,
                         fx,
+                        priced_at=r[3],
                     )
                     cache_setup_tokens = _parallel_cache_setup_tokens(parallel_usage_for_cost)
                     if stage_costs is not None:
@@ -2987,6 +3005,8 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_gemini_analysis_model,
             get_gemini_report_model,
             get_gemini_instant_model,
+            get_instant_chat_llm_provider,
+            get_deepseek_instant_model,
             get_event_timeline_model,
             get_parallel_branch_gemini_model,
             get_parallel_branch_planner_model,
@@ -3053,6 +3073,8 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "gemini_analysis_model": get_gemini_analysis_model(),
             "gemini_report_model": get_gemini_report_model(),
             "gemini_instant_chat_model": get_gemini_instant_model(),
+            "instant_chat_llm_provider": get_instant_chat_llm_provider(),
+            "deepseek_instant_chat_model": get_deepseek_instant_model(),
             "event_timeline_model": get_event_timeline_model(),
             "parallel_branch_gemini_models": {
                 "parashari": get_parallel_branch_gemini_model("parashari"),

@@ -16,6 +16,12 @@ from ai.output_schema import resolve_output_language_policy
 from daily.daily_micro_intents import classify_daily_micro_intent
 from utils.query_context import normalize_query_context, resolve_query_now
 from ai.gemini_chat_analyzer import generate_content_rest_v1beta_result
+from instant_chat_v2.career import CAREER_ALIASES, CAREER_PROFILES, career_profile
+from utils.admin_settings import (
+    CHAT_LLM_DEEPSEEK,
+    get_instant_chat_llm_provider,
+    get_instant_chat_model,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,10 +85,10 @@ def _ordinal_suffix(value: int) -> str:
 # Canonical divisional bundles per intent category (keep in sync with IntentRouter._get_default_divisional_charts).
 _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY: dict[str, list[str]] = {
     "marriage": ["D1", "D9", "D7"],
-    "career": ["D1", "D9", "D10", "Karkamsa"],
-    "job": ["D1", "D9", "D10", "Karkamsa"],
-    "promotion": ["D1", "D9", "D10", "Karkamsa"],
-    "business": ["D1", "D9", "D10", "Karkamsa"],
+    "career": ["D1", "D10"],
+    "job": ["D1", "D10"],
+    "promotion": ["D1", "D10"],
+    "business": ["D1", "D10"],
     "soul": ["D1", "D9", "D20", "Swamsa"],
     "spirituality": ["D1", "D9", "D20", "Swamsa"],
     "purpose": ["D1", "D9", "Karkamsa", "Swamsa"],
@@ -116,6 +122,32 @@ _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY: dict[str, list[str]] = {
     "spouse": ["D1", "D7", "D9"],
     "family": ["D1", "D9", "D12"],
 }
+
+for _career_name, _career_policy in CAREER_PROFILES.items():
+    _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY[_career_name] = list(_career_policy["divisionals"])
+for _career_alias, _career_name in CAREER_ALIASES.items():
+    _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY[_career_alias] = list(
+        _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY[_career_name]
+    )
+
+
+def apply_career_routing_guards(result: Dict[str, Any]) -> None:
+    """Normalize only the LLM's structured career output, never question text."""
+    category = str(result.get("category") or "").strip().lower().replace("-", "_").replace(" ", "_")
+    subtype = result.get("career_subtype")
+    if category not in CAREER_ALIASES and category not in CAREER_PROFILES and not subtype:
+        return
+    profile = career_profile(category, subtype)
+    result["career_subtype"] = profile["subtype"]
+    # Preserve established public categories where possible, but promote a
+    # specific LLM subtype so all downstream calculators share its matrix.
+    # Keep a general career request inside the career domain.  ``general`` is
+    # also the router's global catch-all and would make downstream code drop
+    # the D1/D10 career contract entirely.
+    result["category"] = "career" if profile["subtype"] == "general" else profile["subtype"]
+    result["focus_houses"] = list(profile["houses"])
+    result["divisional_charts"] = list(profile["divisionals"])
+    result["required_divisional_charts"] = list(profile["divisionals"])
 
 
 _CHART_FOCUS_SYNONYMS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -365,6 +397,11 @@ def _build_usage_stage(
 
 
 def _is_transient_intent_error(exc: Exception) -> bool:
+    # Built-in/asyncio TimeoutError commonly has an empty string representation,
+    # so text matching alone incorrectly classifies it as permanent and skips the
+    # existing retry path.
+    if isinstance(exc, TimeoutError):
+        return True
     text = str(exc or "").lower()
     markers = [
         "504",
@@ -1156,19 +1193,56 @@ class IntentRouter:
             return self._model_cache[fallback_fast]
 
     def _get_instant_model_name(self) -> str:
-        """Resolve Instant's model name without constructing a legacy SDK model."""
-        from utils.admin_settings import get_setting
-
-        name = (
-            get_setting("gemini_instant_intent_model")
-            or get_setting("gemini_intent_model")
-            or "models/gemini-3.1-flash-lite"
-        ).strip()
-        if "pro" in name.lower() or "2.0-flash-lite" in name.lower():
-            return "models/gemini-3.1-flash-lite"
-        return name
+        """Use the same admin-selected model as the Instant answer composer."""
+        return str(get_instant_chat_model() or "models/gemini-3.1-flash-lite").strip()
 
     async def _generate_instant_content(self, prompt: str, model_name: str, timeout_s: float):
+        provider = get_instant_chat_llm_provider()
+        if provider == CHAT_LLM_DEEPSEEK:
+            try:
+                from openai import AsyncOpenAI
+            except ImportError as exc:
+                raise RuntimeError(
+                    "The 'openai' package is required for DeepSeek Instant intent classification"
+                ) from exc
+
+            api_key = os.getenv("DEEPSEEK_API_KEY") or ""
+            if not api_key:
+                raise ValueError("DEEPSEEK_API_KEY environment variable not set")
+            base_url = (os.getenv("DEEPSEEK_BASE_URL") or "https://api.deepseek.com").strip().rstrip("/")
+            client = AsyncOpenAI(
+                api_key=api_key,
+                base_url=f"{base_url}/v1",
+                timeout=max(3.0, timeout_s),
+            )
+            response = await asyncio.wait_for(
+                client.chat.completions.create(
+                    model=str(model_name or "deepseek-chat").strip(),
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0,
+                    max_tokens=4096,
+                    extra_body={"thinking": {"type": "disabled"}},
+                ),
+                timeout=max(3.0, timeout_s),
+            )
+            choice = response.choices[0] if response.choices else None
+            text = str(getattr(getattr(choice, "message", None), "content", "") or "")
+            usage = getattr(response, "usage", None)
+            prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+            output_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+            prompt_details = getattr(usage, "prompt_tokens_details", None)
+            cached_tokens = int(getattr(prompt_details, "cached_tokens", 0) or 0)
+            total_tokens = int(getattr(usage, "total_tokens", 0) or (prompt_tokens + output_tokens))
+            return SimpleNamespace(
+                text=text,
+                usage_metadata=SimpleNamespace(
+                    prompt_token_count=prompt_tokens,
+                    candidates_token_count=output_tokens,
+                    cached_content_token_count=cached_tokens,
+                    total_token_count=total_tokens,
+                ),
+            )
+
         api_key = os.getenv("GEMINI_API_KEY") or ""
         if not api_key:
             raise ValueError("GEMINI_API_KEY environment variable not set")
@@ -1330,6 +1404,7 @@ class IntentRouter:
                     'first job',
                 ]
             )
+        apply_career_routing_guards(result)
         if 'divisional_charts' not in result or not isinstance(result.get('divisional_charts'), list):
             result['divisional_charts'] = self._get_default_divisional_charts(result.get('category', 'general'))
         merge_divisional_charts_with_category_defaults(result, user_question=user_question)
@@ -1575,6 +1650,7 @@ class IntentRouter:
                 }
             }
             _refine_life_event_category(user_question, result)
+            apply_career_routing_guards(result)
             result["divisional_charts"] = self._get_default_divisional_charts(result.get("category", "general"))
             merge_divisional_charts_with_category_defaults(result, user_question=user_question)
             if normalized_query_context:
@@ -1648,6 +1724,7 @@ LATEST USER MESSAGE (answer this turn): "{latest_user_reply}"
 
 Task:
 1. Semantically understand the user's question in any language/script.
+   MEDICAL SAFETY OVERRIDE: If the latest message describes a potentially urgent symptom happening now (for example chest pain/pressure, serious breathing difficulty, stroke signs, fainting, severe bleeding, or another possible emergency), set `medical_triage.urgency` to `emergency` or `urgent`. Write `medical_triage.user_message` in the user's current language/script. It must say astrology cannot assess the active symptom, direct the user to immediate medical care/emergency services, and must not ask a question that delays care. Do not route ordinary questions about future susceptibility or general health risk to triage.
    First classify `turn_relation`:
    - `clarification_answer` only when LATEST USER MESSAGE semantically answers the open clarification (including a short one-word answer).
    - `follow_up` when it asks about, challenges, or continues the immediately previous answer.
@@ -1715,9 +1792,12 @@ Evidence planner:
 - A comparison is multi-part: emit one `question_part` per option and give each option its own event_profile (for example promotion and job_change). Add a `decision_option_context` evidence need covering those parts. Never collapse both options into `general_event`.
 - Add one `evidence_needs` item per data need, not per sentence.
 - For "When will I get married?", use event_timing + future_dasha_event_windows + transit_event_windows + natal_topic_foundation with event_profile marriage.
+- For retrospective event discovery such as "When was I married?", use event_timing with timeframe {{"kind":"open_past"}}; request historical_dasha_event_windows, historical_transit_event_windows, and natal_topic_foundation. This asks for probable past periods, not a future forecast or a known factual date.
+- When the assistant has asked which probable past period matches and the user supplies the actual event date, treat the reply as user confirmation, not a new prediction. Preserve the ISO date in `dialogue_state.known_facts.confirmed_event_date`, set `dialogue_state.known_facts.event_date_source="user_confirmed"`, and retain the active event/category. Never describe that confirmed date as a date recovered from astrology.
 - For "When will my Mercury dasha start and how will my career be?", return CLARIFY/compound_plan and ask which one they want answered first. Do not emit evidence needs yet.
 - Always include safety.blocked_content_checks for death_prediction and fetal_sex_determination.
 - For every bounded rolling horizon, timeframe MUST include numeric `duration_months` (for example next six months -> {{"kind":"bounded_future","duration_months":6}}). Use `duration_years` only in addition, never instead.
+- Past event discovery must use timeframe.kind `open_past` (or `past` for a bounded known past range), never `open_future` or `bounded_future`.
 
 Calibration:
 - "How is my relationship with my wife?" -> READY, ANALYZE_TOPIC_POTENTIAL, category relationship or marriage, answer_mode topic_reading, target_subject_key wife, needs_transits false.
@@ -1726,7 +1806,13 @@ Calibration:
 - Natal-promise questions stay natal-promise questions even when the user names the chart that should support them: "Is marriage possible in my birth chart/kundali?" or "Does my D9 promise marriage?" -> potential_capacity, category marriage, D9 in divisional_charts as evidence, and chart_focus null. The requested outcome is marriage promise, not a description of D9 itself.
 - Always identify what the user is actually asking you to judge in requested_object. Use life_outcome when the requested object is marriage, career, children, health, wealth or another lived outcome—even if the user says "in my chart/kundali/D9". Use named_chart only when the chart itself is the requested object (for example, "explain my D9"). factual_chart_lookup is only valid together with requested_object=named_chart.
 - "How will my health be this year?" -> READY, PREDICT_PERIOD_OUTLOOK, category health, answer_mode timing_window, target_subject_key self, context_type annual, needs_transits true, timeframe this year.
+- Set `response_language` to the language actually used by the latest user message. The app language, chart data, prior assistant language, and internal English instructions must not override the latest user message. For English input return `english`; for Hindi input return `hindi`; for Romanized Hindi return `hinglish`; use a concise lowercase language name for other languages.
 - "How will my career be in the second half of 2028?" -> READY, PREDICT_PERIOD_OUTLOOK, category career, answer_mode timing_window, target_subject_key self, needs_transits true, timeframe second half of 2028.
+- For every career/work question, set career_subtype semantically from the user's meaning in any language. Use general only when no narrower subtype applies. Examples: finding work=employment, receiving a specific appointment/offer=offer, reporting to a selected role or joining date=joining, raise/pay=salary, changing role=job_change, quitting=resignation, losing job=job_security, clients/enterprise=business, starting a new enterprise=business_launch, whether an existing enterprise will succeed=business_success, major initiative=project, management role=leadership, public-sector selection=government, overseas work=foreign_career, returning after a break=return_to_work, conflict at work=workplace_conflict, no progress=career_stagnation, hard work not being seen/rewarded or lack of visibility/appraisal=recognition, suitable profession=career_fit, job versus business=job_vs_business. Workplace relationships must use the person-role: manager/boss/supervisor=manager_relationship, colleague/coworker/peer=colleague_relationship, subordinate/direct report/team member=subordinate_relationship, client/customer=client_relationship, business partner=business_partner_relationship, mentor/professional guide=mentor_relationship. Classify these meanings semantically in every supported language; do not implement question-text keyword matching in application code.
+- For every marriage/relationship question, set marriage_subtype semantically in every language: general, love_vs_arranged, remarriage, engagement_vs_wedding, spouse_meeting, spouse_details, or affair. Love-versus-arranged uses comparison_choice. Remarriage uses potential_capacity for promise and event_prediction for timing; clarify the prior marriage/legal status when unknown and store it in extracted_context.prior_marriage_context. Engagement and wedding remain separate milestones. Where/how a spouse may be met uses topic_reading. Spouse profession/location/appearance uses relationship_person. Affair concerns use problem_diagnosis and require relationship context; never assert cheating. Marriage Muhurat uses dedicated_muhurat_flow with muhurat_event_type=marriage. Actual compatibility uses dedicated_partnership_flow and requires two resolved charts.
+- "Did I have a love or arranged marriage?" and the same meaning in any language -> READY, category marriage, marriage_subtype love_vs_arranged, answer_mode comparison_choice, route_action answer. This asks which natal pathway better matches an already-past marriage; it is not retrospective marriage-date discovery and must not request historical dasha or transit windows.
+- "Should I leave my current job?" (and the same meaning in any language) -> READY, category career, career_subtype resignation, answer_mode topic_reading, needs_transits true. This is a current employment decision, not career_fit and not a static description of suitable professions. The answer must compare staying (H6+H10), changing direction (H3+H10), separation (H10+H12), and evidence that another role can land (H2+H6+H10+H11) through D1, D10, current dasha and transit support.
+- "Is my job secure?" -> READY, category career, career_subtype job_security, answer_mode topic_reading, needs_transits true. Do not substitute vocation, Amatyakaraka or Karakamsha analysis for the current decision evidence.
 - "Where should I move for my career?" -> CLARIFY, RECOMMEND_LOCATION, category career, answer_mode location_recommendation, location_scope null; clarification_question in the user's language asking India vs abroad vs both.
 - "Where should I move in India for career?" -> READY, RECOMMEND_LOCATION, location_scope india.
 - "Which city abroad is best for wealth?" -> READY, RECOMMEND_LOCATION, category wealth, location_scope abroad.
@@ -1741,6 +1827,7 @@ Calibration:
 
 Return exactly this JSON shape:
 {{
+  "medical_triage": {{"urgency":"none or urgent or emergency","reason":"brief semantic reason","user_message":"localized urgent-care message, empty when none"}},
   "turn_relation": "new_request" or "clarification_answer" or "follow_up",
   "explicit_remedy_request": true only for an unambiguous direct request for astrological remedies, otherwise false,
   "status": "CLARIFY" or "READY",
@@ -1761,6 +1848,9 @@ Return exactly this JSON shape:
   "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
   "requested_object": "named_chart" or "life_outcome" or "period" or "person" or "mechanism" or "other",
   "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "location_recommendation" or "factual_chart_lookup" or "dedicated_muhurat_flow" or "dedicated_partnership_flow" or "compound_plan" or "problem_diagnosis" or "remedy_action" or "topic_reading",
+  "response_language": "lowercase language of the latest user message, for example english, hindi, hinglish, tamil, bengali, telugu, marathi or gujarati",
+  "career_subtype": "general" or "employment" or "offer" or "joining" or "promotion" or "job_change" or "resignation" or "job_security" or "business" or "business_launch" or "business_success" or "salary" or "project" or "leadership" or "government" or "foreign_career" or "return_to_work" or "workplace_conflict" or "career_stagnation" or "recognition" or "career_fit" or "job_vs_business" or "manager_relationship" or "colleague_relationship" or "subordinate_relationship" or "client_relationship" or "business_partner_relationship" or "mentor_relationship" or null,
+  "marriage_subtype": "general" or "love_vs_arranged" or "remarriage" or "engagement_vs_wedding" or "spouse_meeting" or "spouse_details" or "affair" or null,
   "target_subject_key": "one allowed target subject",
   "needs_year_clarification": false,
   "daily_intent_confirmed": true or false,
@@ -1769,6 +1859,7 @@ Return exactly this JSON shape:
     "specific_date_basis":"not_date_bound",
     "requested_chart":"D1/D2/.../D60/Karkamsa/Swamsa or null",
     "requested_fact":"LLM-normalized fact requested or null",
+    "prior_marriage_context":"LLM-normalized prior marriage/legal status or null",
     "location_scope":"india or abroad or both or null",
     "location_goal":"career/wealth/relationship/education/health/general or null",
     "hub_regions":["known normalized region ids only"],
@@ -1888,6 +1979,7 @@ You are the lightweight intent router for an astrology chat. Keep this fast and 
 
 Your job:
 - classify the user's current question
+- detect active potentially urgent medical symptoms before any astrology. For active chest pain/pressure, serious breathing difficulty, stroke signs, fainting, severe bleeding, or another possible emergency, set medical_triage urgency to urgent/emergency and write a concise same-language message directing immediate medical care; astrology must not assess the symptom. General health-risk questions are not emergencies.
 - decide if clarification is needed
 - identify if it is a daily / exact-date / timing / personality / topic-potential / remedy style question
 - classify the universal answer mode needed by the response generator
@@ -1900,6 +1992,7 @@ Do NOT ask for birth details.
 Do NOT add formatting, bullets, or extra prose outside JSON.
 
 Language rule:
+- Always set `response_language` from the language actually used by the current user question. Do not copy the app language, chart language, previous assistant language, or internal prompt language when the current question is in another language. English question -> `english`; Hindi-script question -> `hindi`; Romanized Hindi -> `hinglish`.
 - If you return `clarification_question`, write it in the same language/script style as the current user question.
 - If unclear, fall back to app language "{app_language}".
 
@@ -1933,6 +2026,8 @@ Rules:
 - Use `RECOMMEND_LOCATION` ONLY when the user wants where to relocate/live/settle, or which city/place/country/direction is favorable. Not for "when will I move". Not for marriage timing, love/compatibility, or "whom will he marry". Birth "Place:" fields are NOT a relocate ask.
 - For `RECOMMEND_LOCATION`: if the user has NOT clearly said India-only / abroad-overseas / both, return CLARIFY. Your clarification_question MUST ask that geography preference in the SAME language/script as the current question (LLM-authored; never English-by-default). Set extracted_context.location_scope to "india"|"abroad"|"both" when known, else null.
 - Use `RECOMMEND_REMEDY_FOR_PROBLEM` when query_context marks a Remedies CTA follow-up OR the latest message is an unambiguous direct request for astrological remedies/upayas/corrective actions for one clear problem or life area. Set `explicit_remedy_request=true` for the latter. Infer this semantically in every language/script. A vague "what should I do?" is not enough by itself.
+- For every marriage/relationship question, set marriage_subtype semantically in every language: general, love_vs_arranged, remarriage, engagement_vs_wedding, spouse_meeting, spouse_details, or affair. Love-versus-arranged uses comparison_choice. Remarriage uses potential_capacity for promise and event_prediction for timing; clarify the prior marriage/legal status when unknown and store it in extracted_context.prior_marriage_context. Keep engagement and wedding as separate milestones. Spouse-meeting questions use topic_reading; profession/location/appearance questions use relationship_person. Affair concerns use problem_diagnosis and require relationship context; never assert cheating. Marriage Muhurat uses dedicated_muhurat_flow with muhurat_event_type=marriage. Compatibility uses dedicated_partnership_flow and requires two resolved charts.
+- "Did I have a love or arranged marriage?" and the same meaning in any language -> READY, category marriage, marriage_subtype love_vs_arranged, answer_mode comparison_choice, route_action answer. It is a static natal-pathway comparison about a past marriage, not retrospective date discovery; do not request historical dasha or transit evidence.
 - IMPORTANT: clarification is ALLOWED in instant mode. Do NOT default to READY when the ask is genuinely unclear.
 - All natural-language understanding belongs to you. Resolve ambiguous people, pronouns, relationships, event meanings, and corrections from the current message, recent conversation, and persisted dialogue state. Never guess an unresolved person or relationship.
 - First classify `turn_relation` semantically in every language/script. Use `clarification_answer` only when LATEST USER MESSAGE actually answers the open clarification (a one-word answer can qualify). Use `follow_up` when it continues or challenges the immediately previous answer. Use `new_request` when it is a self-contained request with a different subject, goal, life area, or requested action.
@@ -2011,6 +2106,7 @@ EVIDENCE PLAN:
 - Always include blocked content checks for `death_prediction` and `fetal_sex_determination`.
 - For direct dasha/date questions, add evidence need kind `dasha_timeline_lookup` with params like {{"planet":"Mercury","level":"mahadasha","operation":"find_start_end"}}.
 - For event timing like marriage, add `natal_topic_foundation`, `future_dasha_event_windows`, and `transit_event_windows` with `event_profile":"marriage"`.
+- For retrospective event discovery like "When was I married?", add `natal_topic_foundation`, `historical_dasha_event_windows`, and `historical_transit_event_windows` with `event_profile":"marriage"`; set timeframe.kind to `open_past`.
 - For every bounded rolling horizon, timeframe MUST include numeric `duration_months` (for example next six months -> {{"kind":"bounded_future","duration_months":6}}). Use `duration_years` only in addition, never instead.
 
 TARGET SUBJECT:
@@ -2024,6 +2120,7 @@ CATEGORY for "when will I…" life-event questions (CRITICAL):
 
 Return ONLY this JSON shape:
 {{
+  "medical_triage": {{"urgency":"none or urgent or emergency","reason":"brief semantic reason","user_message":"same-language urgent-care message, empty when none"}},
   "turn_relation": "new_request" or "clarification_answer" or "follow_up",
   "explicit_remedy_request": true only for an unambiguous direct request for astrological remedies, otherwise false,
   "status": "CLARIFY" or "READY",
@@ -2043,6 +2140,8 @@ Return ONLY this JSON shape:
   "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_LOCATION" or "RECOMMEND_REMEDY_FOR_PROBLEM",
   "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
   "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "location_recommendation" or "factual_chart_lookup" or "dedicated_muhurat_flow" or "dedicated_partnership_flow" or "compound_plan" or "problem_diagnosis" or "remedy_action" or "topic_reading",
+  "response_language": "lowercase language of the latest user message, for example english, hindi, hinglish, tamil, bengali, telugu, marathi or gujarati",
+  "marriage_subtype": "general" or "love_vs_arranged" or "remarriage" or "engagement_vs_wedding" or "spouse_meeting" or "spouse_details" or "affair" or null,
   "target_subject_key": "self" or "spouse" or "wife" or "husband" or "partner" or "child" or "first_child" or "second_child" or "third_child" or "mother" or "father" or "sibling" or "brother" or "sister" or "younger_brother" or "younger_sister" or "younger_sibling" or "elder_brother" or "elder_sister" or "elder_sibling" or "maternal_uncle" or "uncle",
   "needs_year_clarification": false,
   "daily_intent_confirmed": true or false,
@@ -2052,6 +2151,7 @@ Return ONLY this JSON shape:
     "specific_date_basis":"explicit_user_day or relative_user_day or not_date_bound",
     "requested_chart":"D1/D2/.../D60/Karkamsa/Swamsa or null",
     "requested_fact":"LLM-normalized fact requested or null",
+    "prior_marriage_context":"LLM-normalized prior marriage/legal status or null",
     "location_scope":"india or abroad or both or null",
     "location_goal":"career/wealth/relationship/education/health/general or null",
     "hub_regions":["known normalized region ids only"],
@@ -2095,9 +2195,11 @@ Return ONLY this JSON shape:
                 compound_choice_followup_text=compound_choice_followup_text,
             )
 
+        provider = get_instant_chat_llm_provider()
         model_name = self._get_instant_model_name()
         logger.info(
-            "SPEECH_PERF instant_intent_router_request model=%s prompt_chars=%s compact_prompt=%s",
+            "SPEECH_PERF instant_intent_router_request provider=%s model=%s prompt_chars=%s compact_prompt=%s",
+            provider,
             model_name,
             len(prompt),
             compact_prompt_enabled,
@@ -2120,8 +2222,9 @@ Return ONLY this JSON shape:
                     wall_timeout = first_wall_timeout if attempt == 0 else retry_wall_timeout
                     attempt_started = time.time()
                     logger.info(
-                        "SPEECH_PERF instant_intent_router_attempt attempt=%s model=%s request_timeout_s=%.1f wall_timeout_s=%.1f",
+                        "SPEECH_PERF instant_intent_router_attempt attempt=%s provider=%s model=%s request_timeout_s=%.1f wall_timeout_s=%.1f",
                         attempt + 1,
+                        provider,
                         model_name,
                         per_request_timeout,
                         wall_timeout,
@@ -2553,7 +2656,11 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
         CATEGORY → REQUIRED divisional_charts (copy exactly):
         - marriage, partner, spouse → ["D1", "D9", "D7"]
         - love, relationship → ["D1", "D7", "D9"]
-        - career, job, promotion, business, wealth, money, finance → ["D1", "D9", "D10", "Karkamsa"]
+        - career, job, promotion, employment, job_change, resignation, job_security, business, project, leadership, government, foreign_career, return_to_work, workplace_conflict, career_stagnation → ["D1", "D10"]
+        - career_fit → ["D1", "D10", "Karkamsa"]
+        - job_vs_business → ["D1", "D10"]
+        - salary, income, compensation → ["D1", "D10"]
+        - wealth, money, finance → ["D1", "D9", "D10"]
         - soul, spirituality → ["D1", "D9", "D20", "Swamsa"]
         - purpose, dharma → ["D1", "D9", "Karkamsa", "Swamsa"]
         - health → ["D1", "D9", "D30"]

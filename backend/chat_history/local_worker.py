@@ -80,7 +80,14 @@ def run_forever() -> None:
     poll_s = _poll_interval_seconds()
     logger.info("Starting local chat worker poll_interval=%ss", poll_s)
     while True:
-        task = claim_next_local_chat_task()
+        try:
+            task = claim_next_local_chat_task()
+        except Exception as exc:
+            # A short database outage must not permanently kill the daemon
+            # thread.  The API can recover while this worker retries polling.
+            logger.warning("Local chat worker poll failed; retrying in %ss: %s", poll_s, exc)
+            time.sleep(poll_s)
+            continue
         if not task:
             time.sleep(poll_s)
             continue

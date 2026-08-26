@@ -11,6 +11,29 @@ const humanize = (value) => String(value || '')
 
 const unique = (items) => [...new Set(items.filter(Boolean))];
 
+// Evidence is persisted with chat history and can therefore contain older
+// scalar/object shapes as well as the current arrays. Rendering an explanation
+// must never be allowed to crash (and remount) the whole chat screen.
+const asArray = (value) => {
+    if (Array.isArray(value)) return value;
+    if (value === undefined || value === null || value === '') return [];
+    return [value];
+};
+
+const textList = (value) => asArray(value)
+    .map((item) => String(item ?? '').trim())
+    .filter(Boolean);
+
+const houseNumberList = (value) => unique(asArray(value)
+    .flatMap((item) => {
+        if (item && typeof item === 'object') {
+            return [item.house ?? item.house_number ?? item.number ?? item.h];
+        }
+        return [item];
+    })
+    .map((item) => Number(item))
+    .filter((item) => Number.isInteger(item) && item >= 1 && item <= 12));
+
 const formatDate = (iso) => {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').slice(0, 10));
     if (!match) return String(iso || '') || null;
@@ -21,6 +44,70 @@ const formatRange = (start, end) => {
     const from = formatDate(start);
     const to = formatDate(end);
     return from && to ? `${from} – ${to}` : from || to || null;
+};
+
+const dashaLevelLabel = (level) => ({
+    MD: 'Mahadasha', AD: 'Antardasha', PD: 'Pratyantardasha',
+    SD: 'Sookshma dasha', PRANA: 'Prana dasha',
+}[String(level || '').toUpperCase()] || humanize(level));
+
+const ordinal = (value) => {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return String(value || '');
+    const remainder100 = number % 100;
+    if (remainder100 >= 11 && remainder100 <= 13) return `${number}th`;
+    return `${number}${({ 1: 'st', 2: 'nd', 3: 'rd' }[number % 10] || 'th')}`;
+};
+
+const activationMechanism = (mechanism) => ({
+    lordship: 'lordship',
+    natal_occupation: 'natal occupation',
+    natal_aspect: 'natal aspect',
+}[mechanism] || humanize(mechanism));
+
+const decisionActivationItems = (window) => {
+    const items = [];
+    asArray(window.dasha_carriers).filter((row) => row && typeof row === 'object').forEach((carrier) => {
+        const levels = textList(carrier.dasha_levels).map(dashaLevelLabel);
+        const links = asArray(carrier.event_links).filter((row) => row && typeof row === 'object');
+        const details = links.map((link) => {
+            const mechanisms = textList(link.mechanisms).map(activationMechanism);
+            return `${houseText(link)}${mechanisms.length ? ` through ${mechanisms.join(' and ')}` : ''}`;
+        });
+        if (!details.length) {
+            houseNumberList(carrier.natal_event_houses).forEach((house) => details.push(`House ${house} through a calculated natal link`));
+        }
+        items.push({
+            title: `${carrier.planet || 'Dasha planet'}${levels.length ? ` · ${levels.join(' and ')}` : ''}`,
+            text: unique([
+                carrier.natal_placement_house ? `Natal ${carrier.planet || 'planet'} is placed in House ${carrier.natal_placement_house}.` : null,
+                details.length ? `It activates ${details.join('; ')}.` : null,
+            ]).join(' '),
+        });
+    });
+    asArray(window.transit_confirmations).filter((row) => row && typeof row === 'object').forEach((transit) => {
+        const delivered = asArray(transit.delivered_event_houses)
+            .filter((row) => row && typeof row === 'object')
+            .map((row) => {
+                if (row.mechanism === 'transit_occupation') return `occupies ${houseText(row)}`;
+                const aspect = row.aspect_number ? ` by its ${ordinal(row.aspect_number)} aspect` : '';
+                return `aspects ${houseText(row)}${aspect}`;
+            });
+        const reaspectsNatal = textList(transit.trigger_kinds).includes('own_natal_aspect');
+        const reaspect = reaspectsNatal && transit.natal_placement_house
+            ? `${transit.planet} re-aspects its natal position in House ${transit.natal_placement_house}${transit.natal_reaspect_number ? ` by its ${ordinal(transit.natal_reaspect_number)} aspect` : ''}.`
+            : null;
+        items.push({
+            title: `Transit confirmation · ${transit.planet || 'planet'}${formatRange(transit.start, transit.end) ? ` · ${formatRange(transit.start, transit.end)}` : ''}`,
+            text: unique([
+                transit.transit_native_house ? `Transit ${transit.planet} is in House ${transit.transit_native_house}.` : null,
+                delivered.length ? `It ${delivered.join(' and ')}.` : null,
+                reaspect,
+                ...textList(transit.reasons).filter((reason) => !/re-aspects its natal position/i.test(reason)),
+            ]).join(' '),
+        });
+    });
+    return items.filter((item) => item.text);
 };
 
 const houseText = (row) => {
@@ -196,6 +283,347 @@ const conclusion = (data) => {
     return lines.length ? { key: 'conclusion', step: 5, title: 'What this means for you', lines: unique(lines) } : null;
 };
 
+const graphRoutes = (data) => {
+    const routes = [];
+    const add = (route, sourceKey = '') => {
+        if (!route || typeof route !== 'object' || Array.isArray(route)) return;
+        const identity = route.runtime_key || route.route_id || route.question_type || sourceKey;
+        if (routes.some((item) => (item.runtime_key || item.route_id || item.question_type || item.__sourceKey) === identity)) return;
+        routes.push({ ...route, __sourceKey: sourceKey });
+    };
+    asArray(data.knowledge_graph_routes || data.graph_routes).forEach((route) => add(route, 'graph_routes'));
+    Object.entries(data).forEach(([key, value]) => {
+        if (key.endsWith('_graph_route')) add(value, key);
+    });
+    return routes;
+};
+
+const exactGraphEvidenceGroups = (graphRoute, routeIndex) => {
+    const root = graphRoute.graph_tree;
+    if (!root || typeof root !== 'object' || Array.isArray(root)) return [];
+    const questionNode = asArray(root.children).find((node) => node && typeof node === 'object');
+    if (!questionNode) return [];
+    const nodeLabel = (node) => String(node?.label || node?.id || '').trim();
+    const groups = [{
+        key: `knowledge-graph-question-${routeIndex}`,
+        title: `${nodeLabel(root) || 'Question type'}: ${nodeLabel(questionNode)}`,
+        items: [{
+            title: nodeLabel(questionNode),
+            text: `Graph node · ${questionNode.id || 'unknown'}`,
+        }],
+    }];
+
+    asArray(questionNode.children).forEach((relation, relationIndex) => {
+        if (!relation || typeof relation !== 'object') return;
+        const targets = asArray(relation.children).filter((node) => node && typeof node === 'object');
+        if (!targets.length) return;
+        groups.push({
+            key: `knowledge-graph-relation-${routeIndex}-${relationIndex}`,
+            title: nodeLabel(relation),
+            items: targets.map((target) => ({
+                title: nodeLabel(target),
+                text: `Graph node · ${target.id || 'unknown'}`,
+            })),
+        });
+        targets.forEach((target, targetIndex) => {
+            asArray(target.children).forEach((nestedRelation, nestedIndex) => {
+                if (!nestedRelation || typeof nestedRelation !== 'object') return;
+                const nestedTargets = asArray(nestedRelation.children)
+                    .filter((node) => node && typeof node === 'object');
+                if (!nestedTargets.length) return;
+                groups.push({
+                    key: `knowledge-graph-child-${routeIndex}-${relationIndex}-${targetIndex}-${nestedIndex}`,
+                    title: `${nodeLabel(relation)} → ${nodeLabel(target)} → ${nodeLabel(nestedRelation)}`,
+                    items: nestedTargets.map((node) => ({
+                        title: nodeLabel(node),
+                        text: `Graph node · ${node.id || 'unknown'}`,
+                    })),
+                });
+            });
+        });
+    });
+    return groups;
+};
+
+const graphEvidence = (data) => graphRoutes(data).map((graphRoute, routeIndex) => {
+    const requiredNodes = asArray(graphRoute.required_nodes).filter((node) => node && typeof node === 'object');
+    const additionalNodes = asArray(graphRoute.additional_selected_nodes).filter((node) => node && typeof node === 'object');
+    const rules = asArray(graphRoute.decision_rules).filter((node) => node && typeof node === 'object');
+    const guardrails = asArray(graphRoute.guardrails).filter((node) => node && typeof node === 'object');
+    const capabilities = asArray(graphRoute.required_capabilities).filter((node) => node && typeof node === 'object');
+    const domain = humanize(graphRoute.domain || graphRoute.category || graphRoute.__sourceKey.replace(/_graph_route$/, '') || 'Astrology');
+    const exactGraphGroups = exactGraphEvidenceGroups(graphRoute, routeIndex);
+    return {
+        key: `knowledge-graph-route-${routeIndex}`,
+        title: `${domain} knowledge graph audit`,
+        groups: [
+            ...exactGraphGroups,
+            {
+                key: `knowledge-graph-summary-${routeIndex}`,
+                title: `${graphRoute.question_type || `${domain} question`} · ${graphRoute.status === 'matched' ? 'Matched live calculation' : 'Needs review'}`,
+                items: [{
+                    title: 'Question and answer route',
+                    text: `The graph expected ${graphRoute.expected_approach || 'an unspecified approach'}; the live pipeline selected ${graphRoute.selected_approach || 'an unspecified approach'}. ${graphRoute.mode_match ? 'The answer route matched.' : 'The answer route did not match.'}`,
+                }, {
+                    title: 'Graph policy',
+                    text: `Answer contract: ${graphRoute.answer_contract || 'not declared'}. Evidence policy: ${graphRoute.evidence_policy || 'not declared'}.${graphRoute.shadow_only ? ' This is a shadow audit and did not influence the answer.' : ''}`,
+                }, {
+                    title: 'Audit identity',
+                    text: `Ontology ${graphRoute.ontology_version || 'unknown'} · route ${graphRoute.runtime_key || graphRoute.route_id || 'unknown'}.`,
+                }],
+            },
+            !exactGraphGroups.length && requiredNodes.length ? {
+                key: `knowledge-graph-required-${routeIndex}`, title: 'Required graph nodes',
+                items: requiredNodes.map((node) => ({
+                    title: `${node.selected ? '✓' : '—'} ${node.label || humanize(node.id)}`,
+                    text: node.selected ? 'Selected from the live calculation.' : 'Required by the graph but missing from the live calculation.',
+                })),
+            } : null,
+            !exactGraphGroups.length && additionalNodes.length ? {
+                key: `knowledge-graph-additional-${routeIndex}`, title: 'Additional nodes selected',
+                items: additionalNodes.map((node) => ({ title: `✓ ${node.label || humanize(node.id)}`, text: 'Available in the live calculation; not mandatory for this question route.' })),
+            } : null,
+            !exactGraphGroups.length && rules.length ? { key: `knowledge-graph-rules-${routeIndex}`, title: 'Decision rules selected', items: rules.map((node) => ({ title: node.label || humanize(node.id), text: 'Required by the selected graph route.' })) } : null,
+            !exactGraphGroups.length && capabilities.length ? { key: `knowledge-graph-capabilities-${routeIndex}`, title: 'Calculator capabilities required', items: capabilities.map((node) => ({ title: node.label || humanize(node.id), text: 'The ontology requires this calculator capability for the route.' })) } : null,
+            !exactGraphGroups.length && guardrails.length ? { key: `knowledge-graph-guardrails-${routeIndex}`, title: 'Guardrails selected', items: guardrails.map((node) => ({ title: node.label || humanize(node.id), text: 'Applied to prevent an unsupported conclusion.' })) } : null,
+        ].filter(Boolean),
+    };
+});
+
+const careerEvidence = (data) => {
+    const hasCareerReading = data.career_reading && typeof data.career_reading === 'object';
+    const career = hasCareerReading ? data.career_reading : {};
+    if (!hasCareerReading) return null;
+    const sections = [];
+    const relationship = career.relationship && typeof career.relationship === 'object'
+        ? career.relationship : {};
+    const relationshipRows = asArray(relationship.house_roles)
+        .filter((row) => row && typeof row === 'object');
+    const isRelationship = relationshipRows.length > 0;
+    if (isRelationship) sections.push({
+        key: 'career-relationship', title: 'Workplace relationship examined',
+        groups: [{
+            key: 'career-relationship-roles',
+            title: `${humanize(relationship.target || 'workplace relationship')} · Role-specific astrology`,
+            items: relationshipRows.map((row) => {
+                const natal = row.natal_foundation && typeof row.natal_foundation === 'object'
+                    ? row.natal_foundation : {};
+                const professional = row.professional_confirmation && typeof row.professional_confirmation === 'object'
+                    ? row.professional_confirmation : {};
+                return {
+                    title: `House ${row.house} · ${humanize(row.role || 'relationship factor')}`,
+                    text: unique([
+                        natal.lord ? `${natal.lord} rules this factor${natal.lord_placement_house ? ` from House ${natal.lord_placement_house}` : ''}.` : null,
+                        textList(natal.occupants).length ? `Occupants: ${textList(natal.occupants).join(', ')}.` : 'No occupants; its lord and aspects carry the result.',
+                        textList(natal.aspecting_planets || natal.aspects).length ? `Influenced by ${textList(natal.aspecting_planets || natal.aspects).join(', ')}.` : null,
+                        row.assessment ? `D1 assessment: ${humanize(row.assessment)}.` : null,
+                        professional.lord ? `D10 confirmation: ${professional.lord} rules this factor${professional.lord_placement_house ? ` from House ${professional.lord_placement_house}` : ''}.` : null,
+                    ]).join(' '),
+                };
+            }),
+        }],
+    });
+    const diagnosis = career.diagnosis && typeof career.diagnosis === 'object'
+        ? career.diagnosis : {};
+    const diagnosisChain = asArray(diagnosis.conversion_chain)
+        .filter((row) => row && typeof row === 'object');
+    if (diagnosisChain.length || diagnosis.conclusion) sections.push({
+        key: 'career-diagnosis', title: diagnosis.title || 'What is creating the career blockage',
+        groups: diagnosisChain.length ? [{
+            key: 'career-diagnosis-chain', title: 'How work converts into professional results',
+            items: [
+                ...diagnosisChain.map((row) => ({
+                    title: `House ${row.house} · ${humanize(row.role || 'career factor')}`,
+                    text: unique([
+                        `Natal foundation: ${humanize(row.natal_assessment || 'not established')}.`,
+                        row.currently_activated
+                            ? 'This link is active in the supplied present-period evidence.'
+                            : 'This link is not established as active in the supplied present-period evidence.',
+                    ]).join(' '),
+                })),
+                diagnosis.conclusion ? { title: 'Calculated conclusion', text: diagnosis.conclusion } : null,
+                diagnosis.practical_action ? { title: 'Practical implication', text: diagnosis.practical_action } : null,
+            ].filter(Boolean),
+        }] : undefined,
+        lines: diagnosisChain.length ? undefined : unique([diagnosis.conclusion, diagnosis.practical_action]),
+    });
+    const foundation = asArray(career.professional_foundation).filter((row) => row && typeof row === 'object');
+    if (foundation.length && !isRelationship) sections.push({
+        key: 'career-foundation', title: 'Career foundation · D1',
+        groups: [{
+            key: 'career-d1', title: 'Natal professional promise',
+            items: foundation.map((row) => ({
+                title: `House ${row.house}`,
+                text: unique([
+                    row.lord ? `${row.lord} rules this area${row.lord_placement_house ? ` from House ${row.lord_placement_house}` : ''}.` : null,
+                    textList(row.occupants).length ? `Occupants: ${textList(row.occupants).join(', ')}.` : 'No occupants; its lord and aspects carry the result.',
+                    textList(row.aspecting_planets || row.aspects).length ? `Influenced by ${textList(row.aspecting_planets || row.aspects).join(', ')}.` : null,
+                    row.tone ? `Assessment: ${humanize(row.tone)}.` : null,
+                ]).join(' '),
+            })),
+        }],
+    });
+    const expression = asArray(career.professional_expression).filter((row) => row && typeof row === 'object');
+    if (expression.length && !isRelationship) {
+        const byChart = expression.reduce((result, row) => {
+            const chart = row.chart || 'D10';
+            (result[chart] ||= []).push(row);
+            return result;
+        }, {});
+        sections.push({
+            key: 'career-expression', title: 'Professional signature',
+            groups: Object.entries(byChart).map(([chart, rows]) => ({
+                key: `career-${chart}`, title: `${chart} · How the career is expressed`,
+                items: rows.map((row) => ({
+                    title: `House ${row.house}`,
+                    text: unique([
+                        row.lord ? `${row.lord} rules it${row.lord_placement_house ? ` from House ${row.lord_placement_house}` : ''}.` : null,
+                        textList(row.occupants).length ? `Occupants: ${textList(row.occupants).join(', ')}.` : 'No occupants.',
+                        row.rating || row.tone ? `Assessment: ${humanize(row.rating || row.tone)}.` : null,
+                    ]).join(' '),
+                })),
+            })),
+        });
+    }
+    const synthesis = career.vocation_synthesis && typeof career.vocation_synthesis === 'object'
+        ? career.vocation_synthesis : {};
+    const tenthLord = synthesis.tenth_lord_signature && typeof synthesis.tenth_lord_signature === 'object'
+        ? synthesis.tenth_lord_signature : {};
+    const combinations = asArray(synthesis.combination_signatures).filter((row) => row && typeof row === 'object');
+    const signatureItems = [];
+    if (tenthLord.planet) signatureItems.push({
+        title: `10th lord · ${tenthLord.planet}`,
+        text: unique([
+            tenthLord.house ? `Placed in House ${tenthLord.house}.` : null,
+            textList(tenthLord.conjunct_planets).length
+                ? `Conjoined with ${textList(tenthLord.conjunct_planets).join(', ')}; these planets modify the vocation signature together.`
+                : 'No calculated conjunction cluster.',
+        ]).join(' '),
+    });
+    combinations.forEach((row) => signatureItems.push({
+        title: textList(row.planets).join(' + '),
+        text: unique([
+            textList(row.work_functions).length ? `Work functions: ${textList(row.work_functions).join('; ')}.` : null,
+            textList(row.fields).length ? `Supported directions: ${textList(row.fields).join('; ')}.` : null,
+        ]).join(' '),
+    }));
+    if (signatureItems.length && !isRelationship) sections.push({
+        key: 'career-tenth-lord-signature', title: '10th-lord vocation signature',
+        groups: [{ key: 'career-tenth-lord-combinations', title: 'How the profession is shaped', items: signatureItems }],
+    });
+    const vocation = career.vocation_indicators && typeof career.vocation_indicators === 'object'
+        ? career.vocation_indicators : {};
+    const amatya = vocation.amatyakaraka && typeof vocation.amatyakaraka === 'object'
+        ? vocation.amatyakaraka : {};
+    const karkamsa = vocation.karkamsa && typeof vocation.karkamsa === 'object'
+        ? vocation.karkamsa : {};
+    const karkamsaPlanets = karkamsa.planets && typeof karkamsa.planets === 'object'
+        ? Object.entries(karkamsa.planets).filter(([, row]) => row && typeof row === 'object') : [];
+    const vocationItems = [];
+    if (amatya.planet) vocationItems.push({
+        title: `Amatyakaraka · ${amatya.planet}`,
+        text: unique([
+            amatya.house ? `Placed in House ${amatya.house}.` : null,
+            amatya.sign ? `Sign: ${humanize(amatya.sign)}.` : null,
+            'This is the Jaimini indicator of vocation, responsibility and the way professional ability is applied.',
+        ]).join(' '),
+    });
+    if (vocation.karkamsa_ascendant || karkamsaPlanets.length) vocationItems.push({
+        title: 'Karakamsha · vocation confirmation',
+        text: unique([
+            vocation.karkamsa_ascendant ? `Karakamsha ascendant: ${humanize(vocation.karkamsa_ascendant)}.` : null,
+            ...karkamsaPlanets
+                .filter(([, row]) => [1, 6, 10].includes(Number(row.house)))
+                .slice(0, 4)
+                .map(([planet, row]) => `${planet} is in House ${row.house}${row.sign_name || row.sign ? ` (${humanize(row.sign_name || row.sign)})` : ''}.`),
+            'Used as a Jaimini confirmation after the D1 and D10 career foundation.',
+        ]).join(' '),
+    });
+    if (vocationItems.length && !isRelationship) sections.push({
+        key: 'career-jaimini', title: 'Jaimini vocation indicators',
+        groups: [{ key: 'career-jaimini-signature', title: 'Amatyakaraka and Karakamsha', items: vocationItems }],
+    });
+    const windows = asArray(career.delivery_windows).filter((window) => window && typeof window === 'object');
+    const decisionLabel = (verdict) => ({
+        planned_transition_supported: 'Planned transition supported',
+        prepare_do_not_resign: 'Prepare and apply; do not resign yet',
+        stay_for_now: 'Current role has continuity support',
+        instability_not_exit_permission: 'Pressure is present; leaving is not yet supported',
+        insufficient_decision_evidence: 'Not enough support for a stay-or-leave verdict',
+    }[verdict] || humanize(verdict || 'Decision not calculated'));
+    const decisionExplanation = (matrix = {}) => {
+        if (matrix.verdict === 'planned_transition_supported') {
+            return 'This window supports preparing the move, separating from the current role, and landing the next role or income. Secure the next position before resigning.';
+        }
+        if (matrix.verdict === 'prepare_do_not_resign') {
+            return 'Movement toward change is active, but the next role or income is not fully secured by this window. Prepare and apply; do not treat it as a safe resignation window.';
+        }
+        if (matrix.verdict === 'stay_for_now') {
+            return 'The current job has continuity support in this window. Use it to strengthen the role or prepare options rather than resigning immediately.';
+        }
+        if (matrix.verdict === 'instability_not_exit_permission') {
+            return 'The chart shows disruption or pressure, but pressure alone does not mean leaving will improve the outcome.';
+        }
+        return 'This window does not contain enough of the required factors to call it either a safe change window or a definite stay window.';
+    };
+    const gateItem = (title, value, supported, missing) => ({
+        title: `${value ? '✓' : '—'} ${title}`,
+        text: value ? supported : missing,
+    });
+    if (windows.length) sections.push({
+        key: 'career-delivery', title: windows.some((window) => window.decision_matrix)
+            ? 'How the stay-or-change calculation was made'
+            : 'How and when results can arrive',
+        groups: windows.slice(0, 5).map((window, index) => ({
+            key: `career-window-${index}`,
+            title: [formatRange(window.start, window.end), window.chain].filter(Boolean).join(' · '),
+            items: window.decision_matrix ? [
+                {
+                    title: `Verdict · ${decisionLabel(window.decision_matrix.verdict)}`,
+                    text: decisionExplanation(window.decision_matrix),
+                },
+                gateItem(
+                    'Can the current job continue?', window.decision_matrix.continuity_support,
+                    'Yes. Employment and professional-role support are active together (Houses 6 and 10).',
+                    'Not established. Employment and professional-role support are not both active (Houses 6 and 10).',
+                ),
+                gateItem(
+                    'Is movement toward a change active?', window.decision_matrix.change_momentum,
+                    'Yes. Initiative for change and professional movement are active together (Houses 3 and 10).',
+                    'Not established. Initiative for change and professional movement are not both active (Houses 3 and 10).',
+                ),
+                gateItem(
+                    'Is separation from the current role supported?', window.decision_matrix.separation_support,
+                    'Yes. Career and release/separation factors are active together (Houses 10 and 12).',
+                    'Not established. Career and release/separation factors are not both active (Houses 10 and 12).',
+                ),
+                gateItem(
+                    'Is the next role and income supported?', window.decision_matrix.landing_support,
+                    'Yes. Income, employment, role and gains are active together (Houses 2, 6, 10 and 11).',
+                    'Not established. The complete income, employment, role and gains combination is missing (Houses 2, 6, 10 and 11).',
+                ),
+                {
+                    title: 'Combined activation used for this verdict',
+                    text: `The decision test receives Houses ${houseNumberList(window.activated_focus_houses || window.decision_matrix.active_houses).join(', ') || 'not supplied'} after combining the dasha links and transit confirmation below.`,
+                },
+                ...decisionActivationItems(window),
+            ] : asArray(window.stages).filter((stage) => stage && typeof stage === 'object').map((stage) => ({
+                title: humanize(stage.stage || 'career activity'),
+                text: `${stage.label || humanize(stage.stage || 'Career activity')}${textList(stage.supporting_houses).length ? ` Supported by Houses ${textList(stage.supporting_houses).join(', ')}.` : ''}${stage.confidence ? ` Confidence: ${humanize(stage.confidence)}.` : ''}`,
+            })),
+        })),
+    });
+    sections.push({
+        key: 'career-meaning', title: 'How to read this career answer',
+        lines: unique([
+            career.interpretation_rule,
+            windows.length ? 'Activity, formalization, joining, compensation and stability are separate stages; an active period is not automatically a guaranteed offer or promotion.' : null,
+        ]),
+    });
+    return sections.filter((section) => section.lines?.length || section.groups?.length)
+        .map((section, index) => ({ ...section, step: index + 1 }));
+};
+
 const routerSourceLabel = (source) => {
     const value = String(source || '').toLowerCase();
     if (value === 'primary_intent_llm') return 'Primary interpretation';
@@ -223,6 +651,10 @@ export const buildReadableEvidence = (packet) => {
         key: 'legacy', step: null, title: 'Explanation unavailable',
         lines: ['This saved answer uses an older evidence format. Ask it again to see the readable astrology behind the answer.'],
     }];
+    const graphs = graphEvidence(data);
+    const numbered = (sections) => sections
+        .filter((section) => section && (section.lines?.length || section.groups?.length))
+        .map((section, index) => ({ ...section, step: index + 1 }));
     const medical = data.medical_reading;
     if (medical && typeof medical === 'object') {
         const sections = [];
@@ -249,9 +681,10 @@ export const buildReadableEvidence = (packet) => {
                 medical.safety,
             ]),
         });
-        return sections.filter((section) => section.lines?.length)
-            .map((section, index) => ({ ...section, step: index + 1 }));
+        return numbered([...graphs, ...sections]);
     }
+    const career = careerEvidence(data);
+    if (career) return numbered([...graphs, ...career]);
     const chartReading = data.chart_reading;
     if (chartReading && typeof chartReading === 'object') {
         const requested = chartReading.requested_charts || [];
@@ -273,10 +706,10 @@ export const buildReadableEvidence = (packet) => {
         });
         const why = Array.isArray(data.conclusion?.why) ? data.conclusion.why : [];
         if (why.length) sections.push({ key: 'chart-result', title: 'Calculation record', lines: unique(why) });
-        return sections.filter((section) => section.lines?.length)
-            .map((section, index) => ({ ...section, step: index + 1 }));
+        return numbered([...graphs, ...sections]);
     }
-    return [framework(data), promise(data), dasha(data), transits(data), conclusion(data)]
-        .filter((section) => section && (section.lines?.length || section.groups?.length))
-        .map((section, index) => ({ ...section, step: index + 1 }));
+    return numbered([
+        ...graphs,
+        framework(data), promise(data), dasha(data), transits(data), conclusion(data),
+    ]);
 };

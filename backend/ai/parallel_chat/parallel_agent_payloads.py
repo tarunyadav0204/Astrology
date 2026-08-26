@@ -9,11 +9,11 @@ from __future__ import annotations
 import copy
 import logging
 from typing import Any, Dict, List, Optional
-from calculators.vedic_graha_drishti import GRAHA_HOUSE_ASPECTS
 from ai.parallel_chat.dispositor_evidence import (
     build_dispositor_evidence,
     compact_planets_from_core,
 )
+from instant_aspect_policy import instant_activation_aspects
 
 # Parallel Parashari: div_intent must not repeat D1/D9 already sent as core_d1 + div_d9.
 _PARASHARI_DIV_INTENT_OMIT = frozenset({"D1", "D9"})
@@ -595,7 +595,7 @@ def _aspect_targets_from_house(house: Any, planet: str) -> List[int]:
     except (TypeError, ValueError):
         return []
     out = []
-    for n in GRAHA_HOUSE_ASPECTS.get(planet, [1, 7]):
+    for n in instant_activation_aspects(planet):
         out.append(((h + n - 2) % 12) + 1)
     return sorted(set(out))
 
@@ -833,6 +833,19 @@ def _transit_summary(target_houses: List[int], levels: Dict[str, Dict[str, Any]]
     acts = transit_win.get("A") or []
     if not isinstance(acts, list):
         acts = []
+    filtered_acts: List[Dict[str, Any]] = []
+    for act in acts:
+        if not isinstance(act, dict):
+            continue
+        transit_planet = str(act.get("tp") or "")
+        try:
+            aspect_number = int(act.get("an"))
+        except (TypeError, ValueError):
+            aspect_number = None
+        if transit_planet in {"Rahu", "Ketu"} and aspect_number in {5, 9}:
+            continue
+        filtered_acts.append(act)
+    acts = filtered_acts
     active_planets = {str(v.get("p")) for v in levels.values() if isinstance(v, dict) and v.get("p")}
     target_set = {int(h) for h in target_houses}
     th: Dict[str, int] = {}
@@ -855,7 +868,11 @@ def _transit_summary(target_houses: List[int], levels: Dict[str, Dict[str, Any]]
         except (TypeError, ValueError):
             pass
         if act.get("tp") in active_planets or act.get("np") in active_planets:
-            dp.append({k: act.get(k) for k in ("tp", "np", "sd", "ed", "th", "nh", "at", "pk") if act.get(k) is not None})
+            dp.append({
+                k: act.get(k)
+                for k in ("tp", "np", "an", "sd", "ed", "th", "nh", "at", "pk")
+                if act.get(k) is not None
+            })
 
     out: Dict[str, Any] = {"n": len(acts), "th": th, "nh": nh}
     if dp:

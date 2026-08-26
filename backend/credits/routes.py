@@ -26,6 +26,7 @@ from .instant_billing import (
     start_session as start_instant_billing_session,
 )
 from utils.admin_settings import get_chart_guide_video_url, get_nakshatra_guide_videos
+from utils.llm_pricing import deepseek_rate_usd_per_million, mixed_stage_cost_usd
 
 router = APIRouter()
 credit_service = CreditService()
@@ -4244,7 +4245,9 @@ async def get_credits_intelligence_segment(
         raise HTTPException(status_code=400, detail=str(exc))
 
 
-def _question_cost_rate_for_model(model_name: Optional[str], input_tokens_est: int) -> Dict[str, Any]:
+def _question_cost_rate_for_model(
+    model_name: Optional[str], input_tokens_est: int, *, priced_at: Any = None
+) -> Dict[str, Any]:
     m = (model_name or "").strip()
     if not m or m.lower() == "unknown":
         # Prefer configured chat model when historical row lacks model id.
@@ -4254,6 +4257,9 @@ def _question_cost_rate_for_model(model_name: Optional[str], input_tokens_est: i
         except Exception:
             m = "models/gemini-2.5-flash"
     tier = "gt_200k" if int(input_tokens_est or 0) > 200_000 else "le_200k"
+    deepseek_rate = deepseek_rate_usd_per_million(m, priced_at=priced_at)
+    if deepseek_rate is not None:
+        return deepseek_rate
     rates = {
         "models/gemini-3.1-flash-lite": {"in_le": 0.25, "in_gt": 0.25, "cached_in_le": 0.025, "cached_in_gt": 0.025, "out_le": 1.50, "out_gt": 1.50},
         "models/gemini-3.1-pro-preview": {"in_le": 2.00, "in_gt": 4.00, "cached_in_le": 0.20, "cached_in_gt": 0.40, "out_le": 12.00, "out_gt": 18.00},
@@ -4268,11 +4274,12 @@ def _question_cost_rate_for_model(model_name: Optional[str], input_tokens_est: i
         "models/gemini-2.5-flash-lite": {"in_le": 0.10, "in_gt": 0.10, "cached_in_le": 0.01, "cached_in_gt": 0.01, "out_le": 0.40, "out_gt": 0.40},
         "models/gemini-2.0-flash-001": {"in_le": 0.10, "in_gt": 0.10, "cached_in_le": 0.01, "cached_in_gt": 0.01, "out_le": 0.40, "out_gt": 0.40},
         "models/gemini-2.0-flash-lite-001": {"in_le": 0.075, "in_gt": 0.075, "cached_in_le": 0.0075, "cached_in_gt": 0.0075, "out_le": 0.30, "out_gt": 0.30},
-        # DeepSeek (published cache-miss input + output per 1M; V4 uses same estimate until pricing differs)
-        "deepseek-chat": {"in_le": 0.28, "in_gt": 0.28, "out_le": 0.42, "out_gt": 0.42},
-        "deepseek-reasoner": {"in_le": 0.28, "in_gt": 0.28, "out_le": 0.42, "out_gt": 0.42},
-        "deepseek-v4": {"in_le": 0.28, "in_gt": 0.28, "out_le": 0.42, "out_gt": 0.42},
-        "deepseek-v4-reasoner": {"in_le": 0.28, "in_gt": 0.28, "out_le": 0.42, "out_gt": 0.42},
+        # DeepSeek off-peak fallback values. The shared resolver above applies
+        # the request timestamp and doubles these during V4 peak windows.
+        "deepseek-chat": {"in_le": 0.22, "in_gt": 0.22, "cached_in_le": 0.007, "cached_in_gt": 0.007, "out_le": 0.66, "out_gt": 0.66},
+        "deepseek-reasoner": {"in_le": 0.22, "in_gt": 0.22, "cached_in_le": 0.007, "cached_in_gt": 0.007, "out_le": 0.66, "out_gt": 0.66},
+        "deepseek-v4-flash": {"in_le": 0.22, "in_gt": 0.22, "cached_in_le": 0.007, "cached_in_gt": 0.007, "out_le": 0.66, "out_gt": 0.66},
+        "deepseek-v4-pro": {"in_le": 0.66, "in_gt": 0.66, "cached_in_le": 0.022, "cached_in_gt": 0.022, "out_le": 1.98, "out_gt": 1.98},
     }
     row = rates.get(m)
     if not row:
@@ -4433,7 +4440,8 @@ async def get_question_cost_summary(
                    {output_tok_expr} AS llm_output_tokens,
                    {cached_input_tok_expr} AS llm_cached_input_tokens,
                    {non_cached_input_tok_expr} AS llm_non_cached_input_tokens,
-                   {parallel_usage_expr} AS parallel_llm_usage
+                   {parallel_usage_expr} AS parallel_llm_usage,
+                   cm.completed_at
             FROM chat_messages cm
             JOIN chat_sessions cs ON cs.session_id = cm.session_id
             WHERE cm.sender = 'assistant'
@@ -4469,13 +4477,28 @@ async def get_question_cost_summary(
         a_tokens = llm_output_tokens if llm_output_tokens > 0 else max(1, int(round(len(a) / 4.0)))
         if llm_non_cached_input_tokens <= 0 and llm_input_tokens > 0:
             llm_non_cached_input_tokens = max(llm_input_tokens - llm_cached_input_tokens, 0)
-        rate = _question_cost_rate_for_model(model, max(q_tokens, llm_non_cached_input_tokens))
+        rate = _question_cost_rate_for_model(
+            model,
+            max(q_tokens, llm_non_cached_input_tokens),
+            priced_at=(r[7] if len(r) > 7 else None),
+        )
         non_cached_q_tokens = llm_non_cached_input_tokens if llm_input_tokens > 0 else q_tokens
         cached_q_tokens = llm_cached_input_tokens if llm_input_tokens > 0 else 0
         input_non_cached_usd_cost = (non_cached_q_tokens / 1_000_000.0) * float(rate["input"])
         input_cached_usd_cost = (cached_q_tokens / 1_000_000.0) * float(rate.get("cached_input") or rate["input"])
         cache_setup_usd_cost = (cache_setup_tokens / 1_000_000.0) * float(rate["input"])
         output_usd_cost = (a_tokens / 1_000_000.0) * float(rate["output"])
+        stage_cost = mixed_stage_cost_usd(
+            llm_parallel_usage_raw,
+            fallback_model_name=model,
+            priced_at=(r[7] if len(r) > 7 else None),
+            rate_resolver=_question_cost_rate_for_model,
+        )
+        if stage_cost is not None:
+            input_non_cached_usd_cost = stage_cost["input_non_cached"]
+            input_cached_usd_cost = stage_cost["input_cached"]
+            cache_setup_usd_cost = stage_cost["cache_setup"]
+            output_usd_cost = stage_cost["output"]
         usd_cost = (
             input_non_cached_usd_cost
             + input_cached_usd_cost

@@ -11,6 +11,19 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, Iterable, List
 
+from .career import (
+    answer_contract as career_answer_contract,
+    career_question_family,
+    career_profile,
+    classify_career_decision,
+    classify_manifestations,
+    is_career_category,
+    is_career_decision,
+    is_career_relationship,
+    is_static_career_profile,
+    normalize_career_houses,
+)
+
 
 HOUSE_MEANINGS = {
     1: "self, initiative and visibility",
@@ -118,11 +131,9 @@ def _event_key(query_plan: Dict[str, Any], instant_context: Dict[str, Any]) -> s
     timing = _dict(normalized.get("event_timing_verdict"))
     label = str(timing.get("event_category") or timing.get("answer_event_label") or "").lower()
     category = str(query_plan.get("category") or "general").lower()
-    question = str(query_plan.get("question") or "").lower()
-    # Presentation fallback for a router that returned broad `career` while the
-    # already-resolved user goal explicitly names promotion.
-    if category == "career" and re.search(r"\bpromot(?:e|ed|ion)\b|पदोन्नति", question):
-        return "promotion"
+    routed_subtype = str(query_plan.get("career_subtype") or "").strip().lower()
+    if category in {"career", "job", "employment", "promotion", "business"} and routed_subtype:
+        return routed_subtype
     return label if label in DOMAIN_HOUSES else category
 
 
@@ -261,9 +272,17 @@ def _selected_segments(query_plan: Dict[str, Any], instant_context: Dict[str, An
         value = _dict(owner.get("forward_event_dasha_scan"))
         return [row for row in _list(value.get("periods")) if isinstance(row, dict)]
 
+    def historical_rows(owner: Dict[str, Any]) -> List[Dict[str, Any]]:
+        value = _dict(owner.get("historical_event_dasha_scan"))
+        return [row for row in _list(value.get("periods")) if isinstance(row, dict)]
+
     # Prefer the source appropriate to the question shape, but fall through on
     # an empty container. Several timing aliases are emitted by the router.
-    if mode in {"timing_window", "month_timing", "event_timing"}:
+    if bool((query_plan.get("time_scope") or {}).get("retrospective")):
+        sources = (
+            historical_rows(parashari), historical_rows(normalized),
+        )
+    elif mode in {"timing_window", "month_timing", "event_timing"}:
         sources = (
             window_rows(parashari), window_rows(normalized),
             forward_rows(parashari), forward_rows(normalized),
@@ -311,6 +330,9 @@ def _segment_row(row: Dict[str, Any], event_key: str) -> Dict[str, Any]:
                 if isinstance(link, dict) and (h := _house(link.get("house")))
             ],
         })
+    manifestations = row.get("career_manifestations")
+    if not isinstance(manifestations, list) and is_career_category(event_key):
+        manifestations = classify_manifestations(activated)
     return {
         "start": row.get("start") or row.get("start_date"),
         "end": row.get("end") or row.get("end_date"),
@@ -326,6 +348,7 @@ def _segment_row(row: Dict[str, Any], event_key: str) -> Dict[str, Any]:
         "result_areas": [
             item for item in _list(row.get("predicted_result_areas")) if isinstance(item, dict)
         ][:4],
+        "career_manifestations": manifestations or [],
     }
 
 
@@ -356,6 +379,7 @@ def _transit_rows(segments: List[Dict[str, Any]], normalized: Dict[str, Any],
                 "house": house,
                 "meaning": _house_meaning(event_key, house),
                 "mechanism": delivered.get("mechanism"),
+                "aspect_number": delivered.get("aspect_number"),
             })
         reasons = [
             reason for reason in _split_reasons(row.get("why"))
@@ -370,6 +394,7 @@ def _transit_rows(segments: List[Dict[str, Any]], normalized: Dict[str, Any],
             "trigger_kinds": _list(row.get("trigger_kinds")),
             "transit_native_house": _house(row.get("transit_native_house")),
             "natal_placement_house": _house(row.get("natal_placement_house")),
+            "natal_reaspect_number": row.get("natal_reaspect_number"),
             "delivered_event_houses": delivered_rows,
             "confirmed_houses": [
                 {"house": h, "meaning": _house_meaning(event_key, h)}
@@ -377,7 +402,10 @@ def _transit_rows(segments: List[Dict[str, Any]], normalized: Dict[str, Any],
             ],
             "reasons": reasons,
         })
-        if len(result) >= 5:
+        # A career decision can compare several consecutive dasha windows.
+        # Keep enough dated transit rows for every rendered window rather than
+        # silently explaining only the first one or two.
+        if len(result) >= 12:
             break
     return result
 
@@ -736,6 +764,18 @@ def build_user_derivation(*, query_plan: Dict[str, Any], verdict: Dict[str, Any]
     raw_segments = _selected_segments(query_plan, instant_context)
     segments = [_segment_row(row, event_key) for row in raw_segments]
     segments = [row for row in segments if row.get("start") or row.get("chain") or row.get("reasons")]
+    transit_rows = _transit_rows(raw_segments, normalized, event_key)
+
+    def overlapping_transits(row: Dict[str, Any]) -> List[Dict[str, Any]]:
+        start = str(row.get("start") or "")
+        end = str(row.get("end") or "")
+        if not start or not end:
+            return []
+        return [
+            transit for transit in transit_rows
+            if str(transit.get("start") or "") <= end
+            and str(transit.get("end") or "") >= start
+        ]
 
     natal_basis: List[str] = []
     support = promise.get("topic_support")
@@ -766,6 +806,203 @@ def build_user_derivation(*, query_plan: Dict[str, Any], verdict: Dict[str, Any]
     ranked = [row for row in _list(verdict.get("ranked_windows")) if isinstance(row, dict)]
     strongest = ranked[0] if ranked else (segments[-1] if segments else {})
     missing = _list(verdict.get("missing_required_capabilities"))
+    career_reading = None
+    if is_career_category(event_key):
+        intent_summary = _dict(instant_context.get("intent_summary"))
+        profile = career_profile(event_key, intent_summary.get("career_subtype"))
+        career_foundation = _dict(normalized.get("career_foundation"))
+        vocation_synthesis = _dict(career_foundation.get("vocation_synthesis"))
+        amatyakaraka = _dict(career_foundation.get("amatyakaraka"))
+        karkamsa = _dict(career_foundation.get("KARAKAMSHA"))
+        karkamsa_lagna = (
+            karkamsa.get("ascendant_sign")
+            or karkamsa.get("lagna_sign")
+            or _dict(karkamsa.get("lagna")).get("sign_name")
+            or _dict(karkamsa.get("ascendant")).get("sign_name")
+        )
+        career_decision = is_career_decision(event_key, profile["subtype"])
+        question_family = career_question_family(answer_mode, profile["subtype"])
+        career_relationship = is_career_relationship(event_key, profile["subtype"])
+        family_contract = career_answer_contract(answer_mode, profile["subtype"])
+        static_profile = is_static_career_profile(
+            event_key,
+            profile["subtype"],
+            answer_mode=answer_mode,
+        )
+        # A present-tense stay/leave decision is not a timeless vocation
+        # profile.  It needs current and forward dasha/transit activation even
+        # when the router labels its prose shape as ``topic_reading``.
+        timing_requested = question_family == "timing" or career_decision
+        delivery_source = (segments or [
+            _segment_row(row, event_key)
+            for row in _list(parashari.get("forward_periods"))
+            if isinstance(row, dict)
+        ]) if timing_requested else []
+        current_house_candidates = []
+        for source in (
+            normalized.get("active_areas"),
+            _dict(normalized.get("current_timing")).get("activated_houses"),
+            _dict(normalized.get("current_timing")).get("active_houses"),
+            _dict(normalized.get("current_timing")).get("focus_houses"),
+        ):
+            current_house_candidates.extend(_list(source))
+        current_houses = normalize_career_houses(current_house_candidates)
+
+        def _career_house_factor(house: int) -> Dict[str, Any]:
+            for factor in d1_house_factors:
+                try:
+                    number = int(factor.get("house") or factor.get("h") or 0)
+                except (TypeError, ValueError):
+                    number = 0
+                if number == house:
+                    return factor
+            return {}
+
+        diagnosis = {}
+        if question_family == "diagnosis":
+            chain = []
+            for house, role in (
+                (6, "effort, workload and service"),
+                (10, "visibility, authority and professional standing"),
+                (11, "recognition, reward and fulfilment"),
+                (2, "income and compensation"),
+            ):
+                factor = _career_house_factor(house)
+                chain.append({
+                    "house": house,
+                    "role": role,
+                    "natal_assessment": factor.get("assessment") or factor.get("tone") or factor.get("band") or "not established",
+                    "currently_activated": house in current_houses,
+                    "foundation": factor,
+                })
+            active = set(current_houses)
+            if 6 in active and 10 not in active:
+                conversion = "Effort is active, but it is not yet converting into visibility or authority."
+            elif 10 in active and 11 not in active:
+                conversion = "Professional visibility is active, but it is not yet converting into recognition or reward."
+            elif 11 in active and 2 not in active:
+                conversion = "Recognition can develop, but compensation is not confirmed by the current activation."
+            elif {10, 11}.issubset(active):
+                conversion = "Visibility and recognition are both active in the supplied current evidence."
+            else:
+                conversion = "The recurring cause must be judged from the D1 and D10 foundation; the supplied current evidence does not establish a dated recognition window."
+            diagnosis = {
+                "kind": "recognition_conversion" if profile["subtype"] == "recognition" else profile["subtype"],
+                "title": (
+                    "Why effort is not becoming recognition"
+                    if profile["subtype"] == "recognition"
+                    else "What is creating the career blockage"
+                ),
+                "conversion_chain": chain,
+                "current_activated_houses": current_houses,
+                "conclusion": conversion,
+                "practical_action": (
+                    "Make completed work visible, attach it to measurable outcomes, and create a clear path from responsibility to review, recognition, and compensation."
+                    if profile["subtype"] == "recognition"
+                    else "Address the first weak or unsupported link in the calculated career chain."
+                ),
+                "rule": (
+                    "Hard work (House 6) is not itself recognition. Trace whether effort reaches "
+                    "visibility (House 10), recognition/reward (House 11), and only then compensation (House 2)."
+                ),
+            }
+
+        relationship = {}
+        if career_relationship:
+            role_rows = []
+            for raw_house, role in _dict(profile.get("house_roles")).items():
+                try:
+                    house = int(raw_house)
+                except (TypeError, ValueError):
+                    continue
+                d1_factor = _career_house_factor(house)
+                d10_factor = next((
+                    row for row in divisional_house_factors
+                    if str(row.get("chart") or "").upper() == "D10"
+                    and int(row.get("house") or row.get("h") or 0) == house
+                ), {})
+                role_rows.append({
+                    "house": house,
+                    "role": role,
+                    "natal_foundation": d1_factor,
+                    "professional_confirmation": d10_factor,
+                    "assessment": d1_factor.get("assessment") or d1_factor.get("tone") or "not established",
+                })
+            relationship = {
+                "target": profile.get("relationship_target") or profile["subtype"].replace("_relationship", ""),
+                "house_roles": role_rows,
+                "role_planets": profile.get("planets") or [],
+                "rule": (
+                    "Judge this workplace relationship through the target-specific houses and their lords, "
+                    "occupants and aspects. Do not substitute the native's generic vocation profile."
+                ),
+            }
+
+        career_reading = {
+            "subtype": profile["subtype"],
+            "question_family": question_family,
+            "answer_contract": family_contract,
+            "professional_foundation": d1_house_factors,
+            "professional_expression": [
+                row for row in divisional_house_factors
+                if str(row.get("chart") or "").upper() in {"D10", "KARKAMSA", "KARAKAMSHA"}
+            ],
+            "vocation_indicators": ({
+                "amatyakaraka": amatyakaraka,
+                "karkamsa_ascendant": karkamsa_lagna,
+                "karkamsa": karkamsa,
+            } if static_profile else {}),
+            "vocation_synthesis": vocation_synthesis if static_profile else {},
+            "diagnosis": diagnosis,
+            "relationship": relationship,
+            "delivery_windows": [
+                (lambda active, matrix: {
+                    "start": row.get("start"),
+                    "end": row.get("end"),
+                    "chain": row.get("chain"),
+                    "activated_focus_houses": active,
+                    "why": row.get("why") or row.get("reasons"),
+                    "dasha_carriers": row.get("carriers") or row.get("carrier_planets") or [],
+                    "transit_confirmations": overlapping_transits(row),
+                    "stages": row.get("career_manifestations") or [],
+                    "decision_matrix": matrix,
+                })(
+                    normalize_career_houses(
+                        row.get("activated_focus_houses") or row.get("activated_houses") or []
+                    ),
+                    classify_career_decision(
+                        row.get("activated_focus_houses") or row.get("activated_houses") or []
+                    ) if career_decision else None,
+                )
+                for row in delivery_source
+                if row.get("career_manifestations") or career_decision
+            ],
+            "interpretation_rule": (
+                (
+                    "For a stay-or-leave decision, compare employment continuity (H6+H10), "
+                    "initiated change (H3+H10), separation (H10+H12), and next-job landing "
+                    "support (H2+H6+H10+H11) in the same window. H8 shows disruption only; "
+                    "it never proves resignation is beneficial. Career fit is not the decision."
+                ) if career_decision else (
+                    (
+                        "This is a role-specific workplace relationship reading. Use the supplied target, "
+                        "target-specific houses, their lords, occupants and aspects, with D10 confirmation. "
+                        "Do not answer with generic career fit, profession fields, or dated timing unless the user asks when."
+                    ) if career_relationship else
+                    (
+                        "This is a present career diagnosis. D1 and D10 explain the recurring blockage; "
+                        "current activation may explain why it is felt now, but no future date, year, peak, "
+                        "or window may be introduced. For recognition, trace H6 effort through H10 visibility "
+                        "to H11 recognition/reward and H2 compensation."
+                    ) if question_family == "diagnosis" else
+                    "D1 establishes professional promise; D10 shows how it is expressed; "
+                    "Amatyakaraka and Karkamsa confirm the Jaimini vocation signature. "
+                    + ("Dasha and transit windows activate only the listed delivery stages."
+                       if timing_requested else
+                       "This is a static career profile, so no dasha, transit or dated timing is used.")
+                )
+            ),
+        }
     return {
         "schema_version": "instant-user-derivation/v2",
         "event": {
@@ -788,7 +1025,8 @@ def build_user_derivation(*, query_plan: Dict[str, Any], verdict: Dict[str, Any]
             "evidence_complete": bool(d1_support and divisional_support),
         },
         "dasha_activation": segments,
-        "transit_confirmation": _transit_rows(raw_segments, normalized, event_key),
+        "transit_confirmation": transit_rows,
+        "career_reading": career_reading,
         "conclusion": {
             "direction": verdict.get("direction"),
             "confidence": verdict.get("confidence"),

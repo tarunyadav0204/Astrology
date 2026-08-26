@@ -201,6 +201,7 @@ def _acquire_from_pool(pool, *, dict_rows: bool):
     fifth checkout. The wait is deliberately bounded so request threads cannot
     pile up indefinitely when the database is genuinely saturated.
     """
+    from psycopg2 import OperationalError
     from psycopg2.pool import PoolError
 
     timeout = _pool_acquire_timeout_seconds()
@@ -208,6 +209,24 @@ def _acquire_from_pool(pool, *, dict_rows: bool):
     while True:
         try:
             return pool.getconn()
+        except OperationalError:
+            # ThreadedConnectionPool opens a new physical connection whenever
+            # all currently-open connections are checked out and the pool has
+            # not reached maxconn.  If that connect attempt itself times out,
+            # another request may meanwhile have returned a healthy existing
+            # connection.  Prefer that returned connection instead of failing
+            # the request solely because pool growth failed.
+            occupancy = _pool_occupancy(pool)
+            if occupancy["free"] > 0:
+                logger.warning(
+                    "db_pool_growth_failed_reusing_returned_connection application=%s pool=%s used=%s free=%s",
+                    _detect_application_name(),
+                    "dict" if dict_rows else "plain",
+                    occupancy["used"],
+                    occupancy["free"],
+                )
+                return pool.getconn()
+            raise
         except PoolError:
             remaining = deadline - time.monotonic()
             if remaining <= 0:

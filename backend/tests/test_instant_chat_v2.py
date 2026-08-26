@@ -5,21 +5,216 @@ import pytest
 from instant_chat_v2.orchestrator import build_instant_v2_packet, finalize_instant_v2_packet
 from instant_chat_v2.planner import build_query_plan
 from instant_chat_v2.answer_spec import build_answer_spec
+from instant_chat_v2.evidence import build_evidence_ledger
 from instant_chat_v2.user_derivation import build_user_derivation
 from chat.instant_chat_pipeline import (
+    _build_budgeted_instant_prompt,
     _build_period_topic_forecast,
     _build_instant_composer_context,
     _build_instant_composer_prompt_v3,
+    _build_instant_prompt,
+    _constitutional_health_required_rows,
+    _fit_composer_brief,
     _build_event_timing_verdict,
     _instant_real_chart_facts,
+    _is_retrospective_event_request,
+    _instant_answer_language_error,
+    _instant_relational_voice_contract,
+    _instant_response_language,
     _mode_selection_from_intent,
     _requested_charts_from_intent,
     _should_force_event_current_window,
+    _strip_constitutional_health_validation_markers,
     _repair_common_utf8_mojibake,
+    _resolve_constitutional_health_rules,
     _resolve_period_window,
     _slim_event_prediction_payload,
     _target_focus_calculation_frame,
+    _validate_constitutional_health_answer,
 )
+
+
+def test_all_instant_answer_prompt_paths_share_relational_voice_contract():
+    marker = "RELATIONAL VOICE CONTRACT"
+    required_phrases = (
+        "emotionally perceptive",
+        "lived experience",
+        "Protect the user's agency",
+        "Never encourage dependency",
+    )
+    prompts = [
+        _build_budgeted_instant_prompt("How is my career?", {}, "english"),
+        _build_instant_prompt(
+            "How is my career?",
+            {"intent_summary": {"category": "career", "answer_mode": "topic_reading"}},
+            "english",
+        ),
+        _build_instant_composer_prompt_v3(
+            "How is my career?",
+            {
+                "context_profile": "instant_composer_v3",
+                "query_plan": {"category": "career", "answer_mode": "topic_reading"},
+                "intent": {"category": "career", "answer_mode": "topic_reading"},
+                "verdict": {}, "evidence": {}, "answer_contract": {},
+            },
+            "english",
+        ),
+        _build_instant_composer_prompt_v3(
+            "Explain my D9 chart",
+            {
+                "context_profile": "instant_composer_v3",
+                "query_plan": {"answer_mode": "factual_chart_lookup", "forecast_shape": "chart_fact_reading"},
+                "intent": {"answer_mode": "factual_chart_lookup"},
+                "verdict": {}, "evidence": {"chart_facts": {"charts": {}}}, "answer_contract": {},
+            },
+            "english",
+        ),
+        _build_instant_composer_prompt_v3(
+            "What are my health vulnerabilities?",
+            {
+                "context_profile": "instant_composer_v3",
+                "query_plan": {"category": "health", "answer_mode": "topic_reading"},
+                "intent": {"category": "health", "answer_mode": "topic_reading"},
+                "verdict": {}, "evidence": {},
+                "answer_contract": {"health_rules": {"is_time_bound_question": False}},
+            },
+            "english",
+        ),
+    ]
+
+    assert marker in _instant_relational_voice_contract()
+    for prompt in prompts:
+        assert marker in prompt
+        for phrase in required_phrases:
+            assert phrase in prompt
+
+
+def test_instant_response_language_prefers_latest_message_router_over_app_locale():
+    assert _instant_response_language(
+        "What are my health vulnerabilities?",
+        {"response_language": "english"},
+        "hindi",
+    ) == "english"
+    assert _instant_response_language(
+        "मेरी स्वास्थ्य कमजोरियाँ क्या हैं?",
+        {"response_language": "hindi"},
+        "english",
+    ) == "hindi"
+    assert _instant_response_language(
+        "What are my health vulnerabilities?",
+        {"response_language": "hindi"},
+        "hindi",
+    ) == "english"
+
+
+def test_instant_response_language_uses_script_for_older_intent_payloads():
+    assert _instant_response_language(
+        "मेरी स्वास्थ्य कमजोरियाँ क्या हैं?", {}, "english"
+    ) == "hindi"
+
+
+def test_instant_health_language_gate_rejects_hindi_for_english_question():
+    hindi = "आपकी कुंडली के अनुसार मुख्य स्वास्थ्य संवेदनशीलता नाक और हृदय से जुड़ी है।"
+    assert "expected English" in _instant_answer_language_error(hindi, "english")
+    assert _instant_answer_language_error("Your chart highlights the nose and upper back.", "english") is None
+
+
+def test_health_evidence_ledger_preserves_late_anatomy_causes():
+    # Real calculator rows are wider than the generic audit compactor's
+    # 24-key limit. Cause fields must not disappear merely because they were
+    # inserted late in the dictionary.
+    wide_zone = {f"diagnostic_{index}": index for index in range(30)}
+    wide_zone.update({
+        "zone": "anorectal and pelvic region",
+        "confidence": "medium",
+        "confluence_count": 2,
+        "primary_medical_reasons": [
+            "House 6 lord Mars is placed in House 8; that house's anatomical field includes anus, rectum, pelvis."
+        ],
+    })
+    wide_chain = {f"diagnostic_{index}": index for index in range(30)}
+    wide_chain.update({
+        "sixth_lord": "Mars",
+        "sixth_lord_house": 8,
+        "sixth_lord_house_zones": ["anus", "rectum", "pelvis"],
+    })
+    ledger = build_evidence_ledger(
+        {
+            "normalized_evidence": {
+                "health_body_area": {
+                    "major_vulnerabilities": [wide_zone],
+                    "sixth_house_chain": wide_chain,
+                }
+            },
+            "instant_parashari": {},
+        },
+        {"capability_requests": []},
+    )
+    record = next(row for row in ledger["records"] if row["kind"] == "health_body_area")
+    health_value = record["value"]
+    assert health_value["major_vulnerabilities"][0]["primary_medical_reasons"]
+    assert health_value["sixth_house_chain"]["sixth_lord_house"] == 8
+
+    answer_spec = build_answer_spec(
+        {
+            "category": "health",
+            "answer_mode": "topic_reading",
+            "time_scope": {"requested": "natal", "is_exact_day": False},
+        },
+        {"direction": "constitutional susceptibility", "confidence": 0.72},
+        ledger,
+    )
+    zone_row = answer_spec["health_rules"]["allowed_zone_evidence"][0]
+    assert zone_row["anatomy_basis"] == wide_zone["primary_medical_reasons"]
+
+
+def test_oversized_composer_brief_never_drops_health_anatomy_causes():
+    cause = (
+        "House 6 lord Mars is placed in House 8; its anatomical field "
+        "includes anus, rectum and pelvis"
+    )
+    health_rules = {
+        "is_time_bound_question": False,
+        "allowed_zone_names": ["anorectal and pelvic region"],
+        "required_zone_count": 1,
+        "allowed_zone_evidence": [{
+            "zone": "anorectal and pelvic region",
+            "confidence": "medium",
+            "confluence_count": 2,
+            "anatomy_basis": [cause],
+            "why": ["House 6 lord Mars is placed in House 8"],
+        }],
+    }
+    context = {
+        "evidence": {
+            "health_rules": health_rules,
+            "optional_diagnostics": ["x" * 500 for _ in range(20)],
+        },
+        "answer_contract": {"health_rules": health_rules},
+        "oversized_optional_context": [
+            {"diagnostic": "y" * 500, "nested": ["z" * 500]}
+            for _ in range(20)
+        ],
+    }
+
+    fitted = _fit_composer_brief(context, target_chars=1200)
+    rows = _constitutional_health_required_rows(
+        fitted["evidence"]["health_rules"]
+    )
+
+    assert rows[0]["required_cause_facts"] == [cause]
+    assert (
+        fitted["answer_contract"]["health_rules"]
+        ["allowed_zone_evidence"][0]["anatomy_basis"]
+    ) == [cause]
+
+    prompt = _build_instant_composer_prompt_v3(
+        "What are my health vulnerabilities?",
+        fitted,
+        "english",
+    )
+    assert cause in prompt
+    assert '"required_cause_facts":[]' not in prompt
 
 
 def test_slim_event_prediction_preserves_d1_promise_for_readable_evidence():
@@ -66,6 +261,84 @@ def test_slim_event_prediction_preserves_d1_promise_for_readable_evidence():
     assert context["normalized_evidence"]["natal_promise"]["status"] == "supported"
     assert context["_user_evidence"]["natal_topic_factors"] == natal_topic_factors
     assert derivation["natal_promise"]["d1_house_factors"][0]["house"] == 10
+
+
+def test_slim_retrospective_marriage_keeps_only_transit_confirmed_ranked_windows():
+    confirmed = {
+        "start": "2012-12-01", "end": "2013-06-01",
+        "mahadasha": "Saturn", "antardasha": "Saturn", "pratyantardasha": "Venus",
+        "relevance_score": 94, "transit_trigger_score": 14,
+        "activated_focus_houses": [2, 7, 11],
+        "peak_activation_windows": [{
+            "start": "2013-05-08", "end": "2013-05-08", "planet": "Venus",
+            "trigger_score": 14, "trigger_kinds": ["event_house_delivery"],
+        }],
+        "transit_trigger_windows": [{"large_raw_row": "must not cross the slim boundary"}],
+        "why": "Saturn dasha permission with a Venus delivery peak",
+    }
+    unconfirmed = {
+        "start": "2011-11-04", "end": "2012-04-24",
+        "mahadasha": "Saturn", "antardasha": "Saturn", "pratyantardasha": "Saturn",
+        "relevance_score": 84, "transit_trigger_score": 0,
+        "activated_focus_houses": [2, 7, 11], "peak_activation_windows": [],
+        "why": "Dasha permission without historical transit delivery",
+    }
+    context = _slim_event_prediction_payload(
+        birth_summary={}, natal_snapshot={}, target_chart_context={},
+        current_dashas_levels={"md": {"planet": "Saturn"}},
+        current_transits_formatted={"Saturn": {"house_from_lagna": 7}},
+        instant_parashari={
+            "focus_houses": [2, 7, 11],
+            "historical_event_dasha_scan": {
+                "horizon_start": "1996-04-02", "horizon_end": "2026-08-26",
+                "periods": [confirmed, unconfirmed],
+                "claim_rule": "Probable periods only.",
+            },
+        },
+        normalized_evidence={
+            "timing_policy": {"time_direction": "retrospective"},
+            "historical_event_dasha_scan": {"periods": [confirmed, unconfirmed]},
+        },
+        period_window={
+            "kind": "historical_range", "start": "1996-04-02", "end": "2026-08-26",
+        },
+        category="marriage", question="When was I married?",
+        chart_data={"planets": {}}, house_lordships={},
+    )
+
+    normalized = context["normalized_evidence"]
+    assert context["intent_summary"]["time_relation"] == "past"
+    assert normalized["current_timing"] == {}
+    assert normalized["forward_event_dasha_scan"] == {}
+    assert context["current_dashas"] == {}
+    assert context["current_transits"] == {}
+    assert "transit_trigger_windows" not in normalized["historical_event_dasha_scan"]["periods"][0]
+    assert normalized["event_timing_verdict"]["ranked_windows"] == [
+        normalized["historical_event_dasha_scan"]["periods"][0]
+    ]
+
+    ledger = build_evidence_ledger(context, {"capability_requests": []})
+    by_kind = {row["kind"]: row for row in ledger["records"]}
+    assert "historical_dasha_windows" in by_kind
+    assert "historical_event_windows" in by_kind
+
+
+def test_historical_transit_evidence_is_absent_without_a_delivery_peak():
+    scan = {
+        "periods": [{
+            "start": "2011-11-04", "end": "2012-04-24",
+            "transit_trigger_score": 0, "peak_activation_windows": [],
+        }]
+    }
+    ledger = build_evidence_ledger(
+        {
+            "normalized_evidence": {"historical_event_dasha_scan": scan},
+            "instant_parashari": {"historical_event_dasha_scan": scan},
+        },
+        {"capability_requests": []},
+    )
+    assert "historical_dasha_windows" in {row["kind"] for row in ledger["records"]}
+    assert "historical_event_windows" not in {row["kind"] for row in ledger["records"]}
 
 
 def test_explicit_d9_does_not_override_marriage_promise_mode():
@@ -581,6 +854,92 @@ def test_planner_uses_resolved_calendar_end_for_this_year():
     assert plan["time_scope"]["horizon_end"] == "2026-12-31"
 
 
+@pytest.mark.parametrize(
+    ("months", "expected"),
+    [(6, "2027-02-26"), (12, "2027-08-26"), (36, "2029-08-26")],
+)
+def test_planner_bounded_future_duration_overrides_current_day_period_window(months, expected):
+    intent = _intent("career")
+    intent["period_window"] = {
+        "kind": "day",
+        "start": "2026-08-26",
+        "end": "2026-08-26",
+    }
+    intent.setdefault("evidence_plan", {})["question_parts"] = [{
+        "timeframe": {
+            "kind": "bounded_future",
+            "duration_months": months,
+        },
+    }]
+
+    plan = build_query_plan(
+        question="A bounded future question",
+        intent=intent,
+        answer_mode="event_prediction",
+        target_subject={"key": "self"},
+        language="english",
+        as_of="2026-08-26",
+    )
+
+    assert plan["time_scope"]["horizon_end"] == expected
+
+
+def test_planner_marks_open_past_event_discovery_as_retrospective():
+    intent = _intent("marriage")
+    intent["time_relation"] = "past"
+    intent.setdefault("evidence_plan", {})["question_parts"] = [{
+        "timeframe": {"kind": "open_past"},
+        "event_profile": "marriage",
+    }]
+    plan = build_query_plan(
+        question="When was I married?",
+        intent=intent,
+        answer_mode="event_prediction",
+        target_subject={"key": "self"},
+        language="english",
+        as_of="2026-08-26",
+    )
+    assert plan["time_scope"]["retrospective"] is True
+    assert plan["time_scope"]["relation"] == "past"
+    assert plan["time_scope"]["horizon_end"] == "2026-08-26"
+
+
+def test_planner_recovers_retrospective_direction_from_router_dialogue_facts():
+    intent = _intent("marriage")
+    intent["evidence_plan"] = {
+        "question_parts": [{
+            "part_id": "p1", "event_profile": "marriage",
+            "timeframe": {"kind": "none"},
+        }],
+        "evidence_needs": [{"kind": "natal_topic_foundation"}],
+    }
+    intent["extracted_context"] = {
+        "requested_fact": "marriage timing (past)",
+        "instant_dialogue": {
+            "known_facts": {"event": "marriage", "timing_type": "past_event"},
+            "ready_to_calculate": True,
+        },
+    }
+
+    plan = build_query_plan(
+        question="When was I married?", intent=intent,
+        answer_mode="event_prediction", target_subject={"key": "self"},
+        language="english", as_of="2026-08-26",
+    )
+
+    assert plan["time_scope"]["retrospective"] is True
+    assert plan["time_scope"]["semantic"]["kind"] == "open_past"
+    assert plan["time_scope"]["relation"] == "past"
+    assert "historical_dasha_event_windows" in plan["requested_evidence"]
+    assert "historical_transit_event_windows" in plan["requested_evidence"]
+    assert "future_dasha_event_windows" not in plan["requested_evidence"]
+    assert _is_retrospective_event_request(
+        intent,
+        answer_mode="event_prediction",
+        category="marriage",
+    ) is True
+
+
 def test_marriage_packet_exposes_plan_evidence_and_claim_bindings():
     packet = build_instant_v2_packet(
         question="When will I get married?",
@@ -803,7 +1162,9 @@ def test_derived_event_contract_blocks_unmapped_transits_and_sets_horizon():
     assert spec["event_rules"]["window_score_delta"] == 2
     assert "slightly cleaner" in spec["event_rules"]["window_answer_rule"]
     assert spec["event_rules"]["allowed_timing_windows"][-1]["end"] == "2027-08-16"
-    assert "interviews" in spec["event_rules"]["career_manifestations"]
+    # No focus-house activation was supplied for this synthetic window, so the
+    # resolver must not invent interviews (or any other career manifestation).
+    assert spec["event_rules"]["career_manifestations"] == []
     assert "your wife" in spec["required_derived_opening"].lower()
     assert "never 'her/his nth house'" in spec["event_rules"]["derived_subject_rule"].lower()
     assert spec["event_rules"]["required_material_windows"] == [
@@ -980,6 +1341,49 @@ def test_health_answer_spec_only_allows_confluent_major_vulnerabilities():
     assert "heart" not in spec["health_rules"]["allowed_zone_names"]
 
 
+def test_health_answer_spec_reconstructs_exact_sixth_chain_causes_after_profile_compaction():
+    query_plan = {"category": "health", "answer_mode": "topic_reading", "time_scope": {}}
+    ledger = {"records": [{
+        "evidence_id": "ev-health",
+        "kind": "health_body_area",
+        "value": {
+            # This mirrors the production failure: ranked regions survived but
+            # their verbose reason arrays were compacted away.
+            "major_vulnerabilities": [
+                {"zone": "hair", "anatomical_members": ["hair"]},
+                {"zone": "shoulders", "anatomical_members": ["shoulders", "arms", "hands"]},
+                {"zone": "head", "anatomical_members": ["head", "brain", "face"]},
+                {"zone": "anorectal and pelvic region"},
+            ],
+            "sixth_house_chain": {
+                "sixth_lord": "Mars",
+                "sixth_house_sign": "Aries",
+                "sixth_house_sign_zones": ["head", "brain", "face", "eyes"],
+                "sixth_lord_sign": "Gemini",
+                "sixth_lord_sign_zones": ["shoulders", "arms", "hands", "lungs"],
+                "sixth_lord_nakshatra": "Ardra",
+                "sixth_lord_nakshatra_pada": 2,
+                "sixth_lord_nakshatra_lord": "Rahu",
+                "sixth_lord_nakshatra_zones": ["hair"],
+                "sixth_lord_house": 8,
+                "sixth_lord_house_zones": ["anus", "rectum", "pelvis", "excretory organs"],
+            },
+        },
+    }]}
+
+    spec = build_answer_spec(query_plan, {"ranked_windows": []}, ledger)
+    rows = {
+        row["zone"]: row["anatomy_basis"]
+        for row in spec["health_rules"]["allowed_zone_evidence"]
+    }
+
+    assert any("Ardra" in fact for fact in rows["hair"])
+    assert any("Mars is in Gemini" in fact for fact in rows["shoulders"])
+    assert not any("House 3" in fact for fact in rows["shoulders"])
+    assert any("sign in House 6 is Aries" in fact for fact in rows["head"])
+    assert any("Mars is placed in House 8" in fact for fact in rows["anorectal and pelvic region"])
+
+
 def test_broad_health_vulnerability_question_forbids_current_period_narration():
     query_plan = {
         "category": "health",
@@ -1099,6 +1503,32 @@ def test_health_risk_question_is_not_timed_by_generic_event_prediction_mode():
     spec = build_answer_spec(query_plan, {"ranked_windows": [{
         "start": "2026-01-01", "end": "2026-04-06",
     }]}, ledger)
+
+    assert spec["health_rules"]["is_time_bound_question"] is False
+    assert "timing windows or calendar forecasts" in spec["health_rules"]["forbidden_topics"]
+
+
+def test_health_vulnerability_ignores_inferred_semantic_horizon_without_user_time_request():
+    query_plan = {
+        "category": "health",
+        "answer_mode": "topic_reading",
+        "time_scope": {
+            "requested": "current",
+            # Some router paths derive this from the system horizon even when
+            # the user's words contain no timing request.
+            "semantic": {"kind": "date_range", "value": "through 2028"},
+            "as_of": "2026-08-22",
+            "horizon_end": "2028-12-31",
+            "is_exact_day": False,
+        },
+    }
+    ledger = {"records": [{
+        "evidence_id": "ev-health",
+        "kind": "health_body_area",
+        "value": {"major_vulnerabilities": [{"zone": "head"}]},
+    }]}
+
+    spec = build_answer_spec(query_plan, {"ranked_windows": []}, ledger)
 
     assert spec["health_rules"]["is_time_bound_question"] is False
     assert "timing windows or calendar forecasts" in spec["health_rules"]["forbidden_topics"]
@@ -1233,7 +1663,9 @@ def test_broad_health_composer_receives_only_ranked_zone_contract():
     health_rules = {
         "health_question_type": "health",
         "is_time_bound_question": False,
-        "allowed_zone_names": ["face", "spine", "mouth"],
+        "allowed_zone_names": ["face", "spine", "mouth", "anorectal and pelvic region"],
+        "required_zone_count": 4,
+        "require_all_allowed_zones": True,
         "allowed_zone_evidence": [
             {
                 "zone": "face",
@@ -1253,6 +1685,13 @@ def test_broad_health_composer_receives_only_ranked_zone_contract():
                 "zone": "mouth",
                 "confidence": "high",
                 "why": ["Sixth lord shares House 2 with Mars"],
+                "mechanisms": ["acute / inflammatory"],
+            },
+            {
+                "zone": "anorectal and pelvic region",
+                "confidence": "medium",
+                "anatomy_basis": ["House 6 lord Mars is placed in House 8; its anatomical field includes anus, rectum and pelvis"],
+                "why": ["House 6 lord Mars is placed in House 8"],
                 "mechanisms": ["acute / inflammatory"],
             },
         ],
@@ -1289,7 +1728,12 @@ def test_broad_health_composer_receives_only_ranked_zone_contract():
     assert set(brief["evidence"]) == {"health_rules"}
     compact_rules = brief["evidence"]["health_rules"]
     assert [row["zone"] for row in compact_rules["allowed_zone_evidence"]] == [
-        "face", "spine", "mouth"
+        "face", "spine", "mouth", "anorectal and pelvic region"
+    ]
+    assert compact_rules["required_zone_count"] == 4
+    assert compact_rules["require_all_allowed_zones"] is True
+    assert compact_rules["allowed_zone_evidence"][3]["anatomy_basis"] == [
+        "House 6 lord Mars is placed in House 8; its anatomical field includes anus, rectum and pelvis"
     ]
     assert all("activation_sources" not in row for row in compact_rules["allowed_zone_evidence"])
     assert brief["answer_blueprint"]["slots"][0]["slot"].startswith("ranked susceptibility")
@@ -1302,9 +1746,132 @@ def test_broad_health_composer_receives_only_ranked_zone_contract():
     )
     assert "Do not mention a current period" in prompt
     assert "NATAL-ONLY HEALTH EVIDENCE" in prompt
+    assert "every supplied anatomical region" in prompt
+    assert "every region its own explicit explanatory sentence" in prompt
+    assert "If the fact says the 6th lord is placed in House 8" in prompt
+    assert "never replace, infer, or change those facts" in prompt
+    assert "copy that row's `validation_marker` exactly" in prompt
+    assert "app-language fallback" in prompt
+    assert "140-220 visible words" in prompt
+    prompt_context = prompt.split("NATAL-ONLY HEALTH EVIDENCE:\n", 1)[1]
+    assert '"required_zone_rows"' in prompt_context
+    assert '"required_cause_facts"' in prompt_context
+    assert '"health_rules"' not in prompt_context
     assert "Saturn-Rahu-Saturn" not in prompt
     assert '"verdict"' not in prompt
     assert '"recent_history"' not in prompt
+
+
+def test_constitutional_health_answer_rejects_invented_region_causes():
+    rows = _constitutional_health_required_rows({
+        "allowed_zone_evidence": [
+            {"zone": "hair", "anatomy_basis": ["House 6 lord Mars occupies Ardra pada 2; its anatomical focus is hair"]},
+            {"zone": "shoulders", "anatomy_basis": ["House 6 lord Mars is in Gemini, focusing its health indication on shoulders, arms and hands"]},
+            {"zone": "head", "anatomy_basis": ["The sign in House 6 is Aries, linking the disease axis to head, brain and face"]},
+            {"zone": "anorectal and pelvic region", "anatomy_basis": ["House 6 lord Mars is placed in House 8; its anatomical field includes anus, rectum and pelvis"]},
+        ]
+    })
+    wrong = (
+        "Hair is highlighted because the Moon is in the 6th house. "
+        "Shoulders are sensitive because Mars is in the 3rd house. "
+        "The head is sensitive because the Moon is in Aries. "
+        "The anorectal and pelvic region is sensitive because the Ascendant is Scorpio."
+    )
+
+    errors = _validate_constitutional_health_answer(wrong, rows)
+
+    assert any("hair" in error and "Ardra" in error for error in errors)
+    assert any("shoulders" in error and "Gemini" in error for error in errors)
+    assert any("head" in error and "House 6" in error for error in errors)
+    assert any("anorectal" in error and "House 8" in error for error in errors)
+
+
+def test_constitutional_health_answer_accepts_exact_calculated_causes_per_region():
+    rows = _constitutional_health_required_rows({
+        "allowed_zone_evidence": [
+            {"zone": "hair", "anatomy_basis": ["House 6 lord Mars occupies Ardra pada 2; its anatomical focus is hair"]},
+            {"zone": "shoulders", "anatomy_basis": ["House 6 lord Mars is in Gemini, focusing its health indication on shoulders, arms and hands"]},
+            {"zone": "head", "anatomy_basis": ["The sign in House 6 is Aries, linking the disease axis to head, brain and face"]},
+            {"zone": "anorectal and pelvic region", "anatomy_basis": ["House 6 lord Mars is placed in House 8; its anatomical field includes anus, rectum and pelvis"]},
+        ]
+    })
+    correct = (
+        "Hair is highlighted because the 6th lord Mars occupies Ardra nakshatra. "
+        "The shoulders are sensitive because the 6th lord Mars is in Gemini. "
+        "The head is highlighted because Aries is the sign in House 6. "
+        "The anorectal and pelvic region is highlighted because the 6th lord Mars is placed in House 8."
+    )
+
+    assert _validate_constitutional_health_answer(correct, rows) == []
+
+
+def test_constitutional_health_answer_accepts_localized_prose_with_exact_row_markers():
+    rows = _constitutional_health_required_rows({
+        "allowed_zone_evidence": [
+            {
+                "zone": "nose",
+                "anatomy_basis": [
+                    "House 6 lord Jupiter occupies Magha pada 3, ruled by Ketu; its anatomical focus is nose"
+                ],
+            },
+            {
+                "zone": "heart and upper spine/back",
+                "anatomy_basis": [
+                    "House 6 lord Jupiter is in Leo, focusing its health indication on heart, spine, upper back"
+                ],
+            },
+        ]
+    })
+    hindi = (
+        f"पहला क्षेत्र नाक है। छठे भाव के स्वामी गुरु मघा में हैं। {rows[0]['validation_marker']} "
+        f"दूसरा क्षेत्र हृदय और ऊपरी रीढ़ है। गुरु सिंह राशि में हैं। {rows[1]['validation_marker']}"
+    )
+
+    assert _validate_constitutional_health_answer(
+        hindi, rows, strict_sentence_binding=False
+    ) == []
+    visible = _strip_constitutional_health_validation_markers(hindi)
+    assert "HEALTH_EVIDENCE" not in visible
+    assert "नाक" in visible
+    assert "हृदय" in visible
+
+
+def test_constitutional_health_localized_answer_without_markers_still_fails_closed():
+    rows = _constitutional_health_required_rows({
+        "allowed_zone_evidence": [{
+            "zone": "nose",
+            "anatomy_basis": [
+                "House 6 lord Jupiter occupies Magha pada 3, ruled by Ketu; its anatomical focus is nose"
+            ],
+        }]
+    })
+    errors = _validate_constitutional_health_answer(
+        "नाक के लिए छठे भाव के स्वामी गुरु मघा में हैं।",
+        rows,
+        strict_sentence_binding=False,
+    )
+    assert any("missing region: nose" in error for error in errors)
+
+
+def test_constitutional_health_gate_resolves_rules_from_v2_answer_spec():
+    rules = {
+        "is_time_bound_question": False,
+        "allowed_zone_evidence": [{
+            "zone": "anorectal and pelvic region",
+            "anatomy_basis": [
+                "House 6 lord Mars is placed in House 8; its anatomical field includes anus, rectum and pelvis"
+            ],
+        }],
+    }
+
+    resolved = _resolve_constitutional_health_rules(
+        {"evidence": {}},
+        {"answer_spec": {"health_rules": rules}},
+        {},
+    )
+
+    assert resolved is rules
+    assert _constitutional_health_required_rows(resolved)[0]["region"] == "anorectal and pelvic region"
 
 
 def test_timing_confidence_requires_named_calculator_families():

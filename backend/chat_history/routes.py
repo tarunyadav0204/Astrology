@@ -950,6 +950,7 @@ def _mark_chat_processing_failed(message_id: int, error_message: str) -> None:
             """
                 UPDATE chat_messages
                 SET status = %s,
+                    content = '',
                     error_message = %s,
                     completed_at = %s,
                     task_claim_id = NULL,
@@ -1916,6 +1917,13 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     )
 
     instant_chat_requested = requested_chat_tier == "instant"
+    instant_timeline_selection = bool(
+        str(raw_query_context.get("follow_up_type") or "").strip().lower()
+        == "marriage_timeline_selection"
+        and str(raw_query_context.get("marriage_timeline_stage") or "").strip().lower()
+        in {"phase", "pd", "sookshma", "prana", "date"}
+        and isinstance(raw_query_context.get("marriage_timeline_selection"), dict)
+    )
     speech_chat_requested = bool(request.get("speech_chat") or request.get("speechChat"))
     if speech_chat_requested and requested_chat_tier != "instant":
         raise HTTPException(status_code=400, detail="speech_chat requires chat_tier instant")
@@ -2300,6 +2308,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             credit_service.get_credit_setting('speech_chat_cost')
             if speech_chat_billing
             else 0 if speech_chat_requested
+            else 0 if instant_timeline_selection
             else 0 if instant_metered_billing
             else credit_service.get_credit_setting('instant_chat_cost')
         )
@@ -2339,7 +2348,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             )
         )
     )
-    effective_cost = 0 if (free_eligible or instant_metered_billing) else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
+    effective_cost = 0 if (free_eligible or instant_metered_billing or instant_timeline_selection) else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
     log_ask_phase(
         "credits",
         chat_key=chat_key,
@@ -4545,49 +4554,37 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 stream_reveal_chars = 44
 
             def _persist_instant_stream_delta(_delta: str, full_text: str) -> None:
-                """Checkpoint visible Gemini text without finalizing or billing the turn."""
+                """Checkpoint visible provider text without finalizing or billing the turn."""
                 # Repair at the streaming boundary. Waiting for final response
                 # cleanup lets mojibake reach WebSocket clients and durable
                 # processing checkpoints first.
                 visible_text = sanitize_text(_repair_common_utf8_mojibake(full_text))
                 if not visible_text:
                     return
-                reveal_prefixes = _instant_stream_reveal_prefixes(
-                    str(instant_stream_state["last_text"] or ""),
-                    visible_text,
-                    stream_reveal_chars,
-                )
-                for reveal_text in reveal_prefixes:
-                    if instant_stream_state["last_text"]:
-                        wait_for = stream_reveal_interval - (
-                            time.monotonic() - float(instant_stream_state["last_flush"])
+                # Provider adapters already publish appropriately sized live
+                # chunks.  Artificial sleeps here used to block DeepSeek's
+                # async stream and could turn a fast answer into a timeout.
+                try:
+                    with get_conn() as stream_conn:
+                        execute(
+                            stream_conn,
+                            """
+                                UPDATE chat_messages
+                                SET content = %s
+                                WHERE message_id = %s AND status = %s
+                            """,
+                            (visible_text, message_id, "processing"),
                         )
-                        if wait_for > 0:
-                            # This callback runs in the Gemini transport thread,
-                            # never on FastAPI's event loop.
-                            time.sleep(wait_for)
-                    try:
-                        with get_conn() as stream_conn:
-                            execute(
-                                stream_conn,
-                                """
-                                    UPDATE chat_messages
-                                    SET content = %s
-                                    WHERE message_id = %s AND status = %s
-                                """,
-                                (reveal_text, message_id, "processing"),
-                            )
-                            stream_conn.commit()
-                        instant_stream_state["last_flush"] = time.monotonic()
-                        instant_stream_state["last_text"] = reveal_text
-                    except Exception:
-                        # The final authoritative save remains the recovery path.
-                        logger.warning(
-                            "instant stream checkpoint failed message_id=%s",
-                            message_id,
-                            exc_info=True,
-                        )
-                        return
+                        stream_conn.commit()
+                    instant_stream_state["last_flush"] = time.monotonic()
+                    instant_stream_state["last_text"] = visible_text
+                except Exception:
+                    # The final authoritative save remains the recovery path.
+                    logger.warning(
+                        "instant stream checkpoint failed message_id=%s",
+                        message_id,
+                        exc_info=True,
+                    )
 
             result = await generate_instant_chat_response(
                 analyzer,
@@ -4596,6 +4593,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 intent=intent,
                 history=history,
                 language=language,
+                latest_user_question=question,
                 speech_mode=bool(is_speech_chat),
                 stream_callback=_persist_instant_stream_delta,
             )
@@ -5072,7 +5070,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         conn,
                         """
                             UPDATE chat_messages
-                            SET status = %s, error_message = %s, completed_at = %s
+                            SET status = %s, content = '', error_message = %s, completed_at = %s
                             WHERE message_id = %s
                         """,
                         ("failed", "Credit deduction failed. Please try again.", datetime.now(), message_id),
@@ -5095,7 +5093,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     conn,
                     """
                         UPDATE chat_messages
-                        SET status = %s, error_message = %s, completed_at = %s
+                        SET status = %s, content = '', error_message = %s, completed_at = %s
                         WHERE message_id = %s
                     """,
                     ("failed", error_msg, datetime.now(), message_id),

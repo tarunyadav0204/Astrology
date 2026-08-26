@@ -10,7 +10,9 @@ from .methodology import get_methodology
 _EVIDENCE_TO_CAPABILITY = {
     "natal_topic_foundation": "parashari.topic_foundation",
     "future_dasha_event_windows": "parashari.dasha_windows",
+    "historical_dasha_event_windows": "parashari.dasha_windows",
     "transit_event_windows": "transit.trigger_windows",
+    "historical_transit_event_windows": "transit.trigger_windows",
     "current_dasha": "parashari.current_dasha",
     "activated_houses": "parashari.activations",
     "kp_active_houses": "kp.active_houses",

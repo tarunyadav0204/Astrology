@@ -1,4 +1,8 @@
-from ai.parallel_chat.parallel_agent_payloads import build_parashari_agent_payload
+from ai.parallel_chat.parallel_agent_payloads import (
+    _aspect_targets_from_house,
+    _transit_summary,
+    build_parashari_agent_payload,
+)
 from chat.chat_context_builder import ChatContextBuilder
 from context_agents.base import AgentContext
 
@@ -13,6 +17,35 @@ def _birth_data():
         "place": "Hisar, Haryana, India",
         "timezone": 5.5,
     }
+
+
+def test_compact_parashari_nodal_activation_has_no_fifth_or_ninth_target():
+    # From House 2: conjunction=H2, fifth=H6, seventh=H8, ninth=H10.
+    assert _aspect_targets_from_house(2, "Rahu") == [2, 8]
+    assert _aspect_targets_from_house(2, "Ketu") == [2, 8]
+
+
+def test_compact_parashari_filters_precomputed_nodal_fifth_and_ninth_transits():
+    summary = _transit_summary(
+        [6, 8, 10],
+        {"ad": {"p": "Rahu"}},
+        {
+            "A": [
+                {"tp": "Rahu", "np": "Sun", "an": 5, "th": 6, "nh": 1},
+                {"tp": "Rahu", "np": "Moon", "an": 7, "th": 8, "nh": 2},
+                {"tp": "Ketu", "np": "Mars", "an": 9, "th": 10, "nh": 3},
+                # Jupiter's 5th aspect remains valid even when Rahu is the natal target.
+                {"tp": "Jupiter", "np": "Rahu", "an": 5, "th": 6, "nh": 2},
+            ]
+        },
+    )
+
+    assert summary["n"] == 2
+    assert summary["th"] == {"6": 1, "8": 1}
+    assert [(row["tp"], row["an"]) for row in summary["dp"]] == [
+        ("Rahu", 7),
+        ("Jupiter", 5),
+    ]
 
 
 def test_parashari_payload_includes_exact_day_block_when_dasha_as_of_present():

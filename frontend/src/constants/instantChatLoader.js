@@ -39,7 +39,7 @@ export function buildInstantTypingLines(wordCount) {
 }
 
 /** Pause after the server answer arrives, so the first sentence does not pop in instantly. */
-export const INSTANT_REPLY_FIRST_PIECE_MS = 1100;
+export const INSTANT_REPLY_FIRST_PIECE_MS = 0;
 
 export function shouldPaceInstantAnswer({ chatTier, messageType, content } = {}) {
     const tier = String(chatTier || '').toLowerCase();
@@ -87,5 +87,8 @@ export function splitInstantReply(content, maxPieceLength = 95) {
 
 export function getInstantReplyPieceDelay(piece) {
     const length = String(piece || '').length;
-    return Math.max(1800, Math.min(3400, 1100 + length * 22));
+    // Keep the conversational one-piece-at-a-time effect without making a
+    // completed answer feel artificially slow. Typical lines now advance in
+    // roughly 0.6–1.1 seconds instead of 1.4–2.7 seconds.
+    return Math.max(550, Math.min(1100, 360 + length * 8));
 }

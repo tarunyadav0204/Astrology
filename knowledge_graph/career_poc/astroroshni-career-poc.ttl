@@ -1,0 +1,755 @@
+@prefix ar: <https://astroroshni.com/ontology/core#> .
+@prefix career: <https://astroroshni.com/ontology/career#> .
+@prefix domain: <https://astroroshni.com/ontology/domain#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://astroroshni.com/ontology/career-poc>
+    a owl:Ontology ;
+    rdfs:label "AstroRoshni Career Ontology proof of concept"@en ;
+    owl:versionInfo "0.6.0" ;
+    rdfs:comment "Editable authoring model for Career question routing, astrology requirements, calculators, evidence and answer contracts. It does not contain native chart data or predictions."@en .
+
+# ---------------------------------------------------------------------------
+# Core schema. These classes are deliberately domain-neutral so later modules
+# can reuse them for health, marriage, education and other life areas.
+# ---------------------------------------------------------------------------
+
+ar:LifeDomain a owl:Class ; rdfs:label "Life domain"@en .
+ar:QuestionType a owl:Class ; rdfs:label "Question type"@en .
+ar:AnswerMode a owl:Class ; rdfs:label "Answer mode"@en .
+ar:AnswerContract a owl:Class ; rdfs:label "Answer contract"@en .
+ar:AstrologyFactor a owl:Class ; rdfs:label "Astrology factor"@en .
+ar:HouseFactor a owl:Class ; rdfs:subClassOf ar:AstrologyFactor ; rdfs:label "House factor"@en .
+ar:ChartFactor a owl:Class ; rdfs:subClassOf ar:AstrologyFactor ; rdfs:label "Chart factor"@en .
+ar:JaiminiFactor a owl:Class ; rdfs:subClassOf ar:AstrologyFactor ; rdfs:label "Jaimini factor"@en .
+ar:TimingFactor a owl:Class ; rdfs:subClassOf ar:AstrologyFactor ; rdfs:label "Timing factor"@en .
+ar:CalculatorCapability a owl:Class ; rdfs:label "Calculator capability"@en .
+ar:DecisionRule a owl:Class ; rdfs:label "Decision rule"@en .
+ar:EvidencePolicy a owl:Class ; rdfs:label "Evidence policy"@en .
+ar:OutputSection a owl:Class ; rdfs:label "Output section"@en .
+ar:Guardrail a owl:Class ; rdfs:label "Guardrail"@en .
+ar:DecisionStage a owl:Class ; rdfs:label "Decision stage"@en .
+
+ar:inDomain a owl:ObjectProperty ; rdfs:label "Life domain"@en ; rdfs:domain ar:QuestionType ; rdfs:range ar:LifeDomain .
+ar:requiresFactor a owl:ObjectProperty ; rdfs:label "Required astrology factors"@en ; rdfs:domain ar:QuestionType ; rdfs:range ar:AstrologyFactor .
+ar:defaultExcludesFactor a owl:ObjectProperty ; rdfs:label "Excluded by default"@en ; rdfs:domain ar:QuestionType ; rdfs:range ar:AstrologyFactor .
+ar:requiresCapability a owl:ObjectProperty ; rdfs:label "Required calculator capabilities"@en ; rdfs:domain ar:QuestionType ; rdfs:range ar:CalculatorCapability .
+ar:usesAnswerContract a owl:ObjectProperty ; rdfs:label "Answer contract"@en ; rdfs:domain ar:QuestionType ; rdfs:range ar:AnswerContract .
+ar:allowedAnswerMode a owl:ObjectProperty ; rdfs:label "Answer mode"@en ; rdfs:domain ar:QuestionType ; rdfs:range ar:AnswerMode .
+ar:hasEvidencePolicy a owl:ObjectProperty ; rdfs:label "Evidence policy"@en ; rdfs:domain ar:QuestionType ; rdfs:range ar:EvidencePolicy .
+ar:evaluatesRule a owl:ObjectProperty ; rdfs:label "Decision rules"@en ; rdfs:domain ar:QuestionType ; rdfs:range ar:DecisionRule .
+ar:hasGuardrail a owl:ObjectProperty ; rdfs:label "Guardrails"@en ; rdfs:domain ar:QuestionType ; rdfs:range ar:Guardrail .
+ar:hasOutputSection a owl:ObjectProperty ; rdfs:label "Output sections"@en ; rdfs:domain ar:AnswerContract ; rdfs:range ar:OutputSection .
+ar:evaluatesStage a owl:ObjectProperty ; rdfs:label "Decision stages"@en ; rdfs:domain ar:QuestionType ; rdfs:range ar:DecisionStage .
+ar:stageRequiresFactor a owl:ObjectProperty ; rdfs:label "Required astrology factors"@en ; rdfs:domain ar:DecisionStage ; rdfs:range ar:AstrologyFactor .
+ar:stableId a owl:DatatypeProperty ; rdfs:range xsd:string .
+ar:runtimeKey a owl:DatatypeProperty ; rdfs:range xsd:string .
+ar:calculatorBinding a owl:DatatypeProperty ; rdfs:range xsd:string .
+ar:questionExample a owl:DatatypeProperty ; rdfs:range xsd:string .
+ar:ruleText a owl:DatatypeProperty ; rdfs:range xsd:string .
+ar:overrideCondition a owl:DatatypeProperty ; rdfs:range xsd:string .
+ar:sequence a owl:DatatypeProperty ; rdfs:range xsd:integer .
+ar:sourceType a owl:DatatypeProperty ; rdfs:range xsd:string .
+ar:confidencePolicy a owl:DatatypeProperty ; rdfs:range xsd:string .
+ar:priority a owl:DatatypeProperty ; rdfs:range xsd:integer .
+
+# ---------------------------------------------------------------------------
+# Career factors and executable capabilities.
+# ---------------------------------------------------------------------------
+
+career:Career a ar:LifeDomain ; ar:stableId "career" ; skos:prefLabel "Career"@en ; owl:sameAs domain:CareerWorkPublicRole .
+
+career:H1 a ar:HouseFactor ; ar:stableId "house.1" ; skos:prefLabel "Professional identity, initiative and leadership capacity"@en .
+career:H2 a ar:HouseFactor ; ar:stableId "house.2" ; skos:prefLabel "Income, compensation and resources"@en .
+career:H3 a ar:HouseFactor ; ar:stableId "house.3" ; skos:prefLabel "Initiative, movement and change"@en .
+career:H5 a ar:HouseFactor ; ar:stableId "house.5" ; skos:prefLabel "Judgment, strategy, creativity and leadership intelligence"@en .
+career:H6 a ar:HouseFactor ; ar:stableId "house.6" ; skos:prefLabel "Employment, workload, service and competition"@en .
+career:H7 a ar:HouseFactor ; ar:stableId "house.7" ; skos:prefLabel "Business, clients, contracts and partnerships"@en .
+career:H8 a ar:HouseFactor ; ar:stableId "house.8" ; skos:prefLabel "Disruption, restructuring, hidden pressure and forced change"@en .
+career:H9 a ar:HouseFactor ; ar:stableId "house.9" ; skos:prefLabel "Manager, mentor, authority and guidance"@en .
+career:H10 a ar:HouseFactor ; ar:stableId "house.10" ; skos:prefLabel "Role, status, authority and visible responsibility"@en .
+career:H11 a ar:HouseFactor ; ar:stableId "house.11" ; skos:prefLabel "Recognition, gains, networks and goals"@en .
+career:H12 a ar:HouseFactor ; ar:stableId "house.12" ; skos:prefLabel "Release, separation and exit"@en .
+
+career:D1 a ar:ChartFactor ; ar:stableId "chart.d1" ; skos:prefLabel "D1 natal professional foundation"@en .
+career:D10 a ar:ChartFactor ; ar:stableId "chart.d10" ; skos:prefLabel "D10 professional expression"@en .
+career:Amatyakaraka a ar:JaiminiFactor ; ar:stableId "jaimini.amatyakaraka" ; skos:prefLabel "Amatyakaraka vocation indicator"@en .
+career:Karakamsha a ar:JaiminiFactor ; ar:stableId "jaimini.karakamsha" ; skos:prefLabel "Karakamsha vocation confirmation"@en .
+career:DashaActivation a ar:TimingFactor ; ar:stableId "timing.dasha_activation" ; skos:prefLabel "Dasha house activation"@en .
+career:TransitActivation a ar:TimingFactor ; ar:stableId "timing.transit_activation" ; skos:prefLabel "Transit confirmation"@en .
+
+career:CapD1Foundation a ar:CalculatorCapability ;
+    ar:stableId "career.foundation.d1" ;
+    ar:calculatorBinding "instant_chat_v2 evidence builder: D1 house foundation" ;
+    skos:prefLabel "Build D1 Career foundation"@en .
+
+career:CapD10Expression a ar:CalculatorCapability ;
+    ar:stableId "career.expression.d10" ;
+    ar:calculatorBinding "instant_chat_v2 evidence builder: D10 professional expression" ;
+    skos:prefLabel "Build D10 professional expression"@en .
+
+career:CapJaiminiVocation a ar:CalculatorCapability ;
+    ar:stableId "career.vocation.jaimini" ;
+    ar:calculatorBinding "instant_chat_v2.career.build_vocation_synthesis" ;
+    skos:prefLabel "Synthesize Amatyakaraka and Karakamsha vocation"@en .
+
+career:CapDashaActivation a ar:CalculatorCapability ;
+    ar:stableId "career.timing.dasha" ;
+    ar:calculatorBinding "authoritative dasha calculator and house activation" ;
+    skos:prefLabel "Calculate dasha activation"@en .
+
+career:CapTransitActivation a ar:CalculatorCapability ;
+    ar:stableId "career.timing.transit" ;
+    ar:calculatorBinding "transit activation calculator" ;
+    skos:prefLabel "Calculate transit confirmation"@en .
+
+career:CapStayChangeDecision a ar:CalculatorCapability ;
+    ar:stableId "career.decision.stay_change" ;
+    ar:calculatorBinding "instant_chat_v2.career.classify_career_decision" ;
+    skos:prefLabel "Compare stay, change, separation and landing"@en .
+
+career:CapRecognitionConversion a ar:CalculatorCapability ;
+    ar:stableId "career.diagnosis.recognition" ;
+    ar:calculatorBinding "instant_chat_v2.user_derivation recognition conversion" ;
+    skos:prefLabel "Diagnose effort-to-recognition conversion"@en .
+
+career:CapManagerRelationship a ar:CalculatorCapability ;
+    ar:stableId "career.relationship.manager" ;
+    ar:calculatorBinding "career relationship synthesis: manager_relationship" ;
+    skos:prefLabel "Synthesize manager relationship"@en .
+
+career:CapPromotionDecision a ar:CalculatorCapability ;
+    ar:stableId "career.decision.promotion" ;
+    ar:calculatorBinding "career stage synthesis: promotion H10-H11-H2 with dasha and transit" ;
+    skos:prefLabel "Evaluate promotion and recognition delivery"@en .
+
+career:CapCompensationDecision a ar:CalculatorCapability ;
+    ar:stableId "career.decision.compensation" ;
+    ar:calculatorBinding "career stage synthesis: compensation H2-H6-H10-H11 with dasha and transit" ;
+    skos:prefLabel "Evaluate salary and compensation delivery"@en .
+
+career:CapBusinessEmploymentDecision a ar:CalculatorCapability ;
+    ar:stableId "career.decision.business_employment" ;
+    ar:calculatorBinding "career path synthesis: employment H6 versus enterprise H3-H7 with H10-H11 viability" ;
+    skos:prefLabel "Compare employment and business suitability"@en .
+
+career:CapJobChangeTiming a ar:CalculatorCapability ;
+    ar:stableId "career.timing.job_change" ;
+    ar:calculatorBinding "career stage synthesis: H3-H10 movement, H10-H12 release, H2-H6-H10-H11 landing" ;
+    skos:prefLabel "Calculate job-change windows and landing quality"@en .
+
+career:CapWorkplaceConflict a ar:CalculatorCapability ;
+    ar:stableId "career.diagnosis.workplace_conflict" ;
+    ar:calculatorBinding "career relationship synthesis: H6 conflict, H9 manager, H10 authority and H11 support" ;
+    skos:prefLabel "Diagnose workplace conflict"@en .
+
+career:CapEmploymentDelivery a ar:CalculatorCapability ; ar:stableId "career.delivery.employment" ;
+    ar:calculatorBinding "instant_chat_v2.career.classify_manifestations: employment selection and joining" ; skos:prefLabel "Evaluate employment delivery"@en .
+career:CapOfferDelivery a ar:CalculatorCapability ; ar:stableId "career.delivery.offer" ;
+    ar:calculatorBinding "instant_chat_v2.career.classify_manifestations: offer formalization" ; skos:prefLabel "Evaluate job-offer delivery"@en .
+career:CapJoiningDelivery a ar:CalculatorCapability ; ar:stableId "career.delivery.joining" ;
+    ar:calculatorBinding "instant_chat_v2.career.classify_manifestations: role-change and joining execution" ; skos:prefLabel "Evaluate joining delivery"@en .
+career:CapJobSecurityDecision a ar:CalculatorCapability ; ar:stableId "career.decision.job_security" ;
+    ar:calculatorBinding "instant_chat_v2.career.classify_career_decision: continuity and disruption" ; skos:prefLabel "Evaluate job security"@en .
+career:CapBusinessProfile a ar:CalculatorCapability ; ar:stableId "career.profile.business" ;
+    ar:calculatorBinding "instant_chat_v2.career business profile synthesis from D1 D10 and H7" ; skos:prefLabel "Synthesize business profile"@en .
+career:CapBusinessLaunch a ar:CalculatorCapability ; ar:stableId "career.delivery.business_launch" ;
+    ar:calculatorBinding "instant_chat_v2.career.classify_manifestations: business launch" ; skos:prefLabel "Evaluate business launch"@en .
+career:CapBusinessSuccess a ar:CalculatorCapability ; ar:stableId "career.delivery.business_success" ;
+    ar:calculatorBinding "instant_chat_v2.career.classify_manifestations: business growth" ; skos:prefLabel "Evaluate business success"@en .
+career:CapProjectDelivery a ar:CalculatorCapability ; ar:stableId "career.delivery.project" ;
+    ar:calculatorBinding "instant_chat_v2.career.classify_manifestations: project execution and outcome" ; skos:prefLabel "Evaluate project delivery"@en .
+career:CapLeadershipProfile a ar:CalculatorCapability ; ar:stableId "career.profile.leadership" ;
+    ar:calculatorBinding "instant_chat_v2 career foundation synthesis: leadership profile" ; skos:prefLabel "Synthesize leadership potential"@en .
+career:CapGovernmentCareer a ar:CalculatorCapability ; ar:stableId "career.delivery.government" ;
+    ar:calculatorBinding "instant_chat_v2.career.classify_manifestations: government selection" ; skos:prefLabel "Evaluate government-career delivery"@en .
+career:CapForeignCareer a ar:CalculatorCapability ; ar:stableId "career.delivery.foreign" ;
+    ar:calculatorBinding "instant_chat_v2.career.classify_manifestations: foreign career" ; skos:prefLabel "Evaluate foreign-career delivery"@en .
+career:CapReturnToWork a ar:CalculatorCapability ; ar:stableId "career.delivery.return_to_work" ;
+    ar:calculatorBinding "instant_chat_v2.career.classify_manifestations: return to employment" ; skos:prefLabel "Evaluate return to work"@en .
+career:CapCareerStagnation a ar:CalculatorCapability ; ar:stableId "career.diagnosis.stagnation" ;
+    ar:calculatorBinding "instant_chat_v2.user_derivation career blockage diagnosis" ; skos:prefLabel "Diagnose career stagnation"@en .
+career:CapColleagueRelationship a ar:CalculatorCapability ; ar:stableId "career.relationship.colleague" ;
+    ar:calculatorBinding "career relationship synthesis: colleague_relationship" ; skos:prefLabel "Synthesize colleague relationship"@en .
+career:CapSubordinateRelationship a ar:CalculatorCapability ; ar:stableId "career.relationship.subordinate" ;
+    ar:calculatorBinding "career relationship synthesis: subordinate_relationship" ; skos:prefLabel "Synthesize subordinate relationship"@en .
+career:CapClientRelationship a ar:CalculatorCapability ; ar:stableId "career.relationship.client" ;
+    ar:calculatorBinding "career relationship synthesis: client_relationship" ; skos:prefLabel "Synthesize client relationship"@en .
+career:CapBusinessPartnerRelationship a ar:CalculatorCapability ; ar:stableId "career.relationship.business_partner" ;
+    ar:calculatorBinding "career relationship synthesis: business_partner_relationship" ; skos:prefLabel "Synthesize business-partner relationship"@en .
+career:CapMentorRelationship a ar:CalculatorCapability ; ar:stableId "career.relationship.mentor" ;
+    ar:calculatorBinding "career relationship synthesis: mentor_relationship" ; skos:prefLabel "Synthesize mentor relationship"@en .
+
+# ---------------------------------------------------------------------------
+# Answer modes, evidence policies, contracts and guardrails.
+# ---------------------------------------------------------------------------
+
+career:ModeTopicReading a ar:AnswerMode ; ar:runtimeKey "topic_reading" ; skos:prefLabel "Topic reading"@en .
+career:ModePotentialCapacity a ar:AnswerMode ; ar:runtimeKey "potential_capacity" ; skos:prefLabel "Potential capacity"@en .
+career:ModeDecisionSupport a ar:AnswerMode ; ar:runtimeKey "decision_support" ; skos:prefLabel "Decision support"@en .
+career:ModeProblemDiagnosis a ar:AnswerMode ; ar:runtimeKey "problem_diagnosis" ; skos:prefLabel "Problem diagnosis"@en .
+career:ModeRelationshipReading a ar:AnswerMode ; ar:runtimeKey "relationship_reading" ; skos:prefLabel "Work relationship reading"@en .
+
+career:EvidenceStaticCareer a ar:EvidencePolicy ; ar:stableId "evidence.career.static" ;
+    ar:ruleText "Explain the D1 foundation, D10 expression, 10th-lord work function, Amatyakaraka and Karakamsha; do not manufacture dates." .
+career:EvidenceDecision a ar:EvidencePolicy ; ar:stableId "evidence.career.decision" ;
+    ar:ruleText "Show which planets activate each required house through lordship, occupation or aspect, then show dasha support and transit confirmation separately." .
+career:EvidenceRecognition a ar:EvidencePolicy ; ar:stableId "evidence.career.recognition" ;
+    ar:ruleText "Explain the conversion chain from H6 effort to H10 visibility to H11 recognition and H2 compensation; identify the broken or delayed link." .
+career:EvidenceManager a ar:EvidencePolicy ; ar:stableId "evidence.career.manager" ;
+    ar:ruleText "Explain H9 manager/guidance, H10 authority/reputation, H6 daily friction and H11 support; do not substitute vocation indicators." .
+career:EvidencePromotion a ar:EvidencePolicy ; ar:stableId "evidence.career.promotion" ;
+    ar:ruleText "Separate increased responsibility at H10 from recognition at H11 and compensation at H2; name the activating dasha planets and require transit confirmation for a high-confidence dated window." .
+career:EvidenceCompensation a ar:EvidencePolicy ; ar:stableId "evidence.career.compensation" ;
+    ar:ruleText "Explain whether H2 income, H6 employment, H10 role and H11 gains form a complete delivery chain; do not call workload or visibility alone a salary increase." .
+career:EvidenceBusinessEmployment a ar:EvidencePolicy ; ar:stableId "evidence.career.business_employment" ;
+    ar:ruleText "Compare H6 employment support with H3 initiative and H7 commerce/client support, anchored by H10 profession and H11 viability; use D10 and Jaimini vocation as confirmation." .
+career:EvidenceJobChangeTiming a ar:EvidencePolicy ; ar:stableId "evidence.career.job_change_timing" ;
+    ar:ruleText "For every proposed window show H3+H10 movement, H10+H12 release and H2+H6+H10+H11 landing separately, including the planets activating each house and independent transit confirmation." .
+career:EvidencePromotionVsJobChange a ar:EvidencePolicy ; ar:stableId "evidence.career.promotion_vs_job_change" ;
+    ar:ruleText "Compare promotion delivery (H10 responsibility, H11 recognition, H2 compensation) against job-change movement (H3+H10), release (H10+H12), and landing (H2+H6+H10+H11) in the same horizon. Do not select either option without option-specific dasha and transit support." .
+career:EvidenceWorkplaceConflict a ar:EvidencePolicy ; ar:stableId "evidence.career.workplace_conflict" ;
+    ar:ruleText "Distinguish H6 daily conflict, H9 manager or mentor dynamics, H10 authority and reputation, and H11 team support; identify which relationship link is under pressure." .
+career:EvidenceEmployment a ar:EvidencePolicy ; ar:stableId "evidence.career.employment" ; ar:ruleText "Separate employability and applications at H6, role delivery at H10, selection or gains at H11 and compensation at H2; require dasha and transit for dates." .
+career:EvidenceOffer a ar:EvidencePolicy ; ar:stableId "evidence.career.offer" ; ar:ruleText "Separate opportunity, selection and formal written offer; activity or interview evidence alone is not an offer." .
+career:EvidenceJoining a ar:EvidencePolicy ; ar:stableId "evidence.career.joining" ; ar:ruleText "Separate movement, employment permission, role confirmation and actual joining execution; never equate a possible change with a joining date." .
+career:EvidenceJobSecurity a ar:EvidencePolicy ; ar:stableId "evidence.career.job_security" ; ar:ruleText "Compare H6-H10 continuity and H2-H11 income support against H8-H12 disruption; pressure alone does not prove job loss." .
+career:EvidenceBusiness a ar:EvidencePolicy ; ar:stableId "evidence.career.business" ; ar:ruleText "Explain clients and contracts at H7, professional execution at H10, commercial gains at H11 and resources at H2, confirmed through D1 and D10." .
+career:EvidenceBusinessLaunch a ar:EvidencePolicy ; ar:stableId "evidence.career.business_launch" ; ar:ruleText "Require H3 initiative, H7 clients or contracts, H10 enterprise execution and H11 viability; use dasha and transit for launch timing." .
+career:EvidenceBusinessSuccess a ar:EvidencePolicy ; ar:stableId "evidence.career.business_success" ; ar:ruleText "Trace revenue H2, clients H7, operating standing H10 and gains H11; client activity alone is not commercial success." .
+career:EvidenceProject a ar:EvidencePolicy ; ar:stableId "evidence.career.project" ; ar:ruleText "Trace initiative H3, execution H6, accountable delivery H10 and outcome H11; workload alone is not successful completion." .
+career:EvidenceLeadership a ar:EvidencePolicy ; ar:stableId "evidence.career.leadership" ; ar:ruleText "Judge identity H1, strategic judgment H5, guidance H9 and authority H10 through D1 and D10; do not infer leadership from the Sun alone." .
+career:EvidenceGovernment a ar:EvidencePolicy ; ar:stableId "evidence.career.government" ; ar:ruleText "Separate competition and service H6, institution and merit H9, authority H10 and selection H11; require timing evidence for appointment dates." .
+career:EvidenceForeignCareer a ar:EvidencePolicy ; ar:stableId "evidence.career.foreign" ; ar:ruleText "Separate movement H3, long-distance opportunity H9, profession H10 and foreign separation H12; H12 or Rahu alone is insufficient." .
+career:EvidenceReturnToWork a ar:EvidencePolicy ; ar:stableId "evidence.career.return_to_work" ; ar:ruleText "Trace re-entry effort H3, employability H6, role H10 and selection or gains H11; distinguish preparation from actual return." .
+career:EvidenceCareerStagnation a ar:EvidencePolicy ; ar:stableId "evidence.career.stagnation" ; ar:ruleText "Diagnose whether workload H6 is blocked by disruption H8, fails to become visibility H10, or fails to produce gains H11; do not collapse this into recognition alone." .
+career:EvidenceWorkRelationship a ar:EvidencePolicy ; ar:stableId "evidence.career.work_relationship" ; ar:ruleText "Use only the target role's authored relationship houses with D10 confirmation; do not substitute generic vocation or manager rules." .
+
+career:SectionVerdict a ar:OutputSection ; ar:sequence 1 ; skos:prefLabel "Direct answer"@en .
+career:SectionReasoning a ar:OutputSection ; ar:sequence 2 ; skos:prefLabel "Astrological reasoning"@en .
+career:SectionConditions a ar:OutputSection ; ar:sequence 3 ; skos:prefLabel "Opportunity and pressure"@en .
+career:SectionAction a ar:OutputSection ; ar:sequence 4 ; skos:prefLabel "Practical action"@en .
+career:SectionFollowUp a ar:OutputSection ; ar:sequence 5 ; skos:prefLabel "One natural follow-up question"@en .
+
+career:ContractStaticCareer a ar:AnswerContract ; ar:stableId "contract.career.static" ;
+    ar:hasOutputSection career:SectionVerdict, career:SectionReasoning, career:SectionConditions, career:SectionAction, career:SectionFollowUp .
+career:ContractCareerDecision a ar:AnswerContract ; ar:stableId "contract.career.decision" ;
+    ar:hasOutputSection career:SectionVerdict, career:SectionReasoning, career:SectionConditions, career:SectionAction, career:SectionFollowUp .
+career:ContractCareerDiagnosis a ar:AnswerContract ; ar:stableId "contract.career.diagnosis" ;
+    ar:hasOutputSection career:SectionVerdict, career:SectionReasoning, career:SectionAction, career:SectionFollowUp .
+career:ContractManagerRelationship a ar:AnswerContract ; ar:stableId "contract.career.manager_relationship" ;
+    ar:hasOutputSection career:SectionVerdict, career:SectionReasoning, career:SectionConditions, career:SectionAction, career:SectionFollowUp .
+career:ContractCareerTiming a ar:AnswerContract ; ar:stableId "contract.career.timing" ;
+    ar:hasOutputSection career:SectionVerdict, career:SectionReasoning, career:SectionConditions, career:SectionAction, career:SectionFollowUp .
+career:ContractWorkRelationship a ar:AnswerContract ; ar:stableId "contract.career.work_relationship" ;
+    ar:hasOutputSection career:SectionVerdict, career:SectionReasoning, career:SectionConditions, career:SectionAction, career:SectionFollowUp .
+
+career:NoUnrequestedTiming a ar:Guardrail ; ar:stableId "guardrail.no_unrequested_timing" ;
+    ar:ruleText "Static, diagnostic and relationship questions must not receive dasha, transit or dated forecasts unless the question explicitly asks when or supplies a period." .
+career:NoResignationFromVocation a ar:Guardrail ; ar:stableId "guardrail.no_resignation_from_vocation" ;
+    ar:ruleText "Never recommend leaving a job from career fit, vocation signature, H8 or H12 alone." .
+career:SemanticIntentOnly a ar:Guardrail ; ar:stableId "guardrail.semantic_intent" ;
+    ar:ruleText "The multilingual intent LLM selects the question type; this ontology does not classify natural language with keywords." .
+career:NoPromotionFromVisibilityAlone a ar:Guardrail ; ar:stableId "guardrail.no_promotion_from_visibility" ;
+    ar:ruleText "H10 activity alone is not a promotion; recognition requires H11 and compensation claims additionally require H2." .
+career:NoSalaryFromIncomeAlone a ar:Guardrail ; ar:stableId "guardrail.no_salary_from_income_alone" ;
+    ar:ruleText "H2 activation alone may describe money movement; a salary increase requires the employment-role-gains chain H2+H6+H10+H11." .
+career:NoBusinessFromH7Alone a ar:Guardrail ; ar:stableId "guardrail.no_business_from_h7_alone" ;
+    ar:ruleText "H7 alone does not establish business suitability; initiative, profession and viable gains must also be examined." .
+career:NoOfferFromActivityAlone a ar:Guardrail ; ar:stableId "guardrail.no_offer_from_activity" ; ar:ruleText "Applications, interviews, workload or H10 visibility alone do not establish a formal job offer." .
+career:NoJoiningFromChangeAlone a ar:Guardrail ; ar:stableId "guardrail.no_joining_from_change" ; ar:ruleText "H3 movement or role-change pressure alone does not establish selection or joining." .
+career:NoJobLossFromPressureAlone a ar:Guardrail ; ar:stableId "guardrail.no_job_loss_from_pressure" ; ar:ruleText "H8 disruption, H12 separation or dissatisfaction alone does not prove job loss or authorize resignation." .
+career:NoProjectSuccessFromWorkload a ar:Guardrail ; ar:stableId "guardrail.no_project_success_from_workload" ; ar:ruleText "H6 effort or workload alone does not establish project delivery or success." .
+career:NoLeadershipFromSunAlone a ar:Guardrail ; ar:stableId "guardrail.no_leadership_from_sun" ; ar:ruleText "The Sun alone does not establish leadership suitability; H1, H5, H9, H10, D1 and D10 must be synthesized." .
+career:NoGovernmentFromSunAlone a ar:Guardrail ; ar:stableId "guardrail.no_government_from_sun" ; ar:ruleText "The Sun or H10 alone does not establish government selection; service, merit, authority and gains must connect." .
+career:NoForeignFromH12Alone a ar:Guardrail ; ar:stableId "guardrail.no_foreign_from_h12" ; ar:ruleText "H12 or Rahu alone does not establish a foreign job; movement, long-distance opportunity and profession must connect." .
+career:NoReturnFromEffortAlone a ar:Guardrail ; ar:stableId "guardrail.no_return_from_effort" ; ar:ruleText "Preparation or applications alone do not establish a return-to-work result." .
+career:RoleSpecificRelationshipOnly a ar:Guardrail ; ar:stableId "guardrail.role_specific_relationship" ; ar:ruleText "Use the named workplace counterpart's house roles; do not replace colleague, subordinate, client, partner or mentor analysis with manager or vocation analysis." .
+
+# ---------------------------------------------------------------------------
+# Career proof-of-concept question types.
+# ---------------------------------------------------------------------------
+
+career:OverallCareer a ar:QuestionType ;
+    ar:stableId "career.overall" ; ar:runtimeKey "general" ;
+    skos:prefLabel "Overall career"@en ;
+    ar:questionExample "How is my career overall?" ;
+    ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:Amatyakaraka, career:Karakamsha, career:H2, career:H6, career:H10, career:H11 ;
+    ar:defaultExcludesFactor career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapJaiminiVocation ;
+    ar:allowedAnswerMode career:ModeTopicReading ;
+    ar:usesAnswerContract career:ContractStaticCareer ;
+    ar:hasEvidencePolicy career:EvidenceStaticCareer ;
+    ar:evaluatesStage career:OverallFoundationStage, career:OverallExpressionStage, career:OverallVocationStage, career:OverallOutcomeStage ;
+    ar:hasGuardrail career:NoUnrequestedTiming, career:SemanticIntentOnly ;
+    ar:overrideCondition "Add timing only when the user explicitly asks when, this year, or names a time period." .
+
+career:SuitableCareer a ar:QuestionType ;
+    ar:stableId "career.fit" ; ar:runtimeKey "career_fit" ;
+    skos:prefLabel "Suitable career or profession"@en ;
+    ar:questionExample "What kind of career suits me?" ;
+    ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:Amatyakaraka, career:Karakamsha, career:H2, career:H6, career:H10, career:H11 ;
+    ar:defaultExcludesFactor career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapJaiminiVocation ;
+    ar:allowedAnswerMode career:ModePotentialCapacity ;
+    ar:usesAnswerContract career:ContractStaticCareer ;
+    ar:hasEvidencePolicy career:EvidenceStaticCareer ;
+    ar:evaluatesStage career:FitWorkFunctionStage, career:FitVocationStage, career:FitWorkSettingStage, career:FitViabilityStage ;
+    ar:hasGuardrail career:NoUnrequestedTiming, career:NoResignationFromVocation, career:SemanticIntentOnly .
+
+career:LeaveCurrentJob a ar:QuestionType ;
+    ar:stableId "career.resignation" ; ar:runtimeKey "resignation" ;
+    skos:prefLabel "Leave or remain in current job"@en ;
+    ar:questionExample "Should I leave my current job?" ;
+    ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H2, career:H3, career:H6, career:H10, career:H11, career:H12, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapDashaActivation, career:CapTransitActivation, career:CapStayChangeDecision ;
+    ar:allowedAnswerMode career:ModeDecisionSupport ;
+    ar:usesAnswerContract career:ContractCareerDecision ;
+    ar:hasEvidencePolicy career:EvidenceDecision ;
+    ar:evaluatesRule career:RuleStay, career:RuleChange, career:RuleSeparation, career:RuleLanding ;
+    ar:evaluatesStage career:JobContinuityStage, career:JobMovementStage, career:JobSeparationStage, career:JobLandingStage ;
+    ar:hasGuardrail career:NoResignationFromVocation, career:SemanticIntentOnly .
+
+career:RuleStay a ar:DecisionRule ; ar:stableId "career.decision.stay" ;
+    ar:ruleText "Continuity requires employment and professional-role support: H6 + H10." .
+career:RuleChange a ar:DecisionRule ; ar:stableId "career.decision.change" ;
+    ar:ruleText "Movement toward change requires initiative and professional movement: H3 + H10." .
+career:RuleSeparation a ar:DecisionRule ; ar:stableId "career.decision.separation" ;
+    ar:ruleText "A clean exit requires career and release/separation factors: H10 + H12." .
+career:RuleLanding a ar:DecisionRule ; ar:stableId "career.decision.landing" ;
+    ar:ruleText "A safer next role requires income, employment, role and gains: H2 + H6 + H10 + H11." .
+
+career:RecognitionProblem a ar:QuestionType ;
+    ar:stableId "career.recognition" ; ar:runtimeKey "recognition" ;
+    skos:prefLabel "Recognition despite hard work"@en ;
+    ar:questionExample "Why am I not getting recognition despite working hard?" ;
+    ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H2, career:H6, career:H10, career:H11 ;
+    ar:defaultExcludesFactor career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapRecognitionConversion ;
+    ar:allowedAnswerMode career:ModeProblemDiagnosis ;
+    ar:usesAnswerContract career:ContractCareerDiagnosis ;
+    ar:hasEvidencePolicy career:EvidenceRecognition ;
+    ar:evaluatesStage career:RecognitionEffortStage, career:RecognitionVisibilityStage, career:RecognitionRewardStage, career:RecognitionCompensationStage ;
+    ar:hasGuardrail career:NoUnrequestedTiming, career:SemanticIntentOnly ;
+    ar:overrideCondition "Add timing only when the user explicitly asks when recognition will arrive." .
+
+career:ManagerRelationship a ar:QuestionType ;
+    ar:stableId "career.manager_relationship" ; ar:runtimeKey "manager_relationship" ;
+    skos:prefLabel "Relationship with manager"@en ;
+    ar:questionExample "How will my relationship with my manager develop?" ;
+    ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H6, career:H9, career:H10, career:H11 ;
+    ar:defaultExcludesFactor career:Amatyakaraka, career:Karakamsha, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapManagerRelationship ;
+    ar:allowedAnswerMode career:ModeRelationshipReading ;
+    ar:usesAnswerContract career:ContractManagerRelationship ;
+    ar:hasEvidencePolicy career:EvidenceManager ;
+    ar:evaluatesStage career:ManagerDailyInteractionStage, career:ManagerGuidanceStage, career:ManagerAuthorityStage, career:ManagerSupportStage ;
+    ar:hasGuardrail career:NoUnrequestedTiming, career:SemanticIntentOnly ;
+    ar:overrideCondition "Add dasha and transit only when the user asks about development during a specified period or asks when relations improve." .
+
+career:PromotionTiming a ar:QuestionType ;
+    ar:stableId "career.promotion" ; ar:runtimeKey "promotion" ;
+    skos:prefLabel "Promotion and advancement"@en ;
+    ar:questionExample "When will I get promoted?" ;
+    ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H2, career:H6, career:H10, career:H11, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapDashaActivation, career:CapTransitActivation, career:CapPromotionDecision ;
+    ar:allowedAnswerMode career:ModeDecisionSupport ;
+    ar:usesAnswerContract career:ContractCareerTiming ;
+    ar:hasEvidencePolicy career:EvidencePromotion ;
+    ar:evaluatesStage career:PromotionResponsibilityStage, career:PromotionRecognitionStage, career:PromotionCompensationStage ;
+    ar:hasGuardrail career:NoPromotionFromVisibilityAlone, career:SemanticIntentOnly .
+
+career:PromotionResponsibilityStage a ar:DecisionStage ;
+    ar:stableId "career.promotion.stage.responsibility" ;
+    ar:sequence 1 ;
+    skos:prefLabel "Increased responsibility and visibility"@en ;
+    ar:stageRequiresFactor career:H6, career:H10 .
+
+career:PromotionRecognitionStage a ar:DecisionStage ;
+    ar:stableId "career.promotion.stage.recognition" ;
+    ar:sequence 2 ;
+    skos:prefLabel "Recognition and advancement"@en ;
+    ar:stageRequiresFactor career:H10, career:H11 .
+
+career:PromotionCompensationStage a ar:DecisionStage ;
+    ar:stableId "career.promotion.stage.compensation" ;
+    ar:sequence 3 ;
+    skos:prefLabel "Compensation and formalization"@en ;
+    ar:stageRequiresFactor career:H2, career:H6, career:H10, career:H11 .
+
+career:SalaryIncrease a ar:QuestionType ;
+    ar:stableId "career.salary_increase" ; ar:runtimeKey "salary_increase" ;
+    skos:prefLabel "Salary or compensation increase"@en ;
+    ar:questionExample "Will I get a salary increase?" ;
+    ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H2, career:H6, career:H10, career:H11, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapDashaActivation, career:CapTransitActivation, career:CapCompensationDecision ;
+    ar:allowedAnswerMode career:ModeDecisionSupport ;
+    ar:usesAnswerContract career:ContractCareerTiming ;
+    ar:hasEvidencePolicy career:EvidenceCompensation ;
+    ar:evaluatesStage career:SalaryIncomeStage, career:SalaryEmploymentStage, career:SalaryRoleStage, career:SalaryGainStage ;
+    ar:hasGuardrail career:NoSalaryFromIncomeAlone, career:SemanticIntentOnly .
+
+career:BusinessOrEmployment a ar:QuestionType ;
+    ar:stableId "career.business_or_employment" ; ar:runtimeKey "business_vs_employment" ;
+    skos:prefLabel "Business versus employment"@en ;
+    ar:questionExample "Should I choose business or employment?" ;
+    ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:Amatyakaraka, career:Karakamsha, career:H2, career:H3, career:H6, career:H7, career:H10, career:H11 ;
+    ar:defaultExcludesFactor career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapJaiminiVocation, career:CapBusinessEmploymentDecision ;
+    ar:allowedAnswerMode career:ModePotentialCapacity ;
+    ar:usesAnswerContract career:ContractStaticCareer ;
+    ar:hasEvidencePolicy career:EvidenceBusinessEmployment ;
+    ar:evaluatesStage career:PathEmploymentStage, career:PathInitiativeStage, career:PathEnterpriseStage, career:PathViabilityStage ;
+    ar:hasGuardrail career:NoBusinessFromH7Alone, career:NoUnrequestedTiming, career:SemanticIntentOnly .
+
+career:JobChangeTiming a ar:QuestionType ;
+    ar:stableId "career.job_change_timing" ; ar:runtimeKey "job_change_timing" ;
+    skos:prefLabel "Timing of a job change"@en ;
+    ar:questionExample "Is this a good period for changing jobs?" ;
+    ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H2, career:H3, career:H6, career:H10, career:H11, career:H12, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapDashaActivation, career:CapTransitActivation, career:CapJobChangeTiming ;
+    ar:allowedAnswerMode career:ModeDecisionSupport ;
+    ar:usesAnswerContract career:ContractCareerTiming ;
+    ar:hasEvidencePolicy career:EvidenceJobChangeTiming ;
+    ar:evaluatesRule career:RuleChange, career:RuleSeparation, career:RuleLanding ;
+    ar:evaluatesStage career:JobMovementStage, career:JobSeparationStage, career:JobLandingStage ;
+    ar:hasGuardrail career:NoResignationFromVocation, career:SemanticIntentOnly .
+
+career:PromotionVsJobChange a ar:QuestionType ;
+    ar:stableId "career.promotion_vs_job_change" ; ar:runtimeKey "promotion_vs_job_change" ;
+    skos:prefLabel "Promotion versus job change"@en ;
+    ar:questionExample "Is promotion or a job change more likely in the next year?" ;
+    ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H2, career:H3, career:H6, career:H10, career:H11, career:H12, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapDashaActivation, career:CapTransitActivation, career:CapPromotionDecision, career:CapJobChangeTiming ;
+    ar:allowedAnswerMode career:ModeDecisionSupport ;
+    ar:usesAnswerContract career:ContractCareerTiming ;
+    ar:hasEvidencePolicy career:EvidencePromotionVsJobChange ;
+    ar:evaluatesRule career:RuleChange, career:RuleSeparation, career:RuleLanding ;
+    ar:evaluatesStage career:PromotionResponsibilityStage, career:PromotionRecognitionStage, career:PromotionCompensationStage, career:JobMovementStage, career:JobSeparationStage, career:JobLandingStage ;
+    ar:hasGuardrail career:NoPromotionFromVisibilityAlone, career:NoResignationFromVocation, career:SemanticIntentOnly .
+
+career:WorkplaceConflict a ar:QuestionType ;
+    ar:stableId "career.workplace_conflict" ; ar:runtimeKey "workplace_conflict" ;
+    skos:prefLabel "Workplace conflict and politics"@en ;
+    ar:questionExample "Why am I facing conflict at work?" ;
+    ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H6, career:H9, career:H10, career:H11 ;
+    ar:defaultExcludesFactor career:Amatyakaraka, career:Karakamsha, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapWorkplaceConflict ;
+    ar:allowedAnswerMode career:ModeProblemDiagnosis ;
+    ar:usesAnswerContract career:ContractCareerDiagnosis ;
+    ar:hasEvidencePolicy career:EvidenceWorkplaceConflict ;
+    ar:evaluatesStage career:ConflictDailyStage, career:ConflictManagerStage, career:ConflictAuthorityStage, career:ConflictTeamStage ;
+    ar:hasGuardrail career:NoUnrequestedTiming, career:SemanticIntentOnly ;
+    ar:overrideCondition "Add timing only when the user asks when the conflict will improve or names a period." .
+
+# ---------------------------------------------------------------------------
+# Question-specific decision stages. Every Career question type expands to
+# the human decision stages it evaluates; each stage expands to exact factors.
+# ---------------------------------------------------------------------------
+
+career:OverallFoundationStage a ar:DecisionStage ; ar:sequence 1 ; skos:prefLabel "Natal professional foundation"@en ; ar:stageRequiresFactor career:D1, career:H10 .
+career:OverallExpressionStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Professional expression and work environment"@en ; ar:stageRequiresFactor career:D10, career:H6, career:H10 .
+career:OverallVocationStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Vocation and professional ability"@en ; ar:stageRequiresFactor career:Amatyakaraka, career:Karakamsha .
+career:OverallOutcomeStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Income, recognition and fulfilment"@en ; ar:stageRequiresFactor career:H2, career:H11 .
+
+career:FitWorkFunctionStage a ar:DecisionStage ; ar:sequence 1 ; skos:prefLabel "Natural work functions and strengths"@en ; ar:stageRequiresFactor career:D1, career:D10, career:H10 .
+career:FitVocationStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Jaimini vocation signature"@en ; ar:stageRequiresFactor career:Amatyakaraka, career:Karakamsha .
+career:FitWorkSettingStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Suitable work setting"@en ; ar:stageRequiresFactor career:H6, career:H10 .
+career:FitViabilityStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Income and long-term viability"@en ; ar:stageRequiresFactor career:H2, career:H11 .
+
+career:JobContinuityStage a ar:DecisionStage ; ar:sequence 1 ; skos:prefLabel "Continuity in the current job"@en ; ar:stageRequiresFactor career:H6, career:H10 .
+career:JobMovementStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Movement toward a change"@en ; ar:stageRequiresFactor career:H3, career:H10 .
+career:JobSeparationStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Separation from the current role"@en ; ar:stageRequiresFactor career:H10, career:H12 .
+career:JobLandingStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Landing and sustaining the next role"@en ; ar:stageRequiresFactor career:H2, career:H6, career:H10, career:H11 .
+
+career:RecognitionEffortStage a ar:DecisionStage ; ar:sequence 1 ; skos:prefLabel "Effort and work performed"@en ; ar:stageRequiresFactor career:H6 .
+career:RecognitionVisibilityStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Visibility and professional credit"@en ; ar:stageRequiresFactor career:H10 .
+career:RecognitionRewardStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Recognition and goal fulfilment"@en ; ar:stageRequiresFactor career:H11 .
+career:RecognitionCompensationStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Material acknowledgement"@en ; ar:stageRequiresFactor career:H2 .
+
+career:ManagerDailyInteractionStage a ar:DecisionStage ; ar:sequence 1 ; skos:prefLabel "Daily working relationship"@en ; ar:stageRequiresFactor career:H6 .
+career:ManagerGuidanceStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Manager, mentor and guidance dynamic"@en ; ar:stageRequiresFactor career:H9 .
+career:ManagerAuthorityStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Authority, reputation and accountability"@en ; ar:stageRequiresFactor career:H10 .
+career:ManagerSupportStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Support, recognition and shared goals"@en ; ar:stageRequiresFactor career:H11 .
+
+career:SalaryIncomeStage a ar:DecisionStage ; ar:sequence 1 ; skos:prefLabel "Income and compensation movement"@en ; ar:stageRequiresFactor career:H2 .
+career:SalaryEmploymentStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Employment continuity and workload"@en ; ar:stageRequiresFactor career:H6 .
+career:SalaryRoleStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Role and responsibility basis"@en ; ar:stageRequiresFactor career:H10 .
+career:SalaryGainStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Gain, approval and formal award"@en ; ar:stageRequiresFactor career:H11 .
+
+career:PathEmploymentStage a ar:DecisionStage ; ar:sequence 1 ; skos:prefLabel "Employment and structured service"@en ; ar:stageRequiresFactor career:H6, career:H10 .
+career:PathInitiativeStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Independent initiative and risk capacity"@en ; ar:stageRequiresFactor career:H3 .
+career:PathEnterpriseStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Business, clients and partnerships"@en ; ar:stageRequiresFactor career:H7, career:H10 .
+career:PathViabilityStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Income and commercial viability"@en ; ar:stageRequiresFactor career:H2, career:H11 .
+
+career:ConflictDailyStage a ar:DecisionStage ; ar:sequence 1 ; skos:prefLabel "Daily friction, workload and competition"@en ; ar:stageRequiresFactor career:H6 .
+career:ConflictManagerStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Manager, mentor or guidance conflict"@en ; ar:stageRequiresFactor career:H9 .
+career:ConflictAuthorityStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Authority, status and reputation pressure"@en ; ar:stageRequiresFactor career:H10 .
+career:ConflictTeamStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Team support, alliances and recognition"@en ; ar:stageRequiresFactor career:H11 .
+
+# ---------------------------------------------------------------------------
+# Full non-graph Career subtype parity (ontology 0.5.0).
+# ---------------------------------------------------------------------------
+
+career:RuleDisruption a ar:DecisionRule ; ar:stableId "career.decision.disruption" ;
+    ar:ruleText "H8 with H10 or H12 shows restructuring or instability pressure, not automatic job loss." .
+
+career:EmploymentSearch a ar:QuestionType ;
+    ar:stableId "career.employment" ; ar:runtimeKey "employment" ; skos:prefLabel "Employment and job search"@en ;
+    ar:questionExample "When will I get a job?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H2, career:H6, career:H10, career:H11, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapDashaActivation, career:CapTransitActivation, career:CapEmploymentDelivery ;
+    ar:allowedAnswerMode career:ModeDecisionSupport ; ar:usesAnswerContract career:ContractCareerTiming ; ar:hasEvidencePolicy career:EvidenceEmployment ;
+    ar:evaluatesStage career:CareerFoundationStage, career:EmploymentWorkStage, career:EmploymentRoleStage, career:EmploymentOutcomeStage, career:DeliveryTimingStage ;
+    ar:hasGuardrail career:NoOfferFromActivityAlone, career:SemanticIntentOnly .
+
+career:SpecificJobOffer a ar:QuestionType ;
+    ar:stableId "career.offer" ; ar:runtimeKey "offer" ; skos:prefLabel "Specific job offer"@en ;
+    ar:questionExample "Will I receive this job offer?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H2, career:H6, career:H10, career:H11, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapDashaActivation, career:CapTransitActivation, career:CapOfferDelivery ;
+    ar:allowedAnswerMode career:ModeDecisionSupport ; ar:usesAnswerContract career:ContractCareerTiming ; ar:hasEvidencePolicy career:EvidenceOffer ;
+    ar:evaluatesStage career:CareerFoundationStage, career:OfferOpportunityStage, career:OfferSelectionStage, career:OfferFormalizationStage, career:DeliveryTimingStage ;
+    ar:hasGuardrail career:NoOfferFromActivityAlone, career:SemanticIntentOnly .
+
+career:JobJoining a ar:QuestionType ;
+    ar:stableId "career.joining" ; ar:runtimeKey "joining" ; skos:prefLabel "Job joining and start"@en ;
+    ar:questionExample "When will I join the new job?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H3, career:H6, career:H10, career:H11, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapDashaActivation, career:CapTransitActivation, career:CapJoiningDelivery ;
+    ar:allowedAnswerMode career:ModeDecisionSupport ; ar:usesAnswerContract career:ContractCareerTiming ; ar:hasEvidencePolicy career:EvidenceJoining ;
+    ar:evaluatesStage career:CareerFoundationStage, career:JoiningMovementStage, career:JoiningEmploymentStage, career:JoiningRoleStage, career:DeliveryTimingStage ;
+    ar:hasGuardrail career:NoJoiningFromChangeAlone, career:SemanticIntentOnly .
+
+career:JobSecurity a ar:QuestionType ;
+    ar:stableId "career.job_security" ; ar:runtimeKey "job_security" ; skos:prefLabel "Job security and continuity"@en ;
+    ar:questionExample "Is my job secure?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H2, career:H6, career:H8, career:H10, career:H11, career:H12, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapDashaActivation, career:CapTransitActivation, career:CapJobSecurityDecision ;
+    ar:allowedAnswerMode career:ModeDecisionSupport ; ar:usesAnswerContract career:ContractCareerDecision ; ar:hasEvidencePolicy career:EvidenceJobSecurity ;
+    ar:evaluatesRule career:RuleStay, career:RuleSeparation, career:RuleDisruption ;
+    ar:evaluatesStage career:CareerFoundationStage, career:SecurityContinuityStage, career:SecurityIncomeStage, career:SecurityDisruptionStage, career:DeliveryTimingStage ;
+    ar:hasGuardrail career:NoJobLossFromPressureAlone, career:NoResignationFromVocation, career:SemanticIntentOnly .
+
+career:BusinessProfile a ar:QuestionType ;
+    ar:stableId "career.business" ; ar:runtimeKey "business" ; skos:prefLabel "Business potential and operating profile"@en ;
+    ar:questionExample "How is business indicated for me?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:Amatyakaraka, career:Karakamsha, career:H2, career:H7, career:H10, career:H11 ;
+    ar:defaultExcludesFactor career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapJaiminiVocation, career:CapBusinessProfile ;
+    ar:allowedAnswerMode career:ModeTopicReading ; ar:usesAnswerContract career:ContractStaticCareer ; ar:hasEvidencePolicy career:EvidenceBusiness ;
+    ar:evaluatesStage career:CareerFoundationStage, career:VocationConfirmationStage, career:BusinessClientStage, career:BusinessProfessionStage, career:BusinessViabilityStage ;
+    ar:hasGuardrail career:NoBusinessFromH7Alone, career:NoUnrequestedTiming, career:SemanticIntentOnly .
+
+career:BusinessLaunch a ar:QuestionType ;
+    ar:stableId "career.business_launch" ; ar:runtimeKey "business_launch" ; skos:prefLabel "Starting a business"@en ;
+    ar:questionExample "When should I start my business?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H3, career:H7, career:H10, career:H11, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapDashaActivation, career:CapTransitActivation, career:CapBusinessLaunch ;
+    ar:allowedAnswerMode career:ModeDecisionSupport ; ar:usesAnswerContract career:ContractCareerTiming ; ar:hasEvidencePolicy career:EvidenceBusinessLaunch ;
+    ar:evaluatesStage career:CareerFoundationStage, career:LaunchInitiativeStage, career:LaunchClientStage, career:LaunchExecutionStage, career:DeliveryTimingStage ;
+    ar:hasGuardrail career:NoBusinessFromH7Alone, career:SemanticIntentOnly .
+
+career:BusinessSuccess a ar:QuestionType ;
+    ar:stableId "career.business_success" ; ar:runtimeKey "business_success" ; skos:prefLabel "Business success and growth"@en ;
+    ar:questionExample "Will my existing business succeed?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H2, career:H7, career:H10, career:H11, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapDashaActivation, career:CapTransitActivation, career:CapBusinessSuccess ;
+    ar:allowedAnswerMode career:ModeDecisionSupport ; ar:usesAnswerContract career:ContractCareerTiming ; ar:hasEvidencePolicy career:EvidenceBusinessSuccess ;
+    ar:evaluatesStage career:CareerFoundationStage, career:BusinessRevenueStage, career:BusinessMarketStage, career:BusinessStandingStage, career:BusinessGainStage, career:DeliveryTimingStage ;
+    ar:hasGuardrail career:NoBusinessFromH7Alone, career:SemanticIntentOnly .
+
+career:ProjectOutcome a ar:QuestionType ;
+    ar:stableId "career.project" ; ar:runtimeKey "project" ; skos:prefLabel "Professional project outcome"@en ;
+    ar:questionExample "Will this project succeed?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H3, career:H6, career:H10, career:H11, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapDashaActivation, career:CapTransitActivation, career:CapProjectDelivery ;
+    ar:allowedAnswerMode career:ModeDecisionSupport ; ar:usesAnswerContract career:ContractCareerTiming ; ar:hasEvidencePolicy career:EvidenceProject ;
+    ar:evaluatesStage career:CareerFoundationStage, career:ProjectInitiativeStage, career:ProjectExecutionStage, career:ProjectDeliveryStage, career:ProjectOutcomeStage, career:DeliveryTimingStage ;
+    ar:hasGuardrail career:NoProjectSuccessFromWorkload, career:SemanticIntentOnly .
+
+career:LeadershipPotential a ar:QuestionType ;
+    ar:stableId "career.leadership" ; ar:runtimeKey "leadership" ; skos:prefLabel "Leadership and management potential"@en ;
+    ar:questionExample "Am I suited for a leadership role?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:Amatyakaraka, career:Karakamsha, career:H1, career:H5, career:H9, career:H10 ;
+    ar:defaultExcludesFactor career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapJaiminiVocation, career:CapLeadershipProfile ;
+    ar:allowedAnswerMode career:ModePotentialCapacity ; ar:usesAnswerContract career:ContractStaticCareer ; ar:hasEvidencePolicy career:EvidenceLeadership ;
+    ar:evaluatesStage career:CareerFoundationStage, career:VocationConfirmationStage, career:LeadershipIdentityStage, career:LeadershipJudgmentStage, career:LeadershipAuthorityStage ;
+    ar:hasGuardrail career:NoLeadershipFromSunAlone, career:NoUnrequestedTiming, career:SemanticIntentOnly .
+
+career:GovernmentCareer a ar:QuestionType ;
+    ar:stableId "career.government" ; ar:runtimeKey "government" ; skos:prefLabel "Government or public-sector career"@en ;
+    ar:questionExample "Will I get a government job?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H6, career:H9, career:H10, career:H11, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapDashaActivation, career:CapTransitActivation, career:CapGovernmentCareer ;
+    ar:allowedAnswerMode career:ModeDecisionSupport ; ar:usesAnswerContract career:ContractCareerTiming ; ar:hasEvidencePolicy career:EvidenceGovernment ;
+    ar:evaluatesStage career:CareerFoundationStage, career:GovernmentCompetitionStage, career:GovernmentInstitutionStage, career:GovernmentAuthorityStage, career:GovernmentSelectionStage, career:DeliveryTimingStage ;
+    ar:hasGuardrail career:NoGovernmentFromSunAlone, career:SemanticIntentOnly .
+
+career:ForeignCareer a ar:QuestionType ;
+    ar:stableId "career.foreign_career" ; ar:runtimeKey "foreign_career" ; skos:prefLabel "Foreign or overseas career"@en ;
+    ar:questionExample "Will I get a job abroad?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H3, career:H9, career:H10, career:H12, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapDashaActivation, career:CapTransitActivation, career:CapForeignCareer ;
+    ar:allowedAnswerMode career:ModeDecisionSupport ; ar:usesAnswerContract career:ContractCareerTiming ; ar:hasEvidencePolicy career:EvidenceForeignCareer ;
+    ar:evaluatesStage career:CareerFoundationStage, career:ForeignMovementStage, career:ForeignOpportunityStage, career:ForeignProfessionStage, career:ForeignSeparationStage, career:DeliveryTimingStage ;
+    ar:hasGuardrail career:NoForeignFromH12Alone, career:SemanticIntentOnly .
+
+career:ReturnToWork a ar:QuestionType ;
+    ar:stableId "career.return_to_work" ; ar:runtimeKey "return_to_work" ; skos:prefLabel "Return to work after a break"@en ;
+    ar:questionExample "When will I return to work after my career break?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H3, career:H6, career:H10, career:H11, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapDashaActivation, career:CapTransitActivation, career:CapReturnToWork ;
+    ar:allowedAnswerMode career:ModeDecisionSupport ; ar:usesAnswerContract career:ContractCareerTiming ; ar:hasEvidencePolicy career:EvidenceReturnToWork ;
+    ar:evaluatesStage career:CareerFoundationStage, career:ReturnReentryStage, career:ReturnEmploymentStage, career:ReturnRoleStage, career:ReturnOutcomeStage, career:DeliveryTimingStage ;
+    ar:hasGuardrail career:NoReturnFromEffortAlone, career:SemanticIntentOnly .
+
+career:CareerStagnation a ar:QuestionType ;
+    ar:stableId "career.stagnation" ; ar:runtimeKey "career_stagnation" ; skos:prefLabel "Career stagnation and blockage"@en ;
+    ar:questionExample "Why is my career not progressing?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H6, career:H8, career:H10, career:H11 ;
+    ar:defaultExcludesFactor career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapCareerStagnation ;
+    ar:allowedAnswerMode career:ModeProblemDiagnosis ; ar:usesAnswerContract career:ContractCareerDiagnosis ; ar:hasEvidencePolicy career:EvidenceCareerStagnation ;
+    ar:evaluatesStage career:CareerFoundationStage, career:StagnationWorkStage, career:StagnationObstructionStage, career:StagnationVisibilityStage, career:StagnationGainStage ;
+    ar:hasGuardrail career:NoUnrequestedTiming, career:SemanticIntentOnly .
+
+career:ColleagueRelationship a ar:QuestionType ;
+    ar:stableId "career.colleague_relationship" ; ar:runtimeKey "colleague_relationship" ; skos:prefLabel "Relationship with colleague or peer"@en ;
+    ar:questionExample "Why am I having difficulty with my colleague?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H3, career:H6, career:H10, career:H11 ;
+    ar:defaultExcludesFactor career:Amatyakaraka, career:Karakamsha, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapColleagueRelationship ;
+    ar:allowedAnswerMode career:ModeRelationshipReading ; ar:usesAnswerContract career:ContractWorkRelationship ; ar:hasEvidencePolicy career:EvidenceWorkRelationship ;
+    ar:evaluatesStage career:RelationshipFoundationStage, career:ColleagueCommunicationStage, career:ColleagueDailyWorkStage, career:ColleagueStandingStage, career:ColleagueTeamStage ;
+    ar:hasGuardrail career:RoleSpecificRelationshipOnly, career:NoUnrequestedTiming, career:SemanticIntentOnly .
+
+career:SubordinateRelationship a ar:QuestionType ;
+    ar:stableId "career.subordinate_relationship" ; ar:runtimeKey "subordinate_relationship" ; skos:prefLabel "Relationship with direct report or team member"@en ;
+    ar:questionExample "How should I handle my direct report?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H6, career:H10, career:H11 ;
+    ar:defaultExcludesFactor career:Amatyakaraka, career:Karakamsha, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapSubordinateRelationship ;
+    ar:allowedAnswerMode career:ModeRelationshipReading ; ar:usesAnswerContract career:ContractWorkRelationship ; ar:hasEvidencePolicy career:EvidenceWorkRelationship ;
+    ar:evaluatesStage career:RelationshipFoundationStage, career:SubordinateExecutionStage, career:SubordinateAuthorityStage, career:SubordinateResultStage ;
+    ar:hasGuardrail career:RoleSpecificRelationshipOnly, career:NoUnrequestedTiming, career:SemanticIntentOnly .
+
+career:ClientRelationship a ar:QuestionType ;
+    ar:stableId "career.client_relationship" ; ar:runtimeKey "client_relationship" ; skos:prefLabel "Relationship with client or customer"@en ;
+    ar:questionExample "How will my relationship with this client develop?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H2, career:H7, career:H10, career:H11 ;
+    ar:defaultExcludesFactor career:Amatyakaraka, career:Karakamsha, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapClientRelationship ;
+    ar:allowedAnswerMode career:ModeRelationshipReading ; ar:usesAnswerContract career:ContractWorkRelationship ; ar:hasEvidencePolicy career:EvidenceWorkRelationship ;
+    ar:evaluatesStage career:RelationshipFoundationStage, career:ClientAgreementStage, career:ClientValueStage, career:ClientDeliveryStage, career:ClientGainStage ;
+    ar:hasGuardrail career:RoleSpecificRelationshipOnly, career:NoUnrequestedTiming, career:SemanticIntentOnly .
+
+career:BusinessPartnerRelationship a ar:QuestionType ;
+    ar:stableId "career.business_partner_relationship" ; ar:runtimeKey "business_partner_relationship" ; skos:prefLabel "Relationship with business partner"@en ;
+    ar:questionExample "How compatible am I with my business partner?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H2, career:H7, career:H10, career:H11 ;
+    ar:defaultExcludesFactor career:Amatyakaraka, career:Karakamsha, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapBusinessPartnerRelationship ;
+    ar:allowedAnswerMode career:ModeRelationshipReading ; ar:usesAnswerContract career:ContractWorkRelationship ; ar:hasEvidencePolicy career:EvidenceWorkRelationship ;
+    ar:evaluatesStage career:RelationshipFoundationStage, career:PartnerAgreementStage, career:PartnerValueStage, career:PartnerResponsibilityStage, career:PartnerGainStage ;
+    ar:hasGuardrail career:RoleSpecificRelationshipOnly, career:NoUnrequestedTiming, career:SemanticIntentOnly .
+
+career:MentorRelationship a ar:QuestionType ;
+    ar:stableId "career.mentor_relationship" ; ar:runtimeKey "mentor_relationship" ; skos:prefLabel "Relationship with mentor or professional guide"@en ;
+    ar:questionExample "How will my relationship with my mentor develop?" ; ar:inDomain career:Career ;
+    ar:requiresFactor career:D1, career:D10, career:H5, career:H9, career:H10, career:H11 ;
+    ar:defaultExcludesFactor career:Amatyakaraka, career:Karakamsha, career:DashaActivation, career:TransitActivation ;
+    ar:requiresCapability career:CapD1Foundation, career:CapD10Expression, career:CapMentorRelationship ;
+    ar:allowedAnswerMode career:ModeRelationshipReading ; ar:usesAnswerContract career:ContractWorkRelationship ; ar:hasEvidencePolicy career:EvidenceWorkRelationship ;
+    ar:evaluatesStage career:RelationshipFoundationStage, career:MentorCounselStage, career:MentorGuidanceStage, career:MentorDevelopmentStage, career:MentorSupportStage ;
+    ar:hasGuardrail career:RoleSpecificRelationshipOnly, career:NoUnrequestedTiming, career:SemanticIntentOnly .
+
+# Shared and subtype-specific stage nodes for the parity routes.
+career:CareerFoundationStage a ar:DecisionStage ; ar:sequence 1 ; skos:prefLabel "D1 promise and D10 professional expression"@en ; ar:stageRequiresFactor career:D1, career:D10 .
+career:RelationshipFoundationStage a ar:DecisionStage ; ar:sequence 1 ; skos:prefLabel "D1 relationship basis with D10 confirmation"@en ; ar:stageRequiresFactor career:D1, career:D10 .
+career:VocationConfirmationStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Amatyakaraka and Karakamsha confirmation"@en ; ar:stageRequiresFactor career:Amatyakaraka, career:Karakamsha .
+career:DeliveryTimingStage a ar:DecisionStage ; ar:sequence 9 ; skos:prefLabel "Dasha delivery with transit confirmation"@en ; ar:stageRequiresFactor career:DashaActivation, career:TransitActivation .
+
+career:EmploymentWorkStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Employability, applications and competition"@en ; ar:stageRequiresFactor career:H6 .
+career:EmploymentRoleStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Role and professional placement"@en ; ar:stageRequiresFactor career:H10 .
+career:EmploymentOutcomeStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Selection, income and gains"@en ; ar:stageRequiresFactor career:H2, career:H11 .
+career:OfferOpportunityStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Open role and employment opportunity"@en ; ar:stageRequiresFactor career:H6, career:H10 .
+career:OfferSelectionStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Selection and approval"@en ; ar:stageRequiresFactor career:H10, career:H11 .
+career:OfferFormalizationStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Written offer and compensation formalization"@en ; ar:stageRequiresFactor career:H2, career:H6, career:H10, career:H11 .
+career:JoiningMovementStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Movement toward the new role"@en ; ar:stageRequiresFactor career:H3 .
+career:JoiningEmploymentStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Employment and onboarding permission"@en ; ar:stageRequiresFactor career:H6 .
+career:JoiningRoleStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Role confirmation and joining execution"@en ; ar:stageRequiresFactor career:H10, career:H11 .
+career:SecurityContinuityStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Employment and role continuity"@en ; ar:stageRequiresFactor career:H6, career:H10 .
+career:SecurityIncomeStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Income and gains continuity"@en ; ar:stageRequiresFactor career:H2, career:H11 .
+career:SecurityDisruptionStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Restructuring and separation pressure"@en ; ar:stageRequiresFactor career:H8, career:H12 .
+
+career:BusinessClientStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Clients, contracts and partnerships"@en ; ar:stageRequiresFactor career:H7 .
+career:BusinessProfessionStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Enterprise role and execution"@en ; ar:stageRequiresFactor career:H10 .
+career:BusinessViabilityStage a ar:DecisionStage ; ar:sequence 5 ; skos:prefLabel "Revenue and commercial viability"@en ; ar:stageRequiresFactor career:H2, career:H11 .
+career:LaunchInitiativeStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Enterprise initiative and launch action"@en ; ar:stageRequiresFactor career:H3 .
+career:LaunchClientStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Initial clients and agreements"@en ; ar:stageRequiresFactor career:H7 .
+career:LaunchExecutionStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Business execution and viable gains"@en ; ar:stageRequiresFactor career:H10, career:H11 .
+career:BusinessRevenueStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Revenue and resources"@en ; ar:stageRequiresFactor career:H2 .
+career:BusinessMarketStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Clients, market and contracts"@en ; ar:stageRequiresFactor career:H7 .
+career:BusinessStandingStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Operating standing and execution"@en ; ar:stageRequiresFactor career:H10 .
+career:BusinessGainStage a ar:DecisionStage ; ar:sequence 5 ; skos:prefLabel "Growth, gains and fulfilment"@en ; ar:stageRequiresFactor career:H11 .
+
+career:ProjectInitiativeStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Project initiative and ownership"@en ; ar:stageRequiresFactor career:H3 .
+career:ProjectExecutionStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Workload and execution"@en ; ar:stageRequiresFactor career:H6 .
+career:ProjectDeliveryStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Accountable professional delivery"@en ; ar:stageRequiresFactor career:H10 .
+career:ProjectOutcomeStage a ar:DecisionStage ; ar:sequence 5 ; skos:prefLabel "Approval, gains and project outcome"@en ; ar:stageRequiresFactor career:H11 .
+career:LeadershipIdentityStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Leadership identity and initiative"@en ; ar:stageRequiresFactor career:H1 .
+career:LeadershipJudgmentStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Strategic judgment and counsel"@en ; ar:stageRequiresFactor career:H5, career:H9 .
+career:LeadershipAuthorityStage a ar:DecisionStage ; ar:sequence 5 ; skos:prefLabel "Authority and visible responsibility"@en ; ar:stageRequiresFactor career:H10 .
+career:GovernmentCompetitionStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Competition, examination and service"@en ; ar:stageRequiresFactor career:H6 .
+career:GovernmentInstitutionStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Institution, merit and guidance"@en ; ar:stageRequiresFactor career:H9 .
+career:GovernmentAuthorityStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Public authority and role"@en ; ar:stageRequiresFactor career:H10 .
+career:GovernmentSelectionStage a ar:DecisionStage ; ar:sequence 5 ; skos:prefLabel "Selection, result and gains"@en ; ar:stageRequiresFactor career:H11 .
+career:ForeignMovementStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Movement and application"@en ; ar:stageRequiresFactor career:H3 .
+career:ForeignOpportunityStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Long-distance and international opportunity"@en ; ar:stageRequiresFactor career:H9 .
+career:ForeignProfessionStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Profession and overseas role"@en ; ar:stageRequiresFactor career:H10 .
+career:ForeignSeparationStage a ar:DecisionStage ; ar:sequence 5 ; skos:prefLabel "Foreign residence and separation from home base"@en ; ar:stageRequiresFactor career:H12 .
+career:ReturnReentryStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Re-entry initiative and applications"@en ; ar:stageRequiresFactor career:H3 .
+career:ReturnEmploymentStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Employability and work routine"@en ; ar:stageRequiresFactor career:H6 .
+career:ReturnRoleStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Professional role restoration"@en ; ar:stageRequiresFactor career:H10 .
+career:ReturnOutcomeStage a ar:DecisionStage ; ar:sequence 5 ; skos:prefLabel "Selection, support and gains"@en ; ar:stageRequiresFactor career:H11 .
+career:StagnationWorkStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Effort and workload pattern"@en ; ar:stageRequiresFactor career:H6 .
+career:StagnationObstructionStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Disruption and hidden blockage"@en ; ar:stageRequiresFactor career:H8 .
+career:StagnationVisibilityStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Professional visibility and advancement"@en ; ar:stageRequiresFactor career:H10 .
+career:StagnationGainStage a ar:DecisionStage ; ar:sequence 5 ; skos:prefLabel "Gains, goals and fulfilment"@en ; ar:stageRequiresFactor career:H11 .
+
+career:ColleagueCommunicationStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Peer communication and coordination"@en ; ar:stageRequiresFactor career:H3 .
+career:ColleagueDailyWorkStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Daily work and peer friction"@en ; ar:stageRequiresFactor career:H6 .
+career:ColleagueStandingStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Roles, accountability and professional standing"@en ; ar:stageRequiresFactor career:H10 .
+career:ColleagueTeamStage a ar:DecisionStage ; ar:sequence 5 ; skos:prefLabel "Team support and shared goals"@en ; ar:stageRequiresFactor career:H11 .
+career:SubordinateExecutionStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Staff execution and daily work"@en ; ar:stageRequiresFactor career:H6 .
+career:SubordinateAuthorityStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Authority, delegation and accountability"@en ; ar:stageRequiresFactor career:H10 .
+career:SubordinateResultStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Team cooperation and results"@en ; ar:stageRequiresFactor career:H11 .
+career:ClientAgreementStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Client agreement and counterpart"@en ; ar:stageRequiresFactor career:H7 .
+career:ClientValueStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Fees, value and commercial communication"@en ; ar:stageRequiresFactor career:H2 .
+career:ClientDeliveryStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Professional delivery and reputation"@en ; ar:stageRequiresFactor career:H10 .
+career:ClientGainStage a ar:DecisionStage ; ar:sequence 5 ; skos:prefLabel "Repeat support and gains"@en ; ar:stageRequiresFactor career:H11 .
+career:PartnerAgreementStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Partnership, agreement and trust"@en ; ar:stageRequiresFactor career:H7 .
+career:PartnerValueStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Shared value and finances"@en ; ar:stageRequiresFactor career:H2 .
+career:PartnerResponsibilityStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Shared enterprise responsibility"@en ; ar:stageRequiresFactor career:H10 .
+career:PartnerGainStage a ar:DecisionStage ; ar:sequence 5 ; skos:prefLabel "Shared gains and goals"@en ; ar:stageRequiresFactor career:H11 .
+career:MentorCounselStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Counsel, learning and judgment"@en ; ar:stageRequiresFactor career:H5 .
+career:MentorGuidanceStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Mentor, guidance and trust"@en ; ar:stageRequiresFactor career:H9 .
+career:MentorDevelopmentStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Professional development"@en ; ar:stageRequiresFactor career:H10 .
+career:MentorSupportStage a ar:DecisionStage ; ar:sequence 5 ; skos:prefLabel "Support and opportunity"@en ; ar:stageRequiresFactor career:H11 .

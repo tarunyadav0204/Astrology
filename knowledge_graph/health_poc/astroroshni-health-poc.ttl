@@ -1,0 +1,151 @@
+@prefix ar: <https://astroroshni.com/ontology/core#> .
+@prefix health: <https://astroroshni.com/ontology/health#> .
+@prefix domain: <https://astroroshni.com/ontology/domain#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+health:Ontology a owl:Ontology ;
+    rdfs:label "AstroRoshni Instant Health ontology"@en ;
+    owl:versionInfo "0.1.0" .
+
+# Core graph vocabulary. Kept local while Career and Health remain independently publishable PoCs.
+ar:LifeDomain a owl:Class ; rdfs:label "Life domain"@en .
+ar:QuestionType a owl:Class ; rdfs:label "Question type"@en .
+ar:AstrologyFactor a owl:Class ; rdfs:label "Astrology factor"@en .
+ar:CalculatorCapability a owl:Class ; rdfs:label "Calculator capability"@en .
+ar:AnswerMode a owl:Class ; rdfs:label "Answer mode"@en .
+ar:AnswerContract a owl:Class ; rdfs:label "Answer contract"@en .
+ar:EvidencePolicy a owl:Class ; rdfs:label "Evidence policy"@en .
+ar:Guardrail a owl:Class ; rdfs:label "Guardrail"@en .
+ar:DecisionRule a owl:Class ; rdfs:label "Decision rule"@en .
+ar:DecisionStage a owl:Class ; rdfs:label "Decision stage"@en .
+ar:OutputSection a owl:Class ; rdfs:label "Output section"@en .
+ar:inDomain a owl:ObjectProperty ; rdfs:label "Life domain"@en .
+ar:requiresFactor a owl:ObjectProperty ; rdfs:label "Required astrology factors"@en .
+ar:defaultExcludesFactor a owl:ObjectProperty ; rdfs:label "Excluded by default"@en .
+ar:requiresCapability a owl:ObjectProperty ; rdfs:label "Required calculator capabilities"@en .
+ar:allowedAnswerMode a owl:ObjectProperty ; rdfs:label "Answer mode"@en .
+ar:usesAnswerContract a owl:ObjectProperty ; rdfs:label "Answer contract"@en .
+ar:hasEvidencePolicy a owl:ObjectProperty ; rdfs:label "Evidence policy"@en .
+ar:hasGuardrail a owl:ObjectProperty ; rdfs:label "Guardrails"@en .
+ar:evaluatesRule a owl:ObjectProperty ; rdfs:label "Decision rules"@en .
+ar:evaluatesStage a owl:ObjectProperty ; rdfs:label "Decision stages"@en .
+ar:stageRequiresFactor a owl:ObjectProperty ; rdfs:label "Required astrology factors"@en .
+ar:hasOutputSection a owl:ObjectProperty ; rdfs:label "Output sections"@en .
+ar:stableId a owl:DatatypeProperty ; rdfs:label "Stable identifier"@en .
+ar:runtimeKey a owl:DatatypeProperty ; rdfs:label "Runtime key"@en .
+ar:calculatorBinding a owl:DatatypeProperty ; rdfs:label "Calculator binding"@en .
+ar:questionExample a owl:DatatypeProperty ; rdfs:label "Question example"@en .
+ar:ruleText a owl:DatatypeProperty ; rdfs:label "Rule text"@en .
+ar:sequence a owl:DatatypeProperty ; rdfs:label "Sequence"@en .
+ar:overrideCondition a owl:DatatypeProperty ; rdfs:label "Override condition"@en .
+
+health:Health a ar:LifeDomain ; ar:stableId "health.domain.legacy_alias" ; skos:prefLabel "Health"@en ; owl:sameAs domain:HealthWellbeing .
+
+# Calculated evidence factors.
+health:D1 a ar:AstrologyFactor ; skos:prefLabel "D1 constitutional foundation"@en .
+health:D3 a ar:AstrologyFactor ; skos:prefLabel "D3 injury and physical resilience confirmation"@en .
+health:D6 a ar:AstrologyFactor ; skos:prefLabel "D6 disease-pattern confirmation"@en .
+health:D8 a ar:AstrologyFactor ; skos:prefLabel "D8 chronicity, crisis and procedural confirmation"@en .
+health:D30 a ar:AstrologyFactor ; skos:prefLabel "D30 adversity and vulnerability refinement"@en .
+health:H1 a ar:AstrologyFactor ; skos:prefLabel "Vitality, constitution and physical resilience"@en .
+health:H3 a ar:AstrologyFactor ; skos:prefLabel "Movement, courage and injury context"@en .
+health:H4 a ar:AstrologyFactor ; skos:prefLabel "Emotional base and mental comfort"@en .
+health:H5 a ar:AstrologyFactor ; skos:prefLabel "Digestion, regulation and recovery intelligence"@en .
+health:H6 a ar:AstrologyFactor ; skos:prefLabel "Disease, imbalance, treatment and daily management"@en .
+health:H8 a ar:AstrologyFactor ; skos:prefLabel "Chronicity, crisis, surgery and hidden vulnerability"@en .
+health:H11 a ar:AstrologyFactor ; skos:prefLabel "Improvement, support and recovery fulfilment"@en .
+health:H12 a ar:AstrologyFactor ; skos:prefLabel "Rest, hospitalization, drain and convalescence"@en .
+health:MedicalGrahas a ar:AstrologyFactor ; skos:prefLabel "Medical grahas with exact calculated relationships"@en .
+health:MoonMind a ar:AstrologyFactor ; skos:prefLabel "Moon and mental-emotional regulation"@en .
+health:SixthLordChain a ar:AstrologyFactor ; skos:prefLabel "Sixth-house sign, lord, placement and nakshatra chain"@en .
+health:DignityStrength a ar:AstrologyFactor ; skos:prefLabel "Dignity, functional nature and Shadbala modifiers"@en .
+health:BodyZoneEvidence a ar:AstrologyFactor ; skos:prefLabel "Calculated body-zone susceptibility evidence"@en .
+health:ProtectiveFactors a ar:AstrologyFactor ; skos:prefLabel "Calculated protective and recovery factors"@en .
+health:DashaActivation a ar:AstrologyFactor ; skos:prefLabel "Explicit dasha activation of a natal health theme"@en .
+health:TransitConfirmation a ar:AstrologyFactor ; skos:prefLabel "Dated transit confirmation of the same health theme"@en .
+
+# Executable capabilities already present in Instant Health.
+health:CapNatalFoundation a ar:CalculatorCapability ; ar:stableId "health.cap.natal" ; ar:calculatorBinding "instant_chat_pipeline: D1 health foundation and house lordships" ; skos:prefLabel "Calculate natal health foundation"@en .
+health:CapMedicalDivisionals a ar:CalculatorCapability ; ar:stableId "health.cap.divisionals" ; ar:calculatorBinding "DivisionalChartCalculator: D3, D6, D8 and D30" ; skos:prefLabel "Calculate medical divisional confirmations"@en .
+health:CapSixthLordChain a ar:CalculatorCapability ; ar:stableId "health.cap.sixth_lord" ; ar:calculatorBinding "health_body_zones: sixth house, lord, placement and nakshatra" ; skos:prefLabel "Calculate sixth-lord anatomy chain"@en .
+health:CapBodyZones a ar:CalculatorCapability ; ar:stableId "health.cap.body_zones" ; ar:calculatorBinding "reports.context.health_body_zones.build_priority_body_zones" ; skos:prefLabel "Calculate ranked susceptibility zones"@en .
+health:CapPlanetCondition a ar:CalculatorCapability ; ar:stableId "health.cap.condition" ; ar:calculatorBinding "PlanetaryDignitiesCalculator and ShadbalaCalculator" ; skos:prefLabel "Calculate severity and protection modifiers"@en .
+health:CapCategoryFilter a ar:CalculatorCapability ; ar:stableId "health.cap.category" ; ar:calculatorBinding "instant_chat_v2.answer_spec: category-specific health rules" ; skos:prefLabel "Apply health question category policy"@en .
+health:CapDashaActivation a ar:CalculatorCapability ; ar:stableId "health.cap.dasha" ; ar:calculatorBinding "instant event horizon: health-theme dasha activation" ; skos:prefLabel "Calculate health dasha activation"@en .
+health:CapTransitConfirmation a ar:CalculatorCapability ; ar:stableId "health.cap.transit" ; ar:calculatorBinding "instant transit activation timeline with Instant aspect policy" ; skos:prefLabel "Calculate dated transit confirmation"@en .
+health:CapMedicalTriage a ar:CalculatorCapability ; ar:stableId "health.cap.triage" ; ar:calculatorBinding "instant_chat_pipeline._instant_medical_triage_decision" ; skos:prefLabel "Apply medical emergency triage"@en .
+
+health:ModeConstitutional a ar:AnswerMode ; ar:runtimeKey "topic_reading" ; skos:prefLabel "Constitutional susceptibility reading"@en .
+health:ModeMentalWellbeing a ar:AnswerMode ; ar:runtimeKey "problem_diagnosis" ; skos:prefLabel "Mental-wellbeing susceptibility reading"@en .
+health:ModeSafetyAssessment a ar:AnswerMode ; ar:runtimeKey "event_prediction" ; skos:prefLabel "Restrained susceptibility assessment"@en .
+health:ModeRecoverySupport a ar:AnswerMode ; ar:runtimeKey "topic_reading" ; skos:prefLabel "Recovery-support assessment"@en .
+health:ModePeriodForecast a ar:AnswerMode ; ar:runtimeKey "timing_window" ; skos:prefLabel "Time-bound health forecast"@en .
+
+health:SectionDirectAnswer a ar:OutputSection ; skos:prefLabel "Direct answer with medical framing"@en .
+health:SectionNatalEvidence a ar:OutputSection ; skos:prefLabel "Natal vulnerability evidence"@en .
+health:SectionActivation a ar:OutputSection ; skos:prefLabel "Dated activation chain"@en .
+health:SectionProtection a ar:OutputSection ; skos:prefLabel "Protective and recovery factors"@en .
+health:SectionGuidance a ar:OutputSection ; skos:prefLabel "Responsible practical guidance"@en .
+health:ContractConstitutional a ar:AnswerContract ; ar:stableId "health.contract.constitutional" ; skos:prefLabel "Constitutional health answer"@en ; ar:hasOutputSection health:SectionDirectAnswer, health:SectionNatalEvidence, health:SectionProtection, health:SectionGuidance .
+health:ContractTimed a ar:AnswerContract ; ar:stableId "health.contract.timed" ; skos:prefLabel "Time-bound health answer"@en ; ar:hasOutputSection health:SectionDirectAnswer, health:SectionNatalEvidence, health:SectionActivation, health:SectionProtection, health:SectionGuidance .
+
+health:EvidenceConstitutional a ar:EvidencePolicy ; ar:stableId "health.evidence.constitutional" ; ar:ruleText "Lead with D1; medical divisionals only confirm. Name only calculated retained body zones and supplied mechanisms." .
+health:EvidenceMental a ar:EvidencePolicy ; ar:stableId "health.evidence.mental" ; ar:ruleText "Describe mental-emotional susceptibility without declaring a psychiatric diagnosis; preserve exact planetary relationships." .
+health:EvidenceSurgery a ar:EvidencePolicy ; ar:stableId "health.evidence.surgery" ; ar:ruleText "Separate procedural susceptibility from timing suitability; never state that surgery is required." .
+health:EvidenceAccident a ar:EvidencePolicy ; ar:stableId "health.evidence.accident" ; ar:ruleText "Describe injury susceptibility and cautious periods without predicting an accident." .
+health:EvidenceRecovery a ar:EvidencePolicy ; ar:stableId "health.evidence.recovery" ; ar:ruleText "Describe supplied support and pressure factors without promising a medical outcome." .
+health:EvidenceTimed a ar:EvidencePolicy ; ar:stableId "health.evidence.timed" ; ar:ruleText "A dated heightened phase requires natal vulnerability, explicit dasha activation and transit confirmation of the same theme." .
+
+health:EmergencyTriageFirst a ar:Guardrail ; ar:stableId "health.guard.triage" ; ar:ruleText "Active urgent symptoms bypass astrology and receive immediate medical-care guidance." .
+health:NoDiagnosis a ar:Guardrail ; ar:stableId "health.guard.no_diagnosis" ; ar:ruleText "Astrology describes susceptibility only and never diagnoses disease." .
+health:NoBodyPartWithoutEvidence a ar:Guardrail ; ar:stableId "health.guard.body_zone" ; ar:ruleText "Never name an organ, body system or symptom outside calculated retained body-zone evidence." .
+health:NoTimingFromNatal a ar:Guardrail ; ar:stableId "health.guard.no_timing" ; ar:ruleText "A constitutional question excludes dasha, transit and calendar forecasts." .
+health:NoActivationWithoutChain a ar:Guardrail ; ar:stableId "health.guard.activation_chain" ; ar:ruleText "Natal susceptibility alone is not a forecast; require matching dasha and transit evidence." .
+health:NoTreatmentAdvice a ar:Guardrail ; ar:stableId "health.guard.treatment" ; ar:ruleText "Never recommend, reject, delay or prefer medical treatment from astrology." .
+health:NoSurgeryCertainty a ar:Guardrail ; ar:stableId "health.guard.surgery" ; ar:ruleText "Never state that surgery is required or certain." .
+health:NoAccidentPrediction a ar:Guardrail ; ar:stableId "health.guard.accident" ; ar:ruleText "Never predict that an accident will occur." .
+health:NoRecoveryPromise a ar:Guardrail ; ar:stableId "health.guard.recovery" ; ar:ruleText "Never promise recovery, treatment success or another medical outcome." .
+health:ExactRelationshipOnly a ar:Guardrail ; ar:stableId "health.guard.relationship" ; ar:ruleText "An aspect is not a conjunction or nodal-axis placement; state only the supplied relationship." .
+health:StrictRequestedHorizon a ar:Guardrail ; ar:stableId "health.guard.horizon" ; ar:ruleText "Do not mention dates beyond the user's requested horizon." .
+
+health:RuleNatalFirst a ar:DecisionRule ; ar:stableId "health.rule.natal_first" ; ar:ruleText "D1 establishes vulnerability; D3, D6, D8 and D30 can confirm but cannot create it." .
+health:RuleTimedActivation a ar:DecisionRule ; ar:stableId "health.rule.timed" ; ar:ruleText "Heightened susceptibility requires the same natal theme in dasha activation and dated transit confirmation." .
+health:RuleProtectionModifies a ar:DecisionRule ; ar:stableId "health.rule.protection" ; ar:ruleText "Dignity, Shadbala and protective factors modify severity but do not erase vulnerability." .
+
+# Shared decision stages. Each exposes its required-factor children in the compiled graph.
+health:ConstitutionStage a ar:DecisionStage ; ar:sequence 1 ; skos:prefLabel "Constitution and vitality"@en ; ar:stageRequiresFactor health:D1, health:H1, health:MedicalGrahas .
+health:DiseasePatternStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Disease and imbalance pattern"@en ; ar:stageRequiresFactor health:H6, health:SixthLordChain, health:D6 .
+health:BodyZoneStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Calculated body-system focus"@en ; ar:stageRequiresFactor health:BodyZoneEvidence, health:D30 .
+health:ChronicityStage a ar:DecisionStage ; ar:sequence 4 ; skos:prefLabel "Chronicity and hidden pressure"@en ; ar:stageRequiresFactor health:H8, health:H12, health:D8 .
+health:ProtectionStage a ar:DecisionStage ; ar:sequence 5 ; skos:prefLabel "Protection and resilience modifiers"@en ; ar:stageRequiresFactor health:DignityStrength, health:ProtectiveFactors .
+health:MentalFoundationStage a ar:DecisionStage ; ar:sequence 2 ; skos:prefLabel "Mental and emotional regulation"@en ; ar:stageRequiresFactor health:H4, health:MoonMind .
+health:MentalPressureStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Stress, recurrence and rest pressure"@en ; ar:stageRequiresFactor health:H6, health:H8, health:H12 .
+health:SurgeryPatternStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Procedural and surgical susceptibility"@en ; ar:stageRequiresFactor health:H6, health:H8, health:H12, health:D8, health:D30, health:MedicalGrahas .
+health:AccidentPatternStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Injury and accident susceptibility"@en ; ar:stageRequiresFactor health:H3, health:H6, health:H8, health:D3, health:D30, health:MedicalGrahas .
+health:RecoveryPatternStage a ar:DecisionStage ; ar:sequence 3 ; skos:prefLabel "Recovery support and convalescence"@en ; ar:stageRequiresFactor health:H5, health:H6, health:H11, health:H12, health:ProtectiveFactors .
+health:ActivationStage a ar:DecisionStage ; ar:sequence 8 ; skos:prefLabel "Dasha activation of the natal theme"@en ; ar:stageRequiresFactor health:DashaActivation .
+health:TransitStage a ar:DecisionStage ; ar:sequence 9 ; skos:prefLabel "Dated transit confirmation"@en ; ar:stageRequiresFactor health:TransitConfirmation .
+
+# Static question types.
+health:OverallHealth a ar:QuestionType ; ar:stableId "health.overall" ; ar:runtimeKey "health" ; skos:prefLabel "Overall health constitution"@en ; ar:questionExample "What health vulnerabilities does my chart show?" ; ar:inDomain health:Health ;
+    ar:requiresFactor health:D1, health:D6, health:D8, health:D30, health:H1, health:H6, health:H8, health:H12, health:MedicalGrahas, health:SixthLordChain, health:DignityStrength, health:BodyZoneEvidence, health:ProtectiveFactors ; ar:defaultExcludesFactor health:DashaActivation, health:TransitConfirmation ;
+    ar:requiresCapability health:CapNatalFoundation, health:CapMedicalDivisionals, health:CapSixthLordChain, health:CapBodyZones, health:CapPlanetCondition, health:CapMedicalTriage ; ar:allowedAnswerMode health:ModeConstitutional ; ar:usesAnswerContract health:ContractConstitutional ; ar:hasEvidencePolicy health:EvidenceConstitutional ; ar:evaluatesRule health:RuleNatalFirst, health:RuleProtectionModifies ; ar:evaluatesStage health:ConstitutionStage, health:DiseasePatternStage, health:BodyZoneStage, health:ChronicityStage, health:ProtectionStage ; ar:hasGuardrail health:EmergencyTriageFirst, health:NoDiagnosis, health:NoBodyPartWithoutEvidence, health:NoTimingFromNatal, health:NoTreatmentAdvice .
+health:MentalWellbeing a ar:QuestionType ; ar:stableId "health.mental" ; ar:runtimeKey "mental_wellbeing" ; skos:prefLabel "Mental and emotional wellbeing"@en ; ar:questionExample "What mental-wellbeing vulnerabilities does my chart show?" ; ar:inDomain health:Health ;
+    ar:requiresFactor health:D1, health:D6, health:D8, health:D30, health:H1, health:H4, health:H6, health:H8, health:H12, health:MoonMind, health:DignityStrength, health:ProtectiveFactors ; ar:defaultExcludesFactor health:DashaActivation, health:TransitConfirmation ; ar:requiresCapability health:CapNatalFoundation, health:CapMedicalDivisionals, health:CapPlanetCondition, health:CapCategoryFilter, health:CapMedicalTriage ; ar:allowedAnswerMode health:ModeMentalWellbeing ; ar:usesAnswerContract health:ContractConstitutional ; ar:hasEvidencePolicy health:EvidenceMental ; ar:evaluatesRule health:RuleNatalFirst, health:RuleProtectionModifies ; ar:evaluatesStage health:ConstitutionStage, health:MentalFoundationStage, health:MentalPressureStage, health:ProtectionStage ; ar:hasGuardrail health:EmergencyTriageFirst, health:NoDiagnosis, health:ExactRelationshipOnly, health:NoTimingFromNatal, health:NoTreatmentAdvice .
+health:SurgerySusceptibility a ar:QuestionType ; ar:stableId "health.surgery" ; ar:runtimeKey "surgery" ; skos:prefLabel "Surgery or procedure susceptibility"@en ; ar:questionExample "Does my chart show surgical susceptibility?" ; ar:inDomain health:Health ;
+    ar:requiresFactor health:D1, health:D8, health:D30, health:H1, health:H6, health:H8, health:H12, health:MedicalGrahas, health:DignityStrength, health:ProtectiveFactors ; ar:defaultExcludesFactor health:DashaActivation, health:TransitConfirmation ; ar:requiresCapability health:CapNatalFoundation, health:CapMedicalDivisionals, health:CapPlanetCondition, health:CapCategoryFilter, health:CapMedicalTriage ; ar:allowedAnswerMode health:ModeSafetyAssessment ; ar:usesAnswerContract health:ContractConstitutional ; ar:hasEvidencePolicy health:EvidenceSurgery ; ar:evaluatesRule health:RuleNatalFirst, health:RuleProtectionModifies ; ar:evaluatesStage health:ConstitutionStage, health:SurgeryPatternStage, health:ProtectionStage ; ar:hasGuardrail health:EmergencyTriageFirst, health:NoDiagnosis, health:NoSurgeryCertainty, health:NoTimingFromNatal, health:NoTreatmentAdvice .
+health:AccidentSusceptibility a ar:QuestionType ; ar:stableId "health.accident" ; ar:runtimeKey "accident" ; skos:prefLabel "Accident and injury susceptibility"@en ; ar:questionExample "Does my chart show accident susceptibility?" ; ar:inDomain health:Health ;
+    ar:requiresFactor health:D1, health:D3, health:D30, health:H1, health:H3, health:H6, health:H8, health:MedicalGrahas, health:DignityStrength, health:ProtectiveFactors ; ar:defaultExcludesFactor health:DashaActivation, health:TransitConfirmation ; ar:requiresCapability health:CapNatalFoundation, health:CapMedicalDivisionals, health:CapPlanetCondition, health:CapCategoryFilter, health:CapMedicalTriage ; ar:allowedAnswerMode health:ModeSafetyAssessment ; ar:usesAnswerContract health:ContractConstitutional ; ar:hasEvidencePolicy health:EvidenceAccident ; ar:evaluatesRule health:RuleNatalFirst, health:RuleProtectionModifies ; ar:evaluatesStage health:ConstitutionStage, health:AccidentPatternStage, health:ProtectionStage ; ar:hasGuardrail health:EmergencyTriageFirst, health:NoDiagnosis, health:NoAccidentPrediction, health:NoTimingFromNatal, health:NoTreatmentAdvice .
+health:RecoverySupport a ar:QuestionType ; ar:stableId "health.recovery" ; ar:runtimeKey "recovery" ; skos:prefLabel "Recovery and resilience support"@en ; ar:questionExample "What recovery support does my chart show?" ; ar:inDomain health:Health ;
+    ar:requiresFactor health:D1, health:D6, health:D8, health:D30, health:H1, health:H5, health:H6, health:H11, health:H12, health:DignityStrength, health:ProtectiveFactors ; ar:defaultExcludesFactor health:DashaActivation, health:TransitConfirmation ; ar:requiresCapability health:CapNatalFoundation, health:CapMedicalDivisionals, health:CapPlanetCondition, health:CapCategoryFilter, health:CapMedicalTriage ; ar:allowedAnswerMode health:ModeRecoverySupport ; ar:usesAnswerContract health:ContractConstitutional ; ar:hasEvidencePolicy health:EvidenceRecovery ; ar:evaluatesRule health:RuleNatalFirst, health:RuleProtectionModifies ; ar:evaluatesStage health:ConstitutionStage, health:RecoveryPatternStage, health:ProtectionStage ; ar:hasGuardrail health:EmergencyTriageFirst, health:NoDiagnosis, health:NoRecoveryPromise, health:NoTimingFromNatal, health:NoTreatmentAdvice .
+
+# Time-bound variants preserve the existing activation gate.
+health:OverallHealthTiming a ar:QuestionType ; ar:stableId "health.overall.timing" ; ar:runtimeKey "health_timing" ; skos:prefLabel "Health outlook for a requested period"@en ; ar:questionExample "How will my health be this year?" ; ar:inDomain health:Health ; ar:requiresFactor health:D1, health:D6, health:D8, health:D30, health:H1, health:H6, health:H8, health:H12, health:BodyZoneEvidence, health:ProtectiveFactors, health:DashaActivation, health:TransitConfirmation ; ar:requiresCapability health:CapNatalFoundation, health:CapMedicalDivisionals, health:CapBodyZones, health:CapPlanetCondition, health:CapDashaActivation, health:CapTransitConfirmation, health:CapMedicalTriage ; ar:allowedAnswerMode health:ModePeriodForecast ; ar:usesAnswerContract health:ContractTimed ; ar:hasEvidencePolicy health:EvidenceTimed ; ar:evaluatesRule health:RuleNatalFirst, health:RuleTimedActivation, health:RuleProtectionModifies ; ar:evaluatesStage health:ConstitutionStage, health:DiseasePatternStage, health:BodyZoneStage, health:ProtectionStage, health:ActivationStage, health:TransitStage ; ar:hasGuardrail health:EmergencyTriageFirst, health:NoDiagnosis, health:NoBodyPartWithoutEvidence, health:NoActivationWithoutChain, health:StrictRequestedHorizon, health:NoTreatmentAdvice .
+health:MentalWellbeingTiming a ar:QuestionType ; ar:stableId "health.mental.timing" ; ar:runtimeKey "mental_wellbeing_timing" ; skos:prefLabel "Mental-wellbeing outlook for a requested period"@en ; ar:questionExample "How will my mental wellbeing be this year?" ; ar:inDomain health:Health ; ar:requiresFactor health:D1, health:D6, health:D8, health:D30, health:H1, health:H4, health:H6, health:H8, health:H12, health:MoonMind, health:ProtectiveFactors, health:DashaActivation, health:TransitConfirmation ; ar:requiresCapability health:CapNatalFoundation, health:CapMedicalDivisionals, health:CapPlanetCondition, health:CapCategoryFilter, health:CapDashaActivation, health:CapTransitConfirmation, health:CapMedicalTriage ; ar:allowedAnswerMode health:ModePeriodForecast ; ar:usesAnswerContract health:ContractTimed ; ar:hasEvidencePolicy health:EvidenceTimed ; ar:evaluatesRule health:RuleNatalFirst, health:RuleTimedActivation, health:RuleProtectionModifies ; ar:evaluatesStage health:ConstitutionStage, health:MentalFoundationStage, health:MentalPressureStage, health:ProtectionStage, health:ActivationStage, health:TransitStage ; ar:hasGuardrail health:EmergencyTriageFirst, health:NoDiagnosis, health:ExactRelationshipOnly, health:NoActivationWithoutChain, health:StrictRequestedHorizon, health:NoTreatmentAdvice .
+health:SurgeryTiming a ar:QuestionType ; ar:stableId "health.surgery.timing" ; ar:runtimeKey "surgery_timing" ; skos:prefLabel "Surgery or procedure timing susceptibility"@en ; ar:questionExample "Is this a sensitive period for surgery?" ; ar:inDomain health:Health ; ar:requiresFactor health:D1, health:D8, health:D30, health:H1, health:H6, health:H8, health:H12, health:MedicalGrahas, health:ProtectiveFactors, health:DashaActivation, health:TransitConfirmation ; ar:requiresCapability health:CapNatalFoundation, health:CapMedicalDivisionals, health:CapPlanetCondition, health:CapCategoryFilter, health:CapDashaActivation, health:CapTransitConfirmation, health:CapMedicalTriage ; ar:allowedAnswerMode health:ModePeriodForecast ; ar:usesAnswerContract health:ContractTimed ; ar:hasEvidencePolicy health:EvidenceSurgery ; ar:evaluatesRule health:RuleNatalFirst, health:RuleTimedActivation, health:RuleProtectionModifies ; ar:evaluatesStage health:ConstitutionStage, health:SurgeryPatternStage, health:ProtectionStage, health:ActivationStage, health:TransitStage ; ar:hasGuardrail health:EmergencyTriageFirst, health:NoDiagnosis, health:NoSurgeryCertainty, health:NoActivationWithoutChain, health:StrictRequestedHorizon, health:NoTreatmentAdvice .
+health:AccidentTiming a ar:QuestionType ; ar:stableId "health.accident.timing" ; ar:runtimeKey "accident_timing" ; skos:prefLabel "Accident and injury caution period"@en ; ar:questionExample "Are there periods requiring extra accident caution this year?" ; ar:inDomain health:Health ; ar:requiresFactor health:D1, health:D3, health:D30, health:H1, health:H3, health:H6, health:H8, health:MedicalGrahas, health:ProtectiveFactors, health:DashaActivation, health:TransitConfirmation ; ar:requiresCapability health:CapNatalFoundation, health:CapMedicalDivisionals, health:CapPlanetCondition, health:CapCategoryFilter, health:CapDashaActivation, health:CapTransitConfirmation, health:CapMedicalTriage ; ar:allowedAnswerMode health:ModePeriodForecast ; ar:usesAnswerContract health:ContractTimed ; ar:hasEvidencePolicy health:EvidenceAccident ; ar:evaluatesRule health:RuleNatalFirst, health:RuleTimedActivation, health:RuleProtectionModifies ; ar:evaluatesStage health:ConstitutionStage, health:AccidentPatternStage, health:ProtectionStage, health:ActivationStage, health:TransitStage ; ar:hasGuardrail health:EmergencyTriageFirst, health:NoDiagnosis, health:NoAccidentPrediction, health:NoActivationWithoutChain, health:StrictRequestedHorizon, health:NoTreatmentAdvice .
+health:RecoveryTiming a ar:QuestionType ; ar:stableId "health.recovery.timing" ; ar:runtimeKey "recovery_timing" ; skos:prefLabel "Recovery-support outlook for a requested period"@en ; ar:questionExample "When is recovery support stronger?" ; ar:inDomain health:Health ; ar:requiresFactor health:D1, health:D6, health:D8, health:D30, health:H1, health:H5, health:H6, health:H11, health:H12, health:ProtectiveFactors, health:DashaActivation, health:TransitConfirmation ; ar:requiresCapability health:CapNatalFoundation, health:CapMedicalDivisionals, health:CapPlanetCondition, health:CapCategoryFilter, health:CapDashaActivation, health:CapTransitConfirmation, health:CapMedicalTriage ; ar:allowedAnswerMode health:ModePeriodForecast ; ar:usesAnswerContract health:ContractTimed ; ar:hasEvidencePolicy health:EvidenceRecovery ; ar:evaluatesRule health:RuleNatalFirst, health:RuleTimedActivation, health:RuleProtectionModifies ; ar:evaluatesStage health:ConstitutionStage, health:RecoveryPatternStage, health:ProtectionStage, health:ActivationStage, health:TransitStage ; ar:hasGuardrail health:EmergencyTriageFirst, health:NoDiagnosis, health:NoRecoveryPromise, health:NoActivationWithoutChain, health:StrictRequestedHorizon, health:NoTreatmentAdvice .

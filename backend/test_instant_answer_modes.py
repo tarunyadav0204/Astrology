@@ -27,7 +27,13 @@ _stub_module("calculators.real_transit_calculator", RealTransitCalculator=_Dummy
 _stub_module("chat.chat_context_builder", ChatContextBuilder=_Dummy)
 _stub_module("context_agents.base", AgentContext=_Dummy, ContextAgent=_Dummy)
 _stub_module("shared.dasha_calculator", DashaCalculator=_Dummy)
-_stub_module("utils.admin_settings", get_gemini_instant_model=lambda: "stub-model")
+_stub_module(
+    "utils.admin_settings",
+    CHAT_LLM_DEEPSEEK="deepseek",
+    CHAT_LLM_GEMINI="gemini",
+    get_instant_chat_llm_provider=lambda: "gemini",
+    get_instant_chat_model=lambda: "stub-model",
+)
 # Keep real remedy-CTA helpers; only stub time resolution for period-window tests.
 import utils.query_context as _qc_mod
 
@@ -65,6 +71,7 @@ from chat.instant_chat_pipeline import (
     _normalize_question_text,
     _normalize_instant_evidence,
     _period_anchor_datetime,
+    _planet_aspect_number_from,
     _planet_aspects_house_from,
     _is_dasha_calculator_fallback_payload,
     _authoritative_active_dasha_context,
@@ -366,6 +373,43 @@ def test_evidence_plan_normalizes_dasha_lookup_enums():
     assert need["params"]["planet"] == "Mercury"
     assert need["params"]["level"] == "mahadasha"
     assert need["params"]["operation"] == "find_start_end"
+
+
+def test_evidence_plan_preserves_retrospective_timing_enums():
+    plan = normalize_evidence_plan(
+        {
+            "question_parts": [{
+                "part_id": "p1",
+                "text": "When did I get married?",
+                "intent_families": ["event_timing"],
+                "life_domain": "marriage",
+                "event_profile": "marriage",
+                "subject": "self",
+                "timeframe": {"kind": "open_past"},
+            }],
+            "evidence_needs": [
+                {
+                    "kind": "historical_dasha_event_windows",
+                    "system": "vimshottari",
+                    "topic": "marriage",
+                    "supports_parts": ["p1"],
+                },
+                {
+                    "kind": "historical_transit_event_windows",
+                    "system": "transits",
+                    "topic": "marriage",
+                    "supports_parts": ["p1"],
+                },
+            ],
+        },
+        question="When did I get married?",
+    )
+
+    assert plan["question_parts"][0]["timeframe"]["kind"] == "open_past"
+    assert [need["kind"] for need in plan["evidence_needs"]] == [
+        "historical_dasha_event_windows",
+        "historical_transit_event_windows",
+    ]
 
 
 def test_evidence_plan_dasha_lookup_for_future_mercury_mahadasha():
@@ -1271,6 +1315,16 @@ def test_planet_aspects_house_from_vedic_offsets():
     assert _planet_aspects_house_from(2, 4, "Saturn") is True  # Saturn 3rd
     assert _planet_aspects_house_from(2, 11, "Saturn") is True  # Saturn 10th
     assert _planet_aspects_house_from(2, 6, "Saturn") is False
+
+
+def test_instant_activation_excludes_rahu_ketu_fifth_and_ninth_aspects():
+    for planet in ("Rahu", "Ketu"):
+        assert _planet_aspects_house_from(2, 6, planet) is False  # 5th
+        assert _planet_aspects_house_from(2, 8, planet) is True   # 7th
+        assert _planet_aspects_house_from(2, 10, planet) is False  # 9th
+        assert _planet_aspect_number_from(2, 6, planet) is None
+        assert _planet_aspect_number_from(2, 8, planet) == 7
+        assert _planet_aspect_number_from(2, 10, planet) is None
 
 
 def test_is_dasha_calculator_fallback_payload_detects_sun_moon_mars_stub():

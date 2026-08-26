@@ -444,6 +444,11 @@ const MessageBubble = ({
     const nextActionType = String(nextAction?.type || '').trim().toLowerCase();
     const hasNextAction = Boolean(nextAction && nextActionType && nextActionType !== 'none');
     const isRemedyNextAction = nextActionType === 'remedy';
+    const isTimelineSelection = nextActionType === 'timeline_selection';
+    const timelineOptions = isTimelineSelection && Array.isArray(nextAction?.options)
+        ? nextAction.options.filter((option) => option && option.id && option.label)
+        : [];
+    const [selectedTimelineOption, setSelectedTimelineOption] = useState(null);
     const nextActionTitle = String(nextAction?.title || '').trim();
     const nextActionReason = String(nextAction?.reason || '').trim();
     const nextActionFollowUps = Array.isArray(nextAction?.follow_up_questions)
@@ -463,6 +468,88 @@ const MessageBubble = ({
               'Do not give a general chart reading. Give practical remedies only.',
           ].filter(Boolean).join('\n')
         : '';
+
+    useEffect(() => {
+        setSelectedTimelineOption(null);
+    }, [message?.messageId, message?.id, nextAction?.selection_stage]);
+
+    const renderTimelineSelectionCard = () => {
+        if (
+            message.role !== 'assistant'
+            || message.isTyping
+            || message.isProcessing
+            || !isTimelineSelection
+            || timelineOptions.length === 0
+        ) return null;
+
+        return (
+            <div className="marriage-timeline-card" aria-label={nextActionTitle || 'Marriage period selection'}>
+                <div className="marriage-timeline-card__eyebrow">
+                    Marriage date finder · {String(nextAction?.selection_stage || 'period')}
+                </div>
+                <div className="marriage-timeline-card__title">
+                    {nextActionTitle || 'Choose the closest period'}
+                </div>
+                {nextActionReason && (
+                    <div className="marriage-timeline-card__reason">{nextActionReason}</div>
+                )}
+                <div className="marriage-timeline-card__options">
+                    {timelineOptions.map((option, index) => {
+                        const optionId = String(option.id);
+                        const isSelected = selectedTimelineOption === optionId;
+                        const isDisabled = Boolean(selectedTimelineOption);
+                        return (
+                            <button
+                                key={optionId}
+                                type="button"
+                                className={`marriage-timeline-option${isSelected ? ' marriage-timeline-option--selected' : ''}`}
+                                disabled={isDisabled}
+                                onClick={() => {
+                                    if (selectedTimelineOption || !onFollowUpClick) return;
+                                    setSelectedTimelineOption(optionId);
+                                    const sourceMessageId = message.messageId || message.id;
+                                    onFollowUpClick(
+                                        String(option.submit_text || option.label).trim(),
+                                        {
+                                            directSend: true,
+                                            instant_chat: true,
+                                            chat_tier: 'instant',
+                                            instant_timeline_selection: true,
+                                            query_context: {
+                                                ...(option.query_context || {}),
+                                                source_message_id: sourceMessageId ? String(sourceMessageId) : undefined,
+                                                marriage_timeline_source_message_id: sourceMessageId ? String(sourceMessageId) : undefined,
+                                            },
+                                        }
+                                    );
+                                }}
+                            >
+                                <span className="marriage-timeline-option__rank">
+                                    {option.rank ? `#${option.rank}` : index + 1}
+                                </span>
+                                <span className="marriage-timeline-option__copy">
+                                    <strong>{option.primary_label || option.label}</strong>
+                                    {(option.technical_label || option.evidence_hint || option.detail) && (
+                                        <small>
+                                            {option.technical_label ? `Astrology: ${option.technical_label}` : ''}
+                                            {option.technical_label && option.evidence_hint ? ' · ' : ''}
+                                            {option.evidence_hint || (!option.technical_label ? option.detail : '')}
+                                        </small>
+                                    )}
+                                </span>
+                                <span className="marriage-timeline-option__control" aria-hidden="true">
+                                    {isSelected ? '✓' : '›'}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+                <div className="marriage-timeline-card__trust-note">
+                    Your choice narrows the calculation; it is not treated as a date predicted independently.
+                </div>
+            </div>
+        );
+    };
     const isInstantTypingBubble =
         (message.isTyping || message.isProcessing) && messageChatTier === 'instant';
     const instantTypingState = useMemo(
@@ -1453,7 +1540,7 @@ const MessageBubble = ({
             : '';
 
         return (
-            <div className={`message-bubble message-bubble--instant ${message.role} ${message.isTyping || message.isProcessing ? 'typing' : ''}`}>
+            <div className={`message-bubble message-bubble--instant${isTimelineSelection ? ' message-bubble--timeline' : ''} ${message.role} ${message.isTyping || message.isProcessing ? 'typing' : ''}`}>
                 <div className="message-content message-content--instant">
                     <div className="instant-chat-copy">
                         {(message.isTyping || message.isProcessing) && instantTypingState ? (
@@ -1523,13 +1610,15 @@ const MessageBubble = ({
                                                         <h4>{section.title}</h4>
                                                     </header>
                                                     <ul>
-                                                        {section.lines.map((line, index) => <li key={`${section.key}-${index}`}>{line}</li>)}
+                                                        {(Array.isArray(section.lines) ? section.lines : []).map((line, index) => (
+                                                            <li key={`${section.key}-${index}`}>{line}</li>
+                                                        ))}
                                                     </ul>
-                                                    {(section.groups || []).map((group) => (
+                                                    {(Array.isArray(section.groups) ? section.groups : []).map((group) => (
                                                         <section className="instant-evidence-group" key={`${section.key}-${group.key}`}>
                                                             <h5>{group.title}</h5>
-                                                            {(group.lines || []).map((line, index) => <p key={`${group.key}-line-${index}`}>{line}</p>)}
-                                                            {(group.items || []).map((item, index) => (
+                                                            {(Array.isArray(group.lines) ? group.lines : []).map((line, index) => <p key={`${group.key}-line-${index}`}>{line}</p>)}
+                                                            {(Array.isArray(group.items) ? group.items : []).map((item, index) => (
                                                                 <div className="instant-evidence-factor" key={`${group.key}-item-${index}`}>
                                                                     <strong>{item.title}</strong>
                                                                     <p>{item.text}</p>
@@ -1546,6 +1635,7 @@ const MessageBubble = ({
                         </section>
                     ) : null}
                 </div>
+                {renderTimelineSelectionCard()}
             </div>
         );
     }
@@ -1917,6 +2007,8 @@ const MessageBubble = ({
                     )}
                 </div>
 
+                {renderTimelineSelectionCard()}
+
                 {message.role === 'assistant'
                     && !message.isTyping
                     && !message.isProcessing
@@ -1980,6 +2072,7 @@ const MessageBubble = ({
                     && !message.isTyping
                     && !message.isProcessing
                     && messageChatTier !== 'instant'
+                    && !isTimelineSelection
                     && showNextActionCard && (
                     <div
                         className="remedy-next-action-card"

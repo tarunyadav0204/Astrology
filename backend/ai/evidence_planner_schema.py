@@ -73,7 +73,9 @@ EVIDENCE_NEED_KINDS = {
     "current_dasha_stack",
     "dasha_timeline_lookup",
     "future_dasha_event_windows",
+    "historical_dasha_event_windows",
     "transit_event_windows",
+    "historical_transit_event_windows",
     "period_forecast_context",
     "divisional_chart_context",
     "house_analysis",
@@ -109,7 +111,7 @@ PLANETS = {"Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu
 DASHA_LEVELS = {"mahadasha", "antardasha", "pratyantardasha", "sookshma", "prana"}
 LOOKUP_OPERATIONS = {"get_current", "find_start_end", "find_next", "find_previous", "list_periods", "explain_result", "compare"}
 SUBJECT_TYPES = {"self", "spouse", "partner", "ex_partner", "potential_partner", "child", "parent", "sibling", "friend", "other_person", "unborn_child", "unknown"}
-TIMEFRAME_KINDS = {"none", "current", "open_future", "bounded_future", "specific_date", "date_range", "relative_day", "relative_week", "relative_month", "relative_year", "named_period", "past", "recurring"}
+TIMEFRAME_KINDS = {"none", "current", "open_future", "open_past", "bounded_future", "specific_date", "date_range", "relative_day", "relative_week", "relative_month", "relative_year", "named_period", "past", "historical", "retrospective", "recurring"}
 GRANULARITIES = {"exact_fact", "day", "week", "month_window", "quarter_window", "year_window", "multi_year_window", "life_phase"}
 PRIORITIES = {"required", "recommended", "optional"}
 CONFIDENCES = {"high", "medium", "low"}

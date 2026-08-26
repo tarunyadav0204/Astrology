@@ -143,11 +143,90 @@ def test_named_vulnerabilities_originate_in_the_sixth_house_chain():
     chain = result["sixth_house_chain"]
     assert chain["sixth_house_sign"] == "Virgo"
     assert chain["sixth_lord"] == "Mercury"
+    assert chain["sixth_lord_house"] == 3
+    assert chain["sixth_lord_house_zones"] == ["shoulders", "arms", "hands", "lungs"]
     assert chain["sixth_lord_sign"] == "Gemini"
     assert chain["sixth_lord_nakshatra"] == "Chitra"
     assert chain["sixth_lord_nakshatra_zones"] == ["forehead"]
     assert result["major_vulnerabilities"]
     assert all(row["primary_medical_factors"] for row in result["major_vulnerabilities"])
+    assert all(row["primary_medical_reasons"] for row in result["major_vulnerabilities"])
+    assert all(
+        "lord Mercury is in Gemini" in " ".join(row["primary_medical_reasons"])
+        or "lord Mercury occupies Chitra" in " ".join(row["primary_medical_reasons"])
+        or "sign in House 6 is Virgo" in " ".join(row["primary_medical_reasons"])
+        or "lord Mercury is placed in House 3" in " ".join(row["primary_medical_reasons"])
+        for row in result["major_vulnerabilities"]
+    )
+
+
+def test_sixth_lord_destination_house_contributes_anatomy_without_diagnosing():
+    chart = _chart()
+    # Virgo is H6 for Aries rising; Mercury placed in H8 contributes the
+    # anorectal/pelvic field as one anatomical factor.
+    chart["planets"]["Mercury"] = {"house": 8, "sign": 7}
+    result = build_priority_body_zones(chart)
+
+    chain = result["sixth_house_chain"]
+    assert chain["sixth_lord_house"] == 8
+    assert "anus" in chain["sixth_lord_house_zones"]
+    destination_rows = [
+        row for row in result["priority_zones"]
+        if "sixth_lord_house" in (row.get("primary_medical_factors") or [])
+    ]
+    assert destination_rows
+    assert any("anorectal and pelvic region" == row["zone"] for row in destination_rows)
+    assert result["claim_policy"]["diagnosis_allowed"] is False
+
+
+def test_sixth_lord_in_eighth_house_is_retained_in_major_health_evidence():
+    # Scorpio rising: Aries occupies H6 and its lord Mars is placed in H8.
+    # Nakshatra/sign/H6 anatomy must not crowd the H8 anorectal/pelvic field
+    # out of the evidence sent to Tara.
+    houses = [
+        {"house": house, "sign": (7 + house - 1) % 12}
+        for house in range(1, 13)
+    ]
+    chart = {
+        "houses": houses,
+        "planets": {
+            "Sun": {"house": 5, "sign": 11},
+            "Moon": {"house": 1, "sign": 7},
+            "Mars": {"house": 8, "sign": 2},
+            "Mercury": {"house": 5, "sign": 11},
+            "Jupiter": {"house": 10, "sign": 4},
+            "Venus": {"house": 6, "sign": 0},
+            "Saturn": {"house": 3, "sign": 9},
+            "Rahu": {"house": 4, "sign": 10},
+            "Ketu": {"house": 10, "sign": 4},
+        },
+        "graha_drishti_by_house": {},
+    }
+    result = build_priority_body_zones(
+        chart,
+        lords_nakshatra={
+            "sixth_lord": {
+                "planet": "Mars",
+                "nakshatra": {"nakshatra": "Ardra", "lord": "Rahu", "pada": 2},
+            }
+        },
+    )
+
+    major = result["major_vulnerabilities"]
+    anorectal = next(
+        row for row in major if row["zone"] == "anorectal and pelvic region"
+    )
+    assert "sixth_lord_house" in anorectal["primary_medical_factors"]
+    assert any(
+        "House 6 lord Mars is placed in House 8" in reason
+        for reason in anorectal["primary_medical_reasons"]
+    )
+    assert "anus" in anorectal["anatomical_members"]
+    assert "rectum" in anorectal["anatomical_members"]
+    assert any(
+        row["zone"] == "anorectal and pelvic region"
+        for row in result["medical_profile"]["major_vulnerabilities"]
+    )
 
 
 def test_unrelated_afflicted_anatomy_can_confirm_but_not_create_a_named_zone():

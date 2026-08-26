@@ -417,6 +417,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [geminiPremiumModel, setGeminiPremiumModel] = useState('');
   const [geminiAnalysisModel, setGeminiAnalysisModel] = useState('');
   const [geminiInstantChatModel, setGeminiInstantChatModel] = useState('');
+  const [instantChatLlmProvider, setInstantChatLlmProvider] = useState('gemini');
+  const [deepseekInstantChatModel, setDeepseekInstantChatModel] = useState('');
   const [parallelBranchGeminiModels, setParallelBranchGeminiModels] = useState(DEFAULT_PARALLEL_BRANCH_MODELS);
   const [parallelBranchPlannerEnabled, setParallelBranchPlannerEnabled] = useState(false);
   const [parallelBranchPlannerModel, setParallelBranchPlannerModel] = useState('');
@@ -895,6 +897,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setGeminiAnalysisModel(data.gemini_analysis_model || '');
       setGeminiReportModel(data.gemini_report_model || data.gemini_analysis_model || '');
       setGeminiInstantChatModel(data.gemini_instant_chat_model || '');
+      setInstantChatLlmProvider(data.instant_chat_llm_provider || 'gemini');
+      setDeepseekInstantChatModel(data.deepseek_instant_chat_model || 'deepseek-chat');
       setParallelBranchGeminiModels({
         ...DEFAULT_PARALLEL_BRANCH_MODELS,
         ...(data.parallel_branch_gemini_models || {}),
@@ -1289,7 +1293,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setGeminiModelsSaving(true);
     try {
       const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
-      const [enabledRes, allowlistRes, modelRes] = await Promise.all([
+      const [enabledRes, allowlistRes, providerRes, geminiModelRes, deepseekModelRes] = await Promise.all([
         fetch('/api/admin/settings/instant_chat_enabled', {
           method: 'PUT',
           headers,
@@ -1308,6 +1312,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             description: 'Optional CSV user allowlist for instant chat. Empty = all users when enabled.',
           }),
         }),
+        fetch('/api/admin/settings/instant_chat_llm_provider', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'instant_chat_llm_provider',
+            value: instantChatLlmProvider,
+            description: 'Dedicated LLM provider for Instant Chat (gemini or deepseek)',
+          }),
+        }),
         fetch('/api/admin/settings/gemini_instant_chat_model', {
           method: 'PUT',
           headers,
@@ -1317,14 +1330,25 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             description: 'Gemini model for prototype instant chat',
           }),
         }),
+        fetch('/api/admin/settings/deepseek_instant_chat_model', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'deepseek_instant_chat_model',
+            value: deepseekInstantChatModel,
+            description: 'DeepSeek model for Instant Chat',
+          }),
+        }),
       ]);
-      if (!enabledRes.ok || !allowlistRes.ok || !modelRes.ok) {
+      if (!enabledRes.ok || !allowlistRes.ok || !providerRes.ok || !geminiModelRes.ok || !deepseekModelRes.ok) {
         const enabledErr = await enabledRes.json().catch(() => ({}));
         const allowlistErr = await allowlistRes.json().catch(() => ({}));
-        const modelErr = await modelRes.json().catch(() => ({}));
+        const providerErr = await providerRes.json().catch(() => ({}));
+        const geminiModelErr = await geminiModelRes.json().catch(() => ({}));
+        const deepseekModelErr = await deepseekModelRes.json().catch(() => ({}));
         alert(
           'Failed to save instant chat settings: ' +
-            (enabledErr.detail || allowlistErr.detail || modelErr.detail || 'check console')
+            (enabledErr.detail || allowlistErr.detail || providerErr.detail || geminiModelErr.detail || deepseekModelErr.detail || 'check console')
         );
         return;
       }
@@ -7045,18 +7069,36 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
               <div className="setting-item">
                 <div className="setting-info">
-                  <strong>Gemini model — instant chat</strong>
-                  <p>Dedicated Gemini model for the instant lane. This stays separate from standard and premium chat.</p>
+                  <strong>LLM provider — instant chat</strong>
+                  <p>Instant Chat has its own provider and model, independent from standard and premium chat.</p>
                 </div>
                 <select
-                  value={geminiInstantChatModel}
-                  onChange={(e) => setGeminiInstantChatModel(e.target.value)}
+                  value={instantChatLlmProvider}
+                  onChange={(e) => setInstantChatLlmProvider(e.target.value)}
                   style={{ minWidth: '280px' }}
                 >
-                  {geminiModelOptions.map((opt) => (
-                    <option key={`gi-${opt.value}`} value={opt.value}>{opt.label}</option>
-                  ))}
+                  <option value="gemini">Gemini</option>
+                  <option value="deepseek">DeepSeek</option>
                 </select>
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>{instantChatLlmProvider === 'deepseek' ? 'DeepSeek' : 'Gemini'} model — instant chat</strong>
+                  <p>The selected model is used for both Instant routing and its final conversational answer.</p>
+                </div>
+                {instantChatLlmProvider === 'deepseek' ? (
+                  <select value={deepseekInstantChatModel} onChange={(e) => setDeepseekInstantChatModel(e.target.value)} style={{ minWidth: '280px' }}>
+                    {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-chat', label: 'DeepSeek Chat (V3.2)' }]).map((opt) => (
+                      <option key={`dsi-${opt.value}`} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <select value={geminiInstantChatModel} onChange={(e) => setGeminiInstantChatModel(e.target.value)} style={{ minWidth: '280px' }}>
+                    {geminiModelOptions.map((opt) => (
+                      <option key={`gi-${opt.value}`} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="form-buttons" style={{ marginTop: '12px' }}>
                 <button

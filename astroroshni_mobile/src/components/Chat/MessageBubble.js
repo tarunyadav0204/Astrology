@@ -1854,12 +1854,14 @@ function MessageBubble({
                 }]}
                 onPress={() => setShowInstantEvidence((open) => !open)}
               >
-                <Ionicons name="diamond-outline" size={14} color={colors.accent} />
-                <Text style={[styles.instantEvidenceToggleText, { color: colors.text }]}>
+                <Ionicons name="diamond-outline" size={14} color={colors.onAccent} />
+                <Text
+                  style={[styles.instantEvidenceToggleText, { color: colors.onAccent }]}
+                >
                   {whyTaraSaysThis(language || i18n.resolvedLanguage || i18n.language)
                     || t('premiumUi.chat.whyThisAnswer', 'Why Tara says this')}
                 </Text>
-                <Ionicons name={showInstantEvidence ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textSecondary} />
+                <Ionicons name={showInstantEvidence ? 'chevron-up' : 'chevron-down'} size={14} color={colors.onAccent} />
               </TouchableOpacity>
               {showInstantEvidence ? (
                 <View style={[styles.instantEvidencePanel, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>

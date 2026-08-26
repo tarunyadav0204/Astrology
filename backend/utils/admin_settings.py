@@ -127,17 +127,19 @@ OPENAI_CHAT_MODEL_OPTIONS = [
 DEFAULT_OPENAI_CHAT_MODEL = "gpt-4o-mini"
 DEFAULT_OPENAI_PREMIUM_MODEL = "gpt-4o"
 
-# DeepSeek API model IDs (OpenAI-compatible). Confirm current ids with GET https://api.deepseek.com/v1/models when upgrading.
-# V3.2 is the version named on DeepSeek pricing docs for deepseek-chat / deepseek-reasoner; V4 ids appear when the platform exposes them.
+# DeepSeek API model IDs (OpenAI-compatible). Confirm current ids with GET
+# https://api.deepseek.com/v1/models when upgrading.  Keep only API-accepted
+# identifiers here; old admin values are handled by
+# ``_normalize_deepseek_model_id`` below.
 DEEPSEEK_CHAT_MODEL_OPTIONS = [
-    ("deepseek-chat", "DeepSeek Chat (V3.2)"),
+    ("deepseek-chat", "DeepSeek V4 Flash (legacy chat alias)"),
     ("deepseek-reasoner", "DeepSeek Reasoner (V3.2 thinking)"),
-    ("deepseek-v4", "DeepSeek V4 (chat)"),
-    ("deepseek-v4-reasoner", "DeepSeek V4 (thinking)"),
+    ("deepseek-v4-flash", "DeepSeek V4 Flash (chat)"),
+    ("deepseek-v4-pro", "DeepSeek V4 Pro (thinking)"),
 ]
-DEFAULT_DEEPSEEK_CHAT_MODEL = "deepseek-chat"
+DEFAULT_DEEPSEEK_CHAT_MODEL = "deepseek-v4-flash"
 DEFAULT_DEEPSEEK_PREMIUM_MODEL = "deepseek-reasoner"
-DEFAULT_DEEPSEEK_ANALYSIS_MODEL = "deepseek-chat"
+DEFAULT_DEEPSEEK_ANALYSIS_MODEL = "deepseek-v4-flash"
 DEFAULT_DEEPSEEK_REPORT_MODEL = DEFAULT_DEEPSEEK_ANALYSIS_MODEL
 DEFAULT_DEEPSEEK_TIMELINE_MODEL = "deepseek-reasoner"
 
@@ -521,6 +523,27 @@ def get_gemini_instant_model() -> str:
     return DEFAULT_GEMINI_INSTANT_MODEL
 
 
+def get_instant_chat_llm_provider() -> str:
+    """LLM vendor dedicated to Instant Chat; independent from standard chat."""
+    value = (get_setting("instant_chat_llm_provider") or "").strip().lower()
+    return value if value in {CHAT_LLM_GEMINI, CHAT_LLM_DEEPSEEK} else CHAT_LLM_GEMINI
+
+
+def get_deepseek_instant_model() -> str:
+    """DeepSeek model ID dedicated to Instant Chat."""
+    value = get_setting("deepseek_instant_chat_model")
+    if value and value.strip():
+        return _normalize_deepseek_model_id(value.strip())
+    return DEFAULT_DEEPSEEK_CHAT_MODEL
+
+
+def get_instant_chat_model() -> str:
+    """Resolved model for the currently selected Instant Chat vendor."""
+    if get_instant_chat_llm_provider() == CHAT_LLM_DEEPSEEK:
+        return get_deepseek_instant_model()
+    return get_gemini_instant_model()
+
+
 def get_event_timeline_model() -> str:
     """Model ID for event timeline generation. Falls back to premium Gemini model when unset."""
     value = get_setting("event_timeline_model")
@@ -679,8 +702,16 @@ def get_openai_premium_model() -> str:
 def _normalize_deepseek_model_id(model_id: str) -> str:
     """Map legacy/wrong ids to DeepSeek API names."""
     m = (model_id or "").strip()
-    if m == "deepseek-chat-3.2":
-        return "deepseek-chat"
+    aliases = {
+        "deepseek-chat-3.2": "deepseek-chat",
+        # These labels were briefly exposed in Admin but were never valid V4
+        # API model ids.  Normalize persisted production settings so deploys
+        # recover without requiring an administrator to re-save the picker.
+        "deepseek-v4": "deepseek-v4-flash",
+        "deepseek-v4-reasoner": "deepseek-v4-pro",
+    }
+    if m in aliases:
+        return aliases[m]
     return m
 
 

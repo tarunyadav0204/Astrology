@@ -34,6 +34,16 @@ def _add_months(iso_day: str | None, months: Any) -> str | None:
         return None
 
 
+def _is_retrospective_semantic_value(value: Any) -> bool:
+    """Normalize only typed router values, never the user's question text."""
+    token = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    return bool(
+        token in {"past", "open_past", "historical", "retrospective"}
+        or token.startswith(("past_", "historical_", "retrospective_"))
+        or token.endswith("_past")
+    )
+
+
 def build_query_plan(
     *, question: str, intent: Dict[str, Any] | None, answer_mode: str,
     target_subject: Dict[str, Any] | None, language: str, as_of: Any = None,
@@ -56,6 +66,19 @@ def build_query_plan(
         ),
         None,
     )
+    dialogue = (
+        extracted.get("instant_dialogue")
+        if isinstance(extracted.get("instant_dialogue"), dict)
+        else intent.get("dialogue_state") if isinstance(intent.get("dialogue_state"), dict)
+        else {}
+    )
+    known_facts = dialogue.get("known_facts") if isinstance(dialogue.get("known_facts"), dict) else {}
+    confirmed_event_date = _date_text(
+        known_facts.get("confirmed_event_date")
+        or known_facts.get("confirmed_date")
+        or known_facts.get("actual_event_date")
+    )
+    confirmed_event_source = str(known_facts.get("event_date_source") or "").strip().lower()
     category = str(intent.get("category") or query_context.get("event_profile") or "general").strip().lower()
     route_action = str(intent.get("route_action") or "answer").strip().lower()
     if route_action not in {"answer", "clarify", "handoff"}:
@@ -74,6 +97,13 @@ def build_query_plan(
     certainty = str(query_context.get("certainty") or intent.get("certainty") or "probabilistic")
     semantic_kind = str((semantic_timeframe or {}).get("kind") or "none").strip().lower()
     relation = str(intent.get("time_relation") or extracted.get("time_scope") or "").strip().lower()
+    dialogue_time_direction = str(
+        known_facts.get("timing_type")
+        or known_facts.get("timing_direction")
+        or known_facts.get("time_relation")
+        or known_facts.get("time_direction")
+        or ""
+    ).strip().lower()
     semantic_value = (semantic_timeframe or {}).get("value")
     semantic_duration = (semantic_timeframe or {}).get("duration")
     duration_months = (semantic_timeframe or {}).get("duration_months")
@@ -88,6 +118,44 @@ def build_query_plan(
         except (TypeError, ValueError):
             duration_months = None
     as_of_day = _date_text(as_of)
+    requested_historical = any(
+        str(value or "").strip().lower().startswith("historical_")
+        for value in requested
+    )
+    retrospective_signal = bool(
+        _is_retrospective_semantic_value(semantic_kind)
+        or _is_retrospective_semantic_value(relation)
+        or _is_retrospective_semantic_value(dialogue_time_direction)
+        or requested_historical
+    )
+    # Grammatical past tense is not automatically a historical event-timing
+    # request.  "Did I have a love or arranged marriage?" is a static pathway
+    # comparison and must not trigger historical dasha/transit scans.  Only
+    # timing/event-discovery modes may promote past semantics into a
+    # retrospective calculation.
+    retrospective_event_mode = str(answer_mode or "").strip().lower() in {
+        "event_prediction", "event_timing", "lifetime_event_timing",
+        "month_timing", "timing_window", "daily_forecast",
+    }
+    retrospective = bool(retrospective_signal and retrospective_event_mode)
+    if retrospective and semantic_kind in {"", "none", "current"}:
+        semantic_timeframe = {
+            "kind": "open_past",
+            "source": "router_dialogue_known_facts",
+        }
+        semantic_kind = "open_past"
+    if retrospective:
+        requested = [
+            value for value in requested
+            if value not in {"future_dasha_event_windows", "transit_event_windows"}
+        ]
+        for value in (
+            "historical_dasha_event_windows",
+            "historical_transit_event_windows",
+            "natal_topic_foundation",
+        ):
+            if value not in requested:
+                requested.append(value)
     resolved_period = intent.get("period_window") if isinstance(intent.get("period_window"), dict) else {}
     resolved_period_kind = str(resolved_period.get("kind") or "").strip().lower()
     exact_day = bool(
@@ -107,8 +175,25 @@ def build_query_plan(
         resolved_period.get("end")
         or resolved_period.get("horizon_end")
     ) if resolved_period else None
-    horizon_end = resolved_horizon_end or _add_months(as_of_day, duration_months)
-    if str(answer_mode or "") == "event_prediction" and (
+    # A rolling/bounded request such as "next 6 months" can arrive alongside
+    # a generic period_window resolved to the router's current day.  That
+    # current-day boundary is context, not the requested horizon.  Explicit
+    # calendar periods ("this year", a named month, or an exact range) still
+    # keep their resolved end date.
+    rolling_duration_kinds = {"bounded_future", "rolling_window"}
+    if retrospective:
+        horizon_end = as_of_day
+    elif duration_months is not None and semantic_kind in rolling_duration_kinds:
+        horizon_end = _add_months(as_of_day, duration_months)
+    else:
+        horizon_end = resolved_horizon_end or _add_months(as_of_day, duration_months)
+    if retrospective:
+        relation = "past"
+    elif retrospective_signal and _is_retrospective_semantic_value(relation):
+        # Preserve grammatical/semantic past tense for static readings without
+        # promoting them into historical event calculations.
+        relation = "past"
+    elif str(answer_mode or "") == "event_prediction" and (
         semantic_value not in (None, "") or semantic_duration not in (None, "")
     ):
         relation = "current_to_future"
@@ -122,6 +207,9 @@ def build_query_plan(
         "question": str(question or "").strip(),
         "language": str(language or "english").strip().lower(),
         "category": category,
+        "career_subtype": intent.get("career_subtype") or query_context.get("career_subtype"),
+        "marriage_subtype": intent.get("marriage_subtype") or query_context.get("marriage_subtype"),
+        "prior_marriage_context": extracted.get("prior_marriage_context"),
         "answer_mode": str(answer_mode or "topic_reading"),
         "route_action": route_action,
         "user_goal": (
@@ -139,8 +227,18 @@ def build_query_plan(
             "granularity": "day" if exact_day else semantic_kind,
             "is_exact_day": exact_day,
             "target_date": target_day,
+            "retrospective": retrospective,
         },
         "event_profile": query_context.get("event_profile") or category,
+        "confirmed_life_event": ({
+            "date": confirmed_event_date,
+            "source": "user_confirmed",
+            "category": category,
+            "claim_rule": (
+                "Treat this as a fact supplied by the user. It may be used to verify calculated factors "
+                "on that date, but must never be described as a date recovered or proven by astrology."
+            ),
+        } if confirmed_event_date and confirmed_event_source == "user_confirmed" else None),
         "special_flow": {
             "requested_chart": extracted.get("requested_chart"),
             "requested_fact": extracted.get("requested_fact"),
