@@ -190,6 +190,22 @@ def apply_live_graph_policy(
         policy.get("domain") == "marriage"
         and policy.get("runtime_key") == "spouse_meeting"
     )
+    spouse_profile_route = bool(
+        policy.get("domain") == "marriage"
+        and policy.get("runtime_key") == "spouse_profile"
+    )
+    spouse_appearance_route = bool(
+        policy.get("domain") == "marriage"
+        and policy.get("runtime_key") == "spouse_appearance"
+    )
+    spouse_location_route = bool(
+        policy.get("domain") == "marriage"
+        and policy.get("runtime_key") == "spouse_location"
+    )
+    marriage_remedy_route = bool(
+        policy.get("domain") == "marriage"
+        and policy.get("runtime_key") == "marriage_remedies"
+    )
     # Career option comparisons use calculated future option windows.  Love
     # versus arranged marriage is a static natal-pathway comparison, so it
     # must never inherit that timing-based winner machinery.
@@ -312,6 +328,196 @@ def apply_live_graph_policy(
             compact_policy["instruction"] = (
                 "The calculated spouse-meeting packet is incomplete. Do not invent work, friends, travel, family, "
                 "an exact venue or any other meeting story. State that a reliable channel cannot be distinguished."
+            )
+            answer_spec["limitation_instruction"] = compact_policy["instruction"]
+    if bool(policy.get("live")) and spouse_profile_route:
+        normalized = (context or {}).get("normalized_evidence") if isinstance((context or {}).get("normalized_evidence"), Mapping) else {}
+        temperament = normalized.get("spouse_temperament_context") if isinstance(normalized.get("spouse_temperament_context"), Mapping) else {}
+        temperament_rules = {
+            "scope": "static five-layer spouse temperament; no timing",
+            "evidence_complete": bool(temperament.get("evidence_complete")),
+            "primary_evidence": "evidence.spouse_temperament_context.layers",
+            "required_layers": [
+                "seventh_house",
+                "seventh_lord_rashi_nakshatra",
+                "darakaraka_rashi_nakshatra",
+                "venus_rashi_nakshatra",
+                "d9_confirmation",
+            ],
+            "required_answer_order": [
+                "direct synthesized temperament",
+                "seventh house and seventh-lord contribution",
+                "seventh-lord nakshatra refinement",
+                "Darakaraka spouse archetype",
+                "Venus relationship style",
+                "D9 confirmation or qualification",
+                "one question about which traits match the spouse",
+            ],
+            "forbidden_moves": [
+                "Do not infer the whole personality from the seventh house or Mercury alone.",
+                "Do not omit Darakaraka, seventh-lord nakshatra, Venus rashi/nakshatra or D9.",
+                "Do not mention dasha, transit, activation, timing or current-period effects.",
+                "Do not diagnose, assert hidden motives or describe fixed identity with certainty.",
+            ],
+        }
+        compact_policy["spouse_temperament_rules"] = temperament_rules
+        answer_spec["spouse_temperament_rules"] = temperament_rules
+        compact_policy["instruction"] = (
+            "Synthesize the supplied five spouse-temperament layers. Give each layer a distinct role and let D9 "
+            "confirm or qualify the natal picture; no single house, planet, rashi or nakshatra may dominate the answer."
+        )
+        verdict = dict(result.get("verdict") or {})
+        verdict.pop("ranked_windows", None)
+        verdict["scope"] = "static five-layer spouse temperament synthesis"
+        result["verdict"] = verdict
+        if not temperament.get("evidence_complete"):
+            compact_policy["claim_permission"] = "no_specific_spouse_temperament"
+            compact_policy["missing_temperament_layers"] = list(temperament.get("missing_layers") or [])
+            compact_policy["instruction"] = (
+                "Required spouse-temperament layers are missing. Do not invent a personality profile from the seventh "
+                "house alone. State which calculation layers are unavailable."
+            )
+            answer_spec["limitation_instruction"] = compact_policy["instruction"]
+    if bool(policy.get("live")) and spouse_appearance_route:
+        normalized = (context or {}).get("normalized_evidence") if isinstance((context or {}).get("normalized_evidence"), Mapping) else {}
+        appearance = normalized.get("spouse_appearance_context") if isinstance(normalized.get("spouse_appearance_context"), Mapping) else {}
+        appearance_rules = {
+            "scope": "spouse physical appearance and visual presence only; no temperament or timing",
+            "evidence_complete": bool(appearance.get("evidence_complete")),
+            "primary_evidence": "evidence.spouse_appearance_context.layers",
+            "required_layers": [
+                "seventh_house_sign",
+                "seventh_lord_rashi_nakshatra",
+                "darakaraka_rashi_nakshatra",
+                "venus_rashi_nakshatra",
+                "d9_confirmation",
+            ],
+            "required_answer_order": [
+                "direct visual summary",
+                "probable build and stature band",
+                "face and visible expression",
+                "style grooming and visual presence",
+                "one or two strongest distinguishing visible markers",
+                "native-chart probability disclosure",
+            ],
+            "forbidden_moves": [
+                "Do not replace appearance with temperament or character.",
+                "Do not discuss profession, location, compatibility or marriage timing.",
+                "Do not infer exact height, exact measurements, exact skin colour, ethnicity, caste or nationality.",
+                "Do not diagnose, sexualize or claim photographic certainty.",
+                "Do not mention dasha, transit, activation or current periods.",
+            ],
+        }
+        compact_policy["spouse_appearance_rules"] = appearance_rules
+        answer_spec["spouse_appearance_rules"] = appearance_rules
+        compact_policy["instruction"] = (
+            "Answer the requested physical-appearance facet directly from the calculated spouse_appearance_context. "
+            "Synthesize all five layers into bounded visual ranges and keep personality prose out of the answer."
+        )
+        verdict = dict(result.get("verdict") or {})
+        verdict.pop("ranked_windows", None)
+        verdict["scope"] = "static probable spouse appearance from native-chart symbolism"
+        result["verdict"] = verdict
+        if not appearance.get("evidence_complete"):
+            compact_policy["claim_permission"] = "no_specific_spouse_appearance"
+            compact_policy["missing_appearance_layers"] = list(appearance.get("missing_layers") or [])
+            compact_policy["instruction"] = (
+                "Required spouse-appearance layers are missing. Do not answer with personality traits or invent "
+                "physical features; state which calculation layers are unavailable."
+            )
+            answer_spec["limitation_instruction"] = compact_policy["instruction"]
+    if bool(policy.get("live")) and spouse_location_route:
+        normalized = (context or {}).get("normalized_evidence") if isinstance((context or {}).get("normalized_evidence"), Mapping) else {}
+        location = normalized.get("spouse_location_context") if isinstance(normalized.get("spouse_location_context"), Mapping) else {}
+        location_rules = {
+            "scope": "static local-versus-different city, culture or geographical background; no timing",
+            "evidence_complete": bool(location.get("evidence_complete")),
+            "calculated_verdict": location.get("verdict"),
+            "distance_score": location.get("distance_score"),
+            "local_score": location.get("local_score"),
+            "primary_evidence": [
+                "evidence.spouse_location_context.distance_signals",
+                "evidence.spouse_location_context.local_signals",
+            ],
+            "allowed_verdicts": [
+                "different_city_culture_or_background_supported",
+                "local_or_familiar_background_supported",
+                "mixed_distance_and_local_signals",
+                "insufficient_specific_distance_evidence",
+            ],
+            "required_answer_order": [
+                "direct plain-language verdict",
+                "strongest direct distance evidence if present",
+                "strongest local or familiar-root evidence if present",
+                "D9 confirmation or qualification",
+                "one question asking whether this matches the known background",
+            ],
+            "forbidden_moves": [
+                "Do not infer foreignness from Saturn, Virgo, a nakshatra or a planet's generic nature alone.",
+                "Do not convert ordinary conjunctions into a different-city or cultural claim.",
+                "Do not mention dasha, transit, activation or whether the result has manifested yet.",
+                "Do not describe temperament, appearance, profession or relationship quality.",
+                "Do not name a city, country, ethnicity, caste, religion or nationality not supplied by the user.",
+            ],
+        }
+        compact_policy["spouse_location_rules"] = location_rules
+        answer_spec["spouse_location_rules"] = location_rules
+        compact_policy["instruction"] = (
+            "Use the calculated local-versus-distance verdict exactly. Explain only direct spouse links to houses 3, "
+            "4, 9 or 12 and explicit Rahu linkage; weak sign modality cannot decide the answer."
+        )
+        verdict = dict(result.get("verdict") or {})
+        verdict.pop("ranked_windows", None)
+        verdict["scope"] = "static spouse geographical or cultural-background tendency"
+        verdict["spouse_location_verdict"] = location.get("verdict")
+        result["verdict"] = verdict
+        if not location.get("evidence_complete"):
+            compact_policy["claim_permission"] = "no_specific_spouse_location"
+            compact_policy["missing_location_layers"] = list(location.get("missing_layers") or [])
+            compact_policy["instruction"] = (
+                "Required spouse-location layers are missing. Do not invent a foreign, different-city, cultural or "
+                "local-background story; state which calculation layers are unavailable."
+            )
+            answer_spec["limitation_instruction"] = compact_policy["instruction"]
+    if bool(policy.get("live")) and marriage_remedy_route:
+        normalized = (context or {}).get("normalized_evidence") if isinstance((context or {}).get("normalized_evidence"), Mapping) else {}
+        blueprint = normalized.get("remedy_blueprint") if isinstance(normalized.get("remedy_blueprint"), Mapping) else {}
+        selection_mode = str(blueprint.get("selection_mode") or "ranked_three")
+        top = blueprint.get("top_recommendation") if isinstance(blueprint.get("top_recommendation"), Mapping) else {}
+        remedy_rules = {
+            "scope": "calculated marriage remedy delivery; no fresh diagnosis or timing",
+            "selection_mode": selection_mode,
+            "required_count": 1 if selection_mode == "single_top" else 3,
+            "top_recommendation": dict(top),
+            "primary_evidence": "evidence.remedy_blueprint.ranked_remedies",
+            "required_fields_per_remedy": ["action", "frequency", "astrological_reason"],
+            "required_answer_order": [
+                "name the top calculated remedy immediately",
+                "state the exact action",
+                "state frequency or duration",
+                "state the calculated chart reason",
+                "one concise practicality caution",
+            ],
+            "forbidden_moves": [
+                "Do not answer with another marital-conflict diagnosis.",
+                "Do not mention current dasha, transit, activation, manifestation or forecast timing.",
+                "Do not replace the calculated remedy with generic communication advice.",
+                "Do not ask what the conflict is about before delivering the available top remedy.",
+                "Do not invent a mantra, gemstone, charity or behavioral action absent from ranked_remedies.",
+                "Do not guarantee reconciliation or conflict resolution.",
+            ],
+        }
+        compact_policy["marriage_remedy_rules"] = remedy_rules
+        answer_spec["marriage_remedy_rules"] = remedy_rules
+        compact_policy["instruction"] = (
+            "Deliver the calculated remedy selection directly from remedy_blueprint.ranked_remedies. If the user "
+            "asks which remedy is most relevant, give exactly top_recommendation with action, frequency and reason."
+        )
+        if not blueprint or not top:
+            compact_policy["claim_permission"] = "no_calculated_marriage_remedy"
+            compact_policy["instruction"] = (
+                "The calculated marriage remedy blueprint or its ranked top recommendation is unavailable. Do not "
+                "improvise a remedy or substitute another conflict diagnosis."
             )
             answer_spec["limitation_instruction"] = compact_policy["instruction"]
     if bool(policy.get("live")) and comparison_mode and not missing:
@@ -441,6 +647,55 @@ def enforce_live_graph_answer(
             "The available natal evidence does not reliably distinguish whether you met through family, work, "
             "friends, travel, or another channel. Choosing a specific story would be speculation. "
             "What was the actual setting in which you first met?"
+        )
+    if policy.get("claim_permission") == "no_specific_spouse_temperament":
+        missing = ", ".join(
+            str(value).replace("_", " ")
+            for value in list(policy.get("missing_temperament_layers") or [])[:5]
+        )
+        if str(language or "").lower().startswith("hi"):
+            return (
+                "मैं जीवनसाथी के स्वभाव का विश्वसनीय विश्लेषण नहीं दे सकता क्योंकि आवश्यक परतें पूरी नहीं हैं"
+                f" ({missing})। केवल सातवें भाव से व्यक्तित्व बनाना अनुमान होगा।"
+            )
+        return (
+            "I can’t give a reliable spouse-temperament profile because the required chart layers are incomplete"
+            f" ({missing}). Building the personality from the seventh house alone would be speculation."
+        )
+    if policy.get("claim_permission") == "no_specific_spouse_appearance":
+        missing = ", ".join(
+            str(value).replace("_", " ")
+            for value in list(policy.get("missing_appearance_layers") or [])[:5]
+        )
+        if str(language or "").lower().startswith("hi"):
+            return (
+                "मैं जीवनसाथी के रूप-रंग का विश्वसनीय संभावित विवरण नहीं दे सकता क्योंकि आवश्यक कुंडली-परतें "
+                f"पूरी नहीं हैं ({missing})। स्वभाव को शारीरिक रूप बताना अनुमान होगा।"
+            )
+        return (
+            "I can’t give a reliable probable appearance description because the required chart layers are incomplete"
+            f" ({missing}). Replacing physical evidence with personality traits would be speculation."
+        )
+    if policy.get("claim_permission") == "no_specific_spouse_location":
+        missing = ", ".join(
+            str(value).replace("_", " ")
+            for value in list(policy.get("missing_location_layers") or [])[:4]
+        )
+        if str(language or "").lower().startswith("hi"):
+            return (
+                "मैं यह विश्वसनीय रूप से नहीं बता सकता कि जीवनसाथी किसी अलग शहर, संस्कृति या पृष्ठभूमि से जुड़े हैं, "
+                f"क्योंकि आवश्यक कुंडली-परतें पूरी नहीं हैं ({missing})।"
+            )
+        return (
+            "I can’t reliably distinguish a different-city, cultural, or local-background connection because the "
+            f"required chart layers are incomplete ({missing}). Choosing one would be speculation."
+        )
+    if policy.get("claim_permission") == "no_calculated_marriage_remedy":
+        if str(language or "").lower().startswith("hi"):
+            return "गणना किया हुआ विवाह-उपाय उपलब्ध नहीं है, इसलिए कोई सामान्य या मनगढ़ंत उपाय बताना उचित नहीं होगा।"
+        return (
+            "The calculated marriage-remedy recommendation is unavailable, so I won’t replace it with a generic "
+            "remedy or another conflict diagnosis."
         )
     if policy.get("runtime_key") == "spouse_meeting":
         # A static meeting-context answer may not borrow timing prose even if

@@ -136,6 +136,10 @@ class RemedyEngine:
     ) -> Dict[str, Any]:
         focus_houses = [int(h) for h in (instant_parashari.get("focus_houses") or []) if str(h).strip().isdigit()]
         active_planets = self._candidate_planets(current_dashas_context, focus_houses)
+        recurring_marital_conflict = self._is_recurring_marital_conflict(question, category)
+        if recurring_marital_conflict:
+            natal_planets = self._marital_conflict_planets(instant_parashari)
+            active_planets = list(dict.fromkeys([*natal_planets, *active_planets]))[:4]
         chart_planets = (self.chart_data.get("planets") or {}) if isinstance(self.chart_data, dict) else {}
         candidate_planet_rows = [self._planet_summary(planet, chart_planets.get(planet) or {}) for planet in active_planets]
         special_points = self._special_point_summary()
@@ -174,6 +178,14 @@ class RemedyEngine:
                 "action": "Keep this as a caution layer only; pair it with practical care and avoid fear-based language.",
             })
 
+        selection_mode = "single_top" if self._asks_for_single_remedy(question) else "ranked_three"
+        ranked_remedies = self._ranked_remedy_actions(
+            category=category,
+            planets=active_planets,
+            remedy_sections=remedy_sections,
+            recurring_marital_conflict=recurring_marital_conflict,
+        )
+
         return {
             "answer_mode": "remedy_action",
             "category": category,
@@ -181,11 +193,113 @@ class RemedyEngine:
             "candidate_planets": candidate_planet_rows,
             "special_points": special_points,
             "priority_order": active_planets[:3],
+            "selection_mode": selection_mode,
+            "top_recommendation": ranked_remedies[0] if ranked_remedies else {},
+            "ranked_remedies": ranked_remedies,
+            "recurring_marital_conflict": recurring_marital_conflict,
             "constructive_house_expression": self._house_expression_guidance(active_planets, focus_houses, current_dashas_context),
             "remedy_sections": remedy_sections,
             "caution": self._caution_line(active_planets, special_points),
             "follow_up_prompts": self._follow_up_prompts(category),
         }
+
+    @staticmethod
+    def _asks_for_single_remedy(question: str) -> bool:
+        q = str(question or "").strip().lower()
+        return any(marker in q for marker in (
+            "which remedy", "which calculated remedy", "most relevant remedy",
+            "best remedy", "top remedy", "single remedy", "one remedy",
+        ))
+
+    @staticmethod
+    def _is_recurring_marital_conflict(question: str, category: str) -> bool:
+        if str(category or "").strip().lower() not in {"marriage", "relationship", "love", "partner", "spouse"}:
+            return False
+        q = str(question or "").strip().lower()
+        recurring = any(marker in q for marker in ("recurring", "repeated", "keeps happening", "same conflict", "again and again"))
+        conflict = any(marker in q for marker in ("conflict", "argument", "fight", "friction", "marital problem", "relationship problem"))
+        return recurring and conflict
+
+    @staticmethod
+    def _marital_conflict_planets(instant_parashari: Dict[str, Any]) -> List[str]:
+        natal = instant_parashari.get("natal_topic_factors") if isinstance(instant_parashari.get("natal_topic_factors"), dict) else {}
+        rows = {
+            int(row.get("house")): row
+            for row in natal.get("houses") or []
+            if isinstance(row, dict) and str(row.get("house") or "").isdigit()
+        }
+        planets: List[str] = []
+        # Partnership lord/occupants define the repair target; 6/8/12 supply
+        # recurring conflict, rupture and withdrawal pressure.
+        for house in (7, 6, 8, 12):
+            row = rows.get(house) or {}
+            for value in [row.get("lord"), *(row.get("occupants") or []), *(row.get("aspecting_planets") or [])]:
+                planet = str(value or "").strip()
+                if planet and planet not in planets:
+                    planets.append(planet)
+        return planets[:4]
+
+    def _ranked_remedy_actions(
+        self,
+        *,
+        category: str,
+        planets: List[str],
+        remedy_sections: Dict[str, Any],
+        recurring_marital_conflict: bool,
+    ) -> List[Dict[str, Any]]:
+        primary = str((planets or [""])[0] or "").strip()
+        rows: List[Dict[str, Any]] = []
+        if recurring_marital_conflict and primary:
+            rows.append({
+                "rank": 1,
+                "source_section": "behavioral_house_expression",
+                "planet": primary,
+                "action": (
+                    "Use a structured repair ritual: pause an escalating argument for 20 minutes, return the same "
+                    "day, and let each partner state one burden, one feeling, and one clear request without interruption."
+                ),
+                "frequency": "At every escalation, plus one 20-minute check-in each week for 40 days.",
+                "astrological_reason": (
+                    f"{primary} is the first calculated natal marriage-conflict driver; this channels the partnership "
+                    "and conflict houses into structure, listening, and repair instead of repetition."
+                ),
+            })
+        mantra_rows = remedy_sections.get("mantras") if isinstance(remedy_sections.get("mantras"), list) else []
+        if primary:
+            mantra = next((row for row in mantra_rows if str(row.get("planet") or "") == primary and row.get("text")), None)
+            if mantra:
+                rows.append({
+                    "rank": len(rows) + 1,
+                    "source_section": "mantras",
+                    "planet": primary,
+                    "action": str(mantra.get("text")),
+                    "frequency": "108 repetitions daily for 40 days, or on the planet's weekday if daily practice is impractical.",
+                    "astrological_reason": f"This is the calculated sound remedy for the first-priority driver, {primary}.",
+                })
+        charity_rows = remedy_sections.get("charity") if isinstance(remedy_sections.get("charity"), list) else []
+        if primary:
+            charity = next((row for row in charity_rows if str(row.get("planet") or "") == primary and row.get("text")), None)
+            if charity:
+                rows.append({
+                    "rank": len(rows) + 1,
+                    "source_section": "charity",
+                    "planet": primary,
+                    "action": str(charity.get("text")),
+                    "frequency": "Once weekly for 6 weeks.",
+                    "astrological_reason": f"This is the calculated seva/charity expression for {primary}.",
+                })
+        if not rows:
+            behavioral = remedy_sections.get("behavioral") if isinstance(remedy_sections.get("behavioral"), list) else []
+            for text in behavioral[:3]:
+                rows.append({
+                    "rank": len(rows) + 1,
+                    "source_section": "behavioral",
+                    "planet": primary or None,
+                    "action": str(text),
+                    "frequency": "Practice consistently for 40 days.",
+                    "astrological_reason": f"Calculated behavioral expression for {category}." + (f" Primary driver: {primary}." if primary else ""),
+                })
+        return rows[:3]
 
     def _candidate_planets(self, current_dashas_context: Dict[str, Any], focus_houses: List[int]) -> List[str]:
         planets: List[str] = []

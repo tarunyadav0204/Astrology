@@ -10,9 +10,15 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 
 from instant_chat_v2.graph_live import apply_live_graph_policy, enforce_live_graph_answer  # noqa: E402
+from calculators.remedy_engine import RemedyEngine  # noqa: E402
 from chat.instant_chat_pipeline import (  # noqa: E402
     _compact_marriage_pathway_evidence,
     _compact_spouse_meeting_evidence,
+    _compact_spouse_temperament_evidence,
+    _compact_spouse_appearance_evidence,
+    _compact_spouse_location_evidence,
+    _attach_calculated_remedy_blueprint,
+    _normalize_instant_evidence,
     _build_instant_composer_context,
     _build_instant_composer_prompt_v3,
 )
@@ -295,6 +301,370 @@ def test_spouse_meeting_uses_seventh_lord_destination_and_excludes_timing_story(
     )
     assert "Saturn-driven" not in safe
     assert safe == "Family involvement is more likely."
+
+
+def test_spouse_temperament_requires_seventh_lord_nakshatra_darakaraka_venus_and_d9() -> None:
+    chart = {
+        "ascendant": 120.0,
+        "planets": {
+            "Saturn": {"longitude": 155.0, "house": 2, "sign": 5},
+            "Mercury": {"longitude": 201.0, "house": 7, "sign": 6},
+            "Venus": {"longitude": 350.0, "house": 8, "sign": 11},
+            "Mars": {"longitude": 12.0, "house": 9, "sign": 0},
+            "Sun": {"longitude": 40.0, "house": 10, "sign": 1},
+            "Moon": {"longitude": 70.0, "house": 11, "sign": 2},
+            "Jupiter": {"longitude": 100.0, "house": 12, "sign": 3},
+        },
+    }
+    natal = {"houses": [{
+        "house": 7,
+        "lord": "Saturn",
+        "occupants": ["Mercury"],
+        "tone": "challenging",
+        "factors": [{
+            "source": "house_lord", "planet": "Saturn",
+            "facts": {"placement_house": 2},
+        }],
+    }]}
+    karakas = {
+        "calculation_method": "test",
+        "chara_karakas": {"Darakaraka": {
+            "planet": "Mars", "degree_in_sign": 12.0,
+        }},
+    }
+    divisional = {"topic": {
+        "support": "supportive", "codes": ["D9"], "charts": {
+            "D9": {"support": "supportive", "rows": [{"h": 7, "lord": "Saturn", "occ": ["Venus"]}]},
+        },
+    }}
+    temperament = _compact_spouse_temperament_evidence(chart, natal, karakas, divisional)
+    layers = temperament["layers"]
+
+    assert temperament["evidence_complete"] is True
+    assert layers["seventh_house"]["tone"] == "challenging"
+    assert layers["seventh_lord_rashi_nakshatra"]["planet"] == "Saturn"
+    assert layers["seventh_lord_rashi_nakshatra"]["nakshatra"]
+    assert layers["darakaraka_rashi_nakshatra"]["planet"] == "Mars"
+    assert layers["venus_rashi_nakshatra"]["rashi"] == "Pisces"
+    assert layers["venus_rashi_nakshatra"]["nakshatra"]
+    assert layers["d9_confirmation"]["support"] == "supportive"
+
+    packet = _packet("spouse", "relationship_person")
+    context = {
+        "intent_summary": {"category": "spouse", "answer_mode": "relationship_person"},
+        "normalized_evidence": {"spouse_temperament_context": temperament},
+    }
+    result = apply_live_graph_policy(packet, intent={"category": "spouse"}, context=context)
+    policy = result["answer_spec"]["knowledge_graph_policy"]
+    assert policy["runtime_key"] == "spouse_profile"
+    assert policy["spouse_temperament_rules"]["evidence_complete"] is True
+    assert policy.get("claim_permission") != "no_specific_spouse_temperament"
+
+    composer = _build_instant_composer_context(context, result)
+    prompt = _build_instant_composer_prompt_v3(
+        "What kind of temperament does my chart indicate for my spouse?", composer, "english"
+    )
+    assert "five-layer spouse-temperament synthesis" in prompt
+    assert "seventh-lord rashi and nakshatra" in prompt
+    assert "Darakaraka rashi and nakshatra" in prompt
+    assert "Venus rashi and nakshatra" in prompt
+    assert "D9 confirmation" in prompt
+
+
+def test_spouse_temperament_does_not_fall_back_to_seventh_house_when_layers_are_missing() -> None:
+    packet = _packet("spouse", "relationship_person")
+    context = {
+        "intent_summary": {"category": "spouse", "answer_mode": "relationship_person"},
+        "normalized_evidence": {
+            "spouse_temperament_context": {
+                "evidence_complete": False,
+                "missing_layers": [
+                    "seventh_lord_rashi_nakshatra",
+                    "darakaraka_rashi_nakshatra",
+                    "venus_rashi_nakshatra",
+                    "d9_confirmation",
+                ],
+                "layers": {"seventh_house": {"occupants": ["Mercury"]}},
+            },
+        },
+    }
+
+    result = apply_live_graph_policy(packet, intent={"category": "spouse"}, context=context)
+    policy = result["answer_spec"]["knowledge_graph_policy"]
+    assert policy["claim_permission"] == "no_specific_spouse_temperament"
+    assert "darakaraka_rashi_nakshatra" in policy["missing_temperament_layers"]
+
+    safe = enforce_live_graph_answer(
+        "Mercury makes your spouse analytical, practical, and highly communicative.",
+        result,
+        language="english",
+    )
+    assert "Mercury" not in safe
+    assert "seventh house alone would be speculation" in safe
+
+
+def test_spouse_appearance_answers_physical_facet_without_temperament_fallback() -> None:
+    chart = {
+        "ascendant": 120.0,
+        "planets": {
+            "Saturn": {"longitude": 155.0, "house": 2, "sign": 5},
+            "Mercury": {"longitude": 201.0, "house": 7, "sign": 6},
+            "Venus": {"longitude": 350.0, "house": 8, "sign": 11},
+            "Mars": {"longitude": 12.0, "house": 9, "sign": 0},
+        },
+    }
+    natal = {"houses": [{
+        "house": 7, "lord": "Saturn", "occupants": ["Mercury"],
+        "aspecting_planets": ["Jupiter"], "tone": "mixed",
+    }]}
+    karakas = {"chara_karakas": {"Darakaraka": {"planet": "Mars", "degree_in_sign": 12.0}}}
+    divisional = {"topic": {"support": "supportive", "charts": {
+        "D9": {"support": "supportive", "rows": [{"h": 7, "lord": "Saturn", "occ": ["Venus"]}]},
+    }}}
+    appearance = _compact_spouse_appearance_evidence(chart, natal, karakas, divisional)
+    assert appearance["evidence_complete"] is True
+    assert appearance["layers"]["seventh_house_sign"]["rashi"] == "Aquarius"
+
+    packet = _packet(
+        "marriage", "relationship_person",
+        question="How will they look like?",
+        marriage_subtype="spouse_details",
+        special_flow={"spouse_detail_scope": "appearance"},
+    )
+    context = {
+        "intent_summary": {"category": "marriage", "answer_mode": "relationship_person"},
+        "normalized_evidence": {"spouse_appearance_context": appearance},
+    }
+    result = apply_live_graph_policy(
+        packet,
+        intent={"category": "marriage", "marriage_subtype": "spouse_details"},
+        context=context,
+    )
+    policy = result["answer_spec"]["knowledge_graph_policy"]
+    assert policy["runtime_key"] == "spouse_appearance"
+    assert policy["spouse_appearance_rules"]["evidence_complete"] is True
+
+    composer = _build_instant_composer_context(context, result)
+    prompt = _build_instant_composer_prompt_v3("How will they look like?", composer, "english")
+    assert "asks specifically how the spouse may look" in prompt
+    assert "do not answer with temperament" in prompt
+    assert "likely build/stature band" in prompt
+    assert "exact skin colour" in prompt
+
+
+def test_spouse_appearance_missing_layers_cannot_be_replaced_with_personality() -> None:
+    packet = _packet(
+        "spouse", "relationship_person",
+        question="How will they look?",
+        special_flow={"spouse_detail_scope": "appearance"},
+    )
+    context = {
+        "intent_summary": {"category": "spouse", "answer_mode": "relationship_person"},
+        "normalized_evidence": {"spouse_appearance_context": {
+            "evidence_complete": False,
+            "missing_layers": ["darakaraka_rashi_nakshatra", "d9_confirmation"],
+            "layers": {"seventh_house_sign": {"rashi": "Aquarius"}},
+        }},
+    }
+    result = apply_live_graph_policy(packet, intent={"category": "spouse"}, context=context)
+    policy = result["answer_spec"]["knowledge_graph_policy"]
+    assert policy["claim_permission"] == "no_specific_spouse_appearance"
+    safe = enforce_live_graph_answer(
+        "They will be intelligent, practical, reliable and quietly warm.", result, language="english"
+    )
+    assert "quietly warm" not in safe
+    assert "Replacing physical evidence with personality traits would be speculation" in safe
+
+
+def test_spouse_location_requires_direct_distance_links_not_generic_placement_folklore() -> None:
+    chart = {
+        "ascendant": 120.0,
+        "planets": {
+            "Saturn": {"longitude": 155.0, "house": 2, "sign": 5},
+            "Moon": {"longitude": 160.0, "house": 2, "sign": 5},
+            "Jupiter": {"longitude": 165.0, "house": 2, "sign": 5},
+            "Venus": {"longitude": 350.0, "house": 8, "sign": 11},
+            "Sun": {"longitude": 345.0, "house": 8, "sign": 11},
+            "Mars": {"longitude": 355.0, "house": 8, "sign": 11},
+        },
+    }
+    natal = {"houses": [{
+        "house": 7, "lord": "Saturn", "occupants": [], "aspecting_planets": [], "tone": "mixed",
+    }]}
+    karakas = {"chara_karakas": {"Darakaraka": {"planet": "Venus", "degree_in_sign": 20.0}}}
+    divisional = {"topic": {"charts": {
+        "D9": {"support": "mixed", "rows": [{"h": 7, "lord": "Mercury", "occ": []}]},
+    }}}
+    location = _compact_spouse_location_evidence(chart, natal, karakas, divisional)
+    assert location["evidence_complete"] is True
+    assert location["verdict"] == "insufficient_specific_distance_evidence"
+    assert not any(float(row["weight"]) >= 2 for row in location["distance_signals"])
+
+    packet = _packet(
+        "marriage", "relationship_person",
+        question="Does my spouse appear connected with a different city, culture or background?",
+        marriage_subtype="spouse_details",
+        special_flow={"spouse_detail_scope": "location"},
+    )
+    context = {
+        "intent_summary": {"category": "marriage", "answer_mode": "relationship_person"},
+        "normalized_evidence": {"spouse_location_context": location},
+    }
+    result = apply_live_graph_policy(packet, intent={"category": "marriage"}, context=context)
+    policy = result["answer_spec"]["knowledge_graph_policy"]
+    assert policy["runtime_key"] == "spouse_location"
+    assert policy["spouse_location_rules"]["calculated_verdict"] == "insufficient_specific_distance_evidence"
+
+    composer = _build_instant_composer_context(context, result)
+    prompt = _build_instant_composer_prompt_v3(packet["query_plan"]["question"], composer, "english")
+    assert "Saturn in Virgo" in prompt
+    assert "does not by itself mean another city" in prompt
+    assert "Never mention timing" in prompt
+
+
+def test_spouse_location_supports_distance_only_from_direct_spouse_link() -> None:
+    chart = {
+        "ascendant": 120.0,
+        "planets": {
+            "Saturn": {"longitude": 250.0, "house": 9, "sign": 8},
+            "Venus": {"longitude": 320.0, "house": 12, "sign": 10},
+        },
+    }
+    natal = {"houses": [{"house": 7, "lord": "Saturn", "occupants": [], "tone": "supportive"}]}
+    karakas = {"chara_karakas": {"Darakaraka": {"planet": "Venus", "degree_in_sign": 20.0}}}
+    divisional = {"topic": {"charts": {
+        "D9": {"support": "supportive", "rows": [{"h": 7, "lord": "Jupiter", "occ": []}]},
+    }}}
+    location = _compact_spouse_location_evidence(chart, natal, karakas, divisional)
+    assert location["verdict"] == "different_city_culture_or_background_supported"
+    assert location["distance_score"] >= 6
+
+
+def test_marriage_remedy_selection_returns_one_calculated_action_before_diagnosis() -> None:
+    chart = {
+        "planets": {
+            "Saturn": {"house": 3, "sign_name": "Virgo"},
+            "Venus": {"house": 9, "sign_name": "Pisces"},
+            "Mars": {"house": 9, "sign_name": "Pisces"},
+        },
+    }
+    natal = {"houses": [
+        {"house": 7, "lord": "Saturn", "occupants": []},
+        {"house": 6, "lord": "Jupiter", "occupants": []},
+        {"house": 8, "lord": "Saturn", "occupants": []},
+        {"house": 12, "lord": "Mercury", "occupants": []},
+    ]}
+    blueprint = RemedyEngine(chart).build_remedy_blueprint(
+        question="Which calculated remedy is most relevant for recurring marital conflict?",
+        category="marriage",
+        instant_parashari={
+            "focus_houses": [2, 6, 7, 8, 11, 12],
+            "natal_topic_factors": natal,
+        },
+        normalized_evidence={},
+        current_dashas_context={},
+    )
+    top = blueprint["top_recommendation"]
+    assert blueprint["selection_mode"] == "single_top"
+    assert blueprint["recurring_marital_conflict"] is True
+    assert top["source_section"] == "behavioral_house_expression"
+    assert top["planet"] == "Saturn"
+    assert top["action"]
+    assert top["frequency"]
+    assert top["astrological_reason"]
+
+    packet = _packet("marriage", "remedy_action", marriage_subtype="general")
+    context = {
+        "intent_summary": {"category": "marriage", "answer_mode": "remedy_action"},
+        "normalized_evidence": {
+            "remedy_blueprint": blueprint,
+            "current_timing": {"active_dashas": {"md": {"planet": "Saturn"}}},
+        },
+    }
+    result = apply_live_graph_policy(packet, intent={"category": "marriage"}, context=context)
+    policy = result["answer_spec"]["knowledge_graph_policy"]
+    assert policy["runtime_key"] == "marriage_remedies"
+    assert "marriage:DashaActivation" not in policy["observed_factors"]
+    assert "marriage:DashaActivation" not in policy["unexpected_default_exclusions"]
+    assert policy["marriage_remedy_rules"]["required_count"] == 1
+    assert policy["marriage_remedy_rules"]["top_recommendation"] == top
+
+    composer = _build_instant_composer_context(context, result)
+    assert composer["evidence"].get("current_timing") is None
+    prompt = _build_instant_composer_prompt_v3(
+        "Which calculated remedy is most relevant for recurring marital conflict?", composer, "english"
+    )
+    assert "Give exactly one remedy" in prompt
+    assert "give exactly three" not in prompt.lower()
+    assert "Do not mention current dasha" in prompt
+    assert "not by retelling the marital-conflict diagnosis" in prompt
+
+
+def test_remedy_blueprint_second_pass_attaches_ranked_top_recommendation() -> None:
+    chart = {"planets": {
+        "Saturn": {"house": 3, "sign_name": "Virgo"},
+        "Venus": {"house": 9, "sign_name": "Pisces"},
+    }}
+    normalized = {}
+    attached = _attach_calculated_remedy_blueprint(
+        normalized=normalized,
+        chart_data=chart,
+        question="Which calculated remedy is most relevant for recurring marital conflict?",
+        category="marriage",
+        instant_parashari={
+            "focus_houses": [2, 6, 7, 8, 11, 12],
+            "natal_topic_factors": {"houses": [
+                {"house": 7, "lord": "Saturn", "occupants": []},
+                {"house": 6, "lord": "Jupiter", "occupants": []},
+                {"house": 8, "lord": "Saturn", "occupants": []},
+                {"house": 12, "lord": "Mercury", "occupants": []},
+            ]},
+        },
+        current_dashas_context={},
+        target_chart_context=None,
+    )
+    assert attached is True
+    assert normalized["remedy_blueprint"]["selection_mode"] == "single_top"
+    assert normalized["remedy_blueprint"]["top_recommendation"]["action"]
+
+
+def test_remedy_normalization_receives_question_and_chart_data() -> None:
+    normalized = _normalize_instant_evidence(
+        answer_mode="remedy_action",
+        category="marriage",
+        question="Which calculated remedy is most relevant for recurring marital conflict?",
+        chart_data={"planets": {"Saturn": {"house": 3, "sign_name": "Virgo"}}},
+        instant_parashari={
+            "focus_houses": [2, 6, 7, 8, 11, 12],
+            "natal_topic_factors": {"houses": [
+                {"house": 7, "lord": "Saturn", "occupants": []},
+                {"house": 6, "lord": "Jupiter", "occupants": []},
+                {"house": 8, "lord": "Saturn", "occupants": []},
+                {"house": 12, "lord": "Mercury", "occupants": []},
+            ]},
+        },
+        current_transits_formatted={},
+        current_dashas_context={},
+    )
+
+    assert normalized["remedy_blueprint"]["selection_mode"] == "single_top"
+    assert normalized["remedy_blueprint"]["top_recommendation"]["action"]
+
+
+def test_marriage_remedy_route_fails_closed_without_ranked_calculation() -> None:
+    packet = _packet("marriage", "remedy_action")
+    context = {
+        "intent_summary": {"category": "marriage", "answer_mode": "remedy_action"},
+        "normalized_evidence": {"remedy_blueprint": {"selection_mode": "single_top"}},
+    }
+    result = apply_live_graph_policy(packet, intent={"category": "marriage"}, context=context)
+    policy = result["answer_spec"]["knowledge_graph_policy"]
+    assert policy["claim_permission"] == "no_calculated_marriage_remedy"
+    safe = enforce_live_graph_answer(
+        "The Saturn period suggests improving communication.", result, language="english"
+    )
+    assert "Saturn period" not in safe
+    assert "calculated marriage-remedy recommendation is unavailable" in safe
 
 
 def test_marriage_muhurat_uses_live_graph_route_for_dedicated_flow() -> None:

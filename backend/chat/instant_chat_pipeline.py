@@ -6101,9 +6101,58 @@ def _build_answer_mode_contract(answer_mode: str, category: str, period_window: 
     return base
 
 
+def _attach_calculated_remedy_blueprint(
+    *,
+    normalized: Dict[str, Any],
+    chart_data: Dict[str, Any],
+    question: str,
+    category: str,
+    instant_parashari: Dict[str, Any],
+    current_dashas_context: Dict[str, Any],
+    target_chart_context: Optional[Dict[str, Any]],
+) -> bool:
+    """Build and attach the authoritative remedy packet once, returning success."""
+    if isinstance(normalized.get("remedy_blueprint"), dict) and normalized["remedy_blueprint"].get("top_recommendation"):
+        return True
+    try:
+        remedy_blueprint = RemedyEngine(
+            chart_data=chart_data,
+            divisional_charts=chart_data.get("divisional_charts") or {},
+        ).build_remedy_blueprint(
+            question=question,
+            category=category,
+            instant_parashari=instant_parashari,
+            normalized_evidence=normalized,
+            current_dashas_context=current_dashas_context,
+            target_chart_context=target_chart_context,
+        )
+        if not isinstance(remedy_blueprint, dict) or not remedy_blueprint.get("top_recommendation"):
+            logger.error(
+                "INSTANT_REMEDY_BLUEPRINT_INCOMPLETE category=%s selection_mode=%s ranked_count=%s",
+                category,
+                (remedy_blueprint or {}).get("selection_mode") if isinstance(remedy_blueprint, dict) else None,
+                len((remedy_blueprint or {}).get("ranked_remedies") or []) if isinstance(remedy_blueprint, dict) else 0,
+            )
+            return False
+        normalized["remedy_blueprint"] = remedy_blueprint
+        normalized["question_focus"] = remedy_blueprint.get("question_focus") or normalized.get("question_focus")
+        normalized["primary_drivers"] = list(remedy_blueprint.get("candidate_planets") or normalized.get("primary_drivers") or [])
+        normalized["top_risks"] = list(remedy_blueprint.get("priority_order") or normalized.get("top_risks") or [])
+        normalized["special_points"] = remedy_blueprint.get("special_points") or {}
+        normalized["remedy_sections"] = remedy_blueprint.get("remedy_sections") or {}
+        normalized["follow_up_prompts"] = remedy_blueprint.get("follow_up_prompts") or []
+        normalized["caution"] = remedy_blueprint.get("caution") or ""
+        return True
+    except Exception:
+        logger.exception("INSTANT_REMEDY_BLUEPRINT_BUILD_FAILED category=%s", category)
+        return False
+
+
 def _normalize_instant_evidence(
     answer_mode: str,
     category: str,
+    question: str,
+    chart_data: Dict[str, Any],
     instant_parashari: Dict[str, Any],
     current_transits_formatted: Dict[str, Any],
     current_dashas_context: Dict[str, Any],
@@ -6326,29 +6375,15 @@ def _normalize_instant_evidence(
         normalized["career_profile"] = profile
         normalized["career_manifestations"] = classify_career_manifestations(activated)
     if answer_mode == "remedy_action":
-        try:
-            remedy_blueprint = RemedyEngine(
-                chart_data=chart_data,
-                divisional_charts=chart_data.get("divisional_charts") or {},
-            ).build_remedy_blueprint(
-                question=question,
-                category=category,
-                instant_parashari=instant_parashari,
-                normalized_evidence=normalized,
-                current_dashas_context=current_dashas_context,
-                target_chart_context=target_chart_context,
-            )
-            if isinstance(remedy_blueprint, dict):
-                normalized["remedy_blueprint"] = remedy_blueprint
-                normalized["question_focus"] = remedy_blueprint.get("question_focus") or normalized.get("question_focus")
-                normalized["primary_drivers"] = list(remedy_blueprint.get("candidate_planets") or normalized.get("primary_drivers") or [])
-                normalized["top_risks"] = list(remedy_blueprint.get("priority_order") or normalized.get("top_risks") or [])
-                normalized["special_points"] = remedy_blueprint.get("special_points") or {}
-                normalized["remedy_sections"] = remedy_blueprint.get("remedy_sections") or {}
-                normalized["follow_up_prompts"] = remedy_blueprint.get("follow_up_prompts") or []
-                normalized["caution"] = remedy_blueprint.get("caution") or ""
-        except Exception as exc:
-            logger.warning("remedy blueprint build failed: %s", exc)
+        _attach_calculated_remedy_blueprint(
+            normalized=normalized,
+            chart_data=chart_data,
+            question=question,
+            category=category,
+            instant_parashari=instant_parashari,
+            current_dashas_context=current_dashas_context,
+            target_chart_context=target_chart_context,
+        )
     if answer_mode == "event_prediction":
         normalized["timing_policy"] = instant_parashari.get("timing_policy") or {}
         if instant_parashari.get("historical_event_dasha_scan"):
@@ -6594,10 +6629,16 @@ def _instant_parashari_instruction_block(
             ]
         )
     if answer_mode == "remedy_action":
+        remedy_blueprint = (normalized_evidence or {}).get("remedy_blueprint") if isinstance((normalized_evidence or {}).get("remedy_blueprint"), dict) else {}
+        single_top = str(remedy_blueprint.get("selection_mode") or "") == "single_top"
         primary = ", ".join(str(v) for v in (contract.get("primary_evidence") or [])) or "remedy blueprint and active pressure"
         secondary = ", ".join(str(v) for v in (contract.get("secondary_evidence") or [])) or "supporting modifiers"
         avoid = "; ".join(str(v) for v in (contract.get("avoid_drift") or [])) or "generic remedy dump"
-        skeleton = str(contract.get("answer_skeleton") or "One-sentence problem focus -> Three prioritized remedies -> One caution -> One natural follow-up question")
+        skeleton = (
+            "Name the single top calculated remedy -> Exact action -> Frequency/duration -> Calculated chart reason -> One caution"
+            if single_top
+            else str(contract.get("answer_skeleton") or "One-sentence problem focus -> Three prioritized remedies -> One caution -> One natural follow-up question")
+        )
         return "\n".join(
             [
                 f"This answer uses universal answer mode `{answer_mode}`.",
@@ -6606,7 +6647,11 @@ def _instant_parashari_instruction_block(
                 "CRITICAL: Do not give all astrological schools or a generic upaya list. Build remedies only from the remedy blueprint and the strongest active chart pressure.",
                 "CRITICAL: Keep the remedy language practical, layered, and non-dramatic.",
                 "CRITICAL: Answer the request immediately. Do not replace remedies with forecasts, favorable dates, diagnosis, or advice such as merely work harder / be disciplined.",
-                "CRITICAL: Keep this Instant version concise: normally 3 prioritized remedies. For each, state exactly what to do, how/often to do it, and the astrological reason in plain language.",
+                (
+                    "CRITICAL: The user asked which remedy is most relevant. Give exactly one: copy `remedy_blueprint.top_recommendation`, including its action, frequency, and astrological_reason."
+                    if single_top
+                    else "CRITICAL: Keep this Instant version concise: give exactly 3 prioritized remedies. For each, state exactly what to do, how/often to do it, and the astrological reason in plain language."
+                ),
                 f"Answer skeleton: {skeleton}.",
                 f"Primary evidence priority: {primary}.",
                 f"Secondary evidence only after primary evidence: {secondary}.",
@@ -8248,6 +8293,294 @@ def _compact_spouse_meeting_evidence(
     }
 
 
+def _compact_spouse_temperament_evidence(
+    chart_data: Any,
+    natal_topic_factors: Any,
+    karaka_evidence: Any,
+    divisional_support: Any,
+) -> Dict[str, Any]:
+    """Five-layer natal spouse-temperament evidence for the Instant composer."""
+    chart = chart_data if isinstance(chart_data, dict) else {}
+    planets = chart.get("planets") if isinstance(chart.get("planets"), dict) else {}
+    natal = natal_topic_factors if isinstance(natal_topic_factors, dict) else {}
+    try:
+        from reports.context.shared_branch_context import build_nakshatra_context
+
+        nakshatras = build_nakshatra_context(chart).get("positions") or {}
+    except Exception:
+        logger.exception("Instant spouse temperament nakshatra calculation failed")
+        nakshatras = {}
+
+    def planet_layer(planet: Any, *, role: str) -> Dict[str, Any]:
+        name = str(planet or "").strip()
+        row = planets.get(name) if isinstance(planets.get(name), dict) else {}
+        nak = nakshatras.get(name) if isinstance(nakshatras.get(name), dict) else {}
+        sign_index = _sign_index_from_row(row)
+        return {
+            key: value
+            for key, value in {
+                "role": role,
+                "planet": name,
+                "house": _safe_int(row.get("house")),
+                "rashi": SIGN_NAMES[sign_index] if sign_index is not None else row.get("sign_name"),
+                "degree_in_rashi": round(float(row.get("longitude")) % 30, 3) if row.get("longitude") is not None else None,
+                "nakshatra": nak.get("nakshatra_name") or nak.get("name") or nak.get("nakshatra"),
+                "nakshatra_lord": nak.get("nakshatra_lord") or nak.get("lord"),
+                "nakshatra_deity": nak.get("nakshatra_deity") or nak.get("deity"),
+                "pada": nak.get("pada"),
+                "conjunctions": [
+                    other for other, other_row in planets.items()
+                    if other != name
+                    and isinstance(other_row, dict)
+                    and _safe_int(other_row.get("house")) == _safe_int(row.get("house"))
+                ],
+            }.items()
+            if value not in (None, "", [], {})
+        }
+
+    seventh = next(
+        (row for row in natal.get("houses") or [] if isinstance(row, dict) and _safe_int(row.get("house")) == 7),
+        {},
+    )
+    seventh_lord = str(seventh.get("lord") or "").strip()
+    seventh_house = {
+        key: value for key, value in {
+            "house": 7,
+            "lord": seventh_lord,
+            "occupants": list(seventh.get("occupants") or []),
+            "aspecting_planets": list(seventh.get("aspecting_planets") or []),
+            "tone": seventh.get("tone"),
+            "supportive_weight": seventh.get("supportive_weight"),
+            "challenging_weight": seventh.get("challenging_weight"),
+            "factors": list(seventh.get("factors") or [])[:8],
+        }.items() if value not in (None, "", [], {})
+    }
+    karakas = (
+        karaka_evidence.get("chara_karakas")
+        if isinstance(karaka_evidence, dict) and isinstance(karaka_evidence.get("chara_karakas"), dict)
+        else {}
+    )
+    darakaraka_row = karakas.get("Darakaraka") if isinstance(karakas.get("Darakaraka"), dict) else {}
+    darakaraka = planet_layer(darakaraka_row.get("planet"), role="Darakaraka · spouse significator")
+    if darakaraka:
+        darakaraka["chara_karaka_degree_in_rashi"] = darakaraka_row.get("degree_in_sign")
+        darakaraka["calculation_method"] = (
+            karaka_evidence.get("calculation_method")
+            if isinstance(karaka_evidence, dict)
+            else None
+        )
+    d9_topic = _compact_divisional_topic_payload(
+        divisional_support if isinstance(divisional_support, dict) else {}
+    ).get("topic") or {}
+    d9_chart = (d9_topic.get("charts") or {}).get("D9") if isinstance(d9_topic.get("charts"), dict) else {}
+    layers = {
+        "seventh_house": seventh_house,
+        "seventh_lord_rashi_nakshatra": planet_layer(
+            seventh_lord, role="seventh lord · spouse temperament anchor",
+        ),
+        "darakaraka_rashi_nakshatra": darakaraka,
+        "venus_rashi_nakshatra": planet_layer(
+            "Venus", role="Venus · relationship style and affection",
+        ),
+        "d9_confirmation": d9_chart if isinstance(d9_chart, dict) else {},
+    }
+    missing = [key for key, value in layers.items() if not value]
+    return {
+        "scope": "static natal spouse temperament; no timing",
+        "layers": layers,
+        "evidence_complete": not missing,
+        "missing_layers": missing,
+        "synthesis_rule": (
+            "Synthesize all five layers. The seventh house/lord anchors observable temperament; the seventh-lord "
+            "nakshatra refines instinctive style; Darakaraka adds the spouse archetype; Venus describes relating and "
+            "affection; D9 confirms or qualifies. No single planet may become the whole personality."
+        ),
+        "fidelity_rules": [
+            "Copy rashi, nakshatra, lord, pada, house and tone exactly.",
+            "Do not infer temperament from the seventh house alone.",
+            "Do not use current dasha, transit, activation or timing.",
+            "Describe probable traits, not hidden motives, mental-health diagnoses or fixed identity.",
+        ],
+    }
+
+
+def _spouse_detail_scope(question: str, intent: Any) -> Optional[str]:
+    routed = intent if isinstance(intent, dict) else {}
+    extracted = routed.get("extracted_context") if isinstance(routed.get("extracted_context"), dict) else {}
+    explicit = str(extracted.get("spouse_detail_scope") or "").strip().lower()
+    if explicit in {"profession", "location", "appearance", "combined"}:
+        return explicit
+    text = f"{extracted.get('requested_fact') or ''} {question or ''}".lower()
+    if any(marker in text for marker in (
+        "appearance", "physical", "look like", "looks like", "how will they look",
+        "height", "build", "complexion", "face", "facial", "body type",
+    )):
+        return "appearance"
+    if any(marker in text for marker in (
+        "different city", "different culture", "different background", "foreign background",
+        "where from", "which city", "which country", "spouse location", "geographical background",
+        "cultural background", "distant place", "another city", "another country",
+    )):
+        return "location"
+    return None
+
+
+def _compact_spouse_appearance_evidence(
+    chart_data: Any,
+    natal_topic_factors: Any,
+    karaka_evidence: Any,
+    divisional_support: Any,
+) -> Dict[str, Any]:
+    """Placement facts used only for a bounded spouse-appearance reading."""
+    temperament = _compact_spouse_temperament_evidence(
+        chart_data, natal_topic_factors, karaka_evidence, divisional_support,
+    )
+    chart = chart_data if isinstance(chart_data, dict) else {}
+    ascendant = chart.get("ascendant")
+    try:
+        ascendant_sign = int(float(ascendant) / 30) % 12
+    except (TypeError, ValueError):
+        ascendant_sign = None
+    seventh_sign = ((ascendant_sign + 6) % 12) if ascendant_sign is not None else None
+    source_layers = temperament.get("layers") if isinstance(temperament.get("layers"), dict) else {}
+    seventh = source_layers.get("seventh_house") if isinstance(source_layers.get("seventh_house"), dict) else {}
+    layers = {
+        "seventh_house_sign": {
+            key: value for key, value in {
+                "house": 7,
+                "rashi": SIGN_NAMES[seventh_sign] if seventh_sign is not None else None,
+                "lord": seventh.get("lord"),
+                "occupants": list(seventh.get("occupants") or []),
+                "aspecting_planets": list(seventh.get("aspecting_planets") or []),
+                "tone": seventh.get("tone"),
+            }.items() if value not in (None, "", [], {})
+        },
+        "seventh_lord_rashi_nakshatra": source_layers.get("seventh_lord_rashi_nakshatra") or {},
+        "darakaraka_rashi_nakshatra": source_layers.get("darakaraka_rashi_nakshatra") or {},
+        "venus_rashi_nakshatra": source_layers.get("venus_rashi_nakshatra") or {},
+        "d9_confirmation": source_layers.get("d9_confirmation") or {},
+    }
+    missing = [key for key, value in layers.items() if not value]
+    return {
+        "scope": "spouse physical appearance and visual presence only; no temperament, profession, location or timing",
+        "layers": layers,
+        "evidence_complete": not missing,
+        "missing_layers": missing,
+        "appearance_dimensions": [
+            "overall build and stature band",
+            "face and expression",
+            "visual style and grooming",
+            "distinctive presence or mannerisms visible to others",
+        ],
+        "synthesis_rule": (
+            "Translate only convergent physical symbolism across the seventh-house rashi, seventh lord, Darakaraka, "
+            "Venus and D9. Separate likely build, facial/expression qualities and visual style; conflicts must be "
+            "reported as a range rather than silently choosing one placement."
+        ),
+        "fidelity_rules": [
+            "Answer appearance directly; do not substitute personality, compatibility or married-life advice.",
+            "Use probable bands such as lean-to-medium or medium-to-solid, never exact measurements.",
+            "Do not infer ethnicity, caste, nationality, disability, medical condition or exact skin colour.",
+            "Do not use dasha, transit, activation, dates or current periods.",
+            "Disclose that this is a symbolic appearance range from the native chart, not a photograph or certainty.",
+        ],
+    }
+
+
+def _compact_spouse_location_evidence(
+    chart_data: Any,
+    natal_topic_factors: Any,
+    karaka_evidence: Any,
+    divisional_support: Any,
+) -> Dict[str, Any]:
+    """Calculate bounded local-versus-different-background spouse evidence."""
+    temperament = _compact_spouse_temperament_evidence(
+        chart_data, natal_topic_factors, karaka_evidence, divisional_support,
+    )
+    layers = temperament.get("layers") if isinstance(temperament.get("layers"), dict) else {}
+    seventh_lord = layers.get("seventh_lord_rashi_nakshatra") if isinstance(layers.get("seventh_lord_rashi_nakshatra"), dict) else {}
+    darakaraka = layers.get("darakaraka_rashi_nakshatra") if isinstance(layers.get("darakaraka_rashi_nakshatra"), dict) else {}
+    seventh_house = layers.get("seventh_house") if isinstance(layers.get("seventh_house"), dict) else {}
+    d9 = layers.get("d9_confirmation") if isinstance(layers.get("d9_confirmation"), dict) else {}
+
+    distance_signals: List[Dict[str, Any]] = []
+    local_signals: List[Dict[str, Any]] = []
+
+    def placement_signal(source: str, row: Dict[str, Any]) -> None:
+        house = _safe_int(row.get("house"))
+        if house == 3:
+            distance_signals.append({"source": source, "weight": 2.0, "meaning": "different city or mobile regional connection", "fact": f"placed in house {house}"})
+        elif house == 9:
+            distance_signals.append({"source": source, "weight": 3.0, "meaning": "distant region, worldview or cultural difference", "fact": f"placed in house {house}"})
+        elif house == 12:
+            distance_signals.append({"source": source, "weight": 3.0, "meaning": "foreign or far-away connection", "fact": f"placed in house {house}"})
+        elif house == 4:
+            local_signals.append({"source": source, "weight": 3.0, "meaning": "same-region, familiar-root or home-linked connection", "fact": f"placed in house {house}"})
+
+        sign = str(row.get("rashi") or "")
+        if sign in {"Aries", "Cancer", "Libra", "Capricorn"}:
+            distance_signals.append({"source": source, "weight": 0.5, "meaning": "mobility modifier only", "fact": f"in movable rashi {sign}"})
+        elif sign in {"Taurus", "Leo", "Scorpio", "Aquarius"}:
+            local_signals.append({"source": source, "weight": 0.5, "meaning": "rootedness modifier only", "fact": f"in fixed rashi {sign}"})
+
+        conjunctions = {str(value) for value in row.get("conjunctions") or []}
+        if "Rahu" in conjunctions:
+            distance_signals.append({
+                "source": source, "weight": 2.0,
+                "meaning": "unconventional or cross-cultural modifier",
+                "fact": "conjunct Rahu",
+            })
+
+    placement_signal("seventh lord", seventh_lord)
+    placement_signal("Darakaraka", darakaraka)
+    seventh_occupants = {str(value) for value in seventh_house.get("occupants") or []}
+    if "Rahu" in seventh_occupants:
+        distance_signals.append({
+            "source": "seventh house", "weight": 2.0,
+            "meaning": "unconventional or cross-cultural partnership modifier",
+            "fact": "Rahu occupies house 7",
+        })
+
+    distance_score = round(sum(float(row["weight"]) for row in distance_signals), 2)
+    local_score = round(sum(float(row["weight"]) for row in local_signals), 2)
+    strong_distance = sum(float(row["weight"]) for row in distance_signals if float(row["weight"]) >= 2)
+    strong_local = sum(float(row["weight"]) for row in local_signals if float(row["weight"]) >= 2)
+    if strong_distance >= 3 and distance_score >= local_score + 1:
+        verdict = "different_city_culture_or_background_supported"
+    elif strong_local >= 3 and local_score >= distance_score + 1:
+        verdict = "local_or_familiar_background_supported"
+    elif strong_distance >= 2 and strong_local >= 2:
+        verdict = "mixed_distance_and_local_signals"
+    else:
+        verdict = "insufficient_specific_distance_evidence"
+
+    evidence_layers = {
+        "seventh_house": seventh_house,
+        "seventh_lord_location": seventh_lord,
+        "darakaraka_location": darakaraka,
+        "d9_confirmation": d9,
+    }
+    missing = [key for key, value in evidence_layers.items() if not value]
+    return {
+        "scope": "static spouse city, cultural or geographical-background tendency; no timing",
+        "layers": evidence_layers,
+        "distance_signals": distance_signals,
+        "local_signals": local_signals,
+        "distance_score": distance_score,
+        "local_score": local_score,
+        "verdict": verdict,
+        "evidence_complete": not missing,
+        "missing_layers": missing,
+        "decision_rules": [
+            "Only direct spouse links to houses 3, 9 or 12, or explicit Rahu linkage, can materially support a different-city/culture/background claim.",
+            "House 4 directly connected to spouse indicators supports familiar or local roots.",
+            "Movable or fixed rashi is a weak modifier and cannot decide the verdict alone.",
+            "A planet's generic nature, nakshatra folklore or timing activation cannot prove foreignness.",
+            "D9 may confirm or qualify but cannot manufacture a distance claim absent a supplied link.",
+        ],
+    }
+
+
 def _compact_career_foundation(
     category: str,
     routed_subtype: Any,
@@ -8433,6 +8766,8 @@ def _build_instant_context(
     }
     if str(category or "").lower() == "marriage" and marriage_subtype in marriage_route_houses:
         focus = {**focus, "houses": marriage_route_houses[marriage_subtype]}
+    if marriage_subtype == "spouse_details" and _spouse_detail_scope(question, intent) == "location":
+        focus = {**focus, "houses": [3, 4, 7, 9, 12]}
     focus_planets = set(focus["planets"]) | {"Moon"}
 
     query_context = (intent or {}).get("query_context") if isinstance((intent or {}).get("query_context"), dict) else None
@@ -8618,6 +8953,19 @@ def _build_instant_context(
     if retrospective_event:
         answer_mode = "event_prediction"
     target_subject = target_subject_override if isinstance(target_subject_override, dict) else None
+    if (
+        answer_mode == "remedy_action"
+        and str(category or "").lower() in {"marriage", "relationship", "love"}
+        and str((target_subject or {}).get("key") or "").lower() in {"spouse", "wife", "husband", "partner"}
+        and not re.search(r"\b(?:for|help|support)\s+(?:my\s+)?(?:spouse|wife|husband|partner)\b", str(question or ""), re.IGNORECASE)
+    ):
+        # "marital conflict" concerns the native's relationship, not a
+        # derived spouse chart. Keep an explicit "remedy for my spouse" as a
+        # true other-person request.
+        target_subject = {
+            "key": "self", "label": "self", "base_house": 1,
+            "confidence": "high", "source": "marriage_remedy_native_frame",
+        }
     authoritative_event_prediction_dashas: Dict[str, Any] = {}
     if answer_mode == "event_prediction" and not dasha_calc_fallback:
         forced_period_window = dict(period_window or {})
@@ -8690,6 +9038,15 @@ def _build_instant_context(
     }
     if str(category or "").lower() == "marriage" and marriage_subtype in marriage_route_houses:
         focus = {**focus, "houses": marriage_route_houses[marriage_subtype]}
+    if marriage_subtype == "spouse_details" and _spouse_detail_scope(question, intent) == "location":
+        focus = {**focus, "houses": [3, 4, 7, 9, 12]}
+    if (
+        answer_mode == "remedy_action"
+        and str(category or "").lower() in {"marriage", "relationship", "love", "partner", "spouse"}
+        and any(marker in str(question or "").lower() for marker in ("conflict", "argument", "fight", "friction"))
+    ):
+        focus = {**focus, "houses": [2, 6, 7, 8, 11, 12]}
+        instant_parashari["focus_houses"] = list(focus["houses"])
     instant_parashari["natal_topic_factors"] = _compact_natal_topic_factors(
         chart_data,
         list(focus.get("houses") or []),
@@ -8961,8 +9318,13 @@ def _build_instant_context(
         )
         evidence_current_dashas_context = evidence_instant_parashari.get("active_dashas_formatted") or {}
     normalized_evidence = _normalize_instant_evidence(
-        answer_mode=evidence_instant_parashari.get("answer_mode") or "topic_reading",
+        # The final universal mode is authoritative. A rotated target packet
+        # may carry an older/missing answer_mode and previously skipped remedy
+        # calculation even though the query plan correctly said remedy_action.
+        answer_mode=answer_mode,
         category=category,
+        question=question,
+        chart_data=chart_data,
         instant_parashari=evidence_instant_parashari,
         current_transits_formatted=evidence_current_transits_context,
         current_dashas_context=evidence_current_dashas_context,
@@ -8971,6 +9333,22 @@ def _build_instant_context(
         relationship_target=target_subject,
         target_chart_context=target_chart_context,
     )
+    if answer_mode == "remedy_action" and not (
+        isinstance(normalized_evidence.get("remedy_blueprint"), dict)
+        and normalized_evidence["remedy_blueprint"].get("top_recommendation")
+    ):
+        # Retry from the native marriage frame. Remedy selection belongs to
+        # the native's relationship chart; an incorrectly rotated spouse
+        # target must not suppress the calculator packet.
+        _attach_calculated_remedy_blueprint(
+            normalized=normalized_evidence,
+            chart_data=chart_data,
+            question=question,
+            category=category,
+            instant_parashari=instant_parashari,
+            current_dashas_context=current_dashas_context,
+            target_chart_context=None,
+        )
     # Dedicated calculator adapters. These records are intentionally created
     # only from calculator output; their mere presence in a prompt or method
     # registry never marks a capability as available.
@@ -9364,6 +9742,45 @@ def _build_instant_context(
             normalized_evidence.get("person_profile_axes") or [],
             evidence_instant_parashari.get("divisional_support") or {},
         )
+    if (
+        str(answer_mode or "").lower() == "relationship_person"
+        and str(category or "").lower() in {"marriage", "spouse", "partner"}
+        and _spouse_detail_scope(question, intent) not in {"appearance", "location"}
+    ):
+        prompt_normalized_evidence["spouse_temperament_context"] = _compact_spouse_temperament_evidence(
+            chart_data,
+            user_evidence.get("natal_topic_factors"),
+            normalized_evidence.get("karaka_evidence") or {},
+            evidence_instant_parashari.get("divisional_support") or {},
+        )
+    if (
+        str(answer_mode or "").lower() in {"relationship_person", "topic_reading"}
+        and (
+            str(category or "").lower() in {"marriage", "spouse", "partner"}
+            or str((intent or {}).get("marriage_subtype") or "").lower() == "spouse_details"
+        )
+        and _spouse_detail_scope(question, intent) == "appearance"
+    ):
+        prompt_normalized_evidence["spouse_appearance_context"] = _compact_spouse_appearance_evidence(
+            chart_data,
+            user_evidence.get("natal_topic_factors"),
+            normalized_evidence.get("karaka_evidence") or {},
+            evidence_instant_parashari.get("divisional_support") or {},
+        )
+    if (
+        str(answer_mode or "").lower() in {"relationship_person", "topic_reading"}
+        and (
+            str(category or "").lower() in {"marriage", "spouse", "partner"}
+            or str((intent or {}).get("marriage_subtype") or "").lower() == "spouse_details"
+        )
+        and _spouse_detail_scope(question, intent) == "location"
+    ):
+        prompt_normalized_evidence["spouse_location_context"] = _compact_spouse_location_evidence(
+            chart_data,
+            user_evidence.get("natal_topic_factors"),
+            normalized_evidence.get("karaka_evidence") or {},
+            evidence_instant_parashari.get("divisional_support") or {},
+        )
     prompt_current_dashas_levels = evidence_current_dashas_context if is_non_self_target else current_dashas_context
     if answer_mode == "event_prediction" and authoritative_event_prediction_dashas:
         prompt_current_dashas_levels = authoritative_event_prediction_dashas
@@ -9453,6 +9870,9 @@ def _build_instant_context(
             if k in {
                 "answer_mode_contract",
                 "person_profile_axes",
+                "spouse_temperament_context",
+                "spouse_appearance_context",
+                "spouse_location_context",
                 "target_subject",
                 "target_chart_context",
                 "mechanism_links",
@@ -9495,6 +9915,7 @@ def _build_instant_context(
         current_dashas_context = {}
         recent_history = recent_history[-1:]
     if answer_mode == "remedy_action":
+        marriage_remedy = str(category or "").lower() in {"marriage", "relationship", "love", "partner", "spouse"}
         prompt_instant_parashari = {
             k: v
             for k, v in prompt_instant_parashari.items()
@@ -9538,6 +9959,11 @@ def _build_instant_context(
                 "option_comparison",
             }
         }
+        if marriage_remedy:
+            prompt_instant_parashari.pop("active_dashas_formatted", None)
+            prompt_instant_parashari.pop("period_window", None)
+            prompt_instant_parashari.pop("time_relation", None)
+            prompt_normalized_evidence.pop("current_timing", None)
     if not claim_gates.get("allow_divisional_mentions"):
         prompt_instant_parashari.pop("divisional_support", None)
         prompt_instant_parashari.pop("navamsa_root_fruit", None)
@@ -10653,6 +11079,10 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
             "claim_permission", "timing_missing_factors",
             "marriage_pathway_rules",
             "spouse_meeting_rules",
+            "spouse_temperament_rules", "missing_temperament_layers",
+            "spouse_appearance_rules", "missing_appearance_layers",
+            "spouse_location_rules", "missing_location_layers",
+            "marriage_remedy_rules",
         )
         if graph_policy.get(key) not in (None, "", [], {})
     }
@@ -10677,6 +11107,10 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
         "career_rules": answer_spec.get("career_rules"),
         "marriage_pathway_rules": answer_spec.get("marriage_pathway_rules"),
         "spouse_meeting_rules": answer_spec.get("spouse_meeting_rules"),
+        "spouse_temperament_rules": answer_spec.get("spouse_temperament_rules"),
+        "spouse_appearance_rules": answer_spec.get("spouse_appearance_rules"),
+        "spouse_location_rules": answer_spec.get("spouse_location_rules"),
+        "marriage_remedy_rules": answer_spec.get("marriage_remedy_rules"),
         "event_rules": compact_event_rules,
         "forbidden": answer_spec.get("forbidden"),
         "answer_order": answer_spec.get("answer_order"),
@@ -11218,6 +11652,9 @@ def _build_instant_composer_context(
         "option_comparison": normalized.get("option_comparison"),
         "marriage_pathway_comparison": normalized.get("marriage_pathway_comparison"),
         "spouse_meeting_context": normalized.get("spouse_meeting_context"),
+        "spouse_temperament_context": normalized.get("spouse_temperament_context"),
+        "spouse_appearance_context": normalized.get("spouse_appearance_context"),
+        "spouse_location_context": normalized.get("spouse_location_context"),
         "historical_event_dasha_scan": normalized.get("historical_event_dasha_scan"),
         "daily_prediction": _compact_daily_prediction_for_composer(
             instant_context.get("daily_prediction_spine") or normalized.get("daily_prediction_spine")
@@ -11233,10 +11670,13 @@ def _build_instant_composer_context(
     }
     graph_excludes_timing = bool(
         live_graph_policy.get("live")
-        and any(
-            marker in value.lower()
-            for value in graph_exclusions
-            for marker in ("dashaactivation", "transitactivation", "transitconfirmation")
+        and (
+            str(live_graph_policy.get("runtime_key") or "") == "marriage_remedies"
+            or any(
+                marker in value.lower()
+                for value in graph_exclusions
+                for marker in ("dashaactivation", "transitactivation", "transitconfirmation")
+            )
         )
     )
     if graph_excludes_timing:
@@ -11529,7 +11969,11 @@ def _build_instant_composer_context(
             "special_points": normalized.get("special_points") or remedy_blueprint.get("special_points"),
             "remedy_sections": normalized.get("remedy_sections") or remedy_blueprint.get("remedy_sections"),
             "caution": normalized.get("caution") or remedy_blueprint.get("caution"),
-            "current_timing": normalized.get("current_timing"),
+            "current_timing": (
+                None
+                if str(live_graph_policy.get("runtime_key") or "") == "marriage_remedies"
+                else normalized.get("current_timing")
+            ),
         }
     evidence = {key: value for key, value in evidence.items() if value not in (None, "", [], {})}
 
@@ -12163,6 +12607,27 @@ NATAL-ONLY HEALTH EVIDENCE:
         if isinstance(graph_policy.get("spouse_meeting_rules"), dict)
         else {}
     )
+    spouse_temperament_contract = (
+        answer_contract.get("spouse_temperament_rules")
+        if isinstance(answer_contract.get("spouse_temperament_rules"), dict)
+        else graph_policy.get("spouse_temperament_rules")
+        if isinstance(graph_policy.get("spouse_temperament_rules"), dict)
+        else {}
+    )
+    spouse_appearance_contract = (
+        answer_contract.get("spouse_appearance_rules")
+        if isinstance(answer_contract.get("spouse_appearance_rules"), dict)
+        else graph_policy.get("spouse_appearance_rules")
+        if isinstance(graph_policy.get("spouse_appearance_rules"), dict)
+        else {}
+    )
+    spouse_location_contract = (
+        answer_contract.get("spouse_location_rules")
+        if isinstance(answer_contract.get("spouse_location_rules"), dict)
+        else graph_policy.get("spouse_location_rules")
+        if isinstance(graph_policy.get("spouse_location_rules"), dict)
+        else {}
+    )
     marriage_rules = ""
     if str(graph_policy.get("runtime_key") or "") == "love_arranged_marriage":
         past_relation = str(marriage_pathway_contract.get("question_time_relation") or "") == "past"
@@ -12194,6 +12659,47 @@ NATAL-ONLY HEALTH EVIDENCE:
         if past_relation:
             marriage_rules += """
 - The meeting already happened. Use past tense throughout and do not turn the answer into a future prediction.
+"""
+    elif str(graph_policy.get("runtime_key") or "") == "spouse_profile":
+        marriage_rules = """
+- This is a five-layer spouse-temperament synthesis. Use only `evidence.spouse_temperament_context.layers`; a generic `person_profile_axes` sentence or the seventh house alone is insufficient.
+- Begin with a clear, nuanced temperament synthesis in ordinary language. Then show how all five layers contribute: (1) seventh house, (2) seventh-lord rashi and nakshatra, (3) Darakaraka rashi and nakshatra, (4) Venus rashi and nakshatra, and (5) D9 confirmation or qualification.
+- Give each layer its proper role. The seventh house/lord anchors observable partnership temperament; the seventh-lord nakshatra refines instinctive style; Darakaraka adds the spouse archetype; Venus describes affection and relating style; D9 confirms or modifies the D1 picture.
+- Copy every planet, rashi, nakshatra, nakshatra lord, pada, house and tone exactly. Do not substitute generic Mercury, Saturn or Venus folklore for a missing layer.
+- No single placement may become the whole personality. Explicitly reconcile reinforcing and conflicting traits so the result sounds like a real person rather than a list of planets.
+- This is the native chart's indication of the spouse, not the spouse's own chart. Use probable language and do not diagnose, claim hidden motives, or describe fixed identity with certainty.
+- Never mention dasha, transit, activation, dates, current periods or timing. End with one question about which part of this temperament best matches the spouse in real life.
+"""
+        if not spouse_temperament_contract.get("evidence_complete"):
+            marriage_rules += """
+- The required five-layer packet is incomplete. Obey the graph limitation and do not improvise a temperament profile from the available subset.
+"""
+    elif str(graph_policy.get("runtime_key") or "") == "spouse_appearance":
+        marriage_rules = """
+- This asks specifically how the spouse may look. Use only `evidence.spouse_appearance_context.layers`; do not answer with temperament, reliability, intelligence, compatibility, profession, location or married-life advice.
+- Lead with a concise visual summary. Then cover: (1) likely build/stature band, (2) face and visible expression, (3) styling/grooming or visual presence, and (4) the strongest distinctive visible feature or mannerism.
+- Synthesize the seventh-house rashi, seventh-lord rashi/nakshatra, Darakaraka rashi/nakshatra, Venus rashi/nakshatra and D9. Reconcile agreement and conflict; never let Mercury, Venus, the seventh house or any one placement become the whole description.
+- Copy placement facts exactly. Convert them into bounded visual ranges, not exact measurements or photographic certainty.
+- Never infer ethnicity, caste, nationality, disability, medical condition or exact skin colour. Do not sexualize the spouse.
+- State once that this is a probable symbolic range derived from the native's chart. Never mention dasha, transit, activation, timing or current periods.
+- End by asking whether the user wants the strongest two or three visual markers summarized—not by redirecting them to temperament.
+"""
+        if not spouse_appearance_contract.get("evidence_complete"):
+            marriage_rules += """
+- The required appearance packet is incomplete. Obey the graph limitation and do not replace missing physical evidence with personality prose.
+"""
+    elif str(graph_policy.get("runtime_key") or "") == "spouse_location":
+        marriage_rules = """
+- This asks whether the spouse is connected with a different city, culture or background. Use only `evidence.spouse_location_context` and copy its calculated `verdict`; do not create a softer or stronger verdict from generic astrology lore.
+- Only direct spouse-indicator links to houses 3, 9 or 12, or explicit Rahu linkage, materially support distance/different-background. A direct house-4 link supports local or familiar roots. Movable/fixed rashi is only a weak modifier and cannot decide the answer.
+- Begin with one direct plain-language verdict: supported, local/familiar is stronger, mixed, or not specifically shown. Then cite the exact strongest distance and local facts actually present.
+- Saturn in Virgo, a nakshatra, Moon/Jupiter proximity, or a Darakaraka's generic symbolism does not by itself mean another city, culture or country.
+- Never mention timing, dasha, transit, activation, manifestation, current/future unfolding, temperament, appearance or profession. Never name an unsupplied city, country, caste, religion, ethnicity or nationality.
+- D9 may only confirm or qualify the supplied result. End by asking whether the verdict matches the spouse's known background.
+"""
+        if not spouse_location_contract.get("evidence_complete"):
+            marriage_rules += """
+- The required location packet is incomplete. Obey the graph limitation and do not invent either a foreign or local-background story.
 """
     if is_chart_fact:
         return f"""
@@ -12236,15 +12742,26 @@ AUTHORITATIVE COMPOSER BRIEF:
 - Explain what is supported and the main condition in ordinary language. End by asking whether the user wants timing or is asking about a specific relationship.
 """
     if answer_mode == "remedy_action":
-        period_forecast_rules = """
+        composer_remedy_blueprint = (
+            (composer_context.get("evidence") or {}).get("remedy_blueprint")
+            if isinstance((composer_context.get("evidence") or {}).get("remedy_blueprint"), dict)
+            else {}
+        )
+        single_top_remedy = str(composer_remedy_blueprint.get("selection_mode") or "") == "single_top"
+        remedy_delivery_line = (
+            "- The user asks which remedy is most relevant. Give exactly one remedy: copy `evidence.remedy_blueprint.top_recommendation` and state its action, frequency, and astrological_reason. Do not add two alternatives."
+            if single_top_remedy
+            else "- Give exactly three prioritized, concrete remedies from `evidence.remedy_blueprint.ranked_remedies`. For each state the action, frequency, and astrological_reason."
+        )
+        period_forecast_rules = f"""
 - This is an explicit remedy request. Give remedies, not another diagnosis, forecast, favorable date, or lecture about discipline and patience.
 - `evidence.remedy_blueprint` is the authoritative remedy plan. If it is absent or empty, say that the chart-specific remedy plan could not be prepared and ask one precise clarification; never improvise generic advice as a remedy.
-- Start with one short sentence naming the calculated astrological pressure being addressed.
-- Then give exactly three prioritized, concrete remedies from `remedy_blueprint.remedy_sections`. For each remedy state: what to do, how often or when to do it, and which calculated planet, house function, nakshatra, or special blockage makes it relevant.
+{remedy_delivery_line}
+- Start by naming the remedy itself, not by retelling the marital-conflict diagnosis or current planetary period.
 - Prefer constructive house expression first, then the strongest suitable mantra, seva/charity, nakshatra, biological/tree, or behavioral action. Do not dump every available remedy layer.
 - Ordinary career advice such as work consistently, improve communication, seek training, avoid shortcuts, or plan carefully is not a remedy unless it is a concrete `house_expression` or `behavioral` action from the supplied blueprint and its chart connection is stated.
 - Gemstones must remain optional and suitability-dependent. Preserve `evidence.caution`; avoid fear, guarantees, expensive prescriptions, and excessive ritual.
-- Do not give event dates or claim that a remedy guarantees an outcome. End with one natural question about which remedy is practical for the user to follow.
+- Do not mention current dasha, sub-period, transit or activation. Do not give event dates or claim that a remedy guarantees an outcome.
 """
     elif is_period_topic_forecast:
         period_forecast_rules = """
@@ -12845,6 +13362,16 @@ async def generate_instant_chat_response(
         "app_language_fallback": requested_app_language,
     }
     target_subject = (mode_selection or {}).get("target_subject") if isinstance(mode_selection, dict) else None
+    if (
+        answer_mode == "remedy_action"
+        and str((intent or {}).get("category") or "").lower() in {"marriage", "relationship", "love"}
+        and str((target_subject or {}).get("key") or "").lower() in {"spouse", "wife", "husband", "partner"}
+        and not re.search(r"\b(?:for|help|support)\s+(?:my\s+)?(?:spouse|wife|husband|partner)\b", str(question or ""), re.IGNORECASE)
+    ):
+        target_subject = {
+            "key": "self", "label": "self", "base_house": 1,
+            "confidence": "high", "source": "marriage_remedy_native_frame",
+        }
     calculations_started = time.perf_counter()
     instant_context = _build_instant_context(
         birth_data=birth_data,

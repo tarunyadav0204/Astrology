@@ -51,6 +51,71 @@ const CHAT_LANGUAGE_ALIASES = {
 const whyTaraSaysThis = (language) => WHY_TARA_SAYS_THIS[
   CHAT_LANGUAGE_ALIASES[String(language || '').toLowerCase()] || String(language || 'english').toLowerCase()
 ] || WHY_TARA_SAYS_THIS.english;
+
+const InstantEvidenceDetails = ({ evidence, colors, t }) => {
+  const routing = buildRoutingSummary(evidence);
+  const sections = buildReadableEvidence(evidence);
+  return (
+    <>
+      <View style={[styles.instantRoutingSummary, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+        <View style={styles.instantRoutingCell}>
+          <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.finalMode}</Text>
+          <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.finalMode}</Text>
+        </View>
+        <View style={styles.instantRoutingCell}>
+          <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.selected}</Text>
+          <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.selectedMode}</Text>
+        </View>
+        <View style={styles.instantRoutingCell}>
+          <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.source}</Text>
+          <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.source}</Text>
+        </View>
+        <View style={styles.instantRoutingCell}>
+          <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.confidence}</Text>
+          <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.confidence}</Text>
+        </View>
+        {routing.changed ? <Text style={[styles.instantRoutingFlag, { color: colors.warning || colors.accent }]}>{ROUTING_DEBUG_LABELS.adjusted}</Text> : null}
+        {routing.degraded ? <Text style={[styles.instantRoutingFlag, { color: colors.warning || colors.accent }]}>{ROUTING_DEBUG_LABELS.fallback}</Text> : null}
+      </View>
+      {!sections.length ? (
+        <Text style={[styles.instantEvidenceMeta, { color: colors.textSecondary }]}>
+          {t('premiumUi.chat.noEvidenceYet', 'Evidence details are not available for this answer.')}
+        </Text>
+      ) : sections.map((section) => (
+        <View key={section.key} style={styles.instantEvidenceSection}>
+          <View style={styles.instantEvidenceSectionTitleRow}>
+            {section.step ? (
+              <View style={[styles.instantEvidenceStepBadge, { backgroundColor: colors.accentSoft }]}>
+                <Text style={[styles.instantEvidenceStepText, { color: colors.accent }]}>{section.step}</Text>
+              </View>
+            ) : null}
+            <Text style={[styles.instantEvidenceLabel, styles.instantEvidenceSectionTitle, { color: colors.textSecondary }]}>{section.title}</Text>
+          </View>
+          {(section.lines || []).map((line, index) => (
+            <View key={`${section.key}_${index}`} style={styles.instantEvidenceBulletRow}>
+              <View style={[styles.instantEvidenceBulletDot, { backgroundColor: colors.accent }]} />
+              <Text style={[styles.instantEvidenceBulletText, { color: colors.text }]}>{line}</Text>
+            </View>
+          ))}
+          {(section.groups || []).map((group) => (
+            <View key={`${section.key}_${group.key}`} style={[styles.instantEvidenceGroup, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceMuted }]}>
+              <Text style={[styles.instantEvidenceGroupTitle, { color: colors.accent }]}>{group.title}</Text>
+              {(group.lines || []).map((line, index) => (
+                <Text key={`${group.key}_line_${index}`} style={[styles.instantEvidenceBulletText, { color: colors.text }]}>{line}</Text>
+              ))}
+              {(group.items || []).map((item, index) => (
+                <View key={`${group.key}_item_${index}`} style={styles.instantEvidenceFactor}>
+                  <Text style={[styles.instantEvidenceFactorTitle, { color: colors.text }]}>{item.title}</Text>
+                  <Text style={[styles.instantEvidenceBulletText, { color: colors.textSecondary }]}>{item.text}</Text>
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+      ))}
+    </>
+  );
+};
 import { chatAPI } from '../../services/api';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -1811,6 +1876,7 @@ function MessageBubble({
     const isUser = message.role === 'user';
 
     return (
+      <>
       <Animated.View
         style={[
           styles.instantMessageRow,
@@ -1821,7 +1887,6 @@ function MessageBubble({
         <View
           style={[
             styles.instantMessageBubble,
-            showInstantEvidence && instantEvidence ? styles.instantMessageBubbleEvidence : null,
             isUser ? styles.instantMessageBubbleUser : styles.instantMessageBubbleAssistant,
             {
               backgroundColor: isUser ? colors.selectionSurface : colors.surface,
@@ -1852,7 +1917,7 @@ function MessageBubble({
                   backgroundColor: colors.accentSoft,
                   borderColor: colors.selectionBorder,
                 }]}
-                onPress={() => setShowInstantEvidence((open) => !open)}
+                onPress={() => setShowInstantEvidence(true)}
               >
                 <Ionicons name="diamond-outline" size={14} color={colors.onAccent} />
                 <Text
@@ -1861,93 +1926,50 @@ function MessageBubble({
                   {whyTaraSaysThis(language || i18n.resolvedLanguage || i18n.language)
                     || t('premiumUi.chat.whyThisAnswer', 'Why Tara says this')}
                 </Text>
-                <Ionicons name={showInstantEvidence ? 'chevron-up' : 'chevron-down'} size={14} color={colors.onAccent} />
+                <Ionicons name="open-outline" size={14} color={colors.onAccent} />
               </TouchableOpacity>
-              {showInstantEvidence ? (
-                <View style={[styles.instantEvidencePanel, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
-                  <View style={styles.instantEvidenceHeader}>
-                    <View style={styles.instantEvidenceHeaderCopy}>
-                      <Text style={[styles.instantEvidenceEyebrow, { color: colors.accent }]}>
-                        {t('premiumUi.chat.howDerived', 'HOW THIS ANSWER WAS DERIVED')}
-                      </Text>
-                      <Text style={[styles.instantEvidenceTitle, { color: colors.text }]}>
-                        {instantEvidence?.user_derivation?.event?.label || instantEvidence?.query_plan?.user_goal || t('premiumUi.chat.reading', 'Reading')}
-                      </Text>
-
-                    </View>
-
-                  </View>
-
-                  {(() => {
-                    const routing = buildRoutingSummary(instantEvidence);
-                    const sections = buildReadableEvidence(instantEvidence);
-                    return (
-                      <>
-                        <View style={[styles.instantRoutingSummary, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
-                          <View style={styles.instantRoutingCell}>
-                            <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.finalMode}</Text>
-                            <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.finalMode}</Text>
-                          </View>
-                          <View style={styles.instantRoutingCell}>
-                            <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.selected}</Text>
-                            <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.selectedMode}</Text>
-                          </View>
-                          <View style={styles.instantRoutingCell}>
-                            <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.source}</Text>
-                            <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.source}</Text>
-                          </View>
-                          <View style={styles.instantRoutingCell}>
-                            <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.confidence}</Text>
-                            <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.confidence}</Text>
-                          </View>
-                          {routing.changed ? <Text style={[styles.instantRoutingFlag, { color: colors.warning || colors.accent }]}>{ROUTING_DEBUG_LABELS.adjusted}</Text> : null}
-                          {routing.degraded ? <Text style={[styles.instantRoutingFlag, { color: colors.warning || colors.accent }]}>{ROUTING_DEBUG_LABELS.fallback}</Text> : null}
-                        </View>
-                        {!sections.length ? (
-                          <Text style={[styles.instantEvidenceMeta, { color: colors.textSecondary }]}>
-                            {t('premiumUi.chat.noEvidenceYet', 'Evidence details are not available for this answer.')}
-                          </Text>
-                        ) : sections.map((section) => (
-                          <View key={section.key} style={styles.instantEvidenceSection}>
-                            <View style={styles.instantEvidenceSectionTitleRow}>
-                              {section.step ? (
-                                <View style={[styles.instantEvidenceStepBadge, { backgroundColor: colors.accentSoft }]}>
-                                  <Text style={[styles.instantEvidenceStepText, { color: colors.accent }]}>{section.step}</Text>
-                                </View>
-                              ) : null}
-                              <Text style={[styles.instantEvidenceLabel, styles.instantEvidenceSectionTitle, { color: colors.textSecondary }]}>{section.title}</Text>
-                            </View>
-                            {section.lines.map((line, index) => (
-                              <View key={`${section.key}_${index}`} style={styles.instantEvidenceBulletRow}>
-                                <View style={[styles.instantEvidenceBulletDot, { backgroundColor: colors.accent }]} />
-                                <Text style={[styles.instantEvidenceBulletText, { color: colors.text }]}>{line}</Text>
-                              </View>
-                            ))}
-                            {(section.groups || []).map((group) => (
-                              <View key={`${section.key}_${group.key}`} style={[styles.instantEvidenceGroup, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceMuted }]}>
-                                <Text style={[styles.instantEvidenceGroupTitle, { color: colors.accent }]}>{group.title}</Text>
-                                {(group.lines || []).map((line, index) => (
-                                  <Text key={`${group.key}_line_${index}`} style={[styles.instantEvidenceBulletText, { color: colors.text }]}>{line}</Text>
-                                ))}
-                                {(group.items || []).map((item, index) => (
-                                  <View key={`${group.key}_item_${index}`} style={styles.instantEvidenceFactor}>
-                                    <Text style={[styles.instantEvidenceFactorTitle, { color: colors.text }]}>{item.title}</Text>
-                                    <Text style={[styles.instantEvidenceBulletText, { color: colors.textSecondary }]}>{item.text}</Text>
-                                  </View>
-                                ))}
-                              </View>
-                            ))}
-                          </View>
-                        ))}
-                      </>
-                    );
-                  })()}
-                </View>
-              ) : null}
             </>
           ) : null}
         </View>
       </Animated.View>
+        <Modal
+          visible={!isUser && Boolean(showInstantEvidence && instantEvidence)}
+          transparent
+          animationType="slide"
+          statusBarTranslucent
+          onRequestClose={() => setShowInstantEvidence(false)}
+        >
+          <View style={styles.instantEvidenceModalBackdrop}>
+            <View style={[styles.instantEvidenceModalCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+              <View style={[styles.instantEvidenceModalHeader, { borderBottomColor: colors.cardBorder }]}>
+                <View style={styles.instantEvidenceHeaderCopy}>
+                  <Text style={[styles.instantEvidenceEyebrow, { color: colors.accent }]}>
+                    {t('premiumUi.chat.howDerived', 'HOW THIS ANSWER WAS DERIVED')}
+                  </Text>
+                  <Text style={[styles.instantEvidenceTitle, { color: colors.text }]}>
+                    {instantEvidence?.user_derivation?.event?.label || instantEvidence?.query_plan?.user_goal || t('premiumUi.chat.reading', 'Reading')}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.close', 'Close')}
+                  style={[styles.instantEvidenceModalClose, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}
+                  onPress={() => setShowInstantEvidence(false)}
+                >
+                  <Ionicons name="close" size={22} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                style={styles.instantEvidenceModalScroll}
+                contentContainerStyle={styles.instantEvidenceModalContent}
+                showsVerticalScrollIndicator
+              >
+                <InstantEvidenceDetails evidence={instantEvidence} colors={colors} t={t} />
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      </>
     );
   }
 
@@ -2878,9 +2900,6 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 18,
   },
-  instantMessageBubbleEvidence: {
-    maxWidth: '96%',
-  },
   instantMessageBubbleUser: {
     borderBottomRightRadius: 5,
   },
@@ -2925,11 +2944,43 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     lineHeight: 14,
     fontWeight: '800',
   },
-  instantEvidencePanel: {
-    marginTop: 8,
-    padding: 10,
+  instantEvidenceModalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(17, 12, 20, 0.58)',
+    paddingTop: Platform.select({ ios: 54, android: 28, default: 28 }),
+  },
+  instantEvidenceModalCard: {
+    flex: 1,
+    width: '100%',
+    maxHeight: '94%',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  instantEvidenceModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  instantEvidenceModalClose: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  instantEvidenceModalScroll: {
+    flex: 1,
+  },
+  instantEvidenceModalContent: {
+    paddingHorizontal: 18,
+    paddingBottom: 32,
   },
   instantEvidenceHeader: {
     flexDirection: 'row',

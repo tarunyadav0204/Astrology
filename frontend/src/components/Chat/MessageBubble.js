@@ -46,6 +46,85 @@ const whyTaraSaysThis = (language) => WHY_TARA_SAYS_THIS[
 ]
     || WHY_TARA_SAYS_THIS.english;
 
+const InstantEvidenceModal = ({ evidence, onClose }) => {
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') onClose();
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
+    if (!evidence || typeof document === 'undefined') return null;
+    const routing = buildRoutingSummary(evidence);
+    const sections = buildReadableEvidence(evidence);
+
+    return createPortal(
+        <div className="instant-evidence-modal-backdrop" role="presentation" onMouseDown={onClose}>
+            <section
+                className="instant-evidence-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="instant-evidence-modal-title"
+                onMouseDown={(event) => event.stopPropagation()}
+            >
+                <header className="instant-evidence-modal-header">
+                    <div>
+                        <small>HOW THIS ANSWER WAS DERIVED</small>
+                        <strong id="instant-evidence-modal-title">
+                            {evidence?.user_derivation?.event?.label || evidence?.query_plan?.user_goal || routing.category}
+                        </strong>
+                    </div>
+                    <div className="instant-evidence-modal-actions">
+                        <span className={evidence?.verification?.passed ? 'is-pass' : 'is-review'}>
+                            {evidence?.verification?.passed ? 'Evidence linked' : 'Review needed'}
+                        </span>
+                        <button type="button" onClick={onClose} aria-label="Close evidence details">×</button>
+                    </div>
+                </header>
+                <div className="instant-evidence-modal-scroll">
+                    <div className="instant-routing-summary" aria-label="Answer routing debug">
+                        <span><small>Final mode</small><strong>{routing.finalMode}</strong></span>
+                        <span><small>Selected</small><strong>{routing.selectedMode}</strong></span>
+                        <span><small>Source</small><strong>{routing.source}</strong></span>
+                        <span><small>Confidence</small><strong>{routing.confidence}</strong></span>
+                        {routing.changed ? <em>Mode adjusted after routing</em> : null}
+                        {routing.degraded ? <em>Fallback used</em> : null}
+                    </div>
+                    <div className="instant-readable-evidence">
+                        {sections.map((section) => (
+                            <article key={section.key}>
+                                <header>
+                                    {section.step ? <b>{section.step}</b> : null}
+                                    <h4>{section.title}</h4>
+                                </header>
+                                <ul>
+                                    {(Array.isArray(section.lines) ? section.lines : []).map((line, index) => (
+                                        <li key={`${section.key}-${index}`}>{line}</li>
+                                    ))}
+                                </ul>
+                                {(Array.isArray(section.groups) ? section.groups : []).map((group) => (
+                                    <section className="instant-evidence-group" key={`${section.key}-${group.key}`}>
+                                        <h5>{group.title}</h5>
+                                        {(Array.isArray(group.lines) ? group.lines : []).map((line, index) => <p key={`${group.key}-line-${index}`}>{line}</p>)}
+                                        {(Array.isArray(group.items) ? group.items : []).map((item, index) => (
+                                            <div className="instant-evidence-factor" key={`${group.key}-item-${index}`}>
+                                                <strong>{item.title}</strong>
+                                                <p>{item.text}</p>
+                                            </div>
+                                        ))}
+                                    </section>
+                                ))}
+                            </article>
+                        ))}
+                    </div>
+                </div>
+            </section>
+        </div>,
+        document.body,
+    );
+};
+
 const resolveReadyPodcastLang = (messageId, preferredLang) => {
     const mid = messageId != null ? String(messageId) : '';
     if (!mid) return null;
@@ -1558,8 +1637,9 @@ const MessageBubble = ({
                             <button
                                 type="button"
                                 className={`instant-evidence-toggle${showInstantEvidence ? ' is-open' : ''}`}
-                                onClick={() => setShowInstantEvidence((open) => !open)}
+                                onClick={() => setShowInstantEvidence(true)}
                                 aria-expanded={showInstantEvidence}
+                                aria-haspopup="dialog"
                             >
                                 <span aria-hidden="true">◇</span>
                                 {whyTaraSaysThis(language)}
@@ -1578,64 +1658,11 @@ const MessageBubble = ({
                         ) : null}
                         {time ? <time>{time}</time> : null}
                     </div>
-                    {showInstantEvidence && instantEvidence ? (
-                        <section className="instant-evidence-inspector" aria-label="Instant answer evidence">
-                            {(() => {
-                                const routing = buildRoutingSummary(instantEvidence);
-                                const sections = buildReadableEvidence(instantEvidence);
-                                return (
-                                    <>
-                                        <header>
-                                            <div>
-                                                <small>HOW THIS ANSWER WAS DERIVED</small>
-                                                <strong>{instantEvidence?.user_derivation?.event?.label || instantEvidence?.query_plan?.user_goal || routing.category}</strong>
-                                            </div>
-                                            <span className={instantEvidence?.verification?.passed ? 'is-pass' : 'is-review'}>
-                                                {instantEvidence?.verification?.passed ? 'Evidence linked' : 'Review needed'}
-                                            </span>
-                                        </header>
-                                        <div className="instant-routing-summary" aria-label="Answer routing debug">
-                                            <span><small>Final mode</small><strong>{routing.finalMode}</strong></span>
-                                            <span><small>Selected</small><strong>{routing.selectedMode}</strong></span>
-                                            <span><small>Source</small><strong>{routing.source}</strong></span>
-                                            <span><small>Confidence</small><strong>{routing.confidence}</strong></span>
-                                            {routing.changed ? <em>Mode adjusted after routing</em> : null}
-                                            {routing.degraded ? <em>Fallback used</em> : null}
-                                        </div>
-                                        <div className="instant-readable-evidence">
-                                            {sections.map((section) => (
-                                                <article key={section.key}>
-                                                    <header>
-                                                        {section.step ? <b>{section.step}</b> : null}
-                                                        <h4>{section.title}</h4>
-                                                    </header>
-                                                    <ul>
-                                                        {(Array.isArray(section.lines) ? section.lines : []).map((line, index) => (
-                                                            <li key={`${section.key}-${index}`}>{line}</li>
-                                                        ))}
-                                                    </ul>
-                                                    {(Array.isArray(section.groups) ? section.groups : []).map((group) => (
-                                                        <section className="instant-evidence-group" key={`${section.key}-${group.key}`}>
-                                                            <h5>{group.title}</h5>
-                                                            {(Array.isArray(group.lines) ? group.lines : []).map((line, index) => <p key={`${group.key}-line-${index}`}>{line}</p>)}
-                                                            {(Array.isArray(group.items) ? group.items : []).map((item, index) => (
-                                                                <div className="instant-evidence-factor" key={`${group.key}-item-${index}`}>
-                                                                    <strong>{item.title}</strong>
-                                                                    <p>{item.text}</p>
-                                                                </div>
-                                                            ))}
-                                                        </section>
-                                                    ))}
-                                                </article>
-                                            ))}
-                                        </div>
-                                    </>
-                                );
-                            })()}
-                        </section>
-                    ) : null}
                 </div>
                 {renderTimelineSelectionCard()}
+                {showInstantEvidence && instantEvidence ? (
+                    <InstantEvidenceModal evidence={instantEvidence} onClose={() => setShowInstantEvidence(false)} />
+                ) : null}
             </div>
         );
     }

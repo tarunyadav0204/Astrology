@@ -456,10 +456,19 @@ def clamp_remedy_modes_on_intent(result: Optional[Dict[str, Any]], question: str
     """
     if not isinstance(result, dict):
         return
+    q = str(question or "").strip().lower()
+    # Narrow deterministic protection for an explicit remedy noun. The
+    # multilingual router remains authoritative for indirect requests, but a
+    # direct ask such as "Which calculated remedy is most relevant?" must not
+    # be downgraded merely because the model omitted its boolean flag.
+    direct_remedy_noun = bool(re.search(r"\b(remed(?:y|ies)|upay(?:a|am)?s?)\b", q))
+    negated = bool(re.search(r"\b(no|not|without|don't|do not)\b[^.?!]{0,24}\bremed(?:y|ies)\b", q))
+    if direct_remedy_noun and not negated:
+        result["explicit_remedy_request"] = True
     if is_remedy_followup_request(result):
         result["answer_mode"] = "remedy_action"
         mode = str(result.get("mode") or "").strip().upper()
-        if mode in {"", "ANALYZE_PERSONALITY", "ANALYZE_TOPIC_POTENTIAL", "DEFAULT"}:
+        if mode != "RECOMMEND_REMEDY_FOR_PROBLEM":
             result["mode"] = "RECOMMEND_REMEDY_FOR_PROBLEM"
         return
 

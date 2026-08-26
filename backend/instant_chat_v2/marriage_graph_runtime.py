@@ -51,6 +51,9 @@ _FACTOR_LABELS = {
     "marriage:SeventhLord": "Seventh house and lord",
     "marriage:VenusJupiter": "Venus and Jupiter significators",
     "marriage:DarakarakaUpapada": "Darakaraka and Upapada",
+    "marriage:Darakaraka": "Darakaraka spouse archetype",
+    "marriage:SeventhLordNakshatra": "Seventh-lord rashi and nakshatra",
+    "marriage:VenusRashiNakshatra": "Venus rashi and nakshatra",
     "marriage:KpSeventh": "KP seventh-cusp evidence",
     "marriage:DerivedSpouseFrame": "Derived spouse frame",
     "marriage:DashaActivation": "Dasha permission",
@@ -79,10 +82,39 @@ def is_marriage_graph_request(category: Any, query_plan: Mapping[str, Any] | Non
         return True
     plan = query_plan if isinstance(query_plan, Mapping) else {}
     special = plan.get("special_flow") if isinstance(plan.get("special_flow"), Mapping) else {}
+    subtype = str(plan.get("marriage_subtype") or "").strip().lower()
+    target = plan.get("target_subject") if isinstance(plan.get("target_subject"), Mapping) else {}
+    if subtype == "spouse_details" or (
+        str(special.get("spouse_detail_scope") or "").strip().lower() in {"appearance", "location"}
+        and str(target.get("key") or "").strip().lower() in {"spouse", "wife", "husband", "partner"}
+    ):
+        return True
     return bool(
         str(plan.get("answer_mode") or "").strip().lower() == "dedicated_muhurat_flow"
         and str(special.get("muhurat_event_type") or "").strip().lower() == "marriage"
     )
+
+
+def spouse_detail_scope(query_plan: Mapping[str, Any] | None) -> str | None:
+    """Resolve the semantic spouse-detail facet, with a narrow outage fallback."""
+    plan = query_plan if isinstance(query_plan, Mapping) else {}
+    special = plan.get("special_flow") if isinstance(plan.get("special_flow"), Mapping) else {}
+    explicit = str(special.get("spouse_detail_scope") or "").strip().lower()
+    if explicit in {"profession", "location", "appearance", "combined"}:
+        return explicit
+    requested = str(special.get("requested_fact") or "").strip().lower()
+    question = str(plan.get("question") or "").strip().lower()
+    text = f"{requested} {question}"
+    if any(marker in text for marker in (
+        "appearance", "physical", "look like", "looks like", "how will they look",
+        "height", "build", "complexion", "face", "facial", "body type",
+    )):
+        return "appearance"
+    if any(marker in text for marker in ("profession", "career", "occupation", "job", "work")):
+        return "profession"
+    if any(marker in text for marker in ("location", "where from", "settle", "country", "city", "place")):
+        return "location"
+    return None
 
 
 def marriage_graph_runtime_key(category: Any, query_plan: Mapping[str, Any] | None = None) -> str | None:
@@ -92,6 +124,15 @@ def marriage_graph_runtime_key(category: Any, query_plan: Mapping[str, Any] | No
     if mode == "dedicated_muhurat_flow" and str(special.get("muhurat_event_type") or "").strip().lower() == "marriage":
         return "marriage_muhurat"
     category_key = normalize_marriage_category(category)
+    target = plan.get("target_subject") if isinstance(plan.get("target_subject"), Mapping) else {}
+    if category_key is None and (
+        str(plan.get("marriage_subtype") or "").strip().lower() == "spouse_details"
+        or (
+            spouse_detail_scope(plan) in {"appearance", "location"}
+            and str(target.get("key") or "").strip().lower() in {"spouse", "wife", "husband", "partner"}
+        )
+    ):
+        category_key = "spouse"
     if category_key is None:
         return None
     subtype = str(plan.get("marriage_subtype") or "general").strip().lower().replace("-", "_").replace(" ", "_")
@@ -100,6 +141,10 @@ def marriage_graph_runtime_key(category: Any, query_plan: Mapping[str, Any] | No
         return "marriage_remedies"
     if mode == "dedicated_partnership_flow":
         return "compatibility_analysis"
+    if spouse_detail_scope(plan) == "appearance" and mode in {"relationship_person", "topic_reading"}:
+        return "spouse_appearance"
+    if spouse_detail_scope(plan) == "location" and mode in {"relationship_person", "topic_reading"}:
+        return "spouse_location"
     subtype_routes = {
         "love_vs_arranged": "love_arranged_marriage",
         "remarriage": "remarriage",
@@ -167,7 +212,9 @@ def observed_marriage_factors(context: Mapping[str, Any], *, runtime_key: str) -
         "separation_reconciliation_timing": (2, 7, 8, 11, 12), "relationship_diagnosis": (5, 7, 8, 12),
         "love_arranged_marriage": (2, 5, 7, 9, 11), "remarriage": (2, 7, 8, 9, 11, 12),
         "engagement_wedding_timing": (2, 5, 7, 9, 11), "spouse_meeting": (3, 7, 9, 11, 12),
-        "spouse_details": (4, 7, 9, 10, 12), "affair_assessment": (5, 6, 7, 8, 12),
+        "spouse_details": (4, 7, 9, 10, 12), "spouse_appearance": (7,),
+        "spouse_location": (3, 4, 7, 9, 12),
+        "affair_assessment": (5, 6, 7, 8, 12),
     }
     if normalized:
         if runtime_key == "spouse_meeting":
@@ -183,8 +230,37 @@ def observed_marriage_factors(context: Mapping[str, Any], *, runtime_key: str) -
         summary = context.get("intent_summary") if isinstance(context.get("intent_summary"), Mapping) else {}
         if _present(summary.get("target_subject")) or normalize_marriage_category(summary.get("category")):
             factors.add("marriage:RelationshipContext")
-    if runtime_key == "spouse_profile" and _present(normalized.get("person_profile_axes")):
-        factors.add("marriage:DerivedSpouseFrame")
+    if runtime_key == "spouse_profile":
+        temperament = normalized.get("spouse_temperament_context") if isinstance(normalized.get("spouse_temperament_context"), Mapping) else {}
+        layers = temperament.get("layers") if isinstance(temperament.get("layers"), Mapping) else {}
+        if _present(layers.get("seventh_house")):
+            factors.update({"marriage:DerivedSpouseFrame", "marriage:H7", "marriage:SeventhLord"})
+        if _present(layers.get("seventh_lord_rashi_nakshatra")):
+            factors.add("marriage:SeventhLordNakshatra")
+        if _present(layers.get("darakaraka_rashi_nakshatra")):
+            factors.add("marriage:Darakaraka")
+        if _present(layers.get("venus_rashi_nakshatra")):
+            factors.add("marriage:VenusRashiNakshatra")
+    if runtime_key == "spouse_appearance":
+        appearance = normalized.get("spouse_appearance_context") if isinstance(normalized.get("spouse_appearance_context"), Mapping) else {}
+        layers = appearance.get("layers") if isinstance(appearance.get("layers"), Mapping) else {}
+        if _present(layers.get("seventh_house_sign")):
+            factors.update({"marriage:DerivedSpouseFrame", "marriage:H7", "marriage:SeventhLord"})
+        if _present(layers.get("seventh_lord_rashi_nakshatra")):
+            factors.add("marriage:SeventhLordNakshatra")
+        if _present(layers.get("darakaraka_rashi_nakshatra")):
+            factors.add("marriage:Darakaraka")
+        if _present(layers.get("venus_rashi_nakshatra")):
+            factors.add("marriage:VenusRashiNakshatra")
+    if runtime_key == "spouse_location":
+        location = normalized.get("spouse_location_context") if isinstance(normalized.get("spouse_location_context"), Mapping) else {}
+        layers = location.get("layers") if isinstance(location.get("layers"), Mapping) else {}
+        if _present(layers.get("seventh_house")):
+            factors.update({"marriage:DerivedSpouseFrame", "marriage:H7", "marriage:SeventhLord"})
+        if _present(layers.get("seventh_lord_location")):
+            factors.add("marriage:SeventhLordNakshatra")
+        if _present(layers.get("darakaraka_location")):
+            factors.add("marriage:Darakaraka")
     if runtime_key == "spouse_meeting" and _present(normalized.get("spouse_meeting_context")):
         factors.add("marriage:DerivedSpouseFrame")
     if runtime_key == "spouse_details" and _present(normalized.get("person_profile_axes")):
@@ -207,10 +283,14 @@ def observed_marriage_factors(context: Mapping[str, Any], *, runtime_key: str) -
         factors.add("marriage:KpSeventh")
     if "darakaraka" in serialized or "upapada" in serialized:
         factors.add("marriage:DarakarakaUpapada")
-    if _present(normalized.get("forward_event_dasha_scan")) or _present(normalized.get("historical_event_dasha_scan")) or _present(normalized.get("current_timing")):
+    if runtime_key != "marriage_remedies" and (
+        _present(normalized.get("forward_event_dasha_scan"))
+        or _present(normalized.get("historical_event_dasha_scan"))
+        or _present(normalized.get("current_timing"))
+    ):
         factors.add("marriage:DashaActivation")
     transit = normalized.get("transit_activation_timeline")
-    if _present(transit):
+    if runtime_key != "marriage_remedies" and _present(transit):
         factors.add("marriage:TransitConfirmation")
     historical = normalized.get("historical_event_dasha_scan") if isinstance(normalized.get("historical_event_dasha_scan"), Mapping) else {}
     if any((row.get("transit_trigger_windows") or row.get("peak_activation_windows")) for row in historical.get("periods") or [] if isinstance(row, Mapping)):

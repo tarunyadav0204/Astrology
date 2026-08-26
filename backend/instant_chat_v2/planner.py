@@ -201,6 +201,13 @@ def build_query_plan(
         relation = "current_to_future" if semantic_kind in {"relative_range", "rolling_window"} else "future"
     elif not relation:
         relation = "current_or_next"
+    if str(answer_mode or "") == "remedy_action":
+        # Remedy selection is a static calculated-action route. Incidental
+        # router horizons must not turn it into a forecast contract.
+        relation = "static"
+        horizon_end = None
+        target_day = None
+        exact_day = False
     return {
         "schema_version": "instant-query-plan/v1",
         "planner_source": "llm_intent_router",
@@ -242,6 +249,7 @@ def build_query_plan(
         "special_flow": {
             "requested_chart": extracted.get("requested_chart"),
             "requested_fact": extracted.get("requested_fact"),
+            "spouse_detail_scope": extracted.get("spouse_detail_scope"),
             "location_scope": extracted.get("location_scope"),
             "location_goal": extracted.get("location_goal") or category,
             "hub_regions": extracted.get("hub_regions") or [],

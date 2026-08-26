@@ -565,48 +565,63 @@ button.chat-header-credits.credits-display:active {
     background: var(--color-brand);
 }
 
-.instant-evidence-inspector {
-    width: min(42rem, calc(100vw - 3rem));
-    margin-top: 0.65rem;
-    padding: 0.75rem;
+.instant-evidence-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10020;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgba(17, 12, 20, 0.58);
+    backdrop-filter: blur(3px);
+}
+
+.instant-evidence-modal {
+    display: flex;
+    flex-direction: column;
+    width: min(46rem, 100%);
+    max-height: min(46rem, calc(100dvh - 2rem));
     color: var(--color-text);
     background: var(--color-surface-raised, var(--color-surface));
     border: 1px solid var(--color-border);
-    border-radius: 0.85rem;
-    box-shadow: var(--shadow-sm);
+    border-radius: 1rem;
+    box-shadow: 0 24px 70px rgba(12, 7, 15, 0.3);
+    overflow: hidden;
 }
 
-.instant-evidence-inspector > header {
+.instant-evidence-modal-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
-    padding-bottom: 0.65rem;
+    padding: 1rem 1.1rem;
     border-bottom: 1px solid var(--color-border);
 }
 
-.instant-evidence-inspector header div { display: grid; gap: 0.16rem; }
-.instant-evidence-inspector header small { color: var(--color-text-muted); font-size: 0.61rem; font-weight: 900; letter-spacing: 0.14em; }
-.instant-evidence-inspector header strong { font-size: 0.86rem; text-transform: capitalize; }
-.instant-evidence-inspector header > span { padding: 0.2rem 0.42rem; border-radius: 999px; font-size: 0.64rem; font-weight: 800; white-space: nowrap; }
-.instant-evidence-inspector .is-pass { color: var(--color-success, #237a57); background: color-mix(in srgb, var(--color-success, #237a57) 14%, transparent); }
-.instant-evidence-inspector .is-review { color: var(--color-warning, #a36a13); background: color-mix(in srgb, var(--color-warning, #a36a13) 14%, transparent); }
-.instant-evidence-inspector details { padding: 0.5rem 0; border-bottom: 1px solid var(--color-border); }
-.instant-evidence-inspector details:last-child { border-bottom: 0; padding-bottom: 0; }
-.instant-evidence-inspector summary { color: var(--color-text); font-size: 0.76rem; font-weight: 850; cursor: pointer; }
-.instant-evidence-inspector details > p { margin: 0.45rem 0; font-size: 0.78rem; }
-.instant-evidence-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.instant-evidence-tags span { padding: 0.2rem 0.38rem; color: var(--color-text-muted); background: var(--color-surface-muted); border-radius: 0.35rem; font-size: 0.65rem; }
-.instant-evidence-inspector ul, .instant-evidence-inspector ol { display: grid; gap: 0.4rem; margin: 0.5rem 0 0; padding: 0; list-style: none; }
-.instant-evidence-inspector li { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.4rem; background: var(--color-surface-muted); border-radius: 0.45rem; font-size: 0.7rem; }
-.instant-evidence-inspector li em { padding: 0.16rem 0.3rem; border-radius: 999px; color: var(--color-text-muted); font-size: 0.59rem; font-style: normal; }
-.instant-evidence-inspector li em.is-available { color: var(--color-success, #237a57); }
-.instant-evidence-inspector li em.is-not_exposed { color: var(--color-warning, #a36a13); }
-.instant-evidence-inspector ol li { align-items: flex-start; justify-content: flex-start; flex-wrap: wrap; }
-.instant-evidence-inspector ol code { color: var(--color-brand); font-size: 0.62rem; }
-.instant-evidence-inspector ol li > div { display: grid; min-width: 9rem; }
-.instant-evidence-inspector ol small { color: var(--color-text-muted); }
-.instant-evidence-inspector pre { flex: 1 0 100%; max-height: 10rem; margin: 0; padding: 0.45rem; overflow: auto; color: var(--color-text); background: var(--color-surface); border-radius: 0.35rem; font-size: 0.59rem; white-space: pre-wrap; }
+.instant-evidence-modal-header > div:first-child { display: grid; gap: 0.2rem; min-width: 0; }
+.instant-evidence-modal-header small { color: var(--color-text-muted); font-size: 0.62rem; font-weight: 900; letter-spacing: 0.14em; }
+.instant-evidence-modal-header strong { font-size: 1rem; text-transform: capitalize; }
+.instant-evidence-modal-actions { display: flex; align-items: center; gap: 0.55rem; }
+.instant-evidence-modal-actions > span { padding: 0.24rem 0.48rem; border-radius: 999px; font-size: 0.66rem; font-weight: 800; white-space: nowrap; }
+.instant-evidence-modal-actions .is-pass { color: var(--color-success, #237a57); background: color-mix(in srgb, var(--color-success, #237a57) 14%, transparent); }
+.instant-evidence-modal-actions .is-review { color: var(--color-warning, #a36a13); background: color-mix(in srgb, var(--color-warning, #a36a13) 14%, transparent); }
+.instant-evidence-modal-actions button {
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    place-items: center;
+    color: var(--color-text);
+    background: var(--color-surface-muted);
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    font: inherit;
+    font-size: 1.3rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.instant-evidence-modal-scroll { min-height: 0; padding: 0 1.1rem 1.1rem; overflow-y: auto; overscroll-behavior: contain; }
+
 .instant-routing-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.45rem; margin-top: 0.65rem; padding: 0.55rem; border: 1px solid var(--color-border); border-radius: 0.65rem; background: var(--color-surface-muted); }
 .instant-routing-summary > span { display: grid; gap: 0.12rem; min-width: 0; }
 .instant-routing-summary small { color: var(--color-text-muted); font-size: 0.56rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -627,6 +642,11 @@ button.chat-header-credits.credits-display:active {
 .instant-evidence-factor strong { color: var(--color-text); font-size: 0.72rem; }
 .instant-evidence-factor p { margin: 0; color: var(--color-text-muted); font-size: 0.69rem; line-height: 1.42; }
 @media (max-width: 640px) {
+  .instant-evidence-modal-backdrop { padding: 0.6rem; align-items: end; }
+  .instant-evidence-modal { max-height: calc(100dvh - 1.2rem); border-radius: 1rem 1rem 0.75rem 0.75rem; }
+  .instant-evidence-modal-header { padding: 0.9rem; }
+  .instant-evidence-modal-actions > span { display: none; }
+  .instant-evidence-modal-scroll { padding: 0 0.9rem 0.9rem; }
   .instant-routing-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 

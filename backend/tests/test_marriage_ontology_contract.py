@@ -26,14 +26,14 @@ def test_marriage_ontology_compiles_and_validates() -> None:
         cwd=ROOT, capture_output=True, text=True, check=False,
     )
     assert result.returncode == 0, result.stderr
-    assert "Marriage and Relationship ontology PoC valid: 20 competency questions" in result.stdout
+    assert "Marriage and Relationship ontology PoC valid: 22 competency questions" in result.stdout
 
 
 def test_compiled_bundle_covers_all_existing_relationship_families() -> None:
     assert set(MarriageGraphPolicyStore().runtime_keys()) == {
         "marriage_promise", "marriage_timing", "marriage_history", "married_life", "married_life_timing",
         "relationship_outlook", "relationship_timing", "separation_reconciliation",
-        "separation_reconciliation_timing", "spouse_profile", "relationship_diagnosis",
+        "separation_reconciliation_timing", "spouse_profile", "spouse_appearance", "spouse_location", "relationship_diagnosis",
         "marriage_remedies", "love_arranged_marriage", "remarriage", "engagement_wedding_timing",
         "spouse_meeting", "spouse_details", "affair_assessment", "marriage_muhurat",
         "compatibility_analysis",
@@ -64,7 +64,7 @@ def test_marriage_graph_is_attached_to_canonical_parent_with_topics() -> None:
 
 def test_static_routes_exclude_timing_and_timed_routes_require_delivery_chain() -> None:
     store = MarriageGraphPolicyStore()
-    for key in ("marriage_promise", "married_life", "relationship_outlook", "spouse_profile", "relationship_diagnosis", "marriage_remedies", "love_arranged_marriage", "spouse_meeting", "spouse_details", "affair_assessment"):
+    for key in ("marriage_promise", "married_life", "relationship_outlook", "spouse_profile", "spouse_appearance", "spouse_location", "relationship_diagnosis", "marriage_remedies", "love_arranged_marriage", "spouse_meeting", "spouse_details", "affair_assessment"):
         assert {"marriage:DashaActivation", "marriage:TransitConfirmation"}.issubset(store.require(key).default_exclusions)
     for key in ("marriage_timing", "married_life_timing", "relationship_timing", "separation_reconciliation_timing", "remarriage", "engagement_wedding_timing"):
         policy = store.require(key)
@@ -80,6 +80,8 @@ def test_sensitive_relationship_guardrails_are_compiled() -> None:
     assert "marriage:NoDivorceCertainty" in store.require("separation_reconciliation_timing").guardrails
     assert "marriage:ClarifyRelationshipStatus" in store.require("separation_reconciliation").guardrails
     assert "marriage:DerivedChartDisclosure" in store.require("spouse_profile").guardrails
+    assert "marriage:SpouseDetailScope" in store.require("spouse_appearance").guardrails
+    assert "marriage:SpouseDetailScope" in store.require("spouse_location").guardrails
     assert "marriage:NoAffairAssertion" in store.require("affair_assessment").guardrails
     assert "marriage:PriorMarriageRequired" in store.require("remarriage").guardrails
     assert "marriage:SeparateMilestones" in store.require("engagement_wedding_timing").guardrails
@@ -123,6 +125,44 @@ def test_extended_marriage_subtypes_resolve_without_question_text_matching() -> 
             "marriage",
             {"answer_mode": "topic_reading", "marriage_subtype": subtype},
         ) == expected
+
+
+def test_spouse_appearance_facet_resolves_before_generic_spouse_profile() -> None:
+    plan = {
+        "question": "How will they look like?",
+        "answer_mode": "relationship_person",
+        "marriage_subtype": "spouse_details",
+        "special_flow": {"spouse_detail_scope": "appearance"},
+    }
+    assert marriage_graph_runtime_key("marriage", plan) == "spouse_appearance"
+
+    fallback_plan = {
+        "question": "How will they look like?",
+        "answer_mode": "relationship_person",
+        "marriage_subtype": "general",
+        "special_flow": {},
+    }
+    assert marriage_graph_runtime_key("spouse", fallback_plan) == "spouse_appearance"
+
+    inherited_context_plan = {
+        "question": "How will they look?",
+        "answer_mode": "relationship_person",
+        "marriage_subtype": "spouse_details",
+        "target_subject": {"key": "spouse", "label": "spouse"},
+        "special_flow": {"spouse_detail_scope": "appearance"},
+    }
+    assert marriage_graph_runtime_key("general", inherited_context_plan) == "spouse_appearance"
+
+
+def test_spouse_location_facet_resolves_before_umbrella_spouse_details() -> None:
+    plan = {
+        "question": "Does my spouse appear connected with a different city, culture or background?",
+        "answer_mode": "relationship_person",
+        "marriage_subtype": "spouse_details",
+        "target_subject": {"key": "spouse", "label": "spouse"},
+        "special_flow": {"spouse_detail_scope": "location"},
+    }
+    assert marriage_graph_runtime_key("marriage", plan) == "spouse_location"
     assert marriage_graph_runtime_key(
         "marriage", {"answer_mode": "remedy_action", "marriage_subtype": "general"}
     ) == "marriage_remedies"
@@ -135,6 +175,23 @@ def test_marriage_muhurat_resolves_from_dedicated_flow_even_with_muhurat_categor
         "special_flow": {"muhurat_event_type": "marriage"},
     }
     assert marriage_graph_runtime_key("muhurat", plan) == "marriage_muhurat"
+
+
+def test_marriage_remedy_query_plan_discards_incidental_forecast_horizon() -> None:
+    plan = build_query_plan(
+        question="Which calculated remedy is most relevant for recurring marital conflict?",
+        intent={
+            "category": "marriage",
+            "explicit_remedy_request": True,
+            "extracted_context": {"timeframe": "next three years"},
+        },
+        answer_mode="remedy_action",
+        target_subject={"key": "self", "label": "self"},
+        language="english",
+    )
+    assert plan["time_scope"]["relation"] == "static"
+    assert plan["time_scope"]["horizon_end"] is None
+    assert plan["time_scope"]["is_exact_day"] is False
 
 
 def test_query_plan_preserves_semantic_marriage_subtype_and_prior_context() -> None:

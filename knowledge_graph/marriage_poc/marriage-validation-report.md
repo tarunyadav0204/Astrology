@@ -1,7 +1,7 @@
 # Marriage and Relationship ontology validation report
 
-- Ontology version: `0.3.1`
-- Competency questions: **20**
+- Ontology version: `0.3.6`
+- Competency questions: **22**
 - Result: **PASS**
 
 | Test | Human question | Runtime key | Answer mode | Factors | Calculators | Result |
@@ -15,7 +15,9 @@
 | `relationship_timing` | When can this relationship become serious? | `relationship_timing` | `ModeTiming` | 7 | 4 | PASS |
 | `separation_reconciliation` | Can this marriage recover after separation? | `separation_reconciliation` | `ModeOutlook` | 8 | 3 | PASS |
 | `separation_reconciliation_timing` | Is this year supportive for reconciliation? | `separation_reconciliation_timing` | `ModeTiming` | 10 | 5 | PASS |
-| `spouse_profile` | What kind of spouse am I likely to have? | `spouse_profile` | `ModeProfile` | 6 | 2 | PASS |
+| `spouse_profile` | What kind of temperament does my chart indicate for my spouse? | `spouse_profile` | `ModeProfile` | 8 | 2 | PASS |
+| `spouse_appearance` | How will my spouse look? | `spouse_appearance` | `ModeDetailedProfile` | 8 | 2 | PASS |
+| `spouse_location` | Does my spouse appear connected with a different city, culture or background? | `spouse_location` | `ModeDetailedProfile` | 10 | 2 | PASS |
 | `relationship_diagnosis` | Why do the same conflicts repeat in my marriage? | `relationship_diagnosis` | `ModeDiagnosis` | 8 | 3 | PASS |
 | `marriage_remedies` | What remedies can support my marriage? | `marriage_remedies` | `ModeRemedy` | 3 | 1 | PASS |
 | `love_arranged_marriage` | Is love marriage or arranged marriage more supported? | `love_arranged_marriage` | `ModeChoice` | 7 | 2 | PASS |

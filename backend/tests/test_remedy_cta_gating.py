@@ -35,6 +35,22 @@ def test_clamp_remedy_modes_keeps_cta():
     assert result["mode"] == "RECOMMEND_REMEDY_FOR_PROBLEM"
 
 
+def test_clamp_remedy_modes_keeps_unambiguous_direct_remedy_selection() -> None:
+    result = {
+        "mode": "ANALYZE_ROOT_CAUSE",
+        "answer_mode": "problem_diagnosis",
+        "category": "marriage",
+        "query_context": {},
+    }
+    clamp_remedy_modes_on_intent(
+        result,
+        "Which calculated remedy is most relevant for recurring marital conflict?",
+    )
+    assert result["explicit_remedy_request"] is True
+    assert result["answer_mode"] == "remedy_action"
+    assert result["mode"] == "RECOMMEND_REMEDY_FOR_PROBLEM"
+
+
 def test_deep_dive_template_forbids_inline_remedies():
     assert "NO INLINE REMEDIES" in TEMPLATE_DEEP_DIVE
     assert "Analysis + Remedies" not in TEMPLATE_DEEP_DIVE
