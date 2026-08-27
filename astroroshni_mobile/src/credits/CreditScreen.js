@@ -240,6 +240,16 @@ function getFirstPurchaseBonus(product) {
   };
 }
 
+function getCampaignQuestionCount(baseQuestions, campaign, serverQuestions = null) {
+  const serverCount = Number(serverQuestions);
+  if (campaign && Number.isFinite(serverCount) && serverCount >= 0) return serverCount;
+  const base = Number(baseQuestions);
+  const multiplier = Number(campaign?.multiplier);
+  if (!Number.isFinite(base)) return null;
+  if (!campaign || !Number.isFinite(multiplier) || multiplier <= 1) return base;
+  return Math.round(base * multiplier);
+}
+
 function formatFirstPurchaseBonusLabel(bonus) {
   if (!bonus?.eligible) return '';
   if (bonus.bonusType === 'fixed' && bonus.fixedCredits > 0) {
@@ -2114,12 +2124,17 @@ const CreditScreen = ({ navigation, route }) => {
                       const meta = getCreditPackMeta(pack.credits);
                       const packName = pack.name || meta.name || `${pack.credits} Credits`;
                       const badge = pack.badge || meta.badge;
-                      const questions = pack.questions ?? meta.questions;
+                      const creditCampaign = pack.credit_campaign || null;
+                      const baseQuestions = pack.base_questions ?? meta.questions ?? pack.questions;
+                      const questions = getCampaignQuestionCount(
+                        baseQuestions,
+                        creditCampaign,
+                        creditCampaign?.question_count,
+                      );
                       const packBonusCredits =
                         Number(pack.pack_bonus_credits ?? meta.bonusCredits) || 0;
                       const webBonusCredits = Number(pack.web_topup_bonus_credits) || 0;
                       const webBonusPercent = Number(pack.web_topup_bonus_percent) || 0;
-                      const creditCampaign = pack.credit_campaign || null;
                       const totalCredits =
                         Number(pack.total_credits) ||
                         pack.credits + packBonusCredits + webBonusCredits;

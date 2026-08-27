@@ -11,6 +11,7 @@ if str(BACKEND) not in sys.path:
 
 from credits.credit_service import CreditService
 from credits import razorpay_routes
+from credits import credit_campaigns
 from utils import admin_settings
 
 
@@ -181,6 +182,34 @@ def test_razorpay_catalog_includes_independently_enabled_starter(monkeypatch):
     starter = next(pack for pack in packs if pack["credits"] == 24)
     assert starter["amount_paise"] == 2400
     assert starter["is_first_purchase_offer"] is True
+
+
+def test_razorpay_catalog_scales_questions_for_credit_campaign(monkeypatch):
+    monkeypatch.setattr(razorpay_routes, "_first_purchase_starter_is_eligible", lambda _userid: False)
+    monkeypatch.setattr(razorpay_routes.credit_service, "list_active_credit_amounts", lambda: [100])
+    monkeypatch.setattr(admin_settings, "is_web_topup_bonus_enabled", lambda: False)
+    monkeypatch.setattr(admin_settings, "get_web_topup_bonus_percent", lambda: 0)
+    monkeypatch.setattr(
+        credit_campaigns,
+        "active_credit_campaigns_for_user",
+        lambda _userid: [
+            {
+                "id": 7,
+                "name": "Double credits",
+                "multiplier": 2.0,
+                "starts_at": "2026-08-01T00:00:00Z",
+                "ends_at": "2026-09-01T00:00:00Z",
+                "product_ids": ["credits_100"],
+            }
+        ],
+    )
+
+    pack = razorpay_routes.get_razorpay_credit_packs(123)[0]
+
+    assert pack["base_questions"] == 4
+    assert pack["questions"] == 8
+    assert pack["credit_campaign"]["question_count"] == 8
+    assert pack["total_credits"] == 200
 
 
 def test_razorpay_starter_price_uses_admin_config(monkeypatch):

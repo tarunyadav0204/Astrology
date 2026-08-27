@@ -310,6 +310,13 @@ def calculate_campaign_bonus(
     }
 
 
+def calculate_campaign_question_count(base_questions: Any, multiplier: Any) -> int:
+    """Scale pack question copy with the same half-up rule as campaign credits."""
+    questions = max(0, int(base_questions or 0))
+    factor = max(Decimal("1"), Decimal(str(multiplier)))
+    return int((Decimal(questions) * factor).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
 def preview_credit_campaign(
     userid: int,
     *,

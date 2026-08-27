@@ -194,7 +194,10 @@ def get_razorpay_credit_packs(userid: Optional[int] = None) -> List[Dict[str, An
         credit_campaign = None
         if userid is not None and not is_starter:
             try:
-                from credits.credit_campaigns import calculate_campaign_bonus
+                from credits.credit_campaigns import (
+                    calculate_campaign_bonus,
+                    calculate_campaign_question_count,
+                )
 
                 matched_campaign = next(
                     (
@@ -204,6 +207,7 @@ def get_razorpay_credit_packs(userid: Optional[int] = None) -> List[Dict[str, An
                     None,
                 )
                 if matched_campaign:
+                    base_questions = meta.get("questions")
                     credit_campaign = {
                         "id": matched_campaign["id"],
                         "name": matched_campaign["name"],
@@ -216,6 +220,11 @@ def get_razorpay_credit_packs(userid: Optional[int] = None) -> List[Dict[str, An
                             existing_bonus_credits=pack_bonus + web_bonus,
                         ),
                     }
+                    if base_questions is not None:
+                        credit_campaign["question_count"] = calculate_campaign_question_count(
+                            base_questions,
+                            matched_campaign["multiplier"],
+                        )
             except Exception:
                 logger.exception("credit campaign catalog preview failed userid=%s product=%s", userid, _product_id(c))
         displayed_total = int(c) + pack_bonus + web_bonus
@@ -230,7 +239,12 @@ def get_razorpay_credit_packs(userid: Optional[int] = None) -> List[Dict[str, An
                 "currency": "INR",
                 "name": meta.get("name") or f"{c} Credits",
                 "badge": meta.get("badge"),
-                "questions": meta.get("questions"),
+                "questions": (
+                    credit_campaign.get("question_count")
+                    if credit_campaign and credit_campaign.get("question_count") is not None
+                    else meta.get("questions")
+                ),
+                "base_questions": meta.get("questions"),
                 "save_percent": starter_saving if is_starter else (meta.get("save_percent") or 0),
                 "value_prop": (
                     f"{FIRST_PURCHASE_STARTER_CREDITS} credits for {_format_inr(paise)}"

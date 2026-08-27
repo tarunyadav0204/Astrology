@@ -13,7 +13,11 @@ from credits.credit_campaign_routes import (
     admin_create_credit_campaign,
     admin_send_credit_campaign_whatsapp,
 )
-from credits.credit_campaigns import calculate_campaign_bonus, maybe_apply_credit_campaign
+from credits.credit_campaigns import (
+    calculate_campaign_bonus,
+    calculate_campaign_question_count,
+    maybe_apply_credit_campaign,
+)
 from credits.web_continue_routes import _split_campaign_continue_token
 
 
@@ -32,6 +36,14 @@ def test_campaign_rounds_fractional_credit_half_up():
 
     assert result["target_total_credits"] == 1499
     assert result["campaign_bonus_credits"] == 500
+
+
+@pytest.mark.parametrize(
+    ("base_questions", "multiplier", "expected"),
+    [(4, "2", 8), (11, "1.5", 17), (45, "1.5", 68)],
+)
+def test_campaign_scales_displayed_question_count_half_up(base_questions, multiplier, expected):
+    assert calculate_campaign_question_count(base_questions, multiplier) == expected
 
 
 def test_campaign_never_removes_a_better_existing_bonus():
