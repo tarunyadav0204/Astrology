@@ -574,6 +574,18 @@ jobs:
               --max-concurrent-dispatches 40 \
               --max-dispatches-per-second 20
           done
+          QUEUE="nudge-whatsapp-campaign-queue"
+          if ! gcloud tasks queues describe "${QUEUE}" --project "${GCP_PROJECT_ID}" --location asia-south1 >/dev/null 2>&1; then
+            gcloud tasks queues create "${QUEUE}" --project "${GCP_PROJECT_ID}" --location asia-south1
+          fi
+          gcloud tasks queues update "${QUEUE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --location asia-south1 \
+            --max-attempts 8 \
+            --min-backoff 15s \
+            --max-backoff 300s \
+            --max-concurrent-dispatches 5 \
+            --max-dispatches-per-second 5
 
       - name: Deploy nudge worker service to Cloud Run
         id: deploy_nudge_worker_service
@@ -599,7 +611,7 @@ jobs:
             --min-instances 0 \
             --max-instances 50 \
             --port 8080 \
-            --set-env-vars "NUDGE_SERVICE_ROLE=worker,NUDGE_REQUIRE_ISOLATED_DATABASES=true,NUDGE_SERVICE_ENV_FILE=/secrets/app_env/.env,GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID},GCP_PROJECT_ID=${GCP_PROJECT_ID},PUBLIC_API_BASE_URL=https://astroroshni.com,NUDGE_EMAIL_TASKS_QUEUE=nudge-email-queue" \
+            --set-env-vars "NUDGE_SERVICE_ROLE=worker,NUDGE_REQUIRE_ISOLATED_DATABASES=true,NUDGE_SERVICE_ENV_FILE=/secrets/app_env/.env,GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID},GCP_PROJECT_ID=${GCP_PROJECT_ID},PUBLIC_API_BASE_URL=https://astroroshni.com,NUDGE_EMAIL_TASKS_QUEUE=nudge-email-queue,NUDGE_WHATSAPP_TASKS_QUEUE=nudge-whatsapp-campaign-queue" \
             --update-secrets "/secrets/app_env/.env=APP_ENV_FILE:latest,NUDGE_CRON_SECRET=NUDGE_CRON_SECRET:latest,NUDGE_TASKS_SECRET=NUDGE_TASKS_SECRET:latest,NUDGE_AUDIENCE_DATABASE_URL=NUDGE_AUDIENCE_DATABASE_URL:latest,NUDGE_NOTIFICATION_DATABASE_URL=NUDGE_NOTIFICATION_DATABASE_URL:latest"
 
           SERVICE_URL="$(gcloud run services describe "${GCP_NUDGE_WORKER_SERVICE_NAME}" \

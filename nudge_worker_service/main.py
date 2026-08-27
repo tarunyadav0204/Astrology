@@ -26,6 +26,10 @@ if ENV_FILE and os.path.isfile(ENV_FILE):
     load_dotenv(ENV_FILE, override=False)
 
 from nudge_engine.campaigns import process_campaign_batch  # noqa: E402
+from nudge_engine.credit_campaign_whatsapp import (  # noqa: E402
+    ensure_credit_campaign_whatsapp_tables,
+    process_credit_campaign_whatsapp_batch,
+)
 from nudge_engine.delivery import deliver_for_user_batch  # noqa: E402
 from nudge_engine.models import NudgeEvent  # noqa: E402
 from nudge_engine.routes import (  # noqa: E402
@@ -51,6 +55,7 @@ def validate_isolation() -> None:
         audience_conn.cursor().execute("SELECT 1")
     with db.get_conn() as notification_conn:
         db.init_nudge_tables(notification_conn)
+        ensure_credit_campaign_whatsapp_tables(notification_conn)
         notification_conn.cursor().execute("SELECT 1")
         notification_conn.commit()
 
@@ -187,6 +192,26 @@ async def internal_campaign_batch_task(
             process_campaign_batch,
             campaign_id=campaign_id,
             user_ids=user_ids_raw,
+        )
+    )
+
+
+@app.post("/api/nudge/internal/tasks/credit-campaign-whatsapp-batch")
+async def internal_credit_campaign_whatsapp_batch_task(
+    body: Dict[str, Any],
+    x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
+):
+    _require_worker_role()
+    _verify_nudge_task_secret(x_nudge_task_secret)
+    job_id = str(body.get("job_id") or "").strip()
+    recipients = body.get("recipients") or []
+    if not job_id or not isinstance(recipients, list):
+        raise HTTPException(status_code=400, detail="job_id and recipients are required")
+    return await run_in_threadpool(
+        partial(
+            process_credit_campaign_whatsapp_batch,
+            job_id=job_id,
+            recipients=recipients,
         )
     )
 

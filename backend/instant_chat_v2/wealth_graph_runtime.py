@@ -84,6 +84,7 @@ def wealth_graph_runtime_key(category: Any, query_plan: Mapping[str, Any] | None
         # questions such as long-term wealth potential drift into unsupported
         # salary-versus-business claims.
         if subtype == "source": return "wealth_source"
+        if subtype == "multiple_income": return "multiple_income"
         if subtype == "savings_instability" or mode == "problem_diagnosis": return "wealth_diagnosis"
         return "wealth_timing" if _timing_requested(plan) else "wealth"
     if category_key == "income":

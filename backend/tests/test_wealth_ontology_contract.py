@@ -138,6 +138,7 @@ def test_semantic_subtypes_and_modes_resolve_to_specific_routes() -> None:
         ("wealth", "topic_reading", "source", "wealth_source"),
         ("wealth", "problem_diagnosis", "savings_instability", "wealth_diagnosis"),
         ("income", "potential_capacity", "multiple_income", "multiple_income"),
+        ("wealth", "potential_capacity", "multiple_income", "multiple_income"),
         ("debt", "decision_support", "loan_support", "debt"),
         ("debt", "timing_window", "debt_repayment", "debt_repayment"),
         ("wealth", "event_prediction", "debt_repayment", "debt_repayment"),
@@ -492,6 +493,54 @@ def test_reference_chart_wealth_source_ranks_concrete_channels_not_savings_advic
     assert "profession- or service-led" in answer
     assert "automated savings" not in answer
     assert "D2 adds a separate caution" in answer
+
+
+def test_reference_chart_multiple_income_uses_specific_streams_and_complete_route() -> None:
+    birth = {
+        "name": "Tarun", "date": "1980-04-02", "time": "14:55:00",
+        "latitude": 29.2396596, "longitude": 75.8174505,
+        "timezone": "UTC+5:30", "place": "Hisar, Haryana, India",
+    }
+    chart = ChartCalculator({}).calculate_chart(SimpleNamespace(**birth))
+    foundation = _compact_wealth_foundation(
+        chart, birth, {}, category="income", answer_mode="potential_capacity",
+        wealth_subtype="multiple_income",
+    )
+    synthesis = foundation["multiple_income_synthesis"]
+    assert synthesis["verdict"] == "multiple_complementary_streams_supported"
+    assert synthesis["primary_stream"]["id"] == "technical_professional"
+    assert synthesis["secondary_streams"][0]["id"] == "network_commercial_scale"
+
+    context = {
+        "intent_summary": {
+            "category": "income", "answer_mode": "potential_capacity",
+            "wealth_subtype": "multiple_income",
+        },
+        "normalized_evidence": {"wealth_foundation": foundation},
+    }
+    packet = apply_live_graph_policy(
+        {
+            "query_plan": {
+                "category": "income", "answer_mode": "potential_capacity",
+                "wealth_subtype": "multiple_income", "time_scope": {},
+            },
+            "answer_spec": {}, "verification": {}, "user_derivation": {},
+        },
+        intent={"category": "income", "wealth_subtype": "multiple_income"}, context=context,
+    )
+    policy = packet["answer_spec"]["knowledge_graph_policy"]
+    assert policy["runtime_key"] == "multiple_income"
+    assert policy.get("missing_required_factors") == []
+    assert policy.get("claim_permission") != "no_complete_wealth_verdict"
+
+    answer = enforce_live_graph_answer(
+        "Diversifying may help, but build savings first.", packet,
+    )
+    assert "Yes—your chart supports more than one income stream" in answer
+    assert "technical, analytical and systems-led professional work" in answer
+    assert "scalable commercial gains through networks, platforms or products" in answer
+    assert "unrelated side hustles" in answer
+    assert "required calculated layers are unavailable" not in answer
 
 
 def test_reference_chart_investment_synthesis_is_specific_and_generic_answer_fails_safe() -> None:

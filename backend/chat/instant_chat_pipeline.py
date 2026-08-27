@@ -9118,7 +9118,7 @@ def _compact_wealth_foundation(
     }
 
     wealth_source_synthesis: Dict[str, Any] = {}
-    if subtype == "source":
+    if subtype in {"source", "multiple_income"}:
         natal_houses = (result.get("natal_wealth") or {}).get("houses") or {}
         d10 = (result.get("divisional_charts") or {}).get("D10") or {}
         d10_planets = d10.get("planets") if isinstance(d10, dict) else {}
@@ -9318,6 +9318,28 @@ def _compact_wealth_foundation(
             ),
         }
         result["wealth_source_synthesis"] = wealth_source_synthesis
+        if subtype == "multiple_income":
+            viable_channels = [
+                dict(row) for row in ranked_channels
+                if int(row.get("score") or 0) >= 5
+            ]
+            multiple_income_synthesis = {
+                "verdict": (
+                    "multiple_complementary_streams_supported"
+                    if len(viable_channels) >= 2
+                    else "single_primary_stream_with_limited_secondary_support"
+                ),
+                "primary_stream": viable_channels[0] if viable_channels else {},
+                "secondary_streams": viable_channels[1:3],
+                "earning_structure": earning_structure,
+                "retention_qualification": d2_verdict,
+                "answer_rule": (
+                    "State yes or no first. Name the primary stream and each separately supported secondary stream. "
+                    "Prefer complementary streams built from the same core expertise over unrelated side hustles. "
+                    "D2 retention pressure qualifies what remains; it does not negate or create an income stream."
+                ),
+            }
+            result["multiple_income_synthesis"] = multiple_income_synthesis
 
     adjudication_houses = {
         "income": [2, 10, 11],
@@ -14367,15 +14389,17 @@ async def generate_instant_chat_response(
     stream_callback: Optional[Callable[[str, str], None]] = None,
 ) -> Dict[str, Any]:
     intent = apply_timeline_intent_guard(intent)
-    # A repayment subtype is more specific than the broad Wealth category.
-    # Normalize it before chart focus, event scanning and graph selection so a
-    # router category fallback cannot turn repayment into generic wealth timing.
+    # Some Wealth subtypes are more specific than the broad Wealth category.
+    # Normalize them before chart focus and graph selection so a router category
+    # fallback cannot degrade repayment or multiple-income questions.
     if (
         isinstance(intent, dict)
-        and str(intent.get("wealth_subtype") or "").strip().lower() == "debt_repayment"
-        and str(intent.get("category") or "").strip().lower() != "debt"
+        and str(intent.get("wealth_subtype") or "").strip().lower() in {"debt_repayment", "multiple_income"}
     ):
-        intent = {**intent, "category": "debt"}
+        normalized_wealth_subtype = str(intent.get("wealth_subtype") or "").strip().lower()
+        required_category = "debt" if normalized_wealth_subtype == "debt_repayment" else "income"
+        if str(intent.get("category") or "").strip().lower() != required_category:
+            intent = {**intent, "category": required_category}
     requested_app_language = str(language or "english").strip().lower() or "english"
     language = _instant_response_language(
         latest_user_question or question,

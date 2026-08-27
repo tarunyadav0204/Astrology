@@ -5,7 +5,7 @@ import logging
 import os
 import re
 import secrets
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Iterable, Optional, Tuple
 from urllib.parse import urlparse
 
 from db import execute, get_conn
@@ -125,6 +125,58 @@ def get_or_create_continue_token(userid: int) -> str:
             if row and str(row[0] or "").strip():
                 return str(row[0]).strip()
             raise
+
+
+def get_or_create_continue_tokens(userids: Iterable[int]) -> Dict[int, str]:
+    """Return active tokens for many users using one short primary-DB transaction."""
+    ids = sorted({int(value) for value in userids if int(value) > 0})
+    if not ids:
+        return {}
+    with get_conn() as conn:
+        ensure_web_continue_tokens_table(conn)
+        rows = execute(
+            conn,
+            """
+            SELECT userid, token FROM web_continue_tokens
+            WHERE userid = ANY(?) AND revoked_at IS NULL
+            """,
+            (ids,),
+        ).fetchall()
+        tokens = {
+            int(row[0]): str(row[1]).strip()
+            for row in (rows or [])
+            if str(row[1] or "").strip()
+        }
+        for uid in ids:
+            if uid in tokens:
+                continue
+            execute(
+                conn,
+                """
+                INSERT INTO web_continue_tokens (token, userid, created_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT DO NOTHING
+                """,
+                (secrets.token_urlsafe(TOKEN_BYTES), uid),
+            )
+        conn.commit()
+        rows = execute(
+            conn,
+            """
+            SELECT userid, token FROM web_continue_tokens
+            WHERE userid = ANY(?) AND revoked_at IS NULL
+            """,
+            (ids,),
+        ).fetchall()
+        result = {
+            int(row[0]): str(row[1]).strip()
+            for row in (rows or [])
+            if str(row[1] or "").strip()
+        }
+        missing = [uid for uid in ids if uid not in result]
+        if missing:
+            raise RuntimeError(f"Could not create secure links for {len(missing)} recipient(s)")
+        return result
 
 
 def revoke_continue_tokens(userid: int) -> None:

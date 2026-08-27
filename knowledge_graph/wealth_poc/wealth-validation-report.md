@@ -1,6 +1,6 @@
 # Wealth and Finance ontology validation report
 
-- Ontology version: `0.2.3`
+- Ontology version: `0.2.4`
 - Competency questions: **20**
 - Result: **PASS**
 

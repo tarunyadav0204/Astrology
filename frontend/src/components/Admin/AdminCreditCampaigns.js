@@ -123,6 +123,29 @@ export default function AdminCreditCampaigns() {
     loadTemplates();
   }, [loadCampaigns, loadTemplates]);
 
+  useEffect(() => {
+    const jobId = sendResult?.job_id;
+    const campaignId = sendResult?.campaignId;
+    if (!jobId || !campaignId || ['completed', 'completed_with_errors', 'failed'].includes(sendResult.status)) return undefined;
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `/api/admin/campaigns/credits/${campaignId}/whatsapp-jobs/${jobId}`,
+          { headers: getAdminAuthHeaders() },
+        );
+        if (!response.ok) throw new Error(await errorText(response, 'Could not refresh WhatsApp job'));
+        const data = await response.json();
+        setSendResult((current) => (
+          current?.job_id === jobId ? { ...current, ...(data.job || {}) } : current
+        ));
+        if (['completed', 'completed_with_errors', 'failed'].includes(data.job?.status)) loadCampaigns();
+      } catch (err) {
+        setError(err.message || 'Could not refresh WhatsApp job');
+      }
+    }, 2000);
+    return () => window.clearTimeout(timer);
+  }, [sendResult, loadCampaigns]);
+
   const updateForm = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
   const togglePack = (productId) => {
@@ -220,7 +243,7 @@ export default function AdminCreditCampaigns() {
       });
       if (!response.ok) throw new Error(await errorText(response, 'WhatsApp send failed'));
       const data = await response.json();
-      setSendResult({ campaignId: campaign.id, ...data });
+      setSendResult({ campaignId: campaign.id, ...(data.job || {}), message: data.message });
       await loadCampaigns();
     } catch (err) {
       setError(err.message || 'WhatsApp send failed');
@@ -308,6 +331,10 @@ export default function AdminCreditCampaigns() {
         {!loading && !campaigns.length && <div className="credit-campaign-empty">No credit campaigns yet.</div>}
         {campaigns.map((campaign) => {
           const summary = campaign.summary || {};
+          const activeSendJob = sendResult?.campaignId === campaign.id
+            ? sendResult
+            : campaign.whatsapp_job;
+          const sendInProgress = ['queued', 'running'].includes(activeSendJob?.status);
           const isExpired = new Date(campaign.ends_at) <= new Date();
           return (
             <article className="credit-campaign-card" key={campaign.id}>
@@ -323,7 +350,7 @@ export default function AdminCreditCampaigns() {
               </div>
               <div className="credit-campaign-metrics">
                 <div><strong>{summary.recipients || 0}</strong><span>Recipients</span></div>
-                <div><strong>{summary.notified || 0}</strong><span>Notified</span></div>
+                <div><strong>{activeSendJob?.accepted ?? summary.notified ?? 0}</strong><span>Notified</span></div>
                 <div><strong>{summary.opened || 0}</strong><span>Opened</span></div>
                 <div><strong>{summary.buyers || 0}</strong><span>Buyers</span></div>
                 <div><strong>{summary.campaign_bonus_credits || 0}</strong><span>Bonus credits</span></div>
@@ -386,17 +413,26 @@ export default function AdminCreditCampaigns() {
                 <button
                   type="button"
                   className="create-btn"
-                  disabled={campaign.status !== 'active' || isExpired || sendBusy === campaign.id}
+                  disabled={campaign.status !== 'active' || isExpired || sendBusy === campaign.id || sendInProgress}
                   onClick={() => sendWhatsApp(campaign)}
                 >
-                  {sendBusy === campaign.id ? 'Sending…' : 'Send WhatsApp campaign'}
+                  {sendBusy === campaign.id
+                    ? 'Queueing…'
+                    : (sendInProgress ? 'WhatsApp campaign processing…' : 'Send WhatsApp campaign')}
                 </button>
-                {sendResult?.campaignId === campaign.id && (
+                {activeSendJob && (
                   <div className="credit-campaign-send-result">
-                    <strong>Accepted {sendResult.accepted} · Failed {sendResult.failed} · Skipped {sendResult.skipped}</strong>
-                    {(sendResult.results || []).some((row) => row.status !== 'accepted') && (
+                    <strong>
+                      {activeSendJob.status} · Accepted {activeSendJob.accepted || 0} · Failed {activeSendJob.failed || 0} · Skipped {activeSendJob.skipped || 0}
+                    </strong>
+                    <span>{activeSendJob.accepted + activeSendJob.failed + activeSendJob.skipped || 0}/{activeSendJob.total || 0} recipients processed on the isolated worker.</span>
+                    {activeSendJob.error && <span>{activeSendJob.error}</span>}
+                    {!!(activeSendJob.issues || []).length && (
                       <span>
-                        {sendResult.results.filter((row) => row.status !== 'accepted').slice(0, 20).map((row) => `User ${row.user_id}: ${row.error || row.status}`).join(' · ')}
+                        {activeSendJob.issues.map((issue) => (
+                          `User ${issue.user_id}: ${issue.reason || issue.error || issue.status}`
+                        )).join(' · ')}
+                        {activeSendJob.issues_truncated ? ' · Additional excluded IDs are not shown.' : ''}
                       </span>
                     )}
                   </div>

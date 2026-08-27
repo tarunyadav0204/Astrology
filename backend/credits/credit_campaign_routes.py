@@ -1,10 +1,11 @@
 """Admin APIs for targeted credit multiplier campaigns."""
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from decimal import Decimal
+import os
 from typing import Dict, List, Literal, Optional
+import uuid
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,22 +18,14 @@ from credits.credit_campaigns import (
     get_campaign_recipient_ids,
     get_credit_campaign,
     list_credit_campaigns,
-    record_campaign_message_result,
     set_credit_campaign_status,
 )
 from credits.web_continue import (
     ensure_continue_link_environment_is_safe,
-    get_or_create_continue_token,
+    get_or_create_continue_tokens,
 )
 from db import execute, get_conn
-from whatsapp.admin_routes import (
-    _build_send_components,
-    _find_template,
-    _phone_number_id,
-    _resolve_recipients,
-    _template_variables,
-)
-from whatsapp.messaging import send_whatsapp_template
+from whatsapp.admin_routes import _find_template, _phone_number_id, _template_variables
 
 router = APIRouter()
 
@@ -74,7 +67,23 @@ def _validate_product_ids(product_ids: List[str]) -> List[str]:
 @router.get("/admin/campaigns/credits")
 async def admin_list_credit_campaigns(current_user: User = Depends(get_current_user)):
     _require_admin(current_user)
-    return {"campaigns": await run_in_threadpool(list_credit_campaigns)}
+    campaigns = await run_in_threadpool(list_credit_campaigns)
+    try:
+        from nudge_engine.connections import assert_explicit_isolated_database_configuration
+        from nudge_engine.credit_campaign_whatsapp import latest_credit_campaign_whatsapp_jobs
+
+        await run_in_threadpool(assert_explicit_isolated_database_configuration)
+        latest = await run_in_threadpool(
+            latest_credit_campaign_whatsapp_jobs,
+            [campaign["id"] for campaign in campaigns],
+        )
+        for campaign in campaigns:
+            campaign["whatsapp_job"] = latest.get(campaign["id"])
+    except Exception:
+        # Campaign administration remains available if notification storage is
+        # temporarily unavailable; send itself fails closed before enqueueing.
+        pass
+    return {"campaigns": campaigns}
 
 
 @router.post("/admin/campaigns/credits")
@@ -203,7 +212,29 @@ def _save_campaign_template(campaign_id: int, template_name: str, language: str)
         conn.commit()
 
 
-@router.post("/admin/campaigns/credits/{campaign_id}/send-whatsapp")
+@router.get("/admin/campaigns/credits/{campaign_id}/whatsapp-jobs/{job_id}")
+async def admin_get_credit_campaign_whatsapp_job(
+    campaign_id: int,
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    from nudge_engine.connections import assert_explicit_isolated_database_configuration
+    from nudge_engine.credit_campaign_whatsapp import get_credit_campaign_whatsapp_job
+
+    try:
+        await run_in_threadpool(assert_explicit_isolated_database_configuration)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    job = await run_in_threadpool(
+        lambda: get_credit_campaign_whatsapp_job(job_id, include_issues=True)
+    )
+    if not job or int(job["campaign_id"]) != int(campaign_id):
+        raise HTTPException(status_code=404, detail="WhatsApp campaign job not found")
+    return {"job": job}
+
+
+@router.post("/admin/campaigns/credits/{campaign_id}/send-whatsapp", status_code=202)
 async def admin_send_credit_campaign_whatsapp(
     campaign_id: int,
     body: CreditCampaignSendBody,
@@ -227,54 +258,92 @@ async def admin_send_credit_campaign_whatsapp(
         raise HTTPException(status_code=503, detail="WhatsApp phone number ID is not configured")
     template = await run_in_threadpool(_find_template, body.template_name.strip(), body.language.strip())
     _validate_campaign_template(template)
-    recipient_ids = await run_in_threadpool(get_campaign_recipient_ids, campaign_id)
-    recipients = await run_in_threadpool(_resolve_recipients, recipient_ids)
-    eligible = [
-        row for row in recipients
-        if row["status"] == "linked" or (body.include_unlinked and row["status"] == "phone_only")
-    ]
-    skipped = [row for row in recipients if row not in eligible]
-
-    def send_one(row: Dict) -> Dict:
-        try:
-            token = f"{get_or_create_continue_token(int(row['user_id']))}.cc{campaign_id}"
-            values = _template_values(template, campaign, row, token)
-            components = _build_send_components(template, values)
-            ok, error = send_whatsapp_template(
-                to=row["recipient"],
-                phone_number_id=phone_number_id,
-                template_name=body.template_name.strip(),
-                language_code=body.language.strip(),
-                components_override=components,
-                return_error=True,
-            )
-            status = "accepted" if ok else "failed"
-            record_campaign_message_result(campaign_id, row["user_id"], status, error)
-            return {"user_id": row["user_id"], "status": status, "error": error}
-        except Exception as exc:
-            record_campaign_message_result(campaign_id, row["user_id"], "failed", str(exc))
-            return {"user_id": row["user_id"], "status": "failed", "error": str(exc)}
-
-    def send_all() -> List[Dict]:
-        if not eligible:
-            return []
-        results: List[Dict] = []
-        with ThreadPoolExecutor(max_workers=min(5, len(eligible))) as executor:
-            futures = [executor.submit(send_one, row) for row in eligible]
-            for future in as_completed(futures):
-                results.append(future.result())
-        return results
-
-    results = await run_in_threadpool(send_all)
-    results.extend(
-        {"user_id": row["user_id"], "status": "skipped", "error": row["status"]}
-        for row in skipped
+    from nudge_engine.credit_campaign_whatsapp import (
+        active_credit_campaign_whatsapp_job,
+        create_credit_campaign_whatsapp_job,
+        set_job_enqueue_result,
     )
-    await run_in_threadpool(_save_campaign_template, campaign_id, body.template_name.strip(), body.language.strip())
-    results.sort(key=lambda row: row["user_id"])
+    from nudge_engine.connections import assert_explicit_isolated_database_configuration
+    from nudge_engine.task_queue import (
+        enqueue_nudge_task,
+        nudge_tasks_are_isolated,
+        nudge_tasks_enabled,
+    )
+
+    if not nudge_tasks_enabled() or not nudge_tasks_are_isolated():
+        raise HTTPException(
+            status_code=503,
+            detail="WhatsApp campaigns require the isolated notification worker and cannot run on the main API",
+        )
+    try:
+        await run_in_threadpool(assert_explicit_isolated_database_configuration)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    active_job = await run_in_threadpool(active_credit_campaign_whatsapp_job, campaign_id)
+    if active_job:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A WhatsApp send is already {active_job['status']} for this campaign",
+        )
+    recipient_ids = await run_in_threadpool(get_campaign_recipient_ids, campaign_id)
+    tokens = await run_in_threadpool(get_or_create_continue_tokens, recipient_ids)
+    job_id = uuid.uuid4().hex
+    await run_in_threadpool(
+        lambda: create_credit_campaign_whatsapp_job(
+            job_id=job_id,
+            campaign=campaign,
+            template=template,
+            phone_number_id=phone_number_id,
+            include_unlinked=body.include_unlinked,
+            tokens_by_user=tokens,
+            created_by=int(current_user.userid),
+        )
+    )
+    batch_size = max(10, min(int(os.getenv("WHATSAPP_CAMPAIGN_BATCH_SIZE", "25") or "25"), 100))
+    batches = [recipient_ids[index:index + batch_size] for index in range(0, len(recipient_ids), batch_size)]
+    enqueued = 0
+    failed_ids: List[int] = []
+    for index, user_ids in enumerate(batches):
+        queued = await run_in_threadpool(
+            lambda index=index, user_ids=user_ids: enqueue_nudge_task(
+                task_kind="credit-campaign-whatsapp-batch",
+                task_id=f"{job_id}-{index}",
+                payload={
+                    "job_id": job_id,
+                    "recipients": [
+                        {"user_id": user_id, "secure_token": tokens[user_id]}
+                        for user_id in user_ids
+                    ],
+                },
+                dispatch_deadline_s=900,
+            )
+        )
+        if queued:
+            enqueued += 1
+        else:
+            failed_ids.extend(user_ids)
+    enqueue_error = (
+        f"Could not enqueue {len(failed_ids)} recipient(s) on the isolated worker"
+        if failed_ids else None
+    )
+    job = await run_in_threadpool(
+        lambda: set_job_enqueue_result(
+            job_id,
+            enqueued_batches=enqueued,
+            failed_userids=failed_ids,
+            error=enqueue_error,
+        )
+    )
+    await run_in_threadpool(
+        _save_campaign_template,
+        campaign_id,
+        body.template_name.strip(),
+        body.language.strip(),
+    )
+    if enqueued == 0:
+        raise HTTPException(status_code=503, detail=enqueue_error or "Could not enqueue WhatsApp campaign")
     return {
-        "accepted": sum(1 for row in results if row["status"] == "accepted"),
-        "failed": sum(1 for row in results if row["status"] == "failed"),
-        "skipped": sum(1 for row in results if row["status"] == "skipped"),
-        "results": results,
+        "ok": True,
+        "job": job,
+        "message": "WhatsApp campaign queued on the isolated notification worker. You can leave this screen.",
     }

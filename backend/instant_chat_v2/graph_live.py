@@ -115,7 +115,25 @@ def resolve_live_graph_policy(
     comparator: Callable[..., dict[str, Any] | None]
     reviewer: Callable[[Mapping[str, Any] | None], dict[str, Any] | None]
     domain: str
-    if is_career_category(category):
+    wealth_subtype = str(
+        query_plan.get("wealth_subtype")
+        or (context.get("intent_summary") or {}).get("wealth_subtype")
+        or intent.get("wealth_subtype")
+        or ""
+    ).strip().lower()
+    prefer_wealth_graph = wealth_subtype in {
+        "source", "savings_instability", "multiple_income", "debt_repayment",
+        "loan_support", "investing_vs_trading", "investment_risk",
+        "loss_vulnerability", "windfall",
+    }
+    # ``income`` is shared vocabulary with the Career salary route. A typed
+    # Wealth subtype is the more specific domain signal and must win before
+    # the broad Career alias check.
+    if prefer_wealth_graph and is_wealth_category(category):
+        domain, resolver, comparator, reviewer = (
+            "wealth", resolve_wealth_graph_inputs, compare_wealth_graph_policy, build_wealth_graph_route,
+        )
+    elif is_career_category(category):
         domain, resolver, comparator, reviewer = (
             "career", resolve_career_graph_inputs, compare_career_graph_policy, build_career_graph_route,
         )
@@ -298,7 +316,12 @@ def apply_live_graph_policy(
             ),
             "wealth_source_synthesis": (
                 dict(wealth_foundation.get("wealth_source_synthesis"))
-                if runtime_key == "wealth_source" and isinstance(wealth_foundation.get("wealth_source_synthesis"), Mapping)
+                if runtime_key in {"wealth_source", "multiple_income"} and isinstance(wealth_foundation.get("wealth_source_synthesis"), Mapping)
+                else {}
+            ),
+            "multiple_income_synthesis": (
+                dict(wealth_foundation.get("multiple_income_synthesis"))
+                if runtime_key == "multiple_income" and isinstance(wealth_foundation.get("multiple_income_synthesis"), Mapping)
                 else {}
             ),
             "required_answer_order": [
@@ -347,6 +370,7 @@ def apply_live_graph_policy(
                 "Do not call the result a clear yes unless the supplied D1 and D2 synthesis actually supports that strength.",
                 "Do not infer salary/service, business, speculation, debt, expenses, inheritance or windfall unless the selected route and supplied evidence support it.",
                 "For wealth_source, name and rank the supplied concrete earning channels; savings automation, budgeting and retention discipline are qualifications, not wealth sources.",
+                "For multiple_income, answer yes or no from multiple_income_synthesis and name the supplied primary and secondary streams; do not replace them with generic diversification or savings advice.",
                 "Do not let Gandanta, Dagdha Rashi or another special factor replace the D1/D2 synthesis; use it only as a connected modifier.",
                 "Do not turn a numerical wealth score into certainty or quote it as a probability.",
                 "D2 availability is not a positive verdict; use only wealth_foundation.d2_synthesis.verdict to say whether it confirms or qualifies retention.",
@@ -1069,6 +1093,66 @@ def enforce_live_graph_answer(
                         "D2 adds a separate caution: earning capacity is better supported than retention, so keeping and compounding the money needs discipline—but that is a qualification, not the source itself."
                     )
                 parts.append("Which of these paths matches the work or business you are already building?")
+                clean_answer = " ".join(parts)
+        multiple_income_synthesis = (
+            wealth_rules.get("multiple_income_synthesis")
+            if isinstance(wealth_rules.get("multiple_income_synthesis"), Mapping)
+            else {}
+        )
+        if (
+            str(policy.get("runtime_key") or "") == "multiple_income"
+            and multiple_income_synthesis
+            and str(language or "").lower().startswith("en")
+        ):
+            primary_stream = (
+                multiple_income_synthesis.get("primary_stream")
+                if isinstance(multiple_income_synthesis.get("primary_stream"), Mapping)
+                else {}
+            )
+            secondary_streams = [
+                dict(row) for row in list(multiple_income_synthesis.get("secondary_streams") or [])
+                if isinstance(row, Mapping) and row.get("label")
+            ]
+            required_channel_keywords = [
+                str(value).lower()
+                for row in [primary_stream, *secondary_streams[:1]]
+                for value in list(row.get("required_keywords") or [])
+                if value
+            ]
+            names_streams = sum(
+                1 for keyword in required_channel_keywords
+                if re.search(rf"\b{re.escape(keyword)}\w*\b", clean_answer, re.IGNORECASE)
+            ) >= 2
+            gives_direct_verdict = bool(re.search(r"\b(?:yes|supports? more than one|multiple (?:income )?streams?)\b", clean_answer, re.IGNORECASE))
+            if not names_streams or not gives_direct_verdict:
+                verdict = str(multiple_income_synthesis.get("verdict") or "")
+                if verdict == "multiple_complementary_streams_supported":
+                    parts = [
+                        "Yes—your chart supports more than one income stream, but the strongest pattern is complementary streams built around one core expertise, not unrelated side hustles."
+                    ]
+                else:
+                    parts = [
+                        "Your chart is clearer for one primary income engine than for several equally strong streams."
+                    ]
+                if primary_stream.get("label"):
+                    primary_evidence = [str(value) for value in list(primary_stream.get("evidence") or []) if value]
+                    basis = "; ".join(primary_evidence[:2])
+                    parts.append(
+                        f"The primary stream is {primary_stream.get('label')}."
+                        + (f" The chart basis is that {basis}." if basis else "")
+                    )
+                if secondary_streams:
+                    parts.append(f"The strongest secondary stream is {secondary_streams[0].get('label')}.")
+                if len(secondary_streams) > 1:
+                    parts.append(f"A further supporting stream is {secondary_streams[1].get('label')}.")
+                parts.append(
+                    "This favors a structure such as core professional income plus a scalable product/platform or consulting-advisory layer, rather than several disconnected ventures."
+                )
+                if str(multiple_income_synthesis.get("retention_qualification") or "") == "mixed_capacity_with_retention_pressure":
+                    parts.append(
+                        "D2 separately shows retention pressure, so several inflows can still feel financially thin unless the streams are consolidated and retained; that does not cancel the multiple-income promise."
+                    )
+                parts.append("Which second stream are you considering alongside your main work?")
                 clean_answer = " ".join(parts)
         investment_synthesis = (
             wealth_rules.get("investment_synthesis")

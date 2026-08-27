@@ -156,3 +156,27 @@ def assert_isolated_database_configuration() -> None:
         if notification == audience:
             raise RuntimeError("Notification database must not equal the read-replica DSN")
 
+
+def assert_explicit_isolated_database_configuration() -> None:
+    """Fail closed even in an API process that permits local fallback elsewhere."""
+    audience = (
+        os.getenv("NUDGE_AUDIENCE_DATABASE_URL")
+        or os.getenv("APP_READ_REPLICA_DSN")
+        or os.getenv("READ_REPLICA_DSN")
+        or ""
+    ).strip()
+    notification = (
+        os.getenv("NUDGE_NOTIFICATION_DATABASE_URL")
+        or os.getenv("NOTIFICATION_DATABASE_URL")
+        or os.getenv("NOTIFICATION_POSTGRES_DSN")
+        or ""
+    ).strip()
+    if not audience or not notification:
+        raise RuntimeError("Explicit notification database and audience read-replica DSNs are required")
+    app = _app_dsn()
+    if notification == app:
+        raise RuntimeError("Notification database must not equal the application primary DSN")
+    if audience == app:
+        raise RuntimeError("Audience database must not equal the application primary DSN")
+    if notification == audience:
+        raise RuntimeError("Notification database must not equal the read-replica DSN")
