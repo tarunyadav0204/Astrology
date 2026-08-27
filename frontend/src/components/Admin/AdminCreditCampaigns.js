@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { getAdminAuthHeaders } from '../../services/adminService';
+import AdminAudienceBuilder from './AdminAudienceBuilder';
 import './AdminCreditCampaigns.css';
 
 const PACKS = [50, 100, 250, 999];
@@ -71,6 +72,10 @@ export default function AdminCreditCampaigns() {
   const [sendResult, setSendResult] = useState(null);
   const [templateSelections, setTemplateSelections] = useState({});
   const [includeUnlinked, setIncludeUnlinked] = useState({});
+  const [report, setReport] = useState(null);
+  const [reportFilter, setReportFilter] = useState('all');
+  const [reportSearch, setReportSearch] = useState('');
+  const [audienceBuilderOpen, setAudienceBuilderOpen] = useState(false);
   const [form, setForm] = useState({
     name: '',
     multiplier: '2',
@@ -86,6 +91,59 @@ export default function AdminCreditCampaigns() {
     () => templates.filter((template) => campaignTemplateCompatibility(template).compatible),
     [templates],
   );
+  const visibleReportRecipients = useMemo(() => {
+    const recipients = report?.recipients || [];
+    const query = reportSearch.trim().toLowerCase();
+    return recipients.filter((recipient) => {
+      if (reportFilter === 'clicked' && !recipient.clicked) return false;
+      if (reportFilter === 'purchased' && !recipient.purchased) return false;
+      if (reportFilter === 'sent' && !['sent', 'delivered', 'read'].includes(recipient.meta_status)) return false;
+      if (reportFilter === 'delivered' && !['delivered', 'read'].includes(recipient.meta_status)) return false;
+      if (reportFilter === 'read' && recipient.meta_status !== 'read') return false;
+      if (reportFilter === 'failed' && recipient.meta_status !== 'failed' && recipient.send_state !== 'failed') return false;
+      if (!query) return true;
+      return [recipient.userid, recipient.name, recipient.phone]
+        .some((value) => String(value || '').toLowerCase().includes(query));
+    });
+  }, [report, reportFilter, reportSearch]);
+
+  const openCampaignReport = async (campaign) => {
+    setReport({ campaign, recipients: [], delivery: null, loading: true, error: '' });
+    setReportFilter('all');
+    setReportSearch('');
+    try {
+      const response = await fetch(
+        `/api/admin/campaigns/credits/${campaign.id}/recipients`,
+        { headers: getAdminAuthHeaders() },
+      );
+      if (!response.ok) throw new Error(await errorText(response, 'Could not load campaign report'));
+      const data = await response.json();
+      setReport({
+        campaign: data.campaign || campaign,
+        recipients: data.recipients || [],
+        delivery: data.delivery || null,
+        loading: false,
+        error: '',
+      });
+    } catch (err) {
+      setReport((current) => ({
+        ...current,
+        loading: false,
+        error: err.message || 'Could not load campaign report',
+      }));
+    }
+  };
+
+  useEffect(() => {
+    if (!report && !audienceBuilderOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      if (report) setReport(null);
+      else setAudienceBuilderOpen(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [report, audienceBuilderOpen]);
 
   const loadCampaigns = useCallback(async () => {
     setLoading(true);
@@ -252,6 +310,41 @@ export default function AdminCreditCampaigns() {
     }
   };
 
+  const reportTrackingAvailable = Boolean(
+    report?.recipients?.some((recipient) => recipient.meta_tracking_available),
+  );
+  const reportLegacyAccepted = Number(
+    report?.delivery?.metrics?.legacy_accepted
+      ?? (!report?.delivery?.job ? report?.campaign?.summary?.notified : 0)
+      ?? 0,
+  );
+
+  const addAudienceToDraft = ({ userIds }) => {
+    if (parsedRecipients.invalid.length) {
+      return {
+        ok: false,
+        error: 'Fix the invalid IDs in the campaign recipient box before adding a built audience.',
+      };
+    }
+    const existing = new Set(parsedRecipients.ids);
+    const selectedIds = [...new Set((userIds || []).map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+    const newIds = selectedIds.filter((id) => !existing.has(id));
+    const merged = [...parsedRecipients.ids, ...newIds];
+    if (merged.length > 1000) {
+      return {
+        ok: false,
+        error: `This would create ${merged.length.toLocaleString()} recipients. Select no more than ${(1000 - parsedRecipients.ids.length).toLocaleString()} additional users.`,
+      };
+    }
+    if (!newIds.length) {
+      return { ok: false, error: 'Every selected user is already in this campaign.' };
+    }
+    setForm((current) => ({ ...current, recipientText: merged.join(', ') }));
+    setNotice(`Added ${newIds.length.toLocaleString()} audience user${newIds.length === 1 ? '' : 's'} to the campaign draft.`);
+    setAudienceBuilderOpen(false);
+    return { ok: true };
+  };
+
   return (
     <div className="credit-campaign-admin">
       <header className="credit-campaign-hero">
@@ -304,11 +397,14 @@ export default function AdminCreditCampaigns() {
             })}
           </div>
         </fieldset>
-        <label className="credit-campaign-recipients">
-          <span>Eligible AstroRoshni user IDs</span>
-          <textarea value={form.recipientText} onChange={(e) => updateForm('recipientText', e.target.value)} placeholder="18, 42, 105" rows={5} />
+        <div className="credit-campaign-recipients">
+          <div className="credit-campaign-recipients__header">
+            <label htmlFor="credit-campaign-recipient-ids">Eligible AstroRoshni user IDs</label>
+            <button type="button" onClick={() => setAudienceBuilderOpen(true)}>Build an audience</button>
+          </div>
+          <textarea id="credit-campaign-recipient-ids" value={form.recipientText} onChange={(e) => updateForm('recipientText', e.target.value)} placeholder="18, 42, 105" rows={5} />
           <small>{parsedRecipients.ids.length} unique valid ID{parsedRecipients.ids.length === 1 ? '' : 's'} · maximum 1,000</small>
-        </label>
+        </div>
         <label>
           <span>Initial status</span>
           <select value={form.status} onChange={(e) => updateForm('status', e.target.value)}>
@@ -335,6 +431,8 @@ export default function AdminCreditCampaigns() {
             ? sendResult
             : campaign.whatsapp_job;
           const sendInProgress = ['queued', 'running'].includes(activeSendJob?.status);
+          const metaMetrics = activeSendJob?.meta_metrics || {};
+          const metaTrackingAvailable = Number(metaMetrics.accepted || 0) > Number(metaMetrics.legacy_accepted || 0);
           const isExpired = new Date(campaign.ends_at) <= new Date();
           return (
             <article className="credit-campaign-card" key={campaign.id}>
@@ -344,7 +442,7 @@ export default function AdminCreditCampaigns() {
                     <h4>{campaign.name}</h4>
                     <span className={`credit-campaign-status credit-campaign-status--${campaign.status}`}>{isExpired ? 'ended' : campaign.status}</span>
                   </div>
-                  <p>{formatMoment(campaign.starts_at)} → {formatMoment(campaign.ends_at)}</p>
+                  <p>Campaign #{campaign.id} · {formatMoment(campaign.starts_at)} → {formatMoment(campaign.ends_at)}</p>
                 </div>
                 <div className="credit-campaign-multiplier">{formatMultiplier(campaign.multiplier)}<small>× total</small></div>
               </div>
@@ -353,12 +451,15 @@ export default function AdminCreditCampaigns() {
                 <div><strong>{activeSendJob?.accepted ?? summary.notified ?? 0}</strong><span>Notified</span></div>
                 <div><strong>{summary.opened || 0}</strong><span>Opened</span></div>
                 <div><strong>{summary.buyers || 0}</strong><span>Buyers</span></div>
+                <div><strong>{metaTrackingAvailable ? (metaMetrics.delivered || 0) : '—'}</strong><span>Meta delivered</span></div>
+                <div><strong>{metaTrackingAvailable ? (metaMetrics.read || 0) : '—'}</strong><span>Meta read</span></div>
                 <div><strong>{summary.campaign_bonus_credits || 0}</strong><span>Bonus credits</span></div>
               </div>
               <div className="credit-campaign-packs">
                 {(campaign.product_ids || []).length ? campaign.product_ids.map((id) => <span key={id}>{id.replace('credits_', '')}</span>) : <span>All packs</span>}
               </div>
               <div className="credit-campaign-actions">
+                <button type="button" className="credit-campaign-report-button" onClick={() => openCampaignReport(campaign)}>View performance</button>
                 {campaign.status !== 'active' && !isExpired && <button type="button" onClick={() => changeStatus(campaign, 'active')}>Activate</button>}
                 {campaign.status === 'active' && <button type="button" onClick={() => changeStatus(campaign, 'paused')}>Pause</button>}
                 {!isExpired && campaign.status !== 'completed' && <button type="button" onClick={() => changeStatus(campaign, 'completed')}>Complete</button>}
@@ -442,6 +543,154 @@ export default function AdminCreditCampaigns() {
           );
         })}
       </section>
+      {audienceBuilderOpen && (
+        <div className="credit-campaign-audience-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setAudienceBuilderOpen(false);
+        }}>
+          <section className="credit-campaign-audience-modal" role="dialog" aria-modal="true" aria-labelledby="credit-campaign-audience-title">
+            <header className="credit-campaign-audience-header">
+              <div>
+                <span>Campaign audience</span>
+                <h3 id="credit-campaign-audience-title">Find and add recipients</h3>
+                <p>{parsedRecipients.ids.length.toLocaleString()} users are currently in this draft. New selections will be appended and duplicates removed.</p>
+              </div>
+              <button type="button" onClick={() => setAudienceBuilderOpen(false)} aria-label="Close audience builder">Close</button>
+            </header>
+            <div className="credit-campaign-audience-body">
+              <AdminAudienceBuilder
+                audienceOnly
+                onAudienceSelected={addAudienceToDraft}
+                selectionActionLabel="Add selected to credit campaign"
+              />
+            </div>
+          </section>
+        </div>
+      )}
+      {report && (
+        <div className="credit-campaign-report-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setReport(null);
+        }}>
+          <section className="credit-campaign-report-modal" role="dialog" aria-modal="true" aria-labelledby="credit-campaign-report-title">
+            <header className="credit-campaign-report-header">
+              <div>
+                <span>Campaign #{report.campaign?.id}</span>
+                <h3 id="credit-campaign-report-title">{report.campaign?.name || 'Campaign performance'}</h3>
+                <p>See exactly who opened the secure link and who completed an eligible purchase.</p>
+              </div>
+              <button type="button" onClick={() => setReport(null)} aria-label="Close campaign report">Close</button>
+            </header>
+
+            <div className="credit-campaign-report-summary">
+              <div><strong>{report.campaign?.summary?.recipients || report.recipients.length || 0}</strong><span>Recipients</span></div>
+              <div><strong>{report.delivery?.metrics?.accepted ?? report.campaign?.summary?.notified ?? 0}</strong><span>Accepted / notified</span></div>
+              <div><strong>{reportTrackingAvailable ? (report.delivery?.metrics?.sent || 0) : '—'}</strong><span>Meta sent</span></div>
+              <div><strong>{reportTrackingAvailable ? (report.delivery?.metrics?.delivered || 0) : '—'}</strong><span>Meta delivered</span></div>
+              <div><strong>{reportTrackingAvailable ? (report.delivery?.metrics?.read || 0) : '—'}</strong><span>Meta read</span></div>
+              <div><strong>{reportTrackingAvailable ? (report.delivery?.metrics?.meta_failed || 0) : '—'}</strong><span>Meta failed</span></div>
+              <div><strong>{report.campaign?.summary?.opened || 0}</strong><span>Clicked</span></div>
+              <div><strong>{report.campaign?.summary?.buyers || 0}</strong><span>Purchased</span></div>
+            </div>
+            {!report.loading && reportLegacyAccepted > 0 && (
+              <div className="credit-campaign-report-legacy-note">
+                {reportLegacyAccepted} accepted message{reportLegacyAccepted === 1 ? '' : 's'} predate Meta lifecycle tracking. Their previous campaign status is preserved, but sent and delivered cannot be reconstructed.
+              </div>
+            )}
+
+            <div className="credit-campaign-report-controls">
+              <div className="credit-campaign-report-filters" role="group" aria-label="Filter campaign recipients">
+                {[
+                  ['all', 'All'],
+                  ['sent', 'Sent'],
+                  ['delivered', 'Delivered'],
+                  ['read', 'Read'],
+                  ['failed', 'Failed'],
+                  ['clicked', 'Clicked'],
+                  ['purchased', 'Purchased'],
+                ].map(([value, label]) => (
+                  <button
+                    type="button"
+                    key={value}
+                    className={reportFilter === value ? 'is-active' : ''}
+                    onClick={() => setReportFilter(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="search"
+                value={reportSearch}
+                onChange={(event) => setReportSearch(event.target.value)}
+                placeholder="Search ID, name or phone"
+                aria-label="Search campaign recipients"
+              />
+            </div>
+
+            <div className="credit-campaign-report-body">
+              {report.loading ? (
+                <div className="credit-campaign-report-state">Loading campaign activity…</div>
+              ) : report.error ? (
+                <div className="credit-campaign-report-state credit-campaign-report-state--error">{report.error}</div>
+              ) : !visibleReportRecipients.length ? (
+                <div className="credit-campaign-report-state">No recipients match this view.</div>
+              ) : (
+                <table className="credit-campaign-report-table">
+                  <thead>
+                    <tr>
+                      <th>User</th>
+                      <th>Meta status</th>
+                      <th>Clicked</th>
+                      <th>Purchased</th>
+                      <th>Credits</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleReportRecipients.map((recipient) => (
+                      <tr key={recipient.userid}>
+                        <td>
+                          <strong>{recipient.name || 'Unnamed user'}</strong>
+                          <span>ID {recipient.userid}{recipient.phone ? ` · ${recipient.phone}` : ''}</span>
+                        </td>
+                        <td>
+                          <span className={`credit-campaign-report-pill credit-campaign-report-pill--${recipient.meta_status || recipient.message_status || 'pending'}`}>
+                            {recipient.meta_status || recipient.message_status || 'Not sent'}
+                          </span>
+                          {recipient.meta_tracking_available ? (
+                            <small className="credit-campaign-report-meta-time">
+                              {formatMoment(recipient.meta_status === 'failed'
+                                ? recipient.failed_at
+                                : (recipient.read_at || recipient.delivered_at || recipient.sent_at || recipient.accepted_at))}
+                            </small>
+                          ) : recipient.message_status ? (
+                            <small className="credit-campaign-report-legacy-status">Legacy status · delivery unavailable</small>
+                          ) : null}
+                          {recipient.send_error || recipient.message_error ? <small title={recipient.send_error || recipient.message_error}>Send issue</small> : null}
+                        </td>
+                        <td>{recipient.clicked ? formatMoment(recipient.opened_at) : '—'}</td>
+                        <td>
+                          {recipient.purchased ? (
+                            <><strong>Yes · {recipient.purchase_count}</strong><span>{formatMoment(recipient.latest_purchase_at)}</span></>
+                          ) : '—'}
+                        </td>
+                        <td>
+                          {recipient.purchased ? (
+                            <><strong>{recipient.purchased_credits} purchased</strong><span>+{recipient.campaign_bonus_credits} campaign bonus</span></>
+                          ) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            {!report.loading && !report.error && (
+              <footer className="credit-campaign-report-footer">
+                Showing {visibleReportRecipients.length} of {report.recipients.length} recipients
+              </footer>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }

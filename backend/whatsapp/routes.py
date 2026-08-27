@@ -125,6 +125,19 @@ async def whatsapp_webhook_events(request: Request, background_tasks: Background
 
         def _run() -> None:
             try:
+                from nudge_engine.credit_campaign_whatsapp import record_meta_whatsapp_status_updates
+
+                status_result = record_meta_whatsapp_status_updates(payload)
+                if status_result.get("matched"):
+                    logger.info(
+                        "whatsapp webhook: matched %s/%s campaign status update(s)",
+                        status_result["matched"],
+                        status_result["received"],
+                    )
+            except Exception:
+                # Inbound messages remain independent from campaign analytics.
+                logger.exception("whatsapp campaign status webhook processing failed")
+            try:
                 process_whatsapp_payload(payload)
             except Exception:
                 logger.exception("whatsapp webhook processing failed")

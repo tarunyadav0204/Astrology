@@ -71,7 +71,12 @@ function formatExplorerValue(value) {
   return String(value);
 }
 
-export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
+export default function AdminAudienceBuilder({
+  onCreateCampaign = null,
+  onAudienceSelected = null,
+  audienceOnly = false,
+  selectionActionLabel = 'Add selected users',
+}) {
   const [mode, setMode] = useState('audience');
   const [prompt, setPrompt] = useState(EXAMPLE);
   const [explanation, setExplanation] = useState('');
@@ -309,12 +314,24 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
   };
 
   const createCampaign = () => {
-    if (typeof onCreateCampaign !== 'function') return;
     const ids = Array.from(selected);
     if (!ids.length) {
       setError('Select at least one user');
       return;
     }
+    if (typeof onAudienceSelected === 'function') {
+      const result = onAudienceSelected({
+        userIds: ids,
+        prompt,
+        sql,
+        totalMatching: total,
+      });
+      if (result?.ok === false) {
+        setError(result.error || 'Could not add the selected users');
+      }
+      return;
+    }
+    if (typeof onCreateCampaign !== 'function') return;
     onCreateCampaign({
       name: 'NL audience campaign',
       title_template: '',
@@ -353,15 +370,16 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
     <div className="audience-builder">
       <div className="audience-builder__header">
         <div>
-          <h2>Audience, analytics & data explorer</h2>
+          <h2>{audienceOnly ? 'Build campaign audience' : 'Audience, analytics & data explorer'}</h2>
           <p className="audience-builder__hint">
-            Build campaign audiences, answer purchase questions, or explore approved business data in plain
-            English. Every query is read-only and sensitive fields stay unavailable.
+            {audienceOnly
+              ? 'Describe the users you want, preview the matches, and choose which users to add. Every query is read-only and sensitive fields stay unavailable.'
+              : 'Build campaign audiences, answer purchase questions, or explore approved business data in plain English. Every query is read-only and sensitive fields stay unavailable.'}
           </p>
         </div>
       </div>
 
-      <div className="audience-builder__mode-tabs" role="tablist" aria-label="Builder mode">
+      {!audienceOnly ? <div className="audience-builder__mode-tabs" role="tablist" aria-label="Builder mode">
         <button
           type="button"
           role="tab"
@@ -395,7 +413,7 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
           Data Explorer
           <span>Questions across approved tables</span>
         </button>
-      </div>
+      </div> : null}
 
       <div className="audience-builder__prompt-block">
         <label htmlFor="audience-nl-prompt">
@@ -538,7 +556,7 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
           <span>
             <strong>{total}</strong> matching · <strong>{selected.size}</strong> selected
           </span>
-          <label className="audience-builder__push-filter">
+          {!audienceOnly ? <label className="audience-builder__push-filter">
             <input
               type="checkbox"
               checked={pushOnly}
@@ -546,7 +564,7 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
               disabled={busy}
             />
             Push enabled only
-          </label>
+          </label> : null}
         </div>
         <div className="audience-builder__actions">
           <button type="button" className="audience-builder__secondary" onClick={togglePage} disabled={!rows.length}>
@@ -569,7 +587,7 @@ export default function AdminAudienceBuilder({ onCreateCampaign = null }) {
             onClick={createCampaign}
             disabled={!selected.size}
           >
-            Create campaign with selected
+            {typeof onAudienceSelected === 'function' ? selectionActionLabel : 'Create campaign with selected'}
           </button>
         </div>
       </div>

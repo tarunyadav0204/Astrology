@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+import logging
 import os
 from typing import Dict, List, Literal, Optional
 import uuid
@@ -17,6 +18,7 @@ from credits.credit_campaigns import (
     create_credit_campaign,
     get_campaign_recipient_ids,
     get_credit_campaign,
+    get_credit_campaign_recipient_report,
     list_credit_campaigns,
     set_credit_campaign_status,
 )
@@ -28,6 +30,7 @@ from db import execute, get_conn
 from whatsapp.admin_routes import _find_template, _phone_number_id, _template_variables
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class CreditCampaignCreate(BaseModel):
@@ -84,6 +87,66 @@ async def admin_list_credit_campaigns(current_user: User = Depends(get_current_u
         # temporarily unavailable; send itself fails closed before enqueueing.
         pass
     return {"campaigns": campaigns}
+
+
+@router.get("/admin/campaigns/credits/{campaign_id}/recipients")
+async def admin_credit_campaign_recipient_report(
+    campaign_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    campaign = await run_in_threadpool(get_credit_campaign, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Credit campaign not found")
+    recipients = await run_in_threadpool(get_credit_campaign_recipient_report, campaign_id)
+    delivery_report = {"job": None, "metrics": {}, "recipients": {}}
+    try:
+        from nudge_engine.connections import assert_explicit_isolated_database_configuration
+        from nudge_engine.credit_campaign_whatsapp import get_credit_campaign_whatsapp_delivery_report
+
+        await run_in_threadpool(assert_explicit_isolated_database_configuration)
+        delivery_report = await run_in_threadpool(
+            get_credit_campaign_whatsapp_delivery_report,
+            campaign_id,
+        )
+    except Exception:
+        # Historical campaigns and local environments still return the legacy
+        # accepted/failed, click, and purchase report if lifecycle storage is
+        # unavailable or did not exist when the campaign was sent.
+        logger.exception("Meta delivery report unavailable campaign=%s; using legacy fields", campaign_id)
+    delivery_by_user = delivery_report.get("recipients") or {}
+    for recipient in recipients:
+        lifecycle = delivery_by_user.get(int(recipient["userid"]))
+        if lifecycle:
+            recipient.update(lifecycle)
+        else:
+            legacy_status = str(recipient.get("message_status") or "not_sent")
+            recipient.update(
+                {
+                    "send_state": legacy_status,
+                    "send_error": recipient.get("message_error"),
+                    "meta_message_id": None,
+                    "meta_status": legacy_status,
+                    "meta_tracking_available": False,
+                    "accepted_at": recipient.get("notified_at"),
+                    "sent_at": None,
+                    "delivered_at": None,
+                    "read_at": None,
+                    "failed_at": None,
+                }
+            )
+    return {
+        "campaign": {
+            "id": campaign["id"],
+            "name": campaign["name"],
+            "summary": campaign.get("summary") or {},
+        },
+        "recipients": recipients,
+        "delivery": {
+            "job": delivery_report.get("job"),
+            "metrics": delivery_report.get("metrics") or {},
+        },
+    }
 
 
 @router.post("/admin/campaigns/credits")

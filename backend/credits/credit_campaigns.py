@@ -231,6 +231,63 @@ def get_credit_campaign_summary(campaign_id: int, *, conn=None) -> Dict[str, Any
             context.__exit__(None, None, None)
 
 
+def get_credit_campaign_recipient_report(campaign_id: int) -> List[Dict[str, Any]]:
+    """Return one row per recipient from the app read replica."""
+    from nudge_engine.connections import get_audience_conn
+
+    with get_audience_conn() as conn:
+        rows = execute(
+            conn,
+            """
+            WITH purchase_totals AS (
+                SELECT campaign_id, userid,
+                       COUNT(*) AS purchase_count,
+                       MIN(awarded_at) AS first_purchase_at,
+                       MAX(awarded_at) AS latest_purchase_at,
+                       COALESCE(SUM(purchased_credits), 0) AS purchased_credits,
+                       COALESCE(SUM(campaign_bonus_credits), 0) AS campaign_bonus_credits
+                FROM credit_campaign_awards
+                WHERE campaign_id = ?
+                GROUP BY campaign_id, userid
+            )
+            SELECT r.userid, u.name, u.phone,
+                   r.message_status, r.message_error, r.notified_at, r.opened_at,
+                   COALESCE(p.purchase_count, 0),
+                   p.first_purchase_at, p.latest_purchase_at,
+                   COALESCE(p.purchased_credits, 0),
+                   COALESCE(p.campaign_bonus_credits, 0)
+            FROM credit_campaign_recipients r
+            LEFT JOIN users u ON u.userid = r.userid
+            LEFT JOIN purchase_totals p
+              ON p.campaign_id = r.campaign_id AND p.userid = r.userid
+            WHERE r.campaign_id = ?
+            ORDER BY (p.userid IS NOT NULL) DESC,
+                     r.opened_at DESC NULLS LAST,
+                     r.userid
+            """,
+            (int(campaign_id), int(campaign_id)),
+        ).fetchall()
+        return [
+            {
+                "userid": int(row[0]),
+                "name": row[1],
+                "phone": row[2],
+                "message_status": row[3],
+                "message_error": row[4],
+                "notified_at": row[5],
+                "opened_at": row[6],
+                "clicked": row[6] is not None,
+                "purchase_count": int(row[7] or 0),
+                "first_purchase_at": row[8],
+                "latest_purchase_at": row[9],
+                "purchased": int(row[7] or 0) > 0,
+                "purchased_credits": int(row[10] or 0),
+                "campaign_bonus_credits": int(row[11] or 0),
+            }
+            for row in rows
+        ]
+
+
 def set_credit_campaign_status(campaign_id: int, status: str) -> Optional[Dict[str, Any]]:
     with get_conn() as conn:
         ensure_credit_campaign_tables(conn)

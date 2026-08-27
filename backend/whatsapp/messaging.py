@@ -161,6 +161,7 @@ def send_whatsapp_template(
     url_button_index: str = "0",
     components_override: Optional[List[Dict[str, Any]]] = None,
     return_error: bool = False,
+    return_meta: bool = False,
 ):
     """Send an approved WhatsApp message template to a phone/wa recipient.
 
@@ -170,17 +171,27 @@ def send_whatsapp_template(
     (e.g. template URL `https://astroroshni.com/mobile/?c=` → pass the token only).
 
     When return_error=True, returns (ok: bool, error: Optional[str]).
+    When return_meta=True, returns (ok, error, metadata), where metadata contains
+    Meta's wamid. This is additive so existing boolean and two-tuple callers keep
+    their original return shape.
     """
+    def result(ok: bool, error: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None):
+        if return_meta:
+            return ok, error, metadata
+        if return_error:
+            return ok, error
+        return ok
+
     token, ver = _graph_messages_url()
     if not token or not phone_number_id:
         msg = "missing WHATSAPP_ACCESS_TOKEN or phone_number_id"
         logger.warning("Skipping WhatsApp template send: %s", msg)
-        return (False, msg) if return_error else False
+        return result(False, msg)
     to_s = (to or "").strip()
     if not to_s:
         msg = "missing recipient"
         logger.warning("Skipping WhatsApp template send: %s", msg)
-        return (False, msg) if return_error else False
+        return result(False, msg)
     components: List[Dict[str, Any]] = []
     body_parameter_objs: List[Dict[str, Any]] = []
     named = body_named_params or {}
@@ -265,11 +276,34 @@ def send_whatsapp_template(
                 to_s[-4:].rjust(len(to_s), "*") if len(to_s) > 4 else "****",
                 err_text,
             )
-            return (False, f"Meta {r.status_code}: {err_text}") if return_error else False
-        return (True, None) if return_error else True
+            return result(False, f"Meta {r.status_code}: {err_text}")
+        try:
+            response_payload = r.json() if r.content else {}
+        except ValueError:
+            response_payload = {}
+        messages = response_payload.get("messages") if isinstance(response_payload, dict) else None
+        contacts = response_payload.get("contacts") if isinstance(response_payload, dict) else None
+        message_id = (
+            str(messages[0].get("id") or "").strip()
+            if isinstance(messages, list) and messages and isinstance(messages[0], dict)
+            else ""
+        )
+        wa_id = (
+            str(contacts[0].get("wa_id") or "").strip()
+            if isinstance(contacts, list) and contacts and isinstance(contacts[0], dict)
+            else ""
+        )
+        return result(
+            True,
+            None,
+            {
+                "message_id": message_id or None,
+                "wa_id": wa_id or None,
+            },
+        )
     except Exception as e:
         logger.exception("WhatsApp template send error: %s", e)
-        return (False, str(e)) if return_error else False
+        return result(False, str(e))
 
 
 def send_whatsapp_interactive_list(
