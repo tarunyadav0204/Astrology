@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getAdminAuthHeaders } from '../../services/adminService';
+import AdminAudienceBuilder from './AdminAudienceBuilder';
 import './AdminWhatsAppTemplates.css';
 
 const parseUserIds = (value) => {
@@ -77,7 +78,12 @@ const localPreviewValues = (template, mappings) => Object.fromEntries(
   })
 );
 
-export default function AdminWhatsAppTemplates() {
+export default function AdminWhatsAppTemplates({
+  initialMode = 'quick',
+  campaignOnly = false,
+  onCampaignCreated = null,
+}) {
+  const [mode, setMode] = useState(campaignOnly ? 'campaign' : initialMode);
   const [templates, setTemplates] = useState([]);
   const [selectedKey, setSelectedKey] = useState('');
   const [mappings, setMappings] = useState({});
@@ -90,12 +96,18 @@ export default function AdminWhatsAppTemplates() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [previewUserId, setPreviewUserId] = useState('');
+  const [audienceBuilderOpen, setAudienceBuilderOpen] = useState(false);
+  const [campaignName, setCampaignName] = useState('');
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [conversionEvent, setConversionEvent] = useState('click');
+  const [frequencyCapDays, setFrequencyCapDays] = useState('0');
 
   const selectedTemplate = useMemo(
     () => templates.find((item) => `${item.name}::${item.language}` === selectedKey) || null,
     [selectedKey, templates]
   );
   const parsed = useMemo(() => parseUserIds(userIdsText), [userIdsText]);
+  const recipientLimit = mode === 'campaign' ? 10000 : 100;
 
   const loadTemplates = async () => {
     setLoadingTemplates(true);
@@ -154,6 +166,10 @@ export default function AdminWhatsAppTemplates() {
       setError('Enter at least one user ID.');
       return;
     }
+    if (parsed.ids.length > recipientLimit) {
+      setError(`A ${mode === 'campaign' ? 'campaign' : 'quick send'} can contain at most ${recipientLimit.toLocaleString()} users.`);
+      return;
+    }
     setValidating(true);
     try {
       if (!selectedTemplate) {
@@ -164,7 +180,7 @@ export default function AdminWhatsAppTemplates() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAdminAuthHeaders() },
         body: JSON.stringify({
-          user_ids: parsed.ids,
+          user_ids: mode === 'campaign' ? parsed.ids.slice(0, 100) : parsed.ids,
           template_name: selectedTemplate.name,
           language: selectedTemplate.language,
           mappings: mappingsPayload(mappings),
@@ -231,6 +247,79 @@ export default function AdminWhatsAppTemplates() {
     }
   };
 
+  const createCampaign = async (status) => {
+    setError('');
+    if (!selectedTemplate) {
+      setError('Select an approved template.');
+      return;
+    }
+    if (!campaignName.trim()) {
+      setError('Enter a campaign name.');
+      return;
+    }
+    if (parsed.invalid.length || !parsed.ids.length || parsed.ids.length > 10000) {
+      setError(parsed.ids.length > 10000 ? 'A campaign can contain at most 10,000 users.' : 'Enter valid campaign user IDs.');
+      return;
+    }
+    if (!validation) {
+      setError('Check recipients and values before saving the campaign.');
+      return;
+    }
+    if (status === 'scheduled' && !scheduledAt) {
+      setError('Choose a schedule date and time.');
+      return;
+    }
+    setSending(true);
+    setSendResult(null);
+    try {
+      const response = await fetch('/api/admin/whatsapp/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAdminAuthHeaders() },
+        body: JSON.stringify({
+          name: campaignName.trim(),
+          user_ids: parsed.ids,
+          template_name: selectedTemplate.name,
+          language: selectedTemplate.language,
+          mappings: mappingsPayload(mappings),
+          include_unlinked: includeUnlinked,
+          status,
+          scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+          conversion_event: conversionEvent,
+          frequency_cap_days: Number(frequencyCapDays) || 0,
+        }),
+      });
+      if (!response.ok) throw new Error(await apiError(response, 'Could not create WhatsApp campaign'));
+      const result = await response.json();
+      setSendResult({ ...result, campaignCreated: true });
+      if (typeof onCampaignCreated === 'function') onCampaignCreated(result);
+    } catch (err) {
+      setError(err.message || 'Could not create WhatsApp campaign');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const addAudience = ({ userIds }) => {
+    const merged = [...new Set([...parsed.ids, ...(userIds || []).map(Number).filter(Boolean)])];
+    if (merged.length > 10000) {
+      return { ok: false, error: `This audience would contain ${merged.length.toLocaleString()} users; the limit is 10,000.` };
+    }
+    setUserIdsText(merged.join(', '));
+    setValidation(null);
+    setSendResult(null);
+    setAudienceBuilderOpen(false);
+    return { ok: true };
+  };
+
+  useEffect(() => {
+    if (!audienceBuilderOpen) return undefined;
+    const close = (event) => {
+      if (event.key === 'Escape') setAudienceBuilderOpen(false);
+    };
+    document.addEventListener('keydown', close);
+    return () => document.removeEventListener('keydown', close);
+  }, [audienceBuilderOpen]);
+
   const summary = validation?.summary || {};
   const selectedPreview = (validation?.preview || []).find(
     (row) => String(row.user_id) === String(previewUserId)
@@ -244,7 +333,9 @@ export default function AdminWhatsAppTemplates() {
           <div className="wa-title-eyebrow">Outbound messaging</div>
           <h3>WhatsApp message templates</h3>
           <p className="notifications-description">
-            Fetch approved templates from Meta and send one to specific AstroRoshni user IDs.
+            {mode === 'campaign'
+              ? 'Build a saved, scheduled and measurable campaign from an approved Meta template.'
+              : 'Fetch approved templates from Meta and send one immediately to specific AstroRoshni user IDs.'}
           </p>
         </div>
         <button type="button" className="notif-search-btn" onClick={loadTemplates} disabled={loadingTemplates}>
@@ -253,6 +344,17 @@ export default function AdminWhatsAppTemplates() {
       </div>
 
       {error && <div className="notif-result error">{error}</div>}
+
+      {!campaignOnly && (
+        <div className="wa-mode-switch" role="tablist" aria-label="WhatsApp send mode">
+          <button type="button" role="tab" aria-selected={mode === 'quick'} className={mode === 'quick' ? 'is-active' : ''} onClick={() => { setMode('quick'); setValidation(null); setSendResult(null); }}>
+            Quick send <span>Send now to up to 100 users</span>
+          </button>
+          <button type="button" role="tab" aria-selected={mode === 'campaign'} className={mode === 'campaign' ? 'is-active' : ''} onClick={() => { setMode('campaign'); setValidation(null); setSendResult(null); }}>
+            Create campaign <span>Audience, scheduling and analytics</span>
+          </button>
+        </div>
+      )}
 
       <div className="notifications-form notifications-form--wide wa-template-grid">
         <section className="wa-template-card">
@@ -432,10 +534,46 @@ export default function AdminWhatsAppTemplates() {
               <p>Paste AstroRoshni user IDs, validate them, then review the send.</p>
             </div>
           </div>
+          {mode === 'campaign' && (
+            <div className="wa-campaign-settings">
+              <div className="form-field">
+                <label>Campaign name</label>
+                <input value={campaignName} onChange={(event) => setCampaignName(event.target.value)} placeholder="September credit win-back" maxLength={200} />
+              </div>
+              <div className="form-field">
+                <label>Schedule time (optional)</label>
+                <input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} />
+              </div>
+              <div className="form-field">
+                <label>Conversion</label>
+                <select value={conversionEvent} onChange={(event) => setConversionEvent(event.target.value)}>
+                  <option value="click">Tracked link clicked</option>
+                  <option value="credit_purchase">Credits purchased</option>
+                  <option value="subscription_purchase">Subscription purchased</option>
+                  <option value="question">Question asked</option>
+                  <option value="none">Delivery only</option>
+                </select>
+              </div>
+              <div className="form-field">
+                <label>WhatsApp frequency cap</label>
+                <select value={frequencyCapDays} onChange={(event) => setFrequencyCapDays(event.target.value)}>
+                  <option value="0">No campaign-level cap</option>
+                  <option value="1">Exclude users messaged in 1 day</option>
+                  <option value="3">Exclude users messaged in 3 days</option>
+                  <option value="7">Exclude users messaged in 7 days</option>
+                  <option value="14">Exclude users messaged in 14 days</option>
+                  <option value="30">Exclude users messaged in 30 days</option>
+                </select>
+              </div>
+            </div>
+          )}
           <div className="form-field">
             <div className="wa-field-heading">
               <label>User IDs</label>
-              <span>{parsed.ids.length}/100</span>
+              <div className="wa-recipient-heading-actions">
+                <span>{parsed.ids.length.toLocaleString()}/{recipientLimit.toLocaleString()}</span>
+                {mode === 'campaign' && <button type="button" onClick={() => setAudienceBuilderOpen(true)}>Build an audience</button>}
+              </div>
             </div>
             <textarea
               className="notif-paste-ids-input"
@@ -447,7 +585,7 @@ export default function AdminWhatsAppTemplates() {
               }}
               placeholder="123, 456, 789"
             />
-            <small>Separate IDs with commas, spaces, or new lines.</small>
+            <small>Separate IDs with commas, spaces, or new lines.{mode === 'campaign' && parsed.ids.length > 100 ? ' Validation previews the first 100; campaign creation validates the complete audience.' : ''}</small>
           </div>
 
           <label className="wa-unlinked-option">
@@ -471,20 +609,28 @@ export default function AdminWhatsAppTemplates() {
             <button type="button" className="wa-button wa-button--secondary" onClick={validate} disabled={validating || sending}>
               {validating ? 'Checking…' : 'Check recipients and values'}
             </button>
-            <button
-              type="button"
-              className="wa-button wa-button--primary"
-              onClick={send}
-              disabled={
-                !validation
-                || sending
-                || loadingTemplates
-                || (validation.coverage?.blocked || 0) > 0
-                || !(validation.coverage?.eligible > 0)
-              }
-            >
-              {sending ? 'Sending…' : 'Review and send'}
-            </button>
+            {mode === 'quick' ? (
+              <button
+                type="button"
+                className="wa-button wa-button--primary"
+                onClick={send}
+                disabled={!validation || sending || loadingTemplates || (validation.coverage?.blocked || 0) > 0 || !(validation.coverage?.eligible > 0)}
+              >
+                {sending ? 'Sending…' : 'Review and send'}
+              </button>
+            ) : (
+              <>
+                <button type="button" className="wa-button wa-button--secondary" onClick={() => createCampaign('draft')} disabled={!validation || sending || !campaignName.trim()}>
+                  {sending ? 'Saving…' : 'Save draft'}
+                </button>
+                <button type="button" className="wa-button wa-button--secondary" onClick={() => createCampaign('send_now')} disabled={!validation || sending || !campaignName.trim()}>
+                  {sending ? 'Starting…' : 'Send now'}
+                </button>
+                <button type="button" className="wa-button wa-button--primary" onClick={() => createCampaign('scheduled')} disabled={!validation || sending || !campaignName.trim() || !scheduledAt}>
+                  {sending ? 'Scheduling…' : 'Schedule campaign'}
+                </button>
+              </>
+            )}
           </div>
 
           {validation && (
@@ -535,9 +681,11 @@ export default function AdminWhatsAppTemplates() {
 
       {sendResult && (
         <section className="wa-template-card wa-send-results">
-          <h4>Send result</h4>
-          <p>Accepted: {sendResult.accepted} · Failed: {sendResult.failed} · Skipped: {sendResult.skipped}</p>
-          <div className="wa-results-table-wrap">
+          <h4>{sendResult.campaignCreated ? 'Campaign created' : 'Send result'}</h4>
+          {sendResult.campaignCreated ? (
+            <p>Campaign #{sendResult.campaign_id} is {sendResult.status}.{sendResult.scheduled_at ? ` Scheduled for ${new Date(sendResult.scheduled_at).toLocaleString()}.` : ''}</p>
+          ) : <p>Accepted: {sendResult.accepted} · Failed: {sendResult.failed} · Skipped: {sendResult.skipped}</p>}
+          {!sendResult.campaignCreated && <div className="wa-results-table-wrap">
             <table>
               <thead><tr><th>User ID</th><th>Result</th><th>Detail</th></tr></thead>
               <tbody>
@@ -548,8 +696,23 @@ export default function AdminWhatsAppTemplates() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </div>}
         </section>
+      )}
+      {audienceBuilderOpen && (
+        <div className="wa-audience-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setAudienceBuilderOpen(false);
+        }}>
+          <section className="wa-audience-modal" role="dialog" aria-modal="true" aria-labelledby="wa-audience-title">
+            <header className="wa-audience-header">
+              <div><span>WhatsApp campaign</span><h3 id="wa-audience-title">Build recipient audience</h3><p>Selections append to manual IDs and duplicates are removed.</p></div>
+              <button type="button" onClick={() => setAudienceBuilderOpen(false)}>Close</button>
+            </header>
+            <div className="wa-audience-body">
+              <AdminAudienceBuilder audienceOnly onAudienceSelected={addAudience} selectionActionLabel="Add selected to WhatsApp campaign" />
+            </div>
+          </section>
+        </div>
       )}
     </div>
   );

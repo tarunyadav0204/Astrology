@@ -9803,6 +9803,361 @@ def _compact_wealth_foundation(
         }
         result["debt_repayment_synthesis"] = debt_repayment_synthesis
 
+    wealth_growth_timing_synthesis: Dict[str, Any] = {}
+    if effective_category == "wealth" and timing_mode:
+        forward_scan = (
+            normalized_evidence.get("forward_event_dasha_scan")
+            if isinstance(normalized_evidence.get("forward_event_dasha_scan"), dict)
+            else {}
+        )
+        forward_periods = [
+            row for row in list(forward_scan.get("periods") or [])
+            if isinstance(row, dict) and (row.get("start") or row.get("end"))
+        ]
+        window_scan = (
+            normalized_evidence.get("window_dasha_segments")
+            if isinstance(normalized_evidence.get("window_dasha_segments"), dict)
+            else {}
+        )
+        bounded_periods = [
+            row for row in list(window_scan.get("segments") or [])
+            if isinstance(row, dict) and (row.get("start") or row.get("end"))
+        ]
+        forecast_kind = "open_future_growth_search"
+        if not forward_periods and bounded_periods:
+            forecast_kind = "bounded_period_support_forecast"
+            forward_periods = [
+                {**row, "time_status": "future"}
+                for row in bounded_periods
+            ]
+        kp_significators = (
+            (result.get("kp_financial") or {}).get("significators")
+            if isinstance(result.get("kp_financial"), dict)
+            else {}
+        )
+        kp_planet_houses: Dict[str, set[int]] = {}
+        for house_value, planets in (kp_significators or {}).items():
+            house_number = _safe_int(house_value)
+            if house_number is None:
+                continue
+            for planet in list(planets or []):
+                kp_planet_houses.setdefault(str(planet), set()).add(house_number)
+
+        # H2 = accumulation/resources, H9 = expansion/opportunity and H11 =
+        # realized gains. H5 can describe investment/speculative activity, but
+        # it is deliberately not sufficient to turn a period into growth.
+        growth_houses = {2, 9, 11}
+        pressure_houses = {8, 12}
+        adjudicated_growth_windows: List[Dict[str, Any]] = []
+        for row in forward_periods:
+            activated = {
+                house for house in (_safe_int(value) for value in row.get("activated_focus_houses") or [])
+                if house is not None
+            }
+            chain_planets = [
+                str(row.get(key) or "")
+                for key in ("mahadasha", "antardasha", "pratyantardasha")
+                if row.get(key)
+            ]
+            kp_houses: set[int] = set()
+            for planet in chain_planets:
+                kp_houses.update(kp_planet_houses.get(planet, set()))
+
+            peak_windows: List[Dict[str, Any]] = []
+            transit_growth: set[int] = set()
+            transit_pressure: set[int] = set()
+            for peak in list(row.get("peak_activation_windows") or [])[:4]:
+                if not isinstance(peak, dict):
+                    continue
+                peak_houses = {
+                    house for house in (_safe_int(value) for value in peak.get("activated_focus_houses") or [])
+                    if house is not None
+                }
+                delivered_houses = {
+                    house for house in (
+                        _safe_int(item.get("house"))
+                        for item in peak.get("delivered_event_houses") or []
+                        if isinstance(item, dict)
+                    )
+                    if house is not None
+                }
+                all_peak_houses = peak_houses | delivered_houses
+                growth_at_peak = sorted(all_peak_houses & growth_houses)
+                pressure_at_peak = sorted(all_peak_houses & pressure_houses)
+                transit_growth.update(growth_at_peak)
+                transit_pressure.update(pressure_at_peak)
+                peak_windows.append({
+                    "start": peak.get("start"),
+                    "end": peak.get("end"),
+                    "planet": peak.get("planet"),
+                    "growth_houses": growth_at_peak,
+                    "pressure_houses": pressure_at_peak,
+                    "trigger_score": peak.get("trigger_score"),
+                })
+
+            active_growth = activated & growth_houses
+            active_pressure = activated & pressure_houses
+            kp_growth = kp_houses & growth_houses
+            has_growth_core = 11 in active_growth and bool({2, 9} & active_growth)
+            has_kp_growth_core = 11 in kp_growth and bool({2, 9} & kp_growth)
+            transit_confirms_gain = 11 in transit_growth
+            transit_confirms_fuller_growth = transit_confirms_gain and bool({2, 9} & transit_growth)
+            if (
+                growth_houses.issubset(active_growth)
+                and growth_houses.issubset(kp_growth)
+                and transit_confirms_fuller_growth
+            ):
+                classification = "strongest_full_growth_support"
+                tier = 3
+            elif has_growth_core and has_kp_growth_core and transit_confirms_gain:
+                classification = "meaningful_growth_support"
+                tier = 2
+            elif has_growth_core:
+                classification = "growth_preparation_or_partial_support"
+                tier = 1
+            else:
+                classification = "financial_activity_not_meaningful_growth"
+                tier = 0
+            if str(row.get("time_status") or "").lower() == "current" and tier < 2:
+                classification = "current_financial_activity_not_next_growth"
+            adjudicated_growth_windows.append({
+                "start": row.get("start"),
+                "end": row.get("end"),
+                "chain": " - ".join(chain_planets),
+                "classification": classification,
+                "tier": tier,
+                "growth_houses": sorted(active_growth),
+                "pressure_houses": sorted(active_pressure),
+                "kp_growth_houses": sorted(kp_growth),
+                "transit_growth_houses": sorted(transit_growth),
+                "transit_pressure_houses": sorted(transit_pressure),
+                "peak_windows": peak_windows,
+                "source_score": row.get("relevance_score"),
+                "time_status": row.get("time_status"),
+            })
+
+        future_growth_windows = sorted(
+            [
+                row for row in adjudicated_growth_windows
+                if str(row.get("time_status") or "").lower() == "future"
+                and int(row.get("tier") or 0) >= 2
+            ],
+            key=lambda row: str(row.get("start") or ""),
+        )
+        next_window = future_growth_windows[0] if future_growth_windows else {}
+        strongest_window = max(
+            future_growth_windows,
+            key=lambda row: (
+                int(row.get("tier") or 0),
+                len(row.get("transit_growth_houses") or []),
+                int(row.get("source_score") or 0),
+            ),
+            default={},
+        )
+        answer_windows: List[Dict[str, Any]] = []
+        if next_window:
+            answer_windows.append({**next_window, "answer_role": "next_meaningful_growth_phase"})
+        if strongest_window and strongest_window != next_window:
+            answer_windows.append({**strongest_window, "answer_role": "strongest_later_growth_phase"})
+
+        bounded_period_synthesis: Dict[str, Any] = {}
+        if forecast_kind == "bounded_period_support_forecast" and bounded_periods:
+            def iter_month_keys(start_value: Any, end_value: Any) -> List[str]:
+                start_dt = _parse_ymd(start_value)
+                end_dt = _parse_ymd(end_value)
+                if not start_dt or not end_dt or end_dt < start_dt:
+                    return []
+                cursor = start_dt.replace(day=1)
+                final = end_dt.replace(day=1)
+                keys: List[str] = []
+                while cursor <= final and len(keys) < 36:
+                    keys.append(cursor.strftime("%Y-%m"))
+                    cursor = (
+                        cursor.replace(year=cursor.year + 1, month=1)
+                        if cursor.month == 12
+                        else cursor.replace(month=cursor.month + 1)
+                    )
+                return keys
+
+            def month_label(key: str) -> str:
+                try:
+                    return datetime.strptime(key, "%Y-%m").strftime("%B %Y")
+                except ValueError:
+                    return key
+
+            strongest_source_phase = max(
+                bounded_periods,
+                key=lambda row: int(row.get("relevance_score") or 0),
+            )
+            strongest_score = int(strongest_source_phase.get("relevance_score") or 0)
+            secondary_source_phases = sorted(
+                [
+                    row for row in bounded_periods
+                    if row is not strongest_source_phase
+                    and int(row.get("relevance_score") or 0) >= max(1, round(strongest_score * 0.7))
+                ],
+                key=lambda row: (-int(row.get("relevance_score") or 0), str(row.get("start") or "")),
+            )
+
+            strongest_phase_months = iter_month_keys(
+                strongest_source_phase.get("start"), strongest_source_phase.get("end")
+            )
+            secondary_months = {
+                key
+                for row in secondary_source_phases
+                for key in iter_month_keys(row.get("start"), row.get("end"))
+            }
+            peak_by_month: Dict[str, Dict[str, Any]] = {}
+            reinforced_months: set[str] = set()
+            for trigger in list(strongest_source_phase.get("transit_trigger_windows") or []):
+                if not isinstance(trigger, dict):
+                    continue
+                delivered = {
+                    house for house in (
+                        _safe_int(item.get("house"))
+                        for item in trigger.get("delivered_event_houses") or []
+                        if isinstance(item, dict)
+                    )
+                    if house is not None
+                }
+                triggered = {
+                    house for house in (_safe_int(value) for value in trigger.get("activated_focus_houses") or [])
+                    if house is not None
+                }
+                if not ((delivered | triggered) & growth_houses):
+                    continue
+                for key in iter_month_keys(trigger.get("start"), trigger.get("end")):
+                    reinforced_months.add(key)
+                    existing = peak_by_month.get(key) or {}
+                    if int(trigger.get("trigger_score") or 0) > int(existing.get("trigger_score") or 0):
+                        peak_by_month[key] = {
+                            "month": month_label(key),
+                            "trigger_score": trigger.get("trigger_score"),
+                            "planet": trigger.get("planet"),
+                            "growth_houses": sorted((delivered | triggered) & growth_houses),
+                            "start": trigger.get("start"),
+                            "end": trigger.get("end"),
+                        }
+            strongest_peak_score = max(
+                [int(row.get("trigger_score") or 0) for row in peak_by_month.values()] or [0]
+            )
+            strongest_peak_months = sorted(
+                [
+                    row for row in peak_by_month.values()
+                    if strongest_peak_score
+                    and int(row.get("trigger_score") or 0) >= max(1, round(strongest_peak_score * 0.7))
+                ],
+                key=lambda row: str(row.get("start") or ""),
+            )
+            period_window = (
+                (normalized_evidence.get("current_timing") or {}).get("period_window")
+                if isinstance(normalized_evidence.get("current_timing"), dict)
+                else {}
+            )
+            period_months = iter_month_keys(
+                (period_window or {}).get("start"), (period_window or {}).get("end")
+            )
+            supportive_keys = set(strongest_phase_months) | secondary_months
+            bounded_period_synthesis = {
+                "period": period_window or {},
+                "strongest_phase": {
+                    "start": strongest_source_phase.get("start"),
+                    "end": strongest_source_phase.get("end"),
+                    "chain": " - ".join(
+                        str(strongest_source_phase.get(key) or "")
+                        for key in ("mahadasha", "antardasha", "pratyantardasha")
+                        if strongest_source_phase.get(key)
+                    ),
+                    "score": strongest_source_phase.get("relevance_score"),
+                    "growth_houses": sorted({
+                        house for house in (
+                            _safe_int(value) for value in strongest_source_phase.get("activated_focus_houses") or []
+                        ) if house in growth_houses
+                    }),
+                },
+                "strongest_peak_months": strongest_peak_months,
+                "reinforced_support_months": [
+                    month_label(key) for key in strongest_phase_months if key in reinforced_months
+                ],
+                "background_support_months": [
+                    month_label(key)
+                    for key in strongest_phase_months
+                    if key not in reinforced_months and key not in secondary_months
+                ],
+                "secondary_support_months": [month_label(key) for key in sorted(secondary_months)],
+                "lower_support_months": [
+                    month_label(key) for key in period_months if key not in supportive_keys
+                ],
+                "secondary_phases": [
+                    {
+                        "start": row.get("start"), "end": row.get("end"),
+                        "chain": " - ".join(
+                            str(row.get(key) or "")
+                            for key in ("mahadasha", "antardasha", "pratyantardasha")
+                            if row.get(key)
+                        ),
+                        "score": row.get("relevance_score"),
+                        "growth_houses": sorted({
+                            house for house in (
+                                _safe_int(value) for value in row.get("activated_focus_houses") or []
+                            ) if house in growth_houses
+                        }),
+                    }
+                    for row in secondary_source_phases
+                ],
+                "answer_rule": (
+                    "This is a bounded calendar forecast. Name the strongest month or months, the broader supportive "
+                    "runway, secondary months, and quieter/cautious months across the complete requested period. "
+                    "Do not apply the open-future event threshold or answer with an evidence-unavailable refusal."
+                ),
+            }
+        wealth_growth_timing_synthesis = {
+            "forecast_kind": forecast_kind,
+            "verdict": (
+                "bounded_period_support_mapped"
+                if bounded_period_synthesis
+                else "future_growth_phases_identified"
+                if answer_windows
+                else "no_reliable_future_growth_phase"
+            ),
+            "ranked_growth_windows": answer_windows,
+            "next_growth_window": next_window,
+            "strongest_growth_window": strongest_window,
+            "current_window_assessment": next(
+                (
+                    row for row in adjudicated_growth_windows
+                    if str(row.get("time_status") or "").lower() == "current"
+                ),
+                {},
+            ),
+            "partial_support_windows": [
+                row for row in adjudicated_growth_windows
+                if str(row.get("time_status") or "").lower() == "future"
+                and int(row.get("tier") or 0) == 1
+            ][:3],
+            "support_house_rule": {
+                "growth": [2, 9, 11],
+                "pressure": [8, 12],
+                "rule": (
+                    "A meaningful wealth-growth phase needs realized gains through house 11 together with house 2 "
+                    "or 9, route-specific KP support, and dated transit confirmation. House 5 or financial activity "
+                    "alone is not a positive growth verdict."
+                ),
+            },
+            "retention_qualification": d2_verdict,
+            "bounded_period_synthesis": bounded_period_synthesis,
+            "claim_rule": (
+                bounded_period_synthesis.get("answer_rule")
+                if bounded_period_synthesis
+                else (
+                    "For an open-future question, the current/as-of boundary is context and can never be labelled the "
+                    "next growth period. Lead with the earliest future meaningful phase and separately name a stronger "
+                    "later phase when present. These are broad support periods, not guaranteed gains or exact transaction dates."
+                )
+            ),
+        }
+        result["wealth_growth_timing_synthesis"] = wealth_growth_timing_synthesis
+
     qualified = bool(carrier_cautions) or d2_verdict != "supportive_accumulation_pattern"
     result["route_adjudication"] = {
         "route": effective_category or "wealth",
@@ -9814,6 +10169,7 @@ def _compact_wealth_foundation(
         "loss_vulnerability_synthesis": result.get("loss_vulnerability_synthesis") or {},
         "wealth_source_synthesis": wealth_source_synthesis,
         "debt_repayment_synthesis": debt_repayment_synthesis,
+        "wealth_growth_timing_synthesis": wealth_growth_timing_synthesis,
         "forbidden_inference": [
             "Do not call the foundation strong, clear or confirmed when strength_claim_permission is qualified_only.",
             "Do not say D2 confirms retention merely because D2 was calculated.",
@@ -14849,7 +15205,9 @@ async def generate_instant_chat_response(
     )
     buffer_graph_delivery = bool(
         pre_generation_graph_policy.get("live")
-        and str(pre_generation_graph_policy.get("runtime_key") or "").lower() in {"debt_repayment"}
+        and str(pre_generation_graph_policy.get("runtime_key") or "").lower() in {
+            "debt_repayment", "wealth_timing",
+        }
     )
     # Constitutional health claims are buffered until their immutable chart
     # facts pass validation.  Streaming an invented placement and correcting it
@@ -15079,6 +15437,8 @@ NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","fol
                     if domain == "health"
                     else "वास्तविक जीवन में अभी कौन-सा विकल्प ठोस रूप से सामने आ रहा है?"
                     if domain == "career"
+                    else "आप आगे किस वित्तीय क्षेत्र को देखना चाहेंगे—आय, व्यवसाय, निवेश या ऋण?"
+                    if domain == "wealth"
                     else "क्या आप उपलब्ध गैर-समयबद्ध संकेत जानना चाहेंगे?"
                 )
             else:
@@ -15087,6 +15447,8 @@ NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","fol
                     if domain == "health"
                     else "Which option is already becoming concrete in real life?"
                     if domain == "career"
+                    else "Which financial area would you like to examine next—income, business, investments, or debt?"
+                    if domain == "wealth"
                     else "Would you like the supported non-timing indications instead?"
                 )
             response_content = f"{str(response_content or '').rstrip()}\n\n{follow_up}"

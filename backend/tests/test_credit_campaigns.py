@@ -20,7 +20,10 @@ from credits.credit_campaigns import (
     get_credit_campaign_recipient_report,
     maybe_apply_credit_campaign,
 )
-from credits.web_continue_routes import _split_campaign_continue_token
+from credits.web_continue_routes import (
+    _split_attributed_continue_token,
+    _split_campaign_continue_token,
+)
 
 
 def test_campaign_fills_only_gap_after_existing_bonuses():
@@ -279,6 +282,16 @@ def test_campaign_marker_is_split_without_changing_secure_token():
 
     assert token == "secure_token-value"
     assert campaign_id == 42
+
+
+def test_nudge_campaign_marker_is_split_without_changing_secure_token():
+    token, credit_campaign_id, nudge_campaign_id = _split_attributed_continue_token(
+        "secure_token-value.nc17."
+    )
+
+    assert token == "secure_token-value"
+    assert credit_campaign_id is None
+    assert nudge_campaign_id == 17
 
 
 @pytest.mark.asyncio

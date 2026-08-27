@@ -634,6 +634,36 @@ def _snapshot_campaign_batch(
     if landing == "blog":
         data_extra.update(_blog_push_data(campaign))
 
+    template_config = campaign.get("whatsapp_template")
+    raw_mappings = (
+        template_config.get("mappings") or {}
+        if isinstance(template_config, dict)
+        else {}
+    )
+    generator_mappings = {
+        str(key): value
+        for key, value in raw_mappings.items()
+        if isinstance(value, dict)
+        and str(value.get("source") or "").strip().lower() == "generator"
+    }
+    generated_values: Dict[str, Dict[int, str]] = {}
+    if generator_mappings:
+        # This executes on the isolated campaign worker and creates/reuses all
+        # secure links for the batch in one short primary-DB transaction.
+        from credits.web_continue import build_continue_url, get_or_create_continue_tokens
+
+        tokens = get_or_create_continue_tokens(user_ids)
+        for key, mapping in generator_mappings.items():
+            generator = str(mapping.get("generator") or "").strip().lower()
+            generated_values[key] = {}
+            for uid, token in tokens.items():
+                tracked_token = f"{token}.nc{int(campaign_id)}"
+                generated_values[key][int(uid)] = (
+                    build_continue_url(tracked_token)
+                    if generator == "credits_continue_url"
+                    else tracked_token
+                )
+
     snapshots: List[Dict[str, Any]] = []
     for uid in user_ids:
         copy = render_campaign_for_user(campaign, params_by_user.get(uid) or default_params())
@@ -643,6 +673,41 @@ def _snapshot_campaign_batch(
         data = {**data_extra, "nudge_id": group_id}
         if copy.get("question"):
             data["question"] = copy["question"][:500]
+        if isinstance(template_config, dict):
+            from whatsapp.admin_routes import (
+                VariableMapping,
+                _resolve_parameters_for_recipient,
+            )
+
+            endpoints = endpoints_by_user.get(uid) or {}
+            recipient_profile = {
+                "user_id": uid,
+                "name": endpoints.get("name") or "there",
+                "phone": endpoints.get("phone") or "",
+                "email": endpoints.get("email") or "",
+            }
+            mapping_models = {}
+            for key, value in raw_mappings.items():
+                if not isinstance(value, dict):
+                    continue
+                generated = generated_values.get(str(key), {}).get(int(uid))
+                mapping_models[str(key)] = VariableMapping(
+                    **({"source": "fixed", "value": generated} if generated is not None else value)
+                )
+            parameters, missing = _resolve_parameters_for_recipient(
+                template_config.get("template") or {},
+                mapping_models,
+                recipient_profile,
+                generate=False,
+            )
+            data["whatsapp_template"] = {
+                "name": template_config.get("name"),
+                "language": template_config.get("language") or "en",
+                "template": template_config.get("template") or {},
+                "parameters": parameters,
+                "missing": missing,
+                "include_unlinked": bool(template_config.get("include_unlinked")),
+            }
         snapshots.append(
             {
                 "campaign_id": campaign_id,
@@ -724,10 +789,48 @@ def _deliver_recipient_snapshots(recipients: List[Dict[str, Any]]) -> List[Dict[
                 break
             ok = False
             actual = channel
+            meta: Optional[Dict[str, Any]] = None
+            provider_error: Optional[str] = None
             if channel == "whatsapp":
                 wa_id = str(endpoints.get("whatsapp_wa_id") or "")
                 phone_number_id = str(endpoints.get("whatsapp_phone_number_id") or "")
-                if wa_id and phone_number_id:
+                template_config = (recipient.get("data") or {}).get("whatsapp_template")
+                if isinstance(template_config, dict):
+                    actual = "whatsapp_template"
+                    target = wa_id or (
+                        str(endpoints.get("phone") or "")
+                        if template_config.get("include_unlinked")
+                        else ""
+                    )
+                    sender = (
+                        os.getenv("WHATSAPP_PHONE_NUMBER_ID")
+                        or os.getenv("WHATSAPP_NUDGE_PHONE_NUMBER_ID")
+                        or phone_number_id
+                        or ""
+                    ).strip()
+                    missing = template_config.get("missing") or []
+                    if target and sender and not missing:
+                        from whatsapp.admin_routes import _build_send_components
+                        from whatsapp.messaging import send_whatsapp_template
+
+                        components = _build_send_components(
+                            template_config.get("template") or {},
+                            template_config.get("parameters") or {},
+                        )
+                        ok, provider_error, meta = send_whatsapp_template(
+                            to=target,
+                            phone_number_id=sender,
+                            template_name=str(template_config.get("name") or ""),
+                            language_code=str(template_config.get("language") or "en"),
+                            components_override=components,
+                            return_error=True,
+                            return_meta=True,
+                        )
+                    elif missing:
+                        provider_error = f"Unresolved variables: {', '.join(str(value) for value in missing)}"
+                    else:
+                        provider_error = "Recipient is not WhatsApp-linked or has no eligible phone number"
+                elif wa_id and phone_number_id:
                     ok = send_whatsapp_nudge_to_target(
                         wa_id=wa_id,
                         phone_number_id=phone_number_id,
@@ -749,7 +852,7 @@ def _deliver_recipient_snapshots(recipients: List[Dict[str, Any]]) -> List[Dict[
                     question=recipient.get("question"),
                     delivery_group_id=str(recipient.get("delivery_group_id") or ""),
                 )
-            result["attempts"].append((actual, bool(ok)))
+            result["attempts"].append((actual, bool(ok), meta, provider_error))
             if ok:
                 result["sent"].append(actual)
     return list(results.values())
@@ -827,6 +930,19 @@ def process_campaign_batch(*, campaign_id: int, user_ids: List[int]) -> Dict[str
             ]
             if policy == "push_only":
                 requested = ["push"]
+            whatsapp_template = (recipient.get("data") or {}).get("whatsapp_template")
+            whatsapp_reachable = bool(
+                endpoints.get("whatsapp_wa_id")
+                or (
+                    isinstance(whatsapp_template, dict)
+                    and whatsapp_template.get("include_unlinked")
+                    and endpoints.get("phone")
+                )
+                or (
+                    not isinstance(whatsapp_template, dict)
+                    and endpoints.get("phone")
+                )
+            )
             had_reachable_endpoint = any(
                 (
                     channel == "push"
@@ -834,13 +950,7 @@ def process_campaign_batch(*, campaign_id: int, user_ids: List[int]) -> Dict[str
                 )
                 or (
                     channel == "whatsapp"
-                    and bool(
-                        (
-                            endpoints.get("whatsapp_wa_id")
-                            and endpoints.get("whatsapp_phone_number_id")
-                        )
-                        or endpoints.get("phone")
-                    )
+                    and whatsapp_reachable
                 )
                 or (channel == "email" and bool(endpoints.get("email")))
                 for channel in requested
@@ -858,7 +968,15 @@ def process_campaign_batch(*, campaign_id: int, user_ids: List[int]) -> Dict[str
                 should_retry = True
                 continue
             primary_assigned = False
-            for channel, ok in attempts:
+            accepted_message_ids: List[str] = []
+            for attempt in attempts:
+                channel, ok = attempt[0], bool(attempt[1])
+                meta = attempt[2] if len(attempt) > 2 and isinstance(attempt[2], dict) else {}
+                provider_error = attempt[3] if len(attempt) > 3 else None
+                message_id = str(meta.get("message_id") or "").strip() or None
+                recipient_id = str(meta.get("wa_id") or "").strip() or None
+                if message_id:
+                    accepted_message_ids.append(message_id)
                 is_primary = bool(ok and not primary_assigned)
                 if is_primary:
                     primary_assigned = True
@@ -871,12 +989,28 @@ def process_campaign_batch(*, campaign_id: int, user_ids: List[int]) -> Dict[str
                     sent_at=datetime.now(IST_TZ).date(),
                     event_params=json.dumps({"campaign_id": int(campaign_id)}, ensure_ascii=False),
                     channel=str(channel),
-                    data_payload=recipient.get("data") or {},
+                    data_payload={
+                        **(recipient.get("data") or {}),
+                        **({"provider_error": str(provider_error)[:1000]} if provider_error else {}),
+                    },
                     campaign_id=int(campaign_id),
                     delivery_group_id=str(recipient.get("delivery_group_id") or ""),
                     send_status="sent" if ok else "failed",
                     is_primary=is_primary,
+                    meta_message_id=message_id,
+                    meta_recipient_id=recipient_id,
+                    meta_status="accepted" if message_id else None,
                 )
+            if accepted_message_ids:
+                from .credit_campaign_whatsapp import _reconcile_pending_meta_statuses
+
+                try:
+                    _reconcile_pending_meta_statuses(conn, accepted_message_ids)
+                except Exception:
+                    # A fresh notification database may not have received its
+                    # first status webhook yet. Future receipts still update
+                    # the stored wamid directly.
+                    logger.warning("Pending Meta status reconciliation unavailable", exc_info=True)
             if not primary_assigned:
                 db.insert_delivery(
                     conn,
@@ -961,6 +1095,22 @@ def _dispatch_one_campaign(conn, campaign: Dict[str, Any]) -> Dict[str, Any]:
             else bool(token_filter)
         )
         audience = [uid for uid in audience if (uid in reachable) == require_push]
+    frequency_cap_days = max(0, min(int(campaign.get("frequency_cap_days") or 0), 365))
+    if frequency_cap_days and campaign.get("whatsapp_template") and audience:
+        recent_rows = execute(
+            conn,
+            """
+            SELECT DISTINCT userid
+            FROM nudge_deliveries
+            WHERE userid = ANY(%s)
+              AND channel IN ('whatsapp', 'whatsapp_template')
+              AND COALESCE(send_status, 'sent') = 'sent'
+              AND created_at >= CURRENT_TIMESTAMP - (%s * INTERVAL '1 day')
+            """,
+            (audience, frequency_cap_days),
+        ).fetchall()
+        suppressed = {int(row[0]) for row in (recent_rows or [])}
+        audience = [uid for uid in audience if uid not in suppressed]
     db.update_campaign(
         conn,
         campaign_id,
@@ -1145,6 +1295,91 @@ def dispatch_campaign_now(campaign_id: int) -> Dict[str, Any]:
             return {"ok": False, "error": f"campaign status is '{campaign.get('status')}'"}
         result = _dispatch_one_campaign(conn, campaign)
         return {"ok": True, **result}
+
+
+def retry_failed_campaign_recipients(campaign_id: int) -> Dict[str, Any]:
+    """Requeue only exhausted/retryable recipients; never touch successful rows."""
+    cid = int(campaign_id)
+    from .task_queue import (
+        enqueue_nudge_task,
+        nudge_tasks_are_isolated,
+        nudge_tasks_enabled,
+    )
+
+    tasks_enabled = nudge_tasks_enabled()
+    tasks_isolated = nudge_tasks_are_isolated() if tasks_enabled else False
+    inline_max = max(1, min(int(os.getenv("NUDGE_CAMPAIGN_INLINE_MAX_USERS", "100")), 1000))
+    with db.get_conn() as conn:
+        db.init_nudge_tables(conn)
+        campaign = db.get_campaign(conn, cid)
+        if not campaign:
+            return {"ok": False, "error": "campaign_not_found"}
+        rows = execute(
+            conn,
+            """
+            SELECT r.userid
+            FROM nudge_campaign_recipients r
+            LEFT JOIN LATERAL (
+                SELECT d.meta_failed_at, d.meta_delivered_at, d.meta_read_at
+                FROM nudge_deliveries d
+                WHERE d.campaign_id = r.campaign_id AND d.userid = r.userid
+                  AND d.channel IN ('whatsapp', 'whatsapp_template')
+                ORDER BY d.created_at DESC, d.id DESC
+                LIMIT 1
+            ) latest ON TRUE
+            WHERE r.campaign_id = %s
+              AND (
+                  r.state = 'dead'
+                  OR (
+                      latest.meta_failed_at IS NOT NULL
+                      AND latest.meta_delivered_at IS NULL
+                      AND latest.meta_read_at IS NULL
+                  )
+              )
+            ORDER BY r.userid
+            """,
+            (cid,),
+        ).fetchall()
+        user_ids = sorted({int(row[0]) for row in rows or []})
+        if not user_ids:
+            return {"ok": True, "campaign_id": cid, "retried": 0, "message": "No failed recipients"}
+        if tasks_enabled and not tasks_isolated:
+            raise RuntimeError("Retry is blocked until the campaign worker target is isolated")
+        if not tasks_enabled and len(user_ids) > inline_max:
+            raise RuntimeError("Retry requires Cloud Tasks for this audience size")
+        execute(
+            conn,
+            """
+            UPDATE nudge_campaign_recipients
+            SET state = 'ready', attempt_count = 0, available_at = CURRENT_TIMESTAMP,
+                claimed_at = NULL, completed_at = NULL, last_error = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE campaign_id = %s AND userid = ANY(%s)
+            """,
+            (cid, user_ids),
+        )
+        db.update_campaign(conn, cid, status="sending")
+        conn.commit()
+
+    batch_size = max(1, min(int(os.getenv("NUDGE_CAMPAIGN_BATCH_SIZE", "50")), 500))
+    batches = _chunked(user_ids, batch_size)
+    if tasks_enabled:
+        queued = 0
+        nonce = int(datetime.now(IST_TZ).timestamp())
+        for index, chunk in enumerate(batches):
+            if enqueue_nudge_task(
+                task_kind="campaign-batch",
+                task_id=f"retry-{cid}-{nonce}-{index}",
+                payload={"campaign_id": cid, "batch_index": index, "user_ids": chunk},
+            ):
+                queued += 1
+        if queued != len(batches):
+            raise RuntimeError(f"Queued {queued} of {len(batches)} retry batches")
+        return {"ok": True, "campaign_id": cid, "retried": len(user_ids), "tasks_enqueued": queued}
+
+    for chunk in batches:
+        process_campaign_batch(campaign_id=cid, user_ids=chunk)
+    return {"ok": True, "campaign_id": cid, "retried": len(user_ids), "tasks_enqueued": 0}
 
 
 def send_campaign_test(campaign: Dict[str, Any], target_userid: int) -> Dict[str, Any]:

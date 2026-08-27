@@ -41,6 +41,138 @@
   box-shadow: 0 6px 16px rgba(230, 93, 47, 0.18);
 }
 
+.wa-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 6px;
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  background: var(--admin-surface-muted);
+}
+
+.wa-mode-switch button {
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--admin-text);
+  text-align: left;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.wa-mode-switch button span {
+  display: block;
+  margin-top: 3px;
+  color: var(--admin-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.wa-mode-switch button.is-active {
+  border-color: rgba(255, 122, 69, 0.24);
+  background: var(--admin-surface);
+  box-shadow: 0 4px 14px rgba(43, 32, 52, 0.07);
+}
+
+.wa-campaign-settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface-muted);
+}
+
+.wa-campaign-settings .form-field {
+  margin: 0;
+}
+
+.wa-recipient-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--admin-text-muted);
+  font-size: 11px;
+}
+
+.wa-recipient-heading-actions button {
+  padding: 5px 9px;
+  border: 1px solid rgba(230, 93, 47, 0.3);
+  border-radius: 8px;
+  background: rgba(230, 93, 47, 0.08);
+  color: #d6532d;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.wa-audience-backdrop {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(24, 17, 29, 0.58);
+  backdrop-filter: blur(3px);
+}
+
+.wa-audience-modal {
+  display: flex;
+  width: min(1180px, 96vw);
+  max-height: 92vh;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--admin-border);
+  border-radius: 18px;
+  background: var(--admin-surface);
+  box-shadow: 0 24px 70px rgba(20, 12, 28, 0.28);
+}
+
+.wa-audience-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.wa-audience-header span {
+  color: #e65d2f;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.wa-audience-header h3,
+.wa-audience-header p {
+  margin: 3px 0 0;
+}
+
+.wa-audience-header p {
+  color: var(--admin-text-muted);
+  font-size: 12px;
+}
+
+.wa-audience-header button {
+  padding: 8px 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 9px;
+  background: var(--admin-surface-muted);
+  color: var(--admin-text);
+  cursor: pointer;
+}
+
+.wa-audience-body {
+  padding: 18px 22px 24px;
+  overflow: auto;
+}
+
 .notifications-form.wa-template-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.18fr) minmax(360px, 0.82fr);
@@ -595,6 +727,15 @@
 
   .wa-actions {
     flex-direction: column;
+  }
+
+  .wa-mode-switch,
+  .wa-campaign-settings {
+    grid-template-columns: 1fr;
+  }
+
+  .wa-audience-backdrop {
+    padding: 8px;
   }
 }
 

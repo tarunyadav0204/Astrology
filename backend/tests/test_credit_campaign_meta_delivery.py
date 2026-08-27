@@ -78,6 +78,7 @@ def test_record_meta_status_is_idempotent_notification_db_update():
 
     assert result == {"received": 1, "matched": 1, "buffered": 0}
     assert any("meta_failed_at" in call.args[1] for call in execute.call_args_list)
+    assert any("UPDATE nudge_deliveries" in call.args[1] for call in execute.call_args_list)
     connection.commit.assert_called_once_with()
 
 
@@ -88,7 +89,10 @@ def test_status_that_arrives_before_wamid_persistence_is_buffered_and_reconciled
 
     def record_execute(_conn, sql, _params=None):
         cursor = MagicMock()
-        cursor.rowcount = 0 if "UPDATE credit_campaign_whatsapp_recipients" in sql else 1
+        cursor.rowcount = 0 if (
+            "UPDATE credit_campaign_whatsapp_recipients" in sql
+            or "UPDATE nudge_deliveries" in sql
+        ) else 1
         return cursor
 
     with (
@@ -110,10 +114,11 @@ def test_status_that_arrives_before_wamid_persistence_is_buffered_and_reconciled
         ("wamid.abc", "sent", updates_time, "919999999999", None)
     ]
     update_cursor = MagicMock(rowcount=1)
+    nudge_update_cursor = MagicMock(rowcount=0)
     delete_cursor = MagicMock(rowcount=1)
     with patch(
         "nudge_engine.credit_campaign_whatsapp.execute",
-        side_effect=[pending_cursor, update_cursor, delete_cursor],
+        side_effect=[pending_cursor, update_cursor, nudge_update_cursor, delete_cursor],
     ) as execute:
         matched = _reconcile_pending_meta_statuses(connection, ["wamid.abc"])
 

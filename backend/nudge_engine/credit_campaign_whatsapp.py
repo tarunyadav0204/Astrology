@@ -365,7 +365,37 @@ def _apply_meta_status_update(conn, update: Dict[str, Any]) -> int:
             update["message_id"],
         ),
     )
-    return max(0, int(getattr(cursor, "rowcount", 0) or 0))
+    matched = max(0, int(getattr(cursor, "rowcount", 0) or 0))
+    nudge_cursor = execute(
+        conn,
+        f"""
+        UPDATE nudge_deliveries
+        SET meta_recipient_id = COALESCE(%s, meta_recipient_id),
+            {timestamp_column} = COALESCE({timestamp_column}, %s),
+            meta_status = CASE
+                WHEN %s = 'read' THEN 'read'
+                WHEN %s = 'delivered' AND COALESCE(meta_status, '') <> 'read' THEN 'delivered'
+                WHEN %s = 'sent' AND COALESCE(meta_status, '') NOT IN ('delivered', 'read', 'failed') THEN 'sent'
+                WHEN %s = 'failed' AND COALESCE(meta_status, '') NOT IN ('delivered', 'read') THEN 'failed'
+                ELSE COALESCE(meta_status, 'accepted')
+            END,
+            meta_error = CASE WHEN %s = 'failed' THEN COALESCE(%s, meta_error) ELSE meta_error END,
+            meta_status_updated_at = GREATEST(
+                COALESCE(meta_status_updated_at, %s),
+                %s
+            )
+        WHERE meta_message_id = %s
+        """,
+        (
+            update["recipient_id"], update["occurred_at"],
+            status, status, status, status,
+            status, update["error"],
+            update["occurred_at"], update["occurred_at"],
+            update["message_id"],
+        ),
+    )
+    nudge_matched = max(0, int(getattr(nudge_cursor, "rowcount", 0) or 0))
+    return 1 if matched or nudge_matched else 0
 
 
 def _reconcile_pending_meta_statuses(conn, message_ids: Iterable[str]) -> int:
@@ -411,6 +441,7 @@ def record_meta_whatsapp_status_updates(payload: Dict[str, Any]) -> Dict[str, in
     matched = 0
     buffered = 0
     with db.get_conn() as conn:
+        db.init_nudge_tables(conn)
         ensure_credit_campaign_whatsapp_tables(conn)
         for update in updates:
             applied = _apply_meta_status_update(conn, update)

@@ -770,6 +770,201 @@ def test_reference_chart_debt_repayment_uses_route_polarity_not_current_date() -
     assert "not an exact payoff date" in answer
 
 
+def test_reference_chart_next_wealth_growth_searches_future_phases_not_as_of_date() -> None:
+    birth = {
+        "name": "Tarun", "date": "1980-04-02", "time": "14:55:00",
+        "latitude": 29.2396596, "longitude": 75.8174505,
+        "timezone": "UTC+5:30", "place": "Hisar, Haryana, India",
+    }
+    chart = ChartCalculator({}).calculate_chart(SimpleNamespace(**birth))
+    forward_periods = [
+        {
+            "start": "2026-08-27", "end": "2026-09-18", "time_status": "current",
+            "mahadasha": "Saturn", "antardasha": "Rahu", "pratyantardasha": "Saturn",
+            "activated_focus_houses": [2, 11], "relevance_score": 38,
+            "peak_activation_windows": [{
+                "start": "2026-08-27", "end": "2026-09-18", "planet": "Rahu",
+                "activated_focus_houses": [2], "delivered_event_houses": [{"house": 2}],
+            }],
+        },
+        {
+            "start": "2027-04-15", "end": "2027-10-04", "time_status": "future",
+            "mahadasha": "Saturn", "antardasha": "Rahu", "pratyantardasha": "Venus",
+            "activated_focus_houses": [2, 5, 11], "relevance_score": 69,
+            "peak_activation_windows": [{
+                "start": "2027-06-08", "end": "2027-06-08", "planet": "Venus",
+                "activated_focus_houses": [5, 11], "delivered_event_houses": [{"house": 5}, {"house": 11}],
+            }],
+        },
+        {
+            "start": "2028-04-22", "end": "2028-08-22", "time_status": "future",
+            "mahadasha": "Saturn", "antardasha": "Jupiter", "pratyantardasha": "Jupiter",
+            "activated_focus_houses": [2, 9, 11], "relevance_score": 65,
+            "peak_activation_windows": [{
+                "start": "2028-04-22", "end": "2028-07-22", "planet": "Jupiter",
+                "activated_focus_houses": [2], "delivered_event_houses": [{"house": 2}],
+            }],
+        },
+        {
+            "start": "2029-07-21", "end": "2029-08-26", "time_status": "future",
+            "mahadasha": "Saturn", "antardasha": "Jupiter", "pratyantardasha": "Venus",
+            "activated_focus_houses": [2, 5, 9, 11], "relevance_score": 71,
+            "peak_activation_windows": [{
+                "start": "2029-08-08", "end": "2029-08-18", "planet": "Venus",
+                "activated_focus_houses": [2, 11], "delivered_event_houses": [{"house": 2}, {"house": 11}],
+            }],
+        },
+    ]
+    foundation = _compact_wealth_foundation(
+        chart,
+        birth,
+        {"forward_event_dasha_scan": {"periods": forward_periods}},
+        category="wealth",
+        answer_mode="timing_window",
+    )
+    synthesis = foundation["wealth_growth_timing_synthesis"]
+    assert synthesis["current_window_assessment"]["classification"] == "current_financial_activity_not_next_growth"
+    assert synthesis["next_growth_window"]["start"] == "2027-04-15"
+    assert synthesis["strongest_growth_window"]["start"] == "2029-07-21"
+    assert [row["start"] for row in synthesis["ranked_growth_windows"]] == ["2027-04-15", "2029-07-21"]
+    assert any(row["start"] == "2028-04-22" for row in synthesis["partial_support_windows"])
+
+    context = {
+        "intent_summary": {"category": "wealth", "answer_mode": "timing_window"},
+        "normalized_evidence": {"wealth_foundation": foundation},
+        "current_dashas": {"levels": {"MD": {"planet": "Saturn"}}},
+        "current_transits": {"planets": {"Saturn": {"house": 9}}},
+    }
+    packet = apply_live_graph_policy(
+        {
+            "query_plan": {
+                "category": "wealth", "answer_mode": "timing_window",
+                "wealth_subtype": "general", "time_scope": {"as_of": "2026-08-27"},
+            },
+            "answer_spec": {"event_rules": {}}, "verification": {}, "user_derivation": {},
+            "verdict": {"direction": "conditional", "ranked_windows": [{"start": "2026-08-27"}]},
+        },
+        intent={"category": "wealth"}, context=context,
+    )
+    assert [row["start"] for row in packet["verdict"]["ranked_windows"]] == ["2027-04-15", "2029-07-21"]
+    answer = enforce_live_graph_answer(
+        "Your next meaningful wealth-growth window is 27 August 2026 under Saturn-Rahu-Saturn.",
+        packet,
+    )
+    assert "Your next meaningful wealth-growth phase is 15 April 2027 to 4 October 2027" in answer
+    assert "21 July 2029 to 26 August 2029" in answer
+    assert "not guaranteed gains or exact transaction dates" in answer
+
+
+def test_bounded_wealth_forecast_maps_months_instead_of_using_open_future_refusal() -> None:
+    birth = {
+        "name": "Tarun", "date": "1980-04-02", "time": "14:55:00",
+        "latitude": 29.2396596, "longitude": 75.8174505,
+        "timezone": "UTC+5:30", "place": "Hisar, Haryana, India",
+    }
+    chart = ChartCalculator({}).calculate_chart(SimpleNamespace(**birth))
+    segments = [
+        {
+            "start": "2027-01-01", "end": "2027-04-14",
+            "mahadasha": "Saturn", "antardasha": "Rahu", "pratyantardasha": "Mercury",
+            "activated_focus_houses": [2, 11], "relevance_score": 29,
+            "peak_activation_windows": [], "transit_trigger_windows": [],
+        },
+        {
+            "start": "2027-04-15", "end": "2027-10-04",
+            "mahadasha": "Saturn", "antardasha": "Rahu", "pratyantardasha": "Venus",
+            "activated_focus_houses": [2, 5, 11], "relevance_score": 69,
+            "peak_activation_windows": [{
+                "start": "2027-06-08", "end": "2027-06-08", "planet": "Venus",
+                "activated_focus_houses": [5, 11], "delivered_event_houses": [{"house": 5}, {"house": 11}],
+                "trigger_score": 14,
+            }],
+            "transit_trigger_windows": [
+                {
+                    "start": "2027-04-15", "end": "2027-05-27", "planet": "Saturn",
+                    "activated_focus_houses": [11], "delivered_event_houses": [{"house": 11}],
+                    "trigger_score": 2,
+                },
+                {
+                    "start": "2027-06-08", "end": "2027-06-08", "planet": "Venus",
+                    "activated_focus_houses": [5, 11], "delivered_event_houses": [{"house": 5}, {"house": 11}],
+                    "trigger_score": 14,
+                },
+                {
+                    "start": "2027-08-17", "end": "2027-09-06", "planet": "Venus",
+                    "activated_focus_houses": [2], "delivered_event_houses": [{"house": 2}],
+                    "trigger_score": 2,
+                },
+            ],
+        },
+        {
+            "start": "2027-10-05", "end": "2027-11-25",
+            "mahadasha": "Saturn", "antardasha": "Rahu", "pratyantardasha": "Sun",
+            "activated_focus_houses": [2, 9, 11], "relevance_score": 57,
+            "peak_activation_windows": [{
+                "start": "2027-10-05", "end": "2027-10-17", "planet": "Sun",
+                "activated_focus_houses": [9], "delivered_event_houses": [{"house": 9}],
+                "trigger_score": 5,
+            }],
+            "transit_trigger_windows": [],
+        },
+        {
+            "start": "2027-11-26", "end": "2027-12-31",
+            "mahadasha": "Saturn", "antardasha": "Rahu", "pratyantardasha": "Moon",
+            "activated_focus_houses": [2, 11], "relevance_score": 22,
+            "peak_activation_windows": [], "transit_trigger_windows": [],
+        },
+    ]
+    normalized = {
+        "current_timing": {"period_window": {
+            "kind": "window", "start": "2027-01-01", "end": "2027-12-31", "span_days": 365,
+        }},
+        "window_dasha_segments": {"segments": segments},
+    }
+    foundation = _compact_wealth_foundation(
+        chart, birth, normalized, category="wealth", answer_mode="timing_window",
+    )
+    synthesis = foundation["wealth_growth_timing_synthesis"]
+    bounded = synthesis["bounded_period_synthesis"]
+    assert synthesis["forecast_kind"] == "bounded_period_support_forecast"
+    assert synthesis["verdict"] == "bounded_period_support_mapped"
+    assert [row["month"] for row in bounded["strongest_peak_months"]] == ["June 2027"]
+    assert bounded["reinforced_support_months"] == [
+        "April 2027", "May 2027", "June 2027", "August 2027", "September 2027",
+    ]
+    assert bounded["background_support_months"] == ["July 2027"]
+    assert bounded["secondary_support_months"] == ["October 2027", "November 2027"]
+    assert bounded["lower_support_months"] == ["January 2027", "February 2027", "March 2027", "December 2027"]
+
+    context = {
+        "intent_summary": {"category": "wealth", "answer_mode": "timing_window"},
+        "normalized_evidence": {"wealth_foundation": foundation},
+        "current_dashas": {"levels": {"MD": {"planet": "Saturn"}}},
+        "current_transits": {"planets": {"Saturn": {"house": 9}}},
+    }
+    packet = apply_live_graph_policy(
+        {
+            "query_plan": {
+                "category": "wealth", "answer_mode": "timing_window", "wealth_subtype": "general",
+                "time_scope": {"requested": "next year", "as_of": "2027-01-01", "horizon_end": "2027-12-31"},
+            },
+            "answer_spec": {"event_rules": {}}, "verification": {}, "user_derivation": {},
+            "verdict": {"direction": "conditional"},
+        },
+        intent={"category": "wealth"}, context=context,
+    )
+    assert packet["verdict"]["direction"] == "bounded_wealth_support_forecast"
+    answer = enforce_live_graph_answer(
+        "I cannot identify a reliable future wealth-growth phase from the calculated evidence.",
+        packet,
+    )
+    assert answer.startswith("June 2027 is the strongest financially supportive")
+    assert "15 April 2027 to 4 October 2027" in answer
+    assert "October 2027 and November 2027 form a secondary supportive period" in answer
+    assert "January 2027, February 2027, March 2027, and December 2027 are comparatively lower-support" in answer
+    assert "cannot identify" not in answer
+
+
 def test_investment_answer_boundary_retains_supporting_d9_qualification() -> None:
     context = _foundation_context()
     packet = apply_live_graph_policy(

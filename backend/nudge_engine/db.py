@@ -280,6 +280,16 @@ def init_nudge_tables(conn) -> None:
             "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS send_status TEXT",
             "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS is_primary BOOLEAN DEFAULT TRUE",
             "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS clicked_at TIMESTAMPTZ",
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS meta_message_id TEXT",
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS meta_recipient_id TEXT",
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS meta_status TEXT",
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS meta_accepted_at TIMESTAMPTZ",
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS meta_sent_at TIMESTAMPTZ",
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS meta_delivered_at TIMESTAMPTZ",
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS meta_read_at TIMESTAMPTZ",
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS meta_failed_at TIMESTAMPTZ",
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS meta_error TEXT",
+            "ALTER TABLE nudge_deliveries ADD COLUMN IF NOT EXISTS meta_status_updated_at TIMESTAMPTZ",
         ):
             _safe_execute_nudge_ddl(conn, _ddl)
         _safe_execute_nudge_ddl(
@@ -291,6 +301,11 @@ def init_nudge_tables(conn) -> None:
             conn,
             "CREATE INDEX IF NOT EXISTS idx_nudge_deliveries_group "
             "ON nudge_deliveries(delivery_group_id) WHERE delivery_group_id IS NOT NULL",
+        )
+        _safe_execute_nudge_ddl(
+            conn,
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_nudge_deliveries_meta_message "
+            "ON nudge_deliveries(meta_message_id) WHERE meta_message_id IS NOT NULL",
         )
 
         execute(
@@ -310,6 +325,9 @@ def init_nudge_tables(conn) -> None:
                 audience_filter_json TEXT NOT NULL DEFAULT '{"type":"all"}',
                 landing_screen TEXT NOT NULL DEFAULT 'chat',
                 landing_url TEXT,
+                whatsapp_template_json TEXT,
+                conversion_event TEXT NOT NULL DEFAULT 'click',
+                frequency_cap_days INTEGER NOT NULL DEFAULT 0,
                 scheduled_at TIMESTAMPTZ,
                 dispatched_at TIMESTAMPTZ,
                 total_targeted INTEGER NOT NULL DEFAULT 0,
@@ -323,6 +341,12 @@ def init_nudge_tables(conn) -> None:
             conn,
             "ALTER TABLE nudge_campaigns ADD COLUMN IF NOT EXISTS landing_url TEXT",
         )
+        for _ddl in (
+            "ALTER TABLE nudge_campaigns ADD COLUMN IF NOT EXISTS whatsapp_template_json TEXT",
+            "ALTER TABLE nudge_campaigns ADD COLUMN IF NOT EXISTS conversion_event TEXT NOT NULL DEFAULT 'click'",
+            "ALTER TABLE nudge_campaigns ADD COLUMN IF NOT EXISTS frequency_cap_days INTEGER NOT NULL DEFAULT 0",
+        ):
+            _safe_execute_nudge_ddl(conn, _ddl)
         _safe_execute_nudge_ddl(
             conn,
             "CREATE INDEX IF NOT EXISTS idx_nudge_campaigns_status_sched "
@@ -981,6 +1005,9 @@ def insert_delivery(
     delivery_group_id: Optional[str] = None,
     send_status: Optional[str] = None,
     is_primary: bool = True,
+    meta_message_id: Optional[str] = None,
+    meta_recipient_id: Optional[str] = None,
+    meta_status: Optional[str] = None,
 ) -> Optional[int]:
     """Insert one row into nudge_deliveries (in-app inbox + audit). Returns the row id."""
     data_json = ""
@@ -995,14 +1022,17 @@ def insert_delivery(
             """
             INSERT INTO nudge_deliveries
             (userid, trigger_id, title, body, event_params, sent_at, channel, data_json,
-             campaign_id, delivery_group_id, send_status, is_primary)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, NULLIF(%s, ''), %s, %s, %s, %s)
+             campaign_id, delivery_group_id, send_status, is_primary,
+             meta_message_id, meta_recipient_id, meta_status, meta_accepted_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NULLIF(%s, ''), %s, %s, %s, %s,
+                    %s, %s, %s, CASE WHEN %s IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END)
             RETURNING id
             """,
             (
                 userid, trigger_id, title, body, event_params or "", sent_at.isoformat(),
                 channel, data_json or None,
                 campaign_id, delivery_group_id, send_status, bool(is_primary),
+                meta_message_id, meta_recipient_id, meta_status, meta_message_id,
             ),
         )
         row = cur.fetchone()
@@ -1429,7 +1459,8 @@ def insert_cron_run(conn, job_key: str, status: str, summary_json: str) -> Optio
 _CAMPAIGN_COLUMNS = (
     "id", "name", "status", "title_template", "body_template", "question_template",
     "channel_policy", "channels_json", "ai_personalize", "ai_base_prompt",
-    "audience_filter_json", "landing_screen", "landing_url", "scheduled_at", "dispatched_at",
+    "audience_filter_json", "landing_screen", "landing_url", "whatsapp_template_json",
+    "conversion_event", "frequency_cap_days", "scheduled_at", "dispatched_at",
     "total_targeted", "created_by", "created_at", "updated_at",
 )
 
@@ -1447,6 +1478,10 @@ def _campaign_row_to_dict(row: Tuple[Any, ...]) -> Dict[str, Any]:
         out["audience_filter"] = json.loads(out.get("audience_filter_json") or "{}")
     except Exception:
         out["audience_filter"] = {}
+    try:
+        out["whatsapp_template"] = json.loads(out.get("whatsapp_template_json") or "null")
+    except Exception:
+        out["whatsapp_template"] = None
     out["ai_personalize"] = bool(out.get("ai_personalize"))
     return out
 
@@ -1468,6 +1503,9 @@ def create_campaign(
     scheduled_at: Optional[Any],
     status: str,
     created_by: Optional[int],
+    whatsapp_template_json: Optional[str] = None,
+    conversion_event: str = "click",
+    frequency_cap_days: int = 0,
 ) -> Optional[int]:
     cur = execute(
         conn,
@@ -1475,14 +1513,16 @@ def create_campaign(
         INSERT INTO nudge_campaigns
             (name, status, title_template, body_template, question_template,
              channel_policy, channels_json, ai_personalize, ai_base_prompt,
-             audience_filter_json, landing_screen, landing_url, scheduled_at, created_by)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             audience_filter_json, landing_screen, landing_url, whatsapp_template_json,
+             conversion_event, frequency_cap_days, scheduled_at, created_by)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
         (
             name, status, title_template, body_template, question_template or None,
             channel_policy, channels_json, bool(ai_personalize), ai_base_prompt or None,
-            audience_filter_json, landing_screen, landing_url, scheduled_at, created_by,
+            audience_filter_json, landing_screen, landing_url, whatsapp_template_json,
+            str(conversion_event or "click"), int(frequency_cap_days or 0), scheduled_at, created_by,
         ),
     )
     row = cur.fetchone()
@@ -1494,7 +1534,7 @@ def update_campaign(conn, campaign_id: int, **fields: Any) -> int:
         "name", "status", "title_template", "body_template", "question_template",
         "channel_policy", "channels_json", "ai_personalize", "ai_base_prompt",
         "audience_filter_json", "landing_screen", "landing_url", "scheduled_at", "dispatched_at",
-        "total_targeted",
+        "total_targeted", "whatsapp_template_json", "conversion_event", "frequency_cap_days",
     }
     updates = []
     params: List[Any] = []
@@ -1714,6 +1754,49 @@ def list_campaigns(conn, limit: int = 200) -> List[Dict[str, Any]]:
     return [_campaign_row_to_dict(r) for r in (cur.fetchall() or [])]
 
 
+def campaign_recipient_report(conn, campaign_id: int) -> List[Dict[str, Any]]:
+    cur = execute(
+        conn,
+        """
+        SELECT r.userid, r.state, r.last_error, r.attempt_count,
+               d.channel, d.send_status, d.created_at, d.clicked_at,
+               d.meta_message_id, d.meta_status, d.meta_accepted_at,
+               d.meta_sent_at, d.meta_delivered_at, d.meta_read_at,
+               d.meta_failed_at, d.meta_error
+        FROM nudge_campaign_recipients r
+        LEFT JOIN LATERAL (
+            SELECT channel, send_status, created_at, clicked_at,
+                   meta_message_id, meta_status, meta_accepted_at,
+                   meta_sent_at, meta_delivered_at, meta_read_at,
+                   meta_failed_at, meta_error
+            FROM nudge_deliveries d
+            WHERE d.campaign_id = r.campaign_id AND d.userid = r.userid
+              AND d.channel IN ('whatsapp', 'whatsapp_template')
+            ORDER BY (d.meta_message_id IS NOT NULL) DESC, d.created_at DESC, d.id DESC
+            LIMIT 1
+        ) d ON TRUE
+        WHERE r.campaign_id = %s
+        ORDER BY r.userid
+        """,
+        (int(campaign_id),),
+    )
+    keys = (
+        "userid", "state", "last_error", "attempt_count", "channel", "send_status",
+        "created_at", "clicked_at", "meta_message_id", "meta_status", "accepted_at",
+        "sent_at", "delivered_at", "read_at", "failed_at", "meta_error",
+    )
+    rows: List[Dict[str, Any]] = []
+    for raw in cur.fetchall() or []:
+        item = dict(zip(keys, raw))
+        item["userid"] = int(item["userid"])
+        item["attempt_count"] = int(item.get("attempt_count") or 0)
+        for key in ("created_at", "clicked_at", "accepted_at", "sent_at", "delivered_at", "read_at", "failed_at"):
+            if hasattr(item.get(key), "isoformat"):
+                item[key] = item[key].isoformat()
+        rows.append(item)
+    return rows
+
+
 def delete_campaign(conn, campaign_id: int) -> int:
     cur = execute(
         conn,
@@ -1911,6 +1994,21 @@ def mark_delivery_clicked(
     return int(cur.rowcount or 0)
 
 
+def mark_whatsapp_campaign_clicked(conn, campaign_id: int, userid: int) -> int:
+    """Attribute a secure WhatsApp campaign link without requiring a delivery-group token."""
+    cur = execute(
+        conn,
+        """
+        UPDATE nudge_deliveries
+        SET clicked_at = COALESCE(clicked_at, CURRENT_TIMESTAMP)
+        WHERE campaign_id = %s AND userid = %s
+          AND channel IN ('whatsapp', 'whatsapp_template')
+        """,
+        (int(campaign_id), int(userid)),
+    )
+    return int(cur.rowcount or 0)
+
+
 # ---------------------------------------------------------------------------
 # Analytics / dashboard aggregates
 # ---------------------------------------------------------------------------
@@ -1943,13 +2041,18 @@ def _delivery_channel_counts(conn, where_sql: str, params: Tuple[Any, ...]) -> D
                COUNT(*) FILTER (WHERE COALESCE(send_status, '') = 'failed') AS failed_attempts,
                COUNT(*) FILTER (WHERE COALESCE(is_primary, TRUE)
                                 AND (channel IS NULL OR TRIM(channel) = '' OR channel = 'stored')) AS stored_only,
-               COUNT(*) FILTER (WHERE clicked_at IS NOT NULL) AS clicked
+               COUNT(*) FILTER (WHERE clicked_at IS NOT NULL) AS clicked,
+               COUNT(*) FILTER (WHERE meta_message_id IS NOT NULL) AS meta_accepted,
+               COUNT(*) FILTER (WHERE meta_sent_at IS NOT NULL OR meta_delivered_at IS NOT NULL OR meta_read_at IS NOT NULL) AS meta_sent,
+               COUNT(*) FILTER (WHERE meta_delivered_at IS NOT NULL OR meta_read_at IS NOT NULL) AS meta_delivered,
+               COUNT(*) FILTER (WHERE meta_read_at IS NOT NULL) AS meta_read,
+               COUNT(*) FILTER (WHERE meta_failed_at IS NOT NULL AND meta_delivered_at IS NULL AND meta_read_at IS NULL) AS meta_failed
         FROM nudge_deliveries
         WHERE {where_sql}
         """,
         params,
     )
-    row = cur.fetchone() or (0,) * 12
+    row = cur.fetchone() or (0,) * 17
     keys = (
         "targeted",
         "push",
@@ -1963,6 +2066,11 @@ def _delivery_channel_counts(conn, where_sql: str, params: Tuple[Any, ...]) -> D
         "failed_attempts",
         "stored_only",
         "clicked",
+        "meta_accepted",
+        "meta_sent",
+        "meta_delivered",
+        "meta_read",
+        "meta_failed",
     )
     return {k: int(v or 0) for k, v in zip(keys, row)}
 

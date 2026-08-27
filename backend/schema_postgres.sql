@@ -493,6 +493,16 @@ CREATE TABLE "nudge_deliveries" (
     "send_status" TEXT,
     "is_primary" BOOLEAN DEFAULT TRUE,
     "clicked_at" TIMESTAMP,
+    "meta_message_id" TEXT,
+    "meta_recipient_id" TEXT,
+    "meta_status" TEXT,
+    "meta_accepted_at" TIMESTAMPTZ,
+    "meta_sent_at" TIMESTAMPTZ,
+    "meta_delivered_at" TIMESTAMPTZ,
+    "meta_read_at" TIMESTAMPTZ,
+    "meta_failed_at" TIMESTAMPTZ,
+    "meta_error" TEXT,
+    "meta_status_updated_at" TIMESTAMPTZ,
     PRIMARY KEY ("id")
 );
 
@@ -511,6 +521,9 @@ CREATE TABLE "nudge_campaigns" (
     "audience_filter_json" TEXT NOT NULL DEFAULT '{"type":"all"}',
     "landing_screen" TEXT NOT NULL DEFAULT 'chat',
     "landing_url" TEXT,
+    "whatsapp_template_json" TEXT,
+    "conversion_event" TEXT NOT NULL DEFAULT 'click',
+    "frequency_cap_days" INTEGER NOT NULL DEFAULT 0,
     "scheduled_at" TIMESTAMPTZ,
     "dispatched_at" TIMESTAMPTZ,
     "total_targeted" INTEGER NOT NULL DEFAULT 0,
@@ -926,6 +939,7 @@ CREATE INDEX idx_nudge_deliveries_user_sent ON nudge_deliveries(userid, sent_at)
 CREATE INDEX idx_nudge_deliveries_campaign ON nudge_deliveries(campaign_id) WHERE campaign_id IS NOT NULL;
 
 CREATE INDEX idx_nudge_deliveries_group ON nudge_deliveries(delivery_group_id) WHERE delivery_group_id IS NOT NULL;
+CREATE UNIQUE INDEX idx_nudge_deliveries_meta_message ON nudge_deliveries(meta_message_id) WHERE meta_message_id IS NOT NULL;
 
 CREATE INDEX idx_nudge_campaigns_status_sched ON nudge_campaigns(status, scheduled_at);
 

@@ -52,6 +52,19 @@ def _split_campaign_continue_token(raw_token: str) -> tuple[str, Optional[int]]:
     return match.group(1), int(match.group(2))
 
 
+def _split_attributed_continue_token(
+    raw_token: str,
+) -> tuple[str, Optional[int], Optional[int]]:
+    token, credit_campaign_id = _split_campaign_continue_token(raw_token)
+    if credit_campaign_id is not None:
+        return token, credit_campaign_id, None
+    raw = str(raw_token or "").strip()
+    match = re.fullmatch(r"([A-Za-z0-9_-]{8,180})\.nc(\d+)[.,;:!?)]*", raw)
+    if not match:
+        return raw, None, None
+    return match.group(1), None, int(match.group(2))
+
+
 def _digits_only(value: str) -> str:
     return "".join(ch for ch in str(value or "") if ch.isdigit())
 
@@ -72,7 +85,7 @@ def _require_admin(user: User) -> None:
 @auth_router.post("/web-continue")
 async def exchange_web_continue_token(body: WebContinueBody):
     """Exchange a reusable continue token for a normal browser JWT + user payload."""
-    token, campaign_id = _split_campaign_continue_token(body.token)
+    token, campaign_id, nudge_campaign_id = _split_attributed_continue_token(body.token)
     user = resolve_continue_token(token)
     if not user or not user.get("phone"):
         raise HTTPException(status_code=404, detail="Invalid or revoked continue link")
@@ -88,6 +101,23 @@ async def exchange_web_continue_token(body: WebContinueBody):
             await run_in_threadpool(mark_campaign_opened, int(user["userid"]), campaign_id)
     except Exception:
         logger.debug("credit campaign open tracking skipped", exc_info=True)
+    try:
+        if nudge_campaign_id is not None:
+            from nudge_engine import db as nudge_db
+
+            def _mark_nudge_click() -> None:
+                with nudge_db.get_conn() as conn:
+                    nudge_db.init_nudge_tables(conn)
+                    nudge_db.mark_whatsapp_campaign_clicked(
+                        conn,
+                        int(nudge_campaign_id),
+                        int(user["userid"]),
+                    )
+                    conn.commit()
+
+            await run_in_threadpool(_mark_nudge_click)
+    except Exception:
+        logger.debug("WhatsApp campaign click tracking skipped", exc_info=True)
     return {
         "access_token": access_token,
         "token_type": "bearer",

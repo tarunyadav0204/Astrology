@@ -1,11 +1,14 @@
 """Admin endpoints for discovering and sending approved WhatsApp templates."""
 from __future__ import annotations
 
+from datetime import datetime
+import json
 import logging
 import os
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -19,6 +22,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin/whatsapp", tags=["admin-whatsapp"])
 
 MAX_RECIPIENTS = 100
+MAX_CAMPAIGN_RECIPIENTS = 10_000
 _VARIABLE_RE = re.compile(r"{{\s*([^{}]+?)\s*}}")
 
 
@@ -46,19 +50,27 @@ class TemplateSendRequest(TemplateMappingRequest):
     pass
 
 
+class WhatsAppCampaignCreateRequest(TemplateMappingRequest):
+    name: str = Field(..., min_length=3, max_length=200)
+    scheduled_at: Optional[str] = None
+    status: str = Field(default="draft", max_length=20)
+    conversion_event: str = Field(default="click", max_length=40)
+    frequency_cap_days: int = Field(default=0, ge=0, le=365)
+
+
 def _require_admin(user: User) -> None:
     if getattr(user, "role", None) != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
 
 
-def _clean_user_ids(values: List[int]) -> List[int]:
+def _clean_user_ids(values: List[int], *, limit: int = MAX_RECIPIENTS) -> List[int]:
     clean = sorted({int(value) for value in values if int(value) > 0})
     if not clean:
         raise HTTPException(status_code=400, detail="At least one valid user ID is required")
-    if len(clean) > MAX_RECIPIENTS:
+    if len(clean) > limit:
         raise HTTPException(
             status_code=400,
-            detail=f"A maximum of {MAX_RECIPIENTS} users can be sent in one batch",
+            detail=f"A maximum of {limit} users can be included",
         )
     return clean
 
@@ -95,6 +107,51 @@ def _resolve_recipients(user_ids: List[int]) -> List[Dict[str, Any]]:
         )
         found = {int(row[0]): row for row in (cur.fetchall() or [])}
 
+    rows: List[Dict[str, Any]] = []
+    for user_id in clean:
+        row = found.get(user_id)
+        if not row:
+            rows.append({"user_id": user_id, "status": "not_found", "sendable": False})
+            continue
+        linked_target = _valid_recipient(row[3])
+        phone_target = _valid_recipient(row[2])
+        if linked_target:
+            status, target = "linked", linked_target
+        elif phone_target:
+            status, target = "phone_only", phone_target
+        else:
+            status, target = "no_phone", ""
+        rows.append(
+            {
+                "user_id": user_id,
+                "name": str(row[1] or ""),
+                "phone": str(row[2] or ""),
+                "email": str(row[4] or ""),
+                "status": status,
+                "sendable": bool(target),
+                "recipient": target,
+            }
+        )
+    return rows
+
+
+def _resolve_campaign_recipients(user_ids: List[int]) -> List[Dict[str, Any]]:
+    """Resolve large campaign audiences from the application read replica."""
+    clean = _clean_user_ids(user_ids, limit=MAX_CAMPAIGN_RECIPIENTS)
+    from nudge_engine import db as nudge_db
+
+    with nudge_db.get_read_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            SELECT userid, COALESCE(name, ''), COALESCE(phone, ''),
+                   COALESCE(whatsapp_wa_id, ''), COALESCE(email, '')
+            FROM users
+            WHERE userid = ANY(%s)
+            """,
+            (clean,),
+        )
+        found = {int(row[0]): row for row in (cur.fetchall() or [])}
     rows: List[Dict[str, Any]] = []
     for user_id in clean:
         row = found.get(user_id)
@@ -544,3 +601,135 @@ async def send_template(
         "skipped": len(results) - accepted - failed,
         "results": results,
     }
+
+
+@router.post("/campaigns")
+async def create_whatsapp_campaign(
+    body: WhatsAppCampaignCreateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Save a verified Meta-template campaign on the isolated nudge engine."""
+    _require_admin(current_user)
+    recipients = await run_in_threadpool(_resolve_campaign_recipients, body.user_ids)
+    template = await run_in_threadpool(
+        _find_template, body.template_name.strip(), body.language.strip()
+    )
+    unsupported_reason = _unsupported_reason(template)
+    if unsupported_reason:
+        raise HTTPException(status_code=400, detail=unsupported_reason)
+    eligible = _eligible_recipients(recipients, body.include_unlinked)
+    preview = _mapping_preview(template, body.mappings, eligible)
+    unresolved = [row for row in preview if not row["resolved"]]
+    if unresolved:
+        details = "; ".join(
+            f"user {row['user_id']}: {', '.join(row['missing'])}"
+            for row in unresolved[:10]
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Template variables are unresolved for {len(unresolved)} recipient(s). {details}",
+        )
+
+    status = str(body.status or "draft").strip().lower()
+    if status not in {"draft", "scheduled", "send_now"}:
+        raise HTTPException(status_code=400, detail="status must be draft, scheduled, or send_now")
+    stored_status = "draft" if status == "send_now" else status
+    scheduled_at = None
+    if body.scheduled_at and str(body.scheduled_at).strip():
+        try:
+            scheduled_at = datetime.fromisoformat(str(body.scheduled_at).strip().replace("Z", "+00:00"))
+            if scheduled_at.tzinfo is None:
+                scheduled_at = scheduled_at.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid scheduled_at: {exc}") from exc
+    if status == "scheduled" and scheduled_at is None:
+        raise HTTPException(status_code=400, detail="Choose a schedule time")
+
+    conversion_event = str(body.conversion_event or "click").strip().lower()
+    if conversion_event not in {"click", "credit_purchase", "subscription_purchase", "question", "none"}:
+        raise HTTPException(status_code=400, detail="Unsupported conversion event")
+    mappings = {key: value.dict() for key, value in body.mappings.items()}
+    config: Dict[str, Any] = {
+        "name": body.template_name.strip(),
+        "language": body.language.strip(),
+        "category": template.get("category"),
+        "template": template,
+        "mappings": mappings,
+        "include_unlinked": bool(body.include_unlinked),
+        "phone_only_override_by": int(current_user.userid) if body.include_unlinked else None,
+    }
+    body_text = next(
+        (
+            str(component.get("text") or "")
+            for component in (template.get("components") or [])
+            if str(component.get("type") or "").upper() == "BODY"
+        ),
+        body.template_name,
+    )
+
+    from nudge_engine import db as nudge_db
+
+    campaign_id: Optional[int] = None
+    try:
+        with nudge_db.get_conn() as conn:
+            nudge_db.init_nudge_tables(conn)
+            campaign_id = nudge_db.create_campaign(
+                conn,
+                name=body.name.strip(),
+                title_template=f"WhatsApp · {body.template_name.strip()}"[:200],
+                body_template=body_text[:600] or body.template_name.strip(),
+                question_template="",
+                channel_policy="blast",
+                channels_json='["whatsapp"]',
+                ai_personalize=False,
+                ai_base_prompt="",
+                audience_filter_json=json.dumps(
+                    {"type": "user_ids", "user_ids": [row["user_id"] for row in recipients]},
+                    ensure_ascii=False,
+                ),
+                landing_screen="chat",
+                landing_url=None,
+                scheduled_at=scheduled_at,
+                status=stored_status,
+                created_by=current_user.userid,
+                whatsapp_template_json=json.dumps(config, ensure_ascii=False),
+                conversion_event=conversion_event,
+                frequency_cap_days=int(body.frequency_cap_days or 0),
+            )
+            conn.commit()
+
+        dispatch_result = None
+        if status == "send_now":
+            from nudge_engine.campaigns import dispatch_campaign_now
+
+            dispatch_result = await run_in_threadpool(dispatch_campaign_now, int(campaign_id))
+            if not dispatch_result.get("ok"):
+                raise HTTPException(
+                    status_code=409,
+                    detail=dispatch_result.get("error") or "Campaign dispatch failed",
+                )
+
+        return {
+            "ok": True,
+            "campaign_id": int(campaign_id),
+            "status": "sending" if status == "send_now" else status,
+            "scheduled_at": scheduled_at.isoformat() if scheduled_at else None,
+            "dispatch": dispatch_result,
+            "summary": {
+                key: sum(1 for row in recipients if row["status"] == key)
+                for key in ("linked", "phone_only", "no_phone", "not_found")
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        if campaign_id is not None:
+            try:
+                with nudge_db.get_conn() as conn:
+                    nudge_db.init_nudge_tables(conn)
+                    nudge_db.delete_campaign(conn, int(campaign_id))
+                    conn.commit()
+            except Exception:
+                logger.exception("Could not remove incomplete WhatsApp campaign %s", campaign_id)
+        logger.exception("Failed to create WhatsApp campaign")
+        raise HTTPException(status_code=500, detail="Failed to create WhatsApp campaign") from exc

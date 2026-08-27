@@ -329,6 +329,11 @@ def apply_live_graph_policy(
                 if runtime_key == "loss_vulnerability" and isinstance(wealth_foundation.get("loss_vulnerability_synthesis"), Mapping)
                 else {}
             ),
+            "wealth_growth_timing_synthesis": (
+                dict(wealth_foundation.get("wealth_growth_timing_synthesis"))
+                if runtime_key == "wealth_timing" and isinstance(wealth_foundation.get("wealth_growth_timing_synthesis"), Mapping)
+                else {}
+            ),
             "required_answer_order": [
                 "direct route-specific financial verdict",
                 (
@@ -415,6 +420,60 @@ def apply_live_graph_policy(
         compact_policy["wealth_adjudication"] = wealth_adjudication
         answer_spec["financial_safety_rules"] = compact_policy["financial_safety_rules"]
         answer_spec["wealth_answer_rules"] = wealth_answer_rules
+        if runtime_key == "wealth_timing":
+            growth_synthesis = (
+                dict(wealth_foundation.get("wealth_growth_timing_synthesis"))
+                if isinstance(wealth_foundation.get("wealth_growth_timing_synthesis"), Mapping)
+                else {}
+            )
+            growth_windows = [
+                dict(row) for row in list(growth_synthesis.get("ranked_growth_windows") or [])
+                if isinstance(row, Mapping) and (row.get("start") or row.get("end"))
+            ]
+            compact_policy["wealth_growth_timing_synthesis"] = growth_synthesis
+            wealth_answer_rules["wealth_growth_timing_synthesis"] = growth_synthesis
+            wealth_answer_rules["forbidden_moves"].extend([
+                "Do not call the current/as-of date or current dasha boundary the next wealth-growth period.",
+                "Do not equate financial activity, house 5, Rahu opportunity or a high generic event score with realized wealth growth.",
+                "Lead with the earliest supplied future meaningful-growth phase; name the stronger later phase separately when supplied.",
+                "Do not claim an exact gain, transaction or windfall date; present the supplied broad support windows.",
+            ])
+            if growth_synthesis.get("forecast_kind") == "bounded_period_support_forecast":
+                wealth_answer_rules["forbidden_moves"].extend([
+                    "Do not apply the open-future event threshold to a bounded month, quarter or year forecast.",
+                    "Do not refuse a bounded forecast when bounded_period_synthesis maps stronger, secondary and lower-support months.",
+                    "Do not collapse the requested calendar period into one dasha boundary; cover its full chronological progression.",
+                ])
+            verdict = dict(result.get("verdict") or {})
+            verdict["direction"] = (
+                "bounded_wealth_support_forecast"
+                if growth_synthesis.get("forecast_kind") == "bounded_period_support_forecast"
+                else "future_wealth_growth_phases"
+                if growth_windows else "insufficient_future_wealth_growth_evidence"
+            )
+            verdict["ranked_windows"] = growth_windows
+            verdict["rationale"] = {
+                "source": "wealth_foundation.wealth_growth_timing_synthesis",
+                "current_window_assessment": growth_synthesis.get("current_window_assessment"),
+                "partial_support_windows": growth_synthesis.get("partial_support_windows"),
+                "claim_rule": growth_synthesis.get("claim_rule"),
+            }
+            result["verdict"] = verdict
+            event_rules = dict(answer_spec.get("event_rules") or {})
+            event_rules["allowed_timing_windows"] = growth_windows
+            event_rules["required_material_windows"] = growth_windows[:2]
+            event_rules["window_answer_rule"] = growth_synthesis.get("claim_rule")
+            answer_spec["event_rules"] = event_rules
+            if (
+                not growth_windows
+                and growth_synthesis.get("forecast_kind") != "bounded_period_support_forecast"
+                and not timing_missing
+            ):
+                compact_policy["claim_permission"] = "no_ranked_wealth_growth_window"
+                compact_policy["instruction"] = (
+                    "No route-adjudicated future wealth-growth phase is available. Do not turn the current date, "
+                    "financial activity or a dasha boundary into growth timing."
+                )
         if runtime_key == "debt_repayment":
             debt_synthesis = (
                 dict(wealth_foundation.get("debt_repayment_synthesis"))
@@ -1340,6 +1399,189 @@ def enforce_live_graph_answer(
                     "Overall, disciplined, researched and longer-horizon investing is better supported than frequent, leveraged or impulsive speculation. "
                     "That does not mean every speculative decision must fail; it means volatility and retention risk need tighter control."
                 )
+    if policy.get("domain") == "wealth" and policy.get("runtime_key") == "wealth_timing":
+        growth_synthesis = (
+            policy.get("wealth_growth_timing_synthesis")
+            if isinstance(policy.get("wealth_growth_timing_synthesis"), Mapping)
+            else {}
+        )
+        growth_windows = [
+            dict(row) for row in list(growth_synthesis.get("ranked_growth_windows") or [])
+            if isinstance(row, Mapping) and (row.get("start") or row.get("end"))
+        ]
+        bounded_forecast = (
+            growth_synthesis.get("bounded_period_synthesis")
+            if isinstance(growth_synthesis.get("bounded_period_synthesis"), Mapping)
+            else {}
+        )
+        if (
+            policy.get("claim_permission") == "no_ranked_wealth_growth_window"
+            or (not growth_windows and not bounded_forecast)
+        ):
+            if str(language or "").lower().startswith("hi"):
+                return (
+                    "गणना में भविष्य की कोई विश्वसनीय धन-वृद्धि अवधि स्थापित नहीं हुई। केवल वर्तमान दशा, "
+                    "पाँचवें भाव या वित्तीय गतिविधि को धन-वृद्धि मानकर मैं कोई तारीख नहीं बनाऊँगा।"
+                )
+            return (
+                "I can’t identify a reliable future wealth-growth phase from the calculated evidence. Current "
+                "financial activity or a dasha boundary alone is not realized growth, so I won’t turn today into the answer."
+            )
+        if bounded_forecast and str(language or "").lower().startswith("en"):
+            def format_bounded_date(value: Any) -> str:
+                try:
+                    return datetime.strptime(str(value)[:10], "%Y-%m-%d").strftime("%d %B %Y").lstrip("0")
+                except (TypeError, ValueError):
+                    return str(value or "")
+
+            def natural_months(values: Any) -> str:
+                months = [str(value) for value in list(values or []) if value]
+                if not months:
+                    return ""
+                if len(months) == 1:
+                    return months[0]
+                if len(months) == 2:
+                    return f"{months[0]} and {months[1]}"
+                return f"{', '.join(months[:-1])}, and {months[-1]}"
+
+            strongest_phase = (
+                bounded_forecast.get("strongest_phase")
+                if isinstance(bounded_forecast.get("strongest_phase"), Mapping)
+                else {}
+            )
+            peak_rows = [
+                row for row in list(bounded_forecast.get("strongest_peak_months") or [])
+                if isinstance(row, Mapping) and row.get("month")
+            ]
+            peak_months = [str(row.get("month")) for row in peak_rows]
+            reinforced = [
+                str(value) for value in list(bounded_forecast.get("reinforced_support_months") or [])
+                if value and str(value) not in peak_months
+            ]
+            background = list(bounded_forecast.get("background_support_months") or [])
+            secondary = list(bounded_forecast.get("secondary_support_months") or [])
+            lower = list(bounded_forecast.get("lower_support_months") or [])
+            peak_text = natural_months(peak_months) or "the strongest dated transit concentration"
+            parts = [
+                f"{peak_text} is the strongest financially supportive part of the requested period."
+            ]
+            if strongest_phase.get("start") and strongest_phase.get("end"):
+                parts.append(
+                    f"The broader supportive phase runs from {format_bounded_date(strongest_phase.get('start'))} "
+                    f"to {format_bounded_date(strongest_phase.get('end'))}, during {strongest_phase.get('chain')}."
+                )
+            if reinforced:
+                parts.append(
+                    f"Within that phase, {natural_months(reinforced)} receive additional dated transit reinforcement."
+                )
+            if background:
+                parts.append(
+                    f"{natural_months(background)} remains part of the supportive dasha phase, but without the same concentrated transit peak."
+                )
+            if secondary:
+                parts.append(
+                    f"{natural_months(secondary)} {'form' if len(secondary) > 1 else 'forms'} a secondary supportive period: "
+                    "the financial houses remain engaged, but the KP/gain confirmation is less complete than in the strongest phase."
+                )
+            if lower:
+                parts.append(
+                    f"{natural_months(lower)} {'are' if len(lower) > 1 else 'is'} comparatively lower-support, so "
+                    f"{'they are' if len(lower) > 1 else 'it is'} better read as consolidation and financial management rather than a primary growth window."
+                )
+            if growth_synthesis.get("retention_qualification") == "mixed_capacity_with_retention_pressure":
+                parts.append(
+                    "Your D2 still shows retention pressure, so supportive months are better for creating or collecting gains than assuming every inflow will automatically stay."
+                )
+            parts.append(
+                "This is a relative astrological forecast across the year, not a guarantee of profit or a substitute for financial planning."
+            )
+            parts.append(
+                "Would you like me to separate these months further for career income, business, investments, or debt repayment?"
+            )
+            return " ".join(parts)
+        if str(language or "").lower().startswith("en"):
+            def format_growth_date(value: Any) -> str:
+                try:
+                    return datetime.strptime(str(value)[:10], "%Y-%m-%d").strftime("%d %B %Y").lstrip("0")
+                except (TypeError, ValueError):
+                    return str(value or "")
+
+            def growth_range(row: Mapping[str, Any]) -> str:
+                return f"{format_growth_date(row.get('start'))} to {format_growth_date(row.get('end'))}"
+
+            required_dates = [
+                (str(row.get(key) or "")[:10], format_growth_date(row.get(key)))
+                for row in growth_windows[:2]
+                for key in ("start", "end")
+                if row.get(key)
+            ]
+            names_required_windows = all(
+                iso_value in clean_answer or human_value in clean_answer
+                for iso_value, human_value in required_dates
+            )
+            current = (
+                growth_synthesis.get("current_window_assessment")
+                if isinstance(growth_synthesis.get("current_window_assessment"), Mapping)
+                else {}
+            )
+            current_start = format_growth_date(current.get("start")) if current.get("start") else ""
+            mislabels_current = bool(
+                current_start
+                and current_start in clean_answer
+                and re.search(
+                    rf"(?:next|meaningful|growth|significant marker).{{0,100}}{re.escape(current_start)}|"
+                    rf"{re.escape(current_start)}.{{0,100}}(?:next|meaningful|growth|significant marker)",
+                    clean_answer,
+                    re.IGNORECASE,
+                )
+            )
+            unsafe_exact_claim = bool(re.search(
+                r"\b(?:exact gain date|guaranteed gains?|will become wealthy|certain profit)\b",
+                clean_answer,
+                re.IGNORECASE,
+            ))
+            if not names_required_windows or mislabels_current or unsafe_exact_claim:
+                next_window = growth_windows[0]
+                strongest = next(
+                    (
+                        row for row in growth_windows
+                        if row.get("answer_role") == "strongest_later_growth_phase"
+                    ),
+                    max(
+                        growth_windows,
+                        key=lambda row: (
+                            int(row.get("tier") or 0),
+                            len(row.get("transit_growth_houses") or []),
+                        ),
+                    ),
+                )
+                current_sentence = (
+                    f"The current {current.get('chain')} phase beginning {format_growth_date(current.get('start'))} "
+                    "shows financial activity, but it does not have the complete KP-and-transit gain combination, so it is not the answer to ‘next meaningful growth’. "
+                    if current else "The current period is context, not automatically the next growth phase. "
+                )
+                next_sentence = (
+                    f"Your next meaningful wealth-growth phase is {growth_range(next_window)}, during {next_window.get('chain')}. "
+                    f"The period connects wealth houses {', '.join(str(value) for value in next_window.get('growth_houses') or [])}; "
+                    f"the dasha chain supplies KP support through houses {', '.join(str(value) for value in next_window.get('kp_growth_houses') or [])}, "
+                    f"and transit confirms realized-gain house 11."
+                )
+                strongest_sentence = ""
+                if strongest is not next_window:
+                    strongest_sentence = (
+                        f" The fuller and stronger later phase is {growth_range(strongest)}, during {strongest.get('chain')}, "
+                        f"when houses {', '.join(str(value) for value in strongest.get('growth_houses') or [])} combine with broader KP and transit confirmation."
+                    )
+                retention_sentence = (
+                    " D2 still shows mixed accumulation capacity with retention pressure, so these periods support growth opportunities more clearly than automatic wealth retention."
+                    if growth_synthesis.get("retention_qualification") == "mixed_capacity_with_retention_pressure"
+                    else ""
+                )
+                clean_answer = (
+                    f"{current_sentence}{next_sentence}{strongest_sentence}{retention_sentence} "
+                    "These are broad astrological support periods, not guaranteed gains or exact transaction dates. "
+                    "Are you looking for growth through career income, business, or investments?"
+                ).strip()
     if policy.get("domain") == "wealth" and policy.get("runtime_key") == "debt_repayment":
         debt_synthesis = (
             policy.get("debt_repayment_synthesis")

@@ -1,0 +1,55 @@
+.wa-campaign-admin { display: flex; max-width: 1420px; margin: 0 auto; flex-direction: column; gap: 20px; color: var(--admin-text); }
+.wa-campaign-hero, .wa-campaign-card-top, .wa-campaign-list-heading, .wa-report-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.wa-campaign-hero { padding: 24px; border: 1px solid var(--admin-border); border-radius: 18px; background: linear-gradient(135deg, rgba(105, 55, 145, .1), rgba(255, 113, 52, .1)); }
+.wa-campaign-hero span, .wa-report-modal > header span { color: #d95831; font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.wa-campaign-hero h2, .wa-campaign-hero p, .wa-report-modal > header h2, .wa-report-modal > header p { margin: 4px 0 0; }
+.wa-campaign-hero p, .wa-campaign-list-heading p, .wa-report-modal > header p { color: var(--admin-text-muted); font-size: 12px; }
+.wa-campaign-hero > div:last-child { display: flex; gap: 9px; }
+.wa-campaign-hero button, .wa-campaign-card button, .wa-report-modal button { padding: 9px 13px; border: 1px solid var(--admin-border); border-radius: 9px; background: var(--admin-surface); color: var(--admin-text); font-weight: 700; cursor: pointer; }
+.wa-campaign-hero button.is-primary { border-color: #ed6338; background: #ed6338; color: #fff; }
+.wa-campaign-alert { padding: 11px 14px; border-radius: 10px; font-size: 13px; }
+.wa-campaign-alert.is-error { border: 1px solid #efb2a8; background: #fff1ef; color: #a33728; }
+.wa-campaign-alert.is-success { border: 1px solid #a9ddbd; background: #effaf3; color: #23653d; }
+.wa-campaign-composer { padding: 22px; border: 1px solid var(--admin-border); border-radius: 18px; background: var(--admin-surface); }
+.wa-campaign-list { display: flex; flex-direction: column; gap: 12px; }
+.wa-campaign-list-heading { align-items: center; padding: 0 2px; }
+.wa-campaign-list-heading h3, .wa-campaign-list-heading p { margin: 0; }
+.wa-campaign-list-heading strong { display: grid; min-width: 32px; height: 32px; place-items: center; border-radius: 50%; background: var(--admin-surface-muted); }
+.wa-campaign-empty { padding: 34px; border: 1px dashed var(--admin-border); border-radius: 14px; color: var(--admin-text-muted); text-align: center; }
+.wa-campaign-card { display: flex; flex-direction: column; gap: 15px; padding: 18px 20px; border: 1px solid var(--admin-border); border-radius: 15px; background: var(--admin-surface); box-shadow: 0 7px 22px rgba(40, 24, 49, .045); }
+.wa-campaign-name { display: flex; align-items: center; gap: 10px; }
+.wa-campaign-name h3, .wa-campaign-card-top p { margin: 0; }
+.wa-campaign-card-top p { margin-top: 4px; color: var(--admin-text-muted); font-size: 11px; }
+.wa-campaign-name span, .wa-report-status { padding: 4px 8px; border-radius: 999px; background: var(--admin-surface-muted); color: var(--admin-text-muted); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.wa-campaign-name .status-sent, .wa-report-status.status-delivered, .wa-report-status.status-read { background: #e6f7ed; color: #247347; }
+.wa-campaign-name .status-sending, .wa-campaign-name .status-scheduled { background: #fff3df; color: #9a5c0b; }
+.wa-campaign-name .status-paused, .wa-report-status.status-failed, .wa-report-status.status-dead { background: #ffebe7; color: #a43d2c; }
+.wa-campaign-metrics, .wa-report-summary { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.wa-campaign-metrics > div, .wa-report-summary > div { padding: 11px 10px; border: 1px solid var(--admin-border); border-radius: 10px; background: var(--admin-surface-muted); text-align: center; }
+.wa-campaign-metrics strong, .wa-campaign-metrics span, .wa-report-summary strong, .wa-report-summary span { display: block; }
+.wa-campaign-metrics span, .wa-report-summary span { margin-top: 2px; color: var(--admin-text-muted); font-size: 10px; }
+.wa-campaign-details, .wa-campaign-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.wa-campaign-details { color: var(--admin-text-muted); font-size: 11px; }
+.wa-campaign-actions { padding-top: 12px; border-top: 1px solid var(--admin-border); }
+.wa-campaign-actions button { padding: 7px 11px; font-size: 11px; }
+.wa-campaign-actions button.is-danger { color: #b13f31; }
+.wa-report-backdrop { position: fixed; z-index: 10000; inset: 0; display: grid; place-items: center; padding: 22px; background: rgba(25, 17, 30, .62); backdrop-filter: blur(3px); }
+.wa-report-modal { display: flex; width: min(1250px, 97vw); max-height: 92vh; flex-direction: column; overflow: hidden; border: 1px solid var(--admin-border); border-radius: 18px; background: var(--admin-surface); box-shadow: 0 25px 80px rgba(12, 7, 18, .35); }
+.wa-report-modal > header { padding: 18px 22px; border-bottom: 1px solid var(--admin-border); }
+.wa-report-summary { grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 14px 22px 0; }
+.wa-report-filters { display: flex; gap: 7px; padding: 14px 22px; overflow-x: auto; }
+.wa-report-filters button { padding: 6px 10px; font-size: 11px; white-space: nowrap; }
+.wa-report-filters button.is-active { border-color: #ed6338; background: rgba(237, 99, 56, .1); color: #c84f2b; }
+.wa-report-body { padding: 0 22px 22px; overflow: auto; }
+.wa-report-body table { width: 100%; min-width: 880px; border-collapse: collapse; }
+.wa-report-body th, .wa-report-body td { padding: 10px; border-bottom: 1px solid var(--admin-border); text-align: left; vertical-align: top; font-size: 12px; }
+.wa-report-body th { position: sticky; top: 0; background: var(--admin-surface); color: var(--admin-text-muted); font-size: 10px; text-transform: uppercase; }
+.wa-report-body td small { display: block; margin-top: 2px; color: var(--admin-text-muted); }
+@media (max-width: 800px) {
+  .wa-campaign-hero, .wa-campaign-card-top { flex-direction: column; }
+  .wa-campaign-hero > div:last-child { width: 100%; }
+  .wa-campaign-hero button { flex: 1; }
+  .wa-campaign-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .wa-report-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wa-report-backdrop { padding: 7px; }
+}

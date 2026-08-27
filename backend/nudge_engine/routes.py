@@ -219,6 +219,9 @@ class CampaignUpsertRequest(BaseModel):
     audience_filter: Dict[str, Any] = Field(default_factory=lambda: {"type": "all"})
     landing_screen: str = "chat"
     landing_url: Optional[str] = None
+    whatsapp_template: Optional[Dict[str, Any]] = None
+    conversion_event: str = "click"
+    frequency_cap_days: int = Field(default=0, ge=0, le=365)
     scheduled_at: Optional[str] = None  # ISO datetime (IST assumed when no offset)
     status: str = "draft"  # "draft", "scheduled", or "paused"
 
@@ -2384,6 +2387,22 @@ def _validate_campaign_payload(body: CampaignUpsertRequest) -> Dict[str, Any]:
     if status == "scheduled" and scheduled_at is None:
         raise HTTPException(status_code=400, detail="scheduled_at is required when status is 'scheduled'")
 
+    whatsapp_template = body.whatsapp_template
+    whatsapp_template_json = None
+    if whatsapp_template is not None:
+        if "whatsapp" not in channels:
+            raise HTTPException(status_code=400, detail="A WhatsApp template requires the WhatsApp channel")
+        try:
+            whatsapp_template_json = json.dumps(whatsapp_template, ensure_ascii=False)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail="whatsapp_template must be valid JSON") from exc
+        if len(whatsapp_template_json) > 2_000_000:
+            raise HTTPException(status_code=400, detail="WhatsApp template campaign configuration is too large")
+
+    conversion_event = str(body.conversion_event or "click").strip().lower()
+    if conversion_event not in {"click", "credit_purchase", "subscription_purchase", "question", "none"}:
+        raise HTTPException(status_code=400, detail="Unsupported conversion event")
+
     return {
         "name": name,
         "title_template": title_t,
@@ -2399,6 +2418,9 @@ def _validate_campaign_payload(body: CampaignUpsertRequest) -> Dict[str, Any]:
         "audience_filter_json": json.dumps(audience, ensure_ascii=False),
         "landing_screen": landing,
         "landing_url": landing_url,
+        "whatsapp_template_json": whatsapp_template_json,
+        "conversion_event": conversion_event,
+        "frequency_cap_days": int(body.frequency_cap_days or 0),
         "scheduled_at": scheduled_at,
         "status": status,
     }
@@ -2408,6 +2430,7 @@ def _campaign_dto(conn, campaign: Dict[str, Any], include_stats: bool = False) -
     out = dict(campaign)
     out.pop("channels_json", None)
     out.pop("audience_filter_json", None)
+    out.pop("whatsapp_template_json", None)
     if include_stats:
         try:
             out["stats"] = db.campaign_stats(conn, int(campaign["id"]))
@@ -2505,6 +2528,148 @@ async def admin_get_campaign(
         raise HTTPException(status_code=500, detail="Failed to load campaign") from e
 
 
+@router.get("/admin/campaigns/{campaign_id}/recipients")
+async def admin_campaign_recipient_report(
+    campaign_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+
+    def _work() -> Dict[str, Any]:
+        with db.get_conn() as notification_conn:
+            db.init_nudge_tables(notification_conn)
+            campaign = db.get_campaign(notification_conn, int(campaign_id))
+            if not campaign:
+                return {"missing": True}
+            rows = db.campaign_recipient_report(notification_conn, int(campaign_id))
+            stats = db.campaign_stats(notification_conn, int(campaign_id), include_window_conversions=False)
+
+        by_user = {int(row["userid"]): row for row in rows}
+        audience = campaign.get("audience_filter") or {}
+        if str(audience.get("type") or "").lower() == "user_ids":
+            for raw_userid in audience.get("user_ids") or []:
+                try:
+                    userid = int(raw_userid)
+                except (TypeError, ValueError):
+                    continue
+                by_user.setdefault(
+                    userid,
+                    {
+                        "userid": userid,
+                        "state": "not_dispatched" if campaign.get("status") in {"draft", "scheduled", "paused"} else "excluded",
+                        "attempt_count": 0,
+                    },
+                )
+        user_ids = sorted(by_user)
+        if not user_ids:
+            return {"campaign": campaign, "stats": stats, "recipients": []}
+
+        with db.get_read_conn() as app_conn:
+            user_rows = execute(
+                app_conn,
+                "SELECT userid, COALESCE(name, ''), COALESCE(phone, ''), COALESCE(email, '') FROM users WHERE userid = ANY(%s)",
+                (user_ids,),
+            ).fetchall()
+            profiles = {
+                int(row[0]): {"name": row[1], "phone": row[2], "email": row[3]}
+                for row in (user_rows or [])
+            }
+            conversion_event = str(campaign.get("conversion_event") or "click")
+            conversion_cutoff = campaign.get("dispatched_at") or campaign.get("created_at")
+            events: Dict[int, Any] = {}
+            if conversion_event == "credit_purchase":
+                event_rows = execute(
+                    app_conn,
+                    """
+                    SELECT userid, MIN(created_at), COUNT(*), COALESCE(SUM(amount), 0)
+                    FROM credit_transactions
+                    WHERE userid = ANY(%s)
+                      AND source IN ('google_play', 'razorpay')
+                      AND transaction_type IN ('earned', 'refund')
+                      AND created_at >= %s
+                    GROUP BY userid
+                    """,
+                    (user_ids, conversion_cutoff),
+                ).fetchall()
+                events = {int(row[0]): {"at": row[1], "count": int(row[2] or 0), "value": int(row[3] or 0)} for row in event_rows or []}
+            elif conversion_event == "question":
+                event_rows = execute(
+                    app_conn,
+                    """
+                    SELECT cs.user_id, MIN(cm.timestamp), COUNT(*)
+                    FROM chat_sessions cs
+                    JOIN chat_messages cm ON cm.session_id = cs.session_id
+                    WHERE cs.user_id = ANY(%s) AND cm.sender = 'user' AND cm.timestamp >= %s
+                    GROUP BY cs.user_id
+                    """,
+                    (user_ids, conversion_cutoff),
+                ).fetchall()
+                events = {int(row[0]): {"at": row[1], "count": int(row[2] or 0)} for row in event_rows or []}
+            elif conversion_event == "subscription_purchase":
+                event_rows = execute(
+                    app_conn,
+                    """
+                    SELECT userid, MIN(start_date), COUNT(*)
+                    FROM user_subscriptions
+                    WHERE userid = ANY(%s) AND start_date >= %s::date
+                    GROUP BY userid
+                    """,
+                    (user_ids, conversion_cutoff),
+                ).fetchall()
+                events = {int(row[0]): {"at": row[1], "count": int(row[2] or 0)} for row in event_rows or []}
+
+        def _as_datetime(value: Any) -> Optional[datetime]:
+            if value is None:
+                return None
+            if isinstance(value, datetime):
+                return value if value.tzinfo else value.replace(tzinfo=IST_TZ)
+            if isinstance(value, date):
+                return datetime.combine(value, datetime.min.time(), tzinfo=IST_TZ)
+            try:
+                parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+                return parsed if parsed.tzinfo else parsed.replace(tzinfo=IST_TZ)
+            except ValueError:
+                return None
+
+        converted_count = 0
+        output: List[Dict[str, Any]] = []
+        for userid in user_ids:
+            row = by_user[userid]
+            row.update(profiles.get(userid) or {})
+            delivered_at = _as_datetime(row.get("created_at") or row.get("accepted_at"))
+            event = events.get(userid)
+            event_at = _as_datetime((event or {}).get("at"))
+            if conversion_event == "click":
+                converted = bool(row.get("clicked_at"))
+                conversion_at = row.get("clicked_at")
+            elif conversion_event == "none":
+                converted, conversion_at = False, None
+            else:
+                converted = bool(delivered_at and event_at and event_at >= delivered_at)
+                conversion_at = event_at.isoformat() if converted and event_at else None
+            row["converted"] = converted
+            row["conversion_at"] = conversion_at
+            row["conversion_count"] = int((event or {}).get("count") or (1 if converted else 0)) if converted else 0
+            row["conversion_value"] = int((event or {}).get("value") or 0) if converted else 0
+            converted_count += int(converted)
+            output.append(row)
+        stats["selected_conversion_event"] = conversion_event
+        stats["selected_conversions"] = converted_count
+        return {"campaign": campaign, "stats": stats, "recipients": output}
+
+    try:
+        result = await run_in_threadpool(_work)
+        if result.get("missing"):
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        result["campaign"] = _campaign_dto(None, result["campaign"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("campaign recipient report failed id=%s", campaign_id)
+        raise HTTPException(status_code=500, detail="Failed to load campaign recipients") from exc
+
+
 @router.put("/admin/campaigns/{campaign_id}")
 async def admin_update_campaign(
     campaign_id: int,
@@ -2554,6 +2719,53 @@ async def admin_delete_campaign(
     except Exception as e:
         logger.exception("admin_delete_campaign failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to delete campaign") from e
+
+
+@router.post("/admin/campaigns/{campaign_id}/duplicate")
+async def admin_duplicate_campaign(
+    campaign_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    """Copy campaign configuration and audience into a new, safely paused draft."""
+    _require_admin(current_user)
+    try:
+        with db.get_conn() as conn:
+            db.init_nudge_tables(conn)
+            existing = db.get_campaign(conn, int(campaign_id))
+            if not existing:
+                raise HTTPException(status_code=404, detail="Campaign not found")
+            new_id = db.create_campaign(
+                conn,
+                name=f"{existing.get('name') or 'Campaign'} (copy)"[:200],
+                title_template=existing.get("title_template") or "Campaign",
+                body_template=existing.get("body_template") or "Campaign",
+                question_template=existing.get("question_template") or "",
+                channel_policy=existing.get("channel_policy") or "blast",
+                channels_json=json.dumps(existing.get("channels") or [], ensure_ascii=False),
+                ai_personalize=bool(existing.get("ai_personalize")),
+                ai_base_prompt=existing.get("ai_base_prompt") or "",
+                audience_filter_json=json.dumps(existing.get("audience_filter") or {}, ensure_ascii=False),
+                landing_screen=existing.get("landing_screen") or "chat",
+                landing_url=existing.get("landing_url"),
+                scheduled_at=None,
+                status="draft",
+                created_by=current_user.userid,
+                whatsapp_template_json=(
+                    json.dumps(existing.get("whatsapp_template"), ensure_ascii=False)
+                    if existing.get("whatsapp_template") is not None
+                    else None
+                ),
+                conversion_event=existing.get("conversion_event") or "click",
+                frequency_cap_days=int(existing.get("frequency_cap_days") or 0),
+            )
+            conn.commit()
+            campaign = db.get_campaign(conn, int(new_id))
+        return {"ok": True, "campaign": _campaign_dto(None, campaign)}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("admin_duplicate_campaign failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to duplicate campaign") from exc
 
 
 @router.post("/admin/campaigns/{campaign_id}/status")
@@ -2726,6 +2938,26 @@ async def admin_send_campaign_now(
     except Exception as e:
         logger.exception("admin_send_campaign_now failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to dispatch campaign") from e
+
+
+@router.post("/admin/campaigns/{campaign_id}/retry-failed")
+async def admin_retry_failed_campaign_recipients(
+    campaign_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    from .campaigns import retry_failed_campaign_recipients
+
+    try:
+        result = await run_in_threadpool(retry_failed_campaign_recipients, int(campaign_id))
+        if not result.get("ok"):
+            raise HTTPException(status_code=409, detail=result.get("error") or "Retry failed")
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("admin_retry_failed_campaign_recipients failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed recipients could not be requeued") from exc
 
 
 @router.post("/admin/campaigns/dispatch-due")
