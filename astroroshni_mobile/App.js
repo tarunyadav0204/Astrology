@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
-import { NavigationContainer, getPathFromState, getStateFromPath } from '@react-navigation/native';
+import { DefaultTheme, NavigationContainer, getPathFromState, getStateFromPath } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar, View, ActivityIndicator, Animated, Text, TouchableOpacity, Linking, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import Constants from 'expo-constants';
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
 import { useTranslation } from 'react-i18next';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import i18n from './src/locales/i18n';
 
@@ -95,6 +96,36 @@ import WebAlertProvider from './src/platform/WebAlertProvider';
 // Push notifications: imported lazily in useEffect to avoid touching native module at launch (reduces iOS device crash risk).
 
 const Stack = createStackNavigator();
+const transparentNavigationTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: 'transparent',
+    card: 'transparent',
+  },
+};
+
+function ThemedAppBackground({ children }) {
+  const { colors } = useTheme();
+  const gradient = colors.homeGradient || [
+    colors.background,
+    colors.backgroundSecondary || colors.background,
+    colors.background,
+  ];
+
+  return (
+    <LinearGradient colors={gradient} style={themedAppBackgroundStyles.fill}>
+      {children}
+    </LinearGradient>
+  );
+}
+
+const themedAppBackgroundStyles = StyleSheet.create({
+  fill: {
+    flex: 1,
+    ...(Platform.OS === 'web' ? { minHeight: 0, height: '100%', overflow: 'hidden' } : null),
+  },
+});
 
 function ForceUpdateScreen({ info, onUpdate }) {
   const { colors, typography } = useTheme();
@@ -826,6 +857,7 @@ export default function App() {
       >
         <ThemeProvider initialTheme={initialTheme} initialPanditMode={initialPanditMode}>
         <WebAlertProvider>
+        <ThemedAppBackground>
         <Animated.View
           style={{
             flex: 1,
@@ -837,6 +869,7 @@ export default function App() {
             <CreditProvider>
               <ErrorBoundary>
               <NavigationContainer
+                theme={transparentNavigationTheme}
                 linking={linking}
                 onStateChange={(state) => {
                   trackNavigationRoute(state);
@@ -869,17 +902,17 @@ export default function App() {
             // Web: no edge-swipe stack gestures (they steal touch from page scroll in device mode).
             gestureEnabled: Platform.OS !== 'web',
             gestureDirection: 'horizontal',
-            ...(Platform.OS === 'web'
-              ? {
-                  cardStyle: {
+            cardStyle: {
+              backgroundColor: 'transparent',
+              ...(Platform.OS === 'web'
+                ? {
                     flex: 1,
                     minHeight: 0,
                     height: '100%',
                     overflow: 'hidden',
-                    backgroundColor: 'transparent',
-                  },
-                }
-              : null),
+                  }
+                : null),
+            },
           }}
         >
           <Stack.Screen 
@@ -1192,6 +1225,7 @@ export default function App() {
       </CreditProvider>
       </ErrorProvider>
         </Animated.View>
+        </ThemedAppBackground>
         </WebAlertProvider>
       </ThemeProvider>
     </SafeAreaProvider>

@@ -139,6 +139,10 @@ CATEGORY_FOCUS = {
     "job_change": {"houses": [3, 6, 10, 12], "planets": ["Rahu", "Saturn", "Mars", "Mercury"]},
     "business": {"houses": [2, 6, 10, 11], "planets": ["Sun", "Mercury", "Saturn", "Jupiter", "Mars"]},
     "wealth": {"houses": [2, 5, 9, 11], "planets": ["Jupiter", "Venus", "Mercury"]},
+    "income": {"houses": [2, 6, 10, 11], "planets": ["Jupiter", "Mercury", "Venus", "Saturn"]},
+    "debt": {"houses": [2, 6, 8, 11, 12], "planets": ["Jupiter", "Mars", "Saturn"]},
+    "investment": {"houses": [2, 5, 8, 11, 12], "planets": ["Jupiter", "Mercury", "Rahu"]},
+    "inheritance": {"houses": [2, 8, 9, 11], "planets": ["Jupiter", "Saturn", "Mars"]},
     "health": {"houses": [1, 6, 8, 12], "planets": ["Sun", "Moon", "Mars", "Saturn"]},
     "marriage": {"houses": [2, 5, 7, 11], "planets": ["Venus", "Moon", "Jupiter", "Mars"]},
     "progeny": {"houses": [2, 5, 9, 11], "planets": ["Jupiter", "Moon", "Venus"]},
@@ -328,6 +332,11 @@ PARASHARI_TOPIC_MAP = {
     "money": "wealth",
     "finance": "wealth",
     "trading": "wealth",
+    "income": "wealth",
+    "debt": "wealth",
+    "loan": "wealth",
+    "investment": "wealth",
+    "inheritance": "wealth",
     "health": "health",
     "disease": "health",
     "mental_wellbeing": "health",
@@ -1213,6 +1222,7 @@ def _slim_event_prediction_payload(
     period_window: Dict[str, Any],
     category: str,
     career_subtype: Any = None,
+    wealth_subtype: Any = None,
     question: str,
     chart_data: Dict[str, Any],
     house_lordships: Dict[str, List[int]],
@@ -1575,6 +1585,7 @@ def _slim_event_prediction_payload(
         "chart_facts",
         "location_recommendation",
         "muhurat_slots",
+        "wealth_foundation",
     ):
         if (normalized_evidence or {}).get(evidence_key) not in (None, "", [], {}):
             slim_normalized[evidence_key] = (normalized_evidence or {}).get(evidence_key)
@@ -1635,6 +1646,7 @@ def _slim_event_prediction_payload(
                 if is_career_category(category)
                 else None
             ),
+            "wealth_subtype": wealth_subtype,
             "mode": "LIFESPAN_EVENT_TIMING",
             "answer_mode": "event_prediction",
             "period_window": period_window,
@@ -8739,6 +8751,346 @@ def _compact_career_foundation(
     }
 
 
+def _compact_wealth_foundation(
+    chart_data: Dict[str, Any],
+    birth_data: Dict[str, Any],
+    normalized_evidence: Dict[str, Any],
+    *,
+    category: str,
+    answer_mode: str,
+    wealth_subtype: str = "",
+) -> Dict[str, Any]:
+    """Calculate the bounded evidence ledger required by the Wealth graph."""
+    from calculators.indu_lagna_calculator import InduLagnaCalculator
+    from calculators.jaimini_point_calculator import JaiminiPointCalculator
+    from calculators.wealth_calculator import WealthCalculator
+
+    availability = {
+        "d2": False, "d5": False, "d8": False, "d9": False, "d10": False,
+        "lord_nakshatra_chain": False, "dignity_strength": False,
+        "dhana_yogas": False, "indu_lagna": False, "hora_lagna": False,
+        "arudha_gains": False, "kp_fructification": False,
+        "remedy_blueprint": bool(
+            isinstance(normalized_evidence.get("remedy_blueprint"), dict)
+            and normalized_evidence["remedy_blueprint"].get("top_recommendation")
+        ),
+    }
+    subtype = str(wealth_subtype or "").strip().lower()
+    route_houses = {
+        "income": [2, 6, 10, 11],
+        "debt": [2, 6, 8, 11, 12],
+        "investment": [2, 5, 8, 11, 12],
+        "inheritance": [2, 8, 9, 11],
+    }.get(category, [2, 5, 6, 8, 9, 10, 11, 12])
+    if subtype in {"source", "multiple_income"}:
+        route_houses = [2, 6, 7, 10, 11]
+    result: Dict[str, Any] = {
+        "scope": "single-native wealth and finance evidence",
+        "d1_available": bool(chart_data.get("planets")),
+        "houses_available": route_houses,
+        "availability": availability,
+    }
+
+    needed_output_divisions = {2}
+    if category == "investment": needed_output_divisions.add(5)
+    if category == "inheritance": needed_output_divisions.add(8)
+    if category == "income" or subtype in {"source", "multiple_income"}: needed_output_divisions.add(10)
+    divisions: Dict[str, Any] = {}
+    try:
+        divisional_calc = DivisionalChartCalculator(chart_data)
+        for division in sorted(needed_output_divisions | {9}):
+            try:
+                chart = divisional_calc.calculate_divisional_chart(division)
+                if chart:
+                    divisions[f"D{division}"] = chart
+                    if division in (2, 5, 8, 9, 10):
+                        availability[f"d{division}"] = True
+            except Exception:
+                logger.exception("Instant Wealth divisional calculation failed D%s", division)
+    except Exception:
+        logger.exception("Instant Wealth divisional calculator initialization failed")
+
+    try:
+        analysis = WealthCalculator(chart_data, birth_data).calculate_overall_wealth()
+        planet_analysis = (
+            analysis.get("planet_analysis")
+            if isinstance(analysis.get("planet_analysis"), dict)
+            else {}
+        )
+
+        def compact_wealth_planet_condition(value: Any) -> Dict[str, Any]:
+            wrapper = value if isinstance(value, dict) else {}
+            row = wrapper.get("basic_analysis") if isinstance(wrapper.get("basic_analysis"), dict) else wrapper
+            basic = row.get("basic_info") if isinstance(row.get("basic_info"), dict) else {}
+            dignity = row.get("dignity_analysis") if isinstance(row.get("dignity_analysis"), dict) else {}
+            strength = row.get("strength_analysis") if isinstance(row.get("strength_analysis"), dict) else {}
+            special = row.get("special_lordships") if isinstance(row.get("special_lordships"), dict) else {}
+            gandanta = row.get("gandanta_analysis") if isinstance(row.get("gandanta_analysis"), dict) else {}
+            conjunctions = row.get("conjunctions") if isinstance(row.get("conjunctions"), dict) else {}
+            assessment = row.get("overall_assessment") if isinstance(row.get("overall_assessment"), dict) else {}
+            wealth_impact = wrapper.get("wealth_impact") if isinstance(wrapper.get("wealth_impact"), dict) else {}
+            return {
+                "placement": {
+                    "planet": basic.get("planet"), "sign": basic.get("sign_name"),
+                    "house": basic.get("house"), "degree": basic.get("degree"),
+                    "nakshatra": basic.get("nakshatra"),
+                },
+                "dignity": dignity.get("dignity"),
+                "functional_nature": dignity.get("functional_nature"),
+                "strength": {
+                    "shadbala_rupas": strength.get("shadbala_rupas"),
+                    "shadbala_grade": strength.get("shadbala_grade"),
+                },
+                "retrograde": bool((row.get("retrograde_analysis") or {}).get("is_retrograde"))
+                if isinstance(row.get("retrograde_analysis"), dict) else None,
+                "gandanta": {
+                    "is_gandanta": bool(gandanta.get("is_gandanta")),
+                    "name": gandanta.get("gandanta_name"),
+                    "type": gandanta.get("gandanta_type"),
+                    "intensity": gandanta.get("intensity"),
+                    "distance_from_junction": gandanta.get("distance_from_junction"),
+                },
+                "special_lordships": {
+                    "is_yogi_lord": bool(special.get("is_yogi_lord")),
+                    "is_avayogi_lord": bool(special.get("is_avayogi_lord")),
+                    "is_dagdha_lord": bool(special.get("is_dagdha_lord")),
+                    "is_tithi_shunya_lord": bool(special.get("is_tithi_shunya_lord")),
+                    "avayogi_tithi_shunya_benefic_override": bool(
+                        special.get("is_avayogi_tithi_shunya_benefic")
+                    ),
+                    "overlap_rule": special.get("avayogi_tithi_shunya_rule"),
+                    "roles": list(special.get("special_roles") or []),
+                },
+                "conjunctions": [
+                    {
+                        "planet": item.get("planet"), "orb": item.get("orb"),
+                        "type": item.get("type"), "effect": item.get("effect"),
+                    }
+                    for item in list(conjunctions.get("conjunctions") or [])[:6]
+                    if isinstance(item, dict)
+                ],
+                "conjunction_effect": conjunctions.get("overall_conjunction_effect"),
+                "assessment": {
+                    "score": assessment.get("overall_strength_score"),
+                    "grade": assessment.get("classical_grade"),
+                    "strengths": list(assessment.get("key_strengths") or [])[:4],
+                    "weaknesses": list(assessment.get("key_weaknesses") or [])[:4],
+                },
+                "wealth_impact": {
+                    "type": wealth_impact.get("impact_type"),
+                    "severity": wealth_impact.get("severity"),
+                    "reasoning": wealth_impact.get("reasoning"),
+                    "implications": list(wealth_impact.get("implications") or [])[:4],
+                },
+            }
+
+        houses: Dict[str, Any] = {}
+        for house_number, row in (analysis.get("house_analysis") or {}).items():
+            if not isinstance(row, dict):
+                continue
+            try:
+                if int(house_number) not in route_houses:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            house_analysis = row.get("house_analysis") if isinstance(row.get("house_analysis"), dict) else {}
+            lord_analysis = house_analysis.get("house_lord_analysis") if isinstance(house_analysis.get("house_lord_analysis"), dict) else {}
+            lord_strength = lord_analysis.get("strength_analysis") if isinstance(lord_analysis.get("strength_analysis"), dict) else {}
+            assessment = house_analysis.get("overall_house_assessment") if isinstance(house_analysis.get("overall_house_assessment"), dict) else {}
+            basic = house_analysis.get("basic_info") if isinstance(house_analysis.get("basic_info"), dict) else {}
+            lord_placement = lord_analysis.get("basic_info") if isinstance(lord_analysis.get("basic_info"), dict) else {}
+            lord_dignity = lord_analysis.get("dignity_analysis") if isinstance(lord_analysis.get("dignity_analysis"), dict) else {}
+            lord_name = str(basic.get("house_lord") or lord_placement.get("planet") or "")
+            try:
+                house_int = int(house_number)
+            except (TypeError, ValueError):
+                house_int = 0
+            houses[str(house_number)] = {
+                "significance": row.get("wealth_significance"),
+                "interpretation": row.get("wealth_interpretation"),
+                "basic_info": {
+                    "house": basic.get("house_number"), "sign": basic.get("house_sign_name"),
+                    "lord": basic.get("house_lord"),
+                    "occupants": [
+                        planet for planet, placement in (chart_data.get("planets") or {}).items()
+                        if isinstance(placement, dict) and _norm_house(placement.get("house")) == house_int
+                    ],
+                },
+                "lord": {
+                    "placement": {
+                        "planet": lord_placement.get("planet"), "sign": lord_placement.get("sign_name"),
+                        "house": lord_placement.get("house"), "nakshatra": lord_placement.get("nakshatra"),
+                    },
+                    "dignity": lord_dignity.get("dignity") or lord_dignity.get("status"),
+                    "strength": {
+                        "shadbala_points": lord_strength.get("shadbala_points"),
+                        "strength_grade": lord_strength.get("shadbala_grade") or lord_strength.get("strength_grade"),
+                    },
+                    "conditions": compact_wealth_planet_condition(planet_analysis.get(lord_name)),
+                },
+                "assessment": {
+                    "score": assessment.get("overall_strength_score"),
+                    "grade": assessment.get("overall_grade") or assessment.get("classical_grade"),
+                },
+            }
+        ascendant_sign_index = int(float(chart_data.get("ascendant") or 0) // 30) % 12
+        lordships = _get_house_lordships(ascendant_sign_index)
+        for house_number in route_houses:
+            if str(house_number) in houses:
+                continue
+            house_lord = _lord_of_house(lordships, house_number)
+            lord_row = (chart_data.get("planets") or {}).get(house_lord or "") or {}
+            houses[str(house_number)] = {
+                "significance": HOUSE_THEME_LABELS.get(house_number),
+                "basic_info": {
+                    "house": house_number,
+                    "sign": SIGN_NAMES[(ascendant_sign_index + house_number - 1) % 12],
+                    "lord": house_lord,
+                    "occupants": [
+                        planet for planet, placement in (chart_data.get("planets") or {}).items()
+                        if isinstance(placement, dict) and _norm_house(placement.get("house")) == house_number
+                    ],
+                },
+                "lord": {"placement": {
+                    "planet": house_lord, "sign": lord_row.get("sign_name"),
+                    "house": lord_row.get("house"), "nakshatra": lord_row.get("nakshatra"),
+                }},
+                "source": "calculated_D1_route_house",
+            }
+        result["natal_wealth"] = {
+            "wealth_score": analysis.get("wealth_score"),
+            "wealth_constitution": analysis.get("wealth_constitution"),
+            "income_sources": list(analysis.get("income_sources") or [])[:4],
+            "houses": houses,
+            "yogas": analysis.get("yoga_analysis") or {},
+        }
+        carrier_names = {
+            str((row.get("basic_info") or {}).get("lord") or "")
+            for row in houses.values()
+            if isinstance(row, dict)
+        }
+        route_significators = {
+            "investment": {"Jupiter", "Venus", "Mercury", "Rahu"},
+            "income": {"Jupiter", "Venus", "Mercury", "Saturn"},
+            "debt": {"Jupiter", "Mars", "Saturn"},
+            "inheritance": {"Jupiter", "Mars", "Saturn"},
+        }.get(category, {"Jupiter", "Venus", "Mercury"})
+        carrier_names.update(route_significators)
+        result["route_carrier_conditions"] = {
+            planet: compact_wealth_planet_condition(planet_analysis.get(planet))
+            for planet in sorted(carrier_names)
+            if planet and isinstance(planet_analysis.get(planet), dict)
+        }
+        availability["lord_nakshatra_chain"] = bool(houses)
+        availability["dignity_strength"] = bool(analysis.get("planet_analysis"))
+        availability["dhana_yogas"] = isinstance(analysis.get("yoga_analysis"), dict)
+    except Exception:
+        logger.exception("Instant Wealth natal calculation failed")
+
+    try:
+        indu = InduLagnaCalculator(chart_data).get_indu_lagna_analysis()
+        indu_row = ((indu.get("special_lagnas") or {}).get("indu_lagna") or {}) if isinstance(indu, dict) else {}
+        if indu_row:
+            def compact_indu_house(row: Any) -> Dict[str, Any]:
+                row = row if isinstance(row, dict) else {}
+                ruler = row.get("ruler_analysis") if isinstance(row.get("ruler_analysis"), dict) else {}
+                return {
+                    "sign_name": row.get("sign_name"), "natal_house": row.get("natal_house"),
+                    "ruler": row.get("ruler"), "occupying_planets": row.get("occupying_planets") or [],
+                    "aspecting_planets": row.get("aspecting_planets") or [],
+                    "ruler_placement": {
+                        "planet": ruler.get("planet"), "sign_name": ruler.get("sign_name"),
+                        "house": ruler.get("house"), "dignity": ruler.get("dignity"),
+                        "nakshatra": ruler.get("nakshatra"),
+                    } if ruler else {},
+                }
+            result["indu_lagna"] = {
+                "precision": indu_row.get("precision"), "sign": indu_row.get("sign"),
+                "sign_name": indu_row.get("sign_name"), "house_number": indu_row.get("house_number"),
+                "ruler": indu_row.get("ruler"), "ruler_analysis": compact_indu_house({
+                    "sign_name": indu_row.get("sign_name"), "natal_house": indu_row.get("house_number"),
+                    "ruler": indu_row.get("ruler"), "occupying_planets": indu_row.get("occupying_planets"),
+                    "aspecting_planets": indu_row.get("aspecting_planets"),
+                    "ruler_analysis": indu_row.get("ruler_analysis"),
+                }),
+                "second_from_indu": compact_indu_house(indu_row.get("second_from_indu")),
+                "eleventh_from_indu": compact_indu_house(indu_row.get("eleventh_from_indu")),
+                "calculation": indu_row.get("calculation") or {},
+                "interpretation_policy": indu_row.get("interpretation_policy") or {},
+            }
+            availability["indu_lagna"] = True
+    except Exception:
+        logger.exception("Instant Indu Lagna calculation failed")
+
+    try:
+        points = JaiminiPointCalculator(
+            chart_data,
+            divisions.get("D9") if isinstance(divisions.get("D9"), dict) else {},
+            "",
+        ).calculate_jaimini_points()
+        result["special_lagnas"] = {
+            "hora_lagna": points.get("hora_lagna") or {},
+            "arudha_lagna": points.get("arudha_lagna") or {},
+        }
+        availability["hora_lagna"] = bool(result["special_lagnas"]["hora_lagna"])
+        availability["arudha_gains"] = bool(result["special_lagnas"]["arudha_lagna"])
+    except Exception:
+        logger.exception("Instant Wealth special-lagna calculation failed")
+
+    timing_mode = str(answer_mode or "") in {
+        "event_prediction", "event_timing", "lifetime_event_timing",
+        "month_timing", "timing_window", "daily_forecast",
+    }
+    need_kp = category in {"income", "debt", "investment", "inheritance"} or subtype == "windfall" or timing_mode
+    kp = _instant_real_kp_evidence(birth_data) if need_kp else {}
+    if kp:
+        result["kp_financial"] = {
+            "cusp_lords": {
+                str(house): (kp.get("cusp_lords") or {}).get(str(house))
+                or (kp.get("cusp_lords") or {}).get(house)
+                for house in (2, 5, 6, 8, 9, 10, 11, 12)
+            },
+            "significators": kp.get("significators") or {},
+        }
+        availability["kp_fructification"] = True
+
+    # Divisional output is supplied as confirmation, never as a standalone
+    # verdict. D9 is a supporting carrier-condition check for investment and
+    # speculation; it cannot replace the mandatory D2 and D5 judgments.
+    result["divisional_charts"] = {}
+    for key, value in divisions.items():
+        allowed_divisions = {"D2", "D5", "D8", "D10"}
+        if category == "investment" or subtype in {"investment_risk", "loss_vulnerability", "windfall"}:
+            allowed_divisions.add("D9")
+        if key not in allowed_divisions or not isinstance(value, dict):
+            continue
+        chart = value.get("divisional_chart") if isinstance(value.get("divisional_chart"), dict) else value
+        result["divisional_charts"][key] = {
+            "ascendant": chart.get("ascendant"),
+            "planets": {
+                planet: {
+                    "sign": row.get("sign"), "sign_name": row.get("sign_name"),
+                    "house": row.get("house"), "dignity": row.get("dignity"),
+                    "functional_nature": row.get("functional_nature"),
+                }
+                for planet, row in (chart.get("planets") or {}).items()
+                if isinstance(row, dict)
+            },
+        }
+    result["interpretation_rules"] = [
+        "D1 establishes promise; D2 confirms accumulation and retention.",
+        "For investment and speculation, judge the complete fifth-lord condition before its placement: dignity, strength, Gandanta, Avayogi, Dagdha/Tithi-Shunya roles, conjunctions and any declared overlap rule.",
+        "For investment and speculation, D5 refines judgment and D9 qualifies the underlying carriers; D9 can weaken or sustain expression but cannot replace D1, D2 or D5.",
+        "Never call fifth-lord placement in a wealth house positive by itself when its supplied conditions are mixed or challenging.",
+        "Indu Lagna is sign-only supporting evidence and cannot override D1 or D2.",
+        "Separate earning capacity, realized gains, retention, liabilities and loss exposure.",
+        "Use dasha and transit only for a timing route; activation does not imply a positive result.",
+        "Rahu and Ketu contribute through occupation, conjunction and seventh aspect only, never fifth or ninth aspects.",
+        "Never guarantee returns, inheritance, loan approval, windfalls or freedom from loss.",
+    ]
+    return result
+
+
 def _build_instant_context(
     birth_data: Dict[str, Any],
     question: str,
@@ -9385,6 +9737,15 @@ def _build_instant_context(
         karaka_evidence=karaka_evidence,
         d1_snapshot=evidence_natal_snapshot,
     )
+    if category in {"wealth", "income", "debt", "investment", "inheritance"}:
+        normalized_evidence["wealth_foundation"] = _compact_wealth_foundation(
+            chart_data,
+            birth_data,
+            normalized_evidence,
+            category=category,
+            answer_mode=answer_mode,
+            wealth_subtype=str((intent or {}).get("wealth_subtype") or ""),
+        )
 
     location_evidence = _instant_real_location_evidence(
         birth_data=birth_data,
@@ -9677,6 +10038,7 @@ def _build_instant_context(
             period_window=period_window,
             category=category,
             career_subtype=(intent or {}).get("career_subtype"),
+            wealth_subtype=(intent or {}).get("wealth_subtype"),
             question=question,
             chart_data=chart_data,
             house_lordships=house_lordships,
@@ -9806,6 +10168,26 @@ def _build_instant_context(
                 "horizon_segments",
                 "transit_confirmation",
                 "transit_windows",
+            }
+        }
+    static_wealth_route = (
+        category in {"wealth", "income", "debt", "investment", "inheritance"}
+        and answer_mode not in {
+            "event_prediction", "event_timing", "lifetime_event_timing",
+            "month_timing", "timing_window", "daily_forecast",
+        }
+    )
+    if static_wealth_route:
+        prompt_current_dashas_levels = {}
+        prompt_current_transits = {}
+        prompt_transits_context = {}
+        prompt_instant_parashari = {
+            key: value
+            for key, value in prompt_instant_parashari.items()
+            if key not in {
+                "active_dashas", "active_dashas_formatted", "current_dashas",
+                "forward_periods", "horizon_segments", "transit_confirmation",
+                "transit_windows", "horizon_transit_anchors", "major_transits",
             }
         }
     claim_gates = (normalized_evidence.get("claim_gates") or {}) if isinstance(normalized_evidence.get("claim_gates"), dict) else {}
@@ -9957,6 +10339,7 @@ def _build_instant_context(
                 "topic_confirmation",
                 "health_body_area",
                 "option_comparison",
+                "wealth_foundation",
             }
         }
         if marriage_remedy:
@@ -9998,6 +10381,7 @@ def _build_instant_context(
         "birth_summary": evidence_birth_summary if is_non_self_target else birth_summary,
         "intent_summary": {
             "category": category,
+            "wealth_subtype": (intent or {}).get("wealth_subtype"),
             "mode": (intent or {}).get("mode") or "birth",
             "answer_mode": instant_parashari.get("answer_mode") or "topic_reading",
             "period_window": period_window,
@@ -10787,6 +11171,16 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
         if isinstance(source_evidence.get("career_foundation"), dict)
         else {}
     )
+    source_wealth = (
+        source_evidence.get("wealth_foundation")
+        if isinstance(source_evidence.get("wealth_foundation"), dict)
+        else {}
+    )
+    if source_wealth:
+        # Wealth needs nested D1 house/lord rows, D2 placements and the Indu
+        # chain. A slightly larger bounded brief is safer than flattening those
+        # facts into generic financial prose.
+        target_chars = max(target_chars, 13500)
     source_vocation = (
         source_career.get("vocation_synthesis")
         if isinstance(source_career.get("vocation_synthesis"), dict)
@@ -10832,6 +11226,18 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
             list_limit=7,
             string_limit=180,
         )
+
+    def restore_wealth(payload: Dict[str, Any]) -> None:
+        if not source_wealth:
+            return
+        payload_evidence = payload.setdefault("evidence", {})
+        if isinstance(payload_evidence, dict):
+            payload_evidence["wealth_foundation"] = _limit_composer_value(
+                source_wealth,
+                max_depth=8,
+                list_limit=12,
+                string_limit=200,
+            )
 
     def restore_career_decision(payload: Dict[str, Any]) -> None:
         """Keep the calculated cause of every stay/change verdict.
@@ -10912,6 +11318,7 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
     compact = _limit_composer_value(context)
     compact = compact if isinstance(compact, dict) else {}
     restore_vocation(compact)
+    restore_wealth(compact)
     restore_career_decision(compact)
     restore_option_comparison(compact)
     restore_retrospective_windows(compact)
@@ -10926,6 +11333,7 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
     )
     tighter = tighter if isinstance(tighter, dict) else {}
     restore_vocation(tighter)
+    restore_wealth(tighter)
     restore_career_decision(tighter)
     restore_option_comparison(tighter)
     restore_retrospective_windows(tighter)
@@ -11083,6 +11491,7 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
             "spouse_appearance_rules", "missing_appearance_layers",
             "spouse_location_rules", "missing_location_layers",
             "marriage_remedy_rules",
+            "wealth_answer_rules", "financial_safety_rules",
         )
         if graph_policy.get(key) not in (None, "", [], {})
     }
@@ -11111,6 +11520,8 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
         "spouse_appearance_rules": answer_spec.get("spouse_appearance_rules"),
         "spouse_location_rules": answer_spec.get("spouse_location_rules"),
         "marriage_remedy_rules": answer_spec.get("marriage_remedy_rules"),
+        "wealth_answer_rules": answer_spec.get("wealth_answer_rules"),
+        "financial_safety_rules": answer_spec.get("financial_safety_rules"),
         "event_rules": compact_event_rules,
         "forbidden": answer_spec.get("forbidden"),
         "answer_order": answer_spec.get("answer_order"),
@@ -11188,6 +11599,60 @@ def _build_instant_answer_blueprint(
         if isinstance(evidence.get("career_decision"), dict)
         else {}
     )
+    wealth_rules = (
+        (evidence.get("_wealth_rules") or {})
+        if isinstance(evidence.get("_wealth_rules"), dict)
+        else {}
+    )
+    wealth_foundation = (
+        evidence.get("wealth_foundation")
+        if isinstance(evidence.get("wealth_foundation"), dict)
+        else {}
+    )
+    if wealth_rules and wealth_foundation:
+        static_route = bool(wealth_rules.get("static_route"))
+        investment_family = str(wealth_rules.get("runtime_key") or "") in {
+            "investment", "investing_vs_trading", "investment_timing",
+            "investment_risk", "loss_vulnerability", "windfall",
+        }
+        slots = [
+            {"slot": "direct route-specific financial verdict", "source": "evidence.wealth_foundation and verdict; never generic natal promise"},
+            {"slot": "D1 promise and D2 confirmation or qualification", "source": "evidence.wealth_foundation.natal_wealth.houses and evidence.wealth_foundation.divisional_charts.D2"},
+            {"slot": "route-specific mechanism", "source": "answer_contract.wealth_answer_rules.scope and the corresponding required Wealth factors"},
+            {"slot": "earning or gain capacity separated from retention, liabilities and loss exposure", "source": "evidence.wealth_foundation.natal_wealth and route houses"},
+        ]
+        if investment_family:
+            slots.insert(2, {
+                "slot": "complete investment-carrier condition before any placement verdict",
+                "source": "evidence.wealth_foundation.natal_wealth.houses.5.lord.conditions, evidence.wealth_foundation.route_carrier_conditions, and conjunction contradictions",
+            })
+            slots.insert(3, {
+                "slot": "D5 speculative refinement and D9 carrier qualification",
+                "source": "evidence.wealth_foundation.divisional_charts.D5 and evidence.wealth_foundation.divisional_charts.D9; D9 cannot replace D1/D2/D5",
+            })
+        slots.append(
+            {
+                "slot": "manifestation support without overriding D1/D2",
+                "source": "evidence.wealth_foundation.indu_lagna and evidence.wealth_foundation.special_lagnas",
+            }
+            if static_route
+            else {
+                "slot": "allowed financial timing window",
+                "source": "verdict.ranked_windows and evidence.current_timing plus evidence.transit_activation_timeline",
+            }
+        )
+        if evidence.get("remedy_blueprint"):
+            slots.append({"slot": "single calculated remedy", "source": "evidence.remedy_blueprint.top_recommendation"})
+        slots.extend([
+            {"slot": "one practical non-prescriptive takeaway", "source": "the calculated route evidence"},
+            {"slot": "one natural follow-up about the user's actual financial priority", "source": "user_goal"},
+        ])
+        return {
+            "purpose": "semantic slots for the selected live Wealth graph route; not generic natal promise and not prewritten prose",
+            "slots": slots,
+            "forbidden_content": list(wealth_rules.get("forbidden_moves") or []),
+            "user_goal": query_plan.get("user_goal"),
+        }
     if query_plan.get("forecast_shape") == "career_decision":
         return {
             "purpose": "semantic slots for a calculated stay-or-change decision; not a vocation-fit profile",
@@ -11447,6 +11912,7 @@ def _build_instant_composer_context(
         key: query_plan.get(key)
         for key in (
             "category",
+            "wealth_subtype",
             "answer_mode",
             "user_goal",
             "interpretation_frame",
@@ -11504,6 +11970,8 @@ def _build_instant_composer_context(
     career_decision_question = is_career_decision(category, career_subtype)
     if is_career_category(category):
         compact_query_plan["career_subtype"] = career_subtype
+    if intent.get("wealth_subtype") or query_plan.get("wealth_subtype"):
+        compact_query_plan["wealth_subtype"] = intent.get("wealth_subtype") or query_plan.get("wealth_subtype")
     if career_decision_question:
         compact_query_plan["forecast_shape"] = "career_decision"
     static_career_profile = is_static_career_profile(
@@ -11647,6 +12115,7 @@ def _build_instant_composer_context(
         },
         "divisional_specifics": list(normalized.get("divisional_specifics") or [])[:3],
         "career_foundation": normalized.get("career_foundation"),
+        "wealth_foundation": normalized.get("wealth_foundation"),
         "risk_specifics": list(normalized.get("risk_specifics") or [])[:3],
         "health_body_area": normalized.get("health_body_area"),
         "option_comparison": normalized.get("option_comparison"),
@@ -11663,6 +12132,14 @@ def _build_instant_composer_context(
     live_graph_policy = (
         compact_answer_contract.get("knowledge_graph_policy")
         if isinstance(compact_answer_contract.get("knowledge_graph_policy"), dict)
+        else {}
+    )
+    is_wealth_graph = bool(
+        live_graph_policy.get("live") and live_graph_policy.get("domain") == "wealth"
+    )
+    wealth_rules = (
+        compact_answer_contract.get("wealth_answer_rules")
+        if isinstance(compact_answer_contract.get("wealth_answer_rules"), dict)
         else {}
     )
     graph_exclusions = {
@@ -11705,6 +12182,35 @@ def _build_instant_composer_context(
         compact_verdict["scope"] = "static graph route; natal/topic evidence only; no timing"
         for key in ("activation_prediction_rules", "event_rules", "current_cause_rules", "daily_rules"):
             compact_answer_contract.pop(key, None)
+    if is_wealth_graph:
+        # The Wealth graph owns promise and divisional precedence. Remove the
+        # shared natal/D9 narrative entirely so the writer cannot substitute it
+        # for the calculated D1/D2/Indu foundation.
+        compact_verdict = {
+            key: value for key, value in {
+                "direction": (
+                    verdict.get("direction")
+                    if str(verdict.get("direction") or "").startswith(("calculated_wealth", "insufficient_wealth"))
+                    else "synthesize_from_calculated_wealth_foundation"
+                ),
+                "confidence": verdict.get("confidence"),
+                "ranked_windows": compact_verdict.get("ranked_windows") if not wealth_rules.get("static_route") else None,
+                "missing_required_capabilities": verdict.get("missing_required_capabilities"),
+                "scope": wealth_rules.get("scope"),
+            }.items()
+            if value not in (None, "", [], {})
+        }
+        evidence.pop("natal_promise", None)
+        evidence.pop("divisional_specifics", None)
+        evidence.pop("topic_confirmation", None)
+        evidence.pop("special_natal_factors", None)
+        evidence.pop("risk_specifics", None)
+        evidence["_wealth_rules"] = wealth_rules
+        if wealth_rules.get("static_route"):
+            evidence = {
+                "wealth_foundation": evidence.get("wealth_foundation"),
+                "_wealth_rules": wealth_rules,
+            }
     if career_decision_question:
         career_rules = (
             answer_spec.get("career_rules")
@@ -11914,6 +12420,8 @@ def _build_instant_composer_context(
             "career_foundation": (
                 evidence.get("career_foundation") if static_career_profile else None
             ),
+            "wealth_foundation": evidence.get("wealth_foundation"),
+            "_wealth_rules": wealth_rules if is_wealth_graph else None,
         }
     if exact_day:
         # Exact-day forecasts have their own authoritative calculation spine.
@@ -11921,8 +12429,10 @@ def _build_instant_composer_context(
         # transit timelines compete with KP/Moon/Tara and five-level dashas in
         # the composer prompt.
         evidence = {
-            "natal_promise": evidence.get("natal_promise"),
+            "wealth_foundation": evidence.get("wealth_foundation") if is_wealth_graph else None,
+            "natal_promise": None if is_wealth_graph else evidence.get("natal_promise"),
             "daily_prediction": evidence.get("daily_prediction"),
+            "_wealth_rules": wealth_rules if is_wealth_graph else None,
         }
     if is_chart_fact:
         compact_charts: Dict[str, Any] = {}
@@ -11974,6 +12484,8 @@ def _build_instant_composer_context(
                 if str(live_graph_policy.get("runtime_key") or "") == "marriage_remedies"
                 else normalized.get("current_timing")
             ),
+            "wealth_foundation": normalized.get("wealth_foundation") if is_wealth_graph else None,
+            "_wealth_rules": wealth_rules if is_wealth_graph else None,
         }
     evidence = {key: value for key, value in evidence.items() if value not in (None, "", [], {})}
 
@@ -12920,6 +13432,7 @@ def _compact_context_for_speech(instant_context: Dict[str, Any]) -> Dict[str, An
         "transit_activation_timeline": normalized.get("transit_activation_timeline"),
         "divisional_specifics": list(normalized.get("divisional_specifics") or [])[:3],
         "career_foundation": normalized.get("career_foundation"),
+        "wealth_foundation": normalized.get("wealth_foundation"),
         "risk_specifics": list(normalized.get("risk_specifics") or [])[:3],
         "stable_transits": _compact_planet_map(stable_transits, keep_planets),
         "claim_gates": normalized.get("claim_gates"),

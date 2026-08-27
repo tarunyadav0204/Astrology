@@ -471,10 +471,10 @@ export default function ProfileScreen({ navigation, route }) {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} translucent={false} />
       <LinearGradient
-        colors={[colors.background, colors.backgroundSecondary, colors.background]}
+        colors={colors.homeGradient || [colors.background, colors.backgroundSecondary, colors.background]}
         style={styles.gradient}
       >
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.headerSurface }]}>
+        <SafeAreaView style={styles.safeArea}>
           <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cosmicLine }]}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: colors.cosmicRaised }]}>
               <Ionicons name="arrow-back" size={22} color={colors.textInverse} />
@@ -493,7 +493,7 @@ export default function ProfileScreen({ navigation, route }) {
 
           <GHScrollView
             ref={profileScrollRef}
-            style={[styles.scrollView, { backgroundColor: colors.background }]}
+            style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled

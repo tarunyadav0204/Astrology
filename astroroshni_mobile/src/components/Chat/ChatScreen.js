@@ -52,7 +52,7 @@ import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/consta
 import { buildQueryContext } from '../../utils/queryContext';
 import { COUNTRIES, YEARS } from '../../utils/mundaneConstants';
 import { trackAstrologyEvent, trackEvent } from '../../utils/analytics';
-import { useTheme } from '../../context/ThemeContext';
+import { ThemeColorsScope, useTheme } from '../../context/ThemeContext';
 import { Image } from 'react-native';
 
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
@@ -497,8 +497,9 @@ export default function ChatScreen({ navigation, route }) {
   const iconOnlyHeaderBrand = viewportWidth < 340 || effectiveHeaderWidth < 285;
   useAnalytics('ChatScreen');
   const {
-    theme,
-    colors,
+    theme: themeMode,
+    themeId,
+    colors: themeColors,
     getCardElevation,
     isPanditMode,
     enterPanditMode,
@@ -907,6 +908,12 @@ export default function ChatScreen({ navigation, route }) {
   const [showEventPeriods, setShowEventPeriods] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
   const [showGreeting, setShowGreeting] = useState(true);
+  const hasScopedChatPalette = !showGreeting && themeId === 'amethystEmber' && themeColors.chatPalette;
+  const colors = useMemo(
+    () => hasScopedChatPalette ? { ...themeColors, ...themeColors.chatPalette } : themeColors,
+    [hasScopedChatPalette, themeColors],
+  );
+  const theme = hasScopedChatPalette ? 'light' : themeMode;
   const [fomoHomeOpen, setFomoHomeOpen] = useState(false);
   const [fomoNotificationPromptNonce, setFomoNotificationPromptNonce] = useState(0);
   const [homeInfoModalPayload, setHomeInfoModalPayload] = useState(null);
@@ -989,6 +996,7 @@ export default function ChatScreen({ navigation, route }) {
   const nativeSwitchInProgressRef = useRef(false);
   const keepChatOpenAfterNativeSelectRef = useRef(false);
   const startFreshSessionAfterNativeSelectRef = useRef(false);
+  const chatModeAfterNativeSelectRef = useRef(null);
   const pendingFomoQueryContextRef = useRef(null);
   /** Set synchronously when applying route prefill so birthData/focus effects do not force greeting in the same tick. */
   const partnershipPrefillInProgressRef = useRef(false);
@@ -1999,17 +2007,29 @@ export default function ChatScreen({ navigation, route }) {
 
     if (route.params?.returnToChat) {
       const selectedBirthData = route.params?.birthData || route.params?.birthDetails;
+      const requestedReturnMode = String(route.params?.returnToChatMode || '').trim().toLowerCase();
+      const returnToChatMode = ['standard', 'premium', 'instant'].includes(requestedReturnMode)
+        ? requestedReturnMode
+        : null;
       nativeSwitchInProgressRef.current = true;
       keepChatOpenAfterNativeSelectRef.current = true;
       startFreshSessionAfterNativeSelectRef.current = true;
+      chatModeAfterNativeSelectRef.current = returnToChatMode;
+      if (returnToChatMode) {
+        applyChatModeFromTier(returnToChatMode);
+      }
+      if (returnToChatMode === 'instant') {
+        setInstantReceipt(null);
+      }
       navigation.setParams({
         returnToChat: undefined,
+        returnToChatMode: undefined,
         birthData: undefined,
         birthDetails: undefined,
         birthChartId: undefined,
       });
       if (selectedBirthData?.name) {
-        setMessages([buildFreshWelcomeMessage(selectedBirthData.name)]);
+        setMessages([buildFreshWelcomeMessage(selectedBirthData.name, returnToChatMode === 'instant')]);
         setSessionId(null);
         setLoading(false);
         setIsTyping(false);
@@ -2286,6 +2306,7 @@ export default function ChatScreen({ navigation, route }) {
           (switchedFromAnotherNative || shouldStartFreshSession);
 
         if (forceBlankWelcomeOnly) {
+          const preservedChatMode = chatModeAfterNativeSelectRef.current;
           (async () => {
             try {
               await AsyncStorage.multiRemove([`chatMessages_${personId}`, `chatSessions_${personId}`]);
@@ -2294,7 +2315,10 @@ export default function ChatScreen({ navigation, route }) {
             }
           })();
 
-          const welcomeMessage = buildFreshWelcomeMessage(birthData?.name || null);
+          const welcomeMessage = buildFreshWelcomeMessage(
+            birthData?.name || null,
+            preservedChatMode === 'instant',
+          );
           setMessages([]);
           setSessionId(null);
           setLoading(false);
@@ -2302,10 +2326,17 @@ export default function ChatScreen({ navigation, route }) {
           setPendingMessages(new Set());
           setMessagesWithStorage([welcomeMessage]);
           setShowGreeting(false);
+          if (preservedChatMode) {
+            applyChatModeFromTier(preservedChatMode);
+            chatModePreferenceLoadedRef.current = true;
+            chatModeHydratedRef.current = true;
+            saveSelectedChatMode(preservedChatMode, personId);
+          }
           nativeSwitchInProgressRef.current = false;
           keepChatOpenAfterAskEntryRef.current = false;
           keepChatOpenAfterNativeSelectRef.current = false;
           startFreshSessionAfterNativeSelectRef.current = false;
+          chatModeAfterNativeSelectRef.current = null;
 
           setTimeout(() => {
             checkPendingResponses(personId);
@@ -2373,10 +2404,18 @@ export default function ChatScreen({ navigation, route }) {
         }
       } else if (shouldKeepChatOpen) {
         setShowGreeting(false);
+        const preservedChatMode = chatModeAfterNativeSelectRef.current;
+        if (preservedChatMode) {
+          applyChatModeFromTier(preservedChatMode);
+          chatModePreferenceLoadedRef.current = true;
+          chatModeHydratedRef.current = true;
+          saveSelectedChatMode(preservedChatMode, personId);
+        }
         nativeSwitchInProgressRef.current = false;
         keepChatOpenAfterAskEntryRef.current = false;
         keepChatOpenAfterNativeSelectRef.current = false;
         startFreshSessionAfterNativeSelectRef.current = false;
+        chatModeAfterNativeSelectRef.current = null;
       }
     } else {
     }
@@ -3536,7 +3575,7 @@ export default function ChatScreen({ navigation, route }) {
     return t(key, fallback, { name });
   }
 
-  const buildFreshWelcomeMessage = (nativeNameOverride = null) => {
+  const buildFreshWelcomeMessage = (nativeNameOverride = null, instantOverride = isInstantAnalysis) => {
     const nativeName = nativeNameOverride || birthData?.name || 'there';
     if (isMundaneRef.current) {
       return {
@@ -3549,7 +3588,7 @@ export default function ChatScreen({ navigation, route }) {
     }
     return {
       id: Date.now().toString(),
-      content: getWelcomeMessageContent(nativeName),
+      content: getWelcomeMessageContent(nativeName, instantOverride),
       role: 'assistant',
       isWelcome: true,
       timestamp: new Date().toISOString(),
@@ -3876,6 +3915,44 @@ export default function ChatScreen({ navigation, route }) {
     if (!instantBilling.active) return null;
     await endInstantConsultation('chat_session_rotated');
     return startInstantConsultation(newChatSessionId);
+  };
+
+  const openHeaderNativeSelector = async () => {
+    const selectedChatMode = getChatModeKey();
+    if (selectedChatMode === 'instant' && instantBilling.busy) return;
+    if (selectedChatMode === 'instant' && instantBilling.active) {
+      const ended = await endInstantConsultation('native_selector_opened');
+      if (!ended) return;
+      // The receipt belongs to the chart we are leaving. Do not show it in
+      // the fresh Instant thread created for the newly selected native.
+      setInstantReceipt(null);
+    }
+    // Detach UI work belonging to the old chart. Its server-side history can
+    // still complete normally, but it must never write into the new native's
+    // fresh Instant thread after the selector returns.
+    statusPollGenerationRef.current.clear();
+    instantRevealTimersRef.current.forEach((timer) => clearTimeout(timer));
+    instantRevealTimersRef.current.clear();
+    instantRevealActiveRef.current.clear();
+    instantStreamSocketsRef.current.forEach((socket) => {
+      try {
+        socket.close();
+      } catch (_) {
+        // Socket cleanup must not block native selection.
+      }
+    });
+    instantStreamSocketsRef.current.clear();
+    nativeSwitchInProgressRef.current = true;
+    keepChatOpenAfterNativeSelectRef.current = true;
+    startFreshSessionAfterNativeSelectRef.current = true;
+    chatModeAfterNativeSelectRef.current = selectedChatMode;
+    navigation.navigate('SelectNative', {
+      returnTo: 'Home',
+      returnParams: {
+        returnToChat: true,
+        returnToChatMode: selectedChatMode,
+      },
+    });
   };
 
   const saveMessageToHistory = async (message, sessionId) => {
@@ -5951,10 +6028,11 @@ export default function ChatScreen({ navigation, route }) {
   const instantBalanceLow = instantBilling.active && instantRemainingSeconds > 60 && instantRemainingSeconds <= 300;
 
   return (
+    <ThemeColorsScope colors={colors} theme={theme}>
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} translucent={false} />
       <LinearGradient
-        colors={[colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientEnd]}
+        colors={colors.homeGradient || [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientEnd]}
         style={styles.gradientBg}
       >
       {Platform.OS !== 'web' && insets.top > 0 ? (
@@ -6063,9 +6141,24 @@ export default function ChatScreen({ navigation, route }) {
                         ? t('instantBilling.headerTitle', 'Instant with Tara')
                         : t('premiumUi.home.askTara')}
                     </Text>
-                    <Text style={[styles.activeChatSubtitle, { color: colors.textInverseMuted }]} numberOfLines={1}>
-                      {birthData?.name || 'Private consultation'}
-                    </Text>
+                    {birthData ? (
+                      <NativeSelectorChip
+                        birthData={birthData}
+                        onPress={openHeaderNativeSelector}
+                        maxLength={18}
+                        showIcon={false}
+                        style={[
+                          styles.instantNativeSelectorChip,
+                          { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine },
+                        ]}
+                        textStyle={[styles.instantNativeSelectorText, { color: colors.textInverseMuted }]}
+                        iconColor={colors.accentSoft}
+                      />
+                    ) : (
+                      <Text style={[styles.activeChatSubtitle, { color: colors.textInverseMuted }]} numberOfLines={1}>
+                        {birthData?.name || 'Private consultation'}
+                      </Text>
+                    )}
                   </View>
                 </View>
               ) : (
@@ -6497,7 +6590,10 @@ export default function ChatScreen({ navigation, route }) {
         ) : (
           <>
           <KeyboardAvoidingView
-            style={styles.keyboardAvoidingView}
+            style={[
+              styles.keyboardAvoidingView,
+              colors.chatBackground ? { backgroundColor: colors.chatBackground } : null,
+            ]}
             enabled={false}
           >
           {(partnershipMode || isMundane) && (
@@ -7557,13 +7653,17 @@ export default function ChatScreen({ navigation, route }) {
               accessibilityLabel={t('premiumUi.chatScreen.closeMenu')}
             />
             <Animated.View
-              style={[styles.drawerContent, {
-                transform: [{ translateX: drawerAnim }]
-              }]}
+              style={[
+                styles.drawerContent,
+                {
+                  borderLeftColor: colors.borderStrong || colors.cardBorder,
+                  transform: [{ translateX: drawerAnim }],
+                },
+              ]}
               pointerEvents="auto"
             >
               <LinearGradient
-                colors={[colors.background, colors.backgroundSecondary, colors.background]}
+                colors={[colors.surface, colors.surfaceRaised || colors.surface]}
                 style={styles.drawerGradient}
               >
                 <View style={[styles.drawerHeader, { borderBottomColor: colors.cardBorder }]}>
@@ -8753,6 +8853,7 @@ export default function ChatScreen({ navigation, route }) {
       {renderPartnershipSetupModal()}
       </LinearGradient>
     </View>
+    </ThemeColorsScope>
   );
 }
 
@@ -8871,6 +8972,24 @@ const styles = StyleSheet.create({
     lineHeight: 12,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  instantNativeSelectorChip: {
+    alignSelf: 'flex-start',
+    maxWidth: 148,
+    marginTop: 2,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+  },
+  instantNativeSelectorText: {
+    flexShrink: 1,
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '700',
+    letterSpacing: 0.35,
   },
   headerTitle: {
     fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif', default: 'serif' }),
@@ -10557,12 +10676,13 @@ const styles = StyleSheet.create({
   drawerContent: {
     width: Math.min(screenWidth * 0.9, 380),
     height: '100%',
+    borderLeftWidth: 1,
     zIndex: 1,
-    elevation: 1,
+    elevation: 18,
     shadowColor: '#000',
     shadowOffset: { width: -8, height: 0 },
-    shadowOpacity: 0.22,
-    shadowRadius: 28,
+    shadowOpacity: 0.4,
+    shadowRadius: 32,
   },
   drawerGradient: {
     flex: 1,

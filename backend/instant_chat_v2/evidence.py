@@ -138,6 +138,8 @@ def _health_body_area_for_ledger(value: Any) -> Any:
 
 def _capability_evidence_kinds(capability: str) -> List[str]:
     name = str(capability or "").lower()
+    if name == "parashari.wealth_foundation":
+        return ["wealth_foundation"]
     if name == "daily.five_level_dasha":
         return ["daily_dasha_stack"]
     if name == "daily.moon_tara_bala":
@@ -252,6 +254,15 @@ def build_evidence_ledger(instant_context: Dict[str, Any], evidence_plan: Dict[s
     _add(records, source="parashari.natal_promise", kind="natal_promise",
          value=normalized.get("natal_promise"), strength="primary", confidence=0.9,
          calculator="parashari_topic_promise")
+    _add(
+        records,
+        source="parashari.wealth_foundation",
+        kind="wealth_foundation",
+        value=normalized.get("wealth_foundation"),
+        strength="primary",
+        confidence=0.94,
+        calculator="wealth_d1_d2_indu_foundation",
+    )
     _add(records, source="evidence.fusion.legacy", kind="secondary_modifiers",
          value=normalized.get("secondary_modifiers"), strength="supporting", confidence=0.72)
     _add(records, source="parashari.divisional", kind="divisional_confirmation",

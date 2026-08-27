@@ -59,6 +59,7 @@
   --color-chart-text-muted: var(--color-text-muted);
   --color-chart-line: color-mix(in srgb, var(--color-text) 62%, transparent);
   --color-chart-surface: var(--color-surface-raised);
+  --color-chat-canvas: var(--color-canvas);
 }
 
 /* Toasts are reserved for actionable feedback (errors, warnings and background
@@ -517,48 +518,48 @@
 }
 
 [data-theme='amethystEmber'] {
-  color-scheme: dark;
-  --color-canvas: #16091f;
-  --color-canvas-subtle: #1d0d29;
-  --color-surface: #251133;
-  --color-surface-raised: #321746;
-  --color-surface-muted: #3b1d4d;
-  --color-surface-inverse: #0d0512;
-  --color-surface-inverse-raised: #1b0b25;
-  --color-header-surface: #13071c;
-  --color-header-surface-raised: #251133;
+  color-scheme: light;
+  --color-canvas: #fff7ed;
+  --color-canvas-subtle: #fffaf7;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #fff0e6;
+  --color-surface-inverse: #2d1b4e;
+  --color-surface-inverse-raised: #4a2c6d;
+  --color-header-surface: #1a0033;
+  --color-header-surface-raised: #2d1b4e;
   --color-header-text: #fff7ef;
   --color-header-text-muted: rgba(255, 247, 239, 0.7);
-  --color-header-border: rgba(255, 247, 239, 0.18);
+  --color-header-border: rgba(255, 107, 53, 0.34);
 
-  --color-text: #fff7ef;
-  --color-text-muted: rgba(255, 247, 239, 0.7);
-  --color-text-subtle: rgba(255, 247, 239, 0.48);
+  --color-text: #25152f;
+  --color-text-muted: rgba(37, 21, 47, 0.68);
+  --color-text-subtle: rgba(37, 21, 47, 0.46);
   --color-text-inverse: #fff7ef;
   --color-text-inverse-muted: rgba(255, 247, 239, 0.7);
 
-  --color-brand: #f08a3e;
-  --color-brand-hover: #f3b279;
-  --color-brand-active: #d66f28;
-  --color-on-brand: #24102d;
-  --color-accent: #f5a04f;
-  --color-accent-soft: #f7bd78;
-  --color-on-accent: #24102d;
+  --color-brand: #ff6b35;
+  --color-brand-hover: #ff8c5a;
+  --color-brand-active: #e64f1c;
+  --color-on-brand: #2d1538;
+  --color-accent: #f7931e;
+  --color-accent-soft: #ffe0cc;
+  --color-on-accent: #2d1538;
 
-  --color-border: rgba(255, 247, 239, 0.15);
-  --color-border-strong: rgba(245, 160, 79, 0.42);
+  --color-border: rgba(74, 44, 109, 0.16);
+  --color-border-strong: rgba(255, 107, 53, 0.38);
   --color-border-inverse: rgba(255, 247, 239, 0.18);
-  --color-focus: #e98138;
-  --color-overlay: rgba(8, 2, 12, 0.88);
+  --color-focus: #9c27b0;
+  --color-overlay: rgba(26, 0, 51, 0.82);
 
   --color-success: #6fbd91;
   --color-warning: #f0b360;
   --color-danger: #e2674f;
   --color-info: #87aad5;
 
-  --shadow-sm: 0 8px 24px rgba(5, 1, 8, 0.28);
-  --shadow-card: 0 24px 65px rgba(5, 1, 8, 0.42);
-  --shadow-modal: 0 38px 110px rgba(3, 0, 5, 0.72);
+  --shadow-sm: 0 8px 24px rgba(45, 27, 78, 0.1);
+  --shadow-card: 0 24px 65px rgba(45, 27, 78, 0.15);
+  --shadow-modal: 0 38px 110px rgba(26, 0, 51, 0.52);
 
   --planet-sun: #d87929;
   --planet-moon: #74798a;
@@ -577,6 +578,8 @@
   --color-cosmic-line: rgba(245, 204, 171, 0.28);
   --color-cosmic-line-strong: rgba(245, 160, 79, 0.55);
   --color-cosmic-glow: rgba(245, 160, 79, 0.22);
+  --color-chart-surface: #ffffff;
+  --color-chat-canvas: linear-gradient(180deg, #1a0033 0%, #2d1b4e 33.333%, #4a2c6d 66.667%, #ff6b35 100%);
 }
 
 [data-theme='clarity'] {

@@ -60,6 +60,12 @@ def fuse_evidence(query_plan: Dict[str, Any], ledger: Dict[str, Any]) -> Dict[st
     daily_judgment = daily_synthesis.get("daily_judgment") if isinstance(daily_synthesis.get("daily_judgment"), dict) else {}
     historical = (by_kind.get("historical_dasha_windows") or {}).get("value")
     retrospective = bool(time_scope.get("retrospective"))
+    wealth_category = str(query_plan.get("category") or "").strip().lower() in {
+        "wealth", "money", "finance", "income", "debt", "loan",
+        "investment", "investing", "trading", "inheritance",
+    }
+    wealth_foundation = (by_kind.get("wealth_foundation") or {}).get("value")
+    wealth_foundation = wealth_foundation if isinstance(wealth_foundation, dict) else {}
     if retrospective:
         historical = historical if isinstance(historical, dict) else {}
         windows = [
@@ -99,6 +105,33 @@ def fuse_evidence(query_plan: Dict[str, Any], ledger: Dict[str, Any]) -> Dict[st
             "decision_rule": daily_judgment.get("prediction_rule"),
         }
         confidence = 0.9 if not missing_required else 0.38
+    elif wealth_category and not timing_mode:
+        availability = (
+            wealth_foundation.get("availability")
+            if isinstance(wealth_foundation.get("availability"), dict)
+            else {}
+        )
+        d1_d2_complete = bool(
+            wealth_foundation.get("d1_available") and availability.get("d2")
+        )
+        if missing_required or not d1_d2_complete:
+            direction = "insufficient_wealth_foundation"
+            confidence = 0.38
+        elif query_plan.get("answer_mode") == "remedy_action" and availability.get("remedy_blueprint"):
+            direction = "calculated_wealth_remedy_available"
+            confidence = 0.86
+        else:
+            direction = "calculated_wealth_foundation_available"
+            confidence = 0.84
+        windows = []
+        natal = wealth_foundation.get("natal_wealth") if isinstance(wealth_foundation.get("natal_wealth"), dict) else {}
+        rationale = {
+            "source": "wealth_foundation",
+            "d1_d2_complete": d1_d2_complete,
+            "wealth_score": natal.get("wealth_score"),
+            "available_layers": sorted(key for key, value in availability.items() if value),
+            "rule": "Synthesize only the calculated Wealth graph foundation; generic natal promise or D9 cannot replace D2.",
+        }
     elif query_plan.get("answer_mode") == "comparison_choice" and isinstance(option_comparison, dict) and option_comparison:
         comparison = option_comparison.get("comparison") if isinstance(option_comparison.get("comparison"), dict) else {}
         direction = comparison.get("direction") or "insufficient_option_evidence"

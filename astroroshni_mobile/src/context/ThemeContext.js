@@ -254,3 +254,14 @@ export const useTheme = () => {
   }
   return context;
 };
+
+export function ThemeColorsScope({ colors, theme, children }) {
+  const context = useTheme();
+  const value = useMemo(() => ({
+    ...context,
+    colors: colors || context.colors,
+    theme: theme || context.theme,
+  }), [colors, context, theme]);
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}

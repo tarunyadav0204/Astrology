@@ -216,6 +216,7 @@ def build_query_plan(
         "category": category,
         "career_subtype": intent.get("career_subtype") or query_context.get("career_subtype"),
         "marriage_subtype": intent.get("marriage_subtype") or query_context.get("marriage_subtype"),
+        "wealth_subtype": intent.get("wealth_subtype") or query_context.get("wealth_subtype"),
         "prior_marriage_context": extracted.get("prior_marriage_context"),
         "answer_mode": str(answer_mode or "topic_reading"),
         "route_action": route_action,

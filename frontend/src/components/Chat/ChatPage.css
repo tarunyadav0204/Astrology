@@ -2665,7 +2665,7 @@ button.chat-header-credits.credits-display:active {
     color: var(--color-text);
     background:
         radial-gradient(circle at 88% 4%, color-mix(in srgb, var(--color-accent) 12%, transparent), transparent 28rem),
-        var(--color-canvas);
+        var(--color-chat-canvas, var(--color-canvas));
     font-family: var(--font-body);
 }
 
@@ -3471,6 +3471,24 @@ button.chat-header-credits.credits-display:focus-visible {
     background: var(--color-surface);
     border-color: var(--color-border);
     border-radius: var(--radius-md);
+    box-shadow: none;
+}
+
+.chat-page--wizard .single-chart-profile-name { color: var(--color-text); }
+.chat-page--wizard .single-chart-profile-meta { color: var(--color-text-muted); }
+.chat-page--wizard .single-chart-profile-panel__label { color: var(--color-brand); }
+.chat-page--wizard .single-chart-intro__badge {
+    color: var(--color-brand);
+    background: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface));
+    border: 1px solid color-mix(in srgb, var(--color-brand) 32%, var(--color-border));
+    box-shadow: none;
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+}
+.chat-page--wizard .single-chart-avatar {
+    color: var(--color-on-brand);
+    background: var(--color-brand);
+    border: 1px solid color-mix(in srgb, var(--color-brand) 72%, var(--color-border));
     box-shadow: none;
 }
 

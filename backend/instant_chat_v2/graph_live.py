@@ -28,6 +28,12 @@ from .marriage_graph_runtime import (
     is_marriage_graph_request,
     resolve_marriage_graph_inputs,
 )
+from .wealth_graph_runtime import (
+    build_wealth_graph_route,
+    compare_wealth_graph_policy,
+    is_wealth_category,
+    resolve_wealth_graph_inputs,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -120,6 +126,10 @@ def resolve_live_graph_policy(
         domain, resolver, comparator, reviewer = (
             "marriage", resolve_marriage_graph_inputs, compare_marriage_graph_policy, build_marriage_graph_route,
         )
+    elif is_wealth_category(category):
+        domain, resolver, comparator, reviewer = (
+            "wealth", resolve_wealth_graph_inputs, compare_wealth_graph_policy, build_wealth_graph_route,
+        )
     else:
         return None
 
@@ -181,7 +191,13 @@ def apply_live_graph_policy(
     ]
     time_bound_mode = str(query_plan.get("answer_mode") or "") in {
         "event_prediction", "timing_window", "event_timing"
-    }
+    } or bool(
+        policy.get("domain") == "wealth"
+        and policy.get("runtime_key") in {
+            "wealth_timing", "income_timing", "debt_repayment",
+            "loan_support", "investment_timing", "inheritance_timing",
+        }
+    )
     love_arranged_route = bool(
         policy.get("domain") == "marriage"
         and policy.get("runtime_key") == "love_arranged_marriage"
@@ -206,12 +222,17 @@ def apply_live_graph_policy(
         policy.get("domain") == "marriage"
         and policy.get("runtime_key") == "marriage_remedies"
     )
+    wealth_route = policy.get("domain") == "wealth"
     # Career option comparisons use calculated future option windows.  Love
     # versus arranged marriage is a static natal-pathway comparison, so it
     # must never inherit that timing-based winner machinery.
     comparison_mode = bool(
         str(query_plan.get("answer_mode") or "") == "comparison_choice"
         and not love_arranged_route
+        and not (
+            policy.get("domain") == "wealth"
+            and policy.get("runtime_key") == "investing_vs_trading"
+        )
     )
     verdict_missing = {
         str(value) for value in (result.get("verdict") or {}).get("missing_required_capabilities") or []
@@ -224,6 +245,129 @@ def apply_live_graph_policy(
             "evidence limitation and general preventive guidance only."
         )
         answer_spec["limitation_instruction"] = compact_policy["instruction"]
+    if bool(policy.get("live")) and wealth_route:
+        runtime_key = str(policy.get("runtime_key") or "")
+        route_focus = {
+            "wealth": "overall wealth potential, accumulation and retention",
+            "wealth_source": "primary wealth-building channels",
+            "wealth_diagnosis": "savings instability and financial leakage",
+            "wealth_timing": "wealth-growth timing",
+            "income": "income and cash-flow stability",
+            "income_timing": "income-growth timing",
+            "multiple_income": "capacity for multiple income streams",
+            "debt": "debt and borrowing pattern",
+            "debt_diagnosis": "persistent debt mechanism",
+            "debt_repayment": "debt-repayment timing",
+            "loan_support": "loan-support timing and conditions",
+            "investing_vs_trading": "long-term investing versus active trading suitability",
+            "investment": "investment and speculation suitability",
+            "investment_timing": "investment-support timing",
+            "investment_risk": "investment volatility and risk mechanism",
+            "loss_vulnerability": "financial-loss vulnerability",
+            "inheritance": "inheritance and settlement potential",
+            "inheritance_timing": "inheritance or settlement timing",
+            "windfall": "sudden-gain potential and retention",
+            "wealth_remedies": "calculated financial remedy",
+        }.get(runtime_key, "the requested financial timing or decision")
+        is_static_wealth = runtime_key not in {
+            "wealth_timing", "income_timing", "debt_repayment",
+            "loan_support", "investment_timing", "inheritance_timing",
+        }
+        investment_family = runtime_key in {
+            "investment", "investing_vs_trading", "investment_timing",
+            "investment_risk", "loss_vulnerability", "windfall",
+        }
+        wealth_answer_rules = {
+            "runtime_key": runtime_key,
+            "scope": route_focus,
+            "static_route": is_static_wealth,
+            "primary_evidence": "evidence.wealth_foundation",
+            "required_answer_order": [
+                "direct route-specific financial verdict",
+                (
+                    "D1 promise, complete fifth-lord/carrier condition, D2 retention, D5 refinement and supporting D9 qualification"
+                    if investment_family
+                    else "D1 promise and D2 Hora confirmation or qualification"
+                ),
+                "route-specific financial mechanism from the required houses and divisional chart",
+                "earning or gain capacity separated from savings, retention, liabilities and loss exposure",
+                (
+                    "Indu Lagna, Hora Lagna and Arudha manifestation as supporting evidence"
+                    if is_static_wealth
+                    else "dasha permission followed by dated transit confirmation within the requested horizon"
+                ),
+                "one practical non-prescriptive takeaway",
+            ],
+            "factor_precedence": [
+                "D1 establishes financial promise.",
+                "D2 confirms or qualifies accumulation and retention.",
+                "Route-specific houses and D5, D8 or D10 answer only their authorized question.",
+                (
+                    "For investment routes, D5 refines speculative judgment and D9 qualifies the underlying carriers; D9 cannot replace D1, D2 or D5."
+                    if investment_family
+                    else "D9 is not a substitute for the Wealth route's required divisional evidence."
+                ),
+                "Judge every relevant lord as a combined carrier: placement, dignity, strength, Gandanta, special lordships, conjunctions and declared overlap rules.",
+                "Dhana yogas must be operational through actual lords and placements, not merely named.",
+                "Indu Lagna, Hora Lagna and Arudha are manifestation support and cannot override D1/D2.",
+                "Dasha and transit may time an established promise but cannot create one.",
+            ],
+            "forbidden_moves": [
+                (
+                    "Do not use D9 as a standalone Wealth confirmation; on investment routes it may only qualify the supplied D1/D2/D5 carrier evidence."
+                    if investment_family
+                    else "Do not use D9 as the Wealth confirmation chart; D2 is mandatory."
+                ),
+                "Do not judge investment or speculation from the fifth lord's destination alone; include every supplied carrier condition and contradiction.",
+                "Do not say a natal house is active or activated on a static route; use supports, challenges, strengthens, weakens, connects, occupies or aspects.",
+                "Do not call the result a clear yes unless the supplied D1 and D2 synthesis actually supports that strength.",
+                "Do not infer salary/service, business, speculation, debt, expenses, inheritance or windfall unless the selected route and supplied evidence support it.",
+                "Do not let Gandanta, Dagdha Rashi or another special factor replace the D1/D2 synthesis; use it only as a connected modifier.",
+                "Do not turn a numerical wealth score into certainty or quote it as a probability.",
+                "Do not mention current dasha, transit, dates, peaks or current activation on a static route.",
+                "Do not use Rahu or Ketu fifth/ninth aspects.",
+            ],
+        }
+        compact_policy["financial_safety_rules"] = {
+            "scope": "astrological financial tendencies and timing; not regulated financial advice",
+            "required_order": [
+                "direct chart-based verdict",
+                "promise or capacity evidence",
+                "retention and risk qualification",
+                "practical non-prescriptive takeaway",
+            ],
+            "forbidden_moves": [
+                "Do not guarantee wealth, returns, profit, inheritance, loan approval, or freedom from loss.",
+                "Do not recommend a named security, asset, leverage level, trade, lender, or transaction.",
+                "Do not infer timing from natal promise or Indu Lagna alone.",
+                "Do not use dasha or transit language on a static route.",
+                "Do not treat Indu Lagna as an exact-degree point or as overriding D1 and D2.",
+                "Do not describe Rahu or Ketu fifth/ninth aspects; node activation is occupation, conjunction, or seventh aspect only.",
+                "Do not predict another person's death in an inheritance answer.",
+            ],
+        }
+        compact_policy["instruction"] = (
+            "Synthesize only the supplied Wealth foundation in the graph's decision order. Generic natal-promise "
+            "or D9 evidence cannot replace D1 and D2; investment routes may use supplied D9 only as a carrier "
+            "qualification after D5. Separate earning capacity, retention, risk and timing. "
+            "Follow wealth_answer_rules and financial_safety_rules exactly."
+        )
+        compact_policy["wealth_answer_rules"] = wealth_answer_rules
+        answer_spec["financial_safety_rules"] = compact_policy["financial_safety_rules"]
+        answer_spec["wealth_answer_rules"] = wealth_answer_rules
+        if time_bound_mode:
+            # Every required Wealth factor belongs to the timing chain. Missing
+            # natal/divisional promise is as disqualifying as missing dasha or
+            # transit confirmation; timing must not be manufactured on top of it.
+            timing_missing = list(missing)
+        elif missing:
+            compact_policy["claim_permission"] = "no_complete_wealth_verdict"
+            compact_policy["instruction"] = (
+                "Required Wealth evidence is incomplete. State which graph factors are unavailable and give only "
+                "the bounded observations supported by evidence.wealth_foundation. Do not substitute D9, generic "
+                "natal promise, current activation, or planet folklore for the missing layer."
+            )
+            answer_spec["limitation_instruction"] = compact_policy["instruction"]
     if bool(policy.get("live")) and love_arranged_route:
         relation = str((query_plan.get("time_scope") or {}).get("relation") or "").strip().lower()
         pathway_rules = {
@@ -723,18 +867,31 @@ def enforce_live_graph_answer(
             clean_answer,
             flags=re.IGNORECASE,
         )
-        clean_answer = re.sub(
-            r"\bactivation\b",
-            "natal emphasis",
-            clean_answer,
-            flags=re.IGNORECASE,
-        )
+        clean_answer = re.sub(r"\bactivation\b", "natal emphasis", clean_answer, flags=re.IGNORECASE)
         clean_answer = re.sub(
             r"\b(is|are|was|were)\s+active\b",
             r"\1 relevant in the natal chart",
             clean_answer,
             flags=re.IGNORECASE,
         )
+    wealth_rules = policy.get("wealth_answer_rules") if isinstance(policy.get("wealth_answer_rules"), Mapping) else {}
+    if policy.get("domain") == "wealth" and wealth_rules.get("static_route"):
+        # Static Wealth routes use D2 as the mandatory Wealth divisional and
+        # natal relationships are conditions rather than time activations.
+        # D9 is retained only for the authored investment-family carrier check.
+        sentences = re.split(r"(?<=[.!?])\s+", clean_answer)
+        investment_family = str(policy.get("runtime_key") or "") in {
+            "investment", "investing_vs_trading", "investment_risk",
+            "loss_vulnerability", "windfall",
+        }
+        if not investment_family:
+            clean_answer = " ".join(
+                sentence for sentence in sentences
+                if not re.search(r"\b(?:D9|Navamsha|Navamsa)\b", sentence, re.IGNORECASE)
+            ).strip()
+        clean_answer = re.sub(r"\bactivated\b", "emphasized in the natal chart", clean_answer, flags=re.IGNORECASE)
+        clean_answer = re.sub(r"\bactivation\b", "natal emphasis", clean_answer, flags=re.IGNORECASE)
+        clean_answer = re.sub(r"\b(is|are|was|were)\s+active\b", r"\1 relevant in the natal chart", clean_answer, flags=re.IGNORECASE)
     if policy.get("claim_permission") == "no_health_area_specificity":
         if str(language or "").lower().startswith("hi"):
             return (
@@ -759,6 +916,20 @@ def enforce_live_graph_answer(
         return (
             "The available career evidence does not reliably distinguish these two options, so choosing promotion "
             "or job change as more likely would be speculation. Which option is already becoming concrete in real life?"
+        )
+    if policy.get("claim_permission") == "no_complete_wealth_verdict":
+        missing = ", ".join(
+            str(value).split(":")[-1]
+            for value in list(policy.get("missing_required_factors") or [])[:5]
+        )
+        if str(language or "").lower().startswith("hi"):
+            return (
+                f"मैं अभी पूर्ण धन-वित्त निष्कर्ष नहीं दे सकता क्योंकि आवश्यक गणना-परतें ({missing}) उपलब्ध नहीं हैं। "
+                "D9 या सामान्य ग्रह-अर्थ से इस कमी को भरना अनुमान होगा।"
+            )
+        return (
+            f"I can’t give a complete Wealth reading because required calculated layers are unavailable ({missing}). "
+            "Substituting D9 or generic planet meanings for them would be speculation."
         )
     if policy.get("claim_permission") != "directional_only_no_timing":
         return clean_answer

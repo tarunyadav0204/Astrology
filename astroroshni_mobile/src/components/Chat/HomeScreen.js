@@ -390,17 +390,17 @@ export default function HomeScreen({
   const isHindiUi = isPanditMode || isHindiLocale(i18n.language);
   const tabActiveWeight = isHindiUi ? '600' : '800';
   const tabIdleWeight = isHindiUi ? '500' : '600';
-  const tabSafeColor = colors.headerSurface;
+  const tabSafeColor = colors.tabBarSurface || colors.headerSurface;
   const isDark = theme === 'dark';
-  const homePageGradient = [colors.background, colors.backgroundSecondary, colors.background];
+  const homePageGradient = colors.homeGradient || [colors.background, colors.backgroundSecondary, colors.background];
   const homeHeaderGradient = isDark
     ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']
     : isPanditMode
       ? ['#FFFFFF', '#FFFFFF', '#FAFAFA']
       : ['rgba(255, 255, 255, 0.98)', 'rgba(255, 247, 237, 0.95)', 'rgba(255, 237, 213, 0.92)'];
-  const tabBarGradient = [colors.headerSurface, colors.headerSurface];
-  const tabActiveColor = colors.accent;
-  const tabIdleColor = colors.textInverseMuted;
+  const tabBarGradient = [colors.tabBarSurface || colors.headerSurface, colors.tabBarSurface || colors.headerSurface];
+  const tabActiveColor = colors.tabActiveColor || colors.accent;
+  const tabIdleColor = colors.tabIdleColor || colors.textInverseMuted;
   const isIOS = Platform.OS === 'ios';
   const { freeQuestionAvailable, pricing, pricingOriginal, fetchPricing } = useCredits();
   const { requireAuthForPaid } = useAuthGate();

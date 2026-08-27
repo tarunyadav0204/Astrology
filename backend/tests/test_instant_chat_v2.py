@@ -1058,6 +1058,12 @@ def test_answer_contract_limits_instant_reply_and_protects_derived_framing():
 
 def test_event_prediction_contract_preserves_current_cause_and_earliest_relief():
     context = _context()
+    # Wealth timing now requires the same calculated D1/D2 foundation used by
+    # the live Wealth graph; a timing window cannot create financial promise.
+    context["normalized_evidence"]["wealth_foundation"] = {
+        "d1_available": True,
+        "availability": {"d2": True},
+    }
     context["normalized_evidence"]["event_timing_verdict"] = {
         "direction": "conditional",
         "comparison": "current_active_future_slightly_cleaner",

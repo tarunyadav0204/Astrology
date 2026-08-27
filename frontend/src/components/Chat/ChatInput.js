@@ -29,7 +29,6 @@ const ChatInput = ({
     onInterruptAssistantSpeech = () => {},
     instantMode = false,
     onInstantModeChange = () => {},
-    instantSessionActive = false,
     instantPerMinuteCost = 1,
     instantFirstMinuteCost = 1,
     instantHeaderControls = false,
@@ -179,7 +178,7 @@ const ChatInput = ({
         && !useFreeQuestionEligible
         && instantChatEnabled
         && speechChatEnabled;
-    const canSendInstantMessage = !isLoading && !isLocked && instantSessionActive;
+    const canSendInstantMessage = !isLoading && !isLocked;
 
     const commitSend = (text, premiumOverride = null, sendOptions = {}) => {
         const trimmed = String(text || '').trim();
@@ -658,14 +657,14 @@ const ChatInput = ({
                                                     ? 'Ask a quick question…'
                                                     : "Ask me about your birth chart..."
                     }
-                    disabled={isLoading || credits < effectiveCost || isLocked || (isInstantSendMode && !instantSessionActive)}
+                    disabled={isLoading || credits < effectiveCost || isLocked}
                     className={`chat-input${useCompactPremium && showModeSelector ? ' chat-input--mode-select-open' : ''}`}
                 />
                 <button
                     type="button"
                     className={`speech-button ${isSpeechListening ? 'speech-button--listening' : ''}`}
                     onClick={handleSpeechButton}
-                    disabled={!isSpeechSupported || !speechChatEnabled || isLoading || isLocked || (useInstantVoiceSend ? !instantSessionActive : credits < effectiveCost)}
+                    disabled={!isSpeechSupported || !speechChatEnabled || isLoading || isLocked || (!useInstantVoiceSend && credits < effectiveCost)}
                     aria-label={
                         isAssistantSpeaking
                             ? 'Interrupt and ask a follow-up'
@@ -678,9 +677,7 @@ const ChatInput = ({
                             ? 'Speech recognition is not supported in this browser'
                             : !speechChatEnabled
                                 ? 'Voice features are not available right now'
-                                : useInstantVoiceSend && !instantSessionActive
-                                    ? 'Start the Instant consultation first'
-                                    : isAssistantSpeaking
+                                : isAssistantSpeaking
                                         ? 'Interrupt and ask the next question'
                                         : isSpeechListening
                                             ? 'Stop listening'
@@ -742,7 +739,7 @@ const ChatInput = ({
                 )}
                 <button 
                     type="submit" 
-                    disabled={!message.trim() || isLoading || credits < effectiveCost || isLocked || (isInstantSendMode && !instantSessionActive)}
+                    disabled={!message.trim() || isLoading || credits < effectiveCost || isLocked}
                     className="send-button"
                     aria-label={
                         isLoading

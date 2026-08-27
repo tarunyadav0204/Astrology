@@ -62,9 +62,9 @@ export const THEMES = Object.freeze([
   {
     id: 'amethystEmber',
     label: 'Amethyst Ember',
-    colorScheme: 'dark',
-    themeColor: '#13071c',
-    preview: { canvas: '#16091f', surface: '#321746', accent: '#f08a3e', border: 'rgba(255, 247, 239, 0.2)' },
+    colorScheme: 'light',
+    themeColor: '#1a0033',
+    preview: { canvas: '#1a0033', surface: '#ffffff', accent: '#ff6b35', border: 'rgba(255, 107, 53, 0.34)' },
   },
   {
     id: 'clarity',

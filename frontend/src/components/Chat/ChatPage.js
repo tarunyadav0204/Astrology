@@ -864,13 +864,18 @@ const ChatPage = ({ onLogin }) => {
         let sessionId = chatV2SessionId;
         if (!sessionId) {
             sessionId = await createChatV2Session();
-            if (!sessionId) return;
+            if (!sessionId) return null;
             setChatV2SessionId(sessionId);
         }
         try {
-            await instantBilling.start(sessionId);
+            const billingSession = await instantBilling.start(sessionId);
+            return {
+                chatSessionId: sessionId,
+                billingSession,
+            };
         } catch (error) {
             if (/credit/i.test(error?.message || '')) setShowCreditsModal(true);
+            return null;
         }
     };
 
@@ -1818,7 +1823,7 @@ const ChatPage = ({ onLogin }) => {
     const handleSendMessageChatV2 = async (message, options = {}) => {
         if (!birthData) return;
 
-        let currentSessionId = chatV2SessionId;
+        let currentSessionId = options?.instant_chat_session_id || chatV2SessionId;
         if (!currentSessionId) {
             currentSessionId = await createChatV2Session();
             if (!currentSessionId) return;
@@ -1948,7 +1953,8 @@ const ChatPage = ({ onLogin }) => {
         if (useInstantChat) {
             requestData.chat_tier = 'instant';
             requestData.instant_chat = true;
-            requestData.instant_billing_session_id = instantBilling.state?.session_id;
+            requestData.instant_billing_session_id =
+                options?.instant_billing_session_id || instantBilling.state?.session_id;
         } else if (options?.chat_tier) {
             requestData.chat_tier = options.chat_tier;
         }
@@ -2138,8 +2144,13 @@ const ChatPage = ({ onLogin }) => {
             && instantBilling.state.chat_session_id === chatV2SessionId
         );
         if (requestedInstant && !activeForConversation && !options?.instant_timeline_selection) {
-            await startInstantConsultation();
-            return;
+            const startedSession = await startInstantConsultation();
+            if (!startedSession?.billingSession?.session_id || !startedSession?.chatSessionId) return;
+            return handleSendMessageChatV2(message, {
+                ...options,
+                instant_chat_session_id: startedSession.chatSessionId,
+                instant_billing_session_id: startedSession.billingSession.session_id,
+            });
         }
 
         return handleSendMessageChatV2(message, options);
@@ -2736,7 +2747,7 @@ const ChatPage = ({ onLogin }) => {
                                     <div className="wizard-inline-card wizard-inline-card--single-ready">
                                         <p className="single-chart-intro">
                                             <span className="single-chart-intro__badge" aria-hidden="true">
-                                                ✨
+                                                ✦
                                             </span>
                                             <span>
                                                 You’re in <strong>Single Chart</strong> mode — every reply is cast for <strong>one</strong> birth
@@ -3453,7 +3464,6 @@ const ChatPage = ({ onLogin }) => {
                         }
                         setIsInstantAnalysis(next);
                     }}
-                    instantSessionActive={instantBilling.active && instantBilling.state?.chat_session_id === chatV2SessionId}
                     instantPerMinuteCost={instantChatPerMinuteCost}
                     instantFirstMinuteCost={instantChatFirstMinuteCost}
                     instantHeaderControls

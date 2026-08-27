@@ -35,7 +35,7 @@ def block_for(ttl: str, resource: str) -> str:
 
 def objects(block: str, predicate: str) -> list[str]:
     match = re.search(rf"(?ms)\b{re.escape(predicate)}\s+(.+?)(?=\s*;|\s*\.\s*$)", block)
-    return re.findall(r"(?:career|health|marriage|domain|ar):[A-Za-z0-9_]+", match.group(1)) if match else []
+    return re.findall(r"(?:career|health|marriage|wealth|domain|ar):[A-Za-z0-9_]+", match.group(1)) if match else []
 
 
 def literal(block: str, predicate: str) -> str | None:
@@ -121,7 +121,7 @@ def expect_members(actual: list[str], expected: list[str], label: str) -> None:
 
 
 def declared_resources(ttl: str) -> set[str]:
-    return set(re.findall(r"(?m)^\s*((?:career|health|marriage|domain|ar):[A-Za-z0-9_]+)\s+", ttl))
+    return set(re.findall(r"(?m)^\s*((?:career|health|marriage|wealth|domain|ar):[A-Za-z0-9_]+)\s+", ttl))
 
 
 def ontology_version(ttl: str) -> str:
@@ -164,7 +164,7 @@ def validate_integrity(ttl: str, question_resources: list[str]) -> None:
                 for factor in factors:
                     if factor not in declared:
                         raise AssertionError(f"{stage} references undeclared factor {factor}")
-            for reference in re.findall(r"(?:career|health|marriage|domain):[A-Za-z0-9_]+", block):
+            for reference in re.findall(r"(?:career|health|marriage|wealth|domain):[A-Za-z0-9_]+", block):
                 if reference not in declared:
                     raise AssertionError(f"{resource} references undeclared {reference}")
 
@@ -175,7 +175,7 @@ def validate_integrity(ttl: str, question_resources: list[str]) -> None:
     if duplicates:
         raise AssertionError(f"Duplicate QuestionType runtimeKey(s): {', '.join(sorted(duplicates))}")
 
-    capability_resources = re.findall(r"(?m)^\s*((?:career|health|marriage):[A-Za-z0-9_]+)\s+a\s+ar:CalculatorCapability\b", ttl)
+    capability_resources = re.findall(r"(?m)^\s*((?:career|health|marriage|wealth):[A-Za-z0-9_]+)\s+a\s+ar:CalculatorCapability\b", ttl)
     for resource in capability_resources:
         if not literal(block_for(ttl, resource), "ar:calculatorBinding"):
             raise AssertionError(f"{resource} has no executable calculatorBinding")
@@ -186,6 +186,7 @@ def main() -> int:
         "career_poc": "Career",
         "health_poc": "Health",
         "marriage_poc": "Marriage and Relationship",
+        "wealth_poc": "Wealth and Finance",
     }.get(POC.name, POC.name)
     source_ttl = TTL_PATH.read_text(encoding="utf-8")
     core_ttl = CORE_PATH.read_text(encoding="utf-8")
@@ -201,6 +202,7 @@ def main() -> int:
         "career_poc": "career",
         "health_poc": "health",
         "marriage_poc": "marriage",
+        "wealth_poc": "wealth",
     }.get(POC.name)
     if not domain_prefix:
         raise AssertionError(f"Unsupported ontology module: {POC.name}")
