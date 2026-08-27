@@ -22,6 +22,55 @@ def _graph_messages_url() -> Tuple[str, str]:
     return token, ver
 
 
+def fetch_whatsapp_message_templates(*, status: str = "APPROVED") -> List[Dict[str, Any]]:
+    """Fetch message templates for the configured WhatsApp Business Account."""
+    token, ver = _graph_messages_url()
+    waba_id = (
+        os.environ.get("WHATSAPP_BUSINESS_ACCOUNT_ID")
+        or os.environ.get("WHATSAPP_WABA_ID")
+        or ""
+    ).strip()
+    if not token or not waba_id:
+        raise RuntimeError(
+            "missing WHATSAPP_ACCESS_TOKEN or WHATSAPP_BUSINESS_ACCOUNT_ID"
+        )
+
+    url = f"https://graph.facebook.com/{ver}/{waba_id}/message_templates"
+    params: Optional[Dict[str, Any]] = {
+        "fields": "id,name,status,category,language,components",
+        "limit": 100,
+    }
+    templates: List[Dict[str, Any]] = []
+    for _ in range(20):
+        response = requests.get(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+            params=params,
+            timeout=30,
+        )
+        if not (200 <= response.status_code < 300):
+            detail = (response.text or "")[:800]
+            raise RuntimeError(f"Meta {response.status_code}: {detail}")
+        payload = response.json()
+        rows = payload.get("data") if isinstance(payload, dict) else None
+        if isinstance(rows, list):
+            templates.extend(row for row in rows if isinstance(row, dict))
+        next_url = ((payload.get("paging") or {}).get("next") if isinstance(payload, dict) else None)
+        if not next_url:
+            break
+        if not str(next_url).startswith("https://graph.facebook.com/"):
+            raise RuntimeError("Meta returned an unexpected template pagination URL")
+        url = str(next_url)
+        params = None
+
+    wanted = str(status or "").strip().upper()
+    if wanted:
+        templates = [
+            row for row in templates if str(row.get("status") or "").upper() == wanted
+        ]
+    return templates
+
+
 def truncate_whatsapp(s: str, max_len: int) -> str:
     s = (s or "").strip().replace("\n", " ")
     if len(s) <= max_len:
@@ -110,6 +159,7 @@ def send_whatsapp_template(
     button_payload: Optional[str] = None,
     url_button_suffix: Optional[str] = None,
     url_button_index: str = "0",
+    components_override: Optional[List[Dict[str, Any]]] = None,
     return_error: bool = False,
 ):
     """Send an approved WhatsApp message template to a phone/wa recipient.
@@ -184,6 +234,8 @@ def send_whatsapp_template(
                 ],
             }
         )
+    if components_override is not None:
+        components = components_override
     payload: Dict[str, Any] = {
         "messaging_product": "whatsapp",
         "to": to_s,

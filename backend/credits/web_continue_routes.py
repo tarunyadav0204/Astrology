@@ -8,10 +8,12 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 from auth import User, create_access_token_for_user, get_current_user
 from credits.web_continue import (
     build_continue_url,
+    ensure_continue_link_environment_is_safe,
     get_or_create_continue_token,
     lookup_user_for_web_topup,
     resolve_continue_token,
@@ -42,6 +44,14 @@ class AdminWebTopupBody(BaseModel):
     send_whatsapp: bool = False
 
 
+def _split_campaign_continue_token(raw_token: str) -> tuple[str, Optional[int]]:
+    raw = str(raw_token or "").strip()
+    match = re.fullmatch(r"([A-Za-z0-9_-]{8,180})\.cc(\d+)[.,;:!?)]*", raw)
+    if not match:
+        return raw, None
+    return match.group(1), int(match.group(2))
+
+
 def _digits_only(value: str) -> str:
     return "".join(ch for ch in str(value or "") if ch.isdigit())
 
@@ -62,7 +72,8 @@ def _require_admin(user: User) -> None:
 @auth_router.post("/web-continue")
 async def exchange_web_continue_token(body: WebContinueBody):
     """Exchange a reusable continue token for a normal browser JWT + user payload."""
-    user = resolve_continue_token(body.token)
+    token, campaign_id = _split_campaign_continue_token(body.token)
+    user = resolve_continue_token(token)
     if not user or not user.get("phone"):
         raise HTTPException(status_code=404, detail="Invalid or revoked continue link")
     access_token = create_access_token_for_user(
@@ -70,6 +81,13 @@ async def exchange_web_continue_token(body: WebContinueBody):
         userid=int(user["userid"]),
         name=str(user.get("name") or ""),
     )
+    try:
+        from credits.credit_campaigns import mark_campaign_opened
+
+        if campaign_id is not None:
+            await run_in_threadpool(mark_campaign_opened, int(user["userid"]), campaign_id)
+    except Exception:
+        logger.debug("credit campaign open tracking skipped", exc_info=True)
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -86,6 +104,7 @@ async def exchange_web_continue_token(body: WebContinueBody):
 
 
 def _build_link_payload(userid: int, *, rotate: bool = False) -> dict:
+    ensure_continue_link_environment_is_safe()
     token = rotate_continue_token(userid) if rotate else get_or_create_continue_token(userid)
     url = build_continue_url(token)
     return {"userid": int(userid), "token": token, "url": url}
@@ -159,7 +178,10 @@ async def admin_web_topup_link(body: AdminWebTopupBody, current_user: User = Dep
     userid, phone, name = found
     if not phone:
         raise HTTPException(status_code=400, detail="User has no phone on file")
-    payload = _build_link_payload(userid, rotate=bool(body.rotate))
+    try:
+        payload = _build_link_payload(userid, rotate=bool(body.rotate))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     wa_sent = False
     wa_error = None
     if body.send_whatsapp:

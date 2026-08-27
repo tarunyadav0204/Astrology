@@ -18,7 +18,7 @@ WEALTH_ALIASES = {
 TIMING_MODES = frozenset({"event_prediction", "event_timing", "lifetime_event_timing", "month_timing", "timing_window", "daily_forecast"})
 
 _MODE_COMPATIBILITY = {
-    "wealth:ModeTopic": {"topic_reading", "trait_nature", "problem_diagnosis", "potential_capacity"},
+    "wealth:ModeTopic": {"topic_reading", "trait_nature", "problem_diagnosis", "potential_capacity", "decision_support"},
     "wealth:ModeCapacity": {"topic_reading", "potential_capacity", "trait_nature"},
     "wealth:ModeDiagnosis": {"problem_diagnosis", "topic_reading"},
     "wealth:ModeTiming": set(TIMING_MODES),
@@ -70,6 +70,12 @@ def wealth_graph_runtime_key(category: Any, query_plan: Mapping[str, Any] | None
     if mode == "remedy_action":
         return "wealth_remedies"
     if category_key == "wealth":
+        # The primary intent router can occasionally retain the broad Wealth
+        # category while correctly resolving the semantic subtype.  Preserve
+        # the more specific debt-repayment route instead of degrading a
+        # payoff question to generic wealth timing.
+        if subtype == "debt_repayment":
+            return "debt_repayment" if _timing_requested(plan) else "debt"
         if subtype == "windfall": return "windfall"
         if subtype == "loss_vulnerability": return "loss_vulnerability"
         # Capacity describes the strength of the overall wealth promise unless
@@ -84,8 +90,12 @@ def wealth_graph_runtime_key(category: Any, query_plan: Mapping[str, Any] | None
         if subtype == "multiple_income": return "multiple_income"
         return "income_timing" if _timing_requested(plan) else "income"
     if category_key == "debt":
-        if subtype == "loan_support" or mode in {"decision_support", "comparison_choice"}: return "loan_support"
         if mode == "problem_diagnosis": return "debt_diagnosis"
+        if subtype == "debt_repayment": return "debt_repayment" if _timing_requested(plan) else "debt"
+        # A generic question about loans or borrowing is a static natal debt
+        # pattern. ``loan_support`` is the dated approval/support route and may
+        # require dasha/transit evidence only when timing was actually asked.
+        if subtype == "loan_support" and _timing_requested(plan): return "loan_support"
         return "debt_repayment" if _timing_requested(plan) else "debt"
     if category_key == "investment":
         if subtype == "investing_vs_trading" or mode == "comparison_choice": return "investing_vs_trading"
@@ -132,7 +142,7 @@ def observed_wealth_factors(context: Mapping[str, Any], query_plan: Mapping[str,
     for key, factor in flag_map.items():
         if availability.get(key): factors.add(factor)
     plan = query_plan if isinstance(query_plan, Mapping) else {}
-    if _timing_requested(plan) or str(plan.get("wealth_subtype") or "").strip().lower() == "loan_support":
+    if _timing_requested(plan):
         dashas = context.get("current_dashas") if isinstance(context.get("current_dashas"), Mapping) else {}
         transits = context.get("current_transits") if isinstance(context.get("current_transits"), Mapping) else {}
         if _present(dashas.get("levels")): factors.add("wealth:DashaActivation")

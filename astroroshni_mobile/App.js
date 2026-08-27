@@ -17,6 +17,7 @@ import i18n from './src/locales/i18n';
 import WelcomeScreen from './src/components/Welcome/WelcomeScreen';
 import ModernAuthFlow from './src/components/Auth/ModernAuthFlow';
 import WebContinueScreen from './src/components/Auth/WebContinueScreen';
+import { normalizeWebContinueToken } from './src/utils/webContinueToken';
 import ChatScreen from './src/components/Chat/ChatScreen';
 import ChatHistoryScreen from './src/components/Chat/ChatHistoryScreen';
 import ChatViewScreen from './src/components/Chat/ChatViewScreen';
@@ -374,12 +375,12 @@ function getWebContinueTokenFromLocation() {
   try {
     const params = new URLSearchParams(String(window.location?.search || ''));
     const fromQuery = String(params.get('c') || params.get('continue') || '').trim();
-    if (fromQuery) return decodeURIComponent(fromQuery);
+    if (fromQuery) return normalizeWebContinueToken(decodeURIComponent(fromQuery));
 
     const path = String(window.location?.pathname || '');
     const match = path.match(/\/(?:mobile\/)?c\/([^/?#]+)/i);
     if (!match?.[1]) return null;
-    return decodeURIComponent(match[1]).trim() || null;
+    return normalizeWebContinueToken(decodeURIComponent(match[1])) || null;
   } catch (_) {
     return null;
   }

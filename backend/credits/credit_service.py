@@ -3280,6 +3280,7 @@ class CreditService:
         product_id: Optional[str] = None,
         exclude_web_topup_bonus: bool = False,
         exclude_promotional_extras: bool = False,
+        purchase_at=None,
     ) -> Dict[str, Any]:
         """Apply purchase extras, optionally excluding the web-only top-up bonus.
 
@@ -3342,6 +3343,45 @@ class CreditService:
         first_added = int(first_result.get("bonus_credits") or 0) if first_result.get("applied") else 0
         discount_added = int(discount_result.get("bonus_credits") or 0) if discount_result.get("applied") else 0
         web_added = int(web_result.get("bonus_credits") or 0) if web_result.get("applied") else 0
+        standard_bonus_added = pack_added + first_added + discount_added + web_added
+        if exclude_web_topup_bonus or exclude_promotional_extras:
+            campaign_result = {
+                "applied": False,
+                "eligible": False,
+                "bonus_credits": 0,
+                "reason": "excluded_purchase_channel",
+            }
+        else:
+            try:
+                from credits.credit_campaigns import maybe_apply_credit_campaign
+
+                campaign_result = maybe_apply_credit_campaign(
+                    self,
+                    userid=userid,
+                    purchased_credits=purchased_credits,
+                    purchase_source=purchase_source,
+                    purchase_reference_id=purchase_reference_id,
+                    product_id=product_id,
+                    existing_bonus_credits=standard_bonus_added,
+                    purchase_at=purchase_at,
+                )
+            except Exception:
+                logger.exception(
+                    "credit campaign award failed userid=%s payment=%s",
+                    userid,
+                    purchase_reference_id,
+                )
+                campaign_result = {
+                    "applied": False,
+                    "eligible": False,
+                    "bonus_credits": 0,
+                    "reason": "campaign_check_failed",
+                }
+        campaign_added = (
+            int(campaign_result.get("bonus_credits") or 0)
+            if campaign_result.get("applied")
+            else 0
+        )
         try:
             from credits.free_answer_funnel import mark_converted_after_purchase
 
@@ -3359,11 +3399,13 @@ class CreditService:
             "first_purchase_bonus": first_result,
             "purchase_discount": discount_result,
             "web_topup_bonus": web_result,
+            "credit_campaign": campaign_result,
             "pack_bonus_credits_added": pack_added,
             "first_purchase_bonus_credits_added": first_added,
             "discount_credits_added": discount_added,
             "web_topup_bonus_credits_added": web_added,
-            "bonus_credits_added": pack_added + first_added + discount_added + web_added,
+            "credit_campaign_bonus_credits_added": campaign_added,
+            "bonus_credits_added": standard_bonus_added + campaign_added,
         }
 
     def add_credits(self, userid: int, amount: int, source: str, reference_id: str = None, description: str = None, metadata: str = None) -> bool:

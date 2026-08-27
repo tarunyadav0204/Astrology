@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime
 from typing import Any, Callable, Mapping
 
 from .career import is_career_category
@@ -247,6 +248,13 @@ def apply_live_graph_policy(
         answer_spec["limitation_instruction"] = compact_policy["instruction"]
     if bool(policy.get("live")) and wealth_route:
         runtime_key = str(policy.get("runtime_key") or "")
+        normalized = context.get("normalized_evidence") if isinstance(context.get("normalized_evidence"), Mapping) else {}
+        wealth_foundation = normalized.get("wealth_foundation") if isinstance(normalized.get("wealth_foundation"), Mapping) else {}
+        wealth_adjudication = (
+            dict(wealth_foundation.get("route_adjudication"))
+            if isinstance(wealth_foundation.get("route_adjudication"), Mapping)
+            else {}
+        )
         route_focus = {
             "wealth": "overall wealth potential, accumulation and retention",
             "wealth_source": "primary wealth-building channels",
@@ -282,6 +290,17 @@ def apply_live_graph_policy(
             "scope": route_focus,
             "static_route": is_static_wealth,
             "primary_evidence": "evidence.wealth_foundation",
+            "route_adjudication": wealth_adjudication,
+            "investment_synthesis": (
+                dict(wealth_foundation.get("investment_synthesis"))
+                if investment_family and isinstance(wealth_foundation.get("investment_synthesis"), Mapping)
+                else {}
+            ),
+            "wealth_source_synthesis": (
+                dict(wealth_foundation.get("wealth_source_synthesis"))
+                if runtime_key == "wealth_source" and isinstance(wealth_foundation.get("wealth_source_synthesis"), Mapping)
+                else {}
+            ),
             "required_answer_order": [
                 "direct route-specific financial verdict",
                 (
@@ -319,11 +338,21 @@ def apply_live_graph_policy(
                     else "Do not use D9 as the Wealth confirmation chart; D2 is mandatory."
                 ),
                 "Do not judge investment or speculation from the fifth lord's destination alone; include every supplied carrier condition and contradiction.",
+                (
+                    "For an investment route, state the calculated investment_synthesis verdict and actual fifth-lord, D2, D5 and D9 evidence; never say these factors merely 'need to be weighed'."
+                    if investment_family
+                    else "Do not introduce investment suitability unless the selected route asks for it."
+                ),
                 "Do not say a natal house is active or activated on a static route; use supports, challenges, strengthens, weakens, connects, occupies or aspects.",
                 "Do not call the result a clear yes unless the supplied D1 and D2 synthesis actually supports that strength.",
                 "Do not infer salary/service, business, speculation, debt, expenses, inheritance or windfall unless the selected route and supplied evidence support it.",
+                "For wealth_source, name and rank the supplied concrete earning channels; savings automation, budgeting and retention discipline are qualifications, not wealth sources.",
                 "Do not let Gandanta, Dagdha Rashi or another special factor replace the D1/D2 synthesis; use it only as a connected modifier.",
                 "Do not turn a numerical wealth score into certainty or quote it as a probability.",
+                "D2 availability is not a positive verdict; use only wealth_foundation.d2_synthesis.verdict to say whether it confirms or qualifies retention.",
+                "When route_adjudication.strength_claim_permission is qualified_only, do not call the foundation strong, genuinely strong, clear, confirmed or unqualified.",
+                "Do not infer creativity, beauty, luxury, profession or income channel from Indu Lagna's sign or lord alone.",
+                "Do not describe the fifth house as the house of gains. The fifth governs judgment, speculation and investment intelligence; gains belong primarily to the eleventh.",
                 "Do not mention current dasha, transit, dates, peaks or current activation on a static route.",
                 "Do not use Rahu or Ketu fifth/ninth aspects.",
             ],
@@ -353,8 +382,54 @@ def apply_live_graph_policy(
             "Follow wealth_answer_rules and financial_safety_rules exactly."
         )
         compact_policy["wealth_answer_rules"] = wealth_answer_rules
+        compact_policy["wealth_adjudication"] = wealth_adjudication
         answer_spec["financial_safety_rules"] = compact_policy["financial_safety_rules"]
         answer_spec["wealth_answer_rules"] = wealth_answer_rules
+        if runtime_key == "debt_repayment":
+            debt_synthesis = (
+                dict(wealth_foundation.get("debt_repayment_synthesis"))
+                if isinstance(wealth_foundation.get("debt_repayment_synthesis"), Mapping)
+                else {}
+            )
+            repayment_windows = [
+                dict(row) for row in list(debt_synthesis.get("ranked_repayment_windows") or [])
+                if isinstance(row, Mapping) and (row.get("start") or row.get("end"))
+            ]
+            compact_policy["debt_repayment_synthesis"] = debt_synthesis
+            wealth_answer_rules["debt_repayment_synthesis"] = debt_synthesis
+            wealth_answer_rules["forbidden_moves"].extend([
+                "Do not call the current/as-of date a repayment marker merely because a current dasha segment begins there.",
+                "Debt, eighth-house or twelfth-house activation is pressure/activity, not repayment support by itself.",
+                "Do not claim an exact payoff or debt-free date; present only the supplied broad repayment-support windows.",
+                "Do not prescribe consolidation, refinancing, highest-interest-first repayment or another financial strategy unless the user explicitly asks for practical financial guidance.",
+            ])
+            compact_policy["financial_safety_rules"]["forbidden_moves"].append(
+                "Do not prescribe debt consolidation, refinancing or a repayment ordering in an astrology answer."
+            )
+            verdict = dict(result.get("verdict") or {})
+            verdict["direction"] = (
+                "probable_repayment_support_windows"
+                if repayment_windows else "insufficient_debt_repayment_timing_evidence"
+            )
+            verdict["ranked_windows"] = repayment_windows
+            verdict["rationale"] = {
+                "source": "wealth_foundation.debt_repayment_synthesis",
+                "current_window_assessment": debt_synthesis.get("current_window_assessment"),
+                "preparatory_relief_windows": debt_synthesis.get("preparatory_relief_windows"),
+                "claim_rule": debt_synthesis.get("claim_rule"),
+            }
+            result["verdict"] = verdict
+            event_rules = dict(answer_spec.get("event_rules") or {})
+            event_rules["allowed_timing_windows"] = repayment_windows
+            event_rules["required_material_windows"] = repayment_windows[:2]
+            event_rules["window_answer_rule"] = debt_synthesis.get("claim_rule")
+            answer_spec["event_rules"] = event_rules
+            if not repayment_windows and not timing_missing:
+                compact_policy["claim_permission"] = "no_ranked_debt_repayment_window"
+                compact_policy["instruction"] = (
+                    "No route-adjudicated debt-repayment window is available. Do not turn debt-house activity or the "
+                    "current date into repayment timing. Explain that a reliable window was not established."
+                )
         if time_bound_mode:
             # Every required Wealth factor belongs to the timing chain. Missing
             # natal/divisional promise is as disqualifying as missing dasha or
@@ -892,6 +967,318 @@ def enforce_live_graph_answer(
         clean_answer = re.sub(r"\bactivated\b", "emphasized in the natal chart", clean_answer, flags=re.IGNORECASE)
         clean_answer = re.sub(r"\bactivation\b", "natal emphasis", clean_answer, flags=re.IGNORECASE)
         clean_answer = re.sub(r"\b(is|are|was|were)\s+active\b", r"\1 relevant in the natal chart", clean_answer, flags=re.IGNORECASE)
+        adjudication = policy.get("wealth_adjudication") if isinstance(policy.get("wealth_adjudication"), Mapping) else {}
+        if adjudication.get("strength_claim_permission") == "qualified_only":
+            # The writer may not turn calculator availability or a legacy
+            # aggregate score into an unqualified Wealth verdict. Preserve the
+            # prose while deterministically correcting the common overclaims.
+            clean_answer = re.sub(
+                r"\b(?:a\s+)?genuinely strong foundation\b",
+                "a real but qualified foundation",
+                clean_answer,
+                flags=re.IGNORECASE,
+            )
+            clean_answer = re.sub(
+                r"\ba clear pattern of accumulation and retention\b",
+                "a mixed pattern of accumulation capacity and retention pressure",
+                clean_answer,
+                flags=re.IGNORECASE,
+            )
+            clean_answer = re.sub(
+                r"\bthe potential is clearly there\b",
+                "the potential is present but qualified",
+                clean_answer,
+                flags=re.IGNORECASE,
+            )
+            clean_answer = re.sub(
+                r"\bhas a good chance of staying with you and multiplying over time\b",
+                "requires deliberate retention discipline to compound over time",
+                clean_answer,
+                flags=re.IGNORECASE,
+            )
+            # A mixed D2 can qualify a D1 promise but cannot positively confirm
+            # retention. Limit this correction to sentences that name D2/Hora.
+            sentences = re.split(r"(?<=[.!?])\s+", clean_answer)
+            corrected_sentences = []
+            for sentence in sentences:
+                if re.search(r"\b(?:D2|Hora)\b", sentence, re.IGNORECASE):
+                    sentence = re.sub(r"\bconfirms?\b", "qualifies", sentence, flags=re.IGNORECASE)
+                if re.search(r"\bIndu Lagna\b", sentence, re.IGNORECASE) and re.search(
+                    r"\b(?:creativ\w*|beauty|luxury|profession|income channel)\b", sentence, re.IGNORECASE
+                ):
+                    sentence = (
+                        "Indu Lagna is a supplementary wealth lens here; its sign or lord alone does not establish "
+                        "a profession, industry, or income channel."
+                    )
+                sentence = re.sub(
+                    r"\b5th house\s*\(\s*gains(?:\s+and\s+smart\s+allocation)?\s*\)",
+                    "5th house (judgment, speculation and investment intelligence)",
+                    sentence,
+                    flags=re.IGNORECASE,
+                )
+                corrected_sentences.append(sentence)
+            clean_answer = " ".join(corrected_sentences).strip()
+        source_synthesis = (
+            wealth_rules.get("wealth_source_synthesis")
+            if isinstance(wealth_rules.get("wealth_source_synthesis"), Mapping)
+            else {}
+        )
+        if (
+            str(policy.get("runtime_key") or "") == "wealth_source"
+            and source_synthesis
+            and str(language or "").lower().startswith("en")
+        ):
+            ranked_channels = [
+                dict(row) for row in list(source_synthesis.get("ranked_channels") or [])
+                if isinstance(row, Mapping) and row.get("label")
+            ]
+            top_keywords = [
+                str(value).lower() for value in list((ranked_channels[0] if ranked_channels else {}).get("required_keywords") or [])
+                if value
+            ]
+            names_calculated_source = bool(
+                ranked_channels
+                and any(re.search(rf"\b{re.escape(keyword)}\w*\b", clean_answer, re.IGNORECASE) for keyword in top_keywords)
+            )
+            substitutes_retention_for_source = bool(
+                re.search(r"\b(?:automated savings|spending account|investment account|budgeting system)\b", clean_answer, re.IGNORECASE)
+                and not names_calculated_source
+            )
+            if ranked_channels and (not names_calculated_source or substitutes_retention_for_source):
+                def channel_sentence(row: Mapping[str, Any], *, lead: str) -> str:
+                    label = str(row.get("label") or "supported work").strip()
+                    evidence = [str(value).strip() for value in list(row.get("evidence") or []) if str(value).strip()]
+                    basis = "; ".join(evidence[:2])
+                    return f"{lead} {label}. The chart basis is that {basis}." if basis else f"{lead} {label}."
+
+                parts = [channel_sentence(ranked_channels[0], lead="Your strongest wealth-building path is")]
+                if len(ranked_channels) > 1:
+                    parts.append(channel_sentence(ranked_channels[1], lead="Your second channel is"))
+                if len(ranked_channels) > 2:
+                    parts.append(f"A third supported channel is {ranked_channels[2].get('label')}.")
+                structure = str(source_synthesis.get("earning_structure") or "")
+                structure_text = {
+                    "profession_or_service_led": "Overall, the structure is profession- or service-led rather than primarily speculative or partnership-dependent.",
+                    "business_or_enterprise_led": "Overall, the structure is business- or enterprise-led, with professional skill supplying the value being sold.",
+                    "profession_led_hybrid_with_enterprise_upside": "Overall, this is a profession-led hybrid: specialized expertise is the base, with stronger upside when it is scaled through products, platforms, consulting or enterprise rather than kept as salary alone.",
+                }.get(structure)
+                if structure_text:
+                    parts.append(structure_text)
+                if str(source_synthesis.get("retention_qualification") or "") == "mixed_capacity_with_retention_pressure":
+                    parts.append(
+                        "D2 adds a separate caution: earning capacity is better supported than retention, so keeping and compounding the money needs discipline—but that is a qualification, not the source itself."
+                    )
+                parts.append("Which of these paths matches the work or business you are already building?")
+                clean_answer = " ".join(parts)
+        investment_synthesis = (
+            wealth_rules.get("investment_synthesis")
+            if isinstance(wealth_rules.get("investment_synthesis"), Mapping)
+            else {}
+        )
+        if investment_family and investment_synthesis and str(language or "").lower().startswith("en"):
+            fifth_lord = (
+                investment_synthesis.get("fifth_lord")
+                if isinstance(investment_synthesis.get("fifth_lord"), Mapping)
+                else {}
+            )
+            fifth_planet = str(fifth_lord.get("planet") or "")
+            d5 = investment_synthesis.get("d5") if isinstance(investment_synthesis.get("d5"), Mapping) else {}
+            d9 = investment_synthesis.get("d9") if isinstance(investment_synthesis.get("d9"), Mapping) else {}
+            d5_named_planets = [
+                str(row.get("planet") or "")
+                for row in list(d5.get("supporting_placements") or []) + list(d5.get("caution_placements") or [])
+                if isinstance(row, Mapping) and row.get("planet")
+            ]
+            d9_named_planets = [
+                str(row.get("planet") or "")
+                for row in list(d9.get("supporting_placements") or []) + list(d9.get("caution_placements") or [])
+                if isinstance(row, Mapping) and row.get("planet")
+            ]
+            has_concrete_fifth = bool(fifth_planet and re.search(rf"\b{re.escape(fifth_planet)}\b", clean_answer, re.IGNORECASE))
+            has_concrete_d5 = bool(
+                re.search(r"\b(?:D5|Panchamsha)\b", clean_answer, re.IGNORECASE)
+                and any(re.search(rf"\b{re.escape(planet)}\b", clean_answer, re.IGNORECASE) for planet in d5_named_planets)
+            )
+            has_concrete_d9 = bool(
+                re.search(r"\b(?:D9|Navamsha|Navamsa)\b", clean_answer, re.IGNORECASE)
+                and any(re.search(rf"\b{re.escape(planet)}\b", clean_answer, re.IGNORECASE) for planet in d9_named_planets)
+            )
+            if not (has_concrete_fifth and has_concrete_d5 and has_concrete_d9):
+                def ordinal(value: Any) -> str:
+                    try:
+                        number = int(value)
+                    except (TypeError, ValueError):
+                        return str(value or "")
+                    suffix = "th" if 10 <= number % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(number % 10, "th")
+                    return f"{number}{suffix}"
+
+                def placement_text(row: Mapping[str, Any]) -> str:
+                    planet = str(row.get("planet") or "a carrier")
+                    house = row.get("house")
+                    dignity = str(row.get("dignity") or "").replace("_", " ")
+                    text = f"{planet} in the {ordinal(house)} house" if house else planet
+                    if dignity and dignity != "neutral":
+                        text += f" ({dignity})"
+                    return text
+
+                def join_items(values: list[str]) -> str:
+                    values = [value for value in values if value]
+                    if len(values) < 2:
+                        return "".join(values)
+                    if len(values) == 2:
+                        return f"{values[0]} and {values[1]}"
+                    return f"{', '.join(values[:-1])}, and {values[-1]}"
+
+                flag_labels = {
+                    "gandanta": "Gandanta",
+                    "avayogi_lord": "Avayogi lordship",
+                    "dagdha_lord": "Dagdha lordship",
+                    "tithi_shunya_lord": "Tithi-Shunya lordship",
+                    "avayogi_tithi_shunya_override": "the Avayogi–Tithi-Shunya mitigating overlap",
+                    "mixed_or_malefic_conjunctions": "mixed or difficult conjunctions",
+                }
+                flags = [flag_labels.get(str(flag), str(flag).replace("_", " ")) for flag in fifth_lord.get("caution_flags") or []]
+                fifth_strength = str(fifth_lord.get("shadbala_grade") or "").lower()
+                fifth_parts = []
+                if fifth_strength:
+                    fifth_parts.append(f"{fifth_strength} Shadbala")
+                if fifth_lord.get("retrograde"):
+                    fifth_parts.append("retrograde motion")
+                fifth_parts.extend(flags)
+
+                eleventh = (
+                    investment_synthesis.get("eleventh_lord")
+                    if isinstance(investment_synthesis.get("eleventh_lord"), Mapping)
+                    else {}
+                )
+                eleventh_planet = str(eleventh.get("planet") or "The eleventh lord")
+                eleventh_house = eleventh.get("placement_house")
+                eleventh_dignity = str(eleventh.get("dignity") or "").replace("_", " ")
+                gains_sentence = (
+                    f"{eleventh_planet}, the eleventh lord, is in the {ordinal(eleventh_house)} house"
+                    if eleventh_house else f"{eleventh_planet}, the eleventh lord"
+                )
+                if eleventh_dignity == "own sign":
+                    gains_sentence += " in its own sign"
+                elif eleventh_dignity and eleventh_dignity != "neutral":
+                    gains_sentence += f" with {eleventh_dignity} dignity"
+
+                d5_support = [placement_text(row) for row in list(d5.get("supporting_placements") or [])[:2] if isinstance(row, Mapping)]
+                d5_cautions = [placement_text(row) for row in list(d5.get("caution_placements") or [])[:2] if isinstance(row, Mapping)]
+                node_notes = [
+                    f"{row.get('node')} sharing the {ordinal(row.get('house'))} house with {', '.join(str(value) for value in row.get('companions') or [])}"
+                    for row in list(d5.get("node_cooccupancies") or [])[:1]
+                    if isinstance(row, Mapping)
+                ]
+                d9_support = [placement_text(row) for row in list(d9.get("supporting_placements") or [])[:2] if isinstance(row, Mapping)]
+                d9_cautions = [placement_text(row) for row in list(d9.get("caution_placements") or [])[:2] if isinstance(row, Mapping)]
+
+                d5_sentence = "D5 is mixed"
+                if d5_support:
+                    d5_sentence += f": {join_items(d5_support)} support investment judgment"
+                if d5_cautions or node_notes:
+                    d5_sentence += f", while {join_items(d5_cautions + node_notes)} add volatility or pressure"
+                d5_sentence += "."
+                d9_sentence = "D9 provides supporting qualification"
+                if d9_support:
+                    d9_sentence += f": {join_items(d9_support)} sustain the carriers"
+                if d9_cautions:
+                    d9_sentence += f", while {join_items(d9_cautions)} temper consistency"
+                d9_sentence += "."
+
+                clean_answer = (
+                    "Your chart supports investing, but high-risk speculation is a qualified area rather than an open green light. "
+                    f"{gains_sentence}, supporting the capacity to realize gains. "
+                    f"The fifth lord {fifth_planet or 'carrier'} is placed in the {ordinal(fifth_lord.get('placement_house'))} house"
+                    f"; its complete condition includes {join_items(fifth_parts) if fifth_parts else 'mixed evidence'}, so that placement cannot be read as positive by itself. "
+                    f"D2 gives a {str(investment_synthesis.get('retention') or 'mixed').replace('_', ' ')} verdict, separating gain capacity from the ability to retain it. "
+                    f"{d5_sentence} {d9_sentence} "
+                    "Overall, disciplined, researched and longer-horizon investing is better supported than frequent, leveraged or impulsive speculation. "
+                    "That does not mean every speculative decision must fail; it means volatility and retention risk need tighter control."
+                )
+    if policy.get("domain") == "wealth" and policy.get("runtime_key") == "debt_repayment":
+        debt_synthesis = (
+            policy.get("debt_repayment_synthesis")
+            if isinstance(policy.get("debt_repayment_synthesis"), Mapping)
+            else {}
+        )
+        repayment_windows = [
+            dict(row) for row in list(debt_synthesis.get("ranked_repayment_windows") or [])
+            if isinstance(row, Mapping) and (row.get("start") or row.get("end"))
+        ]
+        if policy.get("claim_permission") == "no_ranked_debt_repayment_window" or not repayment_windows:
+            if str(language or "").lower().startswith("hi"):
+                return (
+                    "गणना में कोई विश्वसनीय ऋण-चुकौती अवधि स्थापित नहीं हुई। केवल ऋण या दबाव वाले भावों का सक्रिय "
+                    "होना चुकौती का संकेत नहीं है, इसलिए मैं उससे कोई तारीख नहीं बनाऊँगा।"
+                )
+            return (
+                "I can’t identify a reliable repayment-support window from the calculated evidence. Debt-house "
+                "activity alone is not repayment, so I won’t turn the current date or dasha into a payoff prediction."
+            )
+        if str(language or "").lower().startswith("en"):
+            allowed_dates = {
+                str(row.get(key) or "")[:10]
+                for row in repayment_windows for key in ("start", "end")
+                if row.get(key)
+            }
+            names_allowed_window = any(value in clean_answer for value in allowed_dates)
+            contains_unsafe_debt_claim = bool(re.search(
+                r"\b(significant marker|repayment season|highest[- ]interest|consolidat\w*|refinanc\w*)\b",
+                clean_answer,
+                re.IGNORECASE,
+            ))
+            if not names_allowed_window or contains_unsafe_debt_claim:
+                def format_date(value: Any) -> str:
+                    try:
+                        return datetime.strptime(str(value)[:10], "%Y-%m-%d").strftime("%d %B %Y").lstrip("0")
+                    except (TypeError, ValueError):
+                        return str(value or "")
+
+                def range_text(row: Mapping[str, Any]) -> str:
+                    return f"{format_date(row.get('start'))} to {format_date(row.get('end'))}"
+
+                def house_list(values: Any) -> str:
+                    items = [str(value) for value in list(values or [])]
+                    if len(items) < 2:
+                        return "".join(items)
+                    return f"{', '.join(items[:-1])} and {items[-1]}"
+
+                earliest = min(repayment_windows, key=lambda row: str(row.get("start") or ""))
+                strongest = max(
+                    repayment_windows,
+                    key=lambda row: (int(row.get("tier") or 0), len(row.get("support_houses") or [])),
+                )
+                current = (
+                    debt_synthesis.get("current_window_assessment")
+                    if isinstance(debt_synthesis.get("current_window_assessment"), Mapping)
+                    else {}
+                )
+                opening = (
+                    "The current period shows debt pressure and financial activity, but it is not a clean repayment window"
+                    if current.get("classification") == "debt_activity_not_repayment_support"
+                    else "The current period does not establish a debt-free date"
+                )
+                earliest_sentence = (
+                    f"The first calculated repayment-progress phase is {range_text(earliest)} "
+                    f"during {earliest.get('chain')}. It connects repayment houses "
+                    f"{house_list(earliest.get('support_houses'))}, with KP and transit support, "
+                    "but pressure houses remain involved, so this is better described as progress than guaranteed clearance."
+                )
+                strongest_sentence = ""
+                if strongest is not earliest:
+                    strongest_sentence = (
+                        f"The fuller repayment-support combination appears from {range_text(strongest)} "
+                        f"during {strongest.get('chain')}, when houses "
+                        f"{house_list(strongest.get('support_houses'))} come together. "
+                    )
+                clean_answer = (
+                    f"{opening}; its active houses show resources and burden without the complete repayment combination. "
+                    f"{earliest_sentence} {strongest_sentence}"
+                    "These are broad astrological support periods, not an exact payoff date. Your actual debt-free date "
+                    "depends on the outstanding balance, interest, cash flow and repayments, which the chart does not calculate. "
+                    "Are you asking about one specific loan or your total debt burden?"
+                ).strip()
     if policy.get("claim_permission") == "no_health_area_specificity":
         if str(language or "").lower().startswith("hi"):
             return (

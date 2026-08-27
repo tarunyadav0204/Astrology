@@ -3,14 +3,32 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import secrets
 from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlparse
 
 from db import execute, get_conn
 
 logger = logging.getLogger(__name__)
 
 TOKEN_BYTES = 24  # url-safe ~32 chars
+_TOKEN_WITH_TRAILING_PUNCTUATION_RE = re.compile(
+    r"^([A-Za-z0-9_-]{8,200})[\.,;:!?)\]}]*$"
+)
+
+
+def normalize_continue_token(raw_token: str) -> str:
+    """Return a canonical URL-safe token, tolerating copied sentence punctuation.
+
+    WhatsApp/browser linkification can include a trailing full stop in a dynamic
+    URL. Continue tokens themselves only use Python's token_urlsafe alphabet, so
+    stripping punctuation outside that alphabet is unambiguous. Arbitrary suffixes
+    remain invalid instead of being silently accepted.
+    """
+    raw = (raw_token or "").strip()
+    match = _TOKEN_WITH_TRAILING_PUNCTUATION_RE.fullmatch(raw)
+    return match.group(1) if match else raw
 
 
 def _public_mobile_base() -> str:
@@ -22,6 +40,22 @@ def _public_mobile_base() -> str:
     if base.endswith("/mobile"):
         return base
     return f"{base}/mobile"
+
+
+def ensure_continue_link_environment_is_safe() -> None:
+    """Prevent a non-production database from minting production-bound links."""
+    environment = (os.environ.get("ENVIRONMENT") or "development").strip().lower()
+    allow_external = (
+        os.environ.get("ALLOW_EXTERNAL_WEB_CONTINUE_LINKS") or ""
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    hostname = (urlparse(_public_mobile_base()).hostname or "").lower()
+    targets_production = hostname in {"astroroshni.com", "www.astroroshni.com"}
+    if environment not in {"production", "test"} and targets_production and not allow_external:
+        raise RuntimeError(
+            "This server is using a non-production database, but the WhatsApp link "
+            "opens astroroshni.com. Send from the production admin instead; a token "
+            "created on localhost cannot be redeemed by production."
+        )
 
 
 def ensure_web_continue_tokens_table(conn) -> None:
@@ -122,7 +156,7 @@ def build_continue_url(raw_token: str) -> str:
 
 def resolve_continue_token(raw_token: str) -> Optional[Dict[str, Any]]:
     """Validate reusable token and return user fields. Does not burn the token."""
-    raw = (raw_token or "").strip()
+    raw = normalize_continue_token(raw_token)
     if not raw or len(raw) > 200:
         return None
     with get_conn() as conn:

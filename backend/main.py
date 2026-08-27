@@ -104,11 +104,13 @@ except Exception as _e:
     list_allowed_devices = add_allowed_device = remove_allowed_device = remove_allowed_device_by_id = register_this_device = None
 from credits.routes import router as credits_router
 from credits.razorpay_routes import router as razorpay_credits_router
+from credits.credit_campaign_routes import router as credit_campaign_router
 from credits.web_continue_routes import (
     admin_router as web_continue_admin_router,
     auth_router as web_continue_auth_router,
 )
 from whatsapp.routes import router as whatsapp_router
+from whatsapp.admin_routes import router as whatsapp_admin_router
 from credits.razorpay_subscription_routes import router as razorpay_subscription_router
 from tts.routes import router as tts_router
 from speech.routes import router as speech_router
@@ -1036,9 +1038,11 @@ if _admin_user_profile_available and admin_user_profile_router:
     app.include_router(admin_user_profile_router, prefix="/api")
 app.include_router(credits_router, prefix="/api/credits")
 app.include_router(razorpay_credits_router, prefix="/api/credits")
+app.include_router(credit_campaign_router, prefix="/api")
 app.include_router(web_continue_admin_router, prefix="/api/credits")
 app.include_router(web_continue_auth_router, prefix="/api/auth")
 app.include_router(whatsapp_router, prefix="/api")
+app.include_router(whatsapp_admin_router, prefix="/api")
 app.include_router(razorpay_subscription_router, prefix="/api/credits")
 app.include_router(tts_router, prefix="/api")
 app.include_router(speech_router, prefix="/api")

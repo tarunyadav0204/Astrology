@@ -36,6 +36,8 @@ import AdminNudgeScheduler from './AdminNudgeScheduler';
 import AdminNudgeCampaigns from './AdminNudgeCampaigns';
 import AdminAudienceBuilder from './AdminAudienceBuilder';
 import AdminNudgeAnalytics from './AdminNudgeAnalytics';
+import AdminWhatsAppTemplates from './AdminWhatsAppTemplates';
+import AdminCreditCampaigns from './AdminCreditCampaigns';
 import AdminIssues from './AdminIssues';
 import AdminPandits from './AdminPandits';
 import AdminGooglePlayTestimonials from './AdminGooglePlayTestimonials';
@@ -3394,6 +3396,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         >
           Testimonials
         </button>
+        <button
+          className={`tab ${activeTab === 'campaigns' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('campaigns');
+            setActiveSubTab('creditCampaigns');
+          }}
+        >
+          Campaigns
+        </button>
         <button 
           className={`tab ${activeTab === 'notifications' ? 'active' : ''}`}
           onClick={() => setActiveTab('notifications')}
@@ -3428,6 +3439,18 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           Settings
         </button>
       </div>
+
+      {activeTab === 'campaigns' && (
+        <div className="admin-subtabs">
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'creditCampaigns' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('creditCampaigns')}
+          >
+            Credit campaigns
+          </button>
+        </div>
+      )}
 
       {/* Credit Sub-tabs */}
       {activeTab === 'credits' && (
@@ -4468,6 +4491,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'issues' && <AdminIssues />}
 
+        {activeTab === 'campaigns' && activeSubTab === 'creditCampaigns' && (
+          <AdminCreditCampaigns />
+        )}
+
         {activeTab === 'credits' && activeSubTab === 'management' && (
           <div className="credits-management">
             <h2>Credit Management</h2>
@@ -5149,6 +5176,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </button>
               <button
                 type="button"
+                className={`sub-tab ${notifSubTab === 'whatsapp_templates' ? 'active' : ''}`}
+                onClick={() => setNotifSubTab('whatsapp_templates')}
+              >
+                WhatsApp templates
+              </button>
+              <button
+                type="button"
                 className={`sub-tab ${notifSubTab === 'nudge_triggers' ? 'active' : ''}`}
                 onClick={() => setNotifSubTab('nudge_triggers')}
               >
@@ -5195,6 +5229,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 Sent today
               </button>
             </div>
+
+            {notifSubTab === 'whatsapp_templates' && <AdminWhatsAppTemplates />}
 
             {notifSubTab === 'custom' && (
               <>

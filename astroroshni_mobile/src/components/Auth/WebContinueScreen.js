@@ -5,6 +5,7 @@ import { storage } from '../../services/storage';
 import api from '../../services/api';
 import { getEndpoint } from '../../utils/constants';
 import { resetToRoute } from '../../navigation/navHelpers';
+import { normalizeWebContinueToken } from '../../utils/webContinueToken';
 
 /**
  * Deep link landing: /mobile/c/:token
@@ -12,7 +13,7 @@ import { resetToRoute } from '../../navigation/navHelpers';
  */
 export default function WebContinueScreen({ route, navigation }) {
   const { colors } = useTheme();
-  const token = String(route?.params?.token || '').trim();
+  const token = normalizeWebContinueToken(route?.params?.token);
   const [error, setError] = useState('');
 
   useEffect(() => {

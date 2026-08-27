@@ -2119,6 +2119,7 @@ const CreditScreen = ({ navigation, route }) => {
                         Number(pack.pack_bonus_credits ?? meta.bonusCredits) || 0;
                       const webBonusCredits = Number(pack.web_topup_bonus_credits) || 0;
                       const webBonusPercent = Number(pack.web_topup_bonus_percent) || 0;
+                      const creditCampaign = pack.credit_campaign || null;
                       const totalCredits =
                         Number(pack.total_credits) ||
                         pack.credits + packBonusCredits + webBonusCredits;
@@ -2180,6 +2181,11 @@ const CreditScreen = ({ navigation, route }) => {
                                     base: pack.credits,
                                     bonus: packBonusCredits,
                                   })}
+                                </Text>
+                              ) : null}
+                              {creditCampaign ? (
+                                <Text style={[styles.creditPackBonus, { color: colors.success || colors.primary }]}>
+                                  Special {Number(creditCampaign.multiplier).toLocaleString(undefined, { maximumFractionDigits: 3 })}× offer · {totalCredits} total credits
                                 </Text>
                               ) : null}
                             </View>

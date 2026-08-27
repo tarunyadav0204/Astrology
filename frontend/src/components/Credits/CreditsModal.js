@@ -4,8 +4,6 @@ import { ThemeButton, ThemeInput, ThemeModal } from '../Theme';
 import './CreditsModal.css';
 
 const RAZORPAY_SCRIPT = 'https://checkout.razorpay.com/v1/checkout.js';
-const PAYMENT_SERVICE_BASE_URL = 'https://astroroshni-play-payment-service-800681558445.asia-south2.run.app';
-const DIRECT_PAYMENT_FLAG_DISABLED_STATUSES = new Set([401, 403, 404, 409]);
 
 function loadRazorpayScript() {
     return new Promise((resolve, reject) => {
@@ -63,59 +61,6 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
         return h;
     }, []);
 
-    const directPaymentFetch = useCallback(
-        async (path, body) => {
-            return fetch(`${PAYMENT_SERVICE_BASE_URL}${path}`, {
-                method: 'POST',
-                headers: authHeaders(),
-                body: JSON.stringify(body),
-            });
-        },
-        [authHeaders]
-    );
-
-    const directPaymentGet = useCallback(
-        async (path) => {
-            return fetch(`${PAYMENT_SERVICE_BASE_URL}${path}`, {
-                method: 'GET',
-                headers: authHeaders(),
-            });
-        },
-        [authHeaders]
-    );
-
-    const directPaymentThenFallback = useCallback(
-        async (path, body, fallbackFetch) => {
-            try {
-                const response = await directPaymentFetch(path, body);
-                if (response.ok) return response;
-                if (DIRECT_PAYMENT_FLAG_DISABLED_STATUSES.has(response.status) || response.status >= 500) {
-                    return fallbackFetch();
-                }
-                return response;
-            } catch (_) {
-                return fallbackFetch();
-            }
-        },
-        [directPaymentFetch]
-    );
-
-    const directPaymentGetThenFallback = useCallback(
-        async (path, fallbackFetch) => {
-            try {
-                const response = await directPaymentGet(path);
-                if (response.ok) return response;
-                if (DIRECT_PAYMENT_FLAG_DISABLED_STATUSES.has(response.status) || response.status >= 500) {
-                    return fallbackFetch();
-                }
-                return response;
-            } catch (_) {
-                return fallbackFetch();
-            }
-        },
-        [directPaymentGet]
-    );
-
     const isLoggedIn =
         typeof window !== 'undefined' && typeof localStorage !== 'undefined' && !!localStorage.getItem('token');
 
@@ -161,10 +106,7 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
         let cancelled = false;
         setRazorpayCatalogLoading(true);
         setRazorpayCatalogError('');
-        directPaymentGetThenFallback(
-            '/razorpay/catalog',
-            () => fetch('/api/credits/razorpay/catalog', { headers: authHeaders() })
-        )
+        fetch('/api/credits/razorpay/catalog', { headers: authHeaders() })
             .then((res) => {
                 if (!res.ok) {
                     return res.json().then((d) => {
@@ -188,7 +130,7 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
         return () => {
             cancelled = true;
         };
-    }, [isOpen, isLoggedIn, authHeaders, directPaymentGetThenFallback]);
+    }, [isOpen, isLoggedIn, authHeaders]);
 
     const formatCredits = (n) => {
         const x = Number(n);
@@ -262,16 +204,12 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
         let orderId = null;
         try {
             const orderBody = { credits: creditsAmount };
-            const orderRes = await directPaymentThenFallback(
-                '/razorpay/create-order',
-                orderBody,
-                () =>
-                    fetch('/api/credits/razorpay/create-order', {
-                        method: 'POST',
-                        headers: authHeaders(),
-                        body: JSON.stringify(orderBody),
-                    })
-            );
+            const mainOrderRequest = () => fetch('/api/credits/razorpay/create-order', {
+                method: 'POST',
+                headers: authHeaders(),
+                body: JSON.stringify(orderBody),
+            });
+            const orderRes = await mainOrderRequest();
             const orderData = await orderRes.json().catch(() => ({}));
             if (!orderRes.ok) {
                 const error = new Error(orderData.detail || orderData.message || 'Could not start payment');
@@ -303,16 +241,12 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
                             razorpay_payment_id: response.razorpay_payment_id,
                             razorpay_signature: response.razorpay_signature,
                         };
-                        const verifyRes = await directPaymentThenFallback(
-                            '/razorpay/verify',
-                            verifyBody,
-                            () =>
-                                fetch('/api/credits/razorpay/verify', {
-                                    method: 'POST',
-                                    headers: authHeaders(),
-                                    body: JSON.stringify(verifyBody),
-                                })
-                        );
+                        const mainVerifyRequest = () => fetch('/api/credits/razorpay/verify', {
+                            method: 'POST',
+                            headers: authHeaders(),
+                            body: JSON.stringify(verifyBody),
+                        });
+                        const verifyRes = await mainVerifyRequest();
                         const verifyData = await verifyRes.json().catch(() => ({}));
                         if (!verifyRes.ok) {
                             const error = new Error(verifyData.detail || verifyData.message || 'Verification failed');
@@ -432,9 +366,7 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
                                     </span>
                                     <span className="credits-modal-pack-price">{pack.amount_display}</span>
                                     <span className="credits-modal-pack-credits">
-                                        {(pack.pack_bonus_credits > 0
-                                            ? pack.credits + pack.pack_bonus_credits
-                                            : pack.credits)} Credits
+                                        {Number(pack.total_credits || pack.credits)} Credits
                                     </span>
                                     {pack.questions != null ? (
                                         <span className="credits-modal-pack-questions">
@@ -446,6 +378,11 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
                                     {pack.pack_bonus_credits > 0 ? (
                                         <span className="credits-modal-pack-save">
                                             {pack.credits} + {pack.pack_bonus_credits} bonus (5% extra)
+                                        </span>
+                                    ) : null}
+                                    {pack.credit_campaign ? (
+                                        <span className="credits-modal-pack-save">
+                                            Special {Number(pack.credit_campaign.multiplier).toLocaleString(undefined, { maximumFractionDigits: 3 })}× offer · ends {new Date(pack.credit_campaign.ends_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
                                         </span>
                                     ) : null}
                                     {pack.save_percent > 0 ? (

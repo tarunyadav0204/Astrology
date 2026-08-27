@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import secrets
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
@@ -165,6 +166,14 @@ def get_razorpay_credit_packs(userid: Optional[int] = None) -> List[Dict[str, An
     active_amounts = set(credit_service.list_active_credit_amounts())
     web_bonus_on = is_web_topup_bonus_enabled()
     web_bonus_percent = int(get_web_topup_bonus_percent() or 0) if web_bonus_on else 0
+    active_credit_campaigns: List[Dict[str, Any]] = []
+    if userid is not None:
+        try:
+            from credits.credit_campaigns import active_credit_campaigns_for_user
+
+            active_credit_campaigns = active_credit_campaigns_for_user(userid)
+        except Exception:
+            logger.exception("credit campaign catalog lookup failed userid=%s", userid)
     for c in ALLOWED_CREDITS:
         is_starter = c == FIRST_PURCHASE_STARTER_CREDITS
         if is_starter:
@@ -182,6 +191,36 @@ def get_razorpay_credit_packs(userid: Optional[int] = None) -> List[Dict[str, An
         )
         pack_bonus = int(meta.get("bonus_credits") or 0)
         web_bonus = 0 if is_starter else (credit_service.calculate_web_topup_bonus_credits(c) if web_bonus_on else 0)
+        credit_campaign = None
+        if userid is not None and not is_starter:
+            try:
+                from credits.credit_campaigns import calculate_campaign_bonus
+
+                matched_campaign = next(
+                    (
+                        campaign for campaign in active_credit_campaigns
+                        if not campaign.get("product_ids") or _product_id(c) in campaign["product_ids"]
+                    ),
+                    None,
+                )
+                if matched_campaign:
+                    credit_campaign = {
+                        "id": matched_campaign["id"],
+                        "name": matched_campaign["name"],
+                        "multiplier": matched_campaign["multiplier"],
+                        "starts_at": matched_campaign["starts_at"],
+                        "ends_at": matched_campaign["ends_at"],
+                        **calculate_campaign_bonus(
+                            c,
+                            matched_campaign["multiplier"],
+                            existing_bonus_credits=pack_bonus + web_bonus,
+                        ),
+                    }
+            except Exception:
+                logger.exception("credit campaign catalog preview failed userid=%s product=%s", userid, _product_id(c))
+        displayed_total = int(c) + pack_bonus + web_bonus
+        if credit_campaign:
+            displayed_total += int(credit_campaign.get("campaign_bonus_credits") or 0)
         packs.append(
             {
                 "credits": c,
@@ -200,7 +239,8 @@ def get_razorpay_credit_packs(userid: Optional[int] = None) -> List[Dict[str, An
                 "pack_bonus_credits": pack_bonus,
                 "web_topup_bonus_percent": web_bonus_percent,
                 "web_topup_bonus_credits": web_bonus,
-                "total_credits": int(c) + pack_bonus + web_bonus,
+                "total_credits": displayed_total,
+                "credit_campaign": credit_campaign,
                 "is_first_purchase_offer": is_starter,
                 "price_per_credit_rupees": round(starter_price_per_credit, 2) if is_starter else None,
             }
@@ -406,6 +446,12 @@ def _process_captured_payment(
     credits_raw = str(notes.get("credits") or "").strip()
     product_id = str(notes.get("product_id") or "").strip()
     offer_type = str(notes.get("offer_type") or "").strip()
+    purchase_at = None
+    try:
+        if payment.get("created_at") is not None:
+            purchase_at = datetime.fromtimestamp(int(payment["created_at"]), tz=timezone.utc)
+    except (TypeError, ValueError, OSError):
+        purchase_at = None
 
     if not uid_raw.isdigit():
         return failure("Invalid order notes (userid)", code="invalid_user_notes")
@@ -458,6 +504,7 @@ def _process_captured_payment(
             product_id=product_id,
             exclude_web_topup_bonus=is_play_alternative_billing,
             exclude_promotional_extras=credits == FIRST_PURCHASE_STARTER_CREDITS,
+            purchase_at=purchase_at,
         )
         return {
             "success": True,
@@ -467,6 +514,8 @@ def _process_captured_payment(
             "discount_credits_added": int(extras.get("discount_credits_added") or 0),
             "first_purchase_bonus": extras.get("first_purchase_bonus"),
             "purchase_discount": extras.get("purchase_discount"),
+            "credit_campaign": extras.get("credit_campaign"),
+            "credit_campaign_bonus_credits_added": int(extras.get("credit_campaign_bonus_credits_added") or 0),
             "message": "Already credited",
             "userid": userid,
         }
@@ -510,6 +559,7 @@ def _process_captured_payment(
         product_id=product_id,
         exclude_web_topup_bonus=is_play_alternative_billing,
         exclude_promotional_extras=credits == FIRST_PURCHASE_STARTER_CREDITS,
+        purchase_at=purchase_at,
     )
     bonus_added = int(extras.get("bonus_credits_added") or 0)
     return {
@@ -523,6 +573,8 @@ def _process_captured_payment(
         "first_purchase_bonus": extras.get("first_purchase_bonus"),
         "purchase_discount": extras.get("purchase_discount"),
         "web_topup_bonus": extras.get("web_topup_bonus"),
+        "credit_campaign": extras.get("credit_campaign"),
+        "credit_campaign_bonus_credits_added": int(extras.get("credit_campaign_bonus_credits_added") or 0),
         "message": "Credits added",
         "userid": userid,
     }
@@ -601,10 +653,12 @@ async def razorpay_catalog(current_user: User = Depends(get_current_user)):
             status_code=503,
             detail="Razorpay is not configured (set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET).",
         )
+    packs = get_razorpay_credit_packs(current_user.userid)
     return {
         "key_id": key_id,
         "currency": "INR",
-        "packs": get_razorpay_credit_packs(current_user.userid),
+        "packs": packs,
+        "force_main_payment_api": any(pack.get("credit_campaign") for pack in packs),
     }
 
 
@@ -693,11 +747,14 @@ async def razorpay_create_order(body: CreateOrderBody, current_user: User = Depe
 async def razorpay_verify(body: VerifyPaymentBody, current_user: User = Depends(get_current_user)):
     from .routes import _proxy_to_play_payment_service
 
+    # Browser Razorpay purchases must remain on the main API because targeted
+    # campaign eligibility lives here. Only explicit Play User Choice payments
+    # are candidates for the isolated payment service.
     proxied = _proxy_to_play_payment_service(
         path="/internal/razorpay/verify",
         payload=body.model_dump(),
         current_user=current_user,
-    )
+    ) if (body.google_play_external_transaction_token or "").strip() else None
     if proxied is not None:
         return proxied
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -17,7 +18,9 @@ from chat.instant_chat_pipeline import (  # noqa: E402
     _build_instant_answer_blueprint,
     _build_instant_composer_context,
     _compact_answer_spec_for_composer,
+    _compact_wealth_foundation,
 )
+from calculators.chart_calculator import ChartCalculator  # noqa: E402
 from instant_chat_v2.wealth_graph_policy import WealthGraphPolicyStore  # noqa: E402
 from instant_chat_v2.wealth_graph_runtime import (  # noqa: E402
     compare_wealth_graph_policy,
@@ -47,6 +50,14 @@ def _foundation_context(*, timing: bool = False):
                 "dhana_yogas": True, "indu_lagna": True, "hora_lagna": True,
                 "arudha_gains": True, "kp_fructification": True,
                 "remedy_blueprint": True,
+            },
+            "d2_synthesis": {
+                "verdict": "mixed_capacity_with_retention_pressure",
+            },
+            "route_adjudication": {
+                "direction": "supported_but_qualified",
+                "strength_claim_permission": "qualified_only",
+                "d2_verdict": "mixed_capacity_with_retention_pressure",
             },
         }},
     }
@@ -127,7 +138,10 @@ def test_semantic_subtypes_and_modes_resolve_to_specific_routes() -> None:
         ("wealth", "topic_reading", "source", "wealth_source"),
         ("wealth", "problem_diagnosis", "savings_instability", "wealth_diagnosis"),
         ("income", "potential_capacity", "multiple_income", "multiple_income"),
-        ("debt", "decision_support", "loan_support", "loan_support"),
+        ("debt", "decision_support", "loan_support", "debt"),
+        ("debt", "timing_window", "debt_repayment", "debt_repayment"),
+        ("wealth", "event_prediction", "debt_repayment", "debt_repayment"),
+        ("debt", "timing_window", "loan_support", "loan_support"),
         ("investment", "comparison_choice", "investing_vs_trading", "investing_vs_trading"),
         ("investment", "problem_diagnosis", "investment_risk", "investment_risk"),
         ("wealth", "potential_capacity", "windfall", "windfall"),
@@ -154,6 +168,7 @@ def test_descriptive_future_scope_does_not_convert_static_wealth_modes_to_timing
         ("income", "topic_reading", "general", "income"),
         ("income", "potential_capacity", "multiple_income", "multiple_income"),
         ("debt", "problem_diagnosis", "general", "debt_diagnosis"),
+        ("debt", "topic_reading", "loan_support", "debt"),
         ("investment", "potential_capacity", "general", "investment"),
         ("investment", "comparison_choice", "investing_vs_trading", "investing_vs_trading"),
         ("investment", "problem_diagnosis", "investment_risk", "investment_risk"),
@@ -167,6 +182,25 @@ def test_descriptive_future_scope_does_not_convert_static_wealth_modes_to_timing
             "wealth_subtype": subtype,
             "time_scope": incidental_scope,
         }) == expected
+
+
+def test_generic_loan_question_cannot_demand_timing_evidence() -> None:
+    plan = {
+        "answer_mode": "decision_support",
+        "wealth_subtype": "loan_support",
+        "time_scope": {},
+    }
+    assert wealth_graph_runtime_key("debt", plan) == "debt"
+    comparison = compare_wealth_graph_policy(
+        category="debt",
+        query_plan=plan,
+        observed_answer_mode="decision_support",
+        context=_foundation_context(),
+    )
+    assert comparison and comparison["runtime_key"] == "debt"
+    assert comparison["mode_match"] is True
+    assert "wealth:DashaActivation" not in comparison["required_factors"]
+    assert "wealth:TransitConfirmation" not in comparison["required_factors"]
 
 
 def test_long_term_potential_log_shape_selects_static_overall_wealth_policy() -> None:
@@ -364,6 +398,231 @@ def test_static_wealth_answer_boundary_removes_d9_and_activation_language() -> N
     assert "D2 qualifies retention" in answer
 
 
+def test_qualified_overall_wealth_boundary_corrects_unearned_strength_and_d2_claims() -> None:
+    packet = apply_live_graph_policy(
+        {
+            "query_plan": {"category": "wealth", "answer_mode": "potential_capacity", "time_scope": {}},
+            "answer_spec": {}, "verification": {}, "user_derivation": {},
+        },
+        intent={"category": "wealth"}, context=_foundation_context(),
+    )
+    answer = enforce_live_graph_answer(
+        "Your chart shows a genuinely strong foundation. It is a clear pattern of accumulation and retention. "
+        "The 2nd house and 5th house (gains and smart allocation) are connected. "
+        "Your D2 Hora chart confirms this, so money has a good chance of staying with you and multiplying over time. "
+        "Your Indu Lagna in Pisces points to wealth through creativity, beauty, or luxury. "
+        "The potential is clearly there.",
+        packet,
+    )
+    assert "genuinely strong" not in answer
+    assert "clear pattern of accumulation and retention" not in answer
+    assert "D2 Hora chart confirms" not in answer
+    assert "5th house (gains" not in answer
+    assert "5th house (judgment, speculation and investment intelligence)" in answer
+    assert "wealth through creativity" not in answer
+    assert "Indu Lagna is a supplementary wealth lens" in answer
+    assert "real but qualified foundation" in answer
+    assert "mixed pattern of accumulation capacity and retention pressure" in answer
+    assert "D2 Hora chart qualifies" in answer
+    assert "potential is present but qualified" in answer
+
+
+def test_reference_chart_overall_wealth_is_qualified_and_d2_is_mixed() -> None:
+    birth = {
+        "name": "Tarun", "date": "1980-04-02", "time": "14:55:00",
+        "latitude": 29.2396596, "longitude": 75.8174505,
+        "timezone": "UTC+5:30", "place": "Hisar, Haryana, India",
+    }
+    chart = ChartCalculator({}).calculate_chart(SimpleNamespace(**birth))
+    foundation = _compact_wealth_foundation(
+        chart, birth, {}, category="wealth", answer_mode="potential_capacity",
+    )
+    assert foundation["d2_synthesis"]["verdict"] == "mixed_capacity_with_retention_pressure"
+    assert foundation["route_adjudication"]["strength_claim_permission"] == "qualified_only"
+    mars_caution = next(
+        row for row in foundation["route_adjudication"]["carrier_cautions"]
+        if row["house"] == 5 and row["lord"] == "Mars"
+    )
+    assert {"gandanta", "avayogi_lord", "dagdha_lord", "mixed_or_malefic_conjunctions"}.issubset(
+        mars_caution["flags"]
+    )
+    assert "wealth_score" not in foundation["natal_wealth"]
+    assert "wealth_constitution" not in foundation["natal_wealth"]
+
+
+def test_reference_chart_wealth_source_ranks_concrete_channels_not_savings_advice() -> None:
+    birth = {
+        "name": "Tarun", "date": "1980-04-02", "time": "14:55:00",
+        "latitude": 29.2396596, "longitude": 75.8174505,
+        "timezone": "UTC+5:30", "place": "Hisar, Haryana, India",
+    }
+    chart = ChartCalculator({}).calculate_chart(SimpleNamespace(**birth))
+    foundation = _compact_wealth_foundation(
+        chart, birth, {}, category="wealth", answer_mode="potential_capacity",
+        wealth_subtype="source",
+    )
+    synthesis = foundation["wealth_source_synthesis"]
+    assert synthesis["verdict"] == "ranked_wealth_building_channels"
+    assert synthesis["earning_structure"] == "profession_or_service_led"
+    assert synthesis["ranked_channels"][0]["id"] == "technical_professional"
+    assert synthesis["ranked_channels"][1]["id"] == "network_commercial_scale"
+    assert any("D10 Mercury" in value for value in synthesis["ranked_channels"][0]["evidence"])
+    assert any("eleventh lord Venus" in value for value in synthesis["ranked_channels"][1]["evidence"])
+
+    context = {
+        "intent_summary": {"category": "wealth", "answer_mode": "potential_capacity"},
+        "normalized_evidence": {"wealth_foundation": foundation},
+    }
+    packet = apply_live_graph_policy(
+        {
+            "query_plan": {
+                "category": "wealth", "answer_mode": "potential_capacity",
+                "wealth_subtype": "source", "time_scope": {},
+            },
+            "answer_spec": {}, "verification": {}, "user_derivation": {},
+        },
+        intent={"category": "wealth", "wealth_subtype": "source"}, context=context,
+    )
+    answer = enforce_live_graph_answer(
+        "Your path is disciplined savings, automated transfers and separating your spending account from investments.",
+        packet,
+    )
+    assert "technical, analytical and systems-led professional work" in answer
+    assert "scalable commercial gains through networks, platforms or products" in answer
+    assert "profession- or service-led" in answer
+    assert "automated savings" not in answer
+    assert "D2 adds a separate caution" in answer
+
+
+def test_reference_chart_investment_synthesis_is_specific_and_generic_answer_fails_safe() -> None:
+    birth = {
+        "name": "Tarun", "date": "1980-04-02", "time": "14:55:00",
+        "latitude": 29.2396596, "longitude": 75.8174505,
+        "timezone": "UTC+5:30", "place": "Hisar, Haryana, India",
+    }
+    chart = ChartCalculator({}).calculate_chart(SimpleNamespace(**birth))
+    foundation = _compact_wealth_foundation(
+        chart, birth, {}, category="investment", answer_mode="potential_capacity",
+    )
+    synthesis = foundation["investment_synthesis"]
+    assert synthesis["verdict"] == "disciplined_investing_favored_over_high_risk_speculation"
+    assert synthesis["fifth_lord"]["planet"] == "Mars"
+    assert {"gandanta", "avayogi_lord", "dagdha_lord", "mixed_or_malefic_conjunctions"}.issubset(
+        synthesis["fifth_lord"]["caution_flags"]
+    )
+    assert any(row["planet"] == "Jupiter" and row["house"] == 11 for row in synthesis["d5"]["supporting_placements"])
+    assert any(row["planet"] == "Moon" and "debilitated" in row["reasons"] for row in synthesis["d5"]["caution_placements"])
+    assert any(row["node"] == "Rahu" and "Mars" in row["companions"] for row in synthesis["d5"]["node_cooccupancies"])
+    assert any(row["planet"] == "Mars" and row["house"] == 2 for row in synthesis["d9"]["supporting_placements"])
+    assert any(row["planet"] == "Venus" and row["house"] == 12 for row in synthesis["d9"]["caution_placements"])
+
+    context = {
+        "intent_summary": {"category": "investment", "answer_mode": "potential_capacity"},
+        "normalized_evidence": {"wealth_foundation": foundation},
+    }
+    packet = apply_live_graph_policy(
+        {
+            "query_plan": {
+                "category": "investment", "answer_mode": "potential_capacity",
+                "wealth_subtype": "general", "time_scope": {},
+            },
+            "answer_spec": {}, "verification": {}, "user_derivation": {},
+        },
+        intent={"category": "investment"}, context=context,
+    )
+    answer = enforce_live_graph_answer(
+        "Your chart gives a qualified yes. The fifth lord needs to be weighed. "
+        "D2 is mixed and D9 can qualify the result, so long-term investing is preferable.",
+        packet,
+    )
+    assert "The fifth lord Mars" in answer
+    assert "D5 is mixed" in answer
+    assert "Jupiter in the 11th house" in answer
+    assert "D9 provides supporting qualification" in answer
+    assert "Venus in the 12th house" in answer
+    assert "needs to be weighed" not in answer
+    assert "building and holding" not in answer
+
+
+def test_reference_chart_debt_repayment_uses_route_polarity_not_current_date() -> None:
+    birth = {
+        "name": "Tarun", "date": "1980-04-02", "time": "14:55:00",
+        "latitude": 29.2396596, "longitude": 75.8174505,
+        "timezone": "UTC+5:30", "place": "Hisar, Haryana, India",
+    }
+    chart = ChartCalculator({}).calculate_chart(SimpleNamespace(**birth))
+    forward_periods = [
+        {
+            "start": "2026-08-27", "end": "2026-09-18", "time_status": "current",
+            "mahadasha": "Saturn", "antardasha": "Rahu", "pratyantardasha": "Saturn",
+            "activated_focus_houses": [2, 8], "relevance_score": 35,
+            "peak_activation_windows": [{
+                "start": "2026-08-27", "end": "2026-09-18", "planet": "Rahu",
+                "activated_focus_houses": [2, 8], "delivered_event_houses": [{"house": 2}, {"house": 8}],
+            }],
+        },
+        {
+            "start": "2028-04-22", "end": "2028-08-22", "time_status": "future",
+            "mahadasha": "Saturn", "antardasha": "Jupiter", "pratyantardasha": "Jupiter",
+            "activated_focus_houses": [2, 6, 8], "relevance_score": 70,
+            "peak_activation_windows": [{
+                "start": "2028-04-22", "end": "2028-07-22", "planet": "Jupiter",
+                "activated_focus_houses": [2, 6, 8], "delivered_event_houses": [{"house": 2}, {"house": 6}, {"house": 8}],
+            }],
+        },
+        {
+            "start": "2029-07-21", "end": "2029-08-26", "time_status": "future",
+            "mahadasha": "Saturn", "antardasha": "Jupiter", "pratyantardasha": "Venus",
+            "activated_focus_houses": [2, 6, 8, 11], "relevance_score": 63,
+            "peak_activation_windows": [{
+                "start": "2029-08-11", "end": "2029-08-26", "planet": "Saturn",
+                "activated_focus_houses": [8, 11], "delivered_event_houses": [{"house": 8}, {"house": 11}],
+            }],
+        },
+    ]
+    foundation = _compact_wealth_foundation(
+        chart,
+        birth,
+        {"forward_event_dasha_scan": {"periods": forward_periods}},
+        category="debt",
+        answer_mode="timing_window",
+    )
+    synthesis = foundation["debt_repayment_synthesis"]
+    assert synthesis["current_window_assessment"]["classification"] == "debt_activity_not_repayment_support"
+    assert synthesis["current_window_assessment"]["support_houses"] == [2]
+    assert synthesis["ranked_repayment_windows"][0]["start"] == "2029-07-21"
+    assert synthesis["ranked_repayment_windows"][0]["classification"] == "strongest_repayment_support"
+    assert any(row["start"] == "2028-04-22" for row in synthesis["ranked_repayment_windows"])
+
+    context = {
+        "intent_summary": {"category": "debt", "answer_mode": "timing_window"},
+        "normalized_evidence": {"wealth_foundation": foundation},
+        "current_dashas": {"levels": {"MD": {"planet": "Saturn"}}},
+        "current_transits": {"planets": {"Saturn": {"house": 9}}},
+    }
+    packet = apply_live_graph_policy(
+        {
+            "query_plan": {
+                "category": "debt", "answer_mode": "timing_window",
+                "wealth_subtype": "general", "time_scope": {"as_of": "2026-08-27"},
+            },
+            "answer_spec": {"event_rules": {}}, "verification": {}, "user_derivation": {},
+            "verdict": {"direction": "conditional", "ranked_windows": [{"start": "2026-08-27"}]},
+        },
+        intent={"category": "debt"}, context=context,
+    )
+    assert packet["verdict"]["ranked_windows"][0]["start"] == "2029-07-21"
+    answer = enforce_live_graph_answer(
+        "27 August 2026 is a significant marker. Treat this as repayment season and consolidate smaller debts.",
+        packet,
+    )
+    assert "significant marker" not in answer
+    assert "consolidate" not in answer
+    assert "22 April 2028 to 22 August 2028" in answer
+    assert "21 July 2029 to 26 August 2029" in answer
+    assert "not an exact payoff date" in answer
+
+
 def test_investment_answer_boundary_retains_supporting_d9_qualification() -> None:
     context = _foundation_context()
     packet = apply_live_graph_policy(
@@ -500,7 +759,7 @@ def test_every_timed_wealth_route_requires_dasha_and_transit_confirmation() -> N
         ("wealth", "timing_window", "general", "wealth_timing"),
         ("income", "timing_window", "general", "income_timing"),
         ("debt", "timing_window", "general", "debt_repayment"),
-        ("debt", "decision_support", "loan_support", "loan_support"),
+        ("debt", "timing_window", "loan_support", "loan_support"),
         ("investment", "timing_window", "general", "investment_timing"),
         ("inheritance", "timing_window", "general", "inheritance_timing"),
     ]

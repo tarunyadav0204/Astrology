@@ -1,0 +1,57 @@
+.credit-campaign-admin { display: grid; gap: 24px; color: #26182f; }
+.credit-campaign-hero { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; padding: 28px; border-radius: 22px; background: linear-gradient(135deg, #3c155d, #7a286c 48%, #e36334); color: #fff; box-shadow: 0 16px 40px rgba(60, 21, 93, .18); }
+.credit-campaign-hero h2 { margin: 5px 0 8px; color: inherit; font-size: clamp(25px, 3vw, 38px); }
+.credit-campaign-hero p { margin: 0; max-width: 700px; color: rgba(255,255,255,.82); }
+.credit-campaign-eyebrow { text-transform: uppercase; letter-spacing: .14em; font-size: 12px; font-weight: 800; color: #ffd6b4; }
+.credit-campaign-alert { padding: 13px 16px; border-radius: 12px; font-weight: 650; }
+.credit-campaign-alert--error { background: #fff0f0; color: #a12727; border: 1px solid #f4bcbc; }
+.credit-campaign-alert--success { background: #ebf8f1; color: #1d6845; border: 1px solid #b9e2cb; }
+.credit-campaign-builder { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; padding: 24px; border: 1px solid #e4dce9; border-radius: 20px; background: #fff; box-shadow: 0 8px 28px rgba(42, 24, 52, .06); }
+.credit-campaign-builder__heading { grid-column: 1 / -1; display: grid; gap: 3px; }
+.credit-campaign-builder__heading span { color: #d85b32; text-transform: uppercase; font-size: 11px; letter-spacing: .12em; font-weight: 800; }
+.credit-campaign-builder__heading strong { font-size: 22px; }
+.credit-campaign-builder label, .credit-campaign-builder fieldset { display: grid; gap: 7px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.credit-campaign-builder label > span, .credit-campaign-builder legend { font-weight: 750; }
+.credit-campaign-builder input, .credit-campaign-builder select, .credit-campaign-builder textarea, .credit-campaign-whatsapp select { box-sizing: border-box; width: 100%; padding: 11px 12px; border: 1px solid #d9cfde; border-radius: 10px; background: #fff; font: inherit; color: inherit; }
+.credit-campaign-builder small, .credit-campaign-whatsapp span { color: #756a7c; line-height: 1.45; }
+.credit-campaign-multiplier-input { display: flex; align-items: center; gap: 10px; }
+.credit-campaign-multiplier-input b { color: #d85b32; font-size: 26px; }
+.credit-campaign-date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.credit-campaign-recipients { grid-column: 1 / -1; }
+.credit-campaign-pack-grid { display: flex; flex-wrap: wrap; gap: 9px; }
+.credit-campaign-check { display: flex !important; grid-template-columns: auto 1fr; align-items: center; gap: 8px !important; padding: 9px 11px; border: 1px solid #ded3e3 !important; border-radius: 10px; background: #fbf8fc; }
+.credit-campaign-check input { width: auto; margin: 0; }
+.credit-campaign-check--warning { border-color: #efb767 !important; background: #fff8ed; }
+.credit-campaign-rule-note { display: grid; gap: 4px; padding: 13px 15px; border-radius: 12px; background: #f5eff8; border-left: 4px solid #6d2b82; }
+.credit-campaign-rule-note span { color: #675b6c; font-size: 13px; line-height: 1.45; }
+.credit-campaign-builder > .create-btn { align-self: end; min-height: 46px; }
+.credit-campaign-list { display: grid; gap: 15px; }
+.credit-campaign-list__heading { display: flex; justify-content: space-between; align-items: baseline; }
+.credit-campaign-list__heading h3 { margin: 0; font-size: 23px; }
+.credit-campaign-empty { padding: 30px; text-align: center; border: 1px dashed #d9cfde; border-radius: 16px; color: #756a7c; }
+.credit-campaign-card { display: grid; gap: 16px; padding: 21px; border: 1px solid #e1d8e5; border-radius: 18px; background: #fff; }
+.credit-campaign-card__top { display: flex; justify-content: space-between; gap: 20px; }
+.credit-campaign-card__title-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.credit-campaign-card h4 { margin: 0; font-size: 20px; }
+.credit-campaign-card p { margin: 6px 0 0; color: #756a7c; }
+.credit-campaign-status { padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 850; text-transform: uppercase; letter-spacing: .05em; background: #eee8f1; }
+.credit-campaign-status--active { background: #dff4e8; color: #17663d; }
+.credit-campaign-status--paused { background: #fff0cf; color: #835d10; }
+.credit-campaign-status--completed { background: #e7e7e7; color: #555; }
+.credit-campaign-multiplier { display: grid; min-width: 92px; text-align: right; color: #6d2b82; font-size: 32px; font-weight: 900; }
+.credit-campaign-multiplier small { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.credit-campaign-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; }
+.credit-campaign-metrics div { display: grid; gap: 2px; padding: 11px; border-radius: 11px; background: #f8f4fa; }
+.credit-campaign-metrics strong { font-size: 20px; }
+.credit-campaign-metrics span { color: #756a7c; font-size: 12px; }
+.credit-campaign-packs { display: flex; gap: 7px; flex-wrap: wrap; }
+.credit-campaign-packs span { padding: 5px 9px; border-radius: 999px; background: #fff0e8; color: #a34425; font-size: 12px; font-weight: 750; }
+.credit-campaign-actions { display: flex; gap: 8px; }
+.credit-campaign-actions button { padding: 8px 12px; border: 1px solid #d6cadb; border-radius: 9px; background: #fff; cursor: pointer; }
+.credit-campaign-whatsapp { display: grid; grid-template-columns: minmax(240px, 1.25fr) minmax(220px, 1fr); gap: 12px; align-items: center; padding-top: 16px; border-top: 1px solid #eee6f1; }
+.credit-campaign-whatsapp > div:first-child { display: grid; gap: 4px; }
+.credit-campaign-whatsapp .create-btn { min-height: 43px; }
+.credit-campaign-send-result { grid-column: 1 / -1; display: grid; gap: 5px; padding: 10px 12px; border-radius: 10px; background: #edf8f2; color: #1d6845; }
+.credit-campaign-send-result span { color: #5c514f; font-size: 12px; }
+@media (max-width: 900px) { .credit-campaign-builder { grid-template-columns: 1fr; } .credit-campaign-builder__heading, .credit-campaign-recipients { grid-column: auto; } .credit-campaign-metrics { grid-template-columns: repeat(2, 1fr); } .credit-campaign-whatsapp { grid-template-columns: 1fr; } }
+@media (max-width: 620px) { .credit-campaign-hero, .credit-campaign-card__top { flex-direction: column; } .credit-campaign-date-grid { grid-template-columns: 1fr; } .credit-campaign-multiplier { text-align: left; } }

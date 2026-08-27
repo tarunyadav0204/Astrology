@@ -8776,12 +8776,13 @@ def _compact_wealth_foundation(
         ),
     }
     subtype = str(wealth_subtype or "").strip().lower()
+    effective_category = "debt" if subtype == "debt_repayment" else category
     route_houses = {
         "income": [2, 6, 10, 11],
         "debt": [2, 6, 8, 11, 12],
         "investment": [2, 5, 8, 11, 12],
         "inheritance": [2, 8, 9, 11],
-    }.get(category, [2, 5, 6, 8, 9, 10, 11, 12])
+    }.get(effective_category, [2, 5, 6, 8, 9, 10, 11, 12])
     if subtype in {"source", "multiple_income"}:
         route_houses = [2, 6, 7, 10, 11]
     result: Dict[str, Any] = {
@@ -8958,11 +8959,12 @@ def _compact_wealth_foundation(
                 "source": "calculated_D1_route_house",
             }
         result["natal_wealth"] = {
-            "wealth_score": analysis.get("wealth_score"),
-            "wealth_constitution": analysis.get("wealth_constitution"),
-            "income_sources": list(analysis.get("income_sources") or [])[:4],
             "houses": houses,
             "yogas": analysis.get("yoga_analysis") or {},
+            "claim_rule": (
+                "Judge the supplied houses and carrier conditions directly. The legacy aggregate wealth score and "
+                "constitution label are intentionally excluded because they are not route-level verdicts."
+            ),
         }
         carrier_names = {
             str((row.get("basic_info") or {}).get("lord") or "")
@@ -9077,8 +9079,602 @@ def _compact_wealth_foundation(
                 if isinstance(row, dict)
             },
         }
+
+    d2_planets = (
+        (result.get("divisional_charts") or {}).get("D2", {}).get("planets")
+        if isinstance((result.get("divisional_charts") or {}).get("D2"), dict)
+        else {}
+    )
+    d2_planets = d2_planets if isinstance(d2_planets, dict) else {}
+    d2_support_houses = {1, 2, 5, 9, 10, 11}
+    d2_pressure_houses = {6, 8, 12}
+    d2_support = [
+        {"planet": planet, "house": row.get("house"), "sign": row.get("sign_name"), "dignity": row.get("dignity")}
+        for planet, row in d2_planets.items()
+        if isinstance(row, dict) and _safe_int(row.get("house")) in d2_support_houses
+    ]
+    d2_pressure = [
+        {"planet": planet, "house": row.get("house"), "sign": row.get("sign_name"), "dignity": row.get("dignity")}
+        for planet, row in d2_planets.items()
+        if isinstance(row, dict) and _safe_int(row.get("house")) in d2_pressure_houses
+    ]
+    d2_verdict = (
+        "mixed_capacity_with_retention_pressure"
+        if d2_support and d2_pressure
+        else "supportive_accumulation_pattern"
+        if d2_support
+        else "retention_pressure"
+        if d2_pressure
+        else "not_established"
+    )
+    result["d2_synthesis"] = {
+        "verdict": d2_verdict,
+        "supporting_placements": d2_support,
+        "retention_pressure_placements": d2_pressure,
+        "claim_rule": (
+            "D2 availability is not confirmation. Say D2 confirms accumulation/retention only when this explicit "
+            "verdict is supportive_accumulation_pattern; a mixed verdict must be described as qualification."
+        ),
+    }
+
+    wealth_source_synthesis: Dict[str, Any] = {}
+    if subtype == "source":
+        natal_houses = (result.get("natal_wealth") or {}).get("houses") or {}
+        d10 = (result.get("divisional_charts") or {}).get("D10") or {}
+        d10_planets = d10.get("planets") if isinstance(d10, dict) else {}
+        d10_planets = d10_planets if isinstance(d10_planets, dict) else {}
+
+        def source_house_lord(house_number: int) -> tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
+            house = natal_houses.get(str(house_number)) if isinstance(natal_houses, dict) else {}
+            house = house if isinstance(house, dict) else {}
+            lord = house.get("lord") if isinstance(house.get("lord"), dict) else {}
+            placement = lord.get("placement") if isinstance(lord.get("placement"), dict) else {}
+            conditions = lord.get("conditions") if isinstance(lord.get("conditions"), dict) else {}
+            return house, placement, conditions
+
+        def add_evidence(items: List[str], value: str) -> None:
+            if value and value not in items:
+                items.append(value)
+
+        _, second_lord, _ = source_house_lord(2)
+        _, sixth_lord, sixth_conditions = source_house_lord(6)
+        _, seventh_lord, seventh_conditions = source_house_lord(7)
+        _, tenth_lord, tenth_conditions = source_house_lord(10)
+        _, eleventh_lord, eleventh_conditions = source_house_lord(11)
+
+        channels: List[Dict[str, Any]] = []
+
+        professional_score = 0
+        professional_evidence: List[str] = []
+        if _safe_int(tenth_lord.get("house")) in {2, 10, 11}:
+            professional_score += 5
+            add_evidence(
+                professional_evidence,
+                f"the D1 tenth lord {tenth_lord.get('planet')} is in house {tenth_lord.get('house')}, directly linking profession with earnings or accumulation",
+            )
+        if _safe_int(sixth_lord.get("house")) in {2, 10, 11}:
+            professional_score += 3
+            add_evidence(
+                professional_evidence,
+                f"the D1 sixth lord {sixth_lord.get('planet')} is in house {sixth_lord.get('house')}, connecting sustained work and problem-solving with income",
+            )
+        mercury_d10 = d10_planets.get("Mercury") if isinstance(d10_planets.get("Mercury"), dict) else {}
+        rahu_d10 = d10_planets.get("Rahu") if isinstance(d10_planets.get("Rahu"), dict) else {}
+        mars_d10 = d10_planets.get("Mars") if isinstance(d10_planets.get("Mars"), dict) else {}
+        technical_signature = 0
+        if _safe_int(mercury_d10.get("house")) == 10:
+            technical_signature += 4
+            professional_score += 4
+            add_evidence(
+                professional_evidence,
+                f"D10 Mercury is in the tenth house{', ' + str(mercury_d10.get('dignity')).replace('_', ' ') if mercury_d10.get('dignity') else ''}, emphasizing analysis, communication and systems work",
+            )
+        if str(mercury_d10.get("dignity") or "").lower() in {"exalted", "own_sign", "moolatrikona"}:
+            technical_signature += 2
+            professional_score += 2
+        if _safe_int(rahu_d10.get("house")) == 10:
+            technical_signature += 2
+            professional_score += 1
+            add_evidence(
+                professional_evidence,
+                "Rahu occupies the D10 tenth house, adding digital, unconventional or scalable-system expression",
+            )
+        if _safe_int(mars_d10.get("house")) in {9, 10, 11}:
+            technical_signature += 1
+            professional_score += 1
+            add_evidence(
+                professional_evidence,
+                f"D10 Mars is in house {mars_d10.get('house')}, supporting execution, engineering and building capacity",
+            )
+        if professional_score:
+            channels.append({
+                "id": "technical_professional" if technical_signature >= 4 else "professional_skill",
+                "label": (
+                    "technical, analytical and systems-led professional work"
+                    if technical_signature >= 4
+                    else "profession-led skill monetization"
+                ),
+                "score": professional_score,
+                "evidence": professional_evidence,
+                "required_keywords": (
+                    ["technical", "technology", "analytical", "analytics", "systems", "digital"]
+                    if technical_signature >= 4 else ["professional", "profession", "skill"]
+                ),
+            })
+
+        network_score = 0
+        network_evidence: List[str] = []
+        if _safe_int(eleventh_lord.get("house")) == 11:
+            network_score += 5
+            add_evidence(
+                network_evidence,
+                f"the D1 eleventh lord {eleventh_lord.get('planet')} occupies the eleventh house, strengthening repeatable gains and reach",
+            )
+        eleventh_dignity = str(
+            eleventh_conditions.get("dignity") or eleventh_lord.get("dignity") or ""
+        ).lower()
+        if eleventh_dignity in {"exalted", "own_sign", "moolatrikona"}:
+            network_score += 3
+            add_evidence(network_evidence, f"that eleventh lord is {eleventh_dignity.replace('_', ' ')}")
+        jupiter_d10 = d10_planets.get("Jupiter") if isinstance(d10_planets.get("Jupiter"), dict) else {}
+        venus_d10 = d10_planets.get("Venus") if isinstance(d10_planets.get("Venus"), dict) else {}
+        if _safe_int(jupiter_d10.get("house")) == 11:
+            network_score += 2
+            add_evidence(network_evidence, "D10 Jupiter occupies the eleventh house, supporting gains through scale, networks and wider reach")
+        if _safe_int(venus_d10.get("house")) == 3:
+            network_score += 1
+            add_evidence(network_evidence, "D10 Venus in the third house supports commercial communication, presentation and audience-building")
+        if network_score:
+            channels.append({
+                "id": "network_commercial_scale",
+                "label": "scalable commercial gains through networks, platforms or products",
+                "score": network_score,
+                "evidence": network_evidence,
+                "required_keywords": ["network", "platform", "commercial", "product", "audience", "scale"],
+            })
+
+        advisory_score = 0
+        advisory_evidence: List[str] = []
+        if _safe_int(second_lord.get("house")) == 9:
+            advisory_score += 3
+            add_evidence(
+                advisory_evidence,
+                f"the D1 second lord {second_lord.get('planet')} is in the ninth house, linking wealth with knowledge, guidance and long-range judgment",
+            )
+        jupiter_d1 = (result.get("route_carrier_conditions") or {}).get("Jupiter") or {}
+        jupiter_placement = jupiter_d1.get("placement") if isinstance(jupiter_d1, dict) else {}
+        if isinstance(jupiter_placement, dict) and _safe_int(jupiter_placement.get("house")) == 2:
+            advisory_score += 2
+            add_evidence(advisory_evidence, "Jupiter occupies the D1 second house, supporting monetization of knowledge and counsel")
+        if _safe_int(jupiter_d10.get("house")) == 11:
+            advisory_score += 2
+            add_evidence(advisory_evidence, "D10 Jupiter in the eleventh connects expertise and strategy with gains")
+        if _safe_int(mercury_d10.get("house")) == 10:
+            advisory_score += 2
+            add_evidence(advisory_evidence, "D10 Mercury in the tenth supports consulting, analysis, communication and decision work")
+        if advisory_score:
+            channels.append({
+                "id": "knowledge_advisory",
+                "label": "knowledge, strategy, consulting and advisory work",
+                "score": advisory_score,
+                "evidence": advisory_evidence,
+                "required_keywords": ["knowledge", "strategy", "consulting", "advisory", "guidance", "expertise"],
+            })
+
+        business_score = 0
+        business_evidence: List[str] = []
+        business_cautions: List[str] = []
+        if _safe_int(seventh_lord.get("house")) in {2, 10, 11}:
+            business_score += 5
+            add_evidence(
+                business_evidence,
+                f"the D1 seventh lord {seventh_lord.get('planet')} is in house {seventh_lord.get('house')}, connecting clients, contracts and business with wealth",
+            )
+        seventh_assessment = seventh_conditions.get("assessment") if isinstance(seventh_conditions.get("assessment"), dict) else {}
+        seventh_conjunction_effect = str(seventh_conditions.get("conjunction_effect") or "").lower()
+        if seventh_conjunction_effect in {"harmful", "mixed"}:
+            business_score -= 2
+            business_cautions.append("the seventh-lord conjunction pattern is mixed, so partnership structure and counterparty quality matter")
+        if str(seventh_assessment.get("grade") or "").lower().startswith("adhama"):
+            business_score -= 1
+        if business_score > 0:
+            channels.append({
+                "id": "client_business",
+                "label": "client-led business and carefully structured partnerships",
+                "score": business_score,
+                "evidence": business_evidence,
+                "qualifications": business_cautions,
+                "required_keywords": ["client", "business", "partnership", "contract"],
+            })
+
+        employment_score = 0
+        if _safe_int(sixth_lord.get("house")) in {2, 10, 11}:
+            employment_score += 4
+        employment_score += sum(
+            1 for row in d10_planets.values()
+            if isinstance(row, dict) and _safe_int(row.get("house")) in {6, 10}
+        )
+        enterprise_score = max(0, business_score) + sum(
+            1 for row in d10_planets.values()
+            if isinstance(row, dict) and _safe_int(row.get("house")) in {3, 7, 11}
+        )
+        if employment_score >= enterprise_score + 3:
+            earning_structure = "profession_or_service_led"
+        elif enterprise_score >= employment_score + 3:
+            earning_structure = "business_or_enterprise_led"
+        else:
+            earning_structure = "profession_led_hybrid_with_enterprise_upside"
+
+        ranked_channels = sorted(channels, key=lambda row: (-int(row.get("score") or 0), str(row.get("id") or "")))
+        wealth_source_synthesis = {
+            "verdict": "ranked_wealth_building_channels" if ranked_channels else "source_not_established",
+            "earning_structure": earning_structure,
+            "ranked_channels": ranked_channels[:4],
+            "retention_qualification": d2_verdict,
+            "answer_rule": (
+                "Lead with the highest-ranked concrete earning channel, then name the next one or two supported channels. "
+                "Explain each from its supplied D1 lord connection and D10 expression. Treat D2 only as a retention "
+                "qualification; savings discipline is not itself a wealth source. Do not derive a profession from Indu Lagna."
+            ),
+        }
+        result["wealth_source_synthesis"] = wealth_source_synthesis
+
+    adjudication_houses = {
+        "income": [2, 10, 11],
+        "debt": [2, 6, 8, 11, 12],
+        "investment": [2, 5, 8, 11, 12],
+        "inheritance": [2, 8, 9, 11],
+    }.get(category, [2, 5, 11])
+    carrier_cautions: List[Dict[str, Any]] = []
+    for house_number in adjudication_houses:
+        house_row = ((result.get("natal_wealth") or {}).get("houses") or {}).get(str(house_number))
+        house_row = house_row if isinstance(house_row, dict) else {}
+        lord = house_row.get("lord") if isinstance(house_row.get("lord"), dict) else {}
+        conditions = lord.get("conditions") if isinstance(lord.get("conditions"), dict) else {}
+        placement = lord.get("placement") if isinstance(lord.get("placement"), dict) else {}
+        gandanta = conditions.get("gandanta") if isinstance(conditions.get("gandanta"), dict) else {}
+        special = conditions.get("special_lordships") if isinstance(conditions.get("special_lordships"), dict) else {}
+        conjunctions = list(conditions.get("conjunctions") or [])
+        flags: List[str] = []
+        if gandanta.get("is_gandanta"):
+            flags.append("gandanta")
+        if special.get("is_avayogi_lord"):
+            flags.append("avayogi_lord")
+        if special.get("is_dagdha_lord"):
+            flags.append("dagdha_lord")
+        if special.get("is_tithi_shunya_lord"):
+            flags.append("tithi_shunya_lord")
+        if special.get("avayogi_tithi_shunya_benefic_override"):
+            flags.append("avayogi_tithi_shunya_override")
+        if any(
+            str(item.get("type") or "").lower() in {"malefic", "mixed"}
+            for item in conjunctions if isinstance(item, dict)
+        ):
+            flags.append("mixed_or_malefic_conjunctions")
+        if flags:
+            carrier_cautions.append({
+                "house": house_number,
+                "lord": placement.get("planet"),
+                "flags": flags,
+                "claim_rule": (
+                    "A favorable destination does not erase these conditions. Count the declared overlap override "
+                    "as a qualification, not as cancellation of every other caution."
+                ),
+            })
+
+    investment_synthesis: Dict[str, Any] = {}
+    if category == "investment" or subtype in {"investment_risk", "loss_vulnerability", "windfall"}:
+        def synthesize_investment_division(
+            division_key: str,
+            *,
+            carrier_filter: Optional[set[str]] = None,
+        ) -> Dict[str, Any]:
+            division = (result.get("divisional_charts") or {}).get(division_key)
+            planets = division.get("planets") if isinstance(division, dict) else {}
+            planets = planets if isinstance(planets, dict) else {}
+            support_houses = {2, 5, 9, 10, 11}
+            pressure_houses = {6, 8, 12}
+            strong_dignities = {"own_sign", "exalted", "moolatrikona"}
+            supportive: List[Dict[str, Any]] = []
+            cautions: List[Dict[str, Any]] = []
+            for planet, raw_row in planets.items():
+                if planet in {"Rahu", "Ketu"} or not isinstance(raw_row, dict):
+                    continue
+                if carrier_filter is not None and planet not in carrier_filter:
+                    continue
+                house = _safe_int(raw_row.get("house"))
+                dignity = str(raw_row.get("dignity") or "").lower()
+                nature = str(raw_row.get("functional_nature") or "").lower()
+                support_reasons: List[str] = []
+                caution_reasons: List[str] = []
+                if house in support_houses and nature != "malefic":
+                    support_reasons.append(f"house_{house}")
+                if dignity in strong_dignities:
+                    support_reasons.append(dignity)
+                if house in pressure_houses:
+                    caution_reasons.append(f"house_{house}")
+                if dignity == "debilitated":
+                    caution_reasons.append("debilitated")
+                if nature == "malefic":
+                    caution_reasons.append("functional_malefic")
+                compact = {
+                    "planet": planet,
+                    "house": house,
+                    "sign": raw_row.get("sign_name"),
+                    "dignity": raw_row.get("dignity"),
+                }
+                if support_reasons:
+                    supportive.append({**compact, "reasons": support_reasons})
+                if caution_reasons:
+                    cautions.append({**compact, "reasons": caution_reasons})
+
+            node_cooccupancies: List[Dict[str, Any]] = []
+            for node in ("Rahu", "Ketu"):
+                node_row = planets.get(node) if isinstance(planets.get(node), dict) else {}
+                node_house = _safe_int(node_row.get("house"))
+                if node_house is None:
+                    continue
+                companions = [
+                    planet for planet, raw_row in planets.items()
+                    if planet not in {"Rahu", "Ketu"}
+                    and isinstance(raw_row, dict)
+                    and _safe_int(raw_row.get("house")) == node_house
+                    and (carrier_filter is None or planet in carrier_filter)
+                ]
+                if companions:
+                    node_cooccupancies.append({"node": node, "house": node_house, "companions": companions})
+
+            if supportive and (cautions or node_cooccupancies):
+                verdict = "mixed_support_with_volatility"
+            elif supportive:
+                verdict = "supportive"
+            elif cautions or node_cooccupancies:
+                verdict = "caution_dominant"
+            else:
+                verdict = "not_established"
+            return {
+                "verdict": verdict,
+                "supporting_placements": supportive,
+                "caution_placements": cautions,
+                "node_cooccupancies": node_cooccupancies,
+            }
+
+        natal_houses = (result.get("natal_wealth") or {}).get("houses") or {}
+        investment_carriers = {
+            str(((row.get("basic_info") or {}).get("lord") or ""))
+            for row in natal_houses.values()
+            if isinstance(row, dict)
+        }
+        investment_carriers.update({"Jupiter", "Venus", "Mercury"})
+        investment_carriers.discard("")
+        d5_synthesis = synthesize_investment_division("D5")
+        d9_synthesis = synthesize_investment_division("D9", carrier_filter=investment_carriers)
+
+        fifth_house = natal_houses.get("5") if isinstance(natal_houses, dict) else {}
+        fifth_lord = fifth_house.get("lord") if isinstance(fifth_house, dict) else {}
+        fifth_placement = fifth_lord.get("placement") if isinstance(fifth_lord, dict) else {}
+        fifth_conditions = fifth_lord.get("conditions") if isinstance(fifth_lord, dict) else {}
+        fifth_strength = fifth_conditions.get("strength") if isinstance(fifth_conditions, dict) else {}
+        fifth_caution = next(
+            (row for row in carrier_cautions if row.get("house") == 5),
+            {},
+        )
+        eleventh_house = natal_houses.get("11") if isinstance(natal_houses, dict) else {}
+        eleventh_lord = eleventh_house.get("lord") if isinstance(eleventh_house, dict) else {}
+        eleventh_placement = eleventh_lord.get("placement") if isinstance(eleventh_lord, dict) else {}
+        eleventh_conditions = eleventh_lord.get("conditions") if isinstance(eleventh_lord, dict) else {}
+        eleventh_strength = eleventh_conditions.get("strength") if isinstance(eleventh_conditions, dict) else {}
+        eleventh_dignity = eleventh_conditions.get("dignity") or eleventh_lord.get("dignity")
+
+        gains_supported = str(eleventh_dignity or "").lower() in {
+            "own_sign", "exalted", "moolatrikona"
+        } or str(eleventh_strength.get("shadbala_grade") or "").lower() in {"good", "excellent"}
+        speculation_qualified = bool(fifth_caution)
+        if gains_supported and speculation_qualified:
+            investment_verdict = "disciplined_investing_favored_over_high_risk_speculation"
+        elif speculation_qualified:
+            investment_verdict = "speculation_caution_without_clear_gain_advantage"
+        elif d5_synthesis.get("verdict") == "supportive" and d2_verdict == "supportive_accumulation_pattern":
+            investment_verdict = "investment_and_speculation_supported_if_risk_controlled"
+        else:
+            investment_verdict = "mixed_investment_suitability"
+
+        investment_synthesis = {
+            "verdict": investment_verdict,
+            "gain_capacity": "supported" if gains_supported else "not_clearly_established",
+            "retention": d2_verdict,
+            "fifth_lord": {
+                "planet": fifth_placement.get("planet"),
+                "placement_house": fifth_placement.get("house"),
+                "sign": fifth_placement.get("sign"),
+                "nakshatra": fifth_placement.get("nakshatra"),
+                "dignity": fifth_conditions.get("dignity") or fifth_lord.get("dignity"),
+                "shadbala_grade": fifth_strength.get("shadbala_grade"),
+                "retrograde": fifth_conditions.get("retrograde"),
+                "caution_flags": list(fifth_caution.get("flags") or []),
+            },
+            "eleventh_lord": {
+                "planet": eleventh_placement.get("planet"),
+                "placement_house": eleventh_placement.get("house"),
+                "sign": eleventh_placement.get("sign"),
+                "dignity": eleventh_dignity,
+                "shadbala_grade": eleventh_strength.get("shadbala_grade"),
+            },
+            "d5": d5_synthesis,
+            "d9": d9_synthesis,
+            "kp_available": bool(availability.get("kp_fructification")),
+            "answer_rule": (
+                "State this calculated verdict and the actual fifth-lord, D2, D5 and supporting D9 evidence. "
+                "Do not replace the reading with phrases such as 'needs to be weighed' or generic chart methodology."
+            ),
+        }
+        result["investment_synthesis"] = investment_synthesis
+
+    debt_repayment_synthesis: Dict[str, Any] = {}
+    if effective_category == "debt" and timing_mode:
+        forward_scan = (
+            normalized_evidence.get("forward_event_dasha_scan")
+            if isinstance(normalized_evidence.get("forward_event_dasha_scan"), dict)
+            else {}
+        )
+        forward_periods = [
+            row for row in list(forward_scan.get("periods") or [])
+            if isinstance(row, dict) and (row.get("start") or row.get("end"))
+        ]
+        kp_significators = (
+            (result.get("kp_financial") or {}).get("significators")
+            if isinstance(result.get("kp_financial"), dict)
+            else {}
+        )
+        kp_planet_houses: Dict[str, set[int]] = {}
+        for house_value, planets in (kp_significators or {}).items():
+            house_number = _safe_int(house_value)
+            if house_number is None:
+                continue
+            for planet in list(planets or []):
+                kp_planet_houses.setdefault(str(planet), set()).add(house_number)
+
+        repayment_support_houses = {2, 6, 11}
+        repayment_pressure_houses = {8, 12}
+        adjudicated_windows: List[Dict[str, Any]] = []
+        for row in forward_periods:
+            activated = {
+                house for house in (_safe_int(value) for value in row.get("activated_focus_houses") or [])
+                if house is not None
+            }
+            chain_planets = [
+                str(row.get(key) or "")
+                for key in ("mahadasha", "antardasha", "pratyantardasha")
+                if row.get(key)
+            ]
+            kp_houses: set[int] = set()
+            for planet in chain_planets:
+                kp_houses.update(kp_planet_houses.get(planet, set()))
+            peak_windows: List[Dict[str, Any]] = []
+            transit_support: set[int] = set()
+            transit_pressure: set[int] = set()
+            for peak in list(row.get("peak_activation_windows") or [])[:4]:
+                if not isinstance(peak, dict):
+                    continue
+                peak_houses = {
+                    house for house in (_safe_int(value) for value in peak.get("activated_focus_houses") or [])
+                    if house is not None
+                }
+                delivered_houses = {
+                    house for house in (
+                        _safe_int(item.get("house"))
+                        for item in peak.get("delivered_event_houses") or []
+                        if isinstance(item, dict)
+                    )
+                    if house is not None
+                }
+                all_peak_houses = peak_houses | delivered_houses
+                support_at_peak = sorted(all_peak_houses & repayment_support_houses)
+                pressure_at_peak = sorted(all_peak_houses & repayment_pressure_houses)
+                transit_support.update(support_at_peak)
+                transit_pressure.update(pressure_at_peak)
+                peak_windows.append({
+                    "start": peak.get("start"),
+                    "end": peak.get("end"),
+                    "planet": peak.get("planet"),
+                    "support_houses": support_at_peak,
+                    "pressure_houses": pressure_at_peak,
+                    "trigger_score": peak.get("trigger_score"),
+                })
+
+            support_houses = activated & repayment_support_houses
+            pressure_houses = activated & repayment_pressure_houses
+            kp_support_houses = kp_houses & repayment_support_houses
+            has_repayment_core = 6 in support_houses and bool({2, 11} & support_houses)
+            has_kp_core = 6 in kp_support_houses and bool({2, 11} & kp_support_houses)
+            transit_confirms_repayment = bool({6, 11} & transit_support)
+            if (
+                repayment_support_houses.issubset(support_houses)
+                and repayment_support_houses.issubset(kp_support_houses)
+                and transit_confirms_repayment
+            ):
+                classification = "strongest_repayment_support"
+                tier = 3
+            elif has_repayment_core and has_kp_core and transit_confirms_repayment:
+                classification = "repayment_progress_support"
+                tier = 2
+            elif {2, 11}.issubset(support_houses) and 11 in transit_support:
+                classification = "financial_relief_or_preparation"
+                tier = 1
+            else:
+                classification = "debt_activity_not_repayment_support"
+                tier = 0
+            adjudicated_windows.append({
+                "start": row.get("start"),
+                "end": row.get("end"),
+                "chain": " - ".join(chain_planets),
+                "classification": classification,
+                "tier": tier,
+                "support_houses": sorted(support_houses),
+                "pressure_houses": sorted(pressure_houses),
+                "kp_support_houses": sorted(kp_support_houses),
+                "transit_support_houses": sorted(transit_support),
+                "transit_pressure_houses": sorted(transit_pressure),
+                "peak_windows": peak_windows,
+                "source_score": row.get("relevance_score"),
+                "time_status": row.get("time_status"),
+            })
+
+        ranked_repayment = sorted(
+            [row for row in adjudicated_windows if int(row.get("tier") or 0) >= 2],
+            key=lambda row: (
+                -int(row.get("tier") or 0),
+                -len(row.get("transit_support_houses") or []),
+                str(row.get("start") or ""),
+            ),
+        )[:3]
+        preparatory = sorted(
+            [row for row in adjudicated_windows if int(row.get("tier") or 0) == 1],
+            key=lambda row: str(row.get("start") or ""),
+        )[:2]
+        current_assessment = next(
+            (row for row in adjudicated_windows if str(row.get("time_status") or "").lower() == "current"),
+            {},
+        )
+        debt_repayment_synthesis = {
+            "verdict": "probable_repayment_support_windows" if ranked_repayment else "no_reliable_repayment_window",
+            "ranked_repayment_windows": ranked_repayment,
+            "preparatory_relief_windows": preparatory,
+            "current_window_assessment": current_assessment,
+            "support_house_rule": {
+                "repayment": [2, 6, 11],
+                "pressure": [8, 12],
+                "rule": (
+                    "Debt-house activity is not automatically repayment. A repayment window needs house 6 plus "
+                    "resources/realization from 2 or 11, route-specific KP support, and dated transit confirmation."
+                ),
+            },
+            "claim_rule": (
+                "These are broad astrological repayment-support windows, not a payoff date or guarantee. The actual "
+                "debt-free date depends on balance, interest, cash flow and repayments, none of which astrology calculates."
+            ),
+        }
+        result["debt_repayment_synthesis"] = debt_repayment_synthesis
+
+    qualified = bool(carrier_cautions) or d2_verdict != "supportive_accumulation_pattern"
+    result["route_adjudication"] = {
+        "route": category or "wealth",
+        "direction": "supported_but_qualified" if qualified else "supported",
+        "strength_claim_permission": "qualified_only" if qualified else "supported_if_explained",
+        "d2_verdict": d2_verdict,
+        "carrier_cautions": carrier_cautions,
+        "investment_synthesis": investment_synthesis,
+        "wealth_source_synthesis": wealth_source_synthesis,
+        "debt_repayment_synthesis": debt_repayment_synthesis,
+        "forbidden_inference": [
+            "Do not call the foundation strong, clear or confirmed when strength_claim_permission is qualified_only.",
+            "Do not say D2 confirms retention merely because D2 was calculated.",
+            "Do not derive creativity, beauty, luxury, profession or income channel from Indu Lagna's sign alone.",
+            "Do not turn a house-lord destination into a verdict without its supplied carrier conditions.",
+        ],
+    }
     result["interpretation_rules"] = [
-        "D1 establishes promise; D2 confirms accumulation and retention.",
+        "D1 establishes promise; D2 must be synthesized separately and may confirm or qualify accumulation and retention.",
         "For investment and speculation, judge the complete fifth-lord condition before its placement: dignity, strength, Gandanta, Avayogi, Dagdha/Tithi-Shunya roles, conjunctions and any declared overlap rule.",
         "For investment and speculation, D5 refines judgment and D9 qualifies the underlying carriers; D9 can weaken or sustain expression but cannot replace D1, D2 or D5.",
         "Never call fifth-lord placement in a wealth house positive by itself when its supplied conditions are mixed or challenging.",
@@ -11491,7 +12087,7 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
             "spouse_appearance_rules", "missing_appearance_layers",
             "spouse_location_rules", "missing_location_layers",
             "marriage_remedy_rules",
-            "wealth_answer_rules", "financial_safety_rules",
+            "wealth_answer_rules", "wealth_adjudication", "financial_safety_rules",
         )
         if graph_policy.get(key) not in (None, "", [], {})
     }
@@ -11616,8 +12212,8 @@ def _build_instant_answer_blueprint(
             "investment_risk", "loss_vulnerability", "windfall",
         }
         slots = [
-            {"slot": "direct route-specific financial verdict", "source": "evidence.wealth_foundation and verdict; never generic natal promise"},
-            {"slot": "D1 promise and D2 confirmation or qualification", "source": "evidence.wealth_foundation.natal_wealth.houses and evidence.wealth_foundation.divisional_charts.D2"},
+            {"slot": "direct route-specific financial verdict", "source": "evidence.wealth_foundation.route_adjudication and verdict; obey strength_claim_permission"},
+            {"slot": "D1 promise and D2 explicit confirmation or qualification", "source": "evidence.wealth_foundation.natal_wealth.houses and evidence.wealth_foundation.d2_synthesis; D2 availability alone is not confirmation"},
             {"slot": "route-specific mechanism", "source": "answer_contract.wealth_answer_rules.scope and the corresponding required Wealth factors"},
             {"slot": "earning or gain capacity separated from retention, liabilities and loss exposure", "source": "evidence.wealth_foundation.natal_wealth and route houses"},
         ]
@@ -13771,6 +14367,15 @@ async def generate_instant_chat_response(
     stream_callback: Optional[Callable[[str, str], None]] = None,
 ) -> Dict[str, Any]:
     intent = apply_timeline_intent_guard(intent)
+    # A repayment subtype is more specific than the broad Wealth category.
+    # Normalize it before chart focus, event scanning and graph selection so a
+    # router category fallback cannot turn repayment into generic wealth timing.
+    if (
+        isinstance(intent, dict)
+        and str(intent.get("wealth_subtype") or "").strip().lower() == "debt_repayment"
+        and str(intent.get("category") or "").strip().lower() != "debt"
+    ):
+        intent = {**intent, "category": "debt"}
     requested_app_language = str(language or "english").strip().lower() or "english"
     language = _instant_response_language(
         latest_user_question or question,
@@ -14089,10 +14694,19 @@ async def generate_instant_chat_response(
             len(constitutional_health_rows),
             json.dumps(constitutional_health_rows, ensure_ascii=False, default=str),
         )
+    pre_generation_graph_policy = (
+        ((instant_v2_packet or {}).get("answer_spec") or {}).get("knowledge_graph_policy") or {}
+        if isinstance(instant_v2_packet, dict)
+        else {}
+    )
+    buffer_graph_delivery = bool(
+        pre_generation_graph_policy.get("live")
+        and str(pre_generation_graph_policy.get("runtime_key") or "").lower() in {"debt_repayment"}
+    )
     # Constitutional health claims are buffered until their immutable chart
     # facts pass validation.  Streaming an invented placement and correcting it
     # afterwards is worse than showing this one answer shape atomically.
-    generation_stream_callback = None if constitutional_health_rows else stream_callback
+    generation_stream_callback = None if constitutional_health_rows or buffer_graph_delivery else stream_callback
     started_at = datetime.utcnow()
     llm_result = await analyzer.generate_text_from_prompt(
         prompt,
@@ -14294,12 +14908,21 @@ NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","fol
     response_content = parsed_response.get("content") or response_text
     response_content, prediction_anchor_meta = ResponseParser.parse_prediction_anchor_metadata(response_content)
     if instant_v2_packet:
+        pre_enforcement_content = response_content
         response_content = enforce_live_graph_answer(
             response_content,
             instant_v2_packet,
             language=language,
         )
         graph_policy = ((instant_v2_packet.get("answer_spec") or {}).get("knowledge_graph_policy") or {})
+        if response_content != pre_enforcement_content:
+            logger.info(
+                "INSTANT_GRAPH_ANSWER_REPLACED domain=%s runtime_key=%s before_chars=%s after_chars=%s",
+                graph_policy.get("domain"),
+                graph_policy.get("runtime_key"),
+                len(str(pre_enforcement_content or "")),
+                len(str(response_content or "")),
+            )
         if graph_policy.get("live") and not str(response_content or "").rstrip().endswith("?"):
             domain = str(graph_policy.get("domain") or "").lower()
             if str(language or "").lower().startswith("hi"):
@@ -14374,6 +14997,11 @@ NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","fol
         remedy_followup_active=remedy_active,
         suppress_remedy_cta=suppress_remedy_cta,
     )
+    if buffer_graph_delivery and stream_callback is not None:
+        # This route may replace a plausible-sounding but non-adjudicated LLM
+        # answer. Publish only the final graph-checked text so no client can
+        # retain the raw provider version as the completed message.
+        stream_callback(response_content, response_content)
     next_action = next_action or {}
     graph_policy = (
         ((instant_v2_packet or {}).get("answer_spec") or {}).get("knowledge_graph_policy") or {}

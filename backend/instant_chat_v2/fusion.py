@@ -124,11 +124,13 @@ def fuse_evidence(query_plan: Dict[str, Any], ledger: Dict[str, Any]) -> Dict[st
             direction = "calculated_wealth_foundation_available"
             confidence = 0.84
         windows = []
-        natal = wealth_foundation.get("natal_wealth") if isinstance(wealth_foundation.get("natal_wealth"), dict) else {}
+        adjudication = wealth_foundation.get("route_adjudication") if isinstance(wealth_foundation.get("route_adjudication"), dict) else {}
         rationale = {
             "source": "wealth_foundation",
             "d1_d2_complete": d1_d2_complete,
-            "wealth_score": natal.get("wealth_score"),
+            "route_direction": adjudication.get("direction"),
+            "strength_claim_permission": adjudication.get("strength_claim_permission"),
+            "d2_verdict": adjudication.get("d2_verdict"),
             "available_layers": sorted(key for key, value in availability.items() if value),
             "rule": "Synthesize only the calculated Wealth graph foundation; generic natal promise or D9 cannot replace D2.",
         }
