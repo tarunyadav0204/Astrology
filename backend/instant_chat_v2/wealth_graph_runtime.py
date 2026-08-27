@@ -16,6 +16,17 @@ WEALTH_ALIASES = {
     "speculation": "investment", "inheritance": "inheritance", "legacy": "inheritance",
 }
 TIMING_MODES = frozenset({"event_prediction", "event_timing", "lifetime_event_timing", "month_timing", "timing_window", "daily_forecast"})
+WEALTH_SUBTYPE_CATEGORIES = {
+    "source": "wealth",
+    "savings_instability": "wealth",
+    "multiple_income": "income",
+    "debt_repayment": "debt",
+    "loan_support": "debt",
+    "investing_vs_trading": "investment",
+    "investment_risk": "investment",
+    "loss_vulnerability": "investment",
+    "windfall": "investment",
+}
 
 _MODE_COMPATIBILITY = {
     "wealth:ModeTopic": {"topic_reading", "trait_nature", "problem_diagnosis", "potential_capacity", "decision_support"},
@@ -48,6 +59,17 @@ def is_wealth_category(value: Any) -> bool:
     return normalize_wealth_category(value) is not None
 
 
+def effective_wealth_category(category: Any, wealth_subtype: Any = None) -> str | None:
+    """Resolve a typed Wealth subtype before a broad router category.
+
+    The semantic subtype controls calculator selection. This keeps a broad
+    ``wealth`` category from selecting the right graph node while calculating
+    the wrong divisional chart or house set.
+    """
+    subtype = str(wealth_subtype or "").strip().lower()
+    return WEALTH_SUBTYPE_CATEGORIES.get(subtype) or normalize_wealth_category(category)
+
+
 def _timing_requested(query_plan: Mapping[str, Any]) -> bool:
     mode = str(query_plan.get("answer_mode") or "").strip().lower()
     scope = query_plan.get("time_scope") if isinstance(query_plan.get("time_scope"), Mapping) else {}
@@ -61,12 +83,12 @@ def _timing_requested(query_plan: Mapping[str, Any]) -> bool:
 
 
 def wealth_graph_runtime_key(category: Any, query_plan: Mapping[str, Any] | None = None) -> str | None:
-    category_key = normalize_wealth_category(category)
-    if category_key is None:
-        return None
     plan = query_plan if isinstance(query_plan, Mapping) else {}
     mode = str(plan.get("answer_mode") or "").strip().lower()
     subtype = str(plan.get("wealth_subtype") or "").strip().lower()
+    category_key = effective_wealth_category(category, subtype)
+    if category_key is None:
+        return None
     if mode == "remedy_action":
         return "wealth_remedies"
     if category_key == "wealth":
@@ -99,6 +121,7 @@ def wealth_graph_runtime_key(category: Any, query_plan: Mapping[str, Any] | None
         if subtype == "loan_support" and _timing_requested(plan): return "loan_support"
         return "debt_repayment" if _timing_requested(plan) else "debt"
     if category_key == "investment":
+        if subtype == "windfall": return "windfall"
         if subtype == "investing_vs_trading" or mode == "comparison_choice": return "investing_vs_trading"
         if subtype == "loss_vulnerability": return "loss_vulnerability"
         if subtype == "investment_risk" or mode == "problem_diagnosis": return "investment_risk"

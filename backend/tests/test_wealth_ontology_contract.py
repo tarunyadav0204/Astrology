@@ -24,6 +24,7 @@ from calculators.chart_calculator import ChartCalculator  # noqa: E402
 from instant_chat_v2.wealth_graph_policy import WealthGraphPolicyStore  # noqa: E402
 from instant_chat_v2.wealth_graph_runtime import (  # noqa: E402
     compare_wealth_graph_policy,
+    effective_wealth_category,
     observed_wealth_factors,
     wealth_graph_runtime_key,
 )
@@ -541,6 +542,103 @@ def test_reference_chart_multiple_income_uses_specific_streams_and_complete_rout
     assert "scalable commercial gains through networks, platforms or products" in answer
     assert "unrelated side hustles" in answer
     assert "required calculated layers are unavailable" not in answer
+
+
+def test_all_typed_wealth_subtypes_drive_their_own_calculator_layers_from_broad_category() -> None:
+    birth = {
+        "name": "Tarun", "date": "1980-04-02", "time": "14:55:00",
+        "latitude": 29.2396596, "longitude": 75.8174505,
+        "timezone": "UTC+5:30", "place": "Hisar, Haryana, India",
+    }
+    chart = ChartCalculator({}).calculate_chart(SimpleNamespace(**birth))
+    cases = [
+        ("source", "potential_capacity", "wealth_source"),
+        ("savings_instability", "problem_diagnosis", "wealth_diagnosis"),
+        ("multiple_income", "potential_capacity", "multiple_income"),
+        ("debt_repayment", "timing_window", "debt_repayment"),
+        ("loan_support", "timing_window", "loan_support"),
+        ("investing_vs_trading", "comparison_choice", "investing_vs_trading"),
+        ("investment_risk", "problem_diagnosis", "investment_risk"),
+        ("loss_vulnerability", "topic_reading", "loss_vulnerability"),
+        ("windfall", "potential_capacity", "windfall"),
+    ]
+    for subtype, answer_mode, expected_runtime_key in cases:
+        category = effective_wealth_category("wealth", subtype)
+        foundation = _compact_wealth_foundation(
+            chart, birth, {}, category=category or "wealth",
+            answer_mode=answer_mode, wealth_subtype=subtype,
+        )
+        context = {
+            "intent_summary": {
+                "category": category, "answer_mode": answer_mode,
+                "wealth_subtype": subtype,
+            },
+            "normalized_evidence": {"wealth_foundation": foundation},
+            "current_dashas": {"levels": {"MD": {"planet": "Saturn"}}},
+            "current_transits": {"planets": {"Jupiter": {"house": 11}}},
+        }
+        packet = apply_live_graph_policy(
+            {
+                "query_plan": {
+                    "category": "wealth", "answer_mode": answer_mode,
+                    "wealth_subtype": subtype, "time_scope": {},
+                },
+                "answer_spec": {}, "verification": {}, "user_derivation": {},
+            },
+            intent={"category": "wealth", "wealth_subtype": subtype},
+            context=context,
+        )
+        policy = packet["answer_spec"]["knowledge_graph_policy"]
+        assert policy["domain"] == "wealth", subtype
+        assert policy["runtime_key"] == expected_runtime_key, subtype
+        assert policy.get("missing_required_factors") == [], (subtype, policy.get("missing_required_factors"))
+        assert policy.get("claim_permission") != "no_complete_wealth_verdict", subtype
+
+
+def test_reference_chart_loss_vulnerability_has_d5_and_ranked_loss_mechanisms() -> None:
+    birth = {
+        "name": "Tarun", "date": "1980-04-02", "time": "14:55:00",
+        "latitude": 29.2396596, "longitude": 75.8174505,
+        "timezone": "UTC+5:30", "place": "Hisar, Haryana, India",
+    }
+    chart = ChartCalculator({}).calculate_chart(SimpleNamespace(**birth))
+    foundation = _compact_wealth_foundation(
+        chart, birth, {}, category="wealth", answer_mode="topic_reading",
+        wealth_subtype="loss_vulnerability",
+    )
+    assert foundation["availability"]["d5"] is True
+    assert 6 in foundation["houses_available"]
+    synthesis = foundation["loss_vulnerability_synthesis"]
+    assert synthesis["ranked_vulnerabilities"][0]["id"] == "speculation_volatility"
+    assert synthesis["ranked_vulnerabilities"][1]["id"] == "retention_leakage"
+
+    context = {
+        "intent_summary": {
+            "category": "investment", "answer_mode": "topic_reading",
+            "wealth_subtype": "loss_vulnerability",
+        },
+        "normalized_evidence": {"wealth_foundation": foundation},
+    }
+    packet = apply_live_graph_policy(
+        {
+            "query_plan": {
+                "category": "wealth", "answer_mode": "topic_reading",
+                "wealth_subtype": "loss_vulnerability", "time_scope": {},
+            },
+            "answer_spec": {}, "verification": {}, "user_derivation": {},
+        },
+        intent={"category": "wealth", "wealth_subtype": "loss_vulnerability"}, context=context,
+    )
+    policy = packet["answer_spec"]["knowledge_graph_policy"]
+    assert policy["runtime_key"] == "loss_vulnerability"
+    assert policy.get("missing_required_factors") == []
+    answer = enforce_live_graph_answer("Your chart has mixed financial risk.", packet)
+    assert "high-conviction speculation and volatile investment decisions" in answer
+    assert "fifth lord Mars" in answer
+    assert "D5 is mixed" in answer
+    assert "D2 gives a mixed accumulation pattern with retention pressure" in answer
+    assert "D9 remains mixed" in answer
+    assert "complete Wealth reading" not in answer
 
 
 def test_reference_chart_investment_synthesis_is_specific_and_generic_answer_fails_safe() -> None:

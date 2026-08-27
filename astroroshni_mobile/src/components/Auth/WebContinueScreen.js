@@ -40,6 +40,27 @@ export default function WebContinueScreen({ route, navigation }) {
         } catch (_) {
           /* optional */
         }
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          try {
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('c');
+            cleanUrl.searchParams.delete('continue');
+            cleanUrl.searchParams.delete('__ar_probe');
+            cleanUrl.searchParams.delete('__ar_recover');
+            if (/\/(?:mobile\/)?c\/[^/?#]+/i.test(cleanUrl.pathname)) {
+              cleanUrl.pathname = '/mobile/';
+            }
+            window.history.replaceState(
+              window.history.state,
+              '',
+              `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`,
+            );
+            window.sessionStorage.removeItem('ar_pending_continue_url');
+            window.dispatchEvent(new Event('ar:web-continue-complete'));
+          } catch (_) {
+            /* URL cleanup must never block a successful sign-in. */
+          }
+        }
         resetToRoute(navigation, 'Credits');
       } catch (e) {
         if (cancelled) return;

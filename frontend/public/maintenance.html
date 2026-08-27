@@ -169,7 +169,11 @@
       var status = document.getElementById('status');
       var retry = document.getElementById('retry');
       var sourceUrl = new URL(window.location.href);
-      if (sourceUrl.pathname === '/maintenance.html') sourceUrl.pathname = '/mobile/';
+      if (sourceUrl.pathname === '/maintenance.html') {
+        var pendingContinueUrl = '';
+        try { pendingContinueUrl = sessionStorage.getItem('ar_pending_continue_url') || ''; } catch (_) {}
+        sourceUrl = pendingContinueUrl ? new URL(pendingContinueUrl, window.location.origin) : new URL('/mobile/', window.location.origin);
+      }
       sourceUrl.searchParams.delete('__ar_probe');
       sourceUrl.searchParams.delete('__ar_recover');
 
@@ -183,7 +187,7 @@
       async function probe() {
         clearTimeout(timer);
         status.textContent = failures ? 'Checking again…' : 'Checking the app…';
-        var probeUrl = new URL(sourceUrl.href);
+        var probeUrl = new URL('/mobile/index.html', window.location.origin);
         probeUrl.searchParams.set('__ar_probe', String(Date.now()));
         try {
           var response = await fetch(probeUrl.href, {
@@ -194,7 +198,8 @@
           var html = await response.text();
           var fallback = /name=["']ar-fallback["']|data-ar-fallback|We(?:’|')re updating AstroRoshni/i.test(html);
           var documentResponse = /<html[\s>]/i.test(html) && /<\/html>/i.test(html);
-          if (response.ok && documentResponse && !fallback) {
+          var expoShell = /data-ar-shell=["']expo-web["']/i.test(html);
+          if (response.ok && documentResponse && expoShell && !fallback) {
             status.textContent = 'Connected. Opening…';
             var launchUrl = new URL(sourceUrl.href);
             launchUrl.searchParams.set('__ar_recover', String(Date.now()));

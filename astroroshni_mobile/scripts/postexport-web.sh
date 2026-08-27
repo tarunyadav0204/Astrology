@@ -188,12 +188,24 @@ elif 'apple-mobile-web-app-title' not in html:
 
 # Keep Expo shell URLs under /mobile/ even before React mounts.
 # React Navigation used to rewrite Home to `/`, and the next PWA launch restored CRA.
-boot_guard = '''
+boot_guard = r'''
 <script>
 (function () {
   try {
     var path = location.pathname || '';
     var suffix = (location.search || '') + (location.hash || '');
+    var params = new URLSearchParams(location.search || '');
+    var hasContinuePath = /\/(?:mobile\/)?c\/[^/?#]+/i.test(path);
+    if (params.get('c') || params.get('continue') || hasContinuePath) {
+      sessionStorage.setItem('ar_pending_continue_url', path + suffix);
+    } else if ((path === '/mobile/' || path === '/mobile') && sessionStorage.getItem('ar_pending_continue_url')) {
+      var pendingContinueUrl = sessionStorage.getItem('ar_pending_continue_url');
+      var pendingUrl = new URL(pendingContinueUrl, location.origin);
+      if (pendingUrl.searchParams.get('c') || pendingUrl.searchParams.get('continue')) {
+        location.replace(pendingUrl.pathname + pendingUrl.search + pendingUrl.hash);
+        return;
+      }
+    }
     if (path === '/mobile') {
       location.replace('/mobile/' + suffix);
       return;
@@ -300,16 +312,49 @@ version = {
 }
 (mobile_dir / 'version.json').write_text(json.dumps(version) + '\n', encoding='utf-8')
 
-sw_bits = f'''
+sw_bits = rf'''
 <script>
 (function () {{
   var BUILD = {json.dumps(build_id)};
   window.__AR_WEB_BUILD__ = window.__AR_WEB_BUILD__ || BUILD;
+  var deferUpdateForContinuation = false;
 
-  function reloadOnce() {{
+  function hasSecureContinuation() {{
     try {{
-      if (sessionStorage.getItem('ar_web_reloading') === BUILD) return;
-      sessionStorage.setItem('ar_web_reloading', BUILD);
+      var params = new URLSearchParams(window.location.search || '');
+      var hasContinuePath = /\/(?:mobile\/)?c\/[^/?#]+/i.test(window.location.pathname || '');
+      return Boolean(params.get('c') || params.get('continue') || hasContinuePath || sessionStorage.getItem('ar_pending_continue_url'));
+    }} catch (_) {{
+      return false;
+    }}
+  }}
+
+  async function deployedShellIsReady(targetBuild) {{
+    try {{
+      var response = await fetch('/mobile/index.html?__ar_ready=' + Date.now(), {{
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: {{ 'X-AstroRoshni-Update-Check': '1' }}
+      }});
+      if (!response.ok) return false;
+      var body = await response.text();
+      return body.indexOf('data-ar-shell="expo-web"') >= 0 &&
+        body.indexOf('window.__AR_WEB_BUILD__=' + JSON.stringify(targetBuild)) >= 0;
+    }} catch (_) {{
+      return false;
+    }}
+  }}
+
+  async function reloadOnce(targetBuild) {{
+    if (hasSecureContinuation() || deferUpdateForContinuation) {{
+      try {{ sessionStorage.setItem('ar_web_update_pending', targetBuild || 'unknown'); }} catch (_) {{}}
+      return;
+    }}
+    if (targetBuild && !(await deployedShellIsReady(targetBuild))) return;
+    try {{
+      var guard = targetBuild || BUILD;
+      if (sessionStorage.getItem('ar_web_reloading') === guard) return;
+      sessionStorage.setItem('ar_web_reloading', guard);
     }} catch (_) {{}}
     window.location.reload();
   }}
@@ -329,7 +374,7 @@ sw_bits = f'''
       var data = await res.json();
       if (data && data.build && data.build !== BUILD) {{
         console.info('[PWA] New build available', data.build, 'current', BUILD);
-        reloadOnce();
+        await reloadOnce(data.build);
       }} else {{
         clearReloadGuard();
       }}
@@ -347,19 +392,35 @@ sw_bits = f'''
         }})
         .catch(function (err) {{ console.warn('[PWA] SW registration failed', err); }});
       navigator.serviceWorker.addEventListener('controllerchange', function () {{
-        reloadOnce();
+        checkDeployedBuild();
       }});
     }});
   }}
 
   // iOS home-screen apps often skip SW update races — version.json is the source of truth.
   document.addEventListener('visibilitychange', function () {{
-    if (!document.hidden) checkDeployedBuild();
+    if (!document.hidden) {{
+      if (deferUpdateForContinuation && !hasSecureContinuation()) {{
+        deferUpdateForContinuation = false;
+        return;
+      }}
+      checkDeployedBuild();
+    }}
   }});
   window.addEventListener('pageshow', function (ev) {{
     if (ev.persisted) checkDeployedBuild();
   }});
-  window.addEventListener('focus', checkDeployedBuild);
+  window.addEventListener('focus', function () {{
+    if (deferUpdateForContinuation && !hasSecureContinuation()) {{
+      deferUpdateForContinuation = false;
+      return;
+    }}
+    checkDeployedBuild();
+  }});
+  window.addEventListener('ar:web-continue-complete', function () {{
+    deferUpdateForContinuation = true;
+    try {{ sessionStorage.removeItem('ar_web_update_pending'); }} catch (_) {{}}
+  }});
   setTimeout(checkDeployedBuild, 1500);
 }})();
 </script>

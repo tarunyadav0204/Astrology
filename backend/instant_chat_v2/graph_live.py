@@ -324,6 +324,11 @@ def apply_live_graph_policy(
                 if runtime_key == "multiple_income" and isinstance(wealth_foundation.get("multiple_income_synthesis"), Mapping)
                 else {}
             ),
+            "loss_vulnerability_synthesis": (
+                dict(wealth_foundation.get("loss_vulnerability_synthesis"))
+                if runtime_key == "loss_vulnerability" and isinstance(wealth_foundation.get("loss_vulnerability_synthesis"), Mapping)
+                else {}
+            ),
             "required_answer_order": [
                 "direct route-specific financial verdict",
                 (
@@ -371,6 +376,7 @@ def apply_live_graph_policy(
                 "Do not infer salary/service, business, speculation, debt, expenses, inheritance or windfall unless the selected route and supplied evidence support it.",
                 "For wealth_source, name and rank the supplied concrete earning channels; savings automation, budgeting and retention discipline are qualifications, not wealth sources.",
                 "For multiple_income, answer yes or no from multiple_income_synthesis and name the supplied primary and secondary streams; do not replace them with generic diversification or savings advice.",
+                "For loss_vulnerability, rank the supplied loss mechanisms and distinguish volatility, retention leakage and shared-liability exposure; do not answer as generic investment suitability.",
                 "Do not let Gandanta, Dagdha Rashi or another special factor replace the D1/D2 synthesis; use it only as a connected modifier.",
                 "Do not turn a numerical wealth score into certainty or quote it as a probability.",
                 "D2 availability is not a positive verdict; use only wealth_foundation.d2_synthesis.verdict to say whether it confirms or qualifies retention.",
@@ -1154,12 +1160,66 @@ def enforce_live_graph_answer(
                     )
                 parts.append("Which second stream are you considering alongside your main work?")
                 clean_answer = " ".join(parts)
+        loss_synthesis = (
+            wealth_rules.get("loss_vulnerability_synthesis")
+            if isinstance(wealth_rules.get("loss_vulnerability_synthesis"), Mapping)
+            else {}
+        )
+        if (
+            str(policy.get("runtime_key") or "") == "loss_vulnerability"
+            and loss_synthesis
+            and str(language or "").lower().startswith("en")
+        ):
+            vulnerabilities = [
+                dict(row) for row in list(loss_synthesis.get("ranked_vulnerabilities") or [])
+                if isinstance(row, Mapping) and row.get("label")
+            ]
+            top_keywords = [
+                str(value) for value in list((vulnerabilities[0] if vulnerabilities else {}).get("required_keywords") or [])
+                if value
+            ]
+            names_top_loss = any(
+                re.search(rf"\b{re.escape(keyword)}\w*\b", clean_answer, re.IGNORECASE)
+                for keyword in top_keywords
+            )
+            has_loss_layers = bool(
+                re.search(r"\bD2\b", clean_answer, re.IGNORECASE)
+                and re.search(r"\b(?:D5|Panchamsha)\b", clean_answer, re.IGNORECASE)
+                and re.search(r"\b(?:D9|Navamsha|Navamsa)\b", clean_answer, re.IGNORECASE)
+            )
+            if vulnerabilities and (not names_top_loss or not has_loss_layers):
+                def vulnerability_sentence(row: Mapping[str, Any], lead: str) -> str:
+                    evidence = [str(value).strip() for value in list(row.get("evidence") or []) if str(value).strip()]
+                    basis = "; ".join(evidence[:4])
+                    return f"{lead} {row.get('label')}. The evidence is that {basis}."
+
+                parts = [vulnerability_sentence(vulnerabilities[0], "Your chart is most vulnerable to loss through")]
+                if len(vulnerabilities) > 1:
+                    parts.append(vulnerability_sentence(vulnerabilities[1], "The second vulnerability is"))
+                if len(vulnerabilities) > 2:
+                    parts.append(f"A further pressure point is {vulnerabilities[2].get('label')}.")
+                counterweight = loss_synthesis.get("protective_counterweight") if isinstance(loss_synthesis.get("protective_counterweight"), Mapping) else {}
+                eleventh = counterweight.get("eleventh_lord") if isinstance(counterweight.get("eleventh_lord"), Mapping) else {}
+                if eleventh.get("planet"):
+                    dignity = str(eleventh.get("dignity") or "").replace("_", " ")
+                    parts.append(
+                        f"This does not deny gain capacity: the eleventh lord {eleventh.get('planet')} is in house {eleventh.get('placement_house')}"
+                        + (f" with {dignity} dignity" if dignity else "")
+                        + ". The vulnerability is in decision quality and retention, not an inability to earn."
+                    )
+                parts.append("Which feels more familiar in real life—losses from risky decisions, or money leaving after you earn it?")
+                clean_answer = " ".join(parts)
         investment_synthesis = (
             wealth_rules.get("investment_synthesis")
             if isinstance(wealth_rules.get("investment_synthesis"), Mapping)
             else {}
         )
-        if investment_family and investment_synthesis and str(language or "").lower().startswith("en"):
+        if (
+            investment_family
+            and str(policy.get("runtime_key") or "") != "loss_vulnerability"
+            and investment_synthesis
+            and str(language or "").lower().startswith("en")
+        ):
             fifth_lord = (
                 investment_synthesis.get("fifth_lord")
                 if isinstance(investment_synthesis.get("fifth_lord"), Mapping)

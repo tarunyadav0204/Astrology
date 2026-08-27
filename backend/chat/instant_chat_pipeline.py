@@ -9,7 +9,7 @@ from calendar import monthrange
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Mapping, Optional
 import asyncio
 import time
 
@@ -41,6 +41,7 @@ from instant_chat_v2.career import (
 )
 from instant_chat_v2.health import HEALTH_ALIASES, HEALTH_PROFILES
 from instant_chat_v2.graph_live import apply_live_graph_policy, enforce_live_graph_answer
+from instant_chat_v2.wealth_graph_runtime import effective_wealth_category
 from instant_chat_v2.marriage_timeline import (
     apply_timeline_intent_guard,
     build_phase_action,
@@ -8776,7 +8777,7 @@ def _compact_wealth_foundation(
         ),
     }
     subtype = str(wealth_subtype or "").strip().lower()
-    effective_category = "debt" if subtype == "debt_repayment" else category
+    effective_category = effective_wealth_category(category, subtype) or category
     route_houses = {
         "income": [2, 6, 10, 11],
         "debt": [2, 6, 8, 11, 12],
@@ -8785,6 +8786,12 @@ def _compact_wealth_foundation(
     }.get(effective_category, [2, 5, 6, 8, 9, 10, 11, 12])
     if subtype in {"source", "multiple_income"}:
         route_houses = [2, 6, 7, 10, 11]
+    elif subtype == "savings_instability":
+        route_houses = [2, 6, 8, 11, 12]
+    elif subtype == "loss_vulnerability":
+        route_houses = [2, 5, 6, 8, 11, 12]
+    elif subtype == "windfall":
+        route_houses = [2, 5, 8, 9, 11, 12]
     result: Dict[str, Any] = {
         "scope": "single-native wealth and finance evidence",
         "d1_available": bool(chart_data.get("planets")),
@@ -8793,9 +8800,9 @@ def _compact_wealth_foundation(
     }
 
     needed_output_divisions = {2}
-    if category == "investment": needed_output_divisions.add(5)
-    if category == "inheritance": needed_output_divisions.add(8)
-    if category == "income" or subtype in {"source", "multiple_income"}: needed_output_divisions.add(10)
+    if effective_category == "investment": needed_output_divisions.add(5)
+    if effective_category == "inheritance": needed_output_divisions.add(8)
+    if effective_category == "income" or subtype in {"source", "multiple_income"}: needed_output_divisions.add(10)
     divisions: Dict[str, Any] = {}
     try:
         divisional_calc = DivisionalChartCalculator(chart_data)
@@ -8976,7 +8983,7 @@ def _compact_wealth_foundation(
             "income": {"Jupiter", "Venus", "Mercury", "Saturn"},
             "debt": {"Jupiter", "Mars", "Saturn"},
             "inheritance": {"Jupiter", "Mars", "Saturn"},
-        }.get(category, {"Jupiter", "Venus", "Mercury"})
+        }.get(effective_category, {"Jupiter", "Venus", "Mercury"})
         carrier_names.update(route_significators)
         result["route_carrier_conditions"] = {
             planet: compact_wealth_planet_condition(planet_analysis.get(planet))
@@ -9043,7 +9050,7 @@ def _compact_wealth_foundation(
         "event_prediction", "event_timing", "lifetime_event_timing",
         "month_timing", "timing_window", "daily_forecast",
     }
-    need_kp = category in {"income", "debt", "investment", "inheritance"} or subtype == "windfall" or timing_mode
+    need_kp = effective_category in {"income", "debt", "investment", "inheritance"} or timing_mode
     kp = _instant_real_kp_evidence(birth_data) if need_kp else {}
     if kp:
         result["kp_financial"] = {
@@ -9062,7 +9069,7 @@ def _compact_wealth_foundation(
     result["divisional_charts"] = {}
     for key, value in divisions.items():
         allowed_divisions = {"D2", "D5", "D8", "D10"}
-        if category == "investment" or subtype in {"investment_risk", "loss_vulnerability", "windfall"}:
+        if effective_category == "investment":
             allowed_divisions.add("D9")
         if key not in allowed_divisions or not isinstance(value, dict):
             continue
@@ -9346,7 +9353,7 @@ def _compact_wealth_foundation(
         "debt": [2, 6, 8, 11, 12],
         "investment": [2, 5, 8, 11, 12],
         "inheritance": [2, 8, 9, 11],
-    }.get(category, [2, 5, 11])
+    }.get(effective_category, [2, 5, 11])
     carrier_cautions: List[Dict[str, Any]] = []
     for house_number in adjudication_houses:
         house_row = ((result.get("natal_wealth") or {}).get("houses") or {}).get(str(house_number))
@@ -9385,7 +9392,7 @@ def _compact_wealth_foundation(
             })
 
     investment_synthesis: Dict[str, Any] = {}
-    if category == "investment" or subtype in {"investment_risk", "loss_vulnerability", "windfall"}:
+    if effective_category == "investment":
         def synthesize_investment_division(
             division_key: str,
             *,
@@ -9531,6 +9538,124 @@ def _compact_wealth_foundation(
             ),
         }
         result["investment_synthesis"] = investment_synthesis
+        if subtype == "loss_vulnerability":
+            vulnerabilities: List[Dict[str, Any]] = []
+            fifth_flags = list(investment_synthesis.get("fifth_lord", {}).get("caution_flags") or [])
+            d5_cautions = list(d5_synthesis.get("caution_placements") or [])
+            d5_nodes = list(d5_synthesis.get("node_cooccupancies") or [])
+            speculation_score = len(fifth_flags) + len(d5_cautions) + len(d5_nodes)
+            if speculation_score:
+                readable_flag_labels = {
+                    "gandanta": "Gandanta",
+                    "avayogi_lord": "Avayogi lordship",
+                    "dagdha_lord": "Dagdha lordship",
+                    "tithi_shunya_lord": "Tithi-Shunya lordship",
+                    "mixed_or_malefic_conjunctions": "difficult conjunctions",
+                }
+                fifth_condition_labels = [
+                    readable_flag_labels.get(str(flag))
+                    for flag in fifth_flags
+                    if readable_flag_labels.get(str(flag))
+                ]
+                fifth_condition_text = (
+                    f"the fifth lord {fifth_placement.get('planet') or 'carrier'} is strong but carries "
+                    + ", ".join(fifth_condition_labels)
+                )
+                if "avayogi_tithi_shunya_override" in fifth_flags:
+                    fifth_condition_text += "; its Avayogi–Tithi-Shunya overlap mitigates part of the obstruction but does not erase the other cautions"
+
+                def division_caution_text(row: Mapping[str, Any]) -> str:
+                    planet = str(row.get("planet") or "a carrier")
+                    reasons = [str(value) for value in list(row.get("reasons") or [])]
+                    if "debilitated" in reasons:
+                        return f"debilitated {planet}"
+                    house = row.get("house")
+                    return f"{planet} in house {house}" if house else planet
+
+                d5_caution_text = ", ".join(
+                    division_caution_text(row) for row in d5_cautions[:3] if isinstance(row, Mapping)
+                )
+                d9_cautions = list(d9_synthesis.get("caution_placements") or [])
+                d9_caution_text = ", ".join(
+                    division_caution_text(row) for row in d9_cautions[:3] if isinstance(row, Mapping)
+                )
+                vulnerabilities.append({
+                    "id": "speculation_volatility",
+                    "label": "high-conviction speculation and volatile investment decisions",
+                    "score": speculation_score,
+                    "evidence": [
+                        fifth_condition_text,
+                        (
+                            f"D5 is mixed, with {d5_caution_text} showing volatility pressure"
+                            if d5_caution_text else "D5 gives mixed investment judgment"
+                        ),
+                        (
+                            f"D5 also contains {d5_nodes[0].get('node')} co-occupying house {d5_nodes[0].get('house')} with {', '.join(str(value) for value in d5_nodes[0].get('companions') or [])}"
+                            if d5_nodes else ""
+                        ),
+                        (
+                            f"D9 remains mixed, with {d9_caution_text} qualifying long-term consistency"
+                            if d9_caution_text else "D9 keeps the underlying carrier consistency qualified"
+                        ),
+                    ],
+                    "required_keywords": ["speculation", "volatile", "volatility", "impulsive", "investment"],
+                })
+
+            retention_rows = list((result.get("d2_synthesis") or {}).get("retention_pressure_placements") or [])
+            if retention_rows:
+                vulnerabilities.append({
+                    "id": "retention_leakage",
+                    "label": "retention leakage after money has already been earned",
+                    "score": len(retention_rows) + 2,
+                    "evidence": [
+                        "D2 gives a mixed accumulation pattern with retention pressure",
+                        "the D2 pressure placements are " + ", ".join(
+                            f"{row.get('planet')} in house {row.get('house')}" for row in retention_rows[:3] if isinstance(row, dict)
+                        ),
+                    ],
+                    "required_keywords": ["retention", "leakage", "holding", "outflow", "expenses"],
+                })
+
+            eighth_house = natal_houses.get("8") if isinstance(natal_houses, dict) else {}
+            eighth_basic = eighth_house.get("basic_info") if isinstance(eighth_house, dict) else {}
+            eighth_lord = eighth_house.get("lord") if isinstance(eighth_house, dict) else {}
+            eighth_placement = eighth_lord.get("placement") if isinstance(eighth_lord, dict) else {}
+            eighth_occupants = list(eighth_basic.get("occupants") or []) if isinstance(eighth_basic, dict) else []
+            if eighth_occupants or _safe_int(eighth_placement.get("house")) in {2, 8, 11, 12}:
+                vulnerabilities.append({
+                    "id": "shared_liability_exposure",
+                    "label": "shared-money, liability and opaque-counterparty exposure",
+                    "score": len(eighth_occupants) + 1,
+                    "evidence": [
+                        (
+                            "the D1 eighth house contains " + ", ".join(str(value) for value in eighth_occupants)
+                            if eighth_occupants else ""
+                        ),
+                        (
+                            f"the eighth lord {eighth_placement.get('planet')} is placed in house {eighth_placement.get('house')}"
+                            if eighth_placement.get("planet") else ""
+                        ),
+                    ],
+                    "required_keywords": ["shared", "liability", "counterparty", "joint", "opaque"],
+                })
+
+            ranked_vulnerabilities = sorted(
+                vulnerabilities,
+                key=lambda row: (-int(row.get("score") or 0), str(row.get("id") or "")),
+            )
+            loss_vulnerability_synthesis = {
+                "verdict": "ranked_financial_loss_vulnerabilities",
+                "ranked_vulnerabilities": ranked_vulnerabilities,
+                "protective_counterweight": {
+                    "eleventh_lord": investment_synthesis.get("eleventh_lord"),
+                    "meaning": "Gain capacity can coexist with loss vulnerability; do not turn this reading into a denial of earnings.",
+                },
+                "answer_rule": (
+                    "Lead with the highest-ranked loss mechanism, then the next one or two. Name the actual fifth-lord, "
+                    "D2, D5 and supporting D9 evidence. Separate earning/gain capacity from retention and loss exposure."
+                ),
+            }
+            result["loss_vulnerability_synthesis"] = loss_vulnerability_synthesis
 
     debt_repayment_synthesis: Dict[str, Any] = {}
     if effective_category == "debt" and timing_mode:
@@ -9680,12 +9805,13 @@ def _compact_wealth_foundation(
 
     qualified = bool(carrier_cautions) or d2_verdict != "supportive_accumulation_pattern"
     result["route_adjudication"] = {
-        "route": category or "wealth",
+        "route": effective_category or "wealth",
         "direction": "supported_but_qualified" if qualified else "supported",
         "strength_claim_permission": "qualified_only" if qualified else "supported_if_explained",
         "d2_verdict": d2_verdict,
         "carrier_cautions": carrier_cautions,
         "investment_synthesis": investment_synthesis,
+        "loss_vulnerability_synthesis": result.get("loss_vulnerability_synthesis") or {},
         "wealth_source_synthesis": wealth_source_synthesis,
         "debt_repayment_synthesis": debt_repayment_synthesis,
         "forbidden_inference": [
@@ -14392,13 +14518,11 @@ async def generate_instant_chat_response(
     # Some Wealth subtypes are more specific than the broad Wealth category.
     # Normalize them before chart focus and graph selection so a router category
     # fallback cannot degrade repayment or multiple-income questions.
-    if (
-        isinstance(intent, dict)
-        and str(intent.get("wealth_subtype") or "").strip().lower() in {"debt_repayment", "multiple_income"}
-    ):
-        normalized_wealth_subtype = str(intent.get("wealth_subtype") or "").strip().lower()
-        required_category = "debt" if normalized_wealth_subtype == "debt_repayment" else "income"
-        if str(intent.get("category") or "").strip().lower() != required_category:
+    if isinstance(intent, dict) and str(intent.get("wealth_subtype") or "").strip():
+        required_category = effective_wealth_category(
+            intent.get("category"), intent.get("wealth_subtype")
+        )
+        if required_category and str(intent.get("category") or "").strip().lower() != required_category:
             intent = {**intent, "category": required_category}
     requested_app_language = str(language or "english").strip().lower() or "english"
     language = _instant_response_language(
