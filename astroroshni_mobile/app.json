@@ -30,8 +30,7 @@
         "NSSpeechRecognitionUsageDescription": "AstroRoshni uses speech recognition to turn your spoken question into text.",
         "UIBackgroundModes": [
           "audio"
-        ],
-        "UILaunchScreen": {}
+        ]
       }
     },
     "android": {

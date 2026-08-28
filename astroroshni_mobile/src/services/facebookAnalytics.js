@@ -6,6 +6,11 @@ let sdkUnavailable = false;
 let initStarted = false;
 let sdkReady = false;
 let appStateSubscription = null;
+let trackingPermissionPromptShownThisSession = false;
+
+export function wasTrackingPermissionPromptShownThisSession() {
+  return trackingPermissionPromptShownThisSession;
+}
 
 function getExtra() {
   return Constants.expoConfig?.extra || {};
@@ -343,7 +348,15 @@ async function configureFacebookSdk() {
 
     if (Platform.OS === 'ios') {
       try {
-        const { requestTrackingPermissionsAsync } = require('expo-tracking-transparency');
+        const {
+          getTrackingPermissionsAsync,
+          requestTrackingPermissionsAsync,
+        } = require('expo-tracking-transparency');
+        const currentPermission = await getTrackingPermissionsAsync();
+        if (currentPermission?.status === 'undetermined') {
+          // First-run system prompts must not compete with our theme discovery sheet.
+          trackingPermissionPromptShownThisSession = true;
+        }
         const { status } = await requestTrackingPermissionsAsync();
         if (Settings.setAdvertiserTrackingEnabled) {
           await Settings.setAdvertiserTrackingEnabled(status === 'granted');

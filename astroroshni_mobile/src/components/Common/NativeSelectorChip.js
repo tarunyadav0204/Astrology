@@ -10,14 +10,12 @@ const NativeSelectorChip = ({
   style,
   textStyle,
   iconColor,
-  maxLength = 12,
   showIcon = true
 }) => {
   const { theme, colors, isPanditMode } = useTheme();
   if (!birthData) return null;
 
-  const displayName = birthData.name?.slice(0, maxLength) +
-    (birthData.name?.length > maxLength ? '...' : '');
+  const displayName = String(birthData.name || 'Selected chart');
 
   const chipBg = theme === 'dark'
     ? 'rgba(255, 255, 255, 0.15)'
@@ -42,9 +40,21 @@ const NativeSelectorChip = ({
         style
       ]}
       activeOpacity={0.7}
+      hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
+      accessibilityRole="button"
+      accessibilityLabel={`Change chart. Current chart: ${displayName}`}
+      accessibilityHint="Opens the birth chart selector"
     >
       {showIcon && <Text style={styles.chipIcon}>👤</Text>}
-      <Text style={[styles.nameChipText, { color: colors.textSecondary }, textStyle]}>
+      <Text
+        style={[styles.nameChipText, { color: colors.textSecondary }, textStyle]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+        adjustsFontSizeToFit
+        minimumFontScale={0.78}
+        maxFontSizeMultiplier={1.35}
+        accessibilityElementsHidden
+      >
         {displayName}
       </Text>
       <Ionicons name="chevron-down" size={12} color={iconColor || colors.textTertiary} style={styles.dropdownIcon} />
@@ -56,6 +66,7 @@ const styles = StyleSheet.create({
   nameChip: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     paddingHorizontal: 12,
+    minHeight: 44,
     paddingVertical: 6,
     borderRadius: 16,
     flexDirection: 'row',
@@ -73,6 +84,8 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   nameChipText: {
+    flexShrink: 1,
+    minWidth: 0,
     fontSize: 12,
     fontWeight: '600',
   },

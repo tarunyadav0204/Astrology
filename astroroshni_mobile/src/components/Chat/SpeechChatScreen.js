@@ -2116,9 +2116,9 @@ export default function SpeechChatScreen({ navigation, route }) {
               {birthData?.name
                 ? t('speechChat.screenSubtitleWithChart', {
                     name: birthData.name,
-                    defaultValue: `Voice guide on AstroRoshni · Instant answers for ${birthData.name}`,
+                    defaultValue: `Voice guide on AstroRoshni · Live answers for ${birthData.name}`,
                   })
-                : t('speechChat.screenSubtitleDefault', 'Voice guide on AstroRoshni · Instant spoken answers')}
+                : t('speechChat.screenSubtitleDefault', 'Voice guide on AstroRoshni · Live spoken answers')}
             </Text>
           </View>
           <View style={[styles.liveBadge, { backgroundColor: 'rgba(37,99,235,0.08)', borderColor: 'rgba(37,99,235,0.12)' }]}>

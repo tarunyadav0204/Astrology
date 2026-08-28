@@ -10,7 +10,9 @@ const responseData = (response) => response?.data || response || null;
 
 const readError = (error) => {
   const detail = error?.response?.data?.detail;
-  return detail?.message || detail || error?.message || 'Instant Chat could not be updated.';
+  return String(detail?.message || detail || error?.message || 'Live chat could not be updated.')
+    .replace(/Instant Chat/gi, 'Live chat')
+    .replace(/Instant consultation/gi, 'Live consultation');
 };
 
 const getClientId = async () => {
@@ -29,6 +31,7 @@ export default function useInstantBillingSession({ refreshBalance }) {
   const [error, setError] = useState('');
   const receivedAtRef = useRef(0);
   const heartbeatBusyRef = useRef(false);
+  const endBusyRef = useRef(null);
   const serverStateRef = useRef(null);
 
   const acceptState = useCallback(async (next) => {
@@ -71,7 +74,7 @@ export default function useInstantBillingSession({ refreshBalance }) {
   }, [acceptState, refreshBalance]);
 
   const start = useCallback(async (chatSessionId) => {
-    if (!chatSessionId) throw new Error('A conversation is required before Instant Chat can start.');
+    if (!chatSessionId) throw new Error('A conversation is required before Live chat can start.');
     setBusy(true);
     setError('');
     try {
@@ -90,22 +93,31 @@ export default function useInstantBillingSession({ refreshBalance }) {
   }, [acceptState, refreshBalance]);
 
   const end = useCallback(async (reason = 'user_ended') => {
-    const stored = serverStateRef.current?.session_id || await AsyncStorage.getItem(SESSION_KEY);
-    if (!stored) return null;
-    setBusy(true);
-    setError('');
+    if (endBusyRef.current) return endBusyRef.current;
+    const operation = (async () => {
+      const stored = serverStateRef.current?.session_id || await AsyncStorage.getItem(SESSION_KEY);
+      if (!stored) return null;
+      setBusy(true);
+      setError('');
+      try {
+        const response = await creditAPI.endInstantSession(stored, reason);
+        const next = responseData(response);
+        await acceptState(next);
+        refreshBalance?.();
+        return next;
+      } catch (err) {
+        const message = readError(err);
+        setError(message);
+        throw new Error(message);
+      } finally {
+        setBusy(false);
+      }
+    })();
+    endBusyRef.current = operation;
     try {
-      const response = await creditAPI.endInstantSession(stored, reason);
-      const next = responseData(response);
-      await acceptState(next);
-      refreshBalance?.();
-      return next;
-    } catch (err) {
-      const message = readError(err);
-      setError(message);
-      throw new Error(message);
+      return await operation;
     } finally {
-      setBusy(false);
+      endBusyRef.current = null;
     }
   }, [acceptState, refreshBalance]);
 
@@ -118,13 +130,19 @@ export default function useInstantBillingSession({ refreshBalance }) {
     const intervalSeconds = Math.max(5, Number(serverState.heartbeat_interval_seconds || 10));
     const timer = setInterval(() => heartbeat(), intervalSeconds * 1000);
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') heartbeat();
+      if (nextState === 'active') {
+        heartbeat();
+      } else {
+        // Live is foreground-only. Locking or minimizing the app ends billing
+        // immediately instead of silently consuming credits in the background.
+        end('app_backgrounded').catch(() => {});
+      }
     });
     return () => {
       clearInterval(timer);
       subscription?.remove?.();
     };
-  }, [heartbeat, serverState?.heartbeat_interval_seconds, serverState?.status]);
+  }, [end, heartbeat, serverState?.heartbeat_interval_seconds, serverState?.status]);
 
   useEffect(() => {
     if (!serverState) return undefined;

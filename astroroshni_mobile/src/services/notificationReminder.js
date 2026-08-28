@@ -19,6 +19,10 @@ const CONTEXTUAL_STACK_GUARD_MS = 30 * 60 * 1000;
 let sessionModalShown = false;
 let sessionContextualShown = false;
 
+export function wasNotificationReminderShownThisSession() {
+  return sessionModalShown;
+}
+
 async function baseEligibleForPushAsk() {
   if (Platform.OS === 'ios') return false;
   if (!Device.isDevice) return false;

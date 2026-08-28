@@ -55,7 +55,10 @@ export default function NotificationEnableReminderModal({
       try {
         const show = await shouldShowPushReminder();
         if (cancelled) return;
-        if (show) setVisible(true);
+        if (show) {
+          await recordReminderShown();
+          if (!cancelled) setVisible(true);
+        }
       } catch (_) {
         /* ignore */
       }

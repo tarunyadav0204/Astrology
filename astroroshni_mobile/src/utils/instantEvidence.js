@@ -11,41 +11,6 @@ const humanize = (value) =>
     .trim()
     .replace(/^\w/, (c) => c.toUpperCase());
 
-const routerSourceLabel = (source) => {
-  const value = String(source || '').toLowerCase();
-  if (value === 'primary_intent_llm') return 'Primary interpretation';
-  if (value === 'secondary_answer_mode_llm') return 'Secondary interpretation';
-  if (value.includes('regex_recovery')) return 'Recovered interpretation';
-  if (value.includes('fallback') || value.includes('error')) return 'Fallback routing';
-  return humanize(source || 'Unknown');
-};
-
-// Internal QA labels. These intentionally stay technical so routing traces are
-// comparable across app languages during the pre-launch validation period.
-export const ROUTING_DEBUG_LABELS = {
-  finalMode: 'FINAL MODE',
-  selected: 'SELECTED',
-  source: 'SOURCE',
-  confidence: 'CONFIDENCE',
-  adjusted: 'Mode adjusted after routing',
-  fallback: 'Fallback used',
-};
-
-export const buildRoutingSummary = (packet) => {
-  const route = packet?.routing_decision || packet?.query_plan?.routing_decision || {};
-  const selectedMode = route.selected_mode || route.intent_answer_mode || packet?.query_plan?.answer_mode || 'unknown';
-  const finalMode = route.final_mode || packet?.query_plan?.answer_mode || selectedMode;
-  return {
-    finalMode: humanize(finalMode),
-    selectedMode: humanize(selectedMode),
-    source: routerSourceLabel(route.source),
-    confidence: humanize(route.confidence || 'unknown'),
-    changed: Boolean(route.post_selection_changed) || String(selectedMode) !== String(finalMode),
-    degraded: Boolean(route.degraded),
-    category: humanize(route.intent_category || packet?.query_plan?.category || 'general'),
-  };
-};
-
 const formatDate = (iso) => {
   const raw = String(iso || '').slice(0, 10);
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
@@ -357,63 +322,6 @@ const buildConclusionSection = (derivation) => {
   return { key: 'conclusion', step: 5, title: 'What this means for you', lines: unique(lines) };
 };
 
-const collectGraphRoutes = (derivation) => {
-  const routes = [];
-  const add = (route, sourceKey = '') => {
-    if (!route || typeof route !== 'object' || Array.isArray(route)) return;
-    const identity = route.runtime_key || route.route_id || route.question_type || sourceKey;
-    if (routes.some((item) => (item.runtime_key || item.route_id || item.question_type || item.__sourceKey) === identity)) return;
-    routes.push({ ...route, __sourceKey: sourceKey });
-  };
-  asArray(derivation.knowledge_graph_routes || derivation.graph_routes).forEach((route) => add(route, 'graph_routes'));
-  Object.entries(derivation).forEach(([key, value]) => {
-    if (key.endsWith('_graph_route')) add(value, key);
-  });
-  return routes;
-};
-
-const buildGraphSections = (derivation) => collectGraphRoutes(derivation).map((graphRoute, routeIndex) => {
-  const requiredNodes = asArray(graphRoute.required_nodes).filter((node) => node && typeof node === 'object');
-  const additionalNodes = asArray(graphRoute.additional_selected_nodes).filter((node) => node && typeof node === 'object');
-  const rules = asArray(graphRoute.decision_rules).filter((node) => node && typeof node === 'object');
-  const guardrails = asArray(graphRoute.guardrails).filter((node) => node && typeof node === 'object');
-  const capabilities = asArray(graphRoute.required_capabilities).filter((node) => node && typeof node === 'object');
-  const domain = humanize(graphRoute.domain || graphRoute.category || graphRoute.__sourceKey.replace(/_graph_route$/, '') || 'Astrology');
-  return {
-    key: `knowledge-graph-route-${routeIndex}`, title: `${domain} knowledge graph audit`,
-    groups: [
-      {
-        key: `knowledge-graph-summary-${routeIndex}`,
-        title: `${graphRoute.question_type || `${domain} question`} · ${graphRoute.status === 'matched' ? 'Matched live calculation' : 'Needs review'}`,
-        items: [{
-          title: 'Question and answer route',
-          text: `The graph expected ${graphRoute.expected_approach || 'an unspecified approach'}; the live pipeline selected ${graphRoute.selected_approach || 'an unspecified approach'}. ${graphRoute.mode_match ? 'The answer route matched.' : 'The answer route did not match.'}`,
-        }, {
-          title: 'Graph policy',
-          text: `Answer contract: ${graphRoute.answer_contract || 'not declared'}. Evidence policy: ${graphRoute.evidence_policy || 'not declared'}.${graphRoute.shadow_only ? ' This is a shadow audit and did not influence the answer.' : ''}`,
-        }, {
-          title: 'Audit identity',
-          text: `Ontology ${graphRoute.ontology_version || 'unknown'} · route ${graphRoute.runtime_key || graphRoute.route_id || 'unknown'}.`,
-        }],
-      },
-      requiredNodes.length ? {
-        key: `knowledge-graph-required-${routeIndex}`, title: 'Required graph nodes',
-        items: requiredNodes.map((node) => ({
-          title: `${node.selected ? '✓' : '—'} ${node.label || humanize(node.id)}`,
-          text: node.selected ? 'Selected from the live calculation.' : 'Required by the graph but missing from the live calculation.',
-        })),
-      } : null,
-      additionalNodes.length ? {
-        key: `knowledge-graph-additional-${routeIndex}`, title: 'Additional nodes selected',
-        items: additionalNodes.map((node) => ({ title: `✓ ${node.label || humanize(node.id)}`, text: 'Available in the live calculation; not mandatory for this question route.' })),
-      } : null,
-      rules.length ? { key: `knowledge-graph-rules-${routeIndex}`, title: 'Decision rules selected', items: rules.map((node) => ({ title: node.label || humanize(node.id), text: 'Required by the selected graph route.' })) } : null,
-      capabilities.length ? { key: `knowledge-graph-capabilities-${routeIndex}`, title: 'Calculator capabilities required', items: capabilities.map((node) => ({ title: node.label || humanize(node.id), text: 'The ontology requires this calculator capability for the route.' })) } : null,
-      guardrails.length ? { key: `knowledge-graph-guardrails-${routeIndex}`, title: 'Guardrails selected', items: guardrails.map((node) => ({ title: node.label || humanize(node.id), text: 'Applied to prevent an unsupported conclusion.' })) } : null,
-    ].filter(Boolean),
-  };
-});
-
 const buildCareerSections = (derivation) => {
   const hasCareerReading = derivation.career_reading && typeof derivation.career_reading === 'object';
   const career = hasCareerReading ? derivation.career_reading : {};
@@ -545,7 +453,6 @@ export const buildReadableEvidence = (packet) => {
       lines: ['This saved answer contains the old evidence format. Ask the question again to generate the complete derivation chain.'],
     }];
   }
-  const graphs = buildGraphSections(derivation);
   const numbered = (sections) => sections
     .filter((section) => section && (section.lines?.length || section.groups?.length))
     .map((section, index) => ({ ...section, step: index + 1 }));
@@ -575,10 +482,10 @@ export const buildReadableEvidence = (packet) => {
         medical.safety,
       ]),
     });
-    return numbered([...graphs, ...sections]);
+    return numbered(sections);
   }
   const career = buildCareerSections(derivation);
-  if (career) return numbered([...graphs, ...career]);
+  if (career) return numbered(career);
   const chartReading = derivation.chart_reading;
   if (chartReading && typeof chartReading === 'object') {
     const requested = chartReading.requested_charts || [];
@@ -609,10 +516,9 @@ export const buildReadableEvidence = (packet) => {
     }
     const why = Array.isArray(derivation.conclusion?.why) ? derivation.conclusion.why : [];
     if (why.length) sections.push({ key: 'chart-result', title: 'Calculation record', lines: unique(why) });
-    return numbered([...graphs, ...sections]);
+    return numbered(sections);
   }
   return numbered([
-    ...graphs,
     buildFrameworkSection(derivation),
     buildPromiseSection(derivation),
     buildDashaSection(derivation),

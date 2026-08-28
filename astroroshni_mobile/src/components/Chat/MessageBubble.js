@@ -27,7 +27,7 @@ import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
 import { generatePDF, sharePDFOnWhatsApp, getLogoDataUriForModule, userFacingPdfExportError } from '../../utils/pdfGenerator';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
-import { buildReadableEvidence, buildRoutingSummary, ROUTING_DEBUG_LABELS } from '../../utils/instantEvidence';
+import { buildReadableEvidence } from '../../utils/instantEvidence';
 
 const WHY_TARA_SAYS_THIS = {
   english: 'Why Tara says this',
@@ -53,33 +53,12 @@ const whyTaraSaysThis = (language) => WHY_TARA_SAYS_THIS[
 ] || WHY_TARA_SAYS_THIS.english;
 
 const InstantEvidenceDetails = ({ evidence, colors, t }) => {
-  const routing = buildRoutingSummary(evidence);
   const sections = buildReadableEvidence(evidence);
   return (
     <>
-      <View style={[styles.instantRoutingSummary, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
-        <View style={styles.instantRoutingCell}>
-          <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.finalMode}</Text>
-          <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.finalMode}</Text>
-        </View>
-        <View style={styles.instantRoutingCell}>
-          <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.selected}</Text>
-          <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.selectedMode}</Text>
-        </View>
-        <View style={styles.instantRoutingCell}>
-          <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.source}</Text>
-          <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.source}</Text>
-        </View>
-        <View style={styles.instantRoutingCell}>
-          <Text style={[styles.instantRoutingLabel, { color: colors.textTertiary }]}>{ROUTING_DEBUG_LABELS.confidence}</Text>
-          <Text style={[styles.instantRoutingValue, { color: colors.text }]}>{routing.confidence}</Text>
-        </View>
-        {routing.changed ? <Text style={[styles.instantRoutingFlag, { color: colors.warning || colors.accent }]}>{ROUTING_DEBUG_LABELS.adjusted}</Text> : null}
-        {routing.degraded ? <Text style={[styles.instantRoutingFlag, { color: colors.warning || colors.accent }]}>{ROUTING_DEBUG_LABELS.fallback}</Text> : null}
-      </View>
       {!sections.length ? (
         <Text style={[styles.instantEvidenceMeta, { color: colors.textSecondary }]}>
-          {t('premiumUi.chat.noEvidenceYet', 'Evidence details are not available for this answer.')}
+          {t('premiumUi.chat.noEvidenceYet', 'Tara’s supporting chart notes are not available for this answer.')}
         </Text>
       ) : sections.map((section) => (
         <View key={section.key} style={styles.instantEvidenceSection}>
@@ -117,6 +96,7 @@ const InstantEvidenceDetails = ({ evidence, colors, t }) => {
   );
 };
 import { chatAPI } from '../../services/api';
+import { storage } from '../../services/storage';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
@@ -173,6 +153,18 @@ const resolveReadyPodcastLang = (messageId, preferredLang) => {
   if (premiumPodcastReadyKeys.has(podcastReadyKey(mid, preferred))) return preferred;
   if (premiumPodcastReadyKeys.has(podcastReadyKey(mid, alternate))) return alternate;
   return null;
+};
+
+const podcastLanguagesFromStatus = (response, requestedLang = 'en') => {
+  const data = response?.data || {};
+  const languages = Array.isArray(data.languages)
+    ? data.languages.map(podcastLangFromUiLanguage)
+    : [];
+  // Backward compatibility while mobile and backend releases overlap.
+  if (!languages.length && data.cached === true) {
+    languages.push(podcastLangFromUiLanguage(requestedLang));
+  }
+  return [...new Set(languages)];
 };
 
 const sanitizeVisibleChatContent = (content, { asHtmlSpans = false } = {}) => {
@@ -621,6 +613,96 @@ function MessageBubble({
     }
   };
 
+  const playCachedPodcast = async (listenLang) => {
+    const messageId = message.messageId || message.id;
+    if (!messageId || isLoadingPodcast) return;
+    const lang = persistPodcastListenLang(listenLang);
+    try {
+      userDismissedGeneratingRef.current = false;
+      setIsLoadingPodcast(true);
+      setIsPlayingPodcast(false);
+      setIsPausedPodcast(false);
+      setPodcastPlayerMode('generating');
+      setShowPodcastPlayerModal(true);
+      setPodcastPositionMillis(0);
+      setPodcastDurationMillis(0);
+      const token = await storage.getAuthToken();
+      if (!token) {
+        setIsLoadingPodcast(false);
+        setShowPodcastPlayerModal(false);
+        navigation.navigate('Login');
+        return;
+      }
+      const streamUrl = chatAPI.getPodcastStreamUrl(messageId, lang);
+      await getTextToSpeech().playPodcastFromStream(streamUrl, token, {
+        onProgress: (pos, dur) => {
+          if (userDismissedGeneratingRef.current) return;
+          if (Date.now() - lastSeekedAtRef.current < 600) return;
+          setPodcastPositionMillis(pos);
+          if (dur > 0) setPodcastDurationMillis(dur);
+        },
+        onStart: () => {
+          if (userDismissedGeneratingRef.current) {
+            getTextToSpeech().stopPodcast();
+            setIsLoadingPodcast(false);
+            return;
+          }
+          getTextToSpeech().setPodcastRate(podcastPlaybackRate);
+          setIsLoadingPodcast(false);
+          setIsPlayingPodcast(true);
+          setIsPausedPodcast(false);
+          setPodcastPlayerMode('playing');
+          markPremiumPodcastReady(podcastReadyKey(messageId, lang));
+        },
+        onDone: () => {
+          if (userDismissedGeneratingRef.current) return;
+          setIsLoadingPodcast(false);
+          setIsPlayingPodcast(false);
+          setIsPausedPodcast(false);
+          setShowPodcastPlayerModal(false);
+        },
+        onPause: () => {
+          setIsPlayingPodcast(false);
+          setIsPausedPodcast(true);
+          setPodcastPlayerMode('paused');
+        },
+        onResume: () => {
+          setIsPlayingPodcast(true);
+          setIsPausedPodcast(false);
+          setPodcastPlayerMode('playing');
+        },
+        onStop: () => {
+          if (userDismissedGeneratingRef.current) return;
+          setIsLoadingPodcast(false);
+          setIsPlayingPodcast(false);
+          setIsPausedPodcast(false);
+          setShowPodcastPlayerModal(false);
+        },
+        onError: () => {
+          if (userDismissedGeneratingRef.current) return;
+          setIsLoadingPodcast(false);
+          setIsPlayingPodcast(false);
+          setIsPausedPodcast(false);
+          setShowPodcastPlayerModal(false);
+          Alert.alert(
+            t('common.error', 'Error'),
+            t('podcast.playFailed', 'Could not play podcast. Please try again.'),
+          );
+        },
+      });
+    } catch (error) {
+      console.error('[Podcast] cached playback error', error);
+      setIsLoadingPodcast(false);
+      setIsPlayingPodcast(false);
+      setIsPausedPodcast(false);
+      setShowPodcastPlayerModal(false);
+      Alert.alert(
+        t('common.error', 'Error'),
+        t('podcast.playFailed', 'Could not play podcast. Please try again.'),
+      );
+    }
+  };
+
   const startPodcastPlayback = (listenLang) => {
     const lang = persistPodcastListenLang(listenLang || podcastListenLangRef.current);
     setPodcastPlayerMode('generating');
@@ -636,6 +718,12 @@ function MessageBubble({
     skipPodcastCreditsRef.current = false;
     setShowPodcastLanguageModal(false);
 
+    const existingLocalLang = resolveReadyPodcastLang(message.messageId, lang);
+    if (existingLocalLang) {
+      playCachedPodcast(existingLocalLang);
+      return;
+    }
+
     if (isPremiumChatMessage || skipCredits) {
       startPodcastPlayback(lang);
       return;
@@ -643,22 +731,39 @@ function MessageBubble({
 
     const messageId = message.messageId || null;
     if (messageId) {
+      // Give immediate visual feedback while the lightweight entitlement
+      // lookup determines whether either language was generated previously.
+      userDismissedGeneratingRef.current = false;
+      setPodcastPlayerMode('generating');
+      setShowPodcastPlayerModal(true);
+      podcastCacheCheckRef.current = true;
       try {
         const res = await chatAPI.checkPodcastCache(messageId, lang);
-        if (res?.data?.cached === true) {
-          startPodcastPlayback(lang);
+        const existingLanguages = podcastLanguagesFromStatus(res, lang);
+        existingLanguages.forEach((existingLang) => {
+          markPremiumPodcastReady(podcastReadyKey(messageId, existingLang));
+        });
+        const existingLang = resolveReadyPodcastLang(messageId, lang);
+        if (existingLang) {
+          if (!userDismissedGeneratingRef.current) playCachedPodcast(existingLang);
           return;
         }
       } catch (_) {
         // On error (e.g. network), show modal so user confirms before we attempt creation
+      } finally {
+        podcastCacheCheckRef.current = false;
       }
+      if (userDismissedGeneratingRef.current) return;
+      setShowPodcastPlayerModal(false);
     }
 
     setShowPodcastCreditsModal(true);
   };
 
   const onPodcastButtonPress = async () => {
-    getTextToSpeech().unlockWebAudio?.();
+    // Web requires audio unlocking in the original user gesture. Native does
+    // not, so avoid synchronously loading expo-av before the modal can paint.
+    if (Platform.OS === 'web') getTextToSpeech().unlockWebAudio?.();
     if (isPausedPodcast) {
       getTextToSpeech().resumePodcast();
       return;
@@ -680,7 +785,7 @@ function MessageBubble({
     const playCachedLang = (lang) => {
       const readyKey = podcastReadyKey(message.messageId, lang);
       if (readyKey) markPremiumPodcastReady(readyKey);
-      startPodcastPlayback(lang);
+      playCachedPodcast(lang);
     };
 
     const localCachedLang = resolveReadyPodcastLang(
@@ -692,31 +797,8 @@ function MessageBubble({
       return;
     }
 
-    const messageId = message.messageId || null;
-    if (messageId) {
-      podcastCacheCheckRef.current = true;
-      try {
-        const preferred = podcastLangFromUiLanguage(podcastListenLangRef.current);
-        const alternate = preferred === 'hi' ? 'en' : 'hi';
-        const [prefRes, altRes] = await Promise.all([
-          chatAPI.checkPodcastCache(messageId, preferred),
-          chatAPI.checkPodcastCache(messageId, alternate),
-        ]);
-        if (prefRes?.data?.cached === true) {
-          playCachedLang(preferred);
-          return;
-        }
-        if (altRes?.data?.cached === true) {
-          playCachedLang(alternate);
-          return;
-        }
-      } catch (_) {
-        // Fall through to language picker if cache lookup fails.
-      } finally {
-        podcastCacheCheckRef.current = false;
-      }
-    }
-
+    // No known podcast exists: let the user choose immediately. Entitlement
+    // is checked after selection, with a visible loader, before any credit UI.
     setShowPodcastLanguageModal(true);
   };
 
@@ -1684,7 +1766,7 @@ function MessageBubble({
         : '';
 
   useEffect(() => {
-    if (!isPremiumChatMessage || isInstantChatMessage) return;
+    if (isInstantChatMessage) return;
     if (message.role !== 'assistant' || message.isTyping || message.isProcessing) return;
     if (isClarification || isNativeGate) return;
     const messageId = message.messageId || null;
@@ -1696,17 +1778,12 @@ function MessageBubble({
     let active = true;
     void (async () => {
       try {
-        const [enCached, hiCached] = await Promise.all([
-          chatAPI.checkPodcastCache(messageId, 'en'),
-          chatAPI.checkPodcastCache(messageId, 'hi'),
-        ]);
+        const requestedLang = podcastLangFromUiLanguage(podcastListenLangRef.current);
+        const status = await chatAPI.checkPodcastCache(messageId, requestedLang);
         if (!active) return;
-        if (enCached?.data?.cached === true) {
-          markPremiumPodcastReady(podcastReadyKey(messageId, 'en'));
-        }
-        if (hiCached?.data?.cached === true) {
-          markPremiumPodcastReady(podcastReadyKey(messageId, 'hi'));
-        }
+        podcastLanguagesFromStatus(status, requestedLang).forEach((cachedLang) => {
+          markPremiumPodcastReady(podcastReadyKey(messageId, cachedLang));
+        });
       } catch (_) {
         /* ignore hydrate errors */
       }
@@ -1718,7 +1795,6 @@ function MessageBubble({
     isClarification,
     isInstantChatMessage,
     isNativeGate,
-    isPremiumChatMessage,
     markPremiumPodcastReady,
     message.isProcessing,
     message.isTyping,
@@ -1913,20 +1989,21 @@ function MessageBubble({
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityState={{ expanded: showInstantEvidence }}
+                accessibilityLabel={whyTaraSaysThis(language || i18n.resolvedLanguage || i18n.language)}
                 style={[styles.instantEvidenceToggle, {
                   backgroundColor: colors.accentSoft,
-                  borderColor: colors.selectionBorder,
+                  borderColor: colors.cardBorder,
                 }]}
                 onPress={() => setShowInstantEvidence(true)}
               >
-                <Ionicons name="diamond-outline" size={14} color={colors.onAccent} />
+                <Ionicons name="diamond-outline" size={16} color={colors.text} />
                 <Text
-                  style={[styles.instantEvidenceToggleText, { color: colors.onAccent }]}
+                  style={[styles.instantEvidenceToggleText, { color: colors.text }]}
                 >
                   {whyTaraSaysThis(language || i18n.resolvedLanguage || i18n.language)
                     || t('premiumUi.chat.whyThisAnswer', 'Why Tara says this')}
                 </Text>
-                <Ionicons name="open-outline" size={14} color={colors.onAccent} />
+                <Ionicons name="open-outline" size={15} color={colors.text} />
               </TouchableOpacity>
             </>
           ) : null}
@@ -1944,10 +2021,7 @@ function MessageBubble({
               <View style={[styles.instantEvidenceModalHeader, { borderBottomColor: colors.cardBorder }]}>
                 <View style={styles.instantEvidenceHeaderCopy}>
                   <Text style={[styles.instantEvidenceEyebrow, { color: colors.accent }]}>
-                    {t('premiumUi.chat.howDerived', 'HOW THIS ANSWER WAS DERIVED')}
-                  </Text>
-                  <Text style={[styles.instantEvidenceTitle, { color: colors.text }]}>
-                    {instantEvidence?.user_derivation?.event?.label || instantEvidence?.query_plan?.user_goal || t('premiumUi.chat.reading', 'Reading')}
+                    {whyTaraSaysThis(language || i18n.resolvedLanguage || i18n.language)}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -2914,8 +2988,8 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   instantMessageTime: {
     marginTop: 5,
     alignSelf: 'flex-end',
-    fontSize: 9,
-    lineHeight: 13,
+    fontSize: 12,
+    lineHeight: 16,
   },
   instantInlineTyping: {
     flexDirection: 'row',
@@ -2930,6 +3004,7 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   },
   instantEvidenceToggle: {
     marginTop: 8,
+    minHeight: 44,
     paddingHorizontal: 9,
     paddingVertical: 7,
     borderWidth: StyleSheet.hairlineWidth,
@@ -2940,8 +3015,8 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     gap: 5,
   },
   instantEvidenceToggleText: {
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 13,
+    lineHeight: 17,
     fontWeight: '800',
   },
   instantEvidenceModalBackdrop: {
@@ -2997,11 +3072,6 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   instantEvidenceLabel: { marginTop: 8, marginBottom: 4, fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 1 },
   instantEvidenceValue: { fontSize: 13, lineHeight: 17, fontWeight: '800' },
   instantEvidenceMeta: { marginTop: 2, fontSize: 10, lineHeight: 14 },
-  instantRoutingSummary: { marginTop: 10, padding: 9, borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  instantRoutingCell: { width: '47%', gap: 1 },
-  instantRoutingLabel: { fontSize: 8, lineHeight: 10, fontWeight: '900', letterSpacing: 0.8 },
-  instantRoutingValue: { fontSize: 10, lineHeight: 14, fontWeight: '800' },
-  instantRoutingFlag: { width: '100%', fontSize: 9, lineHeight: 12, fontWeight: '800' },
   instantEvidenceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
   instantEvidenceRowName: { flex: 1, fontSize: 10, lineHeight: 14, fontWeight: '600' },
   instantEvidenceRowStatus: { fontSize: 9, lineHeight: 12, fontWeight: '800' },

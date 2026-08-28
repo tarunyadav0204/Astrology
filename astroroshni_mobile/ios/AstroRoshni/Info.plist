@@ -83,8 +83,6 @@
 	<string>This identifier helps us measure app installs and improve AstroRoshni. You can change this anytime in Settings.</string>
 	<key>RCTNewArchEnabled</key>
 	<false/>
-	<key>UILaunchScreen</key>
-	<dict/>
 	<key>UILaunchStoryboardName</key>
 	<string>SplashScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

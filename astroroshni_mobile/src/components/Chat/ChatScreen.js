@@ -73,6 +73,8 @@ import { shouldPostChatErrorToAdminLogs } from '../../utils/chatAdminErrorGating
 import { typographyTokens } from '../../theme/tokens';
 import useInstantBillingSession from '../../hooks/useInstantBillingSession';
 import { getKpTodayCacheKey, rankKpHomeAreas } from '../../utils/kpHomeRecommendations';
+import { wasNotificationReminderShownThisSession } from '../../services/notificationReminder';
+import { wasTrackingPermissionPromptShownThisSession } from '../../services/facebookAnalytics';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -97,9 +99,9 @@ const INSTANT_LOADER_LINES = [
   'chat.instantLoader.lineTransits',
 ];
 const INSTANT_LOADER_FALLBACKS = [
-  'Tara is reading your question…',
-  'Checking your chart context…',
-  'Looking at the active timing…',
+  'I’m reading your question carefully…',
+  'I’m checking the pattern behind this…',
+  'I’m narrowing down what matters most…',
 ];
 const INSTANT_LOADER_WORD_MS = 2200;
 // Keep the normal thinking sequence calm. The recovery message is exceptional
@@ -558,6 +560,7 @@ export default function ChatScreen({ navigation, route }) {
   const [showInstantEndConfirm, setShowInstantEndConfirm] = useState(false);
   const [pendingModeAfterInstantEnd, setPendingModeAfterInstantEnd] = useState(null);
   const [instantReceipt, setInstantReceipt] = useState(null);
+  const instantAutoReceiptSessionRef = useRef(null);
   const [instantIdleSecondsLeft, setInstantIdleSecondsLeft] = useState(null);
   const instantLastActivityAtRef = useRef(Date.now());
   const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
@@ -568,6 +571,7 @@ export default function ChatScreen({ navigation, route }) {
   const subjectGateOverrideRef = useRef(null);
   const subjectGateMemoryRef = useRef([]);
   const sendMessageRef = useRef(null);
+  const sendButtonPressLockRef = useRef(false);
   /** True after chart/session 409 → new session; second /chat-v2/ask attempt uses this for admin log gating. */
   const pendingChartMismatchSecondAttemptRef = useRef(false);
   /** Delivery group id from a tapped nudge (push/inbox); attached to the next /chat-v2/ask for conversion attribution. */
@@ -737,9 +741,15 @@ export default function ChatScreen({ navigation, route }) {
         if (!active || seen) return;
         timer = setTimeout(() => {
           if (!active) return;
+          // Do not follow a notification ask with a second first-run modal.
+          // Leave theme discovery unseen so it can appear on a later visit.
+          if (
+            wasNotificationReminderShownThisSession() ||
+            wasTrackingPermissionPromptShownThisSession()
+          ) return;
           setThemePickerDiscovery(true);
           setShowQuickThemePicker(true);
-        }, 1400);
+        }, 2400);
       } catch (_) {
         // Discovery is optional; never block the app if storage is unavailable.
       }
@@ -3851,7 +3861,7 @@ export default function ChatScreen({ navigation, route }) {
       return next;
     } catch (error) {
       Alert.alert(
-        t('instantBilling.startFailedTitle', 'Could not start Instant Chat'),
+        t('instantBilling.startFailedTitle', 'Could not start Live chat'),
         error?.message || t('instantBilling.startFailedBody', 'Please check your credits and try again.')
       );
       return null;
@@ -3882,11 +3892,40 @@ export default function ChatScreen({ navigation, route }) {
     }
   };
 
+  useFocusEffect(
+    useCallback(() => () => {
+      if (!instantBilling.active) return;
+      // Navigating away from chat must never leave a paid Live meter running.
+      instantBilling.end('screen_left').catch(() => {});
+    }, [instantBilling.active, instantBilling.end])
+  );
+
   const markInstantActivity = useCallback(() => {
     if (!instantBilling.active) return;
     instantLastActivityAtRef.current = Date.now();
     setInstantIdleSecondsLeft(null);
   }, [instantBilling.active]);
+
+  useEffect(() => {
+    const state = instantBilling.state;
+    const reason = String(state?.ended_reason || '');
+    const sessionKey = String(state?.session_id || '');
+    if (
+      state?.status !== 'ended'
+      || !sessionKey
+      || !['connection_lost', 'credits_exhausted'].includes(reason)
+      || instantAutoReceiptSessionRef.current === sessionKey
+    ) {
+      return;
+    }
+    instantAutoReceiptSessionRef.current = sessionKey;
+    setInstantReceipt({
+      durationSeconds: Number(state.elapsed_seconds || 0),
+      creditsUsed: Number(state.charged_credits || 0),
+      reason,
+    });
+    setInstantIdleSecondsLeft(null);
+  }, [instantBilling.state]);
 
   useEffect(() => {
     if (!instantBilling.active) {
@@ -4930,7 +4969,7 @@ export default function ChatScreen({ navigation, route }) {
               activeSessionId = newSessionId;
               if (useInstantChat && instantBilling.active) {
                 const replacement = await replaceInstantConsultation(newSessionId);
-                if (!replacement) throw new Error('Instant Chat billing session could not be restarted.');
+                if (!replacement) throw new Error('Live chat billing session could not be restarted.');
                 activeInstantBillingSessionId = replacement.session_id;
               }
               return attemptSend(2);
@@ -4950,7 +4989,7 @@ export default function ChatScreen({ navigation, route }) {
               activeSessionId = newSessionId;
               if (useInstantChat && instantBilling.active) {
                 const replacement = await replaceInstantConsultation(newSessionId);
-                if (!replacement) throw new Error('Instant Chat billing session could not be restarted.');
+                if (!replacement) throw new Error('Live chat billing session could not be restarted.');
                 activeInstantBillingSessionId = replacement.session_id;
               }
               return attemptSend(2);
@@ -4971,7 +5010,7 @@ export default function ChatScreen({ navigation, route }) {
               activeSessionId = newSessionId;
               if (useInstantChat && instantBilling.active) {
                 const replacement = await replaceInstantConsultation(newSessionId);
-                if (!replacement) throw new Error('Instant Chat billing session could not be restarted.');
+                if (!replacement) throw new Error('Live chat billing session could not be restarted.');
                 activeInstantBillingSessionId = replacement.session_id;
               }
               return attemptSend(2);
@@ -5191,7 +5230,7 @@ export default function ChatScreen({ navigation, route }) {
 
   const getChatModeName = (modeKey = getChatModeKey()) => {
     if (modeKey === 'premium') return t('chat.modeIntro.premium.name', 'Premium');
-    if (modeKey === 'instant') return t('chat.modeIntro.instant.name', 'Instant');
+    if (modeKey === 'instant') return t('chat.modeIntro.instant.name', 'Live');
     return t('chat.modeIntro.standard.name', 'Standard');
   };
 
@@ -5253,7 +5292,7 @@ export default function ChatScreen({ navigation, route }) {
     ...(instantChatEnabled ? [{
       key: 'instant',
       icon: 'flash',
-      name: t('chat.modeIntro.instant.name', 'Instant'),
+      name: t('chat.modeIntro.instant.name', 'Live'),
       benefit: t('chat.modeIntro.instant.benefit', 'Fastest replies for quick follow-ups and simple questions.'),
       bestFor: t('chat.modeIntro.instant.bestFor', 'Best when you want a concise answer now.'),
       features: [
@@ -6097,13 +6136,15 @@ export default function ChatScreen({ navigation, route }) {
             <View style={[styles.headerCenter, compactHeaderChrome && styles.headerCenterCompact]}>
               {showGreeting ? (
                 <View style={styles.headerBrandRow}>
-                  <View style={[styles.headerLogoContainer, compactHeaderChrome && styles.headerLogoContainerCompact]}>
-                    <Image
-                      source={require('../../../assets/logo.png')}
-                      style={[styles.headerLogo, compactHeaderChrome && styles.headerLogoCompact]}
-                      resizeMode="contain"
-                    />
-                  </View>
+                  {(!compactHeaderChrome || iconOnlyHeaderBrand) ? (
+                    <View style={[styles.headerLogoContainer, compactHeaderChrome && styles.headerLogoContainerCompact]}>
+                      <Image
+                        source={require('../../../assets/logo.png')}
+                        style={[styles.headerLogo, compactHeaderChrome && styles.headerLogoCompact]}
+                        resizeMode="contain"
+                      />
+                    </View>
+                  ) : null}
                   {!iconOnlyHeaderBrand ? (
                     <View style={styles.headerBrandCopy}>
                       <Text
@@ -6134,13 +6175,32 @@ export default function ChatScreen({ navigation, route }) {
                 </View>
               ) : !partnershipMode ? (
                 <View style={styles.activeChatTitleWrap}>
-                  <View style={[styles.activeChatDot, { backgroundColor: colors.accent }]} />
+                  <View
+                    style={[
+                      styles.activeChatDot,
+                      {
+                        backgroundColor: isInstantAnalysis && instantBilling.active
+                          ? (instantBalanceCritical ? (colors.danger || '#c24141') : (colors.success || '#27805f'))
+                          : colors.accent,
+                      },
+                    ]}
+                  />
                   <View style={styles.activeChatTitleCopy}>
-                    <Text style={[styles.activeChatTitle, { color: colors.textInverse }]}>
-                      {isInstantAnalysis && instantBilling.active
-                        ? t('instantBilling.headerTitle', 'Instant with Tara')
-                        : t('premiumUi.home.askTara')}
-                    </Text>
+                    {isInstantAnalysis && instantBilling.active ? (
+                      <View style={styles.liveHeaderTitleRow}>
+                        <Text style={[styles.liveHeaderTitle, { color: colors.textInverse }]}>
+                          {t('instantBilling.liveShort', 'LIVE')}
+                        </Text>
+                        <Ionicons name="time-outline" size={13} color={colors.textInverseMuted} />
+                        <Text style={[styles.liveHeaderTimer, { color: colors.textInverse }]}>
+                          {formatMeterTime(instantBilling.state?.elapsed_seconds)}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={[styles.activeChatTitle, { color: colors.textInverse }]}>
+                        {t('premiumUi.home.askTara')}
+                      </Text>
+                    )}
                     {birthData ? (
                       <NativeSelectorChip
                         birthData={birthData}
@@ -6175,7 +6235,7 @@ export default function ChatScreen({ navigation, route }) {
             </View>
 
             <View style={[styles.headerRight, compactHeaderChrome && styles.headerRightCompact]}>
-              {isGuruMember ? (
+              {isGuruMember && !(isInstantAnalysis && instantBilling.active) ? (
                 <View style={[styles.guruMemberBadge, { backgroundColor: theme === 'dark' ? 'rgba(255,107,53,0.2)' : 'rgba(255,107,53,0.12)', borderColor: colors.primary }]}>
                   <Text style={[styles.guruMemberBadgeText, { color: colors.primary }]}>
                     {t('credits.page.guruMemberBadge', 'Guru Member')}
@@ -6190,6 +6250,8 @@ export default function ChatScreen({ navigation, route }) {
                   isPremiumAnalysis && styles.creditButtonPremium,
                 ]}
                 onPress={() => navigation.navigate('Credits')}
+                accessibilityRole="button"
+                accessibilityLabel={t('credits.label', 'Credits') + `: ${instantBilling.state?.balance ?? credits}`}
               >
                 <Text
                   style={[styles.creditText, compactHeaderChrome && styles.creditTextCompact, { color: colors.textInverse }]}
@@ -6210,6 +6272,22 @@ export default function ChatScreen({ navigation, route }) {
                   </View>
                 )}
               </TouchableOpacity>
+
+              {isInstantAnalysis && instantBilling.active ? (
+                <TouchableOpacity
+                  onPress={() => setShowInstantEndConfirm(true)}
+                  style={[styles.liveHeaderEndButton, { borderColor: colors.cosmicLine, backgroundColor: colors.cosmicGlow }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('instantBilling.endLive', 'End Live consultation')}
+                >
+                  <Ionicons name="stop-circle-outline" size={18} color={colors.textInverse} />
+                  {!compactHeaderChrome ? (
+                    <Text style={[styles.liveHeaderEndText, { color: colors.textInverse }]}>
+                      {t('instantBilling.end', 'End')}
+                    </Text>
+                  ) : null}
+                </TouchableOpacity>
+              ) : null}
 
               {showGreeting && (
                 <TouchableOpacity
@@ -6237,164 +6315,61 @@ export default function ChatScreen({ navigation, route }) {
                 </TouchableOpacity>
               )}
 
-              <TouchableOpacity
-                style={styles.menuButton}
-                onPress={openMenuDrawer}
-              >
-                <Ionicons name="menu" size={20} color={colors.textInverse} />
-              </TouchableOpacity>
+              {!(isInstantAnalysis && instantBilling.active) ? (
+                <TouchableOpacity
+                  style={styles.menuButton}
+                  onPress={openMenuDrawer}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('premiumUi.chatScreen.more', 'More')}
+                >
+                  <Ionicons name="menu" size={20} color={colors.textInverse} />
+                </TouchableOpacity>
+              ) : null}
             </View>
           </LinearGradient>
         </View>
 
-        {!showGreeting && !partnershipMode && !isMundane && isInstantAnalysis ? (
-          <View
-            style={[
-              styles.instantHeaderSession,
-              {
-                backgroundColor: colors.surfaceRaised,
-                borderColor: instantBalanceCritical
-                  ? (colors.danger || '#c24141')
-                  : instantBalanceLow
-                    ? (colors.warning || colors.accent)
-                    : colors.cardBorder,
-              },
-            ]}
-          >
-            <View style={styles.instantHeaderSessionMain}>
-              {instantBilling.active ? (
-                <>
-                  <View style={styles.instantHeaderLiveGroup}>
-                    <View style={[styles.instantHeaderLiveMark, { backgroundColor: colors.accentSoft }]}>
-                      <View
-                        style={[
-                          styles.instantLiveDot,
-                          { backgroundColor: instantBalanceCritical ? (colors.danger || '#c24141') : (colors.success || '#27805f') },
-                        ]}
-                      />
-                    </View>
-                    <View style={styles.instantHeaderIdentity}>
-                      <Text style={[styles.instantHeaderLiveLabel, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {t('instantBilling.liveShort', 'LIVE')}
-                      </Text>
-                      <View style={styles.instantHeaderTimeRow}>
-                        <Ionicons name="time-outline" size={14} color={colors.text} />
-                        <Text style={[styles.instantHeaderMetric, { color: colors.text }]}>
-                          {formatMeterTime(instantBilling.state?.elapsed_seconds)}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={[styles.instantHeaderBalancePill, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
-                      <Ionicons name="sparkles-outline" size={13} color={colors.accent} />
-                      <Text style={[styles.instantHeaderBalanceText, { color: colors.text }]} numberOfLines={1}>
-                        {instantBilling.state?.balance ?? credits}
-                      </Text>
-                      <Text style={[styles.instantHeaderBalanceUnit, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {t('instantBilling.creditsLeft', 'Credits left')}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.instantHeaderActions}>
-                    <TouchableOpacity
-                      onPress={() => setShowInstantEndConfirm(true)}
-                      style={[styles.instantHeaderAction, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceMuted }]}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('instantBilling.end', 'End')}
-                    >
-                      <Ionicons name="stop-circle-outline" size={16} color={colors.danger || colors.primary} />
-                      <Text
-                        style={[styles.instantHeaderActionText, { color: colors.danger || colors.primary }]}
-                      >
-                        {t('instantBilling.end', 'End')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              ) : (
-                <>
-                  <View style={styles.instantHeaderReadyGroup}>
-                    <Ionicons name="flash-outline" size={16} color={colors.accent} style={styles.instantHeaderReadyIcon} />
-                    <Text
-                      style={[styles.instantHeaderReadyText, { color: colors.text }]}
-                      numberOfLines={compactHeaderChrome ? 1 : 2}
-                      accessibilityLabel={t(
-                        'instantBilling.splitRate',
-                        'First minute {{first}} credits · then {{following}} credits per started minute',
-                        {
-                          first: instantChatFirstMinuteCost,
-                          following: instantChatPerMinuteCost,
-                        },
-                      )}
-                    >
-                      {compactHeaderChrome
-                        ? t('instantBilling.splitRateShort', '{{first}} first · {{following}}/min', {
-                            first: instantChatFirstMinuteCost,
-                            following: instantChatPerMinuteCost,
-                          })
-                        : t(
-                            'instantBilling.splitRate',
-                            'First minute {{first}} credits · then {{following}} credits per started minute',
-                            {
-                              first: instantChatFirstMinuteCost,
-                              following: instantChatPerMinuteCost,
-                            },
-                          )}
-                    </Text>
-                  </View>
-                  <View style={styles.instantHeaderActions}>
-                    <TouchableOpacity
-                      onPress={() => {
-                        setShowModeSelector(false);
-                        setShowChatModeIntro(true);
-                      }}
-                      style={[styles.instantHeaderAction, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceMuted }]}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('instantBilling.changeMode', 'Mode')}
-                    >
-                      <Ionicons name="options-outline" size={15} color={colors.text} />
-                      {!compactHeaderChrome ? (
-                        <Text
-                          style={[styles.instantHeaderActionText, { color: colors.text }]}
-                        >
-                          {t('instantBilling.changeMode', 'Mode')}
-                        </Text>
-                      ) : null}
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
-            </View>
+        {!showGreeting && !partnershipMode && !isMundane && isInstantAnalysis && instantBilling.active
+          && (instantBalanceLow || instantBalanceCritical || instantBilling.error || instantIdleSecondsLeft != null) ? (
+          <View style={[styles.liveContextStrip, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
             {(instantBalanceLow || instantBalanceCritical) ? (
               <TouchableOpacity
-                style={[
-                  styles.instantHeaderWarning,
-                  { backgroundColor: instantBalanceCritical ? (colors.danger || '#c24141') : (colors.warning || colors.accent) },
-                ]}
+                style={styles.liveContextStripMain}
                 onPress={() => navigation.navigate('Credits')}
+                accessibilityRole="button"
+                accessibilityLabel={instantBalanceCritical
+                  ? t('instantBilling.oneMinuteLeft', 'About 1 minute left · Add credits')
+                  : t('instantBilling.lowBalance', 'Less than 5 minutes left · Add credits')}
               >
-                <Ionicons name="warning-outline" size={15} color={colors.onAccent || '#fff'} />
-                <Text style={[styles.instantHeaderWarningText, { color: colors.onAccent || '#fff' }]} numberOfLines={1}>
+                <Ionicons name="warning-outline" size={16} color={instantBalanceCritical ? (colors.danger || '#c24141') : (colors.warning || colors.accent)} />
+                <Text style={[styles.liveContextStripText, { color: colors.text }]} numberOfLines={1}>
                   {instantBalanceCritical
                     ? t('instantBilling.oneMinuteLeft', 'About 1 minute left · Add credits')
                     : t('instantBilling.lowBalance', 'Less than 5 minutes left · Add credits')}
                 </Text>
+                <Ionicons name="chevron-forward" size={15} color={colors.textSecondary} />
               </TouchableOpacity>
-            ) : null}
-            {instantBilling.error ? (
-              <Text style={[styles.instantBillingError, { color: colors.danger || '#c24141' }]}>{instantBilling.error}</Text>
-            ) : null}
-            {instantIdleSecondsLeft != null ? (
-              <View style={[styles.instantIdleWarning, { borderTopColor: colors.cosmicLine }]}>
-                <Text style={[styles.instantIdleWarningText, { color: colors.text }]} numberOfLines={2}>
+            ) : instantIdleSecondsLeft != null ? (
+              <View style={styles.liveContextStripMain}>
+                <Text style={[styles.liveContextStripText, { color: colors.text }]} numberOfLines={1}>
                   {t('instantBilling.idleWarning', 'Still there? This consultation will end in {{seconds}}s.', { seconds: instantIdleSecondsLeft })}
                 </Text>
-                <TouchableOpacity onPress={markInstantActivity} style={[styles.instantIdleKeepButton, { borderColor: colors.cosmicLine }]}>
-                  <Text style={[styles.instantHeaderActionText, { color: colors.text, marginLeft: 0 }]}>
+                <TouchableOpacity
+                  onPress={markInstantActivity}
+                  style={[styles.liveContextStripAction, { borderColor: colors.cardBorder }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('instantBilling.keepGoing', 'Keep chatting')}
+                >
+                  <Text style={[styles.liveContextStripActionText, { color: colors.text }]}>
                     {t('instantBilling.keepGoing', 'Keep chatting')}
                   </Text>
                 </TouchableOpacity>
               </View>
-            ) : null}
+            ) : (
+              <Text style={[styles.liveContextStripText, { color: colors.danger || '#c24141' }]} numberOfLines={2}>
+                {instantBilling.error}
+              </Text>
+            )}
           </View>
         ) : null}
 
@@ -6446,7 +6421,7 @@ export default function ChatScreen({ navigation, route }) {
             >
               <Ionicons name="flash-outline" size={17} color={colors.onAccent} />
               <Text style={[styles.instantReceiptPrimaryText, { color: colors.onAccent }]}>
-                {t('instantBilling.again', 'Instant again')}
+                {t('instantBilling.again', 'Go Live again')}
               </Text>
               <Ionicons name="arrow-forward" size={17} color={colors.onAccent} />
             </TouchableOpacity>
@@ -7046,19 +7021,6 @@ export default function ChatScreen({ navigation, route }) {
                 style={{ marginHorizontal: 12, marginBottom: 8 }}
               />
             ) : null}
-            {isInstantAnalysis && instantBilling.active && instantBalanceCritical ? (
-              <TouchableOpacity
-                style={[styles.instantComposerTopUp, { backgroundColor: colors.accentSoft, borderColor: colors.selectionBorder }]}
-                onPress={() => navigation.navigate('Credits')}
-                accessibilityRole="button"
-              >
-                <Ionicons name="wallet-outline" size={16} color={colors.accent} />
-                <Text style={[styles.instantComposerTopUpText, { color: colors.text }]} numberOfLines={1}>
-                  {t('instantBilling.oneMinuteLeft', 'About 1 minute left · Add credits')}
-                </Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.accent} />
-              </TouchableOpacity>
-            ) : null}
             <LinearGradient
               colors={[colors.surfaceRaised || colors.surface, colors.surfaceRaised || colors.surface]}
               style={[
@@ -7080,8 +7042,11 @@ export default function ChatScreen({ navigation, route }) {
                         !isInstantAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
                       ]}
                       onPress={() => switchChatMode('instant')}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: isInstantAnalysis }}
+                      accessibilityLabel={t('chat.modeIntro.instant.name', 'Live')}
                     >
-                      <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>{t('chat.modeInstant', 'Instant')}</Text>
+                      <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>{t('chat.modeIntro.instant.name', 'Live')}</Text>
                       <View style={styles.modeSelectorCostCol}>
                         <Text style={[styles.modeSelectorPrice, { color: colors.text }]}>
                           {t('instantBilling.splitRateShort', '{{first}} first · {{following}}/min', {
@@ -7103,6 +7068,9 @@ export default function ChatScreen({ navigation, route }) {
                       (isPremiumAnalysis || isInstantAnalysis) && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
                     ]}
                     onPress={() => switchChatMode('standard')}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: !isPremiumAnalysis && !isInstantAnalysis }}
+                    accessibilityLabel={t('chat.modeStandard', 'Standard')}
                   >
                     <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>{t('chat.modeStandard', 'Standard')}</Text>
                     <View style={styles.modeSelectorCostCol}>
@@ -7122,6 +7090,9 @@ export default function ChatScreen({ navigation, route }) {
                       !isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
                     ]}
                     onPress={() => switchChatMode('premium')}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isPremiumAnalysis }}
+                    accessibilityLabel={t('chat.modePremium', 'Premium')}
                   >
                     <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>{t('chat.modePremium', 'Premium')}</Text>
                     <View style={styles.modeSelectorCostCol}>
@@ -7245,7 +7216,7 @@ export default function ChatScreen({ navigation, route }) {
                   }
                   accessibilityRole="button"
                   accessibilityLabel={t('chat.speechChatCta', 'Speak your question')}
-                  accessibilityHint={t('chat.speechChatCtaSubtext', 'Instant spoken answers')}
+                  accessibilityHint={t('chat.speechChatCtaSubtext', 'Live spoken answers')}
                 >
                   <LinearGradient
                     colors={[colors.primaryStrong, colors.primary]}
@@ -7266,9 +7237,26 @@ export default function ChatScreen({ navigation, route }) {
                     openNotificationsForFreeQuestion();
                     return;
                   }
-                  sendMessage();
+                  if (sendButtonPressLockRef.current) return;
+                  sendButtonPressLockRef.current = true;
+                  Promise.resolve(sendMessage()).finally(() => {
+                    setTimeout(() => {
+                      sendButtonPressLockRef.current = false;
+                    }, 250);
+                  });
                 }}
                 disabled={(!activeWaitSideMessage && loading) || instantBilling.busy || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate)) || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
+                accessibilityRole="button"
+                accessibilityLabel={activeWaitSideMessage
+                  ? t('chat.sendReply', 'Send reply')
+                  : freeQuestionNotificationGate
+                    ? t('chat.enableNotifications', 'Enable notifications')
+                    : t('chat.sendQuestion', 'Send question')}
+                accessibilityState={{
+                  disabled: (!activeWaitSideMessage && loading) || instantBilling.busy || waitSideReplying || !inputText.trim()
+                    || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate))
+                    || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3)),
+                }}
               >
                 <LinearGradient
                   colors={isPremiumAnalysis ? [colors.accent, colors.primary] : [colors.primaryStrong, colors.primary]}
@@ -7553,6 +7541,10 @@ export default function ChatScreen({ navigation, route }) {
                       key={option.key}
                       activeOpacity={0.86}
                       onPress={() => switchChatMode(option.key)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: isCurrent }}
+                      accessibilityLabel={`${option.name}. ${option.benefit}`}
+                      accessibilityHint={isCurrent ? 'Current chat mode' : `Switch to ${option.name}`}
                       style={[
                         styles.chatModeIntroRow,
                         {
@@ -7615,6 +7607,11 @@ export default function ChatScreen({ navigation, route }) {
                   setShowChatModeIntro(false);
                 }}
                 style={[styles.chatModeIntroContinue, { backgroundColor: colors.primary }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('chat.modeIntro.continue', {
+                  mode: getChatModeName(),
+                  defaultValue: `Continue in ${getChatModeName()}`,
+                })}
               >
                 <Text style={styles.chatModeIntroContinueText}>
                   {t('chat.modeIntro.continue', {
@@ -8693,10 +8690,10 @@ export default function ChatScreen({ navigation, route }) {
         visible={showInstantEndConfirm}
         variant="warning"
         icon="stop-circle-outline"
-        title={t('instantBilling.endTitle', 'End Instant consultation?')}
+        title={t('instantBilling.endTitle', 'End Live consultation?')}
         message={t(
           'instantBilling.endMessage',
-          'Instant Chat cannot be paused. Ending stops the timer; starting again opens a new consultation and prepays a new first minute.'
+          'Live chat cannot be paused. Ending stops the timer; going Live again opens a new consultation and prepays a new first minute.'
         )}
         primaryText={t('instantBilling.endNow', 'End consultation')}
         secondaryText={t('instantBilling.keepGoing', 'Keep chatting')}
@@ -8976,6 +8973,7 @@ const styles = StyleSheet.create({
   instantNativeSelectorChip: {
     alignSelf: 'flex-start',
     maxWidth: 148,
+    minHeight: 24,
     marginTop: 2,
     paddingHorizontal: 7,
     paddingVertical: 2,
@@ -8990,6 +8988,41 @@ const styles = StyleSheet.create({
     lineHeight: 12,
     fontWeight: '700',
     letterSpacing: 0.35,
+  },
+  liveHeaderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  liveHeaderTitle: {
+    fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif', default: 'serif' }),
+    fontSize: 16,
+    lineHeight: 19,
+    fontWeight: '700',
+    marginRight: 2,
+  },
+  liveHeaderTimer: {
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  liveHeaderEndButton: {
+    minWidth: 40,
+    minHeight: 44,
+    marginLeft: 6,
+    paddingHorizontal: 9,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  liveHeaderEndText: {
+    marginLeft: 4,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '800',
   },
   headerTitle: {
     fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif', default: 'serif' }),
@@ -9817,6 +9850,43 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 18,
     padding: 12,
+  },
+  liveContextStrip: {
+    marginHorizontal: 12,
+    marginTop: 6,
+    marginBottom: 2,
+    minHeight: 40,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 13,
+    justifyContent: 'center',
+  },
+  liveContextStripMain: {
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  liveContextStripText: {
+    minWidth: 0,
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+  },
+  liveContextStripAction: {
+    minHeight: 32,
+    paddingHorizontal: 9,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  liveContextStripActionText: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '800',
   },
   instantHeaderSession: {
     marginHorizontal: 12,

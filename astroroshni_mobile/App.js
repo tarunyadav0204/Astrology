@@ -363,7 +363,7 @@ const linking = {
     return path;
   },
 };
-const APP_CONFIG_FETCH_TIMEOUT_MS = 6000;
+const APP_CONFIG_FETCH_TIMEOUT_MS = 2500;
 
 /**
  * WhatsApp / CRM continue links.
@@ -500,7 +500,7 @@ export default function App() {
     }
   };
 
-  const SPLASH_MIN_MS = Platform.OS === 'web' ? 800 : 3000;
+  const SPLASH_MIN_MS = Platform.OS === 'web' ? 800 : 1500;
 
   const checkForceUpdate = async () => {
     let timeoutId = null;
@@ -585,7 +585,8 @@ export default function App() {
             /astroroshni\.com$/i.test(window.location?.hostname || ''));
         if (sameOriginWeb) {
           const { sendAcquisitionFirstOpenOnce } = require('./src/services/acquisitionTracking');
-          await sendAcquisitionFirstOpenOnce().catch(() => {});
+          // Attribution is useful but must never delay the first usable screen.
+          sendAcquisitionFirstOpenOnce().catch(() => {});
         }
       } catch (_) {
         /* optional */
@@ -621,7 +622,7 @@ export default function App() {
           const response = await Promise.race([
             chartAPI.getExistingCharts('', 10, 0, { suppressGlobalError: true }),
             new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Timeout')), 10000)
+              setTimeout(() => reject(new Error('Timeout')), 3500)
             )
           ]);
           if (response.data && response.data.charts && response.data.charts.length > 0) {
