@@ -1086,6 +1086,7 @@ def build_daily_prediction_spine(
     return {
         "target_date": target_dt.strftime("%Y-%m-%d"),
         "method": "daily_spine_v1",
+        "daily_event": school_judgments.get("micro_intent") or {},
         "panchanga": {
             "vara": ((panchang.get("vara") or {}).get("name") or ""),
             "tithi": ((panchang.get("tithi") or {}).get("name") or ""),

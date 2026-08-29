@@ -136,6 +136,11 @@ def test_daily_intent_requires_confirmation_and_date_basis():
     assert _daily_intent_confirmed({
         "extracted_context": {"specific_date_basis": "relative_user_day"},
     }) is False
+    assert _daily_intent_confirmed({
+        "mode": "PREDICT_DAILY",
+        "daily_intent_confirmed": False,
+        "extracted_context": {"specific_date_basis": "relative_user_day"},
+    }) is True
 
 
 def test_extract_month_window_from_month_year_question():

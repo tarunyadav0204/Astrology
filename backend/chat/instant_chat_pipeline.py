@@ -2691,6 +2691,17 @@ def _resolve_period_window(intent: Optional[Dict[str, Any]], now_local: datetime
     }
 
 
+def _structured_exact_day(intent: Optional[Dict[str, Any]], period_window: Optional[Dict[str, Any]] = None) -> bool:
+    """Read exact-day scope only from the semantic router's structured data."""
+    payload = intent if isinstance(intent, dict) else {}
+    window = period_window if isinstance(period_window, dict) else {}
+    embedded = payload.get("period_window") if isinstance(payload.get("period_window"), dict) else {}
+    return bool(
+        str(payload.get("mode") or "").strip().upper() == "PREDICT_DAILY"
+        or str(window.get("kind") or embedded.get("kind") or "").strip().lower() == "day"
+    )
+
+
 def _period_anchor_datetime(period_window: Dict[str, Any], now_local: datetime) -> datetime:
     kind = str((period_window or {}).get("kind") or "current")
     today = now_local.date()
@@ -7526,7 +7537,7 @@ def _requested_charts_from_intent(intent: Optional[Dict[str, Any]], *, answer_mo
     subtype = intent.get("career_subtype")
     static_career_profile = is_static_career_profile(
         category, subtype, answer_mode=answer_mode
-    )
+    ) and not _structured_exact_day(intent)
     if static_career_profile:
         # A static career profile needs the Jaimini vocation signature as well
         # as D1 and D10. Timing-only questions can stay on their bounded packet.
@@ -12707,7 +12718,7 @@ def _build_instant_context(
         prompt_instant_parashari["active_dashas_formatted"] = authoritative_event_prediction_dashas
     static_career_profile = is_static_career_profile(
         category, (intent or {}).get("career_subtype"), answer_mode=answer_mode
-    )
+    ) and not _structured_exact_day(intent, period_window)
     if static_career_profile:
         # Static vocation questions must not inherit incidental timing context
         # from the session. Keep only the natal/divisional career foundation.
@@ -14227,6 +14238,7 @@ def _compact_daily_prediction_for_composer(value: Any) -> Dict[str, Any]:
     kp = schools.get("kp") if isinstance(schools.get("kp"), dict) else {}
     return {
         "target_date": value.get("target_date"),
+        "daily_event": value.get("daily_event") or schools.get("micro_intent"),
         "panchanga": value.get("panchanga"),
         "moon": {
             "transit": moon.get("transit"),
@@ -14716,11 +14728,14 @@ def _build_instant_composer_context(
         compact_query_plan["children_subtype"] = children_subtype
     if career_decision_question:
         compact_query_plan["forecast_shape"] = "career_decision"
-    static_career_profile = is_static_career_profile(
+    exact_day = bool(time_scope.get("is_exact_day"))
+    static_career_profile = not exact_day and (
+        is_static_career_profile(
         category,
         career_subtype,
         answer_mode=answer_mode,
-    ) or bool(career_target and answer_mode in {"topic_reading", "potential_capacity"})
+        ) or bool(career_target and answer_mode in {"topic_reading", "potential_capacity"})
+    )
     health_rules = (
         answer_spec.get("health_rules")
         if isinstance(answer_spec, dict) and isinstance(answer_spec.get("health_rules"), dict)
@@ -14746,11 +14761,20 @@ def _build_instant_composer_context(
     )
     if period_topic_forecast:
         compact_query_plan["forecast_shape"] = "period_topic_forecast"
-    exact_day = bool(time_scope.get("is_exact_day"))
     if exact_day:
         compact_query_plan["forecast_shape"] = "daily_forecast"
 
     compact_answer_contract = _compact_answer_spec_for_composer(answer_spec)
+    if exact_day:
+        # The temporal contract owns this turn. Static domain/profile
+        # contracts remain useful upstream for natal eligibility but must not
+        # tell the writer to answer aptitude instead of today's event.
+        for key in (
+            "career_contract", "career_rules", "capacity_rules",
+            "wealth_answer_rules", "education_answer_rules", "children_answer_rules",
+        ):
+            compact_answer_contract.pop(key, None)
+        career_contract = {}
     if career_contract:
         # The normalized evidence contract is category-level.  Replace its
         # generic career contract with the exact subtype/family contract that
@@ -16192,6 +16216,7 @@ AUTHORITATIVE COMPOSER BRIEF:
     if is_daily_forecast:
         period_forecast_rules = """
 - This is an exact-day forecast, not a shortened annual, monthly, or general dasha reading.
+- Answer the named activity in `evidence.daily_prediction.daily_event` directly. Its semantic facets and event houses are authoritative; do not replace it with general-day advice or static suitability for that profession or activity.
 - Decide the day in this order: KP daily materialisation; transiting Moon, current nakshatra and Tara Bala; Prana and Sookshma triggers; Pratyantardasha as the day frame. Mahadasha and Antardasha are background permission only.
 - Never decide or describe today mainly from MD/AD/PD. Do not say the day is slow, heavy, favorable, difficult, career-active, or relationship-active merely because those three levels or slow transits suggest it.
 - Sentence 1 must give a plain overall outlook for the target day. Then give one or two ranked concrete manifestations, the best use/opportunity, the main caution, and one practical action.

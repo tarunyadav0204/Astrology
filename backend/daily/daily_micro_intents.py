@@ -139,6 +139,75 @@ _CATEGORY_DEFAULTS = {
     "finance": "money_payment",
 }
 
+# Language-neutral facets are selected by the semantic intent LLM.  The
+# backend maps those meanings to astrology; it never tries to rediscover them
+# from words, scripts, translations or dialect-specific phrase lists.
+_SEMANTIC_EVENT_FACETS: Dict[str, Dict[str, Any]] = {
+    "spoken_communication": {"houses": [2, 3, 7, 11], "fast_planets": ["Mercury", "Moon", "Venus"]},
+    "public_performance": {"houses": [1, 5, 10, 11], "fast_planets": ["Sun", "Moon", "Mercury"]},
+    "teaching_advisory": {"houses": [2, 5, 9, 10, 11], "fast_planets": ["Jupiter", "Mercury", "Moon"]},
+    "media_recording": {"houses": [2, 3, 5, 10, 11], "fast_planets": ["Mercury", "Venus", "Moon"]},
+    "audience_response": {"houses": [3, 7, 10, 11], "fast_planets": ["Moon", "Mercury", "Venus"]},
+    "authority_interaction": {"houses": [3, 6, 9, 10, 11], "fast_planets": ["Sun", "Mercury", "Moon"]},
+    "commercial_transaction": {"houses": [2, 7, 10, 11], "fast_planets": ["Mercury", "Venus", "Moon"]},
+    "relationship_exchange": {"houses": [5, 7, 11], "fast_planets": ["Venus", "Moon", "Mercury"]},
+    "travel_movement": {"houses": [3, 9, 12], "fast_planets": ["Moon", "Mars", "Mercury"]},
+    "health_treatment": {"houses": [1, 6, 8, 12], "fast_planets": ["Moon", "Mars", "Sun"]},
+    "study_assessment": {"houses": [4, 5, 9], "fast_planets": ["Mercury", "Moon", "Sun"]},
+    "formal_commitment": {"houses": [3, 7, 10, 11], "fast_planets": ["Mercury", "Sun", "Venus"]},
+    "conflict_exchange": {"houses": [6, 7, 8], "fast_planets": ["Mars", "Mercury", "Moon"]},
+}
+
+DAILY_EVENT_FACET_IDS = tuple(_SEMANTIC_EVENT_FACETS)
+
+
+def build_daily_micro_intent_from_facets(
+    facets: Any,
+    *,
+    activity_label: Any = None,
+    category: str | None = None,
+) -> Dict[str, Any]:
+    """Build the daily event focus solely from LLM-authored semantic facets."""
+    selected = []
+    for value in facets if isinstance(facets, list) else []:
+        facet = str(value or "").strip().lower()
+        if facet in _SEMANTIC_EVENT_FACETS and facet not in selected:
+            selected.append(facet)
+    if not selected:
+        fallback_name = _CATEGORY_DEFAULTS.get(str(category or "").strip().lower(), "general_day")
+        fallback = get_daily_micro_intent_profile(fallback_name)
+        return {
+            **fallback,
+            "confidence": "semantic_fallback",
+            "semantic_facets": [],
+            "activity_label": str(activity_label or "").strip(),
+            "source": "llm_semantic_event_facets",
+        }
+    houses = []
+    planets = []
+    for facet in selected:
+        for house in _SEMANTIC_EVENT_FACETS[facet]["houses"]:
+            if house not in houses:
+                houses.append(house)
+        for planet in _SEMANTIC_EVENT_FACETS[facet]["fast_planets"]:
+            if planet not in planets:
+                planets.append(planet)
+    label = str(activity_label or "").strip() or "this activity"
+    return {
+        "name": "semantic_activity",
+        "confidence": "semantic",
+        "semantic_facets": selected,
+        "activity_label": label,
+        "source_category": str(category or "general").strip().lower(),
+        "source": "llm_semantic_event_facets",
+        "houses": houses,
+        "fast_planets": planets,
+        "daily_focus": f"how {label} is likely to materialize today",
+        "best_for": selected[:3],
+        "watch_for": [],
+        "summary": f"Exact-day activity focus: {label} through {', '.join(selected)}.",
+    }
+
 
 def _normalize(text: str) -> str:
     low = (text or "").lower()

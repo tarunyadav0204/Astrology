@@ -13,7 +13,10 @@ from typing import Any, Dict
 
 from ai.evidence_planner_schema import normalize_evidence_plan
 from ai.output_schema import resolve_output_language_policy
-from daily.daily_micro_intents import classify_daily_micro_intent
+from daily.daily_micro_intents import (
+    DAILY_EVENT_FACET_IDS,
+    build_daily_micro_intent_from_facets,
+)
 from utils.query_context import normalize_query_context, resolve_query_now
 from ai.gemini_chat_analyzer import generate_content_rest_v1beta_result
 from instant_chat_v2.career import CAREER_ALIASES, CAREER_PROFILES, career_profile
@@ -152,6 +155,11 @@ def apply_career_routing_guards(result: Dict[str, Any]) -> None:
     """Normalize only the LLM's structured career output, never question text."""
     category = str(result.get("category") or "").strip().lower().replace("-", "_").replace(" ", "_")
     subtype = result.get("career_subtype")
+    # ``general`` is both the router-wide catch-all and an internal Career
+    # profile name. It is Career only when the semantic LLM explicitly supplied
+    # a career subtype; otherwise promoting it would invent a domain in Python.
+    if category == "general" and not subtype:
+        return
     if category not in CAREER_ALIASES and category not in CAREER_PROFILES and not subtype:
         return
     profile = career_profile(category, subtype)
@@ -699,10 +707,17 @@ def _daily_intent_confirmed(result: Dict[str, Any]) -> bool:
         or result.get("specific_date_basis")
         or ""
     ).strip()
+    mode = str(result.get("mode") or "").strip().upper()
     confirmed = result.get("daily_intent_confirmed")
     if isinstance(confirmed, str):
         confirmed = confirmed.strip().lower() in {"true", "yes", "1"}
-    return bool(confirmed) and basis in {"explicit_user_day", "relative_user_day"}
+    # PREDICT_DAILY is itself the semantic LLM's classification.  Do not make
+    # that meaning depend on a second redundant boolean that small models may
+    # omit.  The date basis still prevents ambient calendar context from being
+    # mistaken for a user-requested day.
+    return bool(confirmed or mode == "PREDICT_DAILY") and basis in {
+        "explicit_user_day", "relative_user_day",
+    }
 
 
 def apply_transit_timing_guards(result: Dict, user_question: str, *, current_year: int, now: datetime | None = None) -> None:
@@ -809,15 +824,50 @@ def apply_transit_timing_guards(result: Dict, user_question: str, *, current_yea
         result["needs_transits"] = True
 
 
-def apply_daily_micro_intent_guards(result: Dict[str, Any], user_question: str) -> None:
+def apply_daily_micro_intent_guards(result: Dict[str, Any]) -> None:
+    """Convert semantic LLM facets to astrology without parsing user text."""
     mode = str(result.get("mode") or "").upper()
     if mode != "PREDICT_DAILY":
         return
+    result["needs_transits"] = True
+    if str(result.get("answer_mode") or "").strip().lower() not in {
+        "dedicated_muhurat_flow",
+        "dedicated_partnership_flow",
+    }:
+        # An exact-day activity is an event forecast even when its subject also
+        # belongs to a static domain graph (career, education, health, etc.).
+        result["answer_mode"] = "event_prediction"
+    result["context_type"] = "birth"
+    result["analysis_type"] = "DAILY_PREDICTION"
     result.setdefault("extracted_context", {})
     if not isinstance(result["extracted_context"], dict):
         result["extracted_context"] = {}
-    result["extracted_context"]["daily_micro_intent"] = classify_daily_micro_intent(
-        user_question,
+    target_date = str(result["extracted_context"].get("specific_date") or "").strip()
+    date_basis = str(result["extracted_context"].get("specific_date_basis") or "").strip()
+    if date_basis in {"explicit_user_day", "relative_user_day"}:
+        try:
+            parsed_date = datetime.strptime(target_date, "%Y-%m-%d")
+        except ValueError:
+            parsed_date = None
+        if parsed_date is not None:
+            result["dasha_as_of"] = target_date
+            result["transit_request"] = {
+                "startYear": parsed_date.year,
+                "endYear": parsed_date.year,
+                "yearMonthMap": {str(parsed_date.year): [parsed_date.strftime("%B")]},
+            }
+    facets = result.get("daily_event_facets")
+    if not isinstance(facets, list):
+        facets = result["extracted_context"].get("daily_event_facets")
+    activity_label = (
+        result.get("daily_activity_label")
+        or result["extracted_context"].get("daily_activity_label")
+        or result.get("career_target")
+        or result.get("education_target")
+    )
+    result["extracted_context"]["daily_micro_intent"] = build_daily_micro_intent_from_facets(
+        facets,
+        activity_label=activity_label,
         category=str(result.get("category") or "general"),
     )
 
@@ -1531,7 +1581,7 @@ class IntentRouter:
             current_year=current_year,
             now=resolved_now.replace(tzinfo=None) if getattr(resolved_now, "tzinfo", None) else resolved_now,
         )
-        apply_daily_micro_intent_guards(result, user_question)
+        apply_daily_micro_intent_guards(result)
         if normalized_query_context:
             result["query_context"] = normalized_query_context
         from utils.query_context import clamp_remedy_modes_on_intent
@@ -1693,6 +1743,7 @@ class IntentRouter:
         apply_career_routing_guards(result)
         apply_education_routing_guards(result)
         apply_children_routing_guards(result)
+        apply_daily_micro_intent_guards(result)
 
         if normalized_query_context:
             result["query_context"] = normalized_query_context
@@ -1886,6 +1937,8 @@ Date/time rules:
 - specific_date_basis: explicit_user_day, relative_user_day, or not_date_bound.
 - context_type is annual only for whole-year forecast style asks; otherwise birth.
 - needs_transits true for daily, timing, and period outlook questions.
+- For every PREDICT_DAILY request, describe the actual activity semantically in `daily_activity_label` and select every relevant `daily_event_facets` value from: {", ".join(DAILY_EVENT_FACET_IDS)}. These facets describe meaning across languages and dialects; do not reduce a named activity to a generic day or static aptitude reading.
+- Temporal scope and subject are independent. When a named activity is tied to one exact day, `mode` remains PREDICT_DAILY even if the activity also names a profession, business, health matter, exam, relationship event, or another life domain. Domain fields describe the activity; they must never downgrade the mode to static aptitude, potential, or topic analysis.
 
 Divisional charts:
 Always keep small. D1/D9 default. Add D10 career/job/business, D7 relationship/children/pregnancy, D30 health/disease, D24 education, D4 property/home, D12 parents/family, Karkamsa/Swamsa soul/purpose.
@@ -1980,6 +2033,8 @@ Return exactly this JSON shape:
   "target_subject_key": "one allowed target subject",
   "needs_year_clarification": false,
   "daily_intent_confirmed": true or false,
+  "daily_activity_label": "concise language-neutral description of the exact-day activity, or null",
+  "daily_event_facets": ["0 or more allowed semantic facet ids; required for a named PREDICT_DAILY activity"],
   "extracted_context": {{
     "timeframe":"", "aspect":"", "specific_date": null,
     "specific_date_basis":"not_date_bound",
@@ -2211,6 +2266,8 @@ Rules:
   - "Aaj ka din kaisa rahega?" -> daily with relative_user_day
   - "27 May 2026 kaisa rahega?" -> daily with explicit_user_day
 - Set `needs_transits=true` for daily, timing, and period outlook questions. Otherwise false unless clearly timing-sensitive.
+- For every PREDICT_DAILY request, preserve the named activity in `daily_activity_label` and select all relevant `daily_event_facets` from: {", ".join(DAILY_EVENT_FACET_IDS)}. Do this semantically in the user's language or dialect; never infer the activity with keyword matching and never replace it with static profession suitability.
+- Temporal scope and subject are independent. When a named activity is tied to one exact day, `mode` remains PREDICT_DAILY even if the activity also names a profession, business, health matter, exam, relationship event, or another life domain. Domain fields describe the activity; they must never downgrade the mode to static aptitude, potential, or topic analysis.
 - `context_type` is usually `birth`; use `annual` only for whole-year forecast style questions.
 - Keep `divisional_charts` small but sensible. D1 and D9 are enough for most instant routing. Add D10 for career/work, D7 for relationships/children, D30 for health/disease, D24 for education, D4 for property/home.
 - When you do return `CLARIFY`, ask only one short narrowing question and give 2-4 quick options when helpful.
@@ -2291,6 +2348,8 @@ Return ONLY this JSON shape:
   "target_subject_key": "self" or "spouse" or "wife" or "husband" or "partner" or "child" or "first_child" or "second_child" or "third_child" or "mother" or "father" or "sibling" or "brother" or "sister" or "younger_brother" or "younger_sister" or "younger_sibling" or "elder_brother" or "elder_sister" or "elder_sibling" or "maternal_uncle" or "uncle",
   "needs_year_clarification": false,
   "daily_intent_confirmed": true or false,
+  "daily_activity_label": "concise language-neutral description of the exact-day activity, or null",
+  "daily_event_facets": ["0 or more allowed semantic facet ids; required for a named PREDICT_DAILY activity"],
   "extracted_context": {{
     "timeframe":"...", "aspect":"...",
     "specific_date":"YYYY-MM-DD only when daily_intent_confirmed=true",

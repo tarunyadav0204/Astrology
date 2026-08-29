@@ -21,6 +21,7 @@ const ModernNavigationHeader = ({
   onLogin,
   onLogout,
   onAdminClick,
+  onHomeClick,
   onOpenCurrentChart,
   sticky = true,
   showNativeBar = true,
@@ -42,6 +43,32 @@ const ModernNavigationHeader = ({
 
   const accountName = user?.name || user?.email || user?.phone || 'Your account';
   const sectionHref = (id) => `${pathname === '/' ? '' : '/'}#${id}`;
+
+  const leaveShell = () => {
+    onHomeClick?.();
+  };
+
+  const goHome = (event) => {
+    closeMenus();
+    if (!onHomeClick) return;
+    event.preventDefault();
+    onHomeClick();
+    if (pathname !== '/') navigate('/');
+  };
+
+  const goSection = (id) => (event) => {
+    closeMenus();
+    if (!onHomeClick) return;
+    event.preventDefault();
+    onHomeClick();
+    const applyHash = () => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.history.replaceState(null, '', `/#${id}`);
+    };
+    if (pathname !== '/') navigate('/');
+    window.setTimeout(applyHash, pathname === '/' ? 50 : 120);
+  };
 
   useEffect(() => {
     const closeMenus = (event) => {
@@ -87,20 +114,30 @@ const ModernNavigationHeader = ({
   const openCurrentChart = () => {
     if (!birthData) return openBirthForm('saved');
     if (onOpenCurrentChart) return onOpenCurrentChart();
+    leaveShell();
     navigate('/charts-dashas');
   };
 
   const askTara = () => {
     closeMenus();
     if (!user) return onLogin?.();
+    leaveShell();
     navigate('/chat?app=1');
+  };
+
+  const goSiteRoute = (to) => (event) => {
+    if (!onHomeClick) return;
+    event.preventDefault();
+    closeMenus();
+    leaveShell();
+    navigate(to);
   };
 
   return (
     <>
       <header className={`mh-nav ar-modern-nav ${sticky ? 'ar-modern-nav--sticky' : ''} ${user && showNativeBar ? 'ar-modern-nav--with-native' : ''}`} aria-label="Primary navigation">
         <div className="mh-nav__inner">
-          <Link className="mh-brand" to="/" aria-label="AstroRoshni home">
+          <Link className="mh-brand" to="/" aria-label="AstroRoshni home" onClick={onHomeClick ? goHome : undefined}>
             <span className="mh-brand__mark" aria-hidden="true">
               <img src={SEO_CONFIG.images.logo} alt="" width="44" height="44" />
             </span>
@@ -108,26 +145,28 @@ const ModernNavigationHeader = ({
           </Link>
 
           <nav className="mh-nav__links" aria-label="Site sections">
-            {SECTION_LINKS.map(([id, label]) => <a key={id} href={sectionHref(id)}>{label}</a>)}
+            {SECTION_LINKS.map(([id, label]) => (
+              <a key={id} href={sectionHref(id)} onClick={onHomeClick ? goSection(id) : undefined}>{label}</a>
+            ))}
             <details className="mh-nav-menu" ref={discoverMenuRef}>
               <summary>Discover</summary>
               <div className="mh-nav-menu__panel" onClick={closeMenus}>
-                <a href={sectionHref('discover')}><span>Discover overview</span><small>Explore AstroRoshni</small></a>
-                <Link to="/ai-kundli-generator"><span>Create Kundli</span><small>Calculate and save your Vedic chart</small></Link>
-                <Link to="/horoscope/daily"><span>Horoscope</span><small>Daily to yearly Sun-sign forecasts</small></Link>
+                <a href={sectionHref('discover')} onClick={onHomeClick ? goSection('discover') : undefined}><span>Discover overview</span><small>Explore AstroRoshni</small></a>
+                <Link to="/ai-kundli-generator" onClick={goSiteRoute('/ai-kundli-generator')}><span>Create Kundli</span><small>Calculate and save your Vedic chart</small></Link>
+                <Link to="/horoscope/daily" onClick={goSiteRoute('/horoscope/daily')}><span>Horoscope</span><small>Daily to yearly Sun-sign forecasts</small></Link>
               </div>
             </details>
             <details className="mh-nav-menu" ref={learnMenuRef}>
               <summary>Learn</summary>
               <div className="mh-nav-menu__panel mh-nav-menu__panel--learn" onClick={closeMenus}>
-                <a href={sectionHref('journal')}><span>Learning overview</span><small>Start with the essentials</small></a>
-                <Link to="/beginners-guide"><span>Beginner’s guide</span><small>Eight foundational lessons</small></Link>
-                <Link to="/advanced-courses"><span>Advanced courses</span><small>Go deeper into interpretation</small></Link>
-                <Link to="/myths-vs-reality"><span>Myths vs reality</span><small>Separate tradition from misconception</small></Link>
-                <Link to="/lesson/1"><span>Start lesson one</span><small>What is astrology?</small></Link>
+                <a href={sectionHref('journal')} onClick={onHomeClick ? goSection('journal') : undefined}><span>Learning overview</span><small>Start with the essentials</small></a>
+                <Link to="/beginners-guide" onClick={goSiteRoute('/beginners-guide')}><span>Beginner’s guide</span><small>Eight foundational lessons</small></Link>
+                <Link to="/advanced-courses" onClick={goSiteRoute('/advanced-courses')}><span>Advanced courses</span><small>Go deeper into interpretation</small></Link>
+                <Link to="/myths-vs-reality" onClick={goSiteRoute('/myths-vs-reality')}><span>Myths vs reality</span><small>Separate tradition from misconception</small></Link>
+                <Link to="/lesson/1" onClick={goSiteRoute('/lesson/1')}><span>Start lesson one</span><small>What is astrology?</small></Link>
               </div>
             </details>
-            <Link to="/panchang">Panchang</Link>
+            <Link to="/panchang" onClick={goSiteRoute('/panchang')}>Panchang</Link>
           </nav>
 
           <div className="mh-nav__actions">
@@ -188,7 +227,7 @@ const ModernNavigationHeader = ({
                 </summary>
                 <div className="mh-account-menu__panel" onClick={closeMenus}>
                   <div className="mh-account-menu__identity"><span>Signed in as</span><strong>{accountName}</strong></div>
-                  <button type="button" onClick={() => navigate('/profile')}>Profile <i aria-hidden>↗</i></button>
+                  <button type="button" onClick={() => { leaveShell(); navigate('/profile'); }}>Profile <i aria-hidden>↗</i></button>
                   <button type="button" onClick={() => openBirthForm('saved')}>Saved Kundlis <i aria-hidden>↗</i></button>
                   <button type="button" onClick={() => setShowCreditsModal(true)}>Credits <b>{creditsLoading ? '—' : credits}</b></button>
                   <button type="button" onClick={onLogout}>Sign out</button>
@@ -205,22 +244,24 @@ const ModernNavigationHeader = ({
           <details className="mh-mobile-menu" ref={mobileMenuRef}>
             <summary aria-label="Open menu"><span></span><span></span></summary>
             <div className="mh-mobile-menu__panel" onClick={closeMenus}>
-              {SECTION_LINKS.map(([id, label]) => <a key={id} href={sectionHref(id)}>{label}</a>)}
+              {SECTION_LINKS.map(([id, label]) => (
+                <a key={id} href={sectionHref(id)} onClick={onHomeClick ? goSection(id) : undefined}>{label}</a>
+              ))}
               <span className="mh-mobile-menu__label">Discover</span>
-              <a href={sectionHref('discover')}>Discover overview</a>
-              <Link to="/ai-kundli-generator">Create Kundli</Link>
-              <Link to="/horoscope/daily">Horoscope</Link>
+              <a href={sectionHref('discover')} onClick={onHomeClick ? goSection('discover') : undefined}>Discover overview</a>
+              <Link to="/ai-kundli-generator" onClick={goSiteRoute('/ai-kundli-generator')}>Create Kundli</Link>
+              <Link to="/horoscope/daily" onClick={goSiteRoute('/horoscope/daily')}>Horoscope</Link>
               <span className="mh-mobile-menu__label">Learn</span>
-              <a href={sectionHref('journal')}>Learning overview</a>
-              <Link to="/beginners-guide">Beginner’s guide</Link>
-              <Link to="/advanced-courses">Advanced courses</Link>
-              <Link to="/myths-vs-reality">Myths vs reality</Link>
-              <Link to="/lesson/1">Start lesson one</Link>
-              <Link to="/panchang">Panchang</Link>
+              <a href={sectionHref('journal')} onClick={onHomeClick ? goSection('journal') : undefined}>Learning overview</a>
+              <Link to="/beginners-guide" onClick={goSiteRoute('/beginners-guide')}>Beginner’s guide</Link>
+              <Link to="/advanced-courses" onClick={goSiteRoute('/advanced-courses')}>Advanced courses</Link>
+              <Link to="/myths-vs-reality" onClick={goSiteRoute('/myths-vs-reality')}>Myths vs reality</Link>
+              <Link to="/lesson/1" onClick={goSiteRoute('/lesson/1')}>Start lesson one</Link>
+              <Link to="/panchang" onClick={goSiteRoute('/panchang')}>Panchang</Link>
               <button type="button" onClick={askTara}>Ask Tara</button>
               <button type="button" onClick={() => openBirthForm('new')}>Create Kundli</button>
               {user && <button type="button" onClick={() => openBirthForm('saved')}>Saved Kundlis</button>}
-              {user && <button type="button" onClick={() => navigate('/profile')}>Profile</button>}
+              {user && <button type="button" onClick={() => { leaveShell(); navigate('/profile'); }}>Profile</button>}
               {user && <button type="button" onClick={() => setShowCreditsModal(true)}>Credits · {creditsLoading ? '—' : credits}</button>}
               <div className="mh-mobile-theme" role="radiogroup" aria-label="Choose appearance" onClick={(event) => event.stopPropagation()}>
                 <span>Appearance</span>

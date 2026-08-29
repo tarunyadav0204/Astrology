@@ -3272,6 +3272,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     <ModernNavigationHeader
       user={user}
       onAdminClick={onAdminClick}
+      onHomeClick={handleHomeClick}
       onLogout={onLogout || (() => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -3285,8 +3286,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
   if (deviceAccessStatus !== 'allowed') {
     return (
-      <div className="admin-panel">
+      <>
         {navigationHeaderNode}
+        <div className="admin-panel">
         <div
           className={`admin-content-wrapper${
             activeTab === 'chat' ? ' admin-content-wrapper--chat-wide' : ''
@@ -3331,14 +3333,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             </div>
           )}
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 
   return (
     <>
+      {navigationHeaderNode}
       <div className="admin-panel">
-        {navigationHeaderNode}
         <div
           className={`admin-content-wrapper${
             activeTab === 'chat' ? ' admin-content-wrapper--chat-wide' : ''

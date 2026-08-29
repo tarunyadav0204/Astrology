@@ -335,6 +335,50 @@ def test_instant_router_finalizer_preserves_llm_semantics_without_text_rules():
     assert result["divisional_charts"] == ["D1", "D9"]
 
 
+def test_instant_router_finalizer_turns_semantic_daily_activity_into_event_forecast():
+    router = IntentRouter.__new__(IntentRouter)
+    result = router._finalize_instant_router_result(
+        {
+            "status": "READY",
+            "mode": "PREDICT_DAILY",
+            "answer_mode": "potential_capacity",
+            "category": "career",
+            "context_type": "birth",
+            "needs_transits": False,
+            "daily_activity_label": "recording an astrology podcast",
+            "daily_event_facets": [
+                "spoken_communication",
+                "media_recording",
+                "public_performance",
+                "teaching_advisory",
+                "audience_response",
+            ],
+            "divisional_charts": ["D1", "D10"],
+            "extracted_context": {
+                "specific_date": "2026-08-29",
+                "specific_date_basis": "relative_user_day",
+            },
+            "evidence_plan": {},
+        },
+        current_year=2026,
+        normalized_query_context=None,
+    )
+
+    assert result["mode"] == "PREDICT_DAILY"
+    assert result["answer_mode"] == "event_prediction"
+    assert result["needs_transits"] is True
+    assert result["analysis_type"] == "DAILY_PREDICTION"
+    assert result["dasha_as_of"] == "2026-08-29"
+    assert result["transit_request"] == {
+        "startYear": 2026,
+        "endYear": 2026,
+        "yearMonthMap": {"2026": ["August"]},
+    }
+    event = result["extracted_context"]["daily_micro_intent"]
+    assert event["activity_label"] == "recording an astrology podcast"
+    assert {2, 3, 5, 9, 10, 11}.issubset(set(event["houses"]))
+
+
 def test_evidence_plan_normalizes_dasha_lookup_enums():
     plan = normalize_evidence_plan(
         {

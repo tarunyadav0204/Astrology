@@ -763,6 +763,46 @@ def test_daily_composer_receives_micro_timing_and_mandatory_shape():
     assert "Sentence 1 must give a plain overall outlook" in prompt
 
 
+def test_exact_day_named_career_activity_outranks_static_target_profile():
+    context = _daily_context()
+    semantic_event = {
+        "name": "semantic_activity",
+        "activity_label": "astrology podcast",
+        "semantic_facets": [
+            "spoken_communication", "public_performance", "teaching_advisory",
+            "media_recording", "audience_response",
+        ],
+        "houses": [2, 3, 5, 7, 9, 10, 11],
+    }
+    context["daily_prediction_spine"]["daily_event"] = semantic_event
+    context["daily_prediction_spine"]["school_judgments"]["micro_intent"] = semantic_event
+    context["normalized_evidence"]["daily_prediction_spine"] = context["daily_prediction_spine"]
+    context["intent_summary"].update({
+        "category": "career",
+        "career_subtype": "career_fit",
+        "career_target": "astrology podcast",
+        "answer_mode": "topic_reading",
+    })
+    packet = build_instant_v2_packet(
+        question="I am doing an astrology podcast today; how will it go?",
+        intent=context["intent_summary"],
+        answer_mode="topic_reading",
+        target_subject={"key": "self"},
+        language="english",
+        instant_context=context,
+    )
+    brief = _build_instant_composer_context(context, packet)
+    prompt = _build_instant_composer_prompt_v3(
+        "I am doing an astrology podcast today; how will it go?", brief, "english"
+    )
+
+    assert brief["query_plan"]["forecast_shape"] == "daily_forecast"
+    assert brief["evidence"]["daily_prediction"]["daily_event"]["activity_label"] == "astrology podcast"
+    assert "career_foundation" not in brief["evidence"]
+    assert "career_contract" not in brief["answer_contract"]
+    assert "do not replace it with general-day advice or static suitability" in prompt
+
+
 def test_exact_day_missing_daily_calculators_is_not_replaced_by_period_evidence():
     context = _context()
     context["intent_summary"] = {

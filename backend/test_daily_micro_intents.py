@@ -1,4 +1,7 @@
-from daily.daily_micro_intents import classify_daily_micro_intent
+from daily.daily_micro_intents import (
+    build_daily_micro_intent_from_facets,
+    classify_daily_micro_intent,
+)
 
 
 def test_classify_interview_meeting():
@@ -13,6 +16,21 @@ def test_classify_relationship_outreach():
     assert result["name"] == "relationship_outreach"
     assert 7 in result["houses"]
     assert "Venus" in result["fast_planets"]
+
+
+def test_semantic_podcast_facets_build_public_communication_event_without_text_matching():
+    result = build_daily_micro_intent_from_facets(
+        [
+            "spoken_communication", "public_performance", "teaching_advisory",
+            "media_recording", "audience_response",
+        ],
+        activity_label="astrology podcast",
+        category="career",
+    )
+    assert result["name"] == "semantic_activity"
+    assert result["activity_label"] == "astrology podcast"
+    assert set((2, 3, 5, 9, 10, 11)).issubset(result["houses"])
+    assert result["source"] == "llm_semantic_event_facets"
 
 
 def test_reduce_daily_context_includes_micro_intent():

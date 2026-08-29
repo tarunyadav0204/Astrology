@@ -94,6 +94,19 @@ def test_non_graph_domain_remains_unchanged() -> None:
     assert apply_live_graph_policy(packet, intent={"category": "property"}, context={}) == packet
 
 
+def test_exact_day_contract_cannot_be_overwritten_by_static_domain_graph() -> None:
+    packet = _packet(
+        "career", "topic_reading", career_subtype="career_fit",
+        time_scope={"is_exact_day": True, "target_date": "2026-08-29"},
+        forecast_shape="daily_forecast",
+    )
+    assert apply_live_graph_policy(
+        packet,
+        intent={"category": "career", "career_subtype": "career_fit", "career_target": "astrology podcast"},
+        context={},
+    ) == packet
+
+
 def test_career_comparison_routes_to_combined_promotion_and_job_change_graph() -> None:
     packet = _packet(
         "career", "comparison_choice", career_subtype="promotion",

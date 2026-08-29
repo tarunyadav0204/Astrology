@@ -202,6 +202,12 @@ def apply_live_graph_policy(
     """Attach a live graph contract to the packet before composer generation."""
     result = dict(packet or {})
     query_plan = dict(result.get("query_plan") or {})
+    time_scope = query_plan.get("time_scope") if isinstance(query_plan.get("time_scope"), Mapping) else {}
+    if time_scope.get("is_exact_day"):
+        # Exact-day materialisation has its own calculator contract (five-level
+        # dasha, Moon/Tara and KP). A static domain route must never overwrite
+        # that temporal lens with vocation, promise or profile evidence.
+        return result
     graph_context = dict(context or {})
     # The fused verdict owns option-specific comparison rows.  Make that
     # adjudicated evidence visible to the graph comparator without copying it
