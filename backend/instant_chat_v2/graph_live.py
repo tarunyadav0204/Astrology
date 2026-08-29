@@ -41,6 +41,12 @@ from .education_graph_runtime import (
     is_education_category,
     resolve_education_graph_inputs,
 )
+from .children_graph_runtime import (
+    build_children_graph_route,
+    compare_children_graph_policy,
+    is_children_category,
+    resolve_children_graph_inputs,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -159,6 +165,10 @@ def resolve_live_graph_policy(
         domain, resolver, comparator, reviewer = (
             "education", resolve_education_graph_inputs, compare_education_graph_policy, build_education_graph_route,
         )
+    elif is_children_category(category):
+        domain, resolver, comparator, reviewer = (
+            "children", resolve_children_graph_inputs, compare_children_graph_policy, build_children_graph_route,
+        )
     else:
         return None
 
@@ -229,6 +239,13 @@ def apply_live_graph_policy(
     ) or bool(
         policy.get("domain") == "education"
         and str(policy.get("runtime_key") or "").endswith("_timing")
+    ) or bool(
+        policy.get("domain") == "children"
+        and str(policy.get("runtime_key") or "") in {
+            "conception_timing", "childbirth_timing", "first_child", "subsequent_child",
+            "assisted_conception_timing", "adoption_timing", "parenthood_vs_career_timing",
+            "parent_child_reconciliation_timing", "retrospective_child_timing",
+        }
     )
     love_arranged_route = bool(
         policy.get("domain") == "marriage"
@@ -345,6 +362,60 @@ def apply_live_graph_policy(
                 " Some required static factors are unavailable; identify the missing layer and limit only the claim "
                 "that depends on it rather than replacing the whole answer with a generic refusal."
             )
+    if bool(policy.get("live")) and policy.get("domain") == "children":
+        runtime_key = str(policy.get("runtime_key") or "children_overview")
+        normalized = context.get("normalized_evidence") if isinstance(context.get("normalized_evidence"), Mapping) else {}
+        foundation = normalized.get("children_foundation") if isinstance(normalized.get("children_foundation"), Mapping) else {}
+        boundary_permissions = {
+            "two_chart_children_handoff": "children_two_chart_handoff",
+            "child_chart_required_handoff": "children_child_chart_handoff",
+            "medical_safety_handoff": "children_medical_handoff",
+            "muhurat_handoff": "children_muhurat_handoff",
+            "legal_custody_handoff": "children_legal_handoff",
+            "fetal_sex_refusal": "children_fetal_sex_refusal",
+        }
+        if runtime_key in boundary_permissions:
+            compact_policy["claim_permission"] = boundary_permissions[runtime_key]
+        static_route = runtime_key not in {
+            "conception_timing", "childbirth_timing", "first_child", "subsequent_child",
+            "assisted_conception_timing", "adoption_timing", "parenthood_vs_career_timing",
+            "parent_child_reconciliation_timing", "retrospective_child_timing",
+        }
+        children_rules = {
+            "runtime_key": runtime_key,
+            "static_route": static_route,
+            "primary_evidence": "evidence.children_foundation",
+            "route_synthesis": foundation.get("route_synthesis") or {},
+            "promise_synthesis": foundation.get("promise_synthesis") or {},
+            "child_order_synthesis": foundation.get("child_order_synthesis") or {},
+            "pathway_synthesis": foundation.get("pathway_synthesis") or {},
+            "claim_boundaries": foundation.get("claim_boundaries") or {},
+            "required_order": [
+                "answer the exact children or parenthood question",
+                "state the D1 promise using an actual supplied condition",
+                "state how D7 confirms or qualifies it using an actual supplied condition",
+                "apply the route-specific child-order, pathway, relationship or timing synthesis",
+                "give one grounded next step without replacing medical, legal or personal judgment",
+            ],
+            "forbidden_moves": [
+                "Never infer conception, birth, adoption, reconciliation or treatment success from one planet or house.",
+                "Never call D7 supportive merely because it was calculated.",
+                "Never turn delay or pressure into automatic denial.",
+                "Never diagnose infertility, pregnancy risk, miscarriage, symptoms or treatment outcome.",
+                "Never predict pregnancy loss, fetal sex, an exact child count or twins.",
+                "Never use a parent's chart as the child's own personality, health, education, career, marriage or fate chart.",
+                "Never present a remedy as fertility treatment or a guarantee.",
+                "Never mention timing on a static route or dates absent from timing_windows.",
+                "For nodes, never use fifth or ninth aspects; retain occupation, conjunction and seventh aspect only.",
+            ],
+        }
+        compact_policy["children_answer_rules"] = children_rules
+        answer_spec["children_answer_rules"] = children_rules
+        compact_policy["instruction"] = (
+            "Use the calculated Children foundation as the sole answer-bearing source. D1 establishes promise and "
+            "D7 independently confirms or qualifies it. Use the exact route synthesis; first and later children, "
+            "conception and childbirth, assisted conception and adoption are not interchangeable routes."
+        )
     if bool(policy.get("live")) and wealth_route:
         runtime_key = str(policy.get("runtime_key") or "")
         normalized = context.get("normalized_evidence") if isinstance(context.get("normalized_evidence"), Mapping) else {}
@@ -1117,6 +1188,42 @@ def enforce_live_graph_answer(
     packet = packet if isinstance(packet, Mapping) else {}
     spec = packet.get("answer_spec") if isinstance(packet.get("answer_spec"), Mapping) else {}
     policy = spec.get("knowledge_graph_policy") if isinstance(spec.get("knowledge_graph_policy"), Mapping) else {}
+    children_boundary = str(policy.get("claim_permission") or "")
+    if children_boundary == "children_fetal_sex_refusal":
+        return (
+            "I can’t predict or imply whether a baby will be a son or daughter. I can still help with the chart’s "
+            "broader parenthood themes or supportive periods without making a fetal-sex claim."
+        )
+    if children_boundary == "children_medical_handoff":
+        return (
+            "A birth chart cannot determine whether a pregnancy is healthy, diagnose fertility, assess a symptom, "
+            "or predict pregnancy loss. Please use your obstetrician or fertility specialist for that decision; "
+            "seek urgent medical care for severe pain, heavy bleeding, fainting, breathing difficulty, or any symptom "
+            "your clinician has told you is urgent. Once medical safety is covered, I can discuss only the chart’s "
+            "non-medical parenthood themes."
+        )
+    if children_boundary == "children_two_chart_handoff":
+        return (
+            "A joint parenthood question needs both resolved birth charts. Please open Partnership Analysis and "
+            "select both people; one chart cannot reliably represent the other partner’s parenthood factors."
+        )
+    if children_boundary == "children_child_chart_handoff":
+        return (
+            "Your chart can describe your experience of parenting and your relationship pattern with children, but "
+            "it cannot reliably give the child’s personality, education, career, marriage, or future. Those personal "
+            "questions need the child’s own chart and appropriate consent. A chart—even the child’s own chart—cannot "
+            "determine whether the child is healthy; health concerns belong with a qualified clinician."
+        )
+    if children_boundary == "children_muhurat_handoff":
+        return (
+            "Choosing among treatment, ceremony, naming, or planned-delivery dates requires the dedicated Muhurat "
+            "flow with actual Panchang conditions. A natal Children reading alone cannot rank those dates."
+        )
+    if children_boundary == "children_legal_handoff":
+        return (
+            "A chart cannot guarantee custody or a court outcome. This needs the Legal flow and advice from a "
+            "qualified lawyer; the Children graph can only discuss your parent-child relationship pattern."
+        )
     if policy.get("claim_permission") == "no_specific_meeting_story":
         if str(language or "").lower().startswith("hi"):
             return (

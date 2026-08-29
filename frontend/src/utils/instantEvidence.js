@@ -283,113 +283,6 @@ const conclusion = (data) => {
     return lines.length ? { key: 'conclusion', step: 5, title: 'What this means for you', lines: unique(lines) } : null;
 };
 
-const graphRoutes = (data) => {
-    const routes = [];
-    const add = (route, sourceKey = '') => {
-        if (!route || typeof route !== 'object' || Array.isArray(route)) return;
-        const identity = route.runtime_key || route.route_id || route.question_type || sourceKey;
-        if (routes.some((item) => (item.runtime_key || item.route_id || item.question_type || item.__sourceKey) === identity)) return;
-        routes.push({ ...route, __sourceKey: sourceKey });
-    };
-    asArray(data.knowledge_graph_routes || data.graph_routes).forEach((route) => add(route, 'graph_routes'));
-    Object.entries(data).forEach(([key, value]) => {
-        if (key.endsWith('_graph_route')) add(value, key);
-    });
-    return routes;
-};
-
-const exactGraphEvidenceGroups = (graphRoute, routeIndex) => {
-    const root = graphRoute.graph_tree;
-    if (!root || typeof root !== 'object' || Array.isArray(root)) return [];
-    const questionNode = asArray(root.children).find((node) => node && typeof node === 'object');
-    if (!questionNode) return [];
-    const nodeLabel = (node) => String(node?.label || node?.id || '').trim();
-    const groups = [{
-        key: `knowledge-graph-question-${routeIndex}`,
-        title: `${nodeLabel(root) || 'Question type'}: ${nodeLabel(questionNode)}`,
-        items: [{
-            title: nodeLabel(questionNode),
-            text: `Graph node · ${questionNode.id || 'unknown'}`,
-        }],
-    }];
-
-    asArray(questionNode.children).forEach((relation, relationIndex) => {
-        if (!relation || typeof relation !== 'object') return;
-        const targets = asArray(relation.children).filter((node) => node && typeof node === 'object');
-        if (!targets.length) return;
-        groups.push({
-            key: `knowledge-graph-relation-${routeIndex}-${relationIndex}`,
-            title: nodeLabel(relation),
-            items: targets.map((target) => ({
-                title: nodeLabel(target),
-                text: `Graph node · ${target.id || 'unknown'}`,
-            })),
-        });
-        targets.forEach((target, targetIndex) => {
-            asArray(target.children).forEach((nestedRelation, nestedIndex) => {
-                if (!nestedRelation || typeof nestedRelation !== 'object') return;
-                const nestedTargets = asArray(nestedRelation.children)
-                    .filter((node) => node && typeof node === 'object');
-                if (!nestedTargets.length) return;
-                groups.push({
-                    key: `knowledge-graph-child-${routeIndex}-${relationIndex}-${targetIndex}-${nestedIndex}`,
-                    title: `${nodeLabel(relation)} → ${nodeLabel(target)} → ${nodeLabel(nestedRelation)}`,
-                    items: nestedTargets.map((node) => ({
-                        title: nodeLabel(node),
-                        text: `Graph node · ${node.id || 'unknown'}`,
-                    })),
-                });
-            });
-        });
-    });
-    return groups;
-};
-
-const graphEvidence = (data) => graphRoutes(data).map((graphRoute, routeIndex) => {
-    const requiredNodes = asArray(graphRoute.required_nodes).filter((node) => node && typeof node === 'object');
-    const additionalNodes = asArray(graphRoute.additional_selected_nodes).filter((node) => node && typeof node === 'object');
-    const rules = asArray(graphRoute.decision_rules).filter((node) => node && typeof node === 'object');
-    const guardrails = asArray(graphRoute.guardrails).filter((node) => node && typeof node === 'object');
-    const capabilities = asArray(graphRoute.required_capabilities).filter((node) => node && typeof node === 'object');
-    const domain = humanize(graphRoute.domain || graphRoute.category || graphRoute.__sourceKey.replace(/_graph_route$/, '') || 'Astrology');
-    const exactGraphGroups = exactGraphEvidenceGroups(graphRoute, routeIndex);
-    return {
-        key: `knowledge-graph-route-${routeIndex}`,
-        title: `${domain} knowledge graph audit`,
-        groups: [
-            ...exactGraphGroups,
-            {
-                key: `knowledge-graph-summary-${routeIndex}`,
-                title: `${graphRoute.question_type || `${domain} question`} · ${graphRoute.status === 'matched' ? 'Matched live calculation' : 'Needs review'}`,
-                items: [{
-                    title: 'Question and answer route',
-                    text: `The graph expected ${graphRoute.expected_approach || 'an unspecified approach'}; the live pipeline selected ${graphRoute.selected_approach || 'an unspecified approach'}. ${graphRoute.mode_match ? 'The answer route matched.' : 'The answer route did not match.'}`,
-                }, {
-                    title: 'Graph policy',
-                    text: `Answer contract: ${graphRoute.answer_contract || 'not declared'}. Evidence policy: ${graphRoute.evidence_policy || 'not declared'}.${graphRoute.shadow_only ? ' This is a shadow audit and did not influence the answer.' : ''}`,
-                }, {
-                    title: 'Audit identity',
-                    text: `Ontology ${graphRoute.ontology_version || 'unknown'} · route ${graphRoute.runtime_key || graphRoute.route_id || 'unknown'}.`,
-                }],
-            },
-            !exactGraphGroups.length && requiredNodes.length ? {
-                key: `knowledge-graph-required-${routeIndex}`, title: 'Required graph nodes',
-                items: requiredNodes.map((node) => ({
-                    title: `${node.selected ? '✓' : '—'} ${node.label || humanize(node.id)}`,
-                    text: node.selected ? 'Selected from the live calculation.' : 'Required by the graph but missing from the live calculation.',
-                })),
-            } : null,
-            !exactGraphGroups.length && additionalNodes.length ? {
-                key: `knowledge-graph-additional-${routeIndex}`, title: 'Additional nodes selected',
-                items: additionalNodes.map((node) => ({ title: `✓ ${node.label || humanize(node.id)}`, text: 'Available in the live calculation; not mandatory for this question route.' })),
-            } : null,
-            !exactGraphGroups.length && rules.length ? { key: `knowledge-graph-rules-${routeIndex}`, title: 'Decision rules selected', items: rules.map((node) => ({ title: node.label || humanize(node.id), text: 'Required by the selected graph route.' })) } : null,
-            !exactGraphGroups.length && capabilities.length ? { key: `knowledge-graph-capabilities-${routeIndex}`, title: 'Calculator capabilities required', items: capabilities.map((node) => ({ title: node.label || humanize(node.id), text: 'The ontology requires this calculator capability for the route.' })) } : null,
-            !exactGraphGroups.length && guardrails.length ? { key: `knowledge-graph-guardrails-${routeIndex}`, title: 'Guardrails selected', items: guardrails.map((node) => ({ title: node.label || humanize(node.id), text: 'Applied to prevent an unsupported conclusion.' })) } : null,
-        ].filter(Boolean),
-    };
-});
-
 const careerEvidence = (data) => {
     const hasCareerReading = data.career_reading && typeof data.career_reading === 'object';
     const career = hasCareerReading ? data.career_reading : {};
@@ -651,7 +544,6 @@ export const buildReadableEvidence = (packet) => {
         key: 'legacy', step: null, title: 'Explanation unavailable',
         lines: ['This saved answer uses an older evidence format. Ask it again to see the readable astrology behind the answer.'],
     }];
-    const graphs = graphEvidence(data);
     const numbered = (sections) => sections
         .filter((section) => section && (section.lines?.length || section.groups?.length))
         .map((section, index) => ({ ...section, step: index + 1 }));
@@ -681,10 +573,10 @@ export const buildReadableEvidence = (packet) => {
                 medical.safety,
             ]),
         });
-        return numbered([...graphs, ...sections]);
+        return numbered(sections);
     }
     const career = careerEvidence(data);
-    if (career) return numbered([...graphs, ...career]);
+    if (career) return numbered(career);
     const chartReading = data.chart_reading;
     if (chartReading && typeof chartReading === 'object') {
         const requested = chartReading.requested_charts || [];
@@ -706,10 +598,9 @@ export const buildReadableEvidence = (packet) => {
         });
         const why = Array.isArray(data.conclusion?.why) ? data.conclusion.why : [];
         if (why.length) sections.push({ key: 'chart-result', title: 'Calculation record', lines: unique(why) });
-        return numbered([...graphs, ...sections]);
+        return numbered(sections);
     }
     return numbered([
-        ...graphs,
         framework(data), promise(data), dasha(data), transits(data), conclusion(data),
     ]);
 };

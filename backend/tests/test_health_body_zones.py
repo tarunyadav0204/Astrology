@@ -1,4 +1,7 @@
-from reports.context.health_body_zones import build_priority_body_zones
+from reports.context.health_body_zones import (
+    build_priority_body_zones,
+    compact_health_body_zone_map,
+)
 
 
 def _chart(*, mars_house=6):
@@ -286,6 +289,29 @@ def test_sixth_house_foundations_use_canonical_magha_mapping():
     assert set(major[0]["anatomical_members"]) == {"nose"}
     assert major[1]["primary_medical_factors"] == ["sixth_lord_sign"]
     assert major[2]["primary_medical_factors"] == ["sixth_house_sign"]
+
+
+def test_compact_health_body_zone_map_exposes_chain_limbs_for_the_analysis_page():
+    result = build_priority_body_zones(
+        _cancer_magha_chart(),
+        lords_nakshatra={
+            "sixth_lord": {
+                "planet": "Jupiter",
+                "nakshatra": {"nakshatra": "Magha", "lord": "Ketu", "pada": 3},
+            }
+        },
+    )
+    compact = compact_health_body_zone_map(result)
+
+    assert compact["top_zone_names"] == ["nose", "heart and upper spine/back", "hips and thighs"]
+    assert [limb["factor"] for limb in compact["chain_limbs"]][:3] == [
+        "sixth_house_sign",
+        "sixth_lord_sign",
+        "sixth_lord_nakshatra",
+    ]
+    assert compact["chain_limbs"][0]["anchor"] == "Sagittarius"
+    assert compact["chain_limbs"][2]["anchor"] == "Magha"
+    assert compact["major_vulnerabilities"][0]["primary_medical_reasons"]
 
 
 def test_all_27_nakshatra_anatomy_mappings_are_available():

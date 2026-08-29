@@ -31,7 +31,7 @@ IMPORTANT: You MUST respond with EXACTLY this JSON structure. Do not add extra f
   "detailed_analysis": [
     {
       "question": "What is my core constitution and vitality pattern?",
-      "answer": "Analyze Lagna, Lagna lord, Sun, Moon, elemental/dosha balance, and health_agent.ct / health_agent.eb if available",
+      "answer": "Analyze Lagna, Lagna lord, Sun, Moon, constitution.primary / constitution.dosha_balance, and health_agent.ct if available. Name the calculated Vata/Pitta/Kapha label from constitution.display exactly; do not invent a different dosha mix. Constitution is prakriti_v1: graha dosha, rashi dosha, and Moon nakshatra, with fixed weights for Lagna, Lagna lord, Moon, Sun, the 6th house, and the remaining grahas.",
       "key_points": ["Point 1", "Point 2"],
       "astrological_basis": "Planetary positions and aspects"
     },
@@ -43,9 +43,9 @@ IMPORTANT: You MUST respond with EXACTLY this JSON structure. Do not add extra f
     },
     {
       "question": "What body parts need special attention?",
-      "answer": "Use signs, houses, afflicted planets, body_parts, mrityu_bhaga_analysis, and health_agent.ph.dhatu/body-system cues",
+      "answer": "Name ONLY the ranked regions in body_zone_map.major_vulnerabilities, in that exact order. For each region, use its primary_medical_reasons and the matching body_zone_map.chain_limbs / sixth_house_chain facts (House 6 sign, 6th lord sign, 6th lord nakshatra, and the house occupied by the 6th lord). Do not invent other organs from generic house or planet folklore, body_parts, or mrityu_bhaga. This is susceptibility, not a diagnosis.",
       "key_points": ["Body part 1", "Body part 2"],
-      "astrological_basis": "House and sign correlations"
+      "astrological_basis": "Sixth-house chain: House 6 sign, 6th lord sign, 6th lord nakshatra, 6th lord destination house"
     },
     {
       "question": "How is my mental and emotional health?",
@@ -110,6 +110,8 @@ CRITICAL RULES:
 6. Do NOT diagnose disease, prescribe treatment, or tell the user to avoid medical care
 7. If a specific disease/symptom is not named in the user input/context, speak in body-system and vulnerability language only
 8. Use the `health_agent` block as the evidence spine when available, especially health_agent.hs, health_agent.ct, health_agent.ph, health_agent.hh, health_agent.rw, and health_agent.d30
+9. Named body areas MUST come from `body_zone_map.major_vulnerabilities`. Valid origins are the sign in House 6, the 6th lord's sign, the 6th lord's nakshatra, and the anatomical field of the house occupied by the 6th lord. Other houses, karakas, vargas and dashas may only confirm those regions.
+10. Use `constitution.display` / `constitution.dosha_balance` for Vata, Pitta, and Kapha. This mix is prakriti_v1 (graha + rashi + Moon nakshatra). Do not invent a different dosha mix.
 """
 
 

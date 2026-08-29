@@ -292,6 +292,57 @@ async def get_overall_health_assessment(request: HealthAnalysisRequest, current_
         print(f"Health calculation error: {error_details}")
         raise HTTPException(status_code=500, detail=f"Health calculation error: {str(e)}\n{error_details}")
 
+
+def _birth_namespace(request: HealthAnalysisRequest):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        date=request.date,
+        time=request.time,
+        place=request.place,
+        latitude=request.latitude or 28.6139,
+        longitude=request.longitude or 77.2090,
+        timezone=request.timezone or "UTC+0",
+        name=request.name,
+        gender=request.gender,
+    )
+
+
+@router.post("/body-zones")
+async def get_health_body_zones(
+    request: HealthAnalysisRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Deterministic sixth-house body-zone map. No credits; not a diagnosis."""
+    try:
+        from calculators.chart_calculator import ChartCalculator
+        from reports.context.health_body_zones import (
+            compact_health_body_zone_map,
+            compute_health_body_zone_map,
+        )
+
+        birth_data = _birth_namespace(request)
+        chart_data = ChartCalculator({}).calculate_chart(birth_data)
+        body_zone_map = compact_health_body_zone_map(
+            compute_health_body_zone_map(chart_data, requested_category="health")
+        )
+        try:
+            from calculators.health_calculator import HealthCalculator
+
+            body_zone_map["constitution"] = HealthCalculator(
+                chart_data, birth_data
+            ).calculate_constitution_profile()
+        except Exception:
+            import traceback
+
+            print(f"Health constitution calculation error: {traceback.format_exc()}")
+        return {"status": "success", "data": body_zone_map}
+    except Exception as e:
+        import traceback
+
+        print(f"Health body-zone calculation error: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Health body-zone calculation error: {str(e)}")
+
 @router.get("/test")
 async def test_health_routes():
     """Test endpoint to verify health routes are working"""

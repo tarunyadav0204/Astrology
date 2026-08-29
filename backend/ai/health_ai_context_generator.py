@@ -77,6 +77,8 @@ class HealthAIContextGenerator(BaseAIContextGenerator):
             
             # Body parts analysis (enhanced)
             "body_parts": self._analyze_body_parts_enhanced(chart_data),
+            "body_zone_map": self._build_body_zone_map(chart_data),
+            "constitution": self._build_constitution(chart_data, birth_data),
             
             # Badhaka analysis
             "badhaka_analysis": badhaka_calc.get_chart_badhaka_summary(ascendant_sign),
@@ -518,6 +520,28 @@ class HealthAIContextGenerator(BaseAIContextGenerator):
         else:
             return 'Good health potential - maintain wellness practices'
     
+    def _build_constitution(self, chart_data: Dict, birth_data: Dict) -> Dict[str, Any]:
+        try:
+            from calculators.health_calculator import HealthCalculator
+
+            return HealthCalculator(chart_data, birth_data).calculate_constitution_profile()
+        except Exception as exc:
+            return {"error": str(exc)[:300]}
+
+    def _build_body_zone_map(self, chart_data: Dict) -> Dict[str, Any]:
+        """Sixth-house chain anatomy used by Instant Chat and the health report."""
+        try:
+            from reports.context.health_body_zones import (
+                compact_health_body_zone_map,
+                compute_health_body_zone_map,
+            )
+
+            return compact_health_body_zone_map(
+                compute_health_body_zone_map(chart_data, requested_category="health")
+            )
+        except Exception as exc:
+            return {"error": str(exc)[:300]}
+
     def _analyze_body_parts_enhanced(self, chart_data: Dict) -> Dict[str, Any]:
         """Enhanced body parts analysis with house-sign overlay"""
         planets = chart_data.get('planets', {})

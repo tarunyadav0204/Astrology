@@ -20,14 +20,14 @@ _HEALTH_HOUSES = {1, 4, 5, 6, 8, 12}
 _RISKY_PLANETS = {"Mars", "Saturn", "Rahu", "Ketu", "Sun"}
 _PLANET_DOSHA = {
     "Sun": "pitta",
-    "Moon": "kapha",
+    "Moon": "kapha-vata",
     "Mars": "pitta",
-    "Mercury": "vata",
+    "Mercury": "vata-pitta-kapha",
     "Jupiter": "kapha",
-    "Venus": "kapha",
+    "Venus": "kapha-vata",
     "Saturn": "vata",
     "Rahu": "vata",
-    "Ketu": "vata-pitta",
+    "Ketu": "pitta",
 }
 _PLANET_DHATU = {
     "Sun": "ojas-vitality / heart-fire axis",

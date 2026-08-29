@@ -1,6 +1,32 @@
 import { apiService } from './apiService';
 
 export const healthService = {
+  async getBodyZones(birthDetails) {
+    const token = localStorage.getItem('token');
+    const response = await fetch('/api/health/body-zones', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: JSON.stringify({
+        name: birthDetails?.name,
+        date: birthDetails.date || '1990-01-01',
+        time: birthDetails.time || '12:00',
+        place: birthDetails.place || 'New Delhi',
+        latitude: birthDetails.latitude || 28.6139,
+        longitude: birthDetails.longitude || 77.2090,
+        timezone: birthDetails.timezone,
+        gender: birthDetails.gender,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Health body-zone request failed (${response.status})`);
+    }
+    const result = await response.json();
+    return result.data;
+  },
+
   async getOverallHealthAssessment(birthDetails) {
     try {
       const response = await apiService.post('/health/overall-assessment', birthDetails);

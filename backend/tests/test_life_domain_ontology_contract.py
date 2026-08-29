@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 
 from instant_chat_v2.career_graph_policy import CareerGraphPolicyStore  # noqa: E402
+from instant_chat_v2.children_graph_policy import ChildrenGraphPolicyStore  # noqa: E402
 from instant_chat_v2.health_graph_policy import HealthGraphPolicyStore  # noqa: E402
 from instant_chat_v2.marriage_graph_policy import MarriageGraphPolicyStore  # noqa: E402
 from instant_chat_v2.question_taxonomy import LIFE_DOMAINS  # noqa: E402
@@ -74,4 +75,14 @@ def test_marriage_graph_uses_shared_parent_and_exposes_domain_topics() -> None:
     topics = next(node for node in domain["children"] if node["label"] == "Domain topics")
     assert [node["id"] for node in topics["children"]] == [
         "domain:Marriage", "domain:Relationship", "domain:Separation",
+    ]
+
+
+def test_children_graph_uses_shared_parent_and_exposes_domain_topics() -> None:
+    domain = _domain_branch(ChildrenGraphPolicyStore().require("children_overview"))
+    assert domain["id"] == "domain:ChildrenParenthood"
+    assert domain["label"] == "Children and parenthood"
+    topics = next(node for node in domain["children"] if node["label"] == "Domain topics")
+    assert [node["id"] for node in topics["children"]] == [
+        "domain:Progeny", "domain:Adoption",
     ]

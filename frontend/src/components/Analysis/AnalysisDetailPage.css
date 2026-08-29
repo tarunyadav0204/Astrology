@@ -888,6 +888,73 @@
   padding: clamp(1.25rem, 4vw, 3.5rem);
 }
 
+.analysis-detail-page--themed .analysis-detail-panel .health-body-zone-preview {
+  max-width: none;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: clamp(1.25rem, 4vw, 3.5rem);
+  padding-bottom: var(--space-5);
+}
+
+.analysis-detail-page--themed .analysis-detail-panel .health-body-zone-preview__header h3,
+.analysis-detail-page--themed .analysis-detail-panel .health-body-zone-preview__regions h4,
+.analysis-detail-page--themed .analysis-detail-panel .health-constitution__label,
+.analysis-detail-page--themed .analysis-detail-panel .health-constitution__name {
+  color: var(--color-text);
+}
+
+.analysis-detail-page--themed .analysis-detail-panel .health-body-zone-preview__eyebrow,
+.analysis-detail-page--themed .analysis-detail-panel .health-body-zone-preview__factor {
+  color: var(--color-brand);
+}
+
+.analysis-detail-page--themed .analysis-detail-panel .health-body-zone-preview__header p,
+.analysis-detail-page--themed .analysis-detail-panel .health-body-zone-preview__zones,
+.analysis-detail-page--themed .analysis-detail-panel .health-body-zone-preview__regions p,
+.analysis-detail-page--themed .analysis-detail-panel .health-body-zone-preview__disclaimer,
+.analysis-detail-page--themed .analysis-detail-panel .health-body-zone-preview__status {
+  color: var(--color-text-muted);
+}
+
+.analysis-detail-page--themed .analysis-detail-panel .health-body-zone-preview__chain li {
+  background: var(--color-canvas-subtle);
+  border-color: var(--color-border);
+}
+
+.analysis-detail-page--themed .analysis-detail-panel .health-body-zone-preview__chain strong {
+  color: var(--color-text);
+}
+
+.analysis-detail-page--themed .analysis-detail-panel .health-body-zone-preview__regions li {
+  border-top-color: var(--color-border);
+}
+
+.analysis-detail-page--themed .analysis-detail-panel .health-body-zone-preview__rank {
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+}
+
+.analysis-detail-page--themed .analysis-detail-panel .health-constitution {
+  border-bottom-color: var(--color-border);
+}
+
+.analysis-detail-page--themed .analysis-detail-panel .health-constitution__bar {
+  background: var(--color-canvas-subtle);
+}
+
+.analysis-detail-page--themed .analysis-detail-panel .health-constitution__bar > span {
+  background: var(--color-brand);
+}
+
+.analysis-detail-page--themed .analysis-detail-panel .health-constitution__summary,
+.analysis-detail-page--themed .analysis-detail-panel .health-constitution__pct {
+  color: var(--color-text-muted);
+}
+
 .analysis-detail-page--themed .analysis-detail-empty__card {
   padding: clamp(2rem, 5vw, 4rem);
 }

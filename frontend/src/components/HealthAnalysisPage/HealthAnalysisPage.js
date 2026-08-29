@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
 import NativeSelector from '../Shared/NativeSelector';
@@ -9,6 +9,7 @@ import SEOHead from '../SEO/SEOHead';
 import { useAstrology } from '../../context/AstrologyContext';
 import { ZODIAC_SIGNS } from '../../config/career.config';
 import { generatePageSEO } from '../../config/seo.config';
+import { healthService } from '../../services/healthService';
 import './HealthAnalysisPage.css';
 
 const HealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
@@ -16,6 +17,33 @@ const HealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
   const { chartData, birthData } = useAstrology();
   const [showModal, setShowModal] = useState(!chartData || !birthData);
   const [activeTab, setActiveTab] = useState('insights');
+  const [bodyZoneMap, setBodyZoneMap] = useState(null);
+  const [bodyZoneLoading, setBodyZoneLoading] = useState(false);
+
+  useEffect(() => {
+    if (!birthData) {
+      setBodyZoneMap(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setBodyZoneLoading(true);
+    healthService.getBodyZones(birthData)
+      .then((payload) => {
+        if (!cancelled) setBodyZoneMap(payload);
+      })
+      .catch((error) => {
+        console.error('Health body-zone preview failed:', error);
+        if (!cancelled) setBodyZoneMap(null);
+      })
+      .finally(() => {
+        if (!cancelled) setBodyZoneLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [birthData?.date, birthData?.time, birthData?.place, birthData?.latitude, birthData?.longitude]);
 
   const handleAdminClick = () => {
     if (onAdminClick) {
@@ -89,10 +117,20 @@ const HealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
                 
                 <div className="tab-content">
                   {activeTab === 'insights' && (
-                    <AIInsightsTab chartData={chartData} birthDetails={birthData} />
+                    <AIInsightsTab
+                      chartData={chartData}
+                      birthDetails={birthData}
+                      bodyZoneMap={bodyZoneMap}
+                      bodyZoneLoading={bodyZoneLoading}
+                    />
                   )}
                   {activeTab === 'detailed' && (
-                    <CompleteHealthAnalysisTab chartData={chartData} birthDetails={birthData} />
+                    <CompleteHealthAnalysisTab
+                      chartData={chartData}
+                      birthDetails={birthData}
+                      bodyZoneMap={bodyZoneMap}
+                      bodyZoneLoading={bodyZoneLoading}
+                    />
                   )}
                 </div>
               </div>

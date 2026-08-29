@@ -1,156 +1,36 @@
 import { buildReadableEvidence } from './instantEvidence';
 
 describe('buildReadableEvidence career explanations', () => {
-    test('shows a promotion graph route without a separate career reading payload', () => {
+    test('never exposes knowledge-graph audit internals in readable evidence', () => {
         const sections = buildReadableEvidence({
             user_derivation: {
-                career_graph_route: {
-                    shadow_only: true,
+                education_graph_route: {
+                    domain: 'education',
                     status: 'matched',
-                    question_type: 'Promotion',
-                    expected_approach: 'Promotion timing',
-                    selected_approach: 'Promotion timing',
-                    mode_match: true,
-                    answer_contract: 'Promotion answer contract',
-                    evidence_policy: 'D1 and D10 promise with dasha and transit delivery',
-                    runtime_key: 'promotion',
-                    required_nodes: [
-                        { id: 'career:H10', label: '10th house (role and authority)', selected: true },
-                        { id: 'career:H11', label: '11th house (recognition and gains)', selected: true },
-                    ],
-                    decision_rules: [{ id: 'career:PromotionRule', label: 'Promotion delivery rule' }],
+                    runtime_key: 'higher_education',
+                    ontology_version: '0.2.4',
+                    answer_contract: 'Internal education decision contract',
+                    graph_tree: { id: 'secret:QuestionType', label: 'Question type' },
                 },
-            },
-        });
-        const graph = sections.find((section) => section.key === 'knowledge-graph-route-0');
-        expect(graph).toBeTruthy();
-        expect(graph.groups[0].title).toContain('Promotion');
-        expect(graph.groups[0].title).toContain('Matched live calculation');
-        expect(graph.groups[1].items[0].title).toContain('10th house');
-        expect(graph.groups[1].items[1].title).toContain('11th house');
-    });
-
-    test('shows exact ontology labels and the promotion decision-stage hierarchy', () => {
-        const sections = buildReadableEvidence({
-            user_derivation: {
-                career_graph_route: {
-                    status: 'matched',
-                    question_type: 'Promotion and advancement',
-                    expected_approach: 'Promotion timing',
-                    selected_approach: 'Promotion timing',
-                    mode_match: true,
-                    graph_tree: {
-                        id: 'ar:QuestionType', label: 'Question type', children: [{
-                            id: 'career:PromotionTiming', label: 'Promotion and advancement', children: [{
-                                id: 'ar:evaluatesStage', label: 'Decision stages', children: [{
-                                    id: 'career:PromotionResponsibilityStage',
-                                    label: 'Increased responsibility and visibility',
-                                    children: [{
-                                        id: 'ar:stageRequiresFactor', label: 'Required astrology factors', children: [
-                                            { id: 'career:H6', label: 'Employment, service, workload and competition', children: [] },
-                                            { id: 'career:H10', label: 'Role, status, authority and visible responsibility', children: [] },
-                                        ],
-                                    }],
-                                }, {
-                                    id: 'career:PromotionRecognitionStage',
-                                    label: 'Recognition and advancement',
-                                    children: [{
-                                        id: 'ar:stageRequiresFactor', label: 'Required astrology factors', children: [
-                                            { id: 'career:H10', label: 'Role, status, authority and visible responsibility', children: [] },
-                                            { id: 'career:H11', label: 'Recognition, gains, networks and goals', children: [] },
-                                        ],
-                                    }],
-                                }, {
-                                    id: 'career:PromotionCompensationStage',
-                                    label: 'Compensation and formalization', children: [],
-                                }],
-                            }],
-                        }],
-                    },
+                chart_reading: {
+                    requested_charts: ['D1', 'D24'],
+                    fact_groups: [{
+                        chart: 'D24',
+                        life_area: 'higher education',
+                        lines: ['Jupiter supports sustained advanced study.'],
+                    }],
+                    missing_charts: [],
                 },
             },
         });
 
-        const graph = sections.find((section) => section.key === 'knowledge-graph-route-0');
-        expect(graph.groups[0].title).toBe('Question type: Promotion and advancement');
-        expect(graph.groups[1].title).toBe('Decision stages');
-        expect(graph.groups[1].items.map((item) => item.title)).toEqual([
-            'Increased responsibility and visibility',
-            'Recognition and advancement',
-            'Compensation and formalization',
-        ]);
-        const recognition = graph.groups.find((group) => (
-            group.title === 'Decision stages → Recognition and advancement → Required astrology factors'
-        ));
-        expect(recognition.items.map((item) => item.title)).toEqual([
-            'Role, status, authority and visible responsibility',
-            'Recognition, gains, networks and goals',
-        ]);
-    });
-
-    test('shows the knowledge graph route, every selected node, and missing requirements', () => {
-        const sections = buildReadableEvidence({
-            user_derivation: {
-                career_graph_route: {
-                    shadow_only: true,
-                    status: 'review_needed',
-                    question_type: 'Manager or authority relationship',
-                    expected_approach: 'Workplace relationship reading',
-                    selected_approach: 'Static career profile',
-                    mode_match: false,
-                    answer_contract: 'Relationship answer contract',
-                    evidence_policy: 'Relationship evidence policy',
-                    required_nodes: [
-                        { id: 'career:H9', label: '9th house (manager and authority)', selected: false },
-                        { id: 'career:D1Foundation', label: 'D1 career foundation', selected: true },
-                    ],
-                    additional_selected_nodes: [
-                        { id: 'career:D10Confirmation', label: 'D10 professional confirmation' },
-                    ],
-                    decision_rules: [{ id: 'career:RuleAuthority', label: 'Authority relationship rule' }],
-                    guardrails: [{ id: 'career:NoVocationShortcut', label: 'No vocation shortcut' }],
-                },
-                career_reading: { professional_foundation: [], professional_expression: [], delivery_windows: [] },
-            },
-        });
-        const graph = sections.find((section) => section.key === 'knowledge-graph-route-0');
-        expect(graph.groups[0].title).toContain('Needs review');
-        expect(graph.groups[1].items[0].title).toContain('— 9th house');
-        expect(graph.groups[1].items[0].text).toContain('missing');
-        expect(graph.groups[1].items[1].title).toContain('✓ D1');
-        expect(graph.groups[2].items[0].title).toContain('✓ D10');
-        expect(graph.groups[3].items[0].title).toBe('Authority relationship rule');
-        expect(graph.groups[4].items[0].title).toBe('No vocation shortcut');
-    });
-
-    test('shows non-career graph nodes alongside domain-specific evidence', () => {
-        const sections = buildReadableEvidence({
-            user_derivation: {
-                health_graph_route: {
-                    domain: 'health',
-                    status: 'matched',
-                    question_type: 'Health vulnerability',
-                    expected_approach: 'Constitutional health reading',
-                    selected_approach: 'Constitutional health reading',
-                    mode_match: true,
-                    required_nodes: [
-                        { id: 'health:H6', label: '6th house health axis', selected: true },
-                    ],
-                },
-                medical_reading: {
-                    constitutional_lines: ['D1 health foundation calculated.'],
-                    vulnerability_groups: [],
-                    condition_lines: [],
-                    judgment_lines: [],
-                    safety: 'Not a diagnosis.',
-                },
-            },
-        });
-
-        expect(sections[0].key).toBe('knowledge-graph-route-0');
-        expect(sections[0].title).toContain('Health');
-        expect(sections[0].groups[1].items[0].title).toContain('6th house');
-        expect(sections.some((section) => section.key === 'medical-constitution')).toBe(true);
+        const rendered = JSON.stringify(sections);
+        expect(rendered).toContain('Jupiter supports sustained advanced study');
+        expect(rendered).not.toMatch(/knowledge graph audit/i);
+        expect(rendered).not.toContain('higher_education');
+        expect(rendered).not.toContain('0.2.4');
+        expect(rendered).not.toContain('secret:QuestionType');
+        expect(rendered).not.toContain('Internal education decision contract');
     });
     test('returns group-only career sections without requiring top-level lines', () => {
         const sections = buildReadableEvidence({

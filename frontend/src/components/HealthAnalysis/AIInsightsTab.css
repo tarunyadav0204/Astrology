@@ -1,4 +1,12 @@
-/* Health AI Insights Tab Styles */
+.health-insights-stack {
+  padding: 20px 20px 0;
+}
+
+@media (max-width: 768px) {
+  .health-insights-stack {
+    padding: 12px 12px 0;
+  }
+}
 .ai-insights-tab.health-theme {
   padding: 20px;
   background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);

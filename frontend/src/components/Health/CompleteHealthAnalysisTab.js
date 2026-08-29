@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import HealthBodyZonePreview from './HealthBodyZonePreview';
 import './CompleteHealthAnalysisTab.css';
 
-const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
+const CompleteHealthAnalysisTab = ({ chartData, birthDetails, bodyZoneMap, bodyZoneLoading }) => {
   const [healthData, setHealthData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -124,6 +125,8 @@ const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
         <h3 style={{color: 'white'}}>🏥 Complete Health Analysis</h3>
         <p style={{color: 'white'}}>Comprehensive Vedic health analysis with detailed calculations</p>
       </div>
+
+      <HealthBodyZonePreview data={bodyZoneMap} loading={bodyZoneLoading} compact />
 
       <div className="analysis-sections">
         {/* Health Score & Constitution */}

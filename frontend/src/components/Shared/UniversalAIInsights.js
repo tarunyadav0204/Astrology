@@ -72,14 +72,14 @@ const ANALYSIS_CONFIG = {
     steps: [
       '🏥 Analyzing health houses',
       '🌿 Mapping constitution and dosha patterns',
-      '⚕️ Checking D30 and sensitive body systems',
+      '⚕️ Mapping sensitive body regions from the 6th-house chain',
       '📅 Ranking health timing windows',
       '🧘 Generating preventive wellness guidance'
     ],
     preview: [
       '✨ 10-part health and wellness report',
       '🌿 Constitution, dosha, vitality, and recovery pattern',
-      '⚕️ Sensitive body systems from D1/D9/D30 evidence',
+      '⚕️ Sensitive body regions already calculated from House 6, the 6th lord, and its nakshatra',
       '🧠 Mental, emotional, sleep, and stress indicators',
       '📅 Health caution windows with dasha/transit support',
       '🧘 Preventive lifestyle guidance with medical safety boundaries'
@@ -181,7 +181,7 @@ const EDITORIAL_COPY = {
   health: {
     quickTitle: 'Wellness pattern',
     loadingTitle: 'Reading your vitality pattern',
-    loadingDetail: 'Connecting the Lagna, health houses, D30, constitution and timing into one personalised report.'
+    loadingDetail: 'Connecting the Lagna, 6th-house body-zone chain, D30, constitution and timing into one personalised report.'
   },
   education: {
     quickTitle: 'Learning direction',

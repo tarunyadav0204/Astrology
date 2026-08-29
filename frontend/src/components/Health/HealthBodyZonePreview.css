@@ -1,0 +1,206 @@
+.health-body-zone-preview {
+  max-width: 52rem;
+  margin: 0 auto 1.5rem;
+  padding: 1.5rem 1.35rem 1.25rem;
+  border: 1px solid #d7ead8;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(46, 125, 50, 0.08);
+  text-align: left;
+}
+
+.health-body-zone-preview.is-compact {
+  margin: 0 0 1.25rem;
+  box-shadow: none;
+}
+
+.health-body-zone-preview__header h3 {
+  margin: 0 0 0.4rem;
+  color: #1b5e20;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.health-body-zone-preview__eyebrow {
+  margin: 0 0 0.25rem;
+  color: #2e7d32;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.health-body-zone-preview__header p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.health-body-zone-preview__status {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.95rem;
+}
+
+.health-constitution {
+  margin-bottom: 1.35rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #eef2ee;
+}
+
+.health-constitution__label {
+  margin: 0.85rem 0 0.75rem;
+  color: #111827;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.health-constitution__doshas {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.health-constitution__doshas li {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr 2.6rem;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.health-constitution__name {
+  color: #1f2937;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.health-constitution__bar {
+  display: block;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #e8f0e8;
+  overflow: hidden;
+}
+
+.health-constitution__bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2e7d32;
+}
+
+.health-constitution__pct {
+  color: #4b5563;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.health-constitution__summary {
+  margin: 0.75rem 0 0;
+  color: #4b5563;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.health-body-zone-preview__chain {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+  gap: 0.75rem;
+  margin: 1.15rem 0 1.25rem;
+  padding: 0;
+  list-style: none;
+}
+
+.health-body-zone-preview__chain li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  background: #f3faf3;
+  border: 1px solid #e3f2e4;
+}
+
+.health-body-zone-preview__factor {
+  color: #2e7d32;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.health-body-zone-preview__chain strong {
+  color: #1f2937;
+  font-size: 0.95rem;
+}
+
+.health-body-zone-preview__zones {
+  color: #4b5563;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.health-body-zone-preview__regions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.health-body-zone-preview__regions li {
+  display: flex;
+  gap: 0.85rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid #eef2ee;
+}
+
+.health-body-zone-preview__rank {
+  flex: 0 0 1.75rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: #2e7d32;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.1rem;
+}
+
+.health-body-zone-preview__regions h4 {
+  margin: 0 0 0.25rem;
+  color: #111827;
+  font-size: 1rem;
+  text-transform: capitalize;
+}
+
+.health-body-zone-preview__regions p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.health-body-zone-preview__disclaimer {
+  margin: 1rem 0 0;
+  color: #6b7280;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .health-body-zone-preview {
+    padding: 1.15rem 1rem 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .health-body-zone-preview__chain {
+    grid-template-columns: 1fr 1fr;
+  }
+}

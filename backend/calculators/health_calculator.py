@@ -6,6 +6,8 @@ from .aspect_calculator import AspectCalculator
 from .planetary_dignities_calculator import PlanetaryDignitiesCalculator
 from .shadbala_calculator import ShadbalaCalculator
 from .yoga_calculator import YogaCalculator
+from .constitution_calculator import compute_constitution_profile
+
 
 class HealthCalculator(BaseCalculator):
     """Comprehensive health analysis using existing calculators"""
@@ -79,6 +81,7 @@ class HealthCalculator(BaseCalculator):
             'health_score': health_score['score'],
             'health_score_breakdown': health_score['calculation_breakdown'],
             'constitution_type': self._determine_constitution(),
+            'constitution': self.calculate_constitution_profile(),
             'element_balance': self._calculate_element_balance(),
             'health_timeline': self._calculate_health_timeline(),
             'health_remedies': self._calculate_health_remedies()
@@ -213,18 +216,13 @@ class HealthCalculator(BaseCalculator):
             'calculation_breakdown': calculation_breakdown
         }
     
+    def calculate_constitution_profile(self):
+        """Deterministic Vata / Pitta / Kapha prakriti from graha, rashi, and Moon nakshatra."""
+        return compute_constitution_profile(self.chart_data)
+
     def _determine_constitution(self):
         """Determine Ayurvedic constitution type"""
-        element_balance = self._calculate_element_balance()
-        
-        if element_balance['Fire'] > 40:
-            return 'Pitta (Fire dominant)'
-        elif element_balance['Water'] > 40:
-            return 'Kapha (Water dominant)'
-        elif element_balance['Air'] > 40:
-            return 'Vata (Air dominant)'
-        else:
-            return 'Mixed constitution'
+        return self.calculate_constitution_profile()["display"]
     
     def _calculate_element_balance(self):
         """Calculate elemental balance"""

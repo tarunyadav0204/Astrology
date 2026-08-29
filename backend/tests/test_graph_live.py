@@ -90,8 +90,8 @@ def test_supported_domains_receive_authoritative_pre_generation_graph_policy(
 
 
 def test_non_graph_domain_remains_unchanged() -> None:
-    packet = _packet("progeny", "topic_reading")
-    assert apply_live_graph_policy(packet, intent={"category": "progeny"}, context={}) == packet
+    packet = _packet("property", "topic_reading")
+    assert apply_live_graph_policy(packet, intent={"category": "property"}, context={}) == packet
 
 
 def test_career_comparison_routes_to_combined_promotion_and_job_change_graph() -> None:

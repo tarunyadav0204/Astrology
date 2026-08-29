@@ -1754,9 +1754,11 @@ def test_broad_health_composer_receives_only_ranked_zone_contract():
     assert "NATAL-ONLY HEALTH EVIDENCE" in prompt
     assert "every supplied anatomical region" in prompt
     assert "every region its own explicit explanatory sentence" in prompt
-    assert "If the fact says the 6th lord is placed in House 8" in prompt
+    assert "name the evidence-bound planet" in prompt
+    assert "do not expose chart codes, numbered houses" in prompt.lower()
+    assert "validation_marker` exactly" in prompt
     assert "never replace, infer, or change those facts" in prompt
-    assert "copy that row's `validation_marker` exactly" in prompt
+    assert "copy that row's `validation_marker` exactly" in prompt.lower()
     assert "app-language fallback" in prompt
     assert "140-220 visible words" in prompt
     prompt_context = prompt.split("NATAL-ONLY HEALTH EVIDENCE:\n", 1)[1]

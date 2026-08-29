@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 SIGN_NAMES = [
     "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
@@ -1489,3 +1489,211 @@ def _build_event_patterns(
     # evidence UI. The previous six-item cap could silently discard mental or
     # metabolic findings after accident/surgery/house patterns were added.
     return patterns[:10]
+
+
+def _lords_nakshatra_from_chart(chart: Dict[str, Any]) -> Dict[str, Any]:
+    """Build the sixth-lord nakshatra payload Instant Chat and reports share."""
+    try:
+        from .shared_branch_context import build_nakshatra_context
+
+        nakshatra = build_nakshatra_context(chart)
+        positions = (nakshatra.get("positions") or {}) if isinstance(nakshatra, dict) else {}
+    except Exception:
+        positions = {}
+    houses = chart.get("houses") or []
+    sixth_lord = _lord_of_house(houses, 6)
+    eighth_lord = _lord_of_house(houses, 8)
+    lagna_lord = _lord_of_house(houses, 1)
+
+    def row_for(planet: Optional[str]) -> Dict[str, Any]:
+        if not planet:
+            return {}
+        nak_row = positions.get(planet) or {}
+        return {
+            "planet": planet,
+            "nakshatra": {
+                "nakshatra": nak_row.get("nakshatra_name") or nak_row.get("nakshatra"),
+                "lord": nak_row.get("nakshatra_lord") or nak_row.get("lord"),
+                "pada": nak_row.get("pada"),
+                "deity": nak_row.get("nakshatra_deity"),
+                "longitude": nak_row.get("longitude"),
+            },
+        }
+
+    return {
+        "lagna_lord": row_for(lagna_lord),
+        "sixth_lord": row_for(sixth_lord),
+        "eighth_lord": row_for(eighth_lord),
+        "moon": row_for("Moon"),
+    }
+
+
+def compute_health_body_zone_map(
+    chart: Dict[str, Any],
+    *,
+    lords_nakshatra: Optional[Dict[str, Any]] = None,
+    current_dashas: Optional[Dict[str, Any]] = None,
+    divisional_charts: Optional[Dict[str, Any]] = None,
+    planet_conditions: Optional[Dict[str, Any]] = None,
+    requested_category: str = "health",
+) -> Dict[str, Any]:
+    """Run the sixth-house body-zone calculator, filling nakshatra from the chart when omitted."""
+    return build_priority_body_zones(
+        chart,
+        lords_nakshatra=lords_nakshatra if lords_nakshatra is not None else _lords_nakshatra_from_chart(chart),
+        current_dashas=current_dashas,
+        divisional_charts=divisional_charts,
+        planet_conditions=planet_conditions,
+        requested_category=requested_category,
+    )
+
+
+def sixth_house_chain_limbs(chain: Mapping[str, Any] | Dict[str, Any] | None) -> List[Dict[str, Any]]:
+    """Display-ready limbs of the classical sixth-house anatomical chain."""
+    chain = chain if isinstance(chain, dict) else {}
+    lord = str(chain.get("sixth_lord") or "the 6th lord").strip()
+    limbs: List[Dict[str, Any]] = []
+
+    sixth_sign = str(chain.get("sixth_house_sign") or "").strip()
+    if sixth_sign:
+        limbs.append({
+            "factor": "sixth_house_sign",
+            "label": "House 6 sign",
+            "anchor": sixth_sign,
+            "detail": f"House 6 is {sixth_sign}",
+            "zones": list(chain.get("sixth_house_sign_zones") or [])[:4],
+        })
+    lord_sign = str(chain.get("sixth_lord_sign") or "").strip()
+    if lord and lord_sign:
+        limbs.append({
+            "factor": "sixth_lord_sign",
+            "label": "6th lord sign",
+            "anchor": f"{lord} in {lord_sign}",
+            "detail": f"6th lord {lord} occupies {lord_sign}",
+            "zones": list(chain.get("sixth_lord_sign_zones") or [])[:4],
+        })
+    nakshatra = str(chain.get("sixth_lord_nakshatra") or "").strip()
+    if lord and nakshatra:
+        pada = chain.get("sixth_lord_nakshatra_pada")
+        nak_lord = str(chain.get("sixth_lord_nakshatra_lord") or "").strip()
+        detail = f"6th lord {lord} occupies {nakshatra}"
+        if pada:
+            detail += f" pada {pada}"
+        if nak_lord:
+            detail += f", ruled by {nak_lord}"
+        limbs.append({
+            "factor": "sixth_lord_nakshatra",
+            "label": "6th lord nakshatra",
+            "anchor": nakshatra,
+            "detail": detail,
+            "zones": list(chain.get("sixth_lord_nakshatra_zones") or [])[:4],
+        })
+    lord_house = chain.get("sixth_lord_house")
+    if lord and lord_house:
+        limbs.append({
+            "factor": "sixth_lord_house",
+            "label": "6th lord house",
+            "anchor": f"{lord} in House {lord_house}",
+            "detail": f"6th lord {lord} is placed in House {lord_house}",
+            "zones": list(chain.get("sixth_lord_house_zones") or [])[:4],
+        })
+    return limbs
+
+
+def compact_health_body_zone_map(value: Any) -> Dict[str, Any]:
+    """Bounded payload for Instant Chat, health analysis UI, and the LLM."""
+    if not isinstance(value, dict):
+        return {}
+
+    zone_keys = (
+        "zone",
+        "anatomical_members",
+        "confidence",
+        "confluence_count",
+        "primary_medical_reasons",
+        "primary_medical_factors",
+        "confirmation_factors",
+        "natal_layers",
+        "sources",
+        "why",
+        "mechanisms",
+        "divisional_repetition",
+        "activation_sources",
+    )
+    chain_keys = (
+        "sixth_house_sign",
+        "sixth_house_sign_zones",
+        "sixth_lord",
+        "sixth_lord_house",
+        "sixth_lord_house_zones",
+        "sixth_lord_sign",
+        "sixth_lord_sign_zones",
+        "sixth_lord_nakshatra",
+        "sixth_lord_nakshatra_pada",
+        "sixth_lord_nakshatra_lord",
+        "sixth_lord_nakshatra_zones",
+    )
+
+    def selected(source: Any, keys: tuple[str, ...]) -> Dict[str, Any]:
+        if not isinstance(source, dict):
+            return {}
+        return {
+            key: source.get(key)
+            for key in keys
+            if source.get(key) not in (None, "", [], {})
+        }
+
+    chain = selected(value.get("sixth_house_chain"), chain_keys)
+    medical_profile = value.get("medical_profile") if isinstance(value.get("medical_profile"), dict) else {}
+    calculated = [row for row in list(value.get("major_vulnerabilities") or []) if isinstance(row, dict)]
+    profile_rows = [
+        row for row in list(medical_profile.get("major_vulnerabilities") or [])
+        if isinstance(row, dict)
+    ]
+    calculated_by_zone = {
+        str(row.get("zone") or "").strip().lower(): row
+        for row in calculated
+        if str(row.get("zone") or "").strip()
+    }
+    merged_rows: List[Dict[str, Any]] = []
+    seen_zones = set()
+    for row in profile_rows or calculated:
+        zone_key = str(row.get("zone") or "").strip().lower()
+        base = calculated_by_zone.get(zone_key) or {}
+        combined = {**base, **row}
+        for rich_key in ("primary_medical_reasons", "primary_medical_factors", "anatomical_members"):
+            if not combined.get(rich_key) and base.get(rich_key):
+                combined[rich_key] = base[rich_key]
+        selected_row = selected(combined, zone_keys)
+        if selected_row:
+            merged_rows.append(selected_row)
+        if zone_key:
+            seen_zones.add(zone_key)
+    for row in calculated:
+        zone_key = str(row.get("zone") or "").strip().lower()
+        if zone_key and zone_key not in seen_zones:
+            merged_rows.append(selected(row, zone_keys))
+            seen_zones.add(zone_key)
+    majors = [row for row in merged_rows[:4] if row]
+    result = {
+        "major_vulnerabilities": majors,
+        "sixth_house_chain": chain,
+        "chain_limbs": sixth_house_chain_limbs(chain),
+        "top_zone_names": [row.get("zone") for row in majors if row.get("zone")],
+        "claim_policy": value.get("claim_policy"),
+        "disclaimer": value.get("disclaimer"),
+    }
+    conditions = list(medical_profile.get("condition_susceptibilities") or [])[:4]
+    if conditions:
+        result["condition_susceptibilities"] = [
+            selected(row, (
+                "key", "title", "risk_level", "evidence",
+                "interpretation", "responsible_guidance", "diagnosis",
+            ))
+            for row in conditions
+            if isinstance(row, dict)
+        ]
+    protection = list(medical_profile.get("protective_factors") or [])[:4]
+    if protection:
+        result["protective_factors"] = protection
+    return {key: item for key, item in result.items() if item not in (None, "", [], {})}

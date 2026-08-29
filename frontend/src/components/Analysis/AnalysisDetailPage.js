@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
@@ -10,6 +10,8 @@ import { WealthReportPDF } from '../PDF/WealthReportPDF';
 import { HealthReportPDF } from '../PDF/HealthReportPDF';
 import { MarriageReportPDF } from '../PDF/MarriageReportPDF';
 import { EducationReportPDF } from '../PDF/EducationReportPDF';
+import HealthBodyZonePreview from '../Health/HealthBodyZonePreview';
+import { healthService } from '../../services/healthService';
 import './AnalysisDetailPage.css';
 
 const PAGE_META = {
@@ -29,7 +31,7 @@ const PAGE_META = {
     headline: 'Health Analysis by Date of Birth',
     kicker: 'Vedic health astrology',
     blurb:
-      'Understand constitution, vitality, sensitive body systems, D30 Trimsamsa signals, stress and sleep patterns, health timing windows, and preventive wellness guidance from your birth chart.',
+      'Understand constitution, vitality, sensitive body regions from the 6th-house chain, D30 Trimsamsa signals, stress and sleep patterns, health timing windows, and preventive wellness guidance from your birth chart.',
     icon: 'D30',
     pdf: HealthReportPDF
   },
@@ -245,7 +247,7 @@ const healthFaqItems = [
   {
     question: 'What houses are important for health astrology?',
     answer:
-      'The 1st house shows body and vitality, the 6th house shows illness and immunity battles, the 8th house shows chronic or hidden vulnerability, and the 12th house shows sleep, recovery, isolation, and hospitalization themes.'
+      'The 1st house shows body and vitality. Sensitive body regions are calculated from the 6th-house chain: the sign in House 6, the 6th lord’s sign and nakshatra, and the house that lord occupies. The 8th and 12th houses add chronic, sleep, recovery, and hospitalization themes.'
   },
   {
     question: 'Does the report cover mental and emotional health?',
@@ -276,17 +278,18 @@ const healthFaqItems = [
 
 const healthMethodCards = [
   ['Lagna and Vitality', 'Body constitution, baseline stamina, vitality pattern, recovery tendency, and how your system responds to pressure.'],
+  ['6th-house body chain', 'House 6 sign, the 6th lord’s sign and nakshatra, and the house that lord occupies. This calculated map of sensitive body regions is shown before the written report and is not a diagnosis.'],
   ['Health Houses', '1st, 6th, 8th, and 12th house signals for body, immunity, chronic themes, sleep, recovery, and caution areas.'],
   ['D30 Trimsamsa', 'A deeper divisional layer for vulnerability refinement, disease-pattern confirmation, and hidden stress indicators.'],
   ['Moon and Mercury', 'Mental wellness, emotional sensitivity, stress processing, sleep rhythm, and nervous-system style.'],
-  ['Dosha and Elements', 'Constitutional tendencies, digestion/metabolism patterns, agni, movement, routine, and preventive lifestyle themes.'],
+  ['Prakriti', 'Vata, Pitta, and Kapha from graha dosha, sign element, and Moon nakshatra. Weighted toward Lagna, Lagna lord, Moon, and Sun, with a smaller 6th-house and remaining-planet layer. Calculated before the written report; not a medical diagnosis.'],
   ['Dasha and Transits', 'Health timing windows where extra caution, rest, professional checkups, or routine discipline may be helpful.']
 ];
 
 const healthReportItems = [
-  'Core constitution, vitality, and recovery pattern',
+  'Core constitution as Vata, Pitta, Kapha, or a dual/tridoshic blend',
+  'Sensitive body regions from the 6th-house chain (House 6 sign, 6th lord sign, nakshatra, and destination house)',
   'Primary health vulnerabilities by body system',
-  'Body parts and systems needing special attention',
   'Mental, emotional, stress, and sleep indicators',
   'Digestion, metabolism, immunity, and recovery capacity',
   'Acute, chronic, sensitivity-based, or preventive pattern classification',
@@ -518,6 +521,8 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
   const { chartData, birthData } = useAstrology();
   const [showBirthModal, setShowBirthModal] = useState(false);
   const [birthModalTab, setBirthModalTab] = useState('saved');
+  const [bodyZoneMap, setBodyZoneMap] = useState(null);
+  const [bodyZoneLoading, setBodyZoneLoading] = useState(false);
 
   const meta = PAGE_META[analysisType];
   const seoData = useMemo(
@@ -546,7 +551,7 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
   const activeProofItems = isMarriage
     ? ['D9 Navamsa', '7th house', 'Darakaraka', 'Marriage timing']
     : isHealth
-      ? ['D30 Trimsamsa', 'Vitality', 'Stress & sleep', 'Health timing']
+      ? ['D30 Trimsamsa', '6th-house chain', 'Vata-Pitta-Kapha', 'Health timing']
       : isEducation
         ? ['D24 Siddhamsa', '5th house', 'Mercury & Jupiter', 'Exam timing']
         : isWealth
@@ -554,6 +559,40 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
           : isProgeny
             ? ['D7 Saptamsa', 'D1 5th house', 'Jupiter', 'Timing windows']
             : ['D10 Dashamsha', '10th house', 'Amatyakaraka', 'Career timing'];
+
+  useEffect(() => {
+    if (!isHealth || !user || !hasBirth) {
+      setBodyZoneMap(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setBodyZoneLoading(true);
+    healthService.getBodyZones(birthData)
+      .then((payload) => {
+        if (!cancelled) setBodyZoneMap(payload);
+      })
+      .catch((error) => {
+        console.error('Health body-zone preview failed:', error);
+        if (!cancelled) setBodyZoneMap(null);
+      })
+      .finally(() => {
+        if (!cancelled) setBodyZoneLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isHealth,
+    user,
+    hasBirth,
+    birthData?.date,
+    birthData?.time,
+    birthData?.place,
+    birthData?.latitude,
+    birthData?.longitude,
+  ]);
 
   const openBirthPicker = (mode = 'saved') => {
     if (!user) {
@@ -801,6 +840,9 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
             </div>
           ) : hasBirth ? (
             <div className="analysis-detail-panel">
+              {isHealth && (
+                <HealthBodyZonePreview data={bodyZoneMap} loading={bodyZoneLoading} compact />
+              )}
               <UniversalAIInsights
                 analysisType={analysisType}
                 chartData={chartData}
@@ -902,7 +944,7 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
                       : isEducation
                       ? 'Education astrology by 4th, 5th, 9th houses and D24'
                       : isHealth
-                      ? 'Health astrology by Lagna, health houses, and D30'
+                      ? 'Health astrology by Lagna, the 6th-house body chain, and D30'
                       : isMarriage
                         ? 'Marriage astrology by 7th house and D9 Navamsa'
                         : 'Career astrology by 10th house and D10 chart'}
@@ -927,9 +969,10 @@ const AnalysisDetailPage = ({ analysisType, user, onLogout, onAdminClick, onLogi
                     </p>
                   ) : isHealth ? (
                     <p>
-                      The Lagna shows the body and constitution, while the 6th, 8th, and 12th houses show illness,
-                      chronic vulnerability, recovery, sleep, and caution patterns. D30 Trimsamsa adds a deeper layer
-                      for refining sensitive indications.
+                      The Lagna shows the body and constitution. Sensitive body regions are calculated from the
+                      6th-house chain — House 6 sign, the 6th lord’s sign and nakshatra, and the house that lord
+                      occupies — before the written report is generated. The 8th and 12th houses add chronic,
+                      sleep, and recovery patterns. D30 Trimsamsa then confirms or weakens those natal indications.
                     </p>
                   ) : isMarriage ? (
                     <p>

@@ -6,6 +6,11 @@ def test_health_report_contract_is_not_limited_to_five_questions():
     assert "health_agent" in HEALTH_STRUCTURED_QUESTION
     assert "D30/Trimsamsa" in HEALTH_STRUCTURED_QUESTION
     assert "What should I not ignore?" in HEALTH_STRUCTURED_QUESTION
+    assert "body_zone_map.major_vulnerabilities" in HEALTH_STRUCTURED_QUESTION
+    assert "sixth_house_chain" in HEALTH_STRUCTURED_QUESTION
+    assert "Named body areas MUST come from" in HEALTH_STRUCTURED_QUESTION
+    assert "constitution.display" in HEALTH_STRUCTURED_QUESTION
+    assert "prakriti_v1" in HEALTH_STRUCTURED_QUESTION
 
 
 def test_attach_health_agent_context_is_resilient():

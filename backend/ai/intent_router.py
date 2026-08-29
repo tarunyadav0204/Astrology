@@ -18,6 +18,12 @@ from utils.query_context import normalize_query_context, resolve_query_now
 from ai.gemini_chat_analyzer import generate_content_rest_v1beta_result
 from instant_chat_v2.career import CAREER_ALIASES, CAREER_PROFILES, career_profile
 from instant_chat_v2.education import education_profile, is_education_category
+from instant_chat_v2.children import (
+    BOUNDARY_CHILDREN_SUBTYPES,
+    TIMING_CHILDREN_SUBTYPES,
+    children_profile,
+    is_children_category,
+)
 from utils.admin_settings import (
     CHAT_LLM_DEEPSEEK,
     get_instant_chat_llm_provider,
@@ -99,6 +105,10 @@ _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY: dict[str, list[str]] = {
     "children": ["D1", "D7", "D9"],
     "child": ["D1", "D7", "D9"],
     "pregnancy": ["D1", "D7", "D9"],
+    "progeny": ["D1", "D7"],
+    "conception": ["D1", "D7"],
+    "childbirth": ["D1", "D7"],
+    "adoption": ["D1", "D7"],
     "siblings": ["D1", "D3", "D9"],
     "property": ["D1", "D4", "D9", "D12"],
     "home": ["D1", "D4", "D9"],
@@ -199,6 +209,37 @@ def apply_education_routing_guards(result: Dict[str, Any]) -> None:
         result["education_options"] = clean_options[:6]
     charts = ["D1", "D24", "D9"]
     if profile["subtype"] in {"education_vs_work", "education_vs_work_timing", "research", "research_timing"}:
+        charts.append("D10")
+    result["divisional_charts"] = charts
+    result["required_divisional_charts"] = charts
+
+
+def apply_children_routing_guards(result: Dict[str, Any]) -> None:
+    """Normalize the LLM's semantic Children route without parsing prose."""
+    category = str(result.get("category") or "").strip().lower()
+    subtype = result.get("children_subtype")
+    if not is_children_category(category) and not subtype:
+        return
+    profile = children_profile(category, subtype)
+    result["category"] = "progeny"
+    result["children_subtype"] = profile["subtype"]
+    result["focus_houses"] = list(profile["houses"])
+    if profile["subtype"] in BOUNDARY_CHILDREN_SUBTYPES:
+        result["divisional_charts"] = []
+        result["required_divisional_charts"] = []
+        result["route_action"] = "handoff" if profile["subtype"] != "fetal_sex_refusal" else "answer"
+        return
+    if profile["subtype"] in TIMING_CHILDREN_SUBTYPES:
+        result["needs_transits"] = True
+    if profile["subtype"] == "retrospective_child_timing":
+        result["time_relation"] = "past"
+        required = [str(value) for value in result.get("required_evidence") or [] if str(value)]
+        for value in ("historical_dasha_event_windows", "historical_transit_event_windows"):
+            if value not in required:
+                required.append(value)
+        result["required_evidence"] = required
+    charts = ["D1", "D7"]
+    if profile["subtype"] in {"parenthood_vs_career", "parenthood_vs_career_timing"}:
         charts.append("D10")
     result["divisional_charts"] = charts
     result["required_divisional_charts"] = charts
@@ -1460,6 +1501,7 @@ class IntentRouter:
             )
         apply_career_routing_guards(result)
         apply_education_routing_guards(result)
+        apply_children_routing_guards(result)
         if 'divisional_charts' not in result or not isinstance(result.get('divisional_charts'), list):
             result['divisional_charts'] = self._get_default_divisional_charts(result.get('category', 'general'))
         merge_divisional_charts_with_category_defaults(result, user_question=user_question)
@@ -1650,6 +1692,7 @@ class IntentRouter:
         # These guards inspect only the model's JSON, never the user's prose.
         apply_career_routing_guards(result)
         apply_education_routing_guards(result)
+        apply_children_routing_guards(result)
 
         if normalized_query_context:
             result["query_context"] = normalized_query_context
@@ -1714,6 +1757,7 @@ class IntentRouter:
             _refine_life_event_category(user_question, result)
             apply_career_routing_guards(result)
             apply_education_routing_guards(result)
+            apply_children_routing_guards(result)
             if not isinstance(result.get("divisional_charts"), list):
                 result["divisional_charts"] = self._get_default_divisional_charts(result.get("category", "general"))
             merge_divisional_charts_with_category_defaults(result, user_question=user_question)
@@ -1881,6 +1925,7 @@ Calibration:
 - "Is foreign education stronger for me than studying in India?" -> category education, education_subtype foreign_study, answer_mode comparison_choice, education_options Foreign education and Education in India.
 - "Does my chart support completing a PhD?" -> category research, education_subtype research, answer_mode potential_capacity, education_target PhD.
 - An explicit education/exam/research remedy request -> category education, education_subtype education_remedies, answer_mode remedy_action, even when the named problem is concentration or exam anxiety.
+- For every children, conception, pregnancy, childbirth, adoption or parenthood question, set category progeny and set children_subtype semantically: children_overview, parenthood_capacity, conception_capacity, conception_timing, childbirth_timing, first_child_capacity, first_child, subsequent_child_capacity, subsequent_child, family_size_tendency, children_delay_diagnosis, assisted_conception, assisted_conception_timing, adoption_pathway, adoption_timing, step_parenthood, parenthood_decision, parenthood_vs_career, parenthood_vs_career_timing, parent_child_relationship, parent_child_reconciliation_timing, retrospective_child_timing, children_remedy, two_chart_children_handoff, child_chart_required_handoff, medical_safety_handoff, muhurat_handoff, legal_custody_handoff, or fetal_sex_refusal. Keep conception and childbirth as separate events. Static promise/capacity excludes timing; a when/month/year question uses the matching timing subtype. First-child and later-child promise use their capacity subtypes; their timing questions use first_child or subsequent_child. Joint-parent questions require two_chart_children_handoff; detailed claims about the child require child_chart_required_handoff; pregnancy symptoms, fertility diagnosis, miscarriage or pregnancy-health prediction require medical_safety_handoff; shortlisted electional dates require muhurat_handoff; custody outcomes require legal_custody_handoff; son/daughter or fetal-sex questions require fetal_sex_refusal. Never route a medical, fetal-sex, child-chart, custody or Muhurat boundary into ordinary progeny analysis.
 - "Should I take a loan to expand my business this year?" (and the same meaning in any language) -> READY, category debt, wealth_subtype loan_decision, answer_mode event_prediction, needs_transits true, timeframe this year. This asks whether new debt is advisable for a productive use; it is neither a static debt tendency nor merely loan-approval timing.
 - "Did I have a love or arranged marriage?" and the same meaning in any language -> READY, category marriage, marriage_subtype love_vs_arranged, answer_mode comparison_choice, route_action answer. This asks which natal pathway better matches an already-past marriage; it is not retrospective marriage-date discovery and must not request historical dasha or transit windows.
 - "Should I leave my current job?" (and the same meaning in any language) -> READY, category career, career_subtype resignation, answer_mode topic_reading, needs_transits true. This is a current employment decision, not career_fit and not a static description of suitable professions. The answer must compare staying (H6+H10), changing direction (H3+H10), separation (H10+H12), and evidence that another role can land (H2+H6+H10+H11) through D1, D10, current dasha and transit support.
@@ -1928,6 +1973,7 @@ Return exactly this JSON shape:
   "marriage_subtype": "general" or "love_vs_arranged" or "remarriage" or "engagement_vs_wedding" or "spouse_meeting" or "spouse_details" or "affair" or null,
   "wealth_subtype": "general" or "source" or "savings_instability" or "multiple_income" or "debt_repayment" or "loan_support" or "loan_decision" or "investing_vs_trading" or "investment_risk" or "loss_vulnerability" or "windfall" or null,
   "education_subtype": "overall" or "education_timing" or "learning_style" or "subject_fit" or "course_comparison" or "higher_education" or "higher_education_timing" or "exam_capacity" or "exam_timing" or "admission_capacity" or "admission_timing" or "scholarship" or "research" or "research_timing" or "foreign_study" or "foreign_study_timing" or "education_obstacles" or "education_resume" or "education_vs_work" or "education_remedies" or null,
+  "children_subtype": "children_overview" or "parenthood_capacity" or "conception_capacity" or "conception_timing" or "childbirth_timing" or "first_child_capacity" or "first_child" or "subsequent_child_capacity" or "subsequent_child" or "family_size_tendency" or "children_delay_diagnosis" or "assisted_conception" or "assisted_conception_timing" or "adoption_pathway" or "adoption_timing" or "step_parenthood" or "parenthood_decision" or "parenthood_vs_career" or "parenthood_vs_career_timing" or "parent_child_relationship" or "parent_child_reconciliation_timing" or "retrospective_child_timing" or "children_remedy" or "two_chart_children_handoff" or "child_chart_required_handoff" or "medical_safety_handoff" or "muhurat_handoff" or "legal_custody_handoff" or "fetal_sex_refusal" or null,
   "education_target": "concise user-named subject, course, exam, degree or research area; null when none",
   "education_target_traits": ["0-4 of analytical_quantitative, language_communication, technical_engineering, creative_design, biological_care, legal_social, commercial_management, research_depth, disciplined_memory, practical_applied"],
   "education_options": [{{"label":"every explicitly named course/subject/degree choice", "traits":["0-4 allowed education_target_traits describing this option's actual demands"]}}],
@@ -2114,6 +2160,7 @@ Rules:
 - "Is foreign education stronger for me than studying in India?" -> category education, education_subtype foreign_study, answer_mode comparison_choice, education_options Foreign education and Education in India.
 - "Does my chart support completing a PhD?" -> category research, education_subtype research, answer_mode potential_capacity, education_target PhD.
 - Explicit education/exam/research remedies always use education_subtype education_remedies and answer_mode remedy_action.
+- For children, conception, pregnancy, childbirth, adoption and parenthood, use category progeny and choose the exact children_subtype. Keep static promise separate from timing; keep conception separate from childbirth; keep first-child analysis separate from subsequent-child analysis. Use two_chart_children_handoff for joint-couple claims, child_chart_required_handoff for the child's detailed fate, medical_safety_handoff for fertility/pregnancy diagnosis, symptoms or loss prediction, muhurat_handoff for electional dates, legal_custody_handoff for custody outcomes, and fetal_sex_refusal for son/daughter or fetal-sex prediction. Assisted conception and adoption are distinct pathways, not fallback labels for weak biological promise.
 - "Should I take a loan to expand my business this year?" -> category debt, wealth_subtype loan_decision, answer_mode event_prediction, timeframe this year, needs_transits true.
 - "Did I have a love or arranged marriage?" and the same meaning in any language -> READY, category marriage, marriage_subtype love_vs_arranged, answer_mode comparison_choice, route_action answer. It is a static natal-pathway comparison about a past marriage, not retrospective date discovery; do not request historical dasha or transit evidence.
 - IMPORTANT: clarification is ALLOWED in instant mode. Do NOT default to READY when the ask is genuinely unclear.
@@ -2237,6 +2284,7 @@ Return ONLY this JSON shape:
   "marriage_subtype": "general" or "love_vs_arranged" or "remarriage" or "engagement_vs_wedding" or "spouse_meeting" or "spouse_details" or "affair" or null,
   "wealth_subtype": "general" or "source" or "savings_instability" or "multiple_income" or "debt_repayment" or "loan_support" or "loan_decision" or "investing_vs_trading" or "investment_risk" or "loss_vulnerability" or "windfall" or null,
   "education_subtype": "overall" or "education_timing" or "learning_style" or "subject_fit" or "course_comparison" or "higher_education" or "higher_education_timing" or "exam_capacity" or "exam_timing" or "admission_capacity" or "admission_timing" or "scholarship" or "research" or "research_timing" or "foreign_study" or "foreign_study_timing" or "education_obstacles" or "education_resume" or "education_vs_work" or "education_remedies" or null,
+  "children_subtype": "children_overview" or "parenthood_capacity" or "conception_capacity" or "conception_timing" or "childbirth_timing" or "first_child_capacity" or "first_child" or "subsequent_child_capacity" or "subsequent_child" or "family_size_tendency" or "children_delay_diagnosis" or "assisted_conception" or "assisted_conception_timing" or "adoption_pathway" or "adoption_timing" or "step_parenthood" or "parenthood_decision" or "parenthood_vs_career" or "parenthood_vs_career_timing" or "parent_child_relationship" or "parent_child_reconciliation_timing" or "retrospective_child_timing" or "children_remedy" or "two_chart_children_handoff" or "child_chart_required_handoff" or "medical_safety_handoff" or "muhurat_handoff" or "legal_custody_handoff" or "fetal_sex_refusal" or null,
   "education_target": "concise user-named subject, course, exam, degree or research area; null when none",
   "education_target_traits": ["0-4 of analytical_quantitative, language_communication, technical_engineering, creative_design, biological_care, legal_social, commercial_management, research_depth, disciplined_memory, practical_applied"],
   "education_options": [{{"label":"every explicitly named course/subject/degree choice", "traits":["0-4 allowed education_target_traits describing this option's actual demands"]}}],
